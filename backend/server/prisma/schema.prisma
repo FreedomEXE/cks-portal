@@ -1,0 +1,32 @@
+// Prisma schema (initial) — mirrors portions of existing Postgres tables.
+// Adjust models to match your actual database (introspect with: npx prisma db pull)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL_PRISMA")
+}
+
+model AppUser {
+  clerk_user_id String  @id
+  email         String? @db.VarChar(255)
+  role          String  @db.VarChar(32)
+  internal_code String  @db.VarChar(64)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+}
+
+// Example entity tables (simplified) — refine types accordingly
+model Crew {
+  crew_id         String  @id
+  name            String?
+  status          String?
+  role            String?
+  address         String?
+  phone           String?
+  email           String?
+  assigned_center String?
+}

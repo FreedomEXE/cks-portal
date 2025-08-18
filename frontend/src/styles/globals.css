@@ -1,0 +1,17 @@
+/* Base layer is imported from src/index.css using @tailwind base */
+
+/* App base tokens */
+:root {
+  --radius: 0.875rem;
+}
+
+@layer base {
+  html, body, #root {
+    height: 100%;
+  color: #181b22;
+  background: #ffffff;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  }
+  body { margin: 0; }
+}

@@ -1,0 +1,9 @@
+{
+  "name": "cks-portal-backend-root",
+  "private": true,
+  "scripts": {
+    "api:dev": "npm --prefix server run dev",
+    "api:build": "npm --prefix server run build",
+    "api:start": "npm --prefix server run start"
+  }
+}
