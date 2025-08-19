@@ -1,5 +1,17 @@
 /**
- * CKS Portal — Manager Profile Tabs Config (initial)
+TRACE
+OutboundImports: none (plain config file)
+InboundUsedBy: frontend/src/components/ProfileTabs.tsx, frontend/src/pages/Hubs/Manager/ManagerProfile.tsx
++ProvidesData: tabs[] configuration (label + columns[])
++ConsumesData: none (export only)
++SideEffects: none
++RoleBranching: none (static config)
++CriticalForManagerProfile: yes (drives which tabs & columns are shown)
++SimplificationRisk: low/med (lots of fields; can be trimmed for manager-only view)
++*/
+
+/**
+ * CKS Portal  Manager Profile Tabs Config (initial)
  * Built from Ecosystem Files CSV headers for MGR-001.
  */
 export type ProfileTab = { label: string; columns: { key: string; label: string }[] };
@@ -89,3 +101,5 @@ export const managerTabsConfig: ProfileTab[] = [
 ];
 
 export default managerTabsConfig;
+
+// MANAGER_TABS_CONFIG_REQUIREMENTS // ExpectedTabIds: profile, centers, crew, services, jobs, training, performance, supplies-equipment // TabHeadings: Profile -> [Full Name, Reports To, Manager ID, Role, Start Date, Years with Company, Primary Region, Email, Languages, Phone, Emergency Contact, Home Address, LinkedIn, Status, Availability, Preferred Areas, QR Code, Synced], Centers -> [Center ID, Center Name, Role, Procedures, Assigned Since, Status], Crew -> [Crew ID, Name, Role, Status, Start Date, Shift, Duties, Custom Procedure, Frequency, Notes], Services -> [Service ID, Service Name, Experience, Proficiency, Certifications], Jobs -> [Job ID, Service Name, Date, Status, Notes], Training -> [Training ID, Service, Date Completed, Last Refresher, Expires On, Type, Days to Complete, Status], Performance -> [Performance ID, Reviewed By, Year, Reliability Score, Avg Rating, Feedback Incidents, Notes], Supplies/Equipment -> [Item, Issued, Location, Status, Condition, Notes] // MissingOrUnused: none identified in config file itself

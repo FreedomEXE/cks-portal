@@ -203,3 +203,5 @@ function safeGet(key: string): string | null {
     return null;
   }
 }
+
+// MANAGER_MIN_REQUIRED_STATE // FieldsNeeded: manager_id, name, code (optional: email, phone, center_id) // MinimalHookSignature: // interface ManagerMeState { loading: boolean; error: string|null; kind: 'manager'|''; // data: null | { manager_id: string; name: string; email?: string; phone?: string; center?: string }; refetch(): void; } // ProposedNextHookName: useManagerProfileData // Notes: Suggest removing multi-endpoint fallbacks and localStorage reliance for manager-only hook; keep debug logging optional behind a flag.

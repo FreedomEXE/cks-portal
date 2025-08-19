@@ -79,3 +79,5 @@ export default function ManagerProfile({ data }: { data: any }) {
 - Do NOT change runtime logic now; implement the above as a documented plan and migrate incrementally.
 +
 */
+
+// MANAGER_TABS_CONFIG_REQUIREMENTS // ExpectedTabIds: Profile, Centers, Crew, Services, Jobs, Training, Performance, Supplies/Equipment // TabHeadings: see managerTabs.config.ts (Profile has Full Name, Reports To, Manager ID, Role, etc.) // MissingOrUnused: none

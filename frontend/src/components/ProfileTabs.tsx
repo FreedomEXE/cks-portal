@@ -1,3 +1,15 @@
+/**
+TRACE
+OutboundImports: ./AdminTable, ./ProfilePhoto
++InboundUsedBy: frontend/src/pages/Hubs/Manager/ManagerProfile.tsx, frontend/src/pages/Hubs/Center/CenterProfile.tsx, frontend/src/pages/Hubs/Customer/CustomerProfile.tsx, others
++ProvidesData: UI component rendering tabs and table-like views based on `tabs` prop
++ConsumesData: tabs[].columns[].key & label, subject.kind, subject.code, subject.name
++SideEffects: none (local state only)
++RoleBranching: renders different layouts for 'Profile' tab vs others (AdminTable)
++CriticalForManagerProfile: yes (renders manager tabs and columns)
++SimplificationRisk: med (contains generic behavior including Profile photo and AdminTable complexity)
++*/
+
 import { useState } from "react";
 import AdminTable from "./AdminTable";
 import ProfilePhoto from "./ProfilePhoto";
@@ -9,6 +21,8 @@ type SubjectMeta = { kind: string; code?: string; name?: string };
 function slugify(label: string) {
   return label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 }
+
+// PROFILETABS_MANAGER_USAGE // PropsConsumedForManager: tabs (labels+columns), subject (kind, code, name) // GenericComplexityRisk: medium - contains photo + admin table logic which may be unnecessary for manager-only variant // SimplifySurfaceForManager: subject.name (used in ProfilePhoto), columns list (could be passed reduced), AdminTable fallback (could be replaced with empty state for manager-only)
 
 export default function ProfileTabs({ tabs, subject }: { tabs: Tab[]; subject?: SubjectMeta }) {
   const [active, setActive] = useState(0);
