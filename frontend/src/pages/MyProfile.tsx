@@ -15,12 +15,12 @@ import { useLocation, useParams, Navigate } from "react-router-dom";
 import { useEffect } from "react";
 import Skeleton from "../components/Skeleton";
 import useMeProfile from "../hooks/useMeProfile";
-import CenterProfile from "./Hubs/Center/CenterProfile";
-import CrewProfile from "./Hubs/Crew/CrewProfile";
-import ContractorProfile from "./Hubs/Contractor/ContractorProfile";
-import CustomerProfile from "./Hubs/Customer/CustomerProfile";
+import CenterProfile from "./Hub/Center/Profile/CenterProfile";
+import CrewProfile from "./Hub/Crew/Profile/CrewProfile";
+import ContractorProfile from "./Hub/Contractor/Profile/ContractorProfile";
+import CustomerProfile from "./Hub/Customer/Profile/CustomerProfile";
 import ProfileCard from "../components/ProfileCard";
-import ManagerProfile from "./Hubs/Manager/ManagerProfile";
+import ManagerProfile from "./Hub/Manager/Profile/ManagerProfile";
 import getRole from "../lib/getRole";
 import { useUser } from "@clerk/clerk-react";
 

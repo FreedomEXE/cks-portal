@@ -16,11 +16,13 @@ function HubCard({ title, subtitle, onClick }: { title: string; subtitle?: strin
 export default function CrewHub() {
   const navigate = useNavigate();
   const state = useMeProfile();
-  const code = state.data?.crew_id || state.data?.code || 'crew';
-  const name = state.data?.name || 'Crew';
+  const storedCode = (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('me:lastCode') : '') || '';
+  const rawCode = storedCode || state.data?.crew_id || state.data?.code || 'crw-000';
+  const code = String(rawCode);
+  const name = state.data?.name || 'Crew Demo';
 
   useEffect(() => {
-    if (!state.loading && !state.error && code) {
+  if (!state.loading && !state.error && code && !['crew','crw-000'].includes(code)) {
       try {
         sessionStorage.setItem('me:lastRole', 'crew');
         sessionStorage.setItem('me:lastCode', code);

@@ -1,18 +1,27 @@
 import Page from '../../../components/Page';
-import { UserButton } from '@clerk/clerk-react';
 import { useNavigate } from 'react-router-dom';
 import useMeProfile from '../../../hooks/useMeProfile';
-import { deriveCodeFrom, displayNameFrom } from '../../../utils/profileCode';
 import Skeleton from '../../../components/Skeleton';
 import NewsPreview from '../../../components/NewsPreview';
 import HubLink from '../../../components/ui/HubLink';
+import React, { useEffect } from 'react';
 
 export default function ManagerHub() {
   const navigate = useNavigate();
   const state = useMeProfile();
-  const code = deriveCodeFrom(state.kind, state.data);
-  const name = displayNameFrom(state.kind, state.data) || 'Name';
-  const codeOrPlaceholder = code || 'ID';
+  const storedCode = (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('me:lastCode') : '') || '';
+  const rawCode = storedCode || (state.data as any)?.manager_id || (state.data as any)?.code || 'mgr-000';
+  const code = String(rawCode);
+  const name = (state.data as any)?.name || 'Manager';
+
+  useEffect(() => {
+    if (!state.loading && !state.error && code && code !== 'mgr-000') {
+      try {
+        sessionStorage.setItem('me:lastRole', 'manager');
+        sessionStorage.setItem('me:lastCode', code);
+      } catch {}
+    }
+  }, [state.loading, state.error, code]);
 
   if (state.loading) return <Page title={'Manager Hub'}><Skeleton lines={6} /></Page>;
   const errorBanner = state.error ? <div style={{padding:12, color:'#b91c1c'}}>Error: {state.error}</div> : null;
@@ -20,10 +29,20 @@ export default function ManagerHub() {
   return (
     <Page
       title={'Manager Hub'}
-      right={<UserButton afterSignOutUrl="/login" />}
+      right={
+        <button
+          className="ui-button"
+            style={{ padding: '10px 16px', fontSize: 14 }}
+            onClick={() => navigate('/logout')}
+            aria-label="Log out"
+            title="Log out"
+        >
+          Log out
+        </button>
+      }
     >
       {errorBanner}
-      <div style={{fontSize:14, color:'#374151', marginTop:4}}>Welcome, {name} ({codeOrPlaceholder})!</div>
+  <div style={{fontSize:14, color:'#374151', marginTop:4}}>Welcome, {name} ({code})!</div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginTop: 16 }}>
         <HubCard hub={code} sub="profile" label="Profile" />
         <HubCard hub={code} sub="centers" label="Centers" />

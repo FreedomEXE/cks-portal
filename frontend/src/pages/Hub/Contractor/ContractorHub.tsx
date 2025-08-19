@@ -16,11 +16,13 @@ function HubCard({ title, subtitle, onClick }: { title: string; subtitle?: strin
 export default function ContractorHub() {
   const navigate = useNavigate();
   const state = useMeProfile();
-  const code = state.data?.contractor_id || state.data?.code || 'contractor';
-  const name = state.data?.company_name || state.data?.name || 'Contractor';
+  const storedCode = (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('me:lastCode') : '') || '';
+  const rawCode = storedCode || state.data?.contractor_id || state.data?.code || 'con-000';
+  const code = String(rawCode);
+  const name = state.data?.company_name || state.data?.name || 'Contractor Demo';
 
   useEffect(() => {
-    if (!state.loading && !state.error && code) {
+  if (!state.loading && !state.error && code && !['contractor','con-000'].includes(code)) {
       try {
         sessionStorage.setItem('me:lastRole', 'contractor');
         sessionStorage.setItem('me:lastCode', code);

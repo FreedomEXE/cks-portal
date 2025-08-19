@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import Page from '../../../components/Page';
-import ManagerProfilePage from './ManagerProfilePage';
+import ManagerProfilePage from '../../Hub/Manager/Profile/ManagerProfilePage';
 
 export default function ManagerProfileParitySmoke() {
   const [baseline, setBaseline] = useState<any>(null);

@@ -2,7 +2,7 @@ import React from 'react';
 import Page from '../../../../components/Page';
 import { useUser } from '@clerk/clerk-react';
 import useMeProfile from '../../../../hooks/useMeProfile';
-import ManagerProfile from '../../../Hubs/Manager/ManagerProfile';
+import ManagerProfile from './ManagerProfile';
 import UserWidget from '../../../../components/UserWidget';
 
 // Internal lightweight adapter to ensure we only show loading until we have (or stub) manager data

@@ -23,15 +23,19 @@ import { useNavigate } from "react-router-dom";
 import { useUser } from '@clerk/clerk-react';
 import HubLink from "../../../components/ui/HubLink";
 import getRole from "../../../lib/getRole";
+import useMeProfile from '../../../hooks/useMeProfile';
 
 export default function AdminHub() {
   const navigate = useNavigate();
   const { user } = useUser() as any;
+  const state = useMeProfile();
   const username = user?.username ?? null;
   const hubFromStorage = (typeof window !== 'undefined' ? (sessionStorage.getItem('code') || sessionStorage.getItem('role')) : null) as string | null;
   const hub = (username || hubFromStorage || 'admin').toLowerCase();
   const role = getRole(user) || '';
   const hubTitle = role === 'manager' ? 'ManagerHub' : 'AdminHub';
+  const storedCode = (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('me:lastCode') : '') || '';
+  const code = storedCode || (state as any)?.data?.username || username || 'admin';
 
   return (
     <Page
@@ -48,7 +52,8 @@ export default function AdminHub() {
         </button>
       }
     >
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 16, marginTop: 12 }}>
+  <div style={{ fontSize: 14, color: '#374151', marginTop: 4 }}>Welcome, Admin ({code})!</div>
+  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 16, marginTop: 12 }}>
           <>
             <HubCard hub={hub} sub="directory" label="Directory" />
             <HubCard hub={hub} sub="create" label="Create" />

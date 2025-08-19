@@ -2,8 +2,7 @@ import React from 'react';
 import { useUser } from '@clerk/clerk-react';
 
 import AdminHub from './Admin/AdminHub';
-import ManagerHubRoutes from './Manager/HubRoutes';            // New manager implementation
-import LegacyManagerHub from '../Hubs/Manager/ManagerHub';     // Legacy fallback (retain until removal)
+import ManagerHub from './Manager/ManagerHub';                 // Simple manager hub
 import getRole from '../../lib/getRole';
 import CenterHub from './Center/CenterHub';
 import ContractorHub from './Contractor/ContractorHub';
@@ -15,9 +14,6 @@ const USE_NEW_ADMIN_UI =
   (import.meta.env.USE_NEW_ADMIN_UI === 'true') ||
   (import.meta.env.VITE_USE_NEW_ADMIN_UI === 'true');
 
-const USE_NEW_MANAGER_HUB =
-  (import.meta.env.USE_NEW_MANAGER_HUB === 'true') ||
-  (import.meta.env.VITE_USE_NEW_MANAGER_HUB === 'true');
 
 // Feature flags for other roles (easy rollback if needed)
 const USE_NEW_CENTER_HUB =
@@ -44,7 +40,6 @@ export default function HubRoleRouter() {
         rawRole: getRole(user),
         normalized: role,
         USE_NEW_ADMIN_UI,
-        USE_NEW_MANAGER_HUB,
         USE_NEW_CENTER_HUB,
         USE_NEW_CONTRACTOR_HUB,
         USE_NEW_CREW_HUB,
@@ -55,7 +50,7 @@ export default function HubRoleRouter() {
   }
 
   // Role routing (manager first to preserve legacy toggle semantics)
-  if (role === 'manager') return USE_NEW_MANAGER_HUB ? <ManagerHubRoutes /> : <LegacyManagerHub />;
+  if (role === 'manager') return <ManagerHub />;
   if (role === 'admin') return <AdminHub />;
   if (role === 'center') return USE_NEW_CENTER_HUB ? <CenterHub /> : <AdminHub />;
   if (role === 'contractor') return USE_NEW_CONTRACTOR_HUB ? <ContractorHub /> : <AdminHub />;

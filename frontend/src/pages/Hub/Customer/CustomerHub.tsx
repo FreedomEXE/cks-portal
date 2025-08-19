@@ -16,11 +16,13 @@ function HubCard({ title, subtitle, onClick }: { title: string; subtitle?: strin
 export default function CustomerHub() {
   const navigate = useNavigate();
   const state = useMeProfile();
-  const code = state.data?.customer_id || state.data?.code || 'customer';
-  const name = state.data?.company_name || state.data?.name || 'Customer';
+  const storedCode = (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('me:lastCode') : '') || '';
+  const rawCode = storedCode || state.data?.customer_id || state.data?.code || 'cus-000';
+  const code = String(rawCode);
+  const name = state.data?.company_name || state.data?.name || 'Customer Demo';
 
   useEffect(() => {
-    if (!state.loading && !state.error && code) {
+  if (!state.loading && !state.error && code && !['customer','cus-000'].includes(code)) {
       try {
         sessionStorage.setItem('me:lastRole', 'customer');
         sessionStorage.setItem('me:lastCode', code);

@@ -9,7 +9,7 @@
 
 import React from "react";
 import useManagerProfileData from "../../../hooks/useManagerProfileData";
-import ManagerProfile from "./ManagerProfile";
+import ManagerProfile from "../../Hub/Manager/Profile/ManagerProfile";
 import Skeleton from "../../../components/Skeleton";
 import Page from "../../../components/Page";
 

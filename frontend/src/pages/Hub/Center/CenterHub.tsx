@@ -17,11 +17,13 @@ function HubCard({ title, subtitle, onClick }: { title: string; subtitle?: strin
 export default function CenterHub() {
   const navigate = useNavigate();
   const state = useMeProfile();
-  const code = state.data?.center_id || state.data?.code || 'center';
-  const name = state.data?.name || 'Center';
+  const storedCode = (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('me:lastCode') : '') || '';
+  const rawCode = storedCode || state.data?.center_id || state.data?.code || 'ctr-000';
+  const code = String(rawCode);
+  const name = state.data?.name || 'Center Demo';
 
   useEffect(() => {
-    if (!state.loading && !state.error && code) {
+  if (!state.loading && !state.error && code && !['center','ctr-000'].includes(code)) {
       try {
         sessionStorage.setItem('me:lastRole', 'center');
         sessionStorage.setItem('me:lastCode', code);
