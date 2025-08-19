@@ -127,3 +127,21 @@ function withOverrideData(kind: string, code: string, data: any) {
 			return d;
 	}
 }
+
+/*
+// MANAGER_BRANCH_EXTRACT
+
+/* Extracted manager-only rendering snippet (for analysis). This is a verbatim extraction of the code path that renders when resolvedKind === 'manager'. Supporting helper `withOverrideData` is defined above and is referenced for `effectiveData`.
+
+const resolvedKind = 'manager';
+const effectiveData = withOverrideData('manager', codeOverride || '', state.data);
+
+let content: React.ReactNode = null;
+if (resolvedKind === "manager") {
+	content = <ManagerProfile data={effectiveData} />;
+}
+
+// Notes:
+// - `effectiveData` should provide { manager_id, code, name } minimal shape.
+// - This snippet excludes other roles and error handling; it assumes `state` and `codeOverride` are in-scope as in the original file.
+*/
