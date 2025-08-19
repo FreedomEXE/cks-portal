@@ -46,17 +46,59 @@ SimplifyDrop:
 
 */
 
+import React, { useEffect, useRef } from "react";
 import ProfileTabs from "../../../components/ProfileTabs";
 import managerTabsConfig from "../../../components/profiles/managerTabs.config";
+import { computeManagerProfileSignature } from "../../../lib/managerProfileSignature";
 
 export default function ManagerProfile({ data }: { data: any }) {
+  const lastLoggedRef = useRef<Record<string, boolean>>({});
   if (!data) return null;
+
+  // Handler passed to ProfileTabs; gathers active labels/columns from the tabs component for shadowing
+  function handleTabSignature(payload: any) {
+    // payload: { tabs, active, activeLabel, columns }
+    // Attach this info to window.__mgrProfileLastColumns for debugging if needed
+    try {
+      (window as any).__mgrProfileLastColumns = payload;
+    } catch {}
+    }
+
+    useEffect(() => {
+    try {
+      const signature = computeManagerProfileSignature({
+        subject: { kind: 'manager', code: data?.manager_id, name: data?.name },
+        tabs: managerTabsConfig,
+      });
+      try { (window as any).__mgrProfileLast = signature; } catch {}
+
+      // If baseline not present and we have a manager_id, set baseline once
+      try {
+        const w = window as any;
+        if (typeof w.__mgrProfileBaseline === 'undefined' && data?.manager_id) {
+          w.__mgrProfileBaseline = signature;
+        }
+      } catch {}
+
+      // Console.debug once per subjectCode
+      const loggedKey = signature.subjectCode || '__no_code__';
+      if (!lastLoggedRef.current[loggedKey]) {
+        try {
+          console.debug('[mgrProfile] signature', { hash: signature.hash, tabCount: signature.tabCount, profileCols: signature.profileTabColumnLabels.length, subjectCode: signature.subjectCode });
+        } catch {}
+        lastLoggedRef.current[loggedKey] = true;
+      }
+    } catch (e) {
+      try { console.debug('[mgrProfile] signature error', String(e)); } catch {}
+    }
+  }, [data]);
   return (
-    <div>
+    <div data-manager-profile-root>
       {/* No header card per recent requirement; only tabs and table headings */}
       <ProfileTabs
         tabs={managerTabsConfig}
         subject={{ kind: 'manager', code: data?.manager_id, name: data?.name }}
+        onSignature={handleTabSignature}
       />
     </div>
   );

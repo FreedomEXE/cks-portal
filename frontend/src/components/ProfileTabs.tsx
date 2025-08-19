@@ -10,7 +10,7 @@ OutboundImports: ./AdminTable, ./ProfilePhoto
 +SimplificationRisk: med (contains generic behavior including Profile photo and AdminTable complexity)
 +*/
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import AdminTable from "./AdminTable";
 import ProfilePhoto from "./ProfilePhoto";
 
@@ -18,17 +18,39 @@ type Column = { key: string; label: string };
 type Tab = { label: string; columns: Column[] };
 type SubjectMeta = { kind: string; code?: string; name?: string };
 
+type SignaturePayload = { tabs: string[]; active: number; activeLabel: string; columns: string[] };
+
 function slugify(label: string) {
   return label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 }
 
 // PROFILETABS_MANAGER_USAGE // PropsConsumedForManager: tabs (labels+columns), subject (kind, code, name) // GenericComplexityRisk: medium - contains photo + admin table logic which may be unnecessary for manager-only variant // SimplifySurfaceForManager: subject.name (used in ProfilePhoto), columns list (could be passed reduced), AdminTable fallback (could be replaced with empty state for manager-only)
 
-export default function ProfileTabs({ tabs, subject }: { tabs: Tab[]; subject?: SubjectMeta }) {
+export default function ProfileTabs({ tabs, subject, onSignature }: { tabs: Tab[]; subject?: SubjectMeta; onSignature?: (p: SignaturePayload) => void }) {
   const [active, setActive] = useState(0);
 
   const current = tabs[active] || tabs[0];
   const columns = (current?.columns || []).map((c) => ({ key: (c.key as string) || slugify(c.label), label: c.label }));
+
+  useEffect(() => {
+    if (typeof onSignature !== "function") return;
+    if (subject?.kind !== "manager") return;
+
+    const payload: SignaturePayload = {
+      tabs: tabs.map((t) => t.label),
+      active,
+      activeLabel: current?.label || "",
+      columns: (current?.columns || []).map((c) => c.label),
+    };
+
+    try {
+      onSignature(payload);
+    } catch (e) {
+      // non-fatal
+    }
+    // only run when active/tabs/subject.kind change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, subject?.kind, tabs]);
 
   return (
     <div style={{ marginTop: 16 }}>

@@ -11,7 +11,7 @@ OutboundImports: ../components/Page, ../hooks/useMeProfile, ./Hubs/Center/Center
 +*/
 import Page from "../components/Page";
 import React from "react";
-import { useLocation, useParams } from "react-router-dom";
+import { useLocation, useParams, Navigate } from "react-router-dom";
 import { useEffect } from "react";
 import Skeleton from "../components/Skeleton";
 import useMeProfile from "../hooks/useMeProfile";
@@ -81,7 +81,8 @@ export default function MyProfilePage() {
 	} else if (resolvedKind === "customer") {
 		content = <CustomerProfile data={effectiveData} showHeader={false} />;
 	} else if (resolvedKind === "manager") {
-		content = <ManagerProfile data={effectiveData} />;
+		// Manager profiles are served from the dedicated manager page; redirect there.
+		content = <Navigate to="/hubs/manager/profile" replace />;
 	} else if (resolvedKind === "admin") {
 		// If we somehow fell back to admin but have a remembered non-admin context in storage
 		// prefer to show a neutral card instead of a misleading admin-only message.

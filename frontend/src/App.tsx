@@ -61,7 +61,8 @@ import { useLocation } from "react-router-dom";
 import { SignedIn } from "@clerk/clerk-react";
 import MePage from './pages/MePage';
 import MyProfilePage from './pages/MyProfile';
-import ManagerProfilePage from './pages/Hub/Manager/Profile/ManagerProfilePage';
+import ManagerProfilePage from './pages/Hubs/Manager/ManagerProfilePage';
+import ManagerProfileParitySmoke from './pages/Hubs/Manager/ManagerProfileParitySmoke';
 import getRole from './lib/getRole';
 // RoleProfile/ProfileRoute removed after inlining My Profile into hubs
 import HubRouter from './pages/HubRouter';
@@ -123,6 +124,8 @@ export default function App() {
           <Route path="/auth/redirect" element={<AfterSignIn />} />
           {/* In-hub profile page (preferred URL) */}
           <Route path="/hubs/:role/profile" element={<MyProfilePage />} />
+          <Route path="/hubs/manager/profile" element={<ManagerProfilePage />} />
+          <Route path="/hubs/manager/parity-smoke" element={<ManagerProfileParitySmoke />} />
           <Route path="/:username/hub/profile" element={profileElement} />
           {/* Redirect generic /hub to username-scoped hub if we have a stored identity */}
           <Route path="/hub" element={<Navigate to={(function(){
