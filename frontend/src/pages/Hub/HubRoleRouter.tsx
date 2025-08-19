@@ -3,8 +3,12 @@ import { useUser } from '@clerk/clerk-react';
 
 import AdminHub from './Admin/AdminHub';
 import ManagerHubRoutes from './Manager/HubRoutes';            // New manager implementation
-import LegacyManagerHub from '../Hubs/Manager/ManagerHub';     // Legacy “MyHub” implementation
+import LegacyManagerHub from '../Hubs/Manager/ManagerHub';     // Legacy fallback (retain until removal)
 import getRole from '../../lib/getRole';
+import CenterHub from './Center/CenterHub';
+import ContractorHub from './Contractor/ContractorHub';
+import CrewHub from './Crew/CrewHub';
+import CustomerHub from './Customer/CustomerHub';
 
 // Feature flags (support raw + Vite-prefixed for flexibility)
 const USE_NEW_ADMIN_UI =
@@ -15,31 +19,49 @@ const USE_NEW_MANAGER_HUB =
   (import.meta.env.USE_NEW_MANAGER_HUB === 'true') ||
   (import.meta.env.VITE_USE_NEW_MANAGER_HUB === 'true');
 
+// Feature flags for other roles (easy rollback if needed)
+const USE_NEW_CENTER_HUB =
+  (import.meta.env.USE_NEW_CENTER_HUB === 'true') ||
+  (import.meta.env.VITE_USE_NEW_CENTER_HUB === 'true') || true; // default on
+const USE_NEW_CONTRACTOR_HUB =
+  (import.meta.env.USE_NEW_CONTRACTOR_HUB === 'true') ||
+  (import.meta.env.VITE_USE_NEW_CONTRACTOR_HUB === 'true') || true;
+const USE_NEW_CREW_HUB =
+  (import.meta.env.USE_NEW_CREW_HUB === 'true') ||
+  (import.meta.env.VITE_USE_NEW_CREW_HUB === 'true') || true;
+const USE_NEW_CUSTOMER_HUB =
+  (import.meta.env.USE_NEW_CUSTOMER_HUB === 'true') ||
+  (import.meta.env.VITE_USE_NEW_CUSTOMER_HUB === 'true') || true;
+
 export default function HubRoleRouter() {
   const { user } = useUser();
   const role = (getRole(user) || '').toLowerCase();
 
   if (typeof window !== 'undefined') {
-    // eslint-disable-next-line no-console
-    console.log('[HubRoleRouter debug]', {
-      rawRole: getRole(user),
-      normalized: role,
-      USE_NEW_ADMIN_UI,
-      USE_NEW_MANAGER_HUB,
-      chosen: role === 'manager'
-        ? (USE_NEW_MANAGER_HUB ? 'NEW ManagerHubRoutes' : 'LEGACY ManagerHub')
-        : 'AdminHub (fallback)'
-    });
+    try {
+      // eslint-disable-next-line no-console
+      console.log('[HubRoleRouter debug]', {
+        rawRole: getRole(user),
+        normalized: role,
+        USE_NEW_ADMIN_UI,
+        USE_NEW_MANAGER_HUB,
+        USE_NEW_CENTER_HUB,
+        USE_NEW_CONTRACTOR_HUB,
+        USE_NEW_CREW_HUB,
+        USE_NEW_CUSTOMER_HUB,
+        chosen: role || 'none'
+      });
+    } catch {}
   }
 
-  // Manager branch first so admin UI flag doesn’t suppress manager testing
-  if (role === 'manager') {
-    return USE_NEW_MANAGER_HUB ? <ManagerHubRoutes /> : <LegacyManagerHub />;
-  }
+  // Role routing (manager first to preserve legacy toggle semantics)
+  if (role === 'manager') return USE_NEW_MANAGER_HUB ? <ManagerHubRoutes /> : <LegacyManagerHub />;
+  if (role === 'admin') return <AdminHub />;
+  if (role === 'center') return USE_NEW_CENTER_HUB ? <CenterHub /> : <AdminHub />;
+  if (role === 'contractor') return USE_NEW_CONTRACTOR_HUB ? <ContractorHub /> : <AdminHub />;
+  if (role === 'crew') return USE_NEW_CREW_HUB ? <CrewHub /> : <AdminHub />;
+  if (role === 'customer') return USE_NEW_CUSTOMER_HUB ? <CustomerHub /> : <AdminHub />;
 
-  // (Optional) If you really want to force legacy Admin UI override for all non-managers when disabled:
-  // if (!USE_NEW_ADMIN_UI) return <AdminHub />;
-
-  // Default / Admin
+  // Unknown role fallback
   return <AdminHub />;
 }

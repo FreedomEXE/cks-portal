@@ -315,10 +315,27 @@ export default function App() {
           })()} replace />} />
           <Route path="/admin/users" element={<AdminUsers />} />
           <Route path="/admin/:section" element={<DirectoryPage />} />
-          <Route path="/hubs/center" element={<CenterHub />} />
-          <Route path="/hubs/contractor" element={<ContractorHub />} />
-          <Route path="/hubs/crew" element={<CrewHub />} />
-          <Route path="/hubs/customer" element={<CustomerHub />} />
+          {/* Legacy plural hub routes -> redirect to unified pattern */}
+          <Route path="/hubs/center" element={<Navigate to={(function(){
+            try {
+              const code = (sessionStorage.getItem('me:lastCode')||'').toLowerCase();
+              return `/${code || 'center'}/hub`;
+            } catch {} return '/center/hub';})()} replace />} />
+          <Route path="/hubs/contractor" element={<Navigate to={(function(){
+            try {
+              const code = (sessionStorage.getItem('me:lastCode')||'').toLowerCase();
+              return `/${code || 'contractor'}/hub`;
+            } catch {} return '/contractor/hub';})()} replace />} />
+          <Route path="/hubs/crew" element={<Navigate to={(function(){
+            try {
+              const code = (sessionStorage.getItem('me:lastCode')||'').toLowerCase();
+              return `/${code || 'crew'}/hub`;
+            } catch {} return '/crew/hub';})()} replace />} />
+          <Route path="/hubs/customer" element={<Navigate to={(function(){
+            try {
+              const code = (sessionStorage.getItem('me:lastCode')||'').toLowerCase();
+              return `/${code || 'customer'}/hub`;
+            } catch {} return '/customer/hub';})()} replace />} />
           {/* Legacy Manager hub removed; manager role now routed by HubRoleRouter */}
 
           {/* /test/* routes removed */}
