@@ -1,11 +1,14 @@
 /**
- * CKS Portal — MyProfile page
- *
- * Purpose: Centralized "My Profile" page for all roles, linked from each Hub.
- * Change summary (Aug 2025):
- * - Added page and routed at /me/profile.
- * - Hubs no longer inline the profile UI; they link here via a top "My Profile" button.
- */
+TRACE
+OutboundImports: ../components/Page, ../hooks/useMeProfile, ./Hubs/Center/CenterProfile, ./Hubs/Crew/CrewProfile, ./Hubs/Contractor/ContractorProfile, ./Hubs/Customer/CustomerProfile, ./Hubs/Manager/ManagerProfile, ../components/ProfileCard, ../lib/getRole, @clerk/clerk-react
++InboundUsedBy: TBD
++ProvidesData: orchestrates role resolution and renders role-specific profile components; provides effectiveData to downstream components
++ConsumesData: state.kind, state.data (manager_id, name, code, center_id, crew_id, contractor_id, customer_id), URL params role/kind/code, localStorage me:lastRole, me:lastCode, user role via getRole(user)
++SideEffects: localStorage writes (me:lastRole, me:lastCode), useEffect for persistence, console.debug calls
++RoleBranching: multiple branches by resolvedKind (center, crew, contractor, customer, manager, admin)
++CriticalForManagerProfile: yes (routes manager role to ManagerProfile component)
++SimplificationRisk: med (contains override heuristics and fallback persistence logic which will need careful migration)
++*/
 import Page from "../components/Page";
 import React from "react";
 import { useLocation, useParams } from "react-router-dom";
@@ -145,3 +148,5 @@ if (resolvedKind === "manager") {
 // - `effectiveData` should provide { manager_id, code, name } minimal shape.
 // - This snippet excludes other roles and error handling; it assumes `state` and `codeOverride` are in-scope as in the original file.
 */
+
+// MANAGER_PROFILE_FIELD_USAGE // FieldsRead (field -> lineNumbers after adding TRACE comment): manager_id: [78, 121], name: [78, 121], code: [36, 78, 121], center_id: [36], crew_id: [36], contractor_id: [36], customer_id: [36] // DownstreamPropsPassed: data -> ManagerProfile (prop name: data) // UnusedComputations: none

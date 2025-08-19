@@ -3,6 +3,18 @@ import { buildUrl, apiFetch } from "../lib/apiBase";
 import { useUser } from '@clerk/clerk-react';
 import getRole from '../lib/getRole';
 
+/**
+TRACE
+OutboundImports: ../lib/apiBase, @clerk/clerk-react, ../lib/getRole
++InboundUsedBy: frontend/src/pages/MyProfile.tsx, frontend/src/pages/Hubs/Manager/ManagerHub.tsx, frontend/src/pages/MePage.tsx
++ProvidesData: yes - hook: { loading, error, kind, data, refetch }
++ConsumesData: window.location.search (role/kind/code), localStorage me:lastRole, me:lastCode, network /me/profile and fallback endpoints
++SideEffects: network fetches (apiFetch), console.debug, localStorage reads in safeGet
++RoleBranching: contains logic to synthesize manager stubs and fallbacks when endpoints 404 or network errors occur
++CriticalForManagerProfile: yes (primary source of manager data and fallbacks)
++SimplificationRisk: high (complex fallback heuristics and debug instrumentation interwoven with logic)
++*/
+
 type MeState = {
   loading: boolean;
   error: string | null;

@@ -1,3 +1,15 @@
+/**
+TRACE
+OutboundImports: ../../../components/ProfileTabs, ../../../components/profiles/managerTabs.config
+InboundUsedBy: frontend/src/pages/MyProfile.tsx, frontend/src/pages/Hubs/Manager/ManagerHub.tsx
+ProvidesData: component props: { data }
+ConsumesData: manager_id, name
+SideEffects: none
+RoleBranching: none
+CriticalForManagerProfile: yes (primary manager profile UI)
+SimplificationRisk: low (thin wrapper around shared tabs)
+*/
+
 /*
   Files in `frontend/src/pages/Hubs/Manager/`:
   - ManagerHub.tsx
@@ -6,7 +18,7 @@
 
 /*
 FilePurpose: Renders the Manager-specific profile view using shared ProfileTabs.
-+
+
 ImportsCategorized:
   UI Components:
     - ProfileTabs (shared tabs renderer)
@@ -17,21 +29,21 @@ ImportsCategorized:
   Styles/Assets:
     - none
 RoleSpecificLogic: does it reference non-manager roles? no (only `manager` subject)
-+
+
   - REMOVE candidates: none (component already manager-scoped)
-+  
+  
 SideEffects: none (no useEffect/localStorage/console debug present)
-+
+
 SuspiciousProps: 
   - `data`: generic prop shape; if it contains multi-role fields this could be a cross-role surface (mark for later audit)
-+
+
 SimplifyKeep:
   - `ProfileTabs` invocation with `managerTabsConfig` and a minimal `subject` ({ kind:'manager', code, name })
-+
+
 SimplifyDrop:
   - any outer wrappers or header card (not used here)
-+  - any role-guarding logic or viewer-mode branches (none present)
-+
+  - any role-guarding logic or viewer-mode branches (none present)
+
 */
 
 import ProfileTabs from "../../../components/ProfileTabs";
