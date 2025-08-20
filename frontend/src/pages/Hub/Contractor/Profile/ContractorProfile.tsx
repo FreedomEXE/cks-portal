@@ -11,7 +11,8 @@ export default function ContractorProfile({ data, showHeader = true }: { data: a
   return (
     <div>
       {showHeader ? <ProfileCard kind="contractor" data={data} /> : null}
-      <ProfileTabs tabs={contractorTabsConfig} subject={{ kind: 'contractor', code: data?.contractor_id, name: data?.company_name }} />
+  <ProfileTabs tabs={contractorTabsConfig} subject={{ kind: 'contractor', code: data?.contractor_id, name: data?.company_name }} data={data} />
     </div>
   );
+          data={data}  
 }

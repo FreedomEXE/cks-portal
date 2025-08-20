@@ -22,9 +22,17 @@ import CustomerProfile from "./Hub/Customer/Profile/CustomerProfile";
 import ProfileCard from "../components/ProfileCard";
 import ManagerProfile from "./Hub/Manager/Profile/ManagerProfile";
 import getRole from "../lib/getRole";
-import { useUser } from "@clerk/clerk-react";
+// Use local auth shim so tests don't require a ClerkProvider
+import { useUser } from "../lib/auth";
 
 export default function MyProfilePage() {
+	// After line 28, add logic to parse role from username
+const { username } = useParams();
+const roleFromUsername = username?.startsWith('con-') ? 'contractor' : 
+                         username?.startsWith('ctr-') ? 'center' :
+                         username?.startsWith('crew-') ? 'crew' :
+                         username?.startsWith('cust-') ? 'customer' :
+                         username?.startsWith('mgr-') ? 'manager' : '';
 	const state = useMeProfile();
 		const { user } = useUser();
 	const { search } = useLocation();
@@ -81,8 +89,8 @@ export default function MyProfilePage() {
 	} else if (resolvedKind === "customer") {
 		content = <CustomerProfile data={effectiveData} showHeader={false} />;
 	} else if (resolvedKind === "manager") {
-		// Manager profiles are served from the dedicated manager page; redirect there.
-		content = <Navigate to="/hubs/manager/profile" replace />;
+		// Render manager profile directly (legacy /hubs/manager/profile route removed)
+		content = <ManagerProfile data={effectiveData} />;
 	} else if (resolvedKind === "admin") {
 		// If we somehow fell back to admin but have a remembered non-admin context in storage
 		// prefer to show a neutral card instead of a misleading admin-only message.

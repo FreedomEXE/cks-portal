@@ -11,7 +11,7 @@ export default function CrewProfile({ data, showHeader = true }: { data: any; sh
   return (
     <div>
       {showHeader ? <ProfileCard kind="crew" data={data} /> : null}
-      <ProfileTabs tabs={crewTabsConfig} subject={{ kind: 'crew', code: data?.crew_id, name: data?.name }} />
+  <ProfileTabs tabs={crewTabsConfig} subject={{ kind: 'crew', code: data?.crew_id, name: data?.name }} data={data} />
     </div>
   );
 }

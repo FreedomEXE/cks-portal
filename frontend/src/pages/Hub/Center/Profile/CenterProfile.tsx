@@ -27,7 +27,7 @@ export default function CenterProfile({ subjectCode, subjectData, viewerRole, re
   return (
     <div>
       {showHeader ? <ProfileCard kind="center" data={subjectData} /> : null}
-      <ProfileTabs tabs={filteredTabs} subject={{ kind: 'center', code: subjectCode, name: subjectData?.center_name || subjectData?.name }} />
+  <ProfileTabs tabs={filteredTabs} subject={{ kind: 'center', code: subjectCode, name: subjectData?.center_name || subjectData?.name }} data={subjectData} />
     </div>
   );
 }

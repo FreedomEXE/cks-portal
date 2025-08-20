@@ -43,6 +43,7 @@ export default function ManagerProfile({ data }: { data: any }) {
       <ProfileTabs
         tabs={managerTabsConfig}
         subject={{ kind: 'manager', code: data?.manager_id, name: data?.name }}
+        data={data}
         onSignature={handleTabSignature}
       />
     </div>

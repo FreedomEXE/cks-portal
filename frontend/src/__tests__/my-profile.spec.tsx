@@ -9,7 +9,7 @@ vi.mock('../hooks/useMeProfile', () => ({
 }));
 
 // Mock Profile components to simple markers to avoid deep tree requirements
-vi.mock('../pages/Hubs/Crew/CrewProfile', () => ({ default: ({ showHeader }: any) => <div data-testid="crew-profile" data-showheader={String(!!showHeader)} /> }));
+vi.mock('../pages/Hub/Crew/Profile/CrewProfile', () => ({ default: ({ showHeader }: any) => <div data-testid="crew-profile" data-showheader={String(!!showHeader)} /> }));
 
 // Page relies on Page layout; we can stub UserWidget to reduce noise if needed
 vi.mock('../components/UserWidget', () => ({ default: () => <div data-testid="user-widget" /> }));

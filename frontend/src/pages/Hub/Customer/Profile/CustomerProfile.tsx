@@ -11,7 +11,7 @@ export default function CustomerProfile({ data, showHeader = true }: { data: any
   return (
     <div>
       {showHeader ? <ProfileCard kind="customer" data={data} /> : null}
-      <ProfileTabs tabs={customerTabsConfig} subject={{ kind: 'customer', code: data?.customer_id, name: data?.company_name }} />
+  <ProfileTabs tabs={customerTabsConfig} subject={{ kind: 'customer', code: data?.customer_id, name: data?.company_name }} data={data} />
     </div>
   );
 }

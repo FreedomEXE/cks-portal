@@ -81,4 +81,44 @@ router.post('/me/link', requireUser, safe(async (req: Request, res: Response) =>
   ok(res, { linked: true, internal_code, role });
 }));
 
+// Primary profile endpoint expected by frontend hook (GET /me/profile)
+// Returns the linked entity row (if any) plus derived kind/role. If user not linked -> 404.
+router.get('/me/profile', requireUser, safe(async (req: Request, res: Response) => {
+  const uid = (req as Request & { userId?: string }).userId;
+  const { rows } = await pool.query(
+    `SELECT clerk_user_id, internal_code, role FROM app_users WHERE clerk_user_id = $1 LIMIT 1`,
+    [uid]
+  );
+  if (!rows.length) return res.status(404).json({ error: 'not linked' });
+  const u = rows[0];
+  const internalCode: string = u.internal_code;
+  const role = u.role || roleFromInternalCode(internalCode) || 'admin';
+
+  // Fetch entity row based on role (manager/admin may not exist yet -> stub)
+  let entity: any = { code: internalCode };
+  try {
+    if (role === 'crew') {
+      const r = await pool.query('SELECT * FROM crew WHERE crew_id=$1 LIMIT 1', [internalCode]);
+      if (r.rowCount) entity = r.rows[0];
+    } else if (role === 'contractor') {
+      const r = await pool.query('SELECT * FROM contractors WHERE contractor_id=$1 LIMIT 1', [internalCode]);
+      if (r.rowCount) entity = r.rows[0];
+    } else if (role === 'customer') {
+      const r = await pool.query('SELECT * FROM customers WHERE customer_id=$1 LIMIT 1', [internalCode]);
+      if (r.rowCount) entity = r.rows[0];
+    } else if (role === 'center') {
+      const r = await pool.query('SELECT * FROM centers WHERE center_id=$1 LIMIT 1', [internalCode]);
+      if (r.rowCount) entity = r.rows[0];
+    } else if (role === 'manager') {
+      entity = { manager_id: internalCode, name: 'Manager', code: internalCode };
+    } else if (role === 'admin') {
+      entity = { code: internalCode, admin: true };
+    }
+  } catch (e: any) {
+    // Non-fatal: return minimal entity info if table missing
+  }
+
+  ok(res, { kind: role, data: entity });
+}));
+
 export default router;

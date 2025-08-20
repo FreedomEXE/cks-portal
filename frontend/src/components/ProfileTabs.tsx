@@ -16,7 +16,7 @@ import ProfilePhoto from "./ProfilePhoto";
 
 type Column = { key: string; label: string };
 type Tab = { label: string; columns: Column[] };
-type SubjectMeta = { kind: string; code?: string; name?: string };
+type SubjectMeta = { kind: string; code?: string; name?: string; data?: Record<string, any> };
 
 type SignaturePayload = { tabs: string[]; active: number; activeLabel: string; columns: string[] };
 
@@ -26,7 +26,7 @@ function slugify(label: string) {
 
 // PROFILETABS_MANAGER_USAGE // PropsConsumedForManager: tabs (labels+columns), subject (kind, code, name) // GenericComplexityRisk: medium - contains photo + admin table logic which may be unnecessary for manager-only variant // SimplifySurfaceForManager: subject.name (used in ProfilePhoto), columns list (could be passed reduced), AdminTable fallback (could be replaced with empty state for manager-only)
 
-export default function ProfileTabs({ tabs, subject, onSignature }: { tabs: Tab[]; subject?: SubjectMeta; onSignature?: (p: SignaturePayload) => void }) {
+export default function ProfileTabs({ tabs, subject, data, onSignature }: { tabs: Tab[]; subject?: SubjectMeta; data?: any; onSignature?: (p: SignaturePayload) => void }) {
   const [active, setActive] = useState(0);
 
   const current = tabs[active] || tabs[0];
@@ -34,7 +34,7 @@ export default function ProfileTabs({ tabs, subject, onSignature }: { tabs: Tab[
 
   useEffect(() => {
     if (typeof onSignature !== "function") return;
-    if (subject?.kind !== "manager") return;
+  if (subject?.kind !== "manager") return;
 
     const payload: SignaturePayload = {
       tabs: tabs.map((t) => t.label),
@@ -97,12 +97,32 @@ export default function ProfileTabs({ tabs, subject, onSignature }: { tabs: Tab[
                     {columns.length === 0 ? (
                       <tr><td colSpan={2} style={{ padding: 24, color: '#6b7280' }}>No data.</td></tr>
                     ) : (
-                      columns.map((c, i) => (
-                        <tr key={c.key + ':' + i} style={{ borderTop: '1px solid #e5e7eb' }}>
-                          <td style={{ padding: '10px 16px', width: '34%', fontWeight: 600, color: '#111827' }}>{c.label}</td>
-                          <td style={{ padding: '10px 16px', color: '#111827' }}>—</td>
-                        </tr>
-                      ))
+                      columns.map((c, i) => {
+                        // Resolve value with key normalization so kebab-case config keys map to underscore or camelCase fields.
+                        const resolve = (src: any, key: string) => {
+                          if (!src) return undefined;
+                          if (key in src) return src[key];
+                          // Try underscore variant
+                          const underscore = key.replace(/-/g, '_');
+                          if (underscore in src) return src[underscore];
+                          // Try camelCase variant
+                          const camel = underscore.replace(/_([a-z0-9])/g, (_, ch) => ch.toUpperCase());
+                          if (camel in src) return src[camel];
+                          // Try removing common suffix conversions (e.g., id vs _id)
+                          if (camel.endsWith('Id')) {
+                            const alt = camel.slice(0, -2) + '_id';
+                            if (alt in src) return src[alt];
+                          }
+                          return undefined;
+                        };
+                        const value = resolve(data, c.key) ?? resolve(subject, c.key) ?? '—';
+                        return (
+                          <tr key={c.key + ':' + i} style={{ borderTop: '1px solid #e5e7eb' }}>
+                            <td style={{ padding: '10px 16px', width: '34%', fontWeight: 600, color: '#111827' }}>{c.label}</td>
+                            <td style={{ padding: '10px 16px', color: '#111827' }}>{String(value)}</td>
+                          </tr>
+                        );
+                      })
                     )}
                   </tbody>
                 </table>

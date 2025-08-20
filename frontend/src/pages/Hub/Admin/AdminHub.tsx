@@ -19,9 +19,8 @@
 ───────────────────────────────────────────────*/
  
 import Page from "../../../components/Page";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams, Link } from "react-router-dom";
 import { useUser } from '@clerk/clerk-react';
-import HubLink from "../../../components/ui/HubLink";
 import getRole from "../../../lib/getRole";
 import useMeProfile from '../../../hooks/useMeProfile';
 
@@ -29,13 +28,12 @@ export default function AdminHub() {
   const navigate = useNavigate();
   const { user } = useUser() as any;
   const state = useMeProfile();
-  const username = user?.username ?? null;
-  const hubFromStorage = (typeof window !== 'undefined' ? (sessionStorage.getItem('code') || sessionStorage.getItem('role')) : null) as string | null;
-  const hub = (username || hubFromStorage || 'admin').toLowerCase();
+  const { username: routeUsername = '' } = useParams();
   const role = getRole(user) || '';
   const hubTitle = role === 'manager' ? 'ManagerHub' : 'AdminHub';
   const storedCode = (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('me:lastCode') : '') || '';
-  const code = storedCode || (state as any)?.data?.username || username || 'admin';
+  const code = storedCode || (state as any)?.data?.username || routeUsername || user?.username || 'admin';
+  const base = `/${routeUsername || code}/hub`;
 
   return (
     <Page
@@ -52,53 +50,37 @@ export default function AdminHub() {
         </button>
       }
     >
-  <div style={{ fontSize: 14, color: '#374151', marginTop: 4 }}>Welcome, Admin ({code})!</div>
-  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 16, marginTop: 12 }}>
-          <>
-            <HubCard hub={hub} sub="directory" label="Directory" />
-            <HubCard hub={hub} sub="create" label="Create" />
-            <HubCard hub={hub} sub="manage" label="Manage" />
-            <HubCard hub={hub} sub="assign" label="Assign" />
-            <HubCard hub={hub} sub="reports" label="Reports" />
-            <HubCard hub={hub} sub="orders" label="Orders" />
-          </>
+      <div style={{ fontSize: 14, color: '#374151', marginTop: 4 }}>Welcome, Admin ({code})!</div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16, marginTop: 12 }}>
+        <NavCard to={`${base}/directory`} label="Directory" />
+        <NavCard to={`${base}/create`} label="Create" />
+        <NavCard to={`${base}/manage`} label="Manage" />
+        <NavCard to={`${base}/assign`} label="Assign" />
+        <NavCard to={`${base}/orders`} label="Orders" />
+        <NavCard to={`${base}/reports`} label="Reports" />
       </div>
       <div className="ui-card" style={{ marginTop: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
           <div className="title">News & Updates</div>
-      <HubLink hub={hub} sub="news" className="ui-button" style={{ padding: '10px 16px', fontSize: 14 }}>View all</HubLink>
+          <Link to={`${base}/news`} className="ui-button" style={{ padding: '10px 16px', fontSize: 14 }}>View all</Link>
         </div>
         <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 8 }}>
-          <li>
-            <HubLink hub={hub} sub="news" style={{ textDecoration: 'none', color: '#111827' }}>
-              • Service pricing model updated — review minimums
-            </HubLink>
-          </li>
-          <li>
-            <HubLink hub={hub} sub="news" style={{ textDecoration: 'none', color: '#111827' }}>
-              • Training schedules posted for Q3
-            </HubLink>
-          </li>
-          <li>
-            <HubLink hub={hub} sub="news" style={{ textDecoration: 'none', color: '#111827' }}>
-              • New supply SKUs added to warehouses
-            </HubLink>
-          </li>
+          <li><Link to={`${base}/news`} style={{ textDecoration: 'none', color: '#111827' }}>• Service pricing model updated — review minimums</Link></li>
+          <li><Link to={`${base}/news`} style={{ textDecoration: 'none', color: '#111827' }}>• Training schedules posted for Q3</Link></li>
+          <li><Link to={`${base}/news`} style={{ textDecoration: 'none', color: '#111827' }}>• New supply SKUs added to warehouses</Link></li>
         </ul>
         <div style={{ marginTop: 12 }}>
-          <HubLink hub={hub} sub="news" className="ui-button" style={{ padding: '6px 10px', fontSize: 12 }}>
-            3 unread updates
-          </HubLink>
+          <Link to={`${base}/news`} className="ui-button" style={{ padding: '6px 10px', fontSize: 12 }}>3 unread updates</Link>
         </div>
       </div>
     </Page>
   );
 }
 
-function HubCard({ hub, sub, label, long = false }: { hub?: string; sub?: string; label: string; long?: boolean }) {
+function NavCard({ to, label }: { to: string; label: string }) {
   return (
-    <HubLink hub={hub} sub={sub} className="hub-card ui-card" style={long ? { gridColumn: "1 / -1", textAlign: "center" } : undefined}>
+    <Link to={to} className="hub-card ui-card" style={{ textDecoration: 'none', padding: 16 }}>
       <div className="title">{label}</div>
-    </HubLink>
+    </Link>
   );
 }

@@ -1,13 +1,32 @@
 import React from 'react';
 import { useUser } from '@clerk/clerk-react';
-
-import AdminHub from './Admin/AdminHub';
-import ManagerHub from './Manager/ManagerHub';                 // Simple manager hub
+import { Routes, Route, useParams, Navigate } from 'react-router-dom';
 import getRole from '../../lib/getRole';
+import AdminHub from './Admin/AdminHub';
+import DirectoryPage from './Admin/Directory/DirectoryPage';
+// Added shared admin pages (legacy top-level) routed under hub
+import CreatePage from '../../pages/Create';
+import CreateItem from '../../pages/CreateItem';
+import ManagePage from '../../pages/Manage';
+import ManageList from '../../pages/ManageList';
+import AssignPage from '../../pages/Assign';
+import OrdersPage from '../../pages/Orders';
+import NewsPage from '../../pages/News';
+import ReportsPage from '../../pages/Reports';
+// Using unified MyProfile page (no separate Hub/MyProfile variant present on disk)
+import MyProfile from '../../pages/MyProfile';
+import ManagerHub from './Manager/ManagerHub';
 import CenterHub from './Center/CenterHub';
 import ContractorHub from './Contractor/ContractorHub';
 import CrewHub from './Crew/CrewHub';
 import CustomerHub from './Customer/CustomerHub';
+import Page from '../../components/Page';
+// Role-specific profile components
+import CenterProfile from './Center/Profile/CenterProfile';
+import CrewProfile from './Crew/Profile/CrewProfile';
+import ContractorProfile from './Contractor/Profile/ContractorProfile';
+import CustomerProfile from './Customer/Profile/CustomerProfile';
+import ManagerProfile from './Manager/Profile/ManagerProfile';
 
 // Feature flags (support raw + Vite-prefixed for flexibility)
 const USE_NEW_ADMIN_UI =
@@ -32,31 +51,48 @@ const USE_NEW_CUSTOMER_HUB =
 export default function HubRoleRouter() {
   const { user } = useUser();
   const role = (getRole(user) || '').toLowerCase();
+  const { username = '' } = useParams();
 
-  if (typeof window !== 'undefined') {
-    try {
-      // eslint-disable-next-line no-console
-      console.log('[HubRoleRouter debug]', {
-        rawRole: getRole(user),
-        normalized: role,
-        USE_NEW_ADMIN_UI,
-        USE_NEW_CENTER_HUB,
-        USE_NEW_CONTRACTOR_HUB,
-        USE_NEW_CREW_HUB,
-        USE_NEW_CUSTOMER_HUB,
-        chosen: role || 'none'
-      });
-    } catch {}
+  // Choose base hub landing component by role
+  function landing() {
+    if (role === 'manager') return <ManagerHub />;
+    if (role === 'admin') return <AdminHub />;
+    if (role === 'center') return USE_NEW_CENTER_HUB ? <CenterHub /> : <AdminHub />;
+    if (role === 'contractor') return USE_NEW_CONTRACTOR_HUB ? <ContractorHub /> : <AdminHub />;
+    if (role === 'crew') return USE_NEW_CREW_HUB ? <CrewHub /> : <AdminHub />;
+    if (role === 'customer') return USE_NEW_CUSTOMER_HUB ? <CustomerHub /> : <AdminHub />;
+    return <AdminHub />; // fallback
   }
 
-  // Role routing (manager first to preserve legacy toggle semantics)
-  if (role === 'manager') return <ManagerHub />;
-  if (role === 'admin') return <AdminHub />;
-  if (role === 'center') return USE_NEW_CENTER_HUB ? <CenterHub /> : <AdminHub />;
-  if (role === 'contractor') return USE_NEW_CONTRACTOR_HUB ? <ContractorHub /> : <AdminHub />;
-  if (role === 'crew') return USE_NEW_CREW_HUB ? <CrewHub /> : <AdminHub />;
-  if (role === 'customer') return USE_NEW_CUSTOMER_HUB ? <CustomerHub /> : <AdminHub />;
+  // profileBody helper was deprecated after routing consolidated to MyProfile
 
-  // Unknown role fallback
-  return <AdminHub />;
+  // Wrapper page for sub-sections that are not yet implemented in new hubs
+  const Placeholder = ({ title }: { title: string }) => (
+    <Page title={title}><div className="ui-card" style={{ padding: 16 }}>Section "{title}" coming soon.</div></Page>
+  );
+
+  return (
+    <Routes>
+      {/* Root hub landing */}
+      <Route path="" element={landing()} />
+      {/* Sub-routes */}
+      <Route path="profile" element={<MyProfile />} />
+  <Route path="centers" element={<Placeholder title="Centers" />} />
+  <Route path="services" element={<Placeholder title="Services" />} />
+  <Route path="jobs" element={<Placeholder title="Jobs" />} />
+  {/* Admin Hub Routes */}
+  <Route path="directory" element={<DirectoryPage />} />
+  <Route path="directory/:section" element={<DirectoryPage />} />
+  <Route path="create" element={<CreatePage />} />
+  <Route path="create/:type" element={<CreateItem />} />
+  <Route path="manage" element={<ManagePage />} />
+  <Route path="manage/:type" element={<ManageList />} />
+  <Route path="assign" element={<AssignPage />} />
+  <Route path="orders" element={<OrdersPage />} />
+  <Route path="news" element={<NewsPage />} />
+  <Route path="reports" element={<ReportsPage />} />
+      {/* Unknown sub-route -> hub root */}
+      <Route path="*" element={<Navigate to="." replace />} />
+    </Routes>
+  );
 }
