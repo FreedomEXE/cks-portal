@@ -17,14 +17,13 @@ import ReportsPage from '../../pages/Reports';
 import MyProfile from '../../pages/MyProfile';
 import ManagerHub from './Manager/ManagerHub';
 import CenterHub from './Center/CenterHub';
-import ContractorHub from './Contractor/ContractorHub';
+import ContractorHub from './Contractor';
 import CrewHub from './Crew/CrewHub';
 import CustomerHub from './Customer/CustomerHub';
 import Page from '../../components/Page';
 // Role-specific profile components
 import CenterProfile from './Center/Profile/CenterProfile';
 import CrewProfile from './Crew/Profile/CrewProfile';
-import ContractorProfile from './Contractor/Profile/ContractorProfile';
 import CustomerProfile from './Customer/Profile/CustomerProfile';
 import ManagerProfile from './Manager/Profile/ManagerProfile';
 

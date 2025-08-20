@@ -1,67 +1,71 @@
+/*───────────────────────────────────────────────
+  Property of CKS  © 2025
+  Manifested by Freedom
+───────────────────────────────────────────────*/
+
 /**
-TRACE
-OutboundImports: ../components/Page, ../hooks/useMeProfile, ./Hubs/Center/CenterProfile, ./Hubs/Crew/CrewProfile, ./Hubs/Contractor/ContractorProfile, ./Hubs/Customer/CustomerProfile, ./Hubs/Manager/ManagerProfile, ../components/ProfileCard, ../lib/getRole, @clerk/clerk-react
-+InboundUsedBy: TBD
-+ProvidesData: orchestrates role resolution and renders role-specific profile components; provides effectiveData to downstream components
-+ConsumesData: state.kind, state.data (manager_id, name, code, center_id, crew_id, contractor_id, customer_id), URL params role/kind/code, localStorage me:lastRole, me:lastCode, user role via getRole(user)
-+SideEffects: localStorage writes (me:lastRole, me:lastCode), useEffect for persistence, console.debug calls
-+RoleBranching: multiple branches by resolvedKind (center, crew, contractor, customer, manager, admin)
-+CriticalForManagerProfile: yes (routes manager role to ManagerProfile component)
-+SimplificationRisk: med (contains override heuristics and fallback persistence logic which will need careful migration)
-+*/
+ * MyProfile.tsx
+ * 
+ * Description: Central profile page that renders role-specific profile components
+ * Function: Determines user role and displays appropriate profile view
+ * Importance: Critical - Main entry point for all user profiles
+ * Connects to: Hub profile components, useMeProfile hook, role detection
+ * 
+ * Notes: Temporary component until all hubs are fully modularized.
+ *        Contains role detection fallbacks and localStorage persistence.
+ *        Will be deprecated once each hub manages its own profile routing.
+ */
+
 import Page from "../components/Page";
 import React from "react";
-import { useLocation, useParams, Navigate } from "react-router-dom";
+import { useLocation, useParams } from "react-router-dom";
 import { useEffect } from "react";
 import Skeleton from "../components/Skeleton";
 import useMeProfile from "../hooks/useMeProfile";
+import ContractorProfile from "./Hub/Contractor/Profile";
 import CenterProfile from "./Hub/Center/Profile/CenterProfile";
 import CrewProfile from "./Hub/Crew/Profile/CrewProfile";
-import ContractorProfile from "./Hub/Contractor/Profile/ContractorProfile";
 import CustomerProfile from "./Hub/Customer/Profile/CustomerProfile";
 import ProfileCard from "../components/ProfileCard";
 import ManagerProfile from "./Hub/Manager/Profile/ManagerProfile";
 import getRole from "../lib/getRole";
-// Use local auth shim so tests don't require a ClerkProvider
 import { useUser } from "../lib/auth";
 
 export default function MyProfilePage() {
-	// After line 28, add logic to parse role from username
-const { username } = useParams();
-const roleFromUsername = username?.startsWith('con-') ? 'contractor' : 
-                         username?.startsWith('ctr-') ? 'center' :
-                         username?.startsWith('crew-') ? 'crew' :
-                         username?.startsWith('cust-') ? 'customer' :
-                         username?.startsWith('mgr-') ? 'manager' : '';
+	const { username } = useParams();
+	const roleFromUsername = username?.startsWith('con-') ? 'contractor' : 
+	                         username?.startsWith('ctr-') ? 'center' :
+	                         username?.startsWith('crew-') ? 'crew' :
+	                         username?.startsWith('cust-') ? 'customer' :
+	                         username?.startsWith('mgr-') ? 'manager' : '';
 	const state = useMeProfile();
-		const { user } = useUser();
+	const { user } = useUser();
 	const { search } = useLocation();
 	const params = new URLSearchParams(search);
 	const { role: roleFromPath } = useParams();
 	const roleOverride = (roleFromPath || params.get('role') || params.get('kind') || '').toLowerCase();
-		const userRole = getRole(user);
-	// Consider last known role/code saved by hubs for a better fallback when API is down
+	const userRole = getRole(user);
 	const lastRole = (typeof localStorage !== 'undefined' ? localStorage.getItem('me:lastRole') : null) || '';
 	const lastCode = (typeof localStorage !== 'undefined' ? localStorage.getItem('me:lastCode') : null) || '';
 	const codeOverride = params.get('code') || lastCode || '';
 	const hasOverride = !!(roleOverride || codeOverride);
-		// Prefer explicit role/code overrides when present (new precedence includes userRole before lastRole, ignoring 'admin' fallbacks)
-		const effectiveKind = (
-			roleOverride ||
-			((state.kind && state.kind !== 'admin') ? state.kind : '') ||
-			((userRole && userRole !== 'admin') ? userRole : '') ||
-			(lastRole && lastRole !== 'admin' ? lastRole : '') ||
-			(state.kind || '')
-		).toLowerCase();
-		// Temporary safety override: if user reports manager but resolved as admin, keep manager
-		const resolvedKind = (effectiveKind === 'admin' && userRole === 'manager') ? 'manager' : effectiveKind;
+	
+	const effectiveKind = (
+		roleOverride ||
+		((state.kind && state.kind !== 'admin') ? state.kind : '') ||
+		((userRole && userRole !== 'admin') ? userRole : '') ||
+		(lastRole && lastRole !== 'admin' ? lastRole : '') ||
+		(state.kind || '')
+	).toLowerCase();
+	
+	const resolvedKind = (effectiveKind === 'admin' && userRole === 'manager') ? 'manager' : effectiveKind;
 	const effectiveData = withOverrideData(effectiveKind, codeOverride, state.data);
 
-	// Remember last non-admin role/code for the header widget routing
 	useEffect(() => {
 		if (state.loading || state.error) return;
 		const subjectCode =
-			effectiveData?.center_id || effectiveData?.crew_id || effectiveData?.contractor_id || effectiveData?.customer_id || effectiveData?.manager_id || effectiveData?.code || '';
+			effectiveData?.center_id || effectiveData?.crew_id || effectiveData?.contractor_id || 
+			effectiveData?.customer_id || effectiveData?.manager_id || effectiveData?.code || '';
 		if (effectiveKind && effectiveKind !== 'admin' && subjectCode) {
 			try {
 				localStorage.setItem('me:lastRole', effectiveKind);
@@ -72,8 +76,6 @@ const roleFromUsername = username?.startsWith('con-') ? 'contractor' :
 
 	if (state.loading && !hasOverride) return <Page title="My Profile"><Skeleton lines={8} /></Page>;
 
-	// If there's an API error but an explicit role/code override exists, continue rendering from overrides.
-	// Otherwise, show the error banner at the top of the page.
 	const maybeErrorBanner = state.error && !hasOverride
 		? <div style={{color:'#b91c1c'}}>Error: {state.error}</div>
 		: null;
@@ -89,11 +91,8 @@ const roleFromUsername = username?.startsWith('con-') ? 'contractor' :
 	} else if (resolvedKind === "customer") {
 		content = <CustomerProfile data={effectiveData} showHeader={false} />;
 	} else if (resolvedKind === "manager") {
-		// Render manager profile directly (legacy /hubs/manager/profile route removed)
 		content = <ManagerProfile data={effectiveData} />;
 	} else if (resolvedKind === "admin") {
-		// If we somehow fell back to admin but have a remembered non-admin context in storage
-		// prefer to show a neutral card instead of a misleading admin-only message.
 		const lastRole = (typeof localStorage !== 'undefined' ? localStorage.getItem('me:lastRole') : null) || '';
 		if (lastRole && lastRole !== 'admin') {
 			content = <ProfileCard kind={lastRole as any} data={effectiveData} />;
@@ -102,15 +101,14 @@ const roleFromUsername = username?.startsWith('con-') ? 'contractor' :
 		}
 	}
 
-	// DEBUG instrumentation (extended)
+	// Debug logging
 	try { console.debug('[MyProfile debug]', { 
 		stateKind: state.kind,
-		stateDataRole: (state as any)?.data?.role,
-		stateDataKind: (state as any)?.data?.kind,
 		roleOverride, lastRole, lastCode, codeOverride,
-		userRole, effectiveKind, resolvedKind, resolvedKindFixApplied: (effectiveKind !== resolvedKind),
+		userRole, effectiveKind, resolvedKind,
 		effectiveDataKeys: Object.keys(effectiveData||{}).slice(0,12)
 	}); } catch {}
+	
 	return (
 		<Page title="My Profile">
 			{maybeErrorBanner}
@@ -119,7 +117,6 @@ const roleFromUsername = username?.startsWith('con-') ? 'contractor' :
 	);
 }
 
-// Build minimal data if overrides are present, falling back to existing data
 function withOverrideData(kind: string, code: string, data: any) {
 	const d = data || {};
 	const c = code || d.code || '';
@@ -139,23 +136,3 @@ function withOverrideData(kind: string, code: string, data: any) {
 			return d;
 	}
 }
-
-/*
-// MANAGER_BRANCH_EXTRACT
-
-/* Extracted manager-only rendering snippet (for analysis). This is a verbatim extraction of the code path that renders when resolvedKind === 'manager'. Supporting helper `withOverrideData` is defined above and is referenced for `effectiveData`.
-
-const resolvedKind = 'manager';
-const effectiveData = withOverrideData('manager', codeOverride || '', state.data);
-
-let content: React.ReactNode = null;
-if (resolvedKind === "manager") {
-	content = <ManagerProfile data={effectiveData} />;
-}
-
-// Notes:
-// - `effectiveData` should provide { manager_id, code, name } minimal shape.
-// - This snippet excludes other roles and error handling; it assumes `state` and `codeOverride` are in-scope as in the original file.
-*/
-
-// MANAGER_PROFILE_FIELD_USAGE // FieldsRead (field -> lineNumbers after adding TRACE comment): manager_id: [78, 121], name: [78, 121], code: [36, 78, 121], center_id: [36], crew_id: [36], contractor_id: [36], customer_id: [36] // DownstreamPropsPassed: data -> ManagerProfile (prop name: data) // UnusedComputations: none

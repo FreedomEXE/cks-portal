@@ -1,21 +1,56 @@
 {
   "compilerOptions": {
-    "target": "ES2020",
+    "target": "ES2022",
     "module": "commonjs",
-    "lib": ["ES2020"],
-    "outDir": "build",
-    "rootDir": ".",
+    "lib": ["ES2022"],
+    "outDir": "./dist",
+    "rootDir": "./",
     "strict": true,
     "noImplicitAny": true,
     "strictNullChecks": true,
-    "forceConsistentCasingInFileNames": true,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "strictPropertyInitialization": true,
+    "noImplicitThis": true,
+    "alwaysStrict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
-  "incremental": true,
-  "types": ["node"]
+    "allowSyntheticDefaultImports": true,
+    "incremental": true,
+    "tsBuildInfoFile": "./dist/.tsbuildinfo",
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "removeComments": true,
+    "types": ["node", "jest"]
   },
-  "include": ["src/**/*.ts", "routes/**/*.ts", "utils/**/*.ts", "db/**/*.ts"],
-  "exclude": ["node_modules", "build", "**/*.test.ts", "**/__tests__/**/*"]
+  "include": [
+    "src/**/*.ts",
+    "routes/**/*.ts",
+    "utils/**/*.ts",
+    "db/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "build",
+    "**/*.spec.ts",
+    "**/*.test.ts",
+    "**/__tests__/**/*",
+    "**/*.js",
+    "coverage",
+    "jest.config.*"
+  ],
+  "ts-node": {
+    "require": ["dotenv/config"],
+    "transpileOnly": true,
+    "files": true
+  }
 }

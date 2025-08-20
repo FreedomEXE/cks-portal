@@ -4,22 +4,36 @@
   "description": "CKS Portal API server (TypeScript)",
   "private": true,
   "type": "commonjs",
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
   "scripts": {
-    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
-    "dev:fastify": "ts-node-dev --respawn --transpile-only src/fastify.ts",
+    "clean": "rimraf dist build server/**/*.js",
+    "prebuild": "npm run clean",
     "build": "tsc",
-    "start": "node build/index.js",
-    "lint": "eslint \"src/**/*.{ts,js}\" \"routes/**/*.{ts,js}\" --max-warnings=0",
-    "lint:fix": "eslint \"src/**/*.{ts,js}\" \"routes/**/*.{ts,js}\" --fix",
-    "format": "prettier --write \"**/*.{ts,js,json,md}\"",
+    "postbuild": "npm run copy:assets",
+    "copy:assets": "echo 'No assets to copy'",
+    "dev": "tsx watch server/src/index.ts",
+    "dev:legacy": "ts-node-dev --respawn --transpile-only server/src/index.ts",
+    "dev:fastify": "tsx watch server/src/fastify.ts",
+    "start": "node dist/server/src/index.js",
+    "start:prod": "NODE_ENV=production node dist/server/src/index.js",
+    "lint": "eslint . --ext .ts --max-warnings=0",
+    "lint:fix": "eslint . --ext .ts --fix",
+    "format": "prettier --write \"**/*.{ts,json,md}\" --ignore-path .gitignore",
+    "format:check": "prettier --check \"**/*.{ts,json,md}\" --ignore-path .gitignore",
+    "type-check": "tsc --noEmit",
     "prepare": "husky install",
     "test": "jest --passWithNoTests",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
+    "test:e2e": "jest --config ./jest.e2e.config.js",
     "migrate": "node-pg-migrate -m migrations up",
     "migrate:down": "node-pg-migrate -m migrations down",
     "migrate:create": "node-pg-migrate -m migrations create",
-    "docs:gen": "ts-node src/openapi.ts > openapi.json"
+    "docs:gen": "ts-node server/src/openapi.ts > openapi.json",
+    "validate": "npm run type-check && npm run lint && npm run format:check && npm run test"
   },
   "dependencies": {
     "@fastify/cors": "^9.0.1",
@@ -62,8 +76,20 @@
     "pino-pretty": "^11.0.0",
     "prettier": "^3.1.1",
     "prisma": "^5.22.0",
+    "rimraf": "^5.0.5",
     "ts-jest": "^29.1.2",
+    "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
+    "tsx": "^4.7.0",
     "typescript": "^5.6.3"
+  },
+  "lint-staged": {
+    "*.ts": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md}": [
+      "prettier --write"
+    ]
   }
 }

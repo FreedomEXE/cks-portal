@@ -1,29 +1,84 @@
-/**
- * File: utils/roles.ts
- *
- * Descriptio:
- *   Internal code → role mapping logic.
- * Functionality:
- *   Regex-based pattern matching to classify internal codes to role labels.
- * Importance:
- *   Central authority for deriving authorization role from alphanumeric codes.
- * Conections:
- *   Consumed by routes/me and potentially future auth middleware.
- * Notes:
- *   Expand mapping when new entity classes introduced (e.g., manager codes).
- */
-/*───────────────────────────────────────────────
+/*───────────────────────────────────────────────────
   Property of CKS  © 2025
   Manifested by Freedom
 ───────────────────────────────────────────────*/
 
-export type InternalRole = 'admin' | 'crew' | 'contractor' | 'customer' | 'center' | null;
+/**
+ * roles.ts
+ * 
+ * Description: Role detection and validation utilities
+ * Function: Determines user roles from modern ID prefixes
+ * Importance: Critical - Ensures consistent role detection across the platform
+ * Connects to: Used by authentication and profile endpoints
+ * 
+ * Notes: Uses modern ID format: prefix-number (e.g., con-000, ctr-001)
+ */
 
-export function roleFromInternalCode(code = ''): InternalRole {
-  if (code === '000-A') return 'admin';
-  if (/-A$|^A/.test(code)) return 'crew';
-  if (/-B$|^B/.test(code)) return 'contractor';
-  if (/-C$|^C/.test(code)) return 'customer';
-  if (/-D$|^D/.test(code)) return 'center';
+export type UserRole = 'admin' | 'manager' | 'contractor' | 'customer' | 'center' | 'crew';
+
+/**
+ * Detect role from internal code using modern prefixes
+ */
+export function roleFromInternalCode(code: string): UserRole | null {
+  if (!code) return null;
+  
+  const lowerCode = code.toLowerCase();
+  
+  // Check for specific codes
+  if (lowerCode === 'admin-000') return 'admin';
+  
+  // Check prefixes
+  if (lowerCode.startsWith('mgr-')) return 'manager';
+  if (lowerCode.startsWith('con-')) return 'contractor';
+  if (lowerCode.startsWith('cust-')) return 'customer';
+  if (lowerCode.startsWith('ctr-')) return 'center';
+  if (lowerCode.startsWith('crew-')) return 'crew';
+  
   return null;
+}
+
+/**
+ * Validate if a code matches expected format for a role
+ */
+export function isValidCode(code: string, role: UserRole): boolean {
+  const lowerCode = code.toLowerCase();
+  
+  switch (role) {
+    case 'admin':
+      return lowerCode === 'admin-000';
+    case 'manager':
+      return /^mgr-\d{3}$/i.test(code);
+    case 'contractor':
+      return /^con-\d{3}$/i.test(code);
+    case 'customer':
+      return /^cust-\d{3}$/i.test(code);
+    case 'center':
+      return /^ctr-\d{3}$/i.test(code);
+    case 'crew':
+      return /^crew-\d{3}$/i.test(code);
+    default:
+      return false;
+  }
+}
+
+/**
+ * Get expected ID prefix for a role
+ */
+export function getPrefixForRole(role: UserRole): string {
+  switch (role) {
+    case 'admin':
+      return 'admin';
+    case 'manager':
+      return 'mgr';
+    case 'contractor':
+      return 'con';
+    case 'customer':
+      return 'cust';
+    case 'center':
+      return 'ctr';
+    case 'crew':
+      return 'crew';
+    default:
+      return '';
+  }
 }

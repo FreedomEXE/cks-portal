@@ -1,21 +1,19 @@
-/**
- * File: routes/me.ts
- *
- * Descriptio:
- *   User bootstrap and linking endpoints for associating Clerk user IDs with internal codes.
- * Functionality:
- *   Auth guards via x-user-id, checks entity existence, upserts app_users, exposes link status.
- * Importance:
- *   Establishes identity/role context required for authorization and tailored UI experiences.
- * Conections:
- *   Depends on db/pool, utils/http, utils/roles; mounted in src/index.ts.
- * Notes:
- *   Add rate limiting or captcha if brute force code attempts become a risk.
- */
 /*───────────────────────────────────────────────
   Property of CKS  © 2025
   Manifested by Freedom
 ───────────────────────────────────────────────*/
+
+/**
+ * me.ts
+ * 
+ * Description: User authentication and profile management endpoints
+ * Function: Links Clerk users with internal entities and provides profile data
+ * Importance: Critical - Establishes user identity and role context
+ * Connects to: Database for user mapping, role detection utilities
+ * 
+ * Notes: Uses modern ID prefixes for role detection.
+ *        Provides unified profile endpoint for all user types.
+ */
 
 import express, { Request, Response, NextFunction } from 'express';
 import { ok, bad, safe } from '../utils/http';
@@ -24,101 +22,246 @@ import { roleFromInternalCode } from '../utils/roles';
 
 const router = express.Router();
 
-function requireUser(req: Request, res: Response, next: NextFunction) {
+// Extended request type with userId
+interface AuthRequest extends Request {
+  userId?: string;
+}
+
+// Authentication middleware
+function requireUser(req: AuthRequest, res: Response, next: NextFunction) {
   const uid = req.header('x-user-id');
-  if (!uid) return bad(res, 'Unauthorized', 401);
-  (req as Request & { userId?: string }).userId = uid;
+  if (!uid) {
+    return bad(res, 'Authentication required', 401);
+  }
+  req.userId = uid;
   next();
 }
 
-router.get('/me/bootstrap', requireUser, safe(async (req: Request, res: Response) => {
+// Check if user is linked to an internal entity
+router.get('/me/bootstrap', requireUser, safe(async (req: AuthRequest, res: Response) => {
   const { rows } = await pool.query(
     `SELECT clerk_user_id, email, internal_code, role 
-     FROM app_users WHERE clerk_user_id = $1`,
-  [(req as Request & { userId?: string }).userId]
+     FROM app_users 
+     WHERE clerk_user_id = $1`,
+    [req.userId]
   );
-  if (!rows.length) return ok(res, { linked: false });
-  const u = rows[0];
-  ok(res, { linked: true, internal_code: u.internal_code, role: u.role });
+  
+  if (!rows.length) {
+    return ok(res, { linked: false });
+  }
+  
+  const user = rows[0];
+  ok(res, { 
+    linked: true, 
+    internal_code: user.internal_code, 
+    role: user.role,
+    email: user.email 
+  });
 }));
 
-router.post('/me/link', requireUser, safe(async (req: Request, res: Response) => {
-  const { internal_code } = req.body || {};
-  if (!internal_code) return bad(res, 'internal_code required');
+// Link user to internal entity
+router.post('/me/link', requireUser, safe(async (req: AuthRequest, res: Response) => {
+  const { internal_code, email } = req.body || {};
+  
+  if (!internal_code) {
+    return bad(res, 'internal_code is required', 400);
+  }
 
-  // verify code exists in any entity table or is admin 000-A
+  // Special case for admin
   let exists = false;
-  if (internal_code === '000-A') {
+  let entityType: string | null = null;
+  
+  if (internal_code === 'admin-000') {
     exists = true;
+    entityType = 'admin';
   } else {
+    // Check each entity table for the code
     const checks = [
-      { table: 'crew', col: 'crew_id' },
-      { table: 'contractors', col: 'contractor_id' },
-      { table: 'customers', col: 'customer_id' },
-      { table: 'centers', col: 'center_id' },
+      { table: 'crew', col: 'crew_id', prefix: 'crew-' },
+      { table: 'contractors', col: 'contractor_id', prefix: 'con-' },
+      { table: 'customers', col: 'customer_id', prefix: 'cust-' },
+      { table: 'centers', col: 'center_id', prefix: 'ctr-' },
     ];
-    for (const c of checks) {
-      const r = await pool.query(`SELECT 1 FROM ${c.table} WHERE ${c.col} = $1 LIMIT 1`, [internal_code]);
-  if ((r.rowCount ?? 0) > 0) { exists = true; break; }
+    
+    for (const check of checks) {
+      // Verify code starts with correct prefix
+      if (!internal_code.toLowerCase().startsWith(check.prefix)) continue;
+      
+      const result = await pool.query(
+        `SELECT 1 FROM ${check.table} WHERE LOWER(${check.col}) = LOWER($1) LIMIT 1`,
+        [internal_code]
+      );
+      
+      if (result.rowCount && result.rowCount > 0) {
+        exists = true;
+        entityType = check.table === 'contractors' ? 'contractor' :
+                     check.table === 'customers' ? 'customer' :
+                     check.table === 'centers' ? 'center' :
+                     check.table === 'crew' ? 'crew' : null;
+        break;
+      }
+    }
+    
+    // Check for manager codes
+    if (!exists && internal_code.toLowerCase().startsWith('mgr-')) {
+      exists = true;
+      entityType = 'manager';
     }
   }
-  if (!exists) return bad(res, 'Unknown internal_code', 404);
+  
+  if (!exists) {
+    return bad(res, 'Invalid internal_code', 404);
+  }
 
-  const role = roleFromInternalCode(internal_code);
-  if (!role) return bad(res, 'Unable to derive role from internal_code');
+  const role = entityType || roleFromInternalCode(internal_code);
+  if (!role) {
+    return bad(res, 'Unable to determine role from internal_code', 400);
+  }
 
-  // Upsert app_users
+  // Upsert user record
   await pool.query(
     `INSERT INTO app_users (clerk_user_id, email, role, internal_code, created_at, updated_at)
      VALUES ($1, $2, $3, $4, NOW(), NOW())
      ON CONFLICT (clerk_user_id) DO UPDATE SET 
         role = EXCLUDED.role, 
-        internal_code = EXCLUDED.internal_code, 
+        internal_code = EXCLUDED.internal_code,
+        email = COALESCE(EXCLUDED.email, app_users.email),
         updated_at = NOW()`,
-  [(req as Request & { userId?: string }).userId, req.body.email || null, role, internal_code]
+    [req.userId, email || null, role, internal_code]
   );
 
-  ok(res, { linked: true, internal_code, role });
+  ok(res, { 
+    linked: true, 
+    internal_code, 
+    role,
+    message: 'Successfully linked to account'
+  });
 }));
 
-// Primary profile endpoint expected by frontend hook (GET /me/profile)
-// Returns the linked entity row (if any) plus derived kind/role. If user not linked -> 404.
-router.get('/me/profile', requireUser, safe(async (req: Request, res: Response) => {
-  const uid = (req as Request & { userId?: string }).userId;
+// Get user profile with entity data
+router.get('/me/profile', requireUser, safe(async (req: AuthRequest, res: Response) => {
+  const uid = req.userId;
+  
+  // Get user record
   const { rows } = await pool.query(
-    `SELECT clerk_user_id, internal_code, role FROM app_users WHERE clerk_user_id = $1 LIMIT 1`,
+    `SELECT clerk_user_id, internal_code, role, email 
+     FROM app_users 
+     WHERE clerk_user_id = $1 
+     LIMIT 1`,
     [uid]
   );
-  if (!rows.length) return res.status(404).json({ error: 'not linked' });
-  const u = rows[0];
-  const internalCode: string = u.internal_code;
-  const role = u.role || roleFromInternalCode(internalCode) || 'admin';
+  
+  if (!rows.length) {
+    return res.status(404).json({ 
+      error: 'User not linked',
+      message: 'Please link your account to an internal code first'
+    });
+  }
+  
+  const user = rows[0];
+  const internalCode: string = user.internal_code;
+  const role = user.role || roleFromInternalCode(internalCode) || 'unknown';
 
-  // Fetch entity row based on role (manager/admin may not exist yet -> stub)
-  let entity: any = { code: internalCode };
+  // Fetch entity data based on role
+  let entityData: any = { 
+    code: internalCode,
+    email: user.email 
+  };
+  
   try {
-    if (role === 'crew') {
-      const r = await pool.query('SELECT * FROM crew WHERE crew_id=$1 LIMIT 1', [internalCode]);
-      if (r.rowCount) entity = r.rows[0];
-    } else if (role === 'contractor') {
-      const r = await pool.query('SELECT * FROM contractors WHERE contractor_id=$1 LIMIT 1', [internalCode]);
-      if (r.rowCount) entity = r.rows[0];
-    } else if (role === 'customer') {
-      const r = await pool.query('SELECT * FROM customers WHERE customer_id=$1 LIMIT 1', [internalCode]);
-      if (r.rowCount) entity = r.rows[0];
-    } else if (role === 'center') {
-      const r = await pool.query('SELECT * FROM centers WHERE center_id=$1 LIMIT 1', [internalCode]);
-      if (r.rowCount) entity = r.rows[0];
-    } else if (role === 'manager') {
-      entity = { manager_id: internalCode, name: 'Manager', code: internalCode };
-    } else if (role === 'admin') {
-      entity = { code: internalCode, admin: true };
+    switch (role) {
+      case 'crew':
+        const crewResult = await pool.query(
+          'SELECT * FROM crew WHERE LOWER(crew_id) = LOWER($1) LIMIT 1',
+          [internalCode]
+        );
+        if (crewResult.rowCount) {
+          entityData = { ...crewResult.rows[0], ...entityData };
+        }
+        break;
+        
+      case 'contractor':
+        const contractorResult = await pool.query(
+          'SELECT * FROM contractors WHERE LOWER(contractor_id) = LOWER($1) LIMIT 1',
+          [internalCode]
+        );
+        if (contractorResult.rowCount) {
+          entityData = { ...contractorResult.rows[0], ...entityData };
+        }
+        break;
+        
+      case 'customer':
+        const customerResult = await pool.query(
+          'SELECT * FROM customers WHERE LOWER(customer_id) = LOWER($1) LIMIT 1',
+          [internalCode]
+        );
+        if (customerResult.rowCount) {
+          entityData = { ...customerResult.rows[0], ...entityData };
+        }
+        break;
+        
+      case 'center':
+        const centerResult = await pool.query(
+          'SELECT * FROM centers WHERE LOWER(center_id) = LOWER($1) LIMIT 1',
+          [internalCode]
+        );
+        if (centerResult.rowCount) {
+          entityData = { ...centerResult.rows[0], ...entityData };
+        }
+        break;
+        
+      case 'manager':
+        // Managers might not have a database record yet
+        entityData = {
+          manager_id: internalCode,
+          name: user.email?.split('@')[0] || 'Manager',
+          code: internalCode,
+          email: user.email,
+          role: 'manager'
+        };
+        break;
+        
+      case 'admin':
+        entityData = {
+          code: internalCode,
+          admin: true,
+          role: 'admin',
+          email: user.email
+        };
+        break;
     }
   } catch (e: any) {
-    // Non-fatal: return minimal entity info if table missing
+    // Log error but don't fail - return basic data
+    console.error(`Failed to fetch entity data for ${role}:${internalCode}`, e);
   }
 
-  ok(res, { kind: role, data: entity });
+  return ok(res, { 
+    kind: role, 
+    data: entityData,
+    internal_code: internalCode 
+  });
+}));
+
+// Get user's accessible entities (for role switching)
+router.get('/me/entities', requireUser, safe(async (req: AuthRequest, res: Response) => {
+  const { rows } = await pool.query(
+    `SELECT internal_code, role 
+     FROM app_users 
+     WHERE clerk_user_id = $1`,
+    [req.userId]
+  );
+  
+  if (!rows.length) {
+    return ok(res, { entities: [] });
+  }
+  
+  // In future, could support multiple linked entities
+  ok(res, { 
+    entities: rows.map(r => ({
+      code: r.internal_code,
+      role: r.role
+    }))
+  });
 }));
 
 export default router;

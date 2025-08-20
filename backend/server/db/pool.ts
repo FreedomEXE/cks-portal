@@ -1,54 +1,94 @@
-/**
- * File: db/pool.ts
- *
- * Descriptio:
- *   PostgreSQL connection pool factory and typed query helper.
- * Functionality:
- *   Builds connection string from env, applies dynamic SSL rules, exports singleton Pool + generic query<T>().
- * Importance:
- *   Core data access primitive for raw SQL before/alongside Prisma adoption.
- * Conections:
- *   Used across routes (entities, profiles, me) and internal helpers; referenced by Express server.
- * Notes:
- *   Replace ad-hoc SQL with repository layer / Prisma gradually to reduce duplication.
- */
 /*───────────────────────────────────────────────
   Property of CKS  © 2025
   Manifested by Freedom
 ───────────────────────────────────────────────*/
 
-import { Pool, QueryResultRow } from 'pg';
+/**
+ * pool.ts
+ * 
+ * Description: PostgreSQL connection pool configuration
+ * Function: Creates and exports a shared database connection pool
+ * Importance: Critical - Single source of database connectivity
+ * Connects to: PostgreSQL database via connection string
+ * 
+ * Notes: Automatically detects SSL requirements based on environment.
+ *        Supports multiple connection string formats.
+ */
 
-function buildConnString(): string {
-  const raw = process.env.DATABASE_URL || process.env.PG_CONNECTION_STRING || process.env.PG_URL;
+import { Pool } from 'pg';
+
+/**
+ * Build connection string from environment variables
+ */
+function buildConnectionString(): string {
+  // Check for direct connection string
+  const raw = 
+    process.env.DATABASE_URL ||
+    process.env.PG_CONNECTION_STRING ||
+    process.env.PG_URL;
+    
   if (raw) return raw;
+  
+  // Build from individual components
   const host = process.env.DB_HOST || 'localhost';
   const port = process.env.DB_PORT || '5432';
-  const db   = process.env.DB_NAME || process.env.PGDATABASE || 'cks_portal_db';
+  const database = process.env.DB_NAME || process.env.PGDATABASE || 'cks_portal_db';
   const user = process.env.DB_USER || process.env.PGUSER || 'postgres';
-  const pass = process.env.DB_PASSWORD || process.env.PGPASSWORD || '';
-  return `postgresql://${encodeURIComponent(user)}:${encodeURIComponent(pass)}@${host}:${port}/${db}`;
+  const password = process.env.DB_PASSWORD || process.env.PGPASSWORD || '';
+  
+  return `postgresql://${encodeURIComponent(user)}:${encodeURIComponent(password)}@${host}:${port}/${database}`;
 }
-function pickSSL(cs?: string): false | { rejectUnauthorized: boolean } {
-  if (typeof process.env.PG_SSL !== 'undefined')
-    return String(process.env.PG_SSL).toLowerCase() === 'false' ? false : { rejectUnauthorized: false };
-  if (typeof process.env.DATABASE_SSL !== 'undefined')
-    return String(process.env.DATABASE_SSL).toLowerCase() === 'true' ? { rejectUnauthorized: false } : false;
-  if (cs && /sslmode=require/i.test(cs)) return { rejectUnauthorized: false };
-  if (cs && /render\.com/i.test(cs)) return { rejectUnauthorized: false };
+
+/**
+ * Determine SSL configuration based on environment
+ */
+function getSSLConfig(connectionString?: string): false | { rejectUnauthorized: boolean } {
+  // Check explicit SSL environment variables
+  if (typeof process.env.PG_SSL !== 'undefined') {
+    return String(process.env.PG_SSL).toLowerCase() === 'false'
+      ? false
+      : { rejectUnauthorized: false };
+  }
+  
+  if (typeof process.env.DATABASE_SSL !== 'undefined') {
+    return String(process.env.DATABASE_SSL).toLowerCase() === 'true'
+      ? { rejectUnauthorized: false }
+      : false;
+  }
+  
+  // Check connection string for SSL indicators
+  if (connectionString && /sslmode=require/i.test(connectionString)) {
+    return { rejectUnauthorized: false };
+  }
+  
+  // Check for known cloud providers
+  if (connectionString && /render\.com|heroku|amazonaws/i.test(connectionString)) {
+    return { rejectUnauthorized: false };
+  }
+  
   return false;
 }
-const connectionString = buildConnString();
-const ssl = pickSSL(connectionString);
-export const pool = new Pool({ connectionString, ssl });
 
-export async function query<T extends QueryResultRow = any>(text: string, params: any[] = []) {
-  const c = await pool.connect();
-  try {
-    return await c.query<T>(text, params);
-  } finally {
-    c.release();
-  }
-}
+// Build connection configuration
+const connectionString = buildConnectionString();
+const ssl = getSSLConfig(connectionString);
+
+// Create and export the pool
+const pool = new Pool({
+  connectionString,
+  ssl,
+  max: 20, // Maximum number of clients in the pool
+  idleTimeoutMillis: 30000, // Close idle clients after 30 seconds
+  connectionTimeoutMillis: 2000, // Return an error after 2 seconds if connection could not be established
+});
+
+// Log connection info (without password)
+const safeUrl = connectionString.replace(/:([^@]+)@/, ':****@');
+console.log(`📦 Database pool created: ${safeUrl}`);
+
+// Handle pool errors
+pool.on('error', (err) => {
+  console.error('Unexpected database pool error:', err);
+});
 
 export default pool;
