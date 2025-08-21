@@ -30,9 +30,10 @@ function buildConnectionString(): string {
   if (raw) return raw;
   
   // Build from individual components
-  const host = process.env.DB_HOST || 'localhost';
-  const port = process.env.DB_PORT || '5432';
-  const database = process.env.DB_NAME || process.env.PGDATABASE || 'cks_portal_db';
+  // Respect both DB_* and common PG_* env var names (Docker/Heroku/etc.)
+  const host = process.env.DB_HOST || process.env.PGHOST || 'localhost';
+  const port = process.env.DB_PORT || process.env.PGPORT || process.env.PG_PORT || '5432';
+  const database = process.env.DB_NAME || process.env.PGDATABASE || process.env.PGDATABASE || 'cks_portal_db';
   const user = process.env.DB_USER || process.env.PGUSER || 'postgres';
   const password = process.env.DB_PASSWORD || process.env.PGPASSWORD || '';
   
@@ -79,7 +80,7 @@ const pool = new Pool({
   ssl,
   max: 20, // Maximum number of clients in the pool
   idleTimeoutMillis: 30000, // Close idle clients after 30 seconds
-  connectionTimeoutMillis: 2000, // Return an error after 2 seconds if connection could not be established
+  connectionTimeoutMillis: 5000, // Return an error after 5 seconds if connection could not be established (give DNS / cloud a bit more time)
 });
 
 // Log connection info (without password)

@@ -9,16 +9,16 @@
     "npm": ">=9.0.0"
   },
   "scripts": {
-    "clean": "rimraf dist build server/**/*.js",
+    "clean": "rimraf dist build src/**/*.js",
     "prebuild": "npm run clean",
     "build": "tsc",
     "postbuild": "npm run copy:assets",
     "copy:assets": "echo 'No assets to copy'",
-    "dev": "tsx watch server/src/index.ts",
-    "dev:legacy": "ts-node-dev --respawn --transpile-only server/src/index.ts",
-    "dev:fastify": "tsx watch server/src/fastify.ts",
-    "start": "node dist/server/src/index.js",
-    "start:prod": "NODE_ENV=production node dist/server/src/index.js",
+    "dev": "tsx watch index.ts",
+    "dev:legacy": "ts-node-dev --respawn --transpile-only index.ts",
+    "dev:fastify": "tsx watch fastify.ts",
+    "start": "node dist/index.js",
+    "start:prod": "NODE_ENV=production node dist/index.js",
     "lint": "eslint . --ext .ts --max-warnings=0",
     "lint:fix": "eslint . --ext .ts --fix",
     "format": "prettier --write \"**/*.{ts,json,md}\" --ignore-path .gitignore",
@@ -32,7 +32,7 @@
     "migrate": "node-pg-migrate -m migrations up",
     "migrate:down": "node-pg-migrate -m migrations down",
     "migrate:create": "node-pg-migrate -m migrations create",
-    "docs:gen": "ts-node server/src/openapi.ts > openapi.json",
+    "docs:gen": "ts-node src/openapi.ts > openapi.json",
     "validate": "npm run type-check && npm run lint && npm run format:check && npm run test"
   },
   "dependencies": {

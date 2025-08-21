@@ -16,15 +16,15 @@ import ReportsPage from '../../pages/Reports';
 // Using unified MyProfile page (no separate Hub/MyProfile variant present on disk)
 import MyProfile from '../../pages/MyProfile';
 import ManagerHub from './Manager/ManagerHub';
-import CenterHub from './Center/CenterHub';
+import CenterHub from './Center';
 import ContractorHub from './Contractor';
-import CrewHub from './Crew/CrewHub';
-import CustomerHub from './Customer/CustomerHub';
+import CrewHub from './Crew';
+import CustomerHub from './Customer';
 import Page from '../../components/Page';
 // Role-specific profile components
-import CenterProfile from './Center/Profile/CenterProfile';
-import CrewProfile from './Crew/Profile/CrewProfile';
-import CustomerProfile from './Customer/Profile/CustomerProfile';
+import CenterProfile from './Center/Profile';
+import CrewProfile from './Crew/Profile';
+import CustomerProfile from './Customer/Profile';
 import ManagerProfile from './Manager/Profile/ManagerProfile';
 
 // Feature flags (support raw + Vite-prefixed for flexibility)

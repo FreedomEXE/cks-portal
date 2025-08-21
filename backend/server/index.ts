@@ -22,14 +22,12 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import swaggerUi from 'swagger-ui-express';
-import { env } from './core/env';
-import { logger, httpLogger } from './core/logger';
-import { notFound, errorHandler } from './core/errors';
-import { metricsMiddleware, metricsHandler } from './core/metrics';
-import pool from '../db/pool';  
-import entitiesRouter from '../routes/entities';
-import profilesRouter from '../routes/profiles.routes';
-import meRouter from '../routes/me';
+import { env } from './src/core/env';
+import { logger, httpLogger } from './src/core/logger';
+import { notFound, errorHandler } from './src/core/errors';
+import { metricsMiddleware, metricsHandler } from './src/core/metrics';
+import pool from './db/pool';  
+import meRouter from './routes/me';
 
 const app = express();
 
@@ -220,8 +218,6 @@ app.get('/api/admin/centers', async (req, res) => {
 });
 
 // Mount modular routes - ALL under /api for consistency
-app.use('/api', entitiesRouter);
-app.use('/api/profiles', profilesRouter);
 app.use('/api', meRouter);
 
 // Swagger documentation

@@ -23,9 +23,9 @@ import { useEffect } from "react";
 import Skeleton from "../components/Skeleton";
 import useMeProfile from "../hooks/useMeProfile";
 import ContractorProfile from "./Hub/Contractor/Profile";
-import CenterProfile from "./Hub/Center/Profile/CenterProfile";
-import CrewProfile from "./Hub/Crew/Profile/CrewProfile";
-import CustomerProfile from "./Hub/Customer/Profile/CustomerProfile";
+import CenterProfile from "./Hub/Center/Profile";
+import CrewProfile from "./Hub/Crew/Profile";
+import CustomerProfile from "./Hub/Customer/Profile";
 import ProfileCard from "../components/ProfileCard";
 import ManagerProfile from "./Hub/Manager/Profile/ManagerProfile";
 import getRole from "../lib/getRole";
@@ -82,8 +82,7 @@ export default function MyProfilePage() {
 
 	let content: React.ReactNode = null;
 	if (resolvedKind === "center") {
-		const subjectCode = effectiveData?.center_id || effectiveData?.code || "";
-		content = <CenterProfile subjectCode={subjectCode} subjectData={effectiveData} viewerRole="center" relationship="own-center" showHeader={false} />;
+		content = <CenterProfile data={effectiveData} showHeader={false} />;
 	} else if (resolvedKind === "crew") {
 		content = <CrewProfile data={effectiveData} showHeader={false} />;
 	} else if (resolvedKind === "contractor") {

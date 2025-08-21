@@ -57,8 +57,9 @@ export function useMeProfile() {
         return;
       }
 
-      // PRIMARY FIX: Add /api prefix to the URL
-      const url = buildUrl("/api/me/profile", codeOverride ? { code: codeOverride } : {});
+  // Use relative path; `buildUrl` will prefix the API base (typically `/api`) so
+  // do not include `/api` here to avoid `/api/api/...` double-prefixing.
+  const url = buildUrl("/me/profile", codeOverride ? { code: codeOverride } : {});
       console.debug('[useMeProfile] fetching', url);
       
       const res = await apiFetch(url);
@@ -70,7 +71,8 @@ export function useMeProfile() {
       // Handle 404 - try fallback endpoints
       if (res.status === 404) {
         const userRole = getRole(user);
-        const fallbackPaths = ['/api/me/manager', '/api/manager/profile', '/api/manager/me'];
+  // Fallback paths should also be relative to API base so omit the leading `/api`.
+  const fallbackPaths = ['/me/manager', '/manager/profile', '/manager/me'];
         let fallbackJson: any = null;
         let fallbackSource: string | null = null;
         

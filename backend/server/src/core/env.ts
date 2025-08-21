@@ -28,6 +28,12 @@ const envSchema = z.object({
   DB_NAME: z.string().optional(),
   DB_USER: z.string().optional(),
   DB_PASSWORD: z.string().optional(),
+  // Common Postgres env var names (Docker/Heroku/Postgres clients)
+  PGHOST: z.string().optional(),
+  PGPORT: z.string().optional(),
+  PGDATABASE: z.string().optional(),
+  PGUSER: z.string().optional(),
+  PGPASSWORD: z.string().optional(),
   PG_SSL: z.string().optional()
   ,
   DATABASE_URL_PRISMA: z.string().url().optional(),
