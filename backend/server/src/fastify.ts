@@ -48,7 +48,7 @@ async function main() {
 
   // Example Redis cache route
   app.get('/cache/ping', async () => {
-    const redis = await connectRedis();
+    await connectRedis();
     return { pong: true };
   });
 

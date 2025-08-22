@@ -27,22 +27,19 @@ import CenterProfile from "./Hub/Center/Profile";
 import CrewProfile from "./Hub/Crew/Profile";
 import CustomerProfile from "./Hub/Customer/Profile";
 import ProfileCard from "../components/ProfileCard";
-import ManagerProfile from "./Hub/Manager/Profile/ManagerProfile";
+import ManagerProfile from "./Hub/Manager/Profile";
 import getRole from "../lib/getRole";
 import { useUser } from "../lib/auth";
 
 export default function MyProfilePage() {
 	const { username } = useParams();
-	const roleFromUsername = username?.startsWith('con-') ? 'contractor' : 
-	                         username?.startsWith('ctr-') ? 'center' :
-	                         username?.startsWith('crew-') ? 'crew' :
-	                         username?.startsWith('cust-') ? 'customer' :
-	                         username?.startsWith('mgr-') ? 'manager' : '';
 	const state = useMeProfile();
 	const { user } = useUser();
 	const { search } = useLocation();
 	const params = new URLSearchParams(search);
 	const { role: roleFromPath } = useParams();
+	
+	// Get role from various sources
 	const roleOverride = (roleFromPath || params.get('role') || params.get('kind') || '').toLowerCase();
 	const userRole = getRole(user);
 	const lastRole = (typeof localStorage !== 'undefined' ? localStorage.getItem('me:lastRole') : null) || '';
@@ -50,29 +47,33 @@ export default function MyProfilePage() {
 	const codeOverride = params.get('code') || lastCode || '';
 	const hasOverride = !!(roleOverride || codeOverride);
 	
+	// FIXED: Prioritize userRole from Clerk over state.kind
 	const effectiveKind = (
 		roleOverride ||
+		userRole ||  // Use Clerk role FIRST
 		((state.kind && state.kind !== 'admin') ? state.kind : '') ||
-		((userRole && userRole !== 'admin') ? userRole : '') ||
 		(lastRole && lastRole !== 'admin' ? lastRole : '') ||
 		(state.kind || '')
 	).toLowerCase();
 	
+	// Special case: if user is manager but effectiveKind is admin, use manager
 	const resolvedKind = (effectiveKind === 'admin' && userRole === 'manager') ? 'manager' : effectiveKind;
-	const effectiveData = withOverrideData(effectiveKind, codeOverride, state.data);
+	
+	// Get the appropriate data based on role
+	const effectiveData = withOverrideData(resolvedKind, codeOverride, state.data);
 
 	useEffect(() => {
 		if (state.loading || state.error) return;
 		const subjectCode =
 			effectiveData?.center_id || effectiveData?.crew_id || effectiveData?.contractor_id || 
 			effectiveData?.customer_id || effectiveData?.manager_id || effectiveData?.code || '';
-		if (effectiveKind && effectiveKind !== 'admin' && subjectCode) {
+		if (resolvedKind && resolvedKind !== 'admin' && subjectCode) {
 			try {
-				localStorage.setItem('me:lastRole', effectiveKind);
+				localStorage.setItem('me:lastRole', resolvedKind);
 				localStorage.setItem('me:lastCode', subjectCode);
 			} catch {}
 		}
-	}, [state.loading, state.error, effectiveKind, effectiveData]);
+	}, [state.loading, state.error, resolvedKind, effectiveData]);
 
 	if (state.loading && !hasOverride) return <Page title="My Profile"><Skeleton lines={8} /></Page>;
 
@@ -80,6 +81,7 @@ export default function MyProfilePage() {
 		? <div style={{color:'#b91c1c'}}>Error: {state.error}</div>
 		: null;
 
+	// FIXED: Use resolvedKind consistently for component selection
 	let content: React.ReactNode = null;
 	if (resolvedKind === "center") {
 		content = <CenterProfile data={effectiveData} showHeader={false} />;
@@ -88,10 +90,13 @@ export default function MyProfilePage() {
 	} else if (resolvedKind === "contractor") {
 		content = <ContractorProfile data={effectiveData} showHeader={false} />;
 	} else if (resolvedKind === "customer") {
-		content = <CustomerProfile data={effectiveData} showHeader={false} />;
+		const CustomerProfileAny = CustomerProfile as React.ComponentType<any>;
+		content = <CustomerProfileAny data={effectiveData} showHeader={false} />;
 	} else if (resolvedKind === "manager") {
-		content = <ManagerProfile data={effectiveData} />;
+		const ManagerProfileAny = ManagerProfile as React.ComponentType<any>;
+		content = <ManagerProfileAny data={effectiveData} />;
 	} else if (resolvedKind === "admin") {
+		// Admin doesn't have a profile component yet
 		const lastRole = (typeof localStorage !== 'undefined' ? localStorage.getItem('me:lastRole') : null) || '';
 		if (lastRole && lastRole !== 'admin') {
 			content = <ProfileCard kind={lastRole as any} data={effectiveData} />;
@@ -100,11 +105,17 @@ export default function MyProfilePage() {
 		}
 	}
 
-	// Debug logging
+	// Debug logging - enhanced
 	try { console.debug('[MyProfile debug]', { 
+		username,
+		userRole,
 		stateKind: state.kind,
-		roleOverride, lastRole, lastCode, codeOverride,
-		userRole, effectiveKind, resolvedKind,
+		roleOverride, 
+		lastRole, 
+		lastCode, 
+		codeOverride,
+		effectiveKind, 
+		resolvedKind,
 		effectiveDataKeys: Object.keys(effectiveData||{}).slice(0,12)
 	}); } catch {}
 	

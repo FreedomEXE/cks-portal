@@ -9,7 +9,7 @@
     "npm": ">=9.0.0"
   },
   "scripts": {
-    "clean": "rimraf dist build src/**/*.js",
+    "clean": "rimraf dist build src",
     "prebuild": "npm run clean",
     "build": "tsc",
     "postbuild": "npm run copy:assets",

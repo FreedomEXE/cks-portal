@@ -4,40 +4,26 @@
 ───────────────────────────────────────────────*/
 
 /**
- * Profile.tsx (Customer)
+ * index.tsx (Customer Hub Router)
  * 
- * Template shared by all Linked Customer User ID's
- * Description: Customer profile component that receives data from parent
- * Function: Displays customer profile card and tabbed information sections
- * Importance: High - Primary view for customer account information
- * Connects to: ProfileCard, ProfileTabs, customerTabs config
+ * Description: Customer hub's own router
+ * Function: Routes to Home and Profile for customers
+ * Importance: Critical - Main routing for customer hub
  * 
- * Notes: Simplified from complex visibility system.
- *        Parent component handles data fetching and role context.
+ * Follows hub isolation principle - completely self-contained
  */
 
-import ProfileCard from '../../../components/ProfileCard';
-import ProfileTabs from '../../../components/ProfileTabs';
-import customerTabsConfig from '../../../components/profiles/customerTabs.config';
+import React from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import CustomerHome from './Home';
+import CustomerProfile from './Profile';
 
-export default function CustomerProfile({ data, showHeader = true }: { data: any; showHeader?: boolean }) {
-  // Handle no data
-  if (!data || Object.keys(data).length === 0) {
-    return (
-      <div className="ui-card" style={{ padding: 16 }}>
-        No profile data available.
-      </div>
-    );
-  }
-  
+export default function CustomerHub() {
   return (
-    <div>
-      {showHeader ? <ProfileCard kind="customer" data={data} /> : null}
-      <ProfileTabs 
-        tabs={customerTabsConfig} 
-        subject={{ kind: 'customer', code: data?.customer_id || data?.code, name: data?.company_name || data?.name }} 
-        data={data} 
-      />
-    </div>
+    <Routes>
+      <Route path="/" element={<CustomerHome />} />
+      <Route path="/profile" element={<CustomerProfile />} />
+      <Route path="/*" element={<Navigate to="/" replace />} />
+    </Routes>
   );
 }
