@@ -1,0 +1,191 @@
+/*───────────────────────────────────────────────
+  Property of CKS  © 2025
+  Manifested by Freedom
+───────────────────────────────────────────────*/
+
+/**
+ * useCenterData.ts
+ * 
+ * Description: Hook for fetching and managing center-specific profile data
+ * Function: Fetches center profile from Center API with fallbacks for offline/dev modes
+ * Importance: Critical - Primary data source for Center hub (crew coordinators)
+ * Connects to: Center API endpoints, localStorage for fallbacks, Clerk for auth
+ * 
+ * Notes: Center-specific version with dedicated API endpoints for crew management.
+ *        Handles center authentication and crew coordination validation.
+ *        Provides stub data when Center API is unavailable.
+ *        Centers coordinate crew operations and report to customer managers.
+ */
+
+import { useCallback, useEffect, useState, useRef } from "react";
+import { buildCenterApiUrl, centerApiFetch } from "../utils/centerApi";
+import { useUser } from '@clerk/clerk-react';
+import { validateCenterRole } from '../utils/centerAuth';
+
+type CenterState = {
+  loading: boolean;
+  error: string | null;
+  kind: string;
+  data: any;
+  _source?: string; // Internal diagnostic
+};
+
+export function useCenterData() {
+  const { user } = useUser();
+  const [state, setState] = useState<CenterState>({ loading: true, error: null, kind: "center", data: null });
+  const didInitialFetchRef = useRef(false);
+
+  const fetchCenterData = useCallback(async () => {
+    try {
+      setState((s) => ({ ...s, loading: true, error: null }));
+      
+      // Check for URL param overrides (dev/testing)
+      const params = new URLSearchParams(window.location.search);
+      const codeOverride = params.get('code') || undefined;
+      
+      // Check localStorage fallbacks (only in dev/offline)
+      const lastCode = user?.id ? undefined : (safeGet('center:lastCode') || undefined);
+
+      // If explicit overrides exist, use demo data
+      if (codeOverride) {
+        const data = makeCenterDemoData(codeOverride || lastCode);
+        setState({ loading: false, error: null, kind: 'center', data, _source: 'override' });
+        console.debug('[useCenterData]', { source: 'override', data });
+        return;
+      }
+
+      // Validate center role first
+      if (!validateCenterRole(user)) {
+        setState({ loading: false, error: 'Unauthorized: Center access required', kind: "", data: null, _source: 'auth-error' });
+        return;
+      }
+
+      const url = buildCenterApiUrl("/profile", codeOverride ? { code: codeOverride } : {});
+      console.debug('[useCenterData] fetching', url);
+      
+      const res = await centerApiFetch(url);
+      let j: any = await res.json();
+      console.debug('[useCenterData] response', { status: res.status, data: j });
+
+      let sourceTag: string = '/center-api/profile';
+
+      // Handle 404 - try fallback endpoints
+      if (res.status === 404) {
+        const fallbackPaths = ['/me', '/center/me', '/profile', '/location'];
+        let fallbackJson: any = null;
+        let fallbackSource: string | null = null;
+        
+        for (const p of fallbackPaths) {
+          try {
+            const r = await centerApiFetch(buildCenterApiUrl(p));
+            console.debug('[useCenterData] trying fallback', { url: p, status: r?.status });
+            if (r.ok) {
+              fallbackJson = await r.json().catch(() => null);
+              fallbackSource = p;
+              break;
+            }
+          } catch (e: any) {
+            console.debug('[useCenterData] fallback error', { url: p, error: e.message });
+          }
+        }
+        
+        // Provide stub for center if all fallbacks fail
+        if (!fallbackJson) {
+          fallbackJson = makeCenterDemoData();
+          fallbackSource = 'stub:center';
+        }
+        
+        j = fallbackJson;
+        sourceTag = fallbackSource || '404-fallback';
+      }
+
+      // Handle other errors
+      if (!res.ok && res.status !== 404) {
+        const msg = String(j?.error || `HTTP ${res.status}`);
+        
+        // For network errors in dev, use fallback data
+        if (!user?.id || /Failed to fetch|NetworkError|ECONNREFUSED/i.test(msg)) {
+          const data = makeCenterDemoData(safeGet('center:lastCode') || undefined);
+          setState({ loading: false, error: null, kind: 'center', data, _source: 'soft-fallback' });
+          return;
+        }
+        
+        setState({ loading: false, error: msg, kind: "", data: null, _source: sourceTag });
+        return;
+      }
+
+      // Normalize response data
+      let data = j?.data || j || {};
+      
+      // Ensure center has required fields
+      if (!data.center_id) data.center_id = 'ctr-000';
+      if (!data.center_name) data.center_name = 'Center Demo Location';
+      
+      setState({ loading: false, error: null, kind: 'center', data, _source: sourceTag });
+      console.debug('[useCenterData] success', { source: sourceTag, hasData: !!data });
+      
+    } catch (e: any) {
+      const msg = e?.message || String(e);
+      
+      // Network error fallback
+      if (/Failed to fetch|NetworkError|ECONNREFUSED/i.test(msg)) {
+        const params = new URLSearchParams(window.location.search);
+        const codeOverride = params.get('code') || undefined;
+        const lastCode = safeGet('center:lastCode') || undefined;
+        const data = makeCenterDemoData(codeOverride || lastCode);
+        
+        setState({ loading: false, error: null, kind: 'center', data, _source: 'network-fallback' });
+        return;
+      }
+      
+      setState({ loading: false, error: msg, kind: "", data: null, _source: 'error' });
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (didInitialFetchRef.current) return; // Prevent double fetch in StrictMode
+    didInitialFetchRef.current = true;
+    fetchCenterData();
+  }, [fetchCenterData]);
+
+  const refetch = useCallback(() => {
+    didInitialFetchRef.current = false;
+    fetchCenterData();
+  }, [fetchCenterData]);
+
+  return { loading: state.loading, error: state.error, kind: state.kind, data: state.data, refetch };
+}
+
+export default useCenterData;
+
+// Helper functions
+function makeCenterDemoData(code?: string) {
+  return { 
+    center_id: code || 'ctr-000', 
+    center_name: 'Downtown Operations Center', 
+    code: code || 'ctr-000',
+    location_type: 'Commercial',
+    facility_manager: 'John Center',
+    email: 'manager@center-demo.com',
+    phone: '(555) 789-0123',
+    address: '789 Operations Blvd, Floor 3',
+    established: '2022-01-01',
+    service_areas: ['Main Floor', 'Upper Level', 'Parking Garage'],
+    customer_account: 'Customer Demo Corp',
+    contractor_assigned: 'Contractor Demo LLC',
+    operation_hours: '24/7',
+    crew_capacity: 6,
+    active_crew: 4,
+    pending_tasks: 3,
+    equipment_count: 12,
+    _stub: true 
+  };
+}
+
+function safeGet(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}

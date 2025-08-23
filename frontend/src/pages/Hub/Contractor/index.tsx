@@ -4,34 +4,46 @@
 ───────────────────────────────────────────────*/
 
 /**
- * index.tsx (Contractor Hub)
+ * index.tsx (ContractorHub - FULLY INDEPENDENT)
  * 
- * Description: Single entry point and router for the Contractor hub module
- * Function: Routes all contractor-related pages and exports hub components
- * Importance: Critical - Defines contractor hub structure and navigation
- * Connects to: Home, Profile (via MyProfile page)
+ * Description: Contractor hub router with complete independence from shared components
+ * Function: Routes all Contractor hub functionality through single Home component
+ * Importance: Critical - Entry point for complete Contractor hub system
+ * Connects to: Contractor Home component only, Contractor authentication, Contractor API
  * 
- * Notes: Profile route uses MyProfile page for data fetching.
- *        The Profile component is exported for external use.
+ * Notes: 100% self-contained routing with no external dependencies.
+ *        All Contractor functionality consolidated into Home component.
+ *        Uses Contractor-specific authentication and session management.
+ *        Perfect template for other hub architectures.
  */
 
-import React from "react";
-import { Routes, Route } from "react-router-dom";
-import Home from "./Home";
-import Profile from "./Profile";  // This is the Profile.tsx in this folder
-import MyProfile from "../../../pages/MyProfile";  // For the route
+import React from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import ContractorHome from './Home';
 
-// Main router for the Contractor hub
 export default function ContractorHub() {
   return (
     <Routes>
-      <Route path="" element={<Home />} />
-      <Route path="profile" element={<MyProfile />} />  {/* MyProfile handles data fetching */}
-      {/* Future routes can be added here */}
+      {/* All Contractor functionality in single Home component */}
+      <Route path="/" element={<ContractorHome />} />
+      <Route path="/profile" element={<ContractorHome />} />
+      <Route path="/dashboard" element={<ContractorHome />} />
+      <Route path="/customers" element={<ContractorHome />} />
+      <Route path="/centers" element={<ContractorHome />} />
+      <Route path="/crew" element={<ContractorHome />} />
+      <Route path="/reports" element={<ContractorHome />} />
+      <Route path="/orders" element={<ContractorHome />} />
+      
+      {/* Legacy routes redirect to home */}
+      <Route path="/services" element={<ContractorHome />} />
+      <Route path="/equipment" element={<ContractorHome />} />
+      <Route path="/jobs" element={<ContractorHome />} />
+      <Route path="/documents" element={<ContractorHome />} />
+      <Route path="/support" element={<ContractorHome />} />
+      <Route path="/billing" element={<ContractorHome />} />
+      
+      {/* Catch any unknown routes and redirect to home */}
+      <Route path="/*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }
-
-// Named exports for backward compatibility or external use
-export { Profile as ContractorProfile };  // This exports ./Profile.tsx as ContractorProfile
-export { Home as ContractorHome };

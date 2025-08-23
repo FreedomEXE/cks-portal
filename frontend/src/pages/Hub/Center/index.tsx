@@ -4,34 +4,42 @@
 ───────────────────────────────────────────────*/
 
 /**
- * index.tsx (Center Hub)
+ * index.tsx (CenterHub - FULLY INDEPENDENT)
  * 
- * Description: Single entry point and router for the Center hub module
- * Function: Routes all center-related pages and exports hub components
- * Importance: Critical - Defines center hub structure and navigation
- * Connects to: Home, Profile (via MyProfile page)
+ * Description: Center hub router with complete independence from shared components
+ * Function: Routes all Center hub functionality through single Home component
+ * Importance: Critical - Entry point for complete Center hub system
+ * Connects to: Center Home component only, Center authentication, Center API
  * 
- * Notes: Profile route uses MyProfile page for data fetching.
- *        The Profile component is exported for external use.
+ * Notes: 100% self-contained routing with no external dependencies.
+ *        All Center functionality consolidated into Home component.
+ *        Uses Center-specific authentication and session management.
+ *        Perfect template for center operations architecture.
  */
 
-import React from "react";
-import { Routes, Route } from "react-router-dom";
-import Home from "./Home";
-import Profile from "./Profile";  // This is the Profile.tsx in this folder
-import MyProfile from "../../../pages/MyProfile";  // For the route
+import React from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import CenterHome from './Home';
 
-// Main router for the Center hub
 export default function CenterHub() {
   return (
     <Routes>
-      <Route path="" element={<Home />} />
-      <Route path="profile" element={<MyProfile />} />  {/* MyProfile handles data fetching */}
-      {/* Future routes can be added here */}
+      {/* All Center functionality in single Home component */}
+      <Route path="/" element={<CenterHome />} />
+      <Route path="/profile" element={<CenterHome />} />
+      <Route path="/dashboard" element={<CenterHome />} />
+      <Route path="/crew" element={<CenterHome />} />
+      <Route path="/services" element={<CenterHome />} />
+      <Route path="/schedules" element={<CenterHome />} />
+      <Route path="/reports" element={<CenterHome />} />
+      <Route path="/support" element={<CenterHome />} />
+      
+      {/* Legacy routes redirect to home */}
+      <Route path="/jobs" element={<CenterHome />} />
+      <Route path="/documents" element={<CenterHome />} />
+      
+      {/* Catch any unknown routes and redirect to home */}
+      <Route path="/*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }
-
-// Named exports for backward compatibility or external use
-export { Profile as CenterProfile };  // This exports ./Profile.tsx as CenterProfile
-export { Home as CenterHome };

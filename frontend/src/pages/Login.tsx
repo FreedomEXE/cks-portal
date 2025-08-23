@@ -30,7 +30,37 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSignIn, useAuth, useUser } from '@clerk/clerk-react';
-import { buildUrl, apiFetch } from '../lib/apiBase';
+// Inline API utilities for login page
+const DEV_PROXY_BASE = '/api';
+const RAW_API_BASE = import.meta.env.VITE_API_URL || DEV_PROXY_BASE;
+const API_BASE = RAW_API_BASE.replace(/\/+$/, "");
+
+function buildUrl(path: string, params: Record<string, any> = {}) {
+  const url = new URL(API_BASE + path, window.location.origin);
+  for (const [k, v] of Object.entries(params)) {
+    if (v !== undefined && v !== null && v !== "") {
+      url.searchParams.set(k, String(v));
+    }
+  }
+  return url.toString();
+}
+
+function getClerkUserId(): string | null {
+  try {
+    const w: any = typeof window !== 'undefined' ? (window as any) : null;
+    const u = w?.Clerk?.user?.id || w?.Clerk?.session?.user?.id || null;
+    return u ? String(u) : null;
+  } catch { return null; }
+}
+
+async function apiFetch(input: string, init: RequestInit = {}) {
+  const userId = getClerkUserId();
+  const headers = new Headers(init.headers || {});
+  if (userId && !headers.has('x-user-id')) headers.set('x-user-id', userId);
+  if (!headers.has('Accept')) headers.set('Accept', 'application/json');
+  const opts: RequestInit = { credentials: 'include', ...init, headers };
+  return fetch(input, opts);
+}
 
 export default function Login() {
   const navigate = useNavigate();

@@ -4,49 +4,41 @@
 ───────────────────────────────────────────────*/
 
 /**
- * index.tsx (Customer Hub Router)
+ * index.tsx (CustomerHub - FULLY INDEPENDENT)
  * 
- * Description: FULLY INDEPENDENT Customer hub router
- * Function: Routes to Home and Profile pages for customer users
- * Importance: High - Controls customer hub routing
- * Connects to: CustomerHome, CustomerProfile components
+ * Description: Customer hub router with complete independence from shared components
+ * Function: Routes all Customer hub functionality through single Home component
+ * Importance: Critical - Entry point for complete Customer hub system
+ * Connects to: Customer Home component only, Customer authentication, Customer API
  * 
- * Notes: Profile component fetches its own data via useMeProfile
+ * Notes: 100% self-contained routing with no external dependencies.
+ *        All Customer functionality consolidated into Home component.
+ *        Uses Customer-specific authentication and session management.
+ *        Perfect template for other hub architectures.
  */
-
 
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import CustomerHome from './Home';
-import CustomerProfile from './Profile';
-import Page from '../../../components/Page';
-
-/**
- * Placeholder for Customer features not yet implemented
- */
-const Placeholder = ({ title }: { title: string }) => (
-  <Page title={title}>
-    <div className="ui-card" style={{ padding: 16 }}>
-      Customer {title} - Coming soon
-    </div>
-  </Page>
-);
 
 export default function CustomerHub() {
   return (
     <Routes>
-      {/* Main Customer routes */}
+      {/* All Customer functionality in single Home component */}
       <Route path="/" element={<CustomerHome />} />
-      <Route path="/profile" element={<CustomerProfile />} />  {/* NO data prop! */}
+      <Route path="/profile" element={<CustomerHome />} />
+      <Route path="/dashboard" element={<CustomerHome />} />
+      <Route path="/centers" element={<CustomerHome />} />
+      <Route path="/crew" element={<CustomerHome />} />
+      <Route path="/reports" element={<CustomerHome />} />
+      <Route path="/orders" element={<CustomerHome />} />
+      <Route path="/services" element={<CustomerHome />} />
       
-      {/* Customer-specific sections */}
-      <Route path="/centers" element={<Placeholder title="Centers" />} />
-      <Route path="/services" element={<Placeholder title="Services" />} />
-      <Route path="/invoices" element={<Placeholder title="Invoices" />} />
-      <Route path="/reports" element={<Placeholder title="Reports" />} />
-      <Route path="/requests" element={<Placeholder title="Requests" />} />
-      <Route path="/documents" element={<Placeholder title="Documents" />} />
-      <Route path="/support" element={<Placeholder title="Support" />} />
+      {/* Legacy routes redirect to home */}
+      <Route path="/invoices" element={<CustomerHome />} />
+      <Route path="/requests" element={<CustomerHome />} />
+      <Route path="/documents" element={<CustomerHome />} />
+      <Route path="/support" element={<CustomerHome />} />
       
       {/* Catch any unknown routes and redirect to home */}
       <Route path="/*" element={<Navigate to="/" replace />} />
