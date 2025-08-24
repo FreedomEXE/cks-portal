@@ -85,25 +85,6 @@ export default function UniversalLogoutButton({
         localStorage.removeItem(key);
       } catch {}
     });
-
-    // Clear any additional auth-related storage
-    try {
-      localStorage.clear();
-      sessionStorage.clear();
-    } catch {}
-  };
-
-  const forceNavigateToLogin = () => {
-    // Multiple navigation attempts to ensure redirect works
-    try {
-      window.location.replace('/login');
-    } catch {
-      try {
-        window.location.href = '/login';
-      } catch {
-        navigate('/login', { replace: true });
-      }
-    }
   };
 
   const handleLogout = async () => {
@@ -112,50 +93,27 @@ export default function UniversalLogoutButton({
     setIsLoggingOut(true);
 
     try {
-      // Step 1: Clear all session data immediately
+      // Set logout flag to prevent auto re-login
+      localStorage.setItem('userLoggedOut', 'true');
+      
+      // Clear all session data immediately
       clearAllSessionData();
 
-      // Step 2: Try Clerk signOut with multiple approaches
+      // Clerk signOut
       if (typeof signOut === 'function') {
-        try {
-          // Try the standard approach first
-          await signOut();
-        } catch (error) {
-          console.warn('[Logout] Standard signOut failed:', error);
-          
-          // Try alternative Clerk signOut methods
-          try {
-            await signOut({ redirectUrl: null });
-          } catch (error2) {
-            console.warn('[Logout] Alternative signOut failed:', error2);
-            
-            // Try direct Clerk instance access
-            try {
-              const clerk = (window as any)?.Clerk;
-              if (clerk && typeof clerk.signOut === 'function') {
-                await clerk.signOut();
-              }
-            } catch (error3) {
-              console.warn('[Logout] Direct Clerk signOut failed:', error3);
-            }
-          }
-        }
+        await signOut();
       }
 
-      // Step 3: Additional cleanup
-      clearAllSessionData();
-
-      // Step 4: Force navigate to login
-      setTimeout(() => {
-        forceNavigateToLogin();
-      }, 100);
+      // Force navigate to login
+      navigate('/login', { replace: true });
 
     } catch (error) {
-      console.error('[Logout] Complete logout failed:', error);
+      console.error('[Universal Logout] Error:', error);
       
       // Ensure we still redirect even if everything fails
       clearAllSessionData();
-      forceNavigateToLogin();
+      localStorage.setItem('userLoggedOut', 'true');
+      navigate('/login', { replace: true });
     } finally {
       setIsLoggingOut(false);
     }
@@ -168,7 +126,7 @@ export default function UniversalLogoutButton({
         padding: '10px 16px', 
         fontSize: 14,
         backgroundColor: HUB_COLORS[hubType],
-        color: 'white',
+        color: hubType === 'customer' ? 'black' : 'white',
         border: 'none',
         borderRadius: 6,
         cursor: isLoggingOut ? 'not-allowed' : 'pointer',

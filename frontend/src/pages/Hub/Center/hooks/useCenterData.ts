@@ -54,7 +54,16 @@ export function useCenterData() {
         return;
       }
 
-      // Validate center role first
+      // For template users, use demo data directly (skip validation)
+      const username = user?.username || '';
+      if (username.includes('-000') || username === 'cen-000') {
+        const data = makeCenterDemoData(username || 'cen-000');
+        setState({ loading: false, error: null, kind: 'center', data, _source: 'template-user' });
+        console.debug('[useCenterData]', { source: 'template-user', username, data });
+        return;
+      }
+
+      // Validate center role for real users
       if (!validateCenterRole(user)) {
         setState({ loading: false, error: 'Unauthorized: Center access required', kind: "", data: null, _source: 'auth-error' });
         return;

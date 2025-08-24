@@ -54,7 +54,16 @@ export function useCrewData() {
         return;
       }
 
-      // Validate crew role first
+      // For template users, use demo data directly (skip validation)
+      const username = user?.username || '';
+      if (username.includes('-000') || username === 'crw-000') {
+        const data = makeCrewDemoData(username || 'crw-000');
+        setState({ loading: false, error: null, kind: 'crew', data, _source: 'template-user' });
+        console.debug('[useCrewData]', { source: 'template-user', username, data });
+        return;
+      }
+
+      // Validate crew role for real users
       if (!validateCrewRole(user)) {
         setState({ loading: false, error: 'Unauthorized: Crew access required', kind: "", data: null, _source: 'auth-error' });
         return;

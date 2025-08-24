@@ -75,7 +75,6 @@ function App() {
           <Route path="/auth/redirect" element={<AfterSignInRedirect />} />
           
           {/* Hub system - all authenticated routes */}
-          <Route path=":username/hub" element={<HubRoleRouter />} />
           <Route path=":username/hub/*" element={<HubRoleRouter />} />
           
           {/* Fallback for any unmatched routes */}

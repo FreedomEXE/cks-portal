@@ -22,6 +22,7 @@ import { useLocation } from 'react-router-dom';
 import { useUser } from '@clerk/clerk-react';
 import { validateAdminRole, getAdminSession, setAdminSession, getAdminOperationalInfo } from './utils/adminAuth';
 import { buildAdminApiUrl, adminApiFetch } from './utils/adminApi';
+import LogoutButton from './components/LogoutButton';
 
 type AdminSection = 'dashboard' | 'directory' | 'create' | 'manage' | 'assign' | 'reports' | 'profile';
 type DirectoryTab = 'crew' | 'contractors' | 'customers' | 'centers' | 'services' | 'products' | 'supplies' | 'procedures' | 'training' | 'management' | 'warehouses' | 'orders' | 'reports';
@@ -256,10 +257,11 @@ export default function AdminHome() {
     return fieldsMap[userType] || ['id', 'name', 'status'];
   };
 
-  // Render section content - NOW FOCUSED ON DIRECTORY
+  // Render section content based on activeSection
   const renderSectionContent = () => {
-    // Admin hub is primarily a directory system
-    return (
+    switch (activeSection) {
+      case 'directory':
+        return (
       <div style={{ padding: '24px 0' }}>
         {/* CKS Directory Header */}
         <div style={{ marginBottom: 24 }}>
@@ -533,10 +535,8 @@ export default function AdminHome() {
           </div>
         )}
       </div>
-    );
+        );
 
-    // Legacy case handling for other sections if needed
-    switch (activeSection) {
       case 'dashboard':
         return (
           <div style={{ padding: '20px 0' }}>
@@ -1518,7 +1518,12 @@ export default function AdminHome() {
         );
 
       default:
-        return null;
+        return (
+          <div style={{ padding: '24px 0', textAlign: 'center', color: '#ffffff' }}>
+            <h2>Section: {activeSection}</h2>
+            <p>Content for {activeSection} section will be implemented here.</p>
+          </div>
+        );
     }
   };
 
@@ -1550,21 +1555,7 @@ export default function AdminHome() {
               borderRadius: '50%', 
               background: '#10b981' 
             }}></div>
-            <button
-              onClick={() => window.location.href = '/logout'}
-              style={{
-                padding: '8px 16px',
-                background: 'linear-gradient(135deg, #000000 0%, #333333 100%)',
-                border: '1px solid #555555',
-                borderRadius: 6,
-                color: '#ffffff',
-                fontSize: 14,
-                fontWeight: 500,
-                cursor: 'pointer'
-              }}
-            >
-              Logout
-            </button>
+            <LogoutButton />
           </div>
         </div>
       </div>

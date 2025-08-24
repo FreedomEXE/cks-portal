@@ -20,8 +20,25 @@ import { useUser } from '@clerk/clerk-react';
 import { useParams } from 'react-router-dom';
 // Inline role extraction utility
 function getRole(user: any, headers?: Record<string, string | null | undefined>) {
+  // First check for template users (xxx-000 format) - infer role from username
+  const username = user?.username || '';
+  if (/^[a-z]{3}-000$/i.test(username)) {
+    const prefix = username.substring(0, 3).toLowerCase();
+    switch(prefix) {
+      case 'mgr': return 'manager';
+      case 'cus': return 'customer';
+      case 'cen': return 'center';
+      case 'con': return 'contractor';
+      case 'crw': return 'crew';
+      case 'adm': return 'admin';
+      default: return null;
+    }
+  }
+  
+  // Then check metadata for real users
   const raw = (user as any)?.publicMetadata?.role ?? (user as any)?.role ?? undefined;
   if (raw && typeof raw === 'string') return raw.toLowerCase();
+  
   // Allow header fallback (x-user-role)
   const hdr = (headers?.['x-user-role'] ?? headers?.['X-User-Role']) as string | undefined;
   if (hdr) return String(hdr).toLowerCase();

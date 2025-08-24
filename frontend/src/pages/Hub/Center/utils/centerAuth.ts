@@ -31,6 +31,12 @@ export interface CenterSession {
 export function validateCenterRole(user: User | null | undefined): boolean {
   if (!user) return false;
   
+  // Allow template users (xxx-000 format)
+  const username = user.username || '';
+  if (username === 'cen-000' || /^[a-z]{3}-000$/i.test(username)) {
+    return true;
+  }
+  
   const role = getCenterRole(user);
   return role === 'center';
 }

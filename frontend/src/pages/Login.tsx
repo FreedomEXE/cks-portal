@@ -74,8 +74,19 @@ export default function Login() {
   const redirectedRef = useRef(false);
 
   // If already signed in (e.g., after OAuth redirect), compute destination and leave /login immediately
+  // But check if user was intentionally logged out
   useEffect(() => {
     if (!isSignedIn || redirectedRef.current) return;
+    
+    // Check if user intentionally logged out (prevent immediate re-login)
+    try {
+      const wasLoggedOut = localStorage.getItem('userLoggedOut') === 'true';
+      if (wasLoggedOut) {
+        localStorage.removeItem('userLoggedOut');
+        return;
+      }
+    } catch {}
+    
     redirectedRef.current = true;
     (async () => {
       try {

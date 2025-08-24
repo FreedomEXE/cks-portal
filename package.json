@@ -11,8 +11,11 @@
     "test": "tests"
   },
   "dependencies": {
+    "@playwright/test": "^1.55.0",
+    "dotenv": "^17.2.1",
     "openai": "^5.15.0",
-    "playwright-core": "^1.55.0"
+    "playwright-core": "^1.55.0",
+    "readline-sync": "^1.4.10"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
