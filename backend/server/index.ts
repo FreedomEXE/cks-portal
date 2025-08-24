@@ -28,6 +28,8 @@ import { notFound, errorHandler } from './src/core/errors';
 import { metricsMiddleware, metricsHandler } from './src/core/metrics';
 import pool from './db/pool';  
 import meRouter from './routes/me';
+import hubsRouter from './routes/hubs';
+import crewRouter from './routes/crew';
 
 const app = express();
 
@@ -219,6 +221,8 @@ app.get('/api/admin/centers', async (req, res) => {
 
 // Mount modular routes - ALL under /api for consistency
 app.use('/api', meRouter);
+app.use('/api/hub', hubsRouter);
+app.use('/api/crew', crewRouter);
 
 // Swagger documentation
 const swaggerSpec = {

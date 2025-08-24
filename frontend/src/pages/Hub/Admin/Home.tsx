@@ -24,14 +24,19 @@ import { validateAdminRole, getAdminSession, setAdminSession, getAdminOperationa
 import { buildAdminApiUrl, adminApiFetch } from './utils/adminApi';
 
 type AdminSection = 'dashboard' | 'directory' | 'create' | 'manage' | 'assign' | 'reports' | 'profile';
+type DirectoryTab = 'crew' | 'contractors' | 'customers' | 'centers' | 'services' | 'products' | 'supplies' | 'procedures' | 'training' | 'management' | 'warehouses' | 'orders' | 'reports';
 
 export default function AdminHome() {
   const { user } = useUser();
   const location = useLocation();
-  const [activeSection, setActiveSection] = useState<AdminSection>('dashboard');
+  const [activeSection, setActiveSection] = useState<AdminSection>('directory');
+  const [activeDirectoryTab, setActiveDirectoryTab] = useState<DirectoryTab>('contractors');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [directoryData, setDirectoryData] = useState<any[]>([]);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [createFormType, setCreateFormType] = useState<DirectoryTab>('crew');
 
   // Set section based on URL path
   useEffect(() => {
@@ -105,8 +110,432 @@ export default function AdminHome() {
     user.role.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Render section content
+  // Directory tab configurations - ORDERED BY CHAIN OF COMMAND
+  const directoryTabs = [
+    { key: 'contractors' as DirectoryTab, label: 'Contractors', color: '#10b981', icon: '🏢' },
+    { key: 'management' as DirectoryTab, label: 'Managers', color: '#3b82f6', icon: '👨‍💼' },
+    { key: 'customers' as DirectoryTab, label: 'Customers', color: '#eab308', icon: '🎯' },
+    { key: 'centers' as DirectoryTab, label: 'Centers', color: '#f97316', icon: '🏬' },
+    { key: 'crew' as DirectoryTab, label: 'Crew', color: '#ef4444', icon: '👷' },
+    { key: 'services' as DirectoryTab, label: 'Services', color: '#8b5cf6', icon: '🔧' },
+    { key: 'products' as DirectoryTab, label: 'Products', color: '#ec4899', icon: '📱' },
+    { key: 'supplies' as DirectoryTab, label: 'Supplies', color: '#06b6d4', icon: '📦' },
+    { key: 'procedures' as DirectoryTab, label: 'Procedures', color: '#84cc16', icon: '📋' },
+    { key: 'training' as DirectoryTab, label: 'Training', color: '#f59e0b', icon: '🎓' },
+    { key: 'warehouses' as DirectoryTab, label: 'Warehouses', color: '#6366f1', icon: '🏭' },
+    { key: 'orders' as DirectoryTab, label: 'Orders Archive', color: '#14b8a6', icon: '📊' },
+    { key: 'reports' as DirectoryTab, label: 'Reports Archive', color: '#059669', icon: '📈' }
+  ];
+
+  // Get directory schema/structure - AT-A-GLANCE ESSENTIAL FIELDS ONLY
+  const getDirectorySchema = () => {
+    switch (activeDirectoryTab) {
+      case 'contractors':
+        return { 
+          id: 'CONTRACTOR ID', 
+          manager_id: 'CKS MANAGER',
+          name: 'COMPANY NAME', 
+          status: 'STATUS'
+        };
+      case 'management':
+        return { 
+          id: 'MANAGER ID', 
+          name: 'MANAGER NAME',
+          assigned_center: 'ASSIGNED CENTER',
+          status: 'STATUS'
+        };
+      case 'customers':
+        return { 
+          id: 'CUSTOMER ID', 
+          manager_id: 'CKS MANAGER',
+          name: 'COMPANY NAME', 
+          status: 'STATUS'
+        };
+      case 'centers':
+        return { 
+          id: 'CENTER ID', 
+          manager_id: 'CKS MANAGER',
+          name: 'CENTER NAME',
+          customer_id: 'CUSTOMER ID',
+          contractor_id: 'CONTRACTOR ID',
+          status: 'STATUS'
+        };
+      case 'crew':
+        return { 
+          id: 'CREW ID', 
+          manager_id: 'CKS MANAGER',
+          center_id: 'ASSIGNED CENTER',
+          status: 'STATUS'
+        };
+      case 'services':
+        return { 
+          id: 'SERVICE ID', 
+          name: 'SERVICE NAME',
+          status: 'STATUS'
+        };
+      case 'products':
+        return { 
+          id: 'PRODUCT ID', 
+          name: 'PRODUCT NAME',
+          warehouse_id: 'WAREHOUSE ID',
+          status: 'STATUS'
+        };
+      case 'supplies':
+        return { 
+          id: 'SUPPLY ID', 
+          name: 'SUPPLY NAME',
+          category: 'CATEGORY',
+          status: 'STATUS'
+        };
+      case 'procedures':
+        return { 
+          id: 'PROCEDURE ID', 
+          name: 'PROCEDURE NAME',
+          center_id: 'CENTER ID',
+          status: 'STATUS'
+        };
+      case 'training':
+        return { 
+          id: 'TRAINING ID', 
+          service_id: 'SERVICE ID',
+          service_name: 'SERVICE NAME',
+          status: 'STATUS'
+        };
+      case 'warehouses':
+        return { 
+          id: 'WAREHOUSE ID', 
+          name: 'WAREHOUSE NAME',
+          type: 'WAREHOUSE TYPE',
+          status: 'STATUS'
+        };
+      case 'orders':
+        return { 
+          id: 'ORDER ID', 
+          type: 'ORDER TYPE', 
+          requester: 'REQUESTER', 
+          status: 'STATUS', 
+          date: 'DATE'
+        };
+      case 'reports':
+        return { 
+          id: 'REPORT ID', 
+          type: 'REPORT TYPE', 
+          reporter: 'REPORTER', 
+          status: 'STATUS', 
+          date: 'DATE'
+        };
+      default:
+        return {};
+    }
+  };
+
+  // Get actual directory data (will come from API - for now returns empty)
+  const getCurrentDirectoryData = () => {
+    // This will be replaced with actual API calls to fetch real data
+    // For now, return empty array to show the schema structure
+    return [];
+  };
+
+  // Smart field detection for user creation - COMPREHENSIVE FORMS
+  const getRequiredFieldsForUserType = (userType: DirectoryTab) => {
+    const fieldsMap = {
+      contractors: ['id', 'name', 'status', 'manager_id', 'contact_person', 'phone', 'email', 'address', 'services_specialized'],
+      management: ['id', 'name', 'status', 'assigned_center', 'territory', 'phone', 'email', 'start_date'],
+      customers: ['id', 'name', 'status', 'manager_id', 'contact_person', 'phone', 'email', 'address'],
+      centers: ['id', 'name', 'status', 'manager_id', 'customer_id', 'contractor_id', 'address', 'phone', 'supervisor_notes'],
+      crew: ['id', 'name', 'status', 'manager_id', 'center_id', 'role', 'phone', 'email', 'start_date', 'skills'],
+      services: ['id', 'name', 'status', 'category', 'description', 'requirements'],
+      products: ['id', 'name', 'status', 'warehouse_id', 'category', 'description', 'price'],
+      supplies: ['id', 'name', 'status', 'category', 'supplier', 'cost', 'stock_level'],
+      procedures: ['id', 'name', 'status', 'center_id', 'description', 'steps', 'safety_requirements'],
+      training: ['id', 'service_id', 'service_name', 'status', 'type', 'duration', 'requirements', 'instructor'],
+      warehouses: ['id', 'name', 'status', 'type', 'location', 'capacity', 'manager_contact'],
+      orders: ['id', 'type', 'requester', 'status', 'date', 'description', 'priority'],
+      reports: ['id', 'type', 'reporter', 'status', 'date', 'summary', 'priority']
+    };
+    return fieldsMap[userType] || ['id', 'name', 'status'];
+  };
+
+  // Render section content - NOW FOCUSED ON DIRECTORY
   const renderSectionContent = () => {
+    // Admin hub is primarily a directory system
+    return (
+      <div style={{ padding: '24px 0' }}>
+        {/* CKS Directory Header */}
+        <div style={{ marginBottom: 24 }}>
+          <h2 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8, color: '#ffffff' }}>
+            🧠 CKS Directory - Complete Business Intelligence
+          </h2>
+          <p style={{ color: '#888888', fontSize: 14 }}>
+            At-a-glance directory showing essential fields. Click any ID to view detailed profile with complete information.
+          </p>
+        </div>
+
+        {/* Directory Tabs */}
+        <div style={{ 
+          background: '#111111',
+          borderRadius: 8,
+          padding: 16,
+          marginBottom: 24,
+          border: '1px solid #333333'
+        }}>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+            {directoryTabs.map((tab) => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveDirectoryTab(tab.key)}
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: 6,
+                  border: `1px solid ${activeDirectoryTab === tab.key ? tab.color : '#444444'}`,
+                  background: activeDirectoryTab === tab.key ? tab.color : '#222222',
+                  color: activeDirectoryTab === tab.key ? '#000000' : tab.color,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6
+                }}
+              >
+                <span>{tab.icon}</span>
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Search Bar & Actions */}
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 16 }}>
+            <input
+              type="text"
+              placeholder={`Search ${activeDirectoryTab}... (first 25 rows shown)`}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              style={{
+                flex: 1,
+                padding: '10px 16px',
+                background: '#000000',
+                border: '1px solid #333333',
+                borderRadius: 6,
+                color: '#ffffff',
+                fontSize: 14
+              }}
+            />
+            <button 
+              onClick={() => setShowCreateForm(true)}
+              style={{
+                padding: '10px 16px',
+                background: directoryTabs.find(t => t.key === activeDirectoryTab)?.color || '#333333',
+                border: 'none',
+                borderRadius: 6,
+                color: '#000000',
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6
+              }}
+            >
+              ➕ Create {activeDirectoryTab.charAt(0).toUpperCase() + activeDirectoryTab.slice(1, -1)}
+            </button>
+          </div>
+
+          {/* Data Table */}
+          <div style={{ 
+            background: '#000000',
+            border: '1px solid #333333',
+            borderRadius: 6,
+            overflow: 'hidden'
+          }}>
+            <div style={{ padding: '12px 16px', background: '#1a1a1a', borderBottom: '1px solid #333333' }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: '#ffffff' }}>
+                {activeDirectoryTab.charAt(0).toUpperCase() + activeDirectoryTab.slice(1)} Directory ({getCurrentDirectoryData().length} entries) - Schema Ready
+              </div>
+              <div style={{ fontSize: 11, color: '#666666', marginTop: 2 }}>
+                Field Structure: {Object.values(getDirectorySchema()).join(' • ')}
+              </div>
+            </div>
+            
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ background: '#0a0a0a' }}>
+                    {Object.values(getDirectorySchema()).map((fieldName, index) => (
+                      <th key={index} style={{ 
+                        padding: '12px 16px', 
+                        textAlign: 'left', 
+                        fontSize: 12, 
+                        fontWeight: 600, 
+                        color: '#888888',
+                        borderBottom: '1px solid #333333'
+                      }}>
+                        {fieldName}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {getCurrentDirectoryData().length > 0 ? (
+                    getCurrentDirectoryData()
+                      .filter(item => 
+                        !searchTerm || 
+                        Object.values(item).some(val => 
+                          String(val).toLowerCase().includes(searchTerm.toLowerCase())
+                        )
+                      )
+                      .slice(0, 25)
+                      .map((item, index) => (
+                        <tr key={index} style={{ 
+                          borderBottom: '1px solid #222222'
+                        }}>
+                          {Object.values(item).map((value, i) => (
+                            <td key={i} style={{ 
+                              padding: '12px 16px', 
+                              fontSize: 14, 
+                              color: '#ffffff',
+                              borderBottom: '1px solid #222222'
+                            }}>
+                              {String(value)}
+                            </td>
+                          ))}
+                        </tr>
+                      ))
+                  ) : (
+                    <tr style={{ borderBottom: '1px solid #222222' }}>
+                      <td 
+                        colSpan={Object.keys(getDirectorySchema()).length} 
+                        style={{ 
+                          padding: '40px', 
+                          textAlign: 'center', 
+                          color: '#666666',
+                          fontSize: 14,
+                          fontStyle: 'italic'
+                        }}
+                      >
+                        No {activeDirectoryTab} entries yet. Use "Create" to add the first {activeDirectoryTab.slice(0, -1)} entry.
+                        <br/><span style={{ fontSize: 12, color: '#444444' }}>
+                          Fields will populate: {Object.values(getDirectorySchema()).join(' • ')}
+                        </span>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        {/* Smart User Creation Form */}
+        {showCreateForm && (
+          <div style={{
+            background: '#111111',
+            border: '1px solid #333333',
+            borderRadius: 8,
+            padding: 20,
+            marginBottom: 24
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <h3 style={{ fontSize: 18, fontWeight: 700, color: '#ffffff', margin: 0 }}>
+                Create New {activeDirectoryTab.charAt(0).toUpperCase() + activeDirectoryTab.slice(1, -1)}
+              </h3>
+              <button
+                onClick={() => setShowCreateForm(false)}
+                style={{
+                  padding: '6px 12px',
+                  background: '#333333',
+                  border: '1px solid #555555',
+                  borderRadius: 4,
+                  color: '#ffffff',
+                  fontSize: 12,
+                  cursor: 'pointer'
+                }}
+              >
+                ✕ Close
+              </button>
+            </div>
+
+            <div style={{ 
+              background: '#0a0a0a', 
+              padding: 16, 
+              borderRadius: 6, 
+              border: '1px solid #333333',
+              marginBottom: 16 
+            }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: directoryTabs.find(t => t.key === activeDirectoryTab)?.color, marginBottom: 8 }}>
+                🧠 Smart Field Detection Active
+              </div>
+              <div style={{ fontSize: 12, color: '#888888', lineHeight: 1.4 }}>
+                Creating {activeDirectoryTab.slice(0, -1)} with fields: {getRequiredFieldsForUserType(activeDirectoryTab).join(', ')}<br/>
+                <span style={{ color: '#eab308' }}>📋 At-a-Glance View: Only essential fields shown in directory table</span><br/>
+                <span style={{ color: '#10b981' }}>👆 Click ID after creation to view complete profile with all details</span>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
+              {getRequiredFieldsForUserType(activeDirectoryTab).map((field) => (
+                <div key={field} style={{ marginBottom: 12 }}>
+                  <label style={{ 
+                    display: 'block', 
+                    fontSize: 12, 
+                    fontWeight: 600, 
+                    color: '#ffffff', 
+                    marginBottom: 6 
+                  }}>
+                    {field.toUpperCase().replace('_', ' ')}
+                  </label>
+                  <input
+                    type="text"
+                    placeholder={`Enter ${field.replace('_', ' ')}`}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      background: '#000000',
+                      border: '1px solid #333333',
+                      borderRadius: 4,
+                      color: '#ffffff',
+                      fontSize: 14
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
+              <button style={{
+                padding: '10px 20px',
+                background: directoryTabs.find(t => t.key === activeDirectoryTab)?.color || '#333333',
+                border: 'none',
+                borderRadius: 6,
+                color: '#000000',
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: 'pointer'
+              }}>
+                Create & Link {activeDirectoryTab.charAt(0).toUpperCase() + activeDirectoryTab.slice(1, -1)}
+              </button>
+              <button 
+                onClick={() => setShowCreateForm(false)}
+                style={{
+                  padding: '10px 20px',
+                  background: '#333333',
+                  border: '1px solid #555555',
+                  borderRadius: 6,
+                  color: '#ffffff',
+                  fontSize: 14,
+                  cursor: 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+
+    // Legacy case handling for other sections if needed
     switch (activeSection) {
       case 'dashboard':
         return (
@@ -1139,6 +1568,7 @@ export default function AdminHome() {
           </div>
         </div>
       </div>
+
 
       {/* Navigation */}
       <div style={{

@@ -206,6 +206,72 @@ export default function CrewHome() {
   // Main render with all sections
   return (
     <div style={{ maxWidth: 1200, margin: '0 auto' }}>
+      {/* OG CREW HUB TEMPLATE DATA - Field names from original spreadsheet */}
+      <div className="ui-card" style={{ margin: '24px 0 16px', padding: 16, borderTop: '4px solid #ef4444' }}>
+        <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 16, color: '#ef4444' }}>
+          🔗 CKS Brain Template Data (Field Names Only)
+        </h2>
+        
+        {/* Profile Template Fields */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16, marginBottom: 16 }}>
+          <div>
+            <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#374151' }}>Profile Fields</h3>
+            <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.5 }}>
+              • Full Name<br/>
+              • Reports To (Manager ID)<br/>
+              • Crew ID<br/>
+              • Role<br/>
+              • Start Date<br/>
+              • Years with Company<br/>
+              • Primary Region<br/>
+              • Email<br/>
+              • Languages<br/>
+              • Phone<br/>
+              • Emergency Contact<br/>
+              • Home Address<br/>
+              • LinkedIn<br/>
+              • Status<br/>
+              • Availability
+            </div>
+          </div>
+          
+          <div>
+            <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#374151' }}>Hub Tabs Structure</h3>
+            <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.5 }}>
+              • Profile (Personal & Work Details)<br/>
+              • Centers (Assigned Locations)<br/>
+              • Services (Specialized Skills)<br/>
+              • Jobs (Current Assignments)<br/>
+              • Supplies/Equipment (Tools & Training)<br/>
+              • Training (Certifications & Modules)<br/>
+              • Performance (Reviews & Metrics)<br/>
+              • Finance (Payroll & Hours)
+            </div>
+          </div>
+          
+          <div>
+            <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#374151' }}>Visual Indicators</h3>
+            <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.5 }}>
+              • ⭐⭐⭐⭐⭐ Performance Rating<br/>
+              • ✅ Skills Checklist<br/>
+              • 🔧 Equipment Training Status<br/>
+              • 📋 Task Completion Status<br/>
+              • 🕐 Time Tracking<br/>
+              • 📚 Training Progress
+            </div>
+          </div>
+        </div>
+        
+        {/* Relationship Data Template */}
+        <div style={{ background: '#fef2f2', padding: 12, borderRadius: 8 }}>
+          <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#ef4444' }}>Smart ID Relationships</h3>
+          <div style={{ fontSize: 12, color: '#7f1d1d', lineHeight: 1.5 }}>
+            <strong>Template:</strong> CRW-001 → Reports To: MGR-001 → Assigned Center: CTR-001 → Services: Janitorial, Floor Care<br/>
+            <strong>When logged in:</strong> Fields populated with actual user data from backend based on crew ID
+          </div>
+        </div>
+      </div>
+
       {/* Hardcoded Page header with navigation tabs - Red theme */}
       <div className="card" style={{
         display: 'flex',

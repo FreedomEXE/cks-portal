@@ -279,7 +279,7 @@ export default function Login() {
           <div className="alert-error mb-2">{error}</div>
         )}
 
-    <form onSubmit={onSubmit} className="px-6 pt-0 pb-4 -mt-28 relative z-10">
+        <form onSubmit={onSubmit} className="px-6 pt-0 pb-4 relative z-10">
           <div className="mb-3 text-left">
       <label className="block mb-1 text-white text-base md:text-lg">Username</label>
             <input

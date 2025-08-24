@@ -172,6 +172,72 @@ export default function ManagerHome() {
   // Main render with all sections
   return (
     <div style={{ maxWidth: 1200, margin: '0 auto' }}>
+      {/* OG MANAGER HUB TEMPLATE DATA - Field names from original spreadsheet */}
+      <div className="ui-card" style={{ margin: '24px 0 16px', padding: 16, borderTop: '4px solid #3b82f6' }}>
+        <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 16, color: '#3b82f6' }}>
+          🔗 CKS Brain Template Data (Field Names Only)
+        </h2>
+        
+        {/* Profile Template Fields */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16, marginBottom: 16 }}>
+          <div>
+            <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#374151' }}>Manager Profile Fields</h3>
+            <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.5 }}>
+              • Full Name<br/>
+              • Reports To<br/>
+              • Manager ID<br/>
+              • Role<br/>
+              • Start Date<br/>
+              • Years with Company<br/>
+              • Primary Region<br/>
+              • Email<br/>
+              • Languages<br/>
+              • Phone<br/>
+              • Emergency Contact<br/>
+              • Home Address<br/>
+              • LinkedIn<br/>
+              • Status<br/>
+              • Availability<br/>
+              • Preferred Areas<br/>
+              • QR Code<br/>
+              • Synced with Portal
+            </div>
+          </div>
+          
+          <div>
+            <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#374151' }}>Hub Tabs Structure</h3>
+            <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.5 }}>
+              • Dashboard (Territory Overview)<br/>
+              • Profile (Personal & Work Details)<br/>
+              • Reports (Performance Analytics)<br/>
+              • Orders (Service Coordination)<br/>
+              • News (Updates & Communications)
+            </div>
+          </div>
+          
+          <div>
+            <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#374151' }}>Management Scope</h3>
+            <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.5 }}>
+              • Assigned Contractors<br/>
+              • Territory Customers<br/>
+              • Center Oversight<br/>
+              • Crew Coordination<br/>
+              • Performance Reviews<br/>
+              • Business Development
+            </div>
+          </div>
+        </div>
+        
+        {/* Relationship Data Template */}
+        <div style={{ background: '#eff6ff', padding: 12, borderRadius: 8 }}>
+          <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#3b82f6' }}>Smart ID Relationships</h3>
+          <div style={{ fontSize: 12, color: '#1d4ed8', lineHeight: 1.5 }}>
+            <strong>Template:</strong> MGR-001 → Oversees: CON-001, CON-002 → Customers: CUS-001, CUS-002 → Centers: Multiple locations → Crew: Territory staff<br/>
+            <strong>When logged in:</strong> Dashboard shows only this manager's assigned contractors, customers, centers, and crew
+          </div>
+        </div>
+      </div>
+
       {/* Hardcoded Page header with navigation tabs */}
       <div className="card" style={{
         display: 'flex',

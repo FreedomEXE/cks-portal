@@ -196,6 +196,69 @@ export default function ContractorHome() {
   // Main render with all sections
   return (
     <div style={{ maxWidth: 1200, margin: '0 auto' }}>
+      {/* OG CONTRACTOR HUB TEMPLATE DATA - Field names from original spreadsheet */}
+      <div className="ui-card" style={{ margin: '24px 0 16px', padding: 16, borderTop: '4px solid #10b981' }}>
+        <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 16, color: '#10b981' }}>
+          🔗 CKS Brain Template Data (Field Names Only)
+        </h2>
+        
+        {/* Profile Template Fields */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16, marginBottom: 16 }}>
+          <div>
+            <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#374151' }}>Contractor Profile Fields</h3>
+            <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.5 }}>
+              • Contractor ID<br/>
+              • Company Name<br/>
+              • Address<br/>
+              • CKS Manager (Assigned)<br/>
+              • Main Contact<br/>
+              • Phone<br/>
+              • Email<br/>
+              • Website<br/>
+              • Years with CKS<br/>
+              • # of Customers<br/>
+              • Contract Start Date<br/>
+              • Status<br/>
+              • Services Specialized In
+            </div>
+          </div>
+          
+          <div>
+            <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#374151' }}>Hub Tabs Structure</h3>
+            <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.5 }}>
+              • Profile (Company Details)<br/>
+              • Customers (Client Management)<br/>
+              • Centers (Service Locations)<br/>
+              • Services (Offered Services)<br/>
+              • Crew (Staff Oversight)<br/>
+              • Contracts Info (Legal & Terms)<br/>
+              • Financials (Billing & Revenue)
+            </div>
+          </div>
+          
+          <div>
+            <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#374151' }}>Business Metrics</h3>
+            <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.5 }}>
+              • Monthly Revenue<br/>
+              • Active Customers<br/>
+              • Service Centers<br/>
+              • Crew Members<br/>
+              • Contract Performance<br/>
+              • Customer Satisfaction
+            </div>
+          </div>
+        </div>
+        
+        {/* Relationship Data Template */}
+        <div style={{ background: '#ecfdf5', padding: 12, borderRadius: 8 }}>
+          <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#10b981' }}>Smart ID Relationships</h3>
+          <div style={{ fontSize: 12, color: '#166534', lineHeight: 1.5 }}>
+            <strong>Template:</strong> CON-001 → CKS Manager: MGR-001 → Customers: CUS-001, CUS-002 → Centers: Multiple locations<br/>
+            <strong>When logged in:</strong> Dashboard shows only this contractor's customers, centers, and assigned CKS manager
+          </div>
+        </div>
+      </div>
+
       {/* Hardcoded Page header with navigation tabs */}
       <div className="card" style={{
         display: 'flex',

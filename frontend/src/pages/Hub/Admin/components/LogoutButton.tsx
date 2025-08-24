@@ -9,16 +9,13 @@
  * Description: Admin-specific logout button component with session cleanup
  * Function: Handles user logout with Admin-specific session management
  * Importance: Critical - Secure logout functionality for Admin hub
- * Connects to: Clerk authentication, Admin session storage, navigation
+ * Connects to: Universal logout component with Admin hub styling
  * 
- * Notes: Fully self-contained logout logic with Admin-specific cleanup.
- *        Clears Admin session data before redirecting to login.
- *        Uses Admin-specific styling to match hub theme.
+ * Notes: Uses the universal logout component for consistent behavior
+ *        across all hubs while maintaining Admin-specific appearance.
  */
 
-import { useAuth } from '@clerk/clerk-react';
-import { useNavigate } from 'react-router-dom';
-import { clearAdminSession } from '../utils/adminAuth';
+import UniversalLogoutButton from '../../../../components/shared/UniversalLogoutButton';
 
 type LogoutButtonProps = {
   style?: React.CSSProperties;
@@ -31,52 +28,13 @@ export default function AdminLogoutButton({
   className = "ui-button", 
   children = "Log out" 
 }: LogoutButtonProps) {
-  const navigate = useNavigate();
-  const { signOut } = useAuth();
-
-  const handleLogout = async () => {
-    try {
-      // Clear Admin-specific session data
-      clearAdminSession();
-      
-      // Clear any shared session remnants
-      try {
-        localStorage.removeItem('me:lastRole');
-        localStorage.removeItem('me:lastCode');
-        localStorage.removeItem('dev:signedOut');
-      } catch {}
-
-      // Attempt Clerk sign out
-      if (typeof signOut === 'function') {
-        await signOut({ redirectUrl: '/login' });
-        return;
-      }
-    } catch (error) {
-      console.warn('[AdminLogout] Sign out error:', error);
-    }
-    
-    // Fallback navigation
-    navigate('/login', { replace: true });
-  };
-
   return (
-    <button
+    <UniversalLogoutButton 
+      hubType="admin"
+      style={style}
       className={className}
-      style={{ 
-        padding: '10px 16px', 
-        fontSize: 14,
-        backgroundColor: '#000000',
-        color: 'white',
-        border: 'none',
-        borderRadius: 6,
-        cursor: 'pointer',
-        ...style 
-      }}
-      onClick={handleLogout}
-      aria-label="Sign out of Admin Hub"
-      title="Sign out"
     >
       {children}
-    </button>
+    </UniversalLogoutButton>
   );
 }

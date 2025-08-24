@@ -196,6 +196,67 @@ export default function CustomerHome() {
   // Main render with all sections
   return (
     <div style={{ maxWidth: 1200, margin: '0 auto' }}>
+      {/* OG CUSTOMER HUB TEMPLATE DATA - Field names from original spreadsheet */}
+      <div className="ui-card" style={{ margin: '24px 0 16px', padding: 16, borderTop: '4px solid #eab308' }}>
+        <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 16, color: '#eab308' }}>
+          🔗 CKS Brain Template Data (Field Names Only)
+        </h2>
+        
+        {/* Profile Template Fields */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16, marginBottom: 16 }}>
+          <div>
+            <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#374151' }}>Customer Profile Fields</h3>
+            <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.5 }}>
+              • Customer ID<br/>
+              • Company Name<br/>
+              • Address<br/>
+              • CKS Manager (Assigned)<br/>
+              • Email<br/>
+              • Phone<br/>
+              • Main Contact<br/>
+              • Website<br/>
+              • Years with CKS<br/>
+              • # of Centers<br/>
+              • Contract Start Date<br/>
+              • Status
+            </div>
+          </div>
+          
+          <div>
+            <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#374151' }}>Hub Tabs Structure</h3>
+            <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.5 }}>
+              • Profile (Organization Details)<br/>
+              • Centers (My Locations)<br/>
+              • Services (Requested Services)<br/>
+              • Jobs (Active Projects)<br/>
+              • Crew (Service Staff)<br/>
+              • Financials (Billing & Costs)
+            </div>
+          </div>
+          
+          <div>
+            <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#374151' }}>Center Management</h3>
+            <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.5 }}>
+              • New Request CTA (Prominent)<br/>
+              • Service History<br/>
+              • Center Performance<br/>
+              • Cost Analytics<br/>
+              • Quality Reports<br/>
+              • Staff Coordination
+            </div>
+          </div>
+        </div>
+        
+        {/* Relationship Data Template */}
+        <div style={{ background: '#fefce8', padding: 12, borderRadius: 8 }}>
+          <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#eab308' }}>Smart ID Relationships</h3>
+          <div style={{ fontSize: 12, color: '#a16207', lineHeight: 1.5 }}>
+            <strong>Template:</strong> CUS-001 → CKS Manager: MGR-001 → Centers: CTR-001, CTR-002, CTR-003, CTR-004 → Services via Contractor<br/>
+            <strong>When logged in:</strong> Dashboard shows only this customer's centers, assigned manager, and service requests
+          </div>
+        </div>
+      </div>
+
       {/* Hardcoded Page header with navigation tabs - Blue theme */}
       <div className="card" style={{
         display: 'flex',

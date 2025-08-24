@@ -9,6 +9,42 @@
  * Description: Center-specific logout button component with session cleanup
  * Function: Handles user logout with Center-specific session management
  * Importance: Critical - Secure logout functionality for Center hub
+ * Connects to: Universal logout component with Center hub styling
+ * 
+ * Notes: Uses the universal logout component for consistent behavior
+ *        across all hubs while maintaining Center-specific appearance.
+ */
+
+import UniversalLogoutButton from '../../../../components/shared/UniversalLogoutButton';
+
+type LogoutButtonProps = {
+  style?: React.CSSProperties;
+  className?: string;
+  children?: React.ReactNode;
+};
+
+export default function CenterLogoutButton({ 
+  style, 
+  className = "ui-button", 
+  children = "Log out" 
+}: LogoutButtonProps) {
+  return (
+    <UniversalLogoutButton 
+      hubType="center"
+      style={style}
+      className={className}
+    >
+      {children}
+    </UniversalLogoutButton>
+  );
+}
+
+/**
+ * LogoutButton.tsx (Center Hub - FULLY INDEPENDENT)
+ * 
+ * Description: Center-specific logout button component with session cleanup
+ * Function: Handles user logout with Center-specific session management
+ * Importance: Critical - Secure logout functionality for Center hub
  * Connects to: Clerk authentication, Center session storage, navigation
  * 
  * Notes: Fully self-contained logout logic with Center-specific cleanup.

@@ -9,6 +9,42 @@
  * Description: Contractor-specific logout button component with session cleanup
  * Function: Handles user logout with Contractor-specific session management
  * Importance: Critical - Secure logout functionality for Contractor hub
+ * Connects to: Universal logout component with Contractor hub styling
+ * 
+ * Notes: Uses the universal logout component for consistent behavior
+ *        across all hubs while maintaining Contractor-specific appearance.
+ */
+
+import UniversalLogoutButton from '../../../../components/shared/UniversalLogoutButton';
+
+type LogoutButtonProps = {
+  style?: React.CSSProperties;
+  className?: string;
+  children?: React.ReactNode;
+};
+
+export default function ContractorLogoutButton({ 
+  style, 
+  className = "ui-button", 
+  children = "Log out" 
+}: LogoutButtonProps) {
+  return (
+    <UniversalLogoutButton 
+      hubType="contractor"
+      style={style}
+      className={className}
+    >
+      {children}
+    </UniversalLogoutButton>
+  );
+}
+
+/**
+ * LogoutButton.tsx (Contractor Hub - FULLY INDEPENDENT)
+ * 
+ * Description: Contractor-specific logout button component with session cleanup
+ * Function: Handles user logout with Contractor-specific session management
+ * Importance: Critical - Secure logout functionality for Contractor hub
  * Connects to: Clerk authentication, Contractor session storage, navigation
  * 
  * Notes: Fully self-contained logout logic with Contractor-specific cleanup.

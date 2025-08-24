@@ -4,7 +4,12 @@
       "Bash(rm:*)",
       "Bash(npm run build:*)",
       "Bash(npm run dev:*)",
-      "Bash(mkdir:*)"
+      "Bash(mkdir:*)",
+      "Bash(curl:*)",
+      "Bash(node:*)",
+      "Bash(npm install:*)",
+      "Bash(winget install:*)",
+      "Bash(npx playwright install:*)"
     ],
     "deny": [],
     "ask": []

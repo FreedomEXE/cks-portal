@@ -424,6 +424,69 @@ export default function CenterHome() {
 
   return (
     <div style={{ maxWidth: 1200, margin: '0 auto' }}>
+      {/* OG CENTER HUB TEMPLATE DATA - Field names from original spreadsheet */}
+      <div className="ui-card" style={{ margin: '24px 0 16px', padding: 16, borderTop: '4px solid #f97316' }}>
+        <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 16, color: '#f97316' }}>
+          🔗 CKS Brain Template Data (Field Names Only)
+        </h2>
+        
+        {/* Profile Template Fields */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16, marginBottom: 16 }}>
+          <div>
+            <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#374151' }}>Center Profile Fields</h3>
+            <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.5 }}>
+              • Center ID<br/>
+              • Name<br/>
+              • Address<br/>
+              • Phone<br/>
+              • Email<br/>
+              • Website<br/>
+              • Socials<br/>
+              • Manager ID (CKS)<br/>
+              • Supervisor ID (Crew Lead)<br/>
+              • Contractor ID<br/>
+              • Customer ID<br/>
+              • Service Start Date<br/>
+              • Status<br/>
+              • Services Active<br/>
+              • Service Frequency
+            </div>
+          </div>
+          
+          <div>
+            <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#374151' }}>Hub Tabs Structure</h3>
+            <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.5 }}>
+              • Profile (Facility Details)<br/>
+              • Services (Active Services)<br/>
+              • Jobs (Work Orders)<br/>
+              • Crew (Staff Assignments)<br/>
+              • Financials (Service Costs)
+            </div>
+          </div>
+          
+          <div>
+            <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#374151' }}>Operational Focus</h3>
+            <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.5 }}>
+              • Crew Coordination<br/>
+              • Service Scheduling<br/>
+              • Quality Metrics<br/>
+              • Equipment Management<br/>
+              • Incident Reporting<br/>
+              • Performance Tracking
+            </div>
+          </div>
+        </div>
+        
+        {/* Relationship Data Template */}
+        <div style={{ background: '#fff7ed', padding: 12, borderRadius: 8 }}>
+          <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#f97316' }}>Smart ID Relationships</h3>
+          <div style={{ fontSize: 12, color: '#c2410c', lineHeight: 1.5 }}>
+            <strong>Template:</strong> CTR-001 → Manager: MGR-001 → Supervisor: CRW-001 → Contractor: CON-001 → Customer: CUS-001<br/>
+            <strong>When logged in:</strong> Shows this center's manager, crew, contractor, customer, and active services
+          </div>
+        </div>
+      </div>
+
       {/* Hardcoded Page header styling - Orange theme */}
       <div className="card" style={{
         display: 'flex',
