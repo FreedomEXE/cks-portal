@@ -23,6 +23,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import useCenterData from './hooks/useCenterData';
 import { setCenterSession, getCenterSession } from './utils/centerAuth';
 import { buildCenterApiUrl, centerApiFetch } from './utils/centerApi';
+import CenterLogoutButton from './components/LogoutButton';
 import CenterNewsPreview from './components/NewsPreview';
 
 type CrewMember = {
@@ -41,7 +42,7 @@ type OperationalMetric = {
   change?: string;
 };
 
-type CenterSection = 'dashboard' | 'profile' | 'crew' | 'services' | 'schedules' | 'reports' | 'support';
+type CenterSection = 'dashboard' | 'profile' | 'services' | 'crew' | 'reports' | 'support';
 
 export default function CenterHome() {
   const navigate = useNavigate();
@@ -58,7 +59,7 @@ export default function CenterHome() {
   // Get center code and name from profile data
   const session = getCenterSession();
   const storedCode = session.code || '';
-  const rawCode = storedCode || state.data?.center_id || state.data?.code || '001-D';
+  const rawCode = storedCode || state.data?.center_id || state.data?.code || 'CEN-000';
   const code = String(rawCode);
   const centerName = state.data?.name || state.data?.center_name || 'Center Demo';
 
@@ -89,7 +90,8 @@ export default function CenterHome() {
           // Crew data
           if (crewRes?.ok) {
             const crewData = await crewRes.json();
-            setCrewMembers(Array.isArray(crewData.crew) ? crewData.crew : []);
+            const items = Array.isArray(crewData?.data) ? crewData.data : (Array.isArray(crewData?.crew) ? crewData.crew : []);
+            setCrewMembers(items);
           } else {
             // Demo crew data
             setCrewMembers([
@@ -103,7 +105,8 @@ export default function CenterHome() {
           // Metrics data
           if (metricsRes?.ok) {
             const metricsData = await metricsRes.json();
-            setMetrics(Array.isArray(metricsData.metrics) ? metricsData.metrics : []);
+            const items = Array.isArray(metricsData?.data) ? metricsData.data : (Array.isArray(metricsData?.metrics) ? metricsData.metrics : []);
+            setMetrics(items);
           } else {
             // Demo metrics
             setMetrics([
@@ -146,13 +149,7 @@ export default function CenterHome() {
               Center Hub
             </h1>
           </div>
-          <button
-            className="ui-button"
-            style={{ padding: '10px 16px', fontSize: 14 }}
-            onClick={() => navigate('/logout')}
-          >
-            Log out
-          </button>
+          <CenterLogoutButton />
         </div>
         <div className="animate-pulse" style={{ padding: 16 }}>
           Loading center hub...
@@ -180,13 +177,7 @@ export default function CenterHome() {
               Center Hub
             </h1>
           </div>
-          <button
-            className="ui-button"
-            style={{ padding: '10px 16px', fontSize: 14 }}
-            onClick={() => navigate('/logout')}
-          >
-            Log out
-          </button>
+          <CenterLogoutButton />
         </div>
         <div style={{ padding: 16, color: '#b91c1c' }}>
           Error: {state.error}
@@ -205,31 +196,69 @@ export default function CenterHome() {
               Welcome to {centerName} ({code})! Monitor crew operations and facility coordination.
             </div>
             
-            {/* Operational Metrics */}
+            {/* Center Dashboard */}
             <div className="ui-card" style={{ marginBottom: 24, borderTop: '3px solid #f97316' }}>
-              <div className="title" style={{ marginBottom: 16, color: '#f97316' }}>Operational Metrics</div>
+              <div className="title" style={{ marginBottom: 16, color: '#f97316' }}>Center Dashboard</div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
-                {metrics.map((metric, i) => (
-                  <div key={i} style={{ 
-                    padding: 16, 
-                    border: '1px solid #e5e7eb', 
-                    borderRadius: 8,
-                    borderLeft: `4px solid ${
-                      metric.status === 'Critical' ? '#ef4444' : 
-                      metric.status === 'Warning' ? '#eab308' : '#10b981'
-                    }`
-                  }}>
-                    <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>{metric.label}</div>
-                    <div style={{ fontSize: 20, fontWeight: 700, color: '#111827' }}>
-                      {metric.value}
-                      {metric.change && (
-                        <span style={{ fontSize: 12, color: '#10b981', marginLeft: 8 }}>
-                          {metric.change}
-                        </span>
-                      )}
-                    </div>
+                <div style={{ 
+                  padding: 16, 
+                  border: '1px solid #e5e7eb', 
+                  borderRadius: 8,
+                  borderLeft: '4px solid #10b981'
+                }}>
+                  <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>Total Crew Today</div>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: '#111827' }}>
+                    {crewMembers.length}
+                    <span style={{ fontSize: 12, color: '#10b981', marginLeft: 8 }}>
+                      Active
+                    </span>
                   </div>
-                ))}
+                </div>
+                
+                <div style={{ 
+                  padding: 16, 
+                  border: '1px solid #e5e7eb', 
+                  borderRadius: 8,
+                  borderLeft: '4px solid #f97316'
+                }}>
+                  <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>Open Requests</div>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: '#111827' }}>
+                    3
+                    <span style={{ fontSize: 12, color: '#f97316', marginLeft: 8 }}>
+                      Pending
+                    </span>
+                  </div>
+                </div>
+                
+                <div style={{ 
+                  padding: 16, 
+                  border: '1px solid #e5e7eb', 
+                  borderRadius: 8,
+                  borderLeft: '4px solid #3b82f6'
+                }}>
+                  <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>This Week</div>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: '#111827' }}>
+                    12
+                    <span style={{ fontSize: 12, color: '#3b82f6', marginLeft: 8 }}>
+                      Services
+                    </span>
+                  </div>
+                </div>
+                
+                <div style={{ 
+                  padding: 16, 
+                  border: '1px solid #e5e7eb', 
+                  borderRadius: 8,
+                  borderLeft: '4px solid #8b5cf6'
+                }}>
+                  <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>Facility Status</div>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: '#111827' }}>
+                    Good
+                    <span style={{ fontSize: 12, color: '#10b981', marginLeft: 8 }}>
+                      ✓
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -283,66 +312,187 @@ export default function CenterHome() {
               )}
             </div>
 
-            {/* Navigation Cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 24 }}>
+            {/* Primary Action Buttons */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
               <button
-                className="hub-card ui-card"
-                style={{ textAlign: 'left', padding: 16, cursor: 'pointer' }}
-                onClick={() => setActiveSection('crew')}
+                className="ui-card"
+                style={{ 
+                  padding: 24, 
+                  cursor: 'pointer',
+                  border: '2px solid #10b981',
+                  borderRadius: 12,
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  color: 'white',
+                  textAlign: 'center',
+                  transition: 'all 0.2s ease',
+                  fontSize: 16,
+                  fontWeight: 700
+                }}
+                onClick={() => {
+                  // TODO: Implement service request modal/flow
+                  alert('New Service Request - Coming Soon!');
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 8px 25px rgba(16, 185, 129, 0.3)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
               >
-                <div className="title" style={{ fontSize: 16, fontWeight: 600 }}>Crew Management</div>
-                <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>Monitor & coordinate crew</div>
+                <div style={{ fontSize: 20, marginBottom: 8 }}>🔧</div>
+                <div>New Service Request</div>
+                <div style={{ fontSize: 12, opacity: 0.9, marginTop: 4 }}>Request cleaning, maintenance, or specialized services</div>
               </button>
               
               <button
-                className="hub-card ui-card"
-                style={{ textAlign: 'left', padding: 16, cursor: 'pointer' }}
-                onClick={() => setActiveSection('schedules')}
+                className="ui-card"
+                style={{ 
+                  padding: 24, 
+                  cursor: 'pointer',
+                  border: '2px solid #3b82f6',
+                  borderRadius: 12,
+                  background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                  color: 'white',
+                  textAlign: 'center',
+                  transition: 'all 0.2s ease',
+                  fontSize: 16,
+                  fontWeight: 700
+                }}
+                onClick={() => {
+                  // TODO: Implement product request modal/flow
+                  alert('New Product Request - Coming Soon!');
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 8px 25px rgba(59, 130, 246, 0.3)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
               >
-                <div className="title" style={{ fontSize: 16, fontWeight: 600 }}>Schedules</div>
-                <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>Crew schedules & shifts</div>
-              </button>
-              
-              <button
-                className="hub-card ui-card"
-                style={{ textAlign: 'left', padding: 16, cursor: 'pointer' }}
-                onClick={() => setActiveSection('services')}
-              >
-                <div className="title" style={{ fontSize: 16, fontWeight: 600 }}>Services</div>
-                <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>Active services</div>
-              </button>
-              
-              <button
-                className="hub-card ui-card"
-                style={{ textAlign: 'left', padding: 16, cursor: 'pointer' }}
-                onClick={() => setActiveSection('reports')}
-              >
-                <div className="title" style={{ fontSize: 16, fontWeight: 600 }}>Reports</div>
-                <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>Performance & logs</div>
+                <div style={{ fontSize: 20, marginBottom: 8 }}>📦</div>
+                <div>New Product Request</div>
+                <div style={{ fontSize: 12, opacity: 0.9, marginTop: 4 }}>Order supplies, equipment, or materials</div>
               </button>
             </div>
 
-            {/* News Preview */}
-            <CenterNewsPreview code={code} />
+            {/* Communication Hub */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
+              {/* News & Updates */}
+              <div className="ui-card" style={{ padding: 16 }}>
+                <div className="title" style={{ marginBottom: 16, color: '#f97316', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  📰 News & Updates
+                </div>
+                <CenterNewsPreview code={code} />
+              </div>
+              
+              {/* Mail & Messages */}
+              <div className="ui-card" style={{ padding: 16 }}>
+                <div className="title" style={{ marginBottom: 16, color: '#f97316', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  📬 Mail
+                  <span style={{ 
+                    background: '#ef4444', 
+                    color: 'white', 
+                    fontSize: 10, 
+                    padding: '2px 6px', 
+                    borderRadius: 12, 
+                    fontWeight: 600 
+                  }}>
+                    3
+                  </span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <div style={{ 
+                    padding: 12, 
+                    border: '1px solid #e5e7eb', 
+                    borderRadius: 6,
+                    borderLeft: '3px solid #f97316'
+                  }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>From Manager - John Center</div>
+                    <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Equipment inspection scheduled for tomorrow at 10 AM</div>
+                    <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>2 hours ago • High Priority</div>
+                  </div>
+                  
+                  <div style={{ 
+                    padding: 12, 
+                    border: '1px solid #e5e7eb', 
+                    borderRadius: 6,
+                    borderLeft: '3px solid #3b82f6'
+                  }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>From Admin - Safety Update</div>
+                    <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>New safety protocols effective immediately</div>
+                    <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>5 hours ago • Information</div>
+                  </div>
+                  
+                  <div style={{ 
+                    padding: 12, 
+                    border: '1px solid #e5e7eb', 
+                    borderRadius: 6,
+                    borderLeft: '3px solid #10b981'
+                  }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>From Crew - Mike Johnson</div>
+                    <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Floor cleaning in lobby completed ahead of schedule</div>
+                    <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>1 day ago • Update</div>
+                  </div>
+                  
+                  <button
+                    style={{
+                      padding: '8px 12px',
+                      background: 'transparent',
+                      border: '1px solid #f97316',
+                      borderRadius: 6,
+                      color: '#f97316',
+                      fontSize: 12,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      textAlign: 'center',
+                      marginTop: 8
+                    }}
+                    onClick={() => {
+                      // TODO: Implement full mailbox view
+                      alert('Full Mailbox - Coming Soon!');
+                    }}
+                  >
+                    View Mailbox
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         );
 
       case 'profile':
+        const profileTabs = [
+          'Center Information',
+          'Account Manager',
+          'Service Information',
+          'Management',
+          'Operations',
+          'Settings'
+        ];
+        
         return (
           <div style={{ animation: 'fadeIn .12s ease-out' }}>
-            {/* Profile Tabs */}
-            <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
-              {['Overview', 'Details', 'Settings'].map((tab, index) => (
+            <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Center Profile</h2>
+            
+            {/* Profile Tabs - At Top Like Crew Hub */}
+            <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+              {profileTabs.map((tab, index) => (
                 <button
                   key={tab}
-                  className={`ui-button ${profileTab === index ? 'active' : ''}`}
-                  style={{ 
-                    padding: '8px 16px',
-                    backgroundColor: profileTab === index ? '#f97316' : 'transparent',
-                    color: profileTab === index ? 'white' : '#374151',
-                    border: profileTab === index ? 'none' : '1px solid #e5e7eb'
-                  }}
                   onClick={() => setProfileTab(index)}
+                  style={{
+                    padding: '6px 12px',
+                    borderRadius: 6,
+                    border: '1px solid #e5e7eb',
+                    background: profileTab === index ? '#f97316' : 'white',
+                    color: profileTab === index ? 'white' : '#111827',
+                    fontSize: 12,
+                    cursor: 'pointer'
+                  }}
                 >
                   {tab}
                 </button>
@@ -350,58 +500,291 @@ export default function CenterHome() {
             </div>
 
             {/* Profile Content */}
-            <div className="ui-card">
-              {profileTab === 0 && (
-                <div>
-                  <div className="title" style={{ marginBottom: 16, color: '#f97316' }}>Center Overview</div>
-                  <div style={{ display: 'grid', gap: 16 }}>
-                    <div>
-                      <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block' }}>
-                        Center Name
-                      </label>
-                      <div style={{ padding: 8, border: '1px solid #e5e7eb', borderRadius: 4, marginTop: 4 }}>
-                        {centerName}
+            <div className="ui-card" style={{ padding: 16 }}>
+              <>
+                {profileTab === 0 && (
+                  <div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: 16 }}>
+                    {/* Center Photo - Matching Crew Hub Style */}
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{
+                        width: 120,
+                        height: 120,
+                        borderRadius: '50%',
+                        background: '#fff7ed',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 36,
+                        fontWeight: 700,
+                        color: '#f97316',
+                        margin: '0 auto 12px',
+                        border: '2px solid #f97316'
+                      }}>
+                        {centerName.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2) || 'CE'}
                       </div>
+                      <button style={{ padding: '6px 12px', fontSize: 12 }}>Update Photo</button>
                     </div>
-                    
+
+                    {/* Center Details */}
                     <div>
-                      <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block' }}>
-                        Center Code
-                      </label>
-                      <div style={{ padding: 8, border: '1px solid #e5e7eb', borderRadius: 4, marginTop: 4 }}>
-                        {code}
-                      </div>
-                    </div>
-                    
-                    <div>
-                      <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block' }}>
-                        Facility Status
-                      </label>
-                      <div style={{ padding: 8, border: '1px solid #e5e7eb', borderRadius: 4, marginTop: 4 }}>
-                        Operational
-                      </div>
+                      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <tbody>
+                          {[
+                            ['Center ID', code || 'Not Set'],
+                            ['Center Name', centerName || 'Not Set'],
+                            ['Address', 'Not Set'],
+                            ['Phone', 'Not Set'],
+                            ['Email', 'Not Set'],
+                            ['Website', 'Not Set'],
+                            ['Social Media', 'Not Set'],
+                            ['QR Code', 'Not Generated']
+                          ].map(([label, value]) => (
+                            <tr key={label} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                              <td style={{ padding: '12px 0', fontWeight: 600, color: '#374151', width: '40%' }}>
+                                {label}:
+                              </td>
+                              <td style={{ padding: '12px 0', color: '#6b7280' }}>
+                                {value}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
                   </div>
                 </div>
               )}
-              
+
               {profileTab === 1 && (
                 <div>
-                  <div className="title" style={{ marginBottom: 16, color: '#f97316' }}>Center Details</div>
-                  <div style={{ color: '#6b7280' }}>
-                    Detailed center information and operational parameters.
+                  <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16, color: '#f97316' }}>CKS Account Manager</h3>
+                  <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: 16 }}>
+                    {/* Manager Photo */}
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{
+                        width: 120,
+                        height: 120,
+                        borderRadius: '50%',
+                        background: '#fff7ed',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 36,
+                        fontWeight: 700,
+                        color: '#f97316',
+                        margin: '0 auto 12px',
+                        border: '2px solid #f97316'
+                      }}>
+                        MD
+                      </div>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: '#111827' }}>Manager Demo</div>
+                      <div style={{ fontSize: 12, color: '#6b7280' }}>Account Manager</div>
+                    </div>
+
+                    {/* Manager Details */}
+                    <div>
+                      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <tbody>
+                          {[
+                            ['Manager Name', 'Manager Demo'],
+                            ['Title', 'Senior Account Manager'],
+                            ['Department', 'Customer Success'],
+                            ['Email', 'manager.demo@cks-portal.com'],
+                            ['Phone', '(555) 123-4567'],
+                            ['Direct Line', '(555) 123-4567 ext. 1001'],
+                            ['Office Location', 'CKS HQ - Building A, Floor 3'],
+                            ['Assigned Since', 'January 2023'],
+                            ['Specialty', 'Commercial Facility Management'],
+                            ['Response Time', '< 4 hours during business hours'],
+                            ['Emergency Contact', '(555) 999-0000 (24/7)'],
+                            ['Preferred Contact', 'Email for non-urgent, Phone for urgent']
+                          ].map(([label, value]) => (
+                            <tr key={label}>
+                              <td style={{ padding: '8px 0', fontWeight: 600, width: '35%' }}>{label}</td>
+                              <td style={{ padding: '8px 0' }}>{value}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      
+                      {/* Contact Actions */}
+                      <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
+                        <button style={{
+                          padding: '8px 16px',
+                          backgroundColor: '#f97316',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: 4,
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor: 'pointer'
+                        }}>
+                          Send Email
+                        </button>
+                        <button style={{
+                          padding: '8px 16px',
+                          backgroundColor: '#f59e0b',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: 4,
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor: 'pointer'
+                        }}>
+                          Schedule Call
+                        </button>
+                        <button style={{
+                          padding: '8px 16px',
+                          backgroundColor: '#ef4444',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: 4,
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor: 'pointer'
+                        }}>
+                          Emergency Contact
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
-              
-              {profileTab === 2 && (
-                <div>
-                  <div className="title" style={{ marginBottom: 16, color: '#f97316' }}>Settings</div>
-                  <div style={{ color: '#6b7280' }}>
-                    Center configuration and preferences.
+                
+                {profileTab === 2 && (
+                  <div>
+                    <div className="title" style={{ marginBottom: 20, color: '#f97316' }}>Service Information</div>
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                      <tbody>
+                        {[
+                          ['Service Start Date', 'Not Set'],
+                          ['Status', 'Active'],
+                          ['Services Active', 'Not Set'],
+                          ['Service Frequency', 'Not Set'],
+                          ['Facility Type', 'Commercial'],
+                          ['Square Footage', 'Not Set']
+                        ].map(([label, value]) => (
+                          <tr key={label} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                            <td style={{ padding: '12px 0', fontWeight: 600, color: '#374151', width: '40%' }}>
+                              {label}:
+                            </td>
+                            <td style={{ padding: '12px 0', color: '#6b7280' }}>
+                              {value}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
-                </div>
-              )}
+                )}
+                
+                {profileTab === 2 && (
+                  <div>
+                    <div className="title" style={{ marginBottom: 20, color: '#f97316' }}>Management</div>
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                      <tbody>
+                        {[
+                          ['Manager ID (CKS)', 'Not Assigned'],
+                          ['Supervisor ID (Crew Lead)', 'Not Assigned'],
+                          ['Contractor ID', 'Not Assigned'],
+                          ['Customer ID', 'Not Assigned']
+                        ].map(([label, value]) => (
+                          <tr key={label} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                            <td style={{ padding: '12px 0', fontWeight: 600, color: '#374151', width: '40%' }}>
+                              {label}:
+                            </td>
+                            <td style={{ padding: '12px 0', color: '#6b7280' }}>
+                              {value}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                
+                {profileTab === 3 && (
+                  <div>
+                    <div className="title" style={{ marginBottom: 20, color: '#f97316' }}>Operations</div>
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                      <tbody>
+                        {[
+                          ['Operating Hours', 'Not Set'],
+                          ['Emergency Contact', 'Not Set'],
+                          ['Special Requirements', 'Not Set']
+                        ].map(([label, value]) => (
+                          <tr key={label} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                            <td style={{ padding: '12px 0', fontWeight: 600, color: '#374151', width: '40%' }}>
+                              {label}:
+                            </td>
+                            <td style={{ padding: '12px 0', color: '#6b7280' }}>
+                              {value}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                
+                {profileTab === 4 && (
+                  <div>
+                    <div className="title" style={{ marginBottom: 20, color: '#f97316' }}>Settings</div>
+                    <div style={{ color: '#6b7280', padding: 20, textAlign: 'center' }}>
+                      Settings and preferences coming soon.
+                    </div>
+                  </div>
+                )}
+              </>
+            </div>
+          </div>
+        );
+
+      case 'services':
+        return (
+          <div style={{ animation: 'fadeIn .12s ease-out' }}>
+            <div className="ui-card">
+              <div className="title" style={{ marginBottom: 16, color: '#f97316' }}>Services Management</div>
+              <div style={{ color: '#6b7280' }}>
+                Active services, scheduling, and service history management coming soon.
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'crew':
+        return (
+          <div style={{ animation: 'fadeIn .12s ease-out' }}>
+            <div className="ui-card">
+              <div className="title" style={{ marginBottom: 16, color: '#f97316' }}>Crew Management</div>
+              <div style={{ color: '#6b7280' }}>
+                Crew assignments, schedules, and performance tracking coming soon.
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'reports':
+        return (
+          <div style={{ animation: 'fadeIn .12s ease-out' }}>
+            <div className="ui-card">
+              <div className="title" style={{ marginBottom: 16, color: '#f97316' }}>Reports & Analytics</div>
+              <div style={{ color: '#6b7280' }}>
+                Performance reports, analytics, and data insights coming soon.
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'support':
+        return (
+          <div style={{ animation: 'fadeIn .12s ease-out' }}>
+            <div className="ui-card">
+              <div className="title" style={{ marginBottom: 16, color: '#f97316' }}>Support & Help</div>
+              <div style={{ color: '#6b7280' }}>
+                Documentation, help resources, and support contacts coming soon.
+              </div>
             </div>
           </div>
         );
@@ -424,69 +807,6 @@ export default function CenterHome() {
 
   return (
     <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-      {/* OG CENTER HUB TEMPLATE DATA - Field names from original spreadsheet */}
-      <div className="ui-card" style={{ margin: '24px 0 16px', padding: 16, borderTop: '4px solid #f97316' }}>
-        <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 16, color: '#f97316' }}>
-          🔗 CKS Brain Template Data (Field Names Only)
-        </h2>
-        
-        {/* Profile Template Fields */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16, marginBottom: 16 }}>
-          <div>
-            <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#374151' }}>Center Profile Fields</h3>
-            <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.5 }}>
-              • Center ID<br/>
-              • Name<br/>
-              • Address<br/>
-              • Phone<br/>
-              • Email<br/>
-              • Website<br/>
-              • Socials<br/>
-              • Manager ID (CKS)<br/>
-              • Supervisor ID (Crew Lead)<br/>
-              • Contractor ID<br/>
-              • Customer ID<br/>
-              • Service Start Date<br/>
-              • Status<br/>
-              • Services Active<br/>
-              • Service Frequency
-            </div>
-          </div>
-          
-          <div>
-            <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#374151' }}>Hub Tabs Structure</h3>
-            <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.5 }}>
-              • Profile (Facility Details)<br/>
-              • Services (Active Services)<br/>
-              • Jobs (Work Orders)<br/>
-              • Crew (Staff Assignments)<br/>
-              • Financials (Service Costs)
-            </div>
-          </div>
-          
-          <div>
-            <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#374151' }}>Operational Focus</h3>
-            <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.5 }}>
-              • Crew Coordination<br/>
-              • Service Scheduling<br/>
-              • Quality Metrics<br/>
-              • Equipment Management<br/>
-              • Incident Reporting<br/>
-              • Performance Tracking
-            </div>
-          </div>
-        </div>
-        
-        {/* Relationship Data Template */}
-        <div style={{ background: '#fff7ed', padding: 12, borderRadius: 8 }}>
-          <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#f97316' }}>Smart ID Relationships</h3>
-          <div style={{ fontSize: 12, color: '#c2410c', lineHeight: 1.5 }}>
-            <strong>Template:</strong> CTR-001 → Manager: MGR-001 → Supervisor: CRW-001 → Contractor: CON-001 → Customer: CUS-001<br/>
-            <strong>When logged in:</strong> Shows this center's manager, crew, contractor, customer, and active services
-          </div>
-        </div>
-      </div>
-
       {/* Hardcoded Page header styling - Orange theme */}
       <div className="card" style={{
         display: 'flex',
@@ -498,46 +818,47 @@ export default function CenterHome() {
         borderTop: '4px solid #f97316'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
-          {/* Navigation tabs */}
-          <div style={{ display: 'flex', gap: 8, marginRight: 16 }}>
-            {([
-              { key: 'dashboard', label: 'Dashboard' },
-              { key: 'profile', label: 'Profile' },
-              { key: 'crew', label: 'Crew' },
-              { key: 'services', label: 'Services' },
-              { key: 'schedules', label: 'Schedules' },
-              { key: 'reports', label: 'Reports' },
-              { key: 'support', label: 'Support' }
-            ] as const).map((tab) => (
-              <button
-                key={tab.key}
-                className={`ui-button ${activeSection === tab.key ? 'active' : ''}`}
-                style={{
-                  padding: '6px 12px',
-                  fontSize: 12,
-                  backgroundColor: activeSection === tab.key ? '#f97316' : 'transparent',
-                  color: activeSection === tab.key ? 'white' : '#374151',
-                  border: activeSection === tab.key ? 'none' : '1px solid #e5e7eb'
-                }}
-                onClick={() => setActiveSection(tab.key)}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-          
           <h1 style={{ fontSize: 44, fontWeight: 800, letterSpacing: 0.3, margin: 0 }}>
             Center Hub
           </h1>
         </div>
         
-        <button
-          className="ui-button"
-          style={{ padding: '10px 16px', fontSize: 14 }}
-          onClick={() => navigate('/logout')}
-        >
-          Log out
-        </button>
+        <CenterLogoutButton />
+      </div>
+
+      {/* Welcome message for center coordinator */}
+      <div style={{ fontSize: 14, color: '#374151', marginTop: 4, marginBottom: 16 }}>
+        Welcome to {centerName} ({code})! Monitor crew operations and facility coordination.
+      </div>
+
+      {/* Main Navigation Tabs */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 24, flexWrap: 'wrap' }}>
+        {([
+          { key: 'dashboard', label: 'Dashboard' },
+          { key: 'profile', label: 'Profile' },
+          { key: 'services', label: 'Services' },
+          { key: 'crew', label: 'Crew' },
+          { key: 'reports', label: 'Reports' },
+          { key: 'support', label: 'Support' }
+        ] as const).map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveSection(tab.key)}
+            style={{
+              padding: '8px 16px',
+              borderRadius: 8,
+              border: '1px solid #e5e7eb',
+              background: activeSection === tab.key ? '#111827' : 'white',
+              color: activeSection === tab.key ? 'white' : '#111827',
+              fontWeight: 600,
+              fontSize: 14,
+              cursor: 'pointer',
+              transition: 'all 0.2s'
+            }}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
       {renderContent()}

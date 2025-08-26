@@ -54,6 +54,15 @@ export function useCustomerData() {
         return;
       }
 
+      // Template users: use demo data directly (skip validation)
+      const username = user?.username || '';
+      if (username.includes('-000') || username === 'cus-000' || username === 'CUS-000') {
+        const data = makeCustomerDemoData(username || 'CUS-000');
+        setState({ loading: false, error: null, kind: 'customer', data, _source: 'template-user' });
+        console.debug('[useCustomerData]', { source: 'template-user', username, data });
+        return;
+      }
+
       // Validate customer role first
       if (!validateCustomerRole(user)) {
         setState({ loading: false, error: 'Unauthorized: Customer access required', kind: "", data: null, _source: 'auth-error' });
@@ -64,7 +73,14 @@ export function useCustomerData() {
       console.debug('[useCustomerData] fetching', url);
       
       const res = await customerApiFetch(url);
-      let j: any = await res.json();
+      let j: any;
+      try {
+        const text = await res.text();
+        j = text ? JSON.parse(text) : {};
+      } catch (parseError) {
+        console.debug('[useCustomerData] JSON parse error, using fallback', parseError);
+        j = {};
+      }
       console.debug('[useCustomerData] response', { status: res.status, data: j });
 
       let sourceTag: string = '/customer-api/profile';
@@ -80,9 +96,14 @@ export function useCustomerData() {
             const r = await customerApiFetch(buildCustomerApiUrl(p));
             console.debug('[useCustomerData] trying fallback', { url: p, status: r?.status });
             if (r.ok) {
-              fallbackJson = await r.json().catch(() => null);
+              try {
+                const text = await r.text();
+                fallbackJson = text ? JSON.parse(text) : null;
+              } catch (parseError) {
+                fallbackJson = null;
+              }
               fallbackSource = p;
-              break;
+              if (fallbackJson) break;
             }
           } catch (e: any) {
             console.debug('[useCustomerData] fallback error', { url: p, error: e.message });
@@ -102,14 +123,12 @@ export function useCustomerData() {
       // Handle other errors
       if (!res.ok && res.status !== 404) {
         const msg = String(j?.error || `HTTP ${res.status}`);
-        
-        // For network errors in dev, use fallback data
-        if (!user?.id || /Failed to fetch|NetworkError|ECONNREFUSED/i.test(msg)) {
+        // For network or server errors (5xx) in dev, use fallback data
+        if (!user?.id || res.status >= 500 || /Failed to fetch|NetworkError|ECONNREFUSED/i.test(msg)) {
           const data = makeCustomerDemoData(safeGet('customer:lastCode') || undefined);
           setState({ loading: false, error: null, kind: 'customer', data, _source: 'soft-fallback' });
           return;
         }
-        
         setState({ loading: false, error: msg, kind: "", data: null, _source: sourceTag });
         return;
       }
@@ -118,7 +137,7 @@ export function useCustomerData() {
       let data = j?.data || j || {};
       
       // Ensure customer has required fields
-      if (!data.customer_id) data.customer_id = 'cust-000';
+      if (!data.customer_id) data.customer_id = 'CUS-000';
       if (!data.customer_name) data.customer_name = 'Customer Demo';
       
       setState({ loading: false, error: null, kind: 'customer', data, _source: sourceTag });

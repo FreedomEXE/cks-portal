@@ -60,9 +60,9 @@ export async function crewApiFetch(input: string, init: RequestInit = {}) {
   const headers = new Headers(init.headers || {});
   
   // Crew-specific headers
-  if (userId && !headers.has('x-crew-user-id')) {
-    headers.set('x-crew-user-id', userId);
-  }
+  if (userId && !headers.has('x-crew-user-id')) headers.set('x-crew-user-id', userId);
+  // Align with backend: also provide generic x-user-id
+  if (userId && !headers.has('x-user-id')) headers.set('x-user-id', userId);
   if (!headers.has('Accept')) headers.set('Accept', 'application/json');
   if (!headers.has('x-hub-type')) headers.set('x-hub-type', 'crew');
   if (!headers.has('x-field-worker')) headers.set('x-field-worker', 'true'); // Crew are field workers

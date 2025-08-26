@@ -63,6 +63,10 @@ export async function customerApiFetch(input: string, init: RequestInit = {}) {
   if (userId && !headers.has('x-customer-user-id')) {
     headers.set('x-customer-user-id', userId);
   }
+  // Align with backend: also provide generic x-user-id
+  if (userId && !headers.has('x-user-id')) {
+    headers.set('x-user-id', userId);
+  }
   if (!headers.has('Accept')) headers.set('Accept', 'application/json');
   if (!headers.has('x-hub-type')) headers.set('x-hub-type', 'customer');
   if (!headers.has('x-center-manager')) headers.set('x-center-manager', 'true'); // Customer manages centers

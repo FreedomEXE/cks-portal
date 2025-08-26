@@ -126,8 +126,12 @@ export function useCenterData() {
       // Normalize response data
       let data = j?.data || j || {};
       
+      // Normalize common field names and IDs
+      if (!data.center_name && data.name) data.center_name = data.name;
+      if (!data.center_id && (data.id || data.code)) data.center_id = data.id || data.code;
+      
       // Ensure center has required fields
-      if (!data.center_id) data.center_id = 'ctr-000';
+      if (!data.center_id) data.center_id = 'CEN-000';
       if (!data.center_name) data.center_name = 'Center Demo Location';
       
       setState({ loading: false, error: null, kind: 'center', data, _source: sourceTag });
@@ -170,9 +174,9 @@ export default useCenterData;
 // Helper functions
 function makeCenterDemoData(code?: string) {
   return { 
-    center_id: code || 'ctr-000', 
+    center_id: code || 'CEN-000', 
     center_name: 'Downtown Operations Center', 
-    code: code || 'ctr-000',
+    code: code || 'CEN-000',
     location_type: 'Commercial',
     facility_manager: 'John Center',
     email: 'manager@center-demo.com',

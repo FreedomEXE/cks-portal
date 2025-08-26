@@ -126,6 +126,12 @@ export function useCrewData() {
       // Normalize response data
       let data = j?.data || j || {};
       
+      // Normalize common field names and IDs
+      if (!data.crew_name && data.name) data.crew_name = data.name;
+      if (!data.center_id && (data.assigned_center || data.center)) {
+        data.center_id = data.assigned_center || data.center;
+      }
+      
       // Ensure crew has required fields
       if (!data.crew_id) data.crew_id = 'crew-000';
       if (!data.crew_name) data.crew_name = 'Crew Demo Member';
@@ -181,7 +187,7 @@ function makeCrewDemoData(code?: string) {
     emergency_contact: 'Sarah Johnson - (555) 876-5432',
     hire_date: '2023-03-15',
     center_assigned: 'Downtown Operations Center',
-    center_id: 'ctr-001',
+    center_id: 'CEN-001',
     shift_schedule: 'Morning (6 AM - 2 PM)',
     hourly_rate: '$18.50',
     supervisor: 'John Center',

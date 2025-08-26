@@ -22,6 +22,7 @@ import { useNavigate, useParams, Link } from 'react-router-dom';
 import useManagerData from './hooks/useManagerData';
 import { setManagerSession, getManagerSession } from './utils/managerAuth';
 import { buildManagerApiUrl, managerApiFetch } from './utils/managerApi';
+import ManagerLogoutButton from './components/LogoutButton';
 
 type NewsItem = { 
   id: string | number; 
@@ -68,7 +69,7 @@ export default function ManagerHome() {
         const r = await managerApiFetch(url);
         if (!r.ok) throw new Error(String(r.status));
         const j = await r.json();
-        const arr = Array.isArray(j?.items) ? j.items : Array.isArray(j) ? j : [];
+        const arr = Array.isArray(j?.data) ? j.data : (Array.isArray(j?.items) ? j.items : (Array.isArray(j) ? j : []));
         if (!cancelled) setNewsItems(arr as NewsItem[]);
       } catch {
         if (!cancelled) {
@@ -121,13 +122,7 @@ export default function ManagerHome() {
               Manager Hub
             </h1>
           </div>
-          <button
-            className="ui-button"
-            style={{ padding: '10px 16px', fontSize: 14 }}
-            onClick={() => navigate('/logout')}
-          >
-            Log out
-          </button>
+          <ManagerLogoutButton />
         </div>
         <div style={{ animation: 'fadeIn .12s ease-out' }}>
           <div style={{ padding: 16, background: '#f9fafb', borderRadius: 12 }}>
@@ -154,13 +149,7 @@ export default function ManagerHome() {
           <h1 style={{ fontSize: 44, fontWeight: 800, letterSpacing: 0.3, margin: 0 }}>
             Manager Hub
           </h1>
-          <button
-            className="ui-button"
-            style={{ padding: '10px 16px', fontSize: 14 }}
-            onClick={() => navigate('/logout')}
-          >
-            Log out
-          </button>
+          <ManagerLogoutButton />
         </div>
         <div style={{ padding: 16, color: '#b91c1c', background: '#fef2f2', borderRadius: 12 }}>
           Manager Hub Error: {state.error}
@@ -172,72 +161,6 @@ export default function ManagerHome() {
   // Main render with all sections
   return (
     <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-      {/* OG MANAGER HUB TEMPLATE DATA - Field names from original spreadsheet */}
-      <div className="ui-card" style={{ margin: '24px 0 16px', padding: 16, borderTop: '4px solid #3b82f6' }}>
-        <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 16, color: '#3b82f6' }}>
-          🔗 CKS Brain Template Data (Field Names Only)
-        </h2>
-        
-        {/* Profile Template Fields */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16, marginBottom: 16 }}>
-          <div>
-            <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#374151' }}>Manager Profile Fields</h3>
-            <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.5 }}>
-              • Full Name<br/>
-              • Reports To<br/>
-              • Manager ID<br/>
-              • Role<br/>
-              • Start Date<br/>
-              • Years with Company<br/>
-              • Primary Region<br/>
-              • Email<br/>
-              • Languages<br/>
-              • Phone<br/>
-              • Emergency Contact<br/>
-              • Home Address<br/>
-              • LinkedIn<br/>
-              • Status<br/>
-              • Availability<br/>
-              • Preferred Areas<br/>
-              • QR Code<br/>
-              • Synced with Portal
-            </div>
-          </div>
-          
-          <div>
-            <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#374151' }}>Hub Tabs Structure</h3>
-            <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.5 }}>
-              • Dashboard (Territory Overview)<br/>
-              • Profile (Personal & Work Details)<br/>
-              • Reports (Performance Analytics)<br/>
-              • Orders (Service Coordination)<br/>
-              • News (Updates & Communications)
-            </div>
-          </div>
-          
-          <div>
-            <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#374151' }}>Management Scope</h3>
-            <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.5 }}>
-              • Assigned Contractors<br/>
-              • Territory Customers<br/>
-              • Center Oversight<br/>
-              • Crew Coordination<br/>
-              • Performance Reviews<br/>
-              • Business Development
-            </div>
-          </div>
-        </div>
-        
-        {/* Relationship Data Template */}
-        <div style={{ background: '#eff6ff', padding: 12, borderRadius: 8 }}>
-          <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#3b82f6' }}>Smart ID Relationships</h3>
-          <div style={{ fontSize: 12, color: '#1d4ed8', lineHeight: 1.5 }}>
-            <strong>Template:</strong> MGR-001 → Oversees: CON-001, CON-002 → Customers: CUS-001, CUS-002 → Centers: Multiple locations → Crew: Territory staff<br/>
-            <strong>When logged in:</strong> Dashboard shows only this manager's assigned contractors, customers, centers, and crew
-          </div>
-        </div>
-      </div>
-
       {/* Hardcoded Page header with navigation tabs */}
       <div className="card" style={{
         display: 'flex',
@@ -253,13 +176,7 @@ export default function ManagerHome() {
             Manager Hub
           </h1>
         </div>
-        <button
-          className="ui-button"
-          style={{ padding: '10px 16px', fontSize: 14 }}
-          onClick={() => navigate('/logout')}
-        >
-          Log out
-        </button>
+        <ManagerLogoutButton />
       </div>
 
       {/* Welcome message */}
@@ -319,6 +236,107 @@ export default function ManagerHome() {
                 </div>
               ))}
             </div>
+
+            {/* Communication Hub */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 24 }}>
+              {/* News & Updates */}
+              <div className="ui-card" style={{ padding: 16 }}>
+                <div className="title" style={{ marginBottom: 16, color: '#3b7af7', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  📰 News & Updates
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {[
+                    { id: 1, title: "Territory performance review scheduled for Q4", date: "2025-08-20", priority: "High" },
+                    { id: 2, title: "New contractor onboarding process updated", date: "2025-08-18", priority: "Medium" },
+                    { id: 3, title: "Center capacity reports now available", date: "2025-08-15", priority: "Low" }
+                  ].map((item) => (
+                    <div key={item.id} style={{ 
+                      padding: 8,
+                      border: '1px solid #f3f4f6',
+                      borderRadius: 4,
+                      borderLeft: '3px solid #3b7af7'
+                    }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: '#111827' }}>{item.title}</div>
+                      <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>{item.date} • {item.priority} Priority</div>
+                    </div>
+                  ))}
+                </div>
+                <button style={{
+                  width: '100%',
+                  padding: '8px 16px',
+                  fontSize: 12,
+                  backgroundColor: '#dbeafe',
+                  color: '#3b7af7',
+                  border: '1px solid #60a5fa',
+                  borderRadius: 4,
+                  cursor: 'pointer',
+                  marginTop: 8
+                }}
+                onClick={() => {
+                  alert('Full News - Coming Soon!');
+                }}
+                >
+                  View All News
+                </button>
+              </div>
+              
+              {/* Mail & Messages */}
+              <div className="ui-card" style={{ padding: 16 }}>
+                <div className="title" style={{ marginBottom: 16, color: '#3b7af7', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  📬 Mail
+                  <span style={{ 
+                    background: '#ef4444', 
+                    color: 'white', 
+                    fontSize: 10, 
+                    padding: '2px 6px', 
+                    borderRadius: 12, 
+                    fontWeight: 600 
+                  }}>
+                    4
+                  </span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <div style={{ 
+                    padding: 12, 
+                    border: '1px solid #e5e7eb', 
+                    borderRadius: 6,
+                    borderLeft: '3px solid #3b7af7'
+                  }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>From Regional Director</div>
+                    <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Quarterly territory review meeting scheduled</div>
+                    <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>45 minutes ago • High Priority</div>
+                  </div>
+                  
+                  <div style={{ 
+                    padding: 12, 
+                    border: '1px solid #e5e7eb', 
+                    borderRadius: 6,
+                    borderLeft: '3px solid #3b7af7'
+                  }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>From HR - Personnel Team</div>
+                    <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Contractor performance evaluations due</div>
+                    <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>1 hour ago • Medium Priority</div>
+                  </div>
+                </div>
+                <button style={{
+                  width: '100%',
+                  padding: '8px 16px',
+                  fontSize: 12,
+                  backgroundColor: '#dbeafe',
+                  color: '#3b7af7',
+                  border: '1px solid #60a5fa',
+                  borderRadius: 4,
+                  cursor: 'pointer',
+                  marginTop: 8
+                }}
+                onClick={() => {
+                  alert('Full Mailbox - Coming Soon!');
+                }}
+                >
+                  View Mailbox
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
@@ -370,7 +388,7 @@ export default function ManagerHome() {
                       }}>
                         {name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2) || 'MG'}
                       </div>
-                      <button style={{ padding: '6px 12px', fontSize: 12 }}>Change Photo</button>
+                      <button style={{ padding: '6px 12px', fontSize: 12 }}>Update Photo</button>
                     </div>
 
                     {/* Manager Details */}

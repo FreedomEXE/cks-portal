@@ -9,52 +9,15 @@
  * Description: Center-specific logout button component with session cleanup
  * Function: Handles user logout with Center-specific session management
  * Importance: Critical - Secure logout functionality for Center hub
- * Connects to: Universal logout component with Center hub styling
- * 
- * Notes: Uses the universal logout component for consistent behavior
- *        across all hubs while maintaining Center-specific appearance.
- */
-
-import UniversalLogoutButton from '../../../../components/shared/UniversalLogoutButton';
-
-type LogoutButtonProps = {
-  style?: React.CSSProperties;
-  className?: string;
-  children?: React.ReactNode;
-};
-
-export default function CenterLogoutButton({ 
-  style, 
-  className = "ui-button", 
-  children = "Log out" 
-}: LogoutButtonProps) {
-  return (
-    <UniversalLogoutButton 
-      hubType="center"
-      style={style}
-      className={className}
-    >
-      {children}
-    </UniversalLogoutButton>
-  );
-}
-
-/**
- * LogoutButton.tsx (Center Hub - FULLY INDEPENDENT)
- * 
- * Description: Center-specific logout button component with session cleanup
- * Function: Handles user logout with Center-specific session management
- * Importance: Critical - Secure logout functionality for Center hub
  * Connects to: Clerk authentication, Center session storage, navigation
  * 
  * Notes: Fully self-contained logout logic with Center-specific cleanup.
  *        Clears Center session data before redirecting to login.
- *        Uses Center-specific styling to match hub theme.
  */
 
 import { useAuth } from '@clerk/clerk-react';
 import { useNavigate } from 'react-router-dom';
-import { clearCenterSession } from '../utils/centerAuth';
+import { useState } from 'react';
 
 type LogoutButtonProps = {
   style?: React.CSSProperties;
@@ -68,31 +31,58 @@ export default function CenterLogoutButton({
   children = "Log out" 
 }: LogoutButtonProps) {
   const navigate = useNavigate();
-  const { signOut } = useAuth();
+  const { signOut, isLoaded } = useAuth();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  const clearCenterSessionData = () => {
+    const centerKeys = [
+      'center:session',
+      'center:lastCode',
+      'role',
+      'code',
+      'me:lastRole',
+      'me:lastCode'
+    ];
+
+    centerKeys.forEach(key => {
+      try {
+        sessionStorage.removeItem(key);
+        localStorage.removeItem(key);
+      } catch {}
+    });
+  };
 
   const handleLogout = async () => {
-    try {
-      // Clear Center-specific session data
-      clearCenterSession();
-      
-      // Clear any shared session remnants
-      try {
-        localStorage.removeItem('me:lastRole');
-        localStorage.removeItem('me:lastCode');
-        localStorage.removeItem('dev:signedOut');
-      } catch {}
+    if (isLoggingOut || !isLoaded) return;
+    
+    setIsLoggingOut(true);
 
-      // Attempt Clerk sign out
+    try {
+      // Set logout flag to prevent auto re-login
+      localStorage.setItem('userLoggedOut', 'true');
+      
+      // Clear Center session data
+      clearCenterSessionData();
+
+      // Clerk signOut with redirect URL - this ensures proper logout flow
       if (typeof signOut === 'function') {
         await signOut({ redirectUrl: '/login' });
-        return;
+        return; // signOut with redirectUrl handles the navigation
       }
+
+      // Fallback: Force navigate to login if signOut doesn't redirect
+      navigate('/login', { replace: true });
+
     } catch (error) {
-      console.warn('[CenterLogout] Sign out error:', error);
+      console.error('[Center Logout] Error:', error);
+      
+      // Ensure we redirect even if signOut fails
+      clearCenterSessionData();
+      localStorage.setItem('userLoggedOut', 'true');
+      navigate('/login', { replace: true });
+    } finally {
+      setIsLoggingOut(false);
     }
-    
-    // Fallback navigation
-    navigate('/login', { replace: true });
   };
 
   return (
@@ -101,18 +91,20 @@ export default function CenterLogoutButton({
       style={{ 
         padding: '10px 16px', 
         fontSize: 14,
-        backgroundColor: '#f97316',
+        backgroundColor: '#f97316', // Center orange
         color: 'white',
         border: 'none',
         borderRadius: 6,
-        cursor: 'pointer',
+        cursor: isLoggingOut ? 'not-allowed' : 'pointer',
+        opacity: isLoggingOut ? 0.6 : 1,
         ...style 
       }}
       onClick={handleLogout}
+      disabled={isLoggingOut || !isLoaded}
       aria-label="Sign out of Center Hub"
       title="Sign out"
     >
-      {children}
+      {isLoggingOut ? 'Signing out...' : children}
     </button>
   );
 }

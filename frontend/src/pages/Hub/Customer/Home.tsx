@@ -23,6 +23,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import useCustomerData from './hooks/useCustomerData';
 import { setCustomerSession, getCustomerSession } from './utils/customerAuth';
 import { buildCustomerApiUrl, customerApiFetch } from './utils/customerApi';
+import CustomerLogoutButton from './components/LogoutButton';
 
 type CenterSummary = {
   id: string;
@@ -42,7 +43,7 @@ type ServiceRequest = {
   date: string;
 };
 
-type CustomerSection = 'dashboard' | 'profile' | 'centers' | 'crew' | 'reports' | 'orders' | 'services';
+type CustomerSection = 'dashboard' | 'profile' | 'services' | 'centers' | 'crew' | 'reports' | 'orders' | 'support';
 
 export default function CustomerHome() {
   const navigate = useNavigate();
@@ -90,7 +91,8 @@ export default function CustomerHome() {
           // Center summaries
           if (centersRes?.ok) {
             const centersData = await centersRes.json();
-            setCenters(Array.isArray(centersData.centers) ? centersData.centers : []);
+            const items = Array.isArray(centersData?.data) ? centersData.data : (Array.isArray(centersData?.centers) ? centersData.centers : []);
+            setCenters(items);
           } else {
             // Demo center data
             setCenters([
@@ -105,7 +107,8 @@ export default function CustomerHome() {
           // Service requests
           if (requestsRes?.ok) {
             const requestsData = await requestsRes.json();
-            setServiceRequests(Array.isArray(requestsData.requests) ? requestsData.requests : []);
+            const items = Array.isArray(requestsData?.data) ? requestsData.data : (Array.isArray(requestsData?.requests) ? requestsData.requests : []);
+            setServiceRequests(items);
           } else {
             // Demo service requests
             setServiceRequests([
@@ -145,13 +148,7 @@ export default function CustomerHome() {
               Customer Hub
             </h1>
           </div>
-          <button
-            className="ui-button"
-            style={{ padding: '10px 16px', fontSize: 14 }}
-            onClick={() => navigate('/logout')}
-          >
-            Log out
-          </button>
+          <CustomerLogoutButton />
         </div>
         <div style={{ animation: 'fadeIn .12s ease-out' }}>
           <div style={{ padding: 16, background: '#fefce8', borderRadius: 12 }}>
@@ -178,13 +175,7 @@ export default function CustomerHome() {
           <h1 style={{ fontSize: 44, fontWeight: 800, letterSpacing: 0.3, margin: 0 }}>
             Customer Hub
           </h1>
-          <button
-            className="ui-button"
-            style={{ padding: '10px 16px', fontSize: 14 }}
-            onClick={() => navigate('/logout')}
-          >
-            Log out
-          </button>
+          <CustomerLogoutButton />
         </div>
         <div style={{ padding: 16, color: '#b91c1c', background: '#fef2f2', borderRadius: 12 }}>
           Customer Hub Error: {state.error}
@@ -196,66 +187,6 @@ export default function CustomerHome() {
   // Main render with all sections
   return (
     <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-      {/* OG CUSTOMER HUB TEMPLATE DATA - Field names from original spreadsheet */}
-      <div className="ui-card" style={{ margin: '24px 0 16px', padding: 16, borderTop: '4px solid #eab308' }}>
-        <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 16, color: '#eab308' }}>
-          🔗 CKS Brain Template Data (Field Names Only)
-        </h2>
-        
-        {/* Profile Template Fields */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16, marginBottom: 16 }}>
-          <div>
-            <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#374151' }}>Customer Profile Fields</h3>
-            <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.5 }}>
-              • Customer ID<br/>
-              • Company Name<br/>
-              • Address<br/>
-              • CKS Manager (Assigned)<br/>
-              • Email<br/>
-              • Phone<br/>
-              • Main Contact<br/>
-              • Website<br/>
-              • Years with CKS<br/>
-              • # of Centers<br/>
-              • Contract Start Date<br/>
-              • Status
-            </div>
-          </div>
-          
-          <div>
-            <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#374151' }}>Hub Tabs Structure</h3>
-            <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.5 }}>
-              • Profile (Organization Details)<br/>
-              • Centers (My Locations)<br/>
-              • Services (Requested Services)<br/>
-              • Jobs (Active Projects)<br/>
-              • Crew (Service Staff)<br/>
-              • Financials (Billing & Costs)
-            </div>
-          </div>
-          
-          <div>
-            <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#374151' }}>Center Management</h3>
-            <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.5 }}>
-              • New Request CTA (Prominent)<br/>
-              • Service History<br/>
-              • Center Performance<br/>
-              • Cost Analytics<br/>
-              • Quality Reports<br/>
-              • Staff Coordination
-            </div>
-          </div>
-        </div>
-        
-        {/* Relationship Data Template */}
-        <div style={{ background: '#fefce8', padding: 12, borderRadius: 8 }}>
-          <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#eab308' }}>Smart ID Relationships</h3>
-          <div style={{ fontSize: 12, color: '#a16207', lineHeight: 1.5 }}>
-            <strong>Template:</strong> CUS-001 → CKS Manager: MGR-001 → Centers: CTR-001, CTR-002, CTR-003, CTR-004 → Services via Contractor<br/>
-            <strong>When logged in:</strong> Dashboard shows only this customer's centers, assigned manager, and service requests
-          </div>
-        </div>
-      </div>
 
       {/* Hardcoded Page header with navigation tabs - Blue theme */}
       <div className="card" style={{
@@ -272,13 +203,7 @@ export default function CustomerHome() {
             Customer Hub
           </h1>
         </div>
-        <button
-          className="ui-button"
-          style={{ padding: '10px 16px', fontSize: 14 }}
-          onClick={() => navigate('/logout')}
-        >
-          Log out
-        </button>
+        <CustomerLogoutButton />
       </div>
 
       {/* Welcome message for center manager */}
@@ -291,11 +216,12 @@ export default function CustomerHome() {
         {[
           { key: 'dashboard' as CustomerSection, label: 'Center Dashboard' },
           { key: 'profile' as CustomerSection, label: 'Customer Profile' },
+          { key: 'services' as CustomerSection, label: 'My Services' },
           { key: 'centers' as CustomerSection, label: 'My Centers' },
           { key: 'crew' as CustomerSection, label: 'My Crew' },
           { key: 'reports' as CustomerSection, label: 'Reports' },
           { key: 'orders' as CustomerSection, label: 'Orders' },
-          { key: 'services' as CustomerSection, label: 'My Services' }
+          { key: 'support' as CustomerSection, label: 'Support' }
         ].map(section => (
           <button
             key={section.key}
@@ -423,6 +349,107 @@ export default function CustomerHome() {
                 </tbody>
               </table>
             </div>
+
+            {/* Communication Hub */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
+              {/* News & Updates */}
+              <div className="ui-card" style={{ padding: 16 }}>
+                <div className="title" style={{ marginBottom: 16, color: '#eab308', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  📰 News & Updates
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {[
+                    { id: 1, title: "Service agreement renewal available", date: "2025-08-20", priority: "Medium" },
+                    { id: 2, title: "New premium services now available", date: "2025-08-18", priority: "Low" },
+                    { id: 3, title: "Center maintenance schedule updated", date: "2025-08-15", priority: "High" }
+                  ].map((item) => (
+                    <div key={item.id} style={{ 
+                      padding: 8,
+                      border: '1px solid #f3f4f6',
+                      borderRadius: 4,
+                      borderLeft: '3px solid #eab308'
+                    }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: '#111827' }}>{item.title}</div>
+                      <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>{item.date} • {item.priority} Priority</div>
+                    </div>
+                  ))}
+                </div>
+                <button style={{
+                  width: '100%',
+                  padding: '8px 16px',
+                  fontSize: 12,
+                  backgroundColor: '#fef3c7',
+                  color: '#eab308',
+                  border: '1px solid #fbbf24',
+                  borderRadius: 4,
+                  cursor: 'pointer',
+                  marginTop: 8
+                }}
+                onClick={() => {
+                  alert('Full News - Coming Soon!');
+                }}
+                >
+                  View All News
+                </button>
+              </div>
+              
+              {/* Mail & Messages */}
+              <div className="ui-card" style={{ padding: 16 }}>
+                <div className="title" style={{ marginBottom: 16, color: '#eab308', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  📬 Mail
+                  <span style={{ 
+                    background: '#ef4444', 
+                    color: 'white', 
+                    fontSize: 10, 
+                    padding: '2px 6px', 
+                    borderRadius: 12, 
+                    fontWeight: 600 
+                  }}>
+                    3
+                  </span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <div style={{ 
+                    padding: 12, 
+                    border: '1px solid #e5e7eb', 
+                    borderRadius: 6,
+                    borderLeft: '3px solid #eab308'
+                  }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>From Manager - Customer Success</div>
+                    <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Your service agreement is up for renewal</div>
+                    <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>1 hour ago • High Priority</div>
+                  </div>
+                  
+                  <div style={{ 
+                    padding: 12, 
+                    border: '1px solid #e5e7eb', 
+                    borderRadius: 6,
+                    borderLeft: '3px solid #eab308'
+                  }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>From Billing - Finance Team</div>
+                    <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Monthly invoice ready for review</div>
+                    <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>3 hours ago • Medium Priority</div>
+                  </div>
+                </div>
+                <button style={{
+                  width: '100%',
+                  padding: '8px 16px',
+                  fontSize: 12,
+                  backgroundColor: '#fef3c7',
+                  color: '#eab308',
+                  border: '1px solid #fbbf24',
+                  borderRadius: 4,
+                  cursor: 'pointer',
+                  marginTop: 8
+                }}
+                onClick={() => {
+                  alert('Full Mailbox - Coming Soon!');
+                }}
+                >
+                  View Mailbox
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
@@ -433,7 +460,7 @@ export default function CustomerHome() {
             
             {/* Profile Tabs */}
             <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
-              {['Customer Info', 'Centers', 'Contract', 'Contact Manager', 'Service Areas'].map((tab, i) => (
+              {['Customer Info', 'Account Manager', 'Centers', 'Contract', 'Contact Manager', 'Service Areas'].map((tab, i) => (
                 <button
                   key={tab}
                   onClick={() => setProfileTab(i)}
@@ -462,7 +489,7 @@ export default function CustomerHome() {
                       <div style={{
                         width: 120,
                         height: 120,
-                        borderRadius: 12,
+                        borderRadius: '50%',
                         background: '#fefce8',
                         display: 'flex',
                         alignItems: 'center',
@@ -475,7 +502,7 @@ export default function CustomerHome() {
                       }}>
                         {customerName.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2) || 'CU'}
                       </div>
-                      <button style={{ padding: '6px 12px', fontSize: 12 }}>Update Logo</button>
+                      <button style={{ padding: '6px 12px', fontSize: 12 }}>Update Photo</button>
                     </div>
 
                     {/* Customer Details */}
@@ -483,14 +510,18 @@ export default function CustomerHome() {
                       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                         <tbody>
                           {[
-                            ['Customer Name', state.data?.customer_name || customerName],
                             ['Customer ID', state.data?.customer_id || code],
-                            ['Account Type', state.data?.account_type || 'Corporate'],
-                            ['Contact Person', state.data?.contact_person || 'Jane Customer'],
+                            ['Company Name', state.data?.company_name || customerName],
+                            ['Address', state.data?.address || '456 Corporate Blvd, Suite 200'],
+                            ['CKS Manager (Assigned)', state.data?.cks_manager || 'Manager Demo'],
                             ['Email', state.data?.email || 'contact@customer-demo.com'],
                             ['Phone', state.data?.phone || '(555) 456-7890'],
-                            ['Address', state.data?.address || '456 Corporate Blvd, Suite 200'],
-                            ['Established', state.data?.established || '2021-01-01']
+                            ['Main Contact', state.data?.main_contact || 'Jane Customer'],
+                            ['Website', state.data?.website || 'www.customer-demo.com'],
+                            ['Years with CKS', state.data?.years_with_cks || '3 Years'],
+                            ['# of Centers', state.data?.num_centers || '5'],
+                            ['Contract Start Date', state.data?.contract_start_date || '2021-01-01'],
+                            ['Status', state.data?.status || 'Active']
                           ].map(([label, value]) => (
                             <tr key={label}>
                               <td style={{ padding: '8px 0', fontWeight: 600, width: '30%' }}>{label}</td>
@@ -503,9 +534,104 @@ export default function CustomerHome() {
                   </div>
                 </div>
               )}
-              {profileTab !== 0 && (
+              {profileTab === 1 && (
+                <div>
+                  <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16, color: '#eab308' }}>CKS Account Manager</h3>
+                  <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: 16 }}>
+                    {/* Manager Photo */}
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{
+                        width: 120,
+                        height: 120,
+                        borderRadius: '50%',
+                        background: '#fefce8',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 36,
+                        fontWeight: 700,
+                        color: '#eab308',
+                        margin: '0 auto 12px',
+                        border: '2px solid #eab308'
+                      }}>
+                        MD
+                      </div>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: '#111827' }}>Manager Demo</div>
+                      <div style={{ fontSize: 12, color: '#6b7280' }}>Account Manager</div>
+                    </div>
+
+                    {/* Manager Details */}
+                    <div>
+                      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <tbody>
+                          {[
+                            ['Manager Name', 'Manager Demo'],
+                            ['Title', 'Senior Account Manager'],
+                            ['Department', 'Customer Success'],
+                            ['Email', 'manager.demo@cks-portal.com'],
+                            ['Phone', '(555) 123-4567'],
+                            ['Direct Line', '(555) 123-4567 ext. 1001'],
+                            ['Office Location', 'CKS HQ - Building A, Floor 3'],
+                            ['Assigned Since', 'January 2023'],
+                            ['Specialty', 'Commercial Facility Management'],
+                            ['Response Time', '< 4 hours during business hours'],
+                            ['Emergency Contact', '(555) 999-0000 (24/7)'],
+                            ['Preferred Contact', 'Email for non-urgent, Phone for urgent']
+                          ].map(([label, value]) => (
+                            <tr key={label}>
+                              <td style={{ padding: '8px 0', fontWeight: 600, width: '35%' }}>{label}</td>
+                              <td style={{ padding: '8px 0' }}>{value}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      
+                      {/* Contact Actions */}
+                      <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
+                        <button style={{
+                          padding: '8px 16px',
+                          backgroundColor: '#eab308',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: 4,
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor: 'pointer'
+                        }}>
+                          Send Email
+                        </button>
+                        <button style={{
+                          padding: '8px 16px',
+                          backgroundColor: '#f59e0b',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: 4,
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor: 'pointer'
+                        }}>
+                          Schedule Call
+                        </button>
+                        <button style={{
+                          padding: '8px 16px',
+                          backgroundColor: '#ef4444',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: 4,
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor: 'pointer'
+                        }}>
+                          Emergency Contact
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {profileTab > 1 && (
                 <div style={{ textAlign: 'center', padding: 40, color: '#6b7280' }}>
-                  Customer {['', 'Centers', 'Contract', 'Contact Manager', 'Service Areas'][profileTab]} data will be populated from Customer API
+                  Customer {['', '', 'Centers', 'Contract', 'Contact Manager', 'Service Areas'][profileTab]} data will be populated from Customer API
                 </div>
               )}
             </div>
@@ -577,6 +703,20 @@ export default function CustomerHome() {
                 Service management portal will be implemented here.<br/>
                 This will show available services, service agreements,<br/>
                 and service configuration for customer centers.
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* SUPPORT SECTION */}
+        {activeSection === 'support' && (
+          <div>
+            <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Support</h2>
+            <div className="ui-card" style={{ padding: 16 }}>
+              <div style={{ textAlign: 'center', padding: 40, color: '#6b7280' }}>
+                Customer support center will be implemented here.<br/>
+                This will include help documentation, support tickets,<br/>
+                and direct contact with customer service representatives.
               </div>
             </div>
           </div>

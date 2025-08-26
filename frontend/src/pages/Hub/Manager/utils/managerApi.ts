@@ -62,6 +62,10 @@ export async function managerApiFetch(input: string, init: RequestInit = {}) {
   if (userId && !headers.has('x-manager-user-id')) {
     headers.set('x-manager-user-id', userId);
   }
+  // Align with backend: also provide generic x-user-id
+  if (userId && !headers.has('x-user-id')) {
+    headers.set('x-user-id', userId);
+  }
   if (!headers.has('Accept')) headers.set('Accept', 'application/json');
   if (!headers.has('x-hub-type')) headers.set('x-hub-type', 'manager');
   

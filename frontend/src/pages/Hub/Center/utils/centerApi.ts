@@ -63,6 +63,10 @@ export async function centerApiFetch(input: string, init: RequestInit = {}) {
   if (userId && !headers.has('x-center-user-id')) {
     headers.set('x-center-user-id', userId);
   }
+  // Align with backend pattern: also provide generic x-user-id
+  if (userId && !headers.has('x-user-id')) {
+    headers.set('x-user-id', userId);
+  }
   if (!headers.has('Accept')) headers.set('Accept', 'application/json');
   if (!headers.has('x-hub-type')) headers.set('x-hub-type', 'center');
   if (!headers.has('x-crew-coordinator')) headers.set('x-crew-coordinator', 'true'); // Center coordinates crew

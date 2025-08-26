@@ -18,7 +18,7 @@
 
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { buildCrewApiUrl } from "../utils/crewApi";
+import { buildCrewApiUrl, crewApiFetch } from "../utils/crewApi";
 
 type NewsItem = { 
   id: string | number; 
@@ -45,15 +45,10 @@ export default function CrewNewsPreview({ code, limit = 3, showUnread = true }: 
         setLoading(true);
         // Ask Crew backend for filtered news
         const url = buildCrewApiUrl('/news', { code, limit });
-        const r = await fetch(url, { 
-          credentials: 'include',
-          headers: {
-            'x-hub-type': 'crew'
-          }
-        });
+        const r = await crewApiFetch(url);
         if (!r.ok) throw new Error(String(r.status));
         const j = await r.json();
-        const arr = Array.isArray(j?.items) ? j.items : Array.isArray(j) ? j : [];
+        const arr = Array.isArray(j?.data) ? j.data : (Array.isArray(j?.items) ? j.items : (Array.isArray(j) ? j : []));
         if (!cancelled) setItems(arr as NewsItem[]);
       } catch {
         if (!cancelled) setItems(demoCrewNews.slice(0, limit));

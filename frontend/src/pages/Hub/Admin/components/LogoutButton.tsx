@@ -64,12 +64,13 @@ export default function AdminLogoutButton({
       // Clear Admin session data
       clearAdminSessionData();
 
-      // Clerk signOut
+      // Clerk signOut with redirect URL - this ensures proper logout flow
       if (typeof signOut === 'function') {
-        await signOut();
+        await signOut({ redirectUrl: '/login' });
+        return; // signOut with redirectUrl handles the navigation
       }
 
-      // Force navigate to login
+      // Fallback: Force navigate to login if signOut doesn't redirect
       navigate('/login', { replace: true });
 
     } catch (error) {

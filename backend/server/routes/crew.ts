@@ -50,7 +50,7 @@ function getUserRole(userId: string): string | null {
  */
 router.get('/profile', async (req: Request, res: Response) => {
   try {
-    const userId = String(req.headers['x-user-id'] || '');
+    const userId = String((req.headers['x-user-id'] || req.headers['x-crew-user-id'] || '').toString());
     const role = getUserRole(userId);
     
     if (!userId) {
@@ -60,11 +60,11 @@ router.get('/profile', async (req: Request, res: Response) => {
     // For admin, return sample crew profile
     if (role === 'admin') {
       const sampleProfile = {
-        crew_id: 'crew-001',
+        crew_id: 'CRW-001',
         name: 'Sample Crew Member',
         role: 'Supervisor',
         status: 'Active',
-        assigned_center: 'ctr-001',
+        assigned_center: 'CEN-001',
         phone: '416-555-0123',
         email: 'crew@cks.com',
         skills: ['cleaning', 'maintenance'],
@@ -259,7 +259,7 @@ router.get('/me', async (req: Request, res: Response) => {
  */
 router.get('/member', async (req: Request, res: Response) => {
   try {
-    const userId = String(req.headers['x-user-id'] || '');
+    const userId = String((req.headers['x-user-id'] || req.headers['x-crew-user-id'] || '').toString());
     const role = getUserRole(userId);
     
     // Sample crew member details
@@ -268,7 +268,7 @@ router.get('/member', async (req: Request, res: Response) => {
       name: 'Sample Crew Member',
       position: 'Field Technician',
       department: 'Operations',
-      assigned_center: 'ctr-001',
+      assigned_center: 'CEN-001',
       shift: 'Day Shift (8AM - 5PM)',
       supervisor: 'MGR-001',
       start_date: '2024-01-15',
@@ -287,6 +287,46 @@ router.get('/member', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Crew member endpoint error:', error);
     res.status(500).json({ error: 'Failed to fetch crew member details' });
+  }
+});
+
+/**
+ * GET /api/crew/news
+ * Returns recent news items for crew
+ */
+router.get('/news', async (req: Request, res: Response) => {
+  try {
+    const userId = String((req.headers['x-user-id'] || req.headers['x-crew-user-id'] || '').toString());
+    const limit = Number(req.query.limit || 3);
+    const items = [
+      { id: 'news-001', title: 'Safety training reminder - complete by Friday', date: '2025-08-10' },
+      { id: 'news-002', title: 'New time tracking system goes live Monday', date: '2025-08-05' },
+      { id: 'news-003', title: 'Employee appreciation event next week', date: '2025-08-01' }
+    ].slice(0, Math.max(1, Math.min(10, limit)));
+    return res.json({ success: true, data: items });
+  } catch (error) {
+    console.error('Crew news endpoint error:', error);
+    return res.status(500).json({ success: false, error: 'Failed to fetch crew news', error_code: 'server_error' });
+  }
+});
+
+/**
+ * GET /api/crew/inbox
+ * Returns recent messages for crew
+ */
+router.get('/inbox', async (req: Request, res: Response) => {
+  try {
+    const userId = String((req.headers['x-user-id'] || req.headers['x-crew-user-id'] || '').toString());
+    const limit = Number(req.query.limit || 5);
+    const data = [
+      { id: 'msg-001', from: 'Manager', subject: 'Shift update', snippet: 'Your shift starts at 6AM tomorrow', date: '2025-08-10', unread: true, priority: 'normal' },
+      { id: 'msg-002', from: 'Admin', subject: 'Policy change', snippet: 'Please review the updated safety policy', date: '2025-08-09', unread: true, priority: 'high' },
+      { id: 'msg-003', from: 'Center', subject: 'Supplies restock', snippet: 'Restocking scheduled for Friday', date: '2025-08-08', unread: false, priority: 'low' }
+    ].slice(0, Math.max(1, Math.min(10, limit)));
+    return res.json({ success: true, data });
+  } catch (error) {
+    console.error('Crew inbox endpoint error:', error);
+    return res.status(500).json({ success: false, error: 'Failed to fetch crew inbox', error_code: 'server_error' });
   }
 });
 

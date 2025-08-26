@@ -54,6 +54,15 @@ export function useContractorData() {
         return;
       }
 
+      // Template users: use demo data directly (skip validation)
+      const username = user?.username || '';
+      if (username.includes('-000') || username === 'con-000' || username === 'CON-000') {
+        const data = makeContractorDemoData(username || 'CON-000');
+        setState({ loading: false, error: null, kind: 'contractor', data, _source: 'template-user' });
+        console.debug('[useContractorData]', { source: 'template-user', username, data });
+        return;
+      }
+
       // Validate contractor role first
       if (!validateContractorRole(user)) {
         setState({ loading: false, error: 'Unauthorized: Contractor access required', kind: "", data: null, _source: 'auth-error' });
@@ -102,14 +111,12 @@ export function useContractorData() {
       // Handle other errors
       if (!res.ok && res.status !== 404) {
         const msg = String(j?.error || `HTTP ${res.status}`);
-        
-        // For network errors in dev, use fallback data
-        if (!user?.id || /Failed to fetch|NetworkError|ECONNREFUSED/i.test(msg)) {
+        // For network or server errors (5xx) in dev, use fallback data
+        if (!user?.id || res.status >= 500 || /Failed to fetch|NetworkError|ECONNREFUSED/i.test(msg)) {
           const data = makeContractorDemoData(safeGet('contractor:lastCode') || undefined);
           setState({ loading: false, error: null, kind: 'contractor', data, _source: 'soft-fallback' });
           return;
         }
-        
         setState({ loading: false, error: msg, kind: "", data: null, _source: sourceTag });
         return;
       }
@@ -118,7 +125,7 @@ export function useContractorData() {
       let data = j?.data || j || {};
       
       // Ensure contractor has required fields
-      if (!data.contractor_id) data.contractor_id = 'con-000';
+      if (!data.contractor_id) data.contractor_id = 'CON-000';
       if (!data.company_name) data.company_name = 'Contractor Demo';
       
       setState({ loading: false, error: null, kind: 'contractor', data, _source: sourceTag });

@@ -53,6 +53,15 @@ export function useManagerData() {
         return;
       }
 
+      // Template users: use demo data directly (skip validation)
+      const username = user?.username || '';
+      if (username.includes('-000') || username === 'mgr-000' || username === 'MGR-000') {
+        const data = makeManagerDemoData(username || 'MGR-000');
+        setState({ loading: false, error: null, kind: 'manager', data, _source: 'template-user' });
+        console.debug('[useManagerData]', { source: 'template-user', username, data });
+        return;
+      }
+
       // Validate manager role first
       if (!validateManagerRole(user)) {
         setState({ loading: false, error: 'Unauthorized: Manager access required', kind: "", data: null, _source: 'auth-error' });
@@ -101,14 +110,12 @@ export function useManagerData() {
       // Handle other errors
       if (!res.ok && res.status !== 404) {
         const msg = String(j?.error || `HTTP ${res.status}`);
-        
-        // For network errors in dev, use fallback data
-        if (!user?.id || /Failed to fetch|NetworkError|ECONNREFUSED/i.test(msg)) {
+        // For network or server errors (5xx) in dev, use fallback data
+        if (!user?.id || res.status >= 500 || /Failed to fetch|NetworkError|ECONNREFUSED/i.test(msg)) {
           const data = makeManagerDemoData(safeGet('manager:lastCode') || undefined);
           setState({ loading: false, error: null, kind: 'manager', data, _source: 'soft-fallback' });
           return;
         }
-        
         setState({ loading: false, error: msg, kind: "", data: null, _source: sourceTag });
         return;
       }
@@ -117,7 +124,7 @@ export function useManagerData() {
       let data = j?.data || j || {};
       
       // Ensure manager has required fields
-      if (!data.manager_id) data.manager_id = 'mgr-000';
+      if (!data.manager_id) data.manager_id = 'MGR-000';
       if (!data.name) data.name = 'Manager Demo';
       
       setState({ loading: false, error: null, kind: 'manager', data, _source: sourceTag });

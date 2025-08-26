@@ -28,6 +28,7 @@ function getRole(user: any, headers?: Record<string, string | null | undefined>)
       case 'mgr': return 'manager';
       case 'cus': return 'customer';
       case 'cen': return 'center';
+      case 'ctr': return 'center'; // Legacy support for ctr-000
       case 'con': return 'contractor';
       case 'crw': return 'crew';
       case 'adm': return 'admin';

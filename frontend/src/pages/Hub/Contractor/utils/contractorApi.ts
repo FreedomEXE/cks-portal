@@ -63,6 +63,10 @@ export async function contractorApiFetch(input: string, init: RequestInit = {}) 
   if (userId && !headers.has('x-contractor-user-id')) {
     headers.set('x-contractor-user-id', userId);
   }
+  // Align with backend: also provide generic x-user-id
+  if (userId && !headers.has('x-user-id')) {
+    headers.set('x-user-id', userId);
+  }
   if (!headers.has('Accept')) headers.set('Accept', 'application/json');
   if (!headers.has('x-hub-type')) headers.set('x-hub-type', 'contractor');
   if (!headers.has('x-client-tier')) headers.set('x-client-tier', 'premium'); // Contractors are paying clients

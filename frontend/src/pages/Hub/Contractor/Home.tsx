@@ -23,6 +23,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import useContractorData from './hooks/useContractorData';
 import { setContractorSession, getContractorSession } from './utils/contractorAuth';
 import { buildContractorApiUrl, contractorApiFetch } from './utils/contractorApi';
+import ContractorLogoutButton from './components/LogoutButton';
 
 type BusinessMetric = {
   label: string;
@@ -39,7 +40,7 @@ type CustomerSummary = {
   last_service: string;
 };
 
-type ContractorSection = 'dashboard' | 'profile' | 'customers' | 'centers' | 'crew' | 'reports' | 'orders' | 'manager' | 'services';
+type ContractorSection = 'dashboard' | 'profile' | 'services' | 'customers' | 'centers' | 'crew' | 'reports' | 'orders' | 'support';
 
 export default function ContractorHome() {
   const navigate = useNavigate();
@@ -87,7 +88,8 @@ export default function ContractorHome() {
           // Business metrics
           if (metricsRes?.ok) {
             const metricsData = await metricsRes.json();
-            setBusinessMetrics(metricsData.metrics || []);
+            const items = Array.isArray(metricsData?.data) ? metricsData.data : (metricsData?.metrics || []);
+            setBusinessMetrics(items);
           } else {
             // Demo business metrics for contractors (no revenue data)
             setBusinessMetrics([
@@ -103,7 +105,8 @@ export default function ContractorHome() {
           // Customer summaries
           if (customersRes?.ok) {
             const customersData = await customersRes.json();
-            setCustomers(Array.isArray(customersData.customers) ? customersData.customers : []);
+            const items = Array.isArray(customersData?.data) ? customersData.data : (Array.isArray(customersData?.customers) ? customersData.customers : []);
+            setCustomers(items);
           } else {
             // Demo customer data
             setCustomers([
@@ -145,13 +148,7 @@ export default function ContractorHome() {
               Contractor Hub
             </h1>
           </div>
-          <button
-            className="ui-button"
-            style={{ padding: '10px 16px', fontSize: 14 }}
-            onClick={() => navigate('/logout')}
-          >
-            Log out
-          </button>
+          <ContractorLogoutButton />
         </div>
         <div style={{ animation: 'fadeIn .12s ease-out' }}>
           <div style={{ padding: 16, background: '#f0fdf4', borderRadius: 12 }}>
@@ -178,13 +175,7 @@ export default function ContractorHome() {
           <h1 style={{ fontSize: 44, fontWeight: 800, letterSpacing: 0.3, margin: 0 }}>
             Contractor Hub
           </h1>
-          <button
-            className="ui-button"
-            style={{ padding: '10px 16px', fontSize: 14 }}
-            onClick={() => navigate('/logout')}
-          >
-            Log out
-          </button>
+          <ContractorLogoutButton />
         </div>
         <div style={{ padding: 16, color: '#b91c1c', background: '#fef2f2', borderRadius: 12 }}>
           Contractor Hub Error: {state.error}
@@ -196,69 +187,6 @@ export default function ContractorHome() {
   // Main render with all sections
   return (
     <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-      {/* OG CONTRACTOR HUB TEMPLATE DATA - Field names from original spreadsheet */}
-      <div className="ui-card" style={{ margin: '24px 0 16px', padding: 16, borderTop: '4px solid #10b981' }}>
-        <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 16, color: '#10b981' }}>
-          🔗 CKS Brain Template Data (Field Names Only)
-        </h2>
-        
-        {/* Profile Template Fields */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16, marginBottom: 16 }}>
-          <div>
-            <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#374151' }}>Contractor Profile Fields</h3>
-            <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.5 }}>
-              • Contractor ID<br/>
-              • Company Name<br/>
-              • Address<br/>
-              • CKS Manager (Assigned)<br/>
-              • Main Contact<br/>
-              • Phone<br/>
-              • Email<br/>
-              • Website<br/>
-              • Years with CKS<br/>
-              • # of Customers<br/>
-              • Contract Start Date<br/>
-              • Status<br/>
-              • Services Specialized In
-            </div>
-          </div>
-          
-          <div>
-            <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#374151' }}>Hub Tabs Structure</h3>
-            <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.5 }}>
-              • Profile (Company Details)<br/>
-              • Customers (Client Management)<br/>
-              • Centers (Service Locations)<br/>
-              • Services (Offered Services)<br/>
-              • Crew (Staff Oversight)<br/>
-              • Contracts Info (Legal & Terms)<br/>
-              • Financials (Billing & Revenue)
-            </div>
-          </div>
-          
-          <div>
-            <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#374151' }}>Business Metrics</h3>
-            <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.5 }}>
-              • Monthly Revenue<br/>
-              • Active Customers<br/>
-              • Service Centers<br/>
-              • Crew Members<br/>
-              • Contract Performance<br/>
-              • Customer Satisfaction
-            </div>
-          </div>
-        </div>
-        
-        {/* Relationship Data Template */}
-        <div style={{ background: '#ecfdf5', padding: 12, borderRadius: 8 }}>
-          <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#10b981' }}>Smart ID Relationships</h3>
-          <div style={{ fontSize: 12, color: '#166534', lineHeight: 1.5 }}>
-            <strong>Template:</strong> CON-001 → CKS Manager: MGR-001 → Customers: CUS-001, CUS-002 → Centers: Multiple locations<br/>
-            <strong>When logged in:</strong> Dashboard shows only this contractor's customers, centers, and assigned CKS manager
-          </div>
-        </div>
-      </div>
-
       {/* Hardcoded Page header with navigation tabs */}
       <div className="card" style={{
         display: 'flex',
@@ -274,13 +202,7 @@ export default function ContractorHome() {
             Contractor Hub
           </h1>
         </div>
-        <button
-          className="ui-button"
-          style={{ padding: '10px 16px', fontSize: 14 }}
-          onClick={() => navigate('/logout')}
-        >
-          Log out
-        </button>
+        <ContractorLogoutButton />
       </div>
 
       {/* Welcome message for premium client */}
@@ -293,13 +215,13 @@ export default function ContractorHome() {
         {[
           { key: 'dashboard' as ContractorSection, label: 'Business Dashboard' },
           { key: 'profile' as ContractorSection, label: 'Company Profile' },
+          { key: 'services' as ContractorSection, label: 'My Services' },
           { key: 'customers' as ContractorSection, label: 'My Customers' },
           { key: 'centers' as ContractorSection, label: 'My Centers' },
           { key: 'crew' as ContractorSection, label: 'My Crew' },
           { key: 'reports' as ContractorSection, label: 'Reports' },
           { key: 'orders' as ContractorSection, label: 'Orders' },
-          { key: 'manager' as ContractorSection, label: 'My CKS Manager' },
-          { key: 'services' as ContractorSection, label: 'My Services' }
+          { key: 'support' as ContractorSection, label: 'Support' }
         ].map(section => (
           <button
             key={section.key}
@@ -377,6 +299,107 @@ export default function ContractorHome() {
                 </tbody>
               </table>
             </div>
+
+            {/* Communication Hub */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
+              {/* News & Updates */}
+              <div className="ui-card" style={{ padding: 16 }}>
+                <div className="title" style={{ marginBottom: 16, color: '#10b981', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  📰 News & Updates
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {[
+                    { id: 1, title: "New customer opportunities available", date: "2025-08-20", priority: "High" },
+                    { id: 2, title: "Performance bonus program launched", date: "2025-08-18", priority: "Medium" },
+                    { id: 3, title: "Quarterly business review scheduled", date: "2025-08-15", priority: "Low" }
+                  ].map((item) => (
+                    <div key={item.id} style={{ 
+                      padding: 8,
+                      border: '1px solid #f3f4f6',
+                      borderRadius: 4,
+                      borderLeft: '3px solid #10b981'
+                    }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: '#111827' }}>{item.title}</div>
+                      <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>{item.date} • {item.priority} Priority</div>
+                    </div>
+                  ))}
+                </div>
+                <button style={{
+                  width: '100%',
+                  padding: '8px 16px',
+                  fontSize: 12,
+                  backgroundColor: '#dcfce7',
+                  color: '#10b981',
+                  border: '1px solid #22c55e',
+                  borderRadius: 4,
+                  cursor: 'pointer',
+                  marginTop: 8
+                }}
+                onClick={() => {
+                  alert('Full News - Coming Soon!');
+                }}
+                >
+                  View All News
+                </button>
+              </div>
+              
+              {/* Mail & Messages */}
+              <div className="ui-card" style={{ padding: 16 }}>
+                <div className="title" style={{ marginBottom: 16, color: '#10b981', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  📬 Mail
+                  <span style={{ 
+                    background: '#ef4444', 
+                    color: 'white', 
+                    fontSize: 10, 
+                    padding: '2px 6px', 
+                    borderRadius: 12, 
+                    fontWeight: 600 
+                  }}>
+                    2
+                  </span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <div style={{ 
+                    padding: 12, 
+                    border: '1px solid #e5e7eb', 
+                    borderRadius: 6,
+                    borderLeft: '3px solid #10b981'
+                  }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>From Business Development</div>
+                    <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>New customer prospect requires immediate attention</div>
+                    <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>30 minutes ago • High Priority</div>
+                  </div>
+                  
+                  <div style={{ 
+                    padding: 12, 
+                    border: '1px solid #e5e7eb', 
+                    borderRadius: 6,
+                    borderLeft: '3px solid #10b981'
+                  }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>From Operations - Service Team</div>
+                    <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Weekly performance metrics ready for review</div>
+                    <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>2 hours ago • Medium Priority</div>
+                  </div>
+                </div>
+                <button style={{
+                  width: '100%',
+                  padding: '8px 16px',
+                  fontSize: 12,
+                  backgroundColor: '#dcfce7',
+                  color: '#10b981',
+                  border: '1px solid #22c55e',
+                  borderRadius: 4,
+                  cursor: 'pointer',
+                  marginTop: 8
+                }}
+                onClick={() => {
+                  alert('Full Mailbox - Coming Soon!');
+                }}
+                >
+                  View Mailbox
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
@@ -387,7 +410,7 @@ export default function ContractorHome() {
             
             {/* Profile Tabs */}
             <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
-              {['Company Info', 'Services', 'Account Manager', 'Business License', 'Performance'].map((tab, i) => (
+              {['Company Info', 'Account Manager'].map((tab, i) => (
                 <button
                   key={tab}
                   onClick={() => setProfileTab(i)}
@@ -416,7 +439,7 @@ export default function ContractorHome() {
                       <div style={{
                         width: 120,
                         height: 120,
-                        borderRadius: 12,
+                        borderRadius: '50%',
                         background: '#f0fdf4',
                         display: 'flex',
                         alignItems: 'center',
@@ -429,7 +452,7 @@ export default function ContractorHome() {
                       }}>
                         {companyName.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2) || 'CO'}
                       </div>
-                      <button style={{ padding: '6px 12px', fontSize: 12 }}>Update Logo</button>
+                      <button style={{ padding: '6px 12px', fontSize: 12 }}>Update Photo</button>
                     </div>
 
                     {/* Company Details */}
@@ -437,14 +460,19 @@ export default function ContractorHome() {
                       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                         <tbody>
                           {[
-                            ['Company Name', state.data?.company_name || companyName],
                             ['Contractor ID', state.data?.contractor_id || code],
-                            ['Business License', state.data?.business_license || 'BL-123456'],
-                            ['Contact Person', state.data?.contact_person || 'John Contractor'],
-                            ['Email', state.data?.email || 'contact@contractor-demo.com'],
-                            ['Phone', state.data?.phone || '(555) 987-6543'],
+                            ['Company Name', state.data?.company_name || companyName],
                             ['Address', state.data?.address || '123 Business Ave, Suite 100'],
-                            ['Established', state.data?.established || '2020-01-01']
+                            ['CKS Manager (Assigned)', state.data?.cks_manager || 'Manager Demo'],
+                            ['Main Contact', state.data?.main_contact || 'John Contractor'],
+                            ['Phone', state.data?.phone || '(555) 987-6543'],
+                            ['Email', state.data?.email || 'contact@contractor-demo.com'],
+                            ['Website', state.data?.website || 'www.contractor-demo.com'],
+                            ['Years with CKS', state.data?.years_with_cks || '4 Years'],
+                            ['# of Customers', state.data?.num_customers || '8'],
+                            ['Contract Start Date', state.data?.contract_start_date || '2020-01-01'],
+                            ['Status', state.data?.status || 'Active'],
+                            ['Services Specialized In', state.data?.services_specialized || 'Cleaning, Maintenance, Security']
                           ].map(([label, value]) => (
                             <tr key={label}>
                               <td style={{ padding: '8px 0', fontWeight: 600, width: '30%' }}>{label}</td>
@@ -457,9 +485,54 @@ export default function ContractorHome() {
                   </div>
                 </div>
               )}
-              {profileTab !== 0 && (
-                <div style={{ textAlign: 'center', padding: 40, color: '#6b7280' }}>
-                  Company {['', 'Services', 'Account Manager', 'Business License', 'Performance'][profileTab]} data will be populated from Contractor API
+              {profileTab === 1 && (
+                <div>
+                  <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16, color: '#10b981' }}>CKS Account Manager</h3>
+                  <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: 16 }}>
+                    {/* Manager Photo */}
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{
+                        width: 120,
+                        height: 120,
+                        borderRadius: '50%',
+                        background: '#eff6ff',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 36,
+                        fontWeight: 700,
+                        color: '#3b7af7',
+                        margin: '0 auto 12px',
+                        border: '2px solid #3b7af7'
+                      }}>
+                        {'Manager Demo'.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2) || 'MD'}
+                      </div>
+                      <div style={{ fontSize: 12, color: '#6b7280' }}>Account Manager</div>
+                    </div>
+
+                    {/* Manager Details */}
+                    <div>
+                      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <tbody>
+                          {[
+                            ['Manager Name', 'Manager Demo'],
+                            ['Manager ID', 'MGR-001'],
+                            ['Territory', 'Demo Territory'],
+                            ['Email', 'manager@cksdemo.com'],
+                            ['Phone', '(555) 123-4567'],
+                            ['Years with CKS', '5 Years'],
+                            ['Assigned Since', '2020-01-01'],
+                            ['Contact Preference', 'Email']
+                          ].map(([label, value]) => (
+                            <tr key={label}>
+                              <td style={{ padding: '8px 0', fontWeight: 600, width: '40%' }}>{label}</td>
+                              <td style={{ padding: '8px 0', color: '#6b7280' }}>{value}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -536,15 +609,15 @@ export default function ContractorHome() {
           </div>
         )}
 
-        {/* MY CKS MANAGER SECTION */}
-        {activeSection === 'manager' && (
+        {/* SUPPORT SECTION */}
+        {activeSection === 'support' && (
           <div>
-            <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>My CKS Manager</h2>
+            <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Support</h2>
             <div className="ui-card" style={{ padding: 16 }}>
               <div style={{ textAlign: 'center', padding: 40, color: '#6b7280' }}>
-                CKS manager communication portal will be implemented here.<br/>
-                This will show your assigned CKS account manager,<br/>
-                communication history, and direct messaging capabilities.
+                Contractor support center will be implemented here.<br/>
+                This will include help documentation, support tickets,<br/>
+                and direct contact with contractor support representatives.
               </div>
             </div>
           </div>

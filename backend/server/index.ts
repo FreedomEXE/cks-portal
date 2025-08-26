@@ -30,6 +30,9 @@ import pool from './db/pool';
 import meRouter from './routes/me';
 import hubsRouter from './routes/hubs';
 import crewRouter from './routes/crew';
+import managerRouter from './routes/manager';
+import customerRouter from './routes/customer';
+import contractorRouter from './routes/contractor';
 
 const app = express();
 
@@ -223,6 +226,9 @@ app.get('/api/admin/centers', async (req, res) => {
 app.use('/api', meRouter);
 app.use('/api/hub', hubsRouter);
 app.use('/api/crew', crewRouter);
+app.use('/api/manager', managerRouter);
+app.use('/api/customer', customerRouter);
+app.use('/api/contractor', contractorRouter);
 
 // Swagger documentation
 const swaggerSpec = {

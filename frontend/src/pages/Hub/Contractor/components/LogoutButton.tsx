@@ -9,52 +9,15 @@
  * Description: Contractor-specific logout button component with session cleanup
  * Function: Handles user logout with Contractor-specific session management
  * Importance: Critical - Secure logout functionality for Contractor hub
- * Connects to: Universal logout component with Contractor hub styling
- * 
- * Notes: Uses the universal logout component for consistent behavior
- *        across all hubs while maintaining Contractor-specific appearance.
- */
-
-import UniversalLogoutButton from '../../../../components/shared/UniversalLogoutButton';
-
-type LogoutButtonProps = {
-  style?: React.CSSProperties;
-  className?: string;
-  children?: React.ReactNode;
-};
-
-export default function ContractorLogoutButton({ 
-  style, 
-  className = "ui-button", 
-  children = "Log out" 
-}: LogoutButtonProps) {
-  return (
-    <UniversalLogoutButton 
-      hubType="contractor"
-      style={style}
-      className={className}
-    >
-      {children}
-    </UniversalLogoutButton>
-  );
-}
-
-/**
- * LogoutButton.tsx (Contractor Hub - FULLY INDEPENDENT)
- * 
- * Description: Contractor-specific logout button component with session cleanup
- * Function: Handles user logout with Contractor-specific session management
- * Importance: Critical - Secure logout functionality for Contractor hub
  * Connects to: Clerk authentication, Contractor session storage, navigation
  * 
  * Notes: Fully self-contained logout logic with Contractor-specific cleanup.
  *        Clears Contractor session data before redirecting to login.
- *        Uses Contractor-specific styling to match hub theme.
  */
 
 import { useAuth } from '@clerk/clerk-react';
 import { useNavigate } from 'react-router-dom';
-import { clearContractorSession } from '../utils/contractorAuth';
+import { useState } from 'react';
 
 type LogoutButtonProps = {
   style?: React.CSSProperties;
@@ -68,31 +31,58 @@ export default function ContractorLogoutButton({
   children = "Log out" 
 }: LogoutButtonProps) {
   const navigate = useNavigate();
-  const { signOut } = useAuth();
+  const { signOut, isLoaded } = useAuth();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  const clearContractorSessionData = () => {
+    const contractorKeys = [
+      'contractor:session',
+      'contractor:lastCode',
+      'role',
+      'code',
+      'me:lastRole',
+      'me:lastCode'
+    ];
+
+    contractorKeys.forEach(key => {
+      try {
+        sessionStorage.removeItem(key);
+        localStorage.removeItem(key);
+      } catch {}
+    });
+  };
 
   const handleLogout = async () => {
-    try {
-      // Clear Contractor-specific session data
-      clearContractorSession();
-      
-      // Clear any shared session remnants
-      try {
-        localStorage.removeItem('me:lastRole');
-        localStorage.removeItem('me:lastCode');
-        localStorage.removeItem('dev:signedOut');
-      } catch {}
+    if (isLoggingOut || !isLoaded) return;
+    
+    setIsLoggingOut(true);
 
-      // Attempt Clerk sign out
+    try {
+      // Set logout flag to prevent auto re-login
+      localStorage.setItem('userLoggedOut', 'true');
+      
+      // Clear Contractor session data
+      clearContractorSessionData();
+
+      // Clerk signOut with redirect URL - this ensures proper logout flow
       if (typeof signOut === 'function') {
         await signOut({ redirectUrl: '/login' });
-        return;
+        return; // signOut with redirectUrl handles the navigation
       }
+
+      // Fallback: Force navigate to login if signOut doesn't redirect
+      navigate('/login', { replace: true });
+
     } catch (error) {
-      console.warn('[ContractorLogout] Sign out error:', error);
+      console.error('[Contractor Logout] Error:', error);
+      
+      // Ensure we redirect even if signOut fails
+      clearContractorSessionData();
+      localStorage.setItem('userLoggedOut', 'true');
+      navigate('/login', { replace: true });
+    } finally {
+      setIsLoggingOut(false);
     }
-    
-    // Fallback navigation
-    navigate('/login', { replace: true });
   };
 
   return (
@@ -101,18 +91,20 @@ export default function ContractorLogoutButton({
       style={{ 
         padding: '10px 16px', 
         fontSize: 14,
-        backgroundColor: '#10b981',
+        backgroundColor: '#10b981', // Contractor green
         color: 'white',
         border: 'none',
         borderRadius: 6,
-        cursor: 'pointer',
+        cursor: isLoggingOut ? 'not-allowed' : 'pointer',
+        opacity: isLoggingOut ? 0.6 : 1,
         ...style 
       }}
       onClick={handleLogout}
+      disabled={isLoggingOut || !isLoaded}
       aria-label="Sign out of Contractor Hub"
       title="Sign out"
     >
-      {children}
+      {isLoggingOut ? 'Signing out...' : children}
     </button>
   );
 }

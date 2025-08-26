@@ -18,7 +18,7 @@
 
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { buildCenterApiUrl } from "../utils/centerApi";
+import { buildCenterApiUrl, centerApiFetch } from "../utils/centerApi";
 
 type NewsItem = { 
   id: string | number; 
@@ -45,15 +45,10 @@ export default function CenterNewsPreview({ code, limit = 3, showUnread = true }
         setLoading(true);
         // Ask Center backend for filtered news
         const url = buildCenterApiUrl('/news', { code, limit });
-        const r = await fetch(url, { 
-          credentials: 'include',
-          headers: {
-            'x-hub-type': 'center'
-          }
-        });
+        const r = await centerApiFetch(url);
         if (!r.ok) throw new Error(String(r.status));
         const j = await r.json();
-        const arr = Array.isArray(j?.items) ? j.items : Array.isArray(j) ? j : [];
+        const arr = Array.isArray(j?.data) ? j.data : (Array.isArray(j?.items) ? j.items : (Array.isArray(j) ? j : []));
         if (!cancelled) setItems(arr as NewsItem[]);
       } catch {
         if (!cancelled) setItems(demoCenterNews.slice(0, limit));

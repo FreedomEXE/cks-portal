@@ -25,6 +25,15 @@
 - **CKS Crew** perform actual work, managed by **CKS Managers**
 - **CKS Admin** creates all users and manages the system
 
+## 🖥️ Hub Data Model (Critical Understanding)
+**IMPORTANT**: Only the **Admin Hub** accesses real database data directly.
+
+**All other 5 role hubs** (Manager, Contractor, Customer, Center, Crew) are **USER-SPECIFIC TEMPLATES**:
+- Each user who logs in sees their own personalized data
+- Template data is replaced with user-specific information based on their role and relationships
+- For example: `mgr-001` sees only centers/crew assigned to them, `cen-005` sees only their facility data
+- Currently showing template data for development/testing purposes
+
 ## 🆔 ID System (Critical to Understand)
 - **MGR-XXX** = Managers
 - **CON-XXX** = Contractors  

@@ -15,7 +15,9 @@
  *        across all hubs while maintaining Manager-specific appearance.
  */
 
-import UniversalLogoutButton from '../../../../components/shared/UniversalLogoutButton';
+import { useAuth } from '@clerk/clerk-react';
+import { useNavigate } from 'react-router-dom';
+import { useState } from 'react';
 
 type LogoutButtonProps = {
   style?: React.CSSProperties;
@@ -28,13 +30,81 @@ export default function ManagerLogoutButton({
   className = "ui-button", 
   children = "Log out" 
 }: LogoutButtonProps) {
+  const navigate = useNavigate();
+  const { signOut, isLoaded } = useAuth();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  const clearManagerSessionData = () => {
+    const managerKeys = [
+      'manager:session',
+      'manager:lastCode',
+      'role',
+      'code',
+      'me:lastRole',
+      'me:lastCode'
+    ];
+
+    managerKeys.forEach(key => {
+      try {
+        sessionStorage.removeItem(key);
+        localStorage.removeItem(key);
+      } catch {}
+    });
+  };
+
+  const handleLogout = async () => {
+    if (isLoggingOut || !isLoaded) return;
+    
+    setIsLoggingOut(true);
+
+    try {
+      // Set logout flag to prevent auto re-login
+      localStorage.setItem('userLoggedOut', 'true');
+      
+      // Clear Manager session data
+      clearManagerSessionData();
+
+      // Clerk signOut with redirect URL - this ensures proper logout flow
+      if (typeof signOut === 'function') {
+        await signOut({ redirectUrl: '/login' });
+        return; // signOut with redirectUrl handles the navigation
+      }
+
+      // Fallback: Force navigate to login if signOut doesn't redirect
+      navigate('/login', { replace: true });
+
+    } catch (error) {
+      console.error('[Manager Logout] Error:', error);
+      
+      // Ensure we redirect even if signOut fails
+      clearManagerSessionData();
+      localStorage.setItem('userLoggedOut', 'true');
+      navigate('/login', { replace: true });
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
+
   return (
-    <UniversalLogoutButton 
-      hubType="manager"
-      style={style}
+    <button
       className={className}
+      style={{ 
+        padding: '10px 16px', 
+        fontSize: 14,
+        backgroundColor: '#3b82f6', // Manager blue
+        color: 'white',
+        border: 'none',
+        borderRadius: 6,
+        cursor: isLoggingOut ? 'not-allowed' : 'pointer',
+        opacity: isLoggingOut ? 0.6 : 1,
+        ...style 
+      }}
+      onClick={handleLogout}
+      disabled={isLoggingOut || !isLoaded}
+      aria-label="Sign out of Manager Hub"
+      title="Sign out"
     >
-      {children}
-    </UniversalLogoutButton>
+      {isLoggingOut ? 'Signing out...' : children}
+    </button>
   );
 }

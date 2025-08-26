@@ -63,7 +63,6 @@ The CKS Portal is a role-based web application that centralizes service delivery
 | **Supplies** | `SUP-XXX` | Provided products/supplies |
 | **Procedures** | `PRC-XXX` | Process & operational guides |
 | **Training** | `TRN-XXX` | Training materials |
-## 4. Data Model (Entities)
 | **Warehouses** | `WHS-XXX` | Supply storage facilities |
 | **Reports** | `RPT-XXX` | Center-generated reports on job quality/issues |
 
@@ -229,10 +228,16 @@ The CKS Portal is a role-based web application that centralizes service delivery
 - **Frontend Hub Architecture**: All 6 role-based hubs implemented with complete independence
 - **Authentication Flow**: Clerk-based login with username-scoped routing (`/{id}/hub`)
 - **Admin Directory**: 12-tab unified directory system for entity management
-- **UI Templates**: All hubs populated with realistic template data
+- **UI Templates**: All hubs populated with realistic template data (user-specific when logged in)
 - **Smart ID System**: MGR-XXX, CON-XXX, CUS-XXX, CEN-XXX, CRW-XXX format implemented
 - **Profile System**: Header UserWidget with role-specific profile access
 - **Docker Setup**: Cross-browser testing environment configured
+
+### 🔑 **Hub Data Architecture**
+**CRITICAL**: Admin Hub = Real database access | All other hubs = User-specific template data
+- **Admin Hub**: Direct access to all database entities for system management
+- **Role Hubs**: Template structure populated with user-specific data based on their relationships and permissions
+- **Current State**: Templates show sample data, backend integration will populate with real user data
 
 ### 🚧 **In Progress/Needs Work**
 - **Backend Integration**: Frontend hubs need connection to database APIs
