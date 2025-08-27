@@ -55,7 +55,7 @@ MGR-XXX, CON-XXX, CUS-XXX, CEN-XXX, CRW-XXX, ADM-XXX format determines login and
 
 - **Tech Stack**: React + TypeScript + Vite + Tailwind (Frontend), Node.js + Express/Fastify + PostgreSQL (Backend)
 - **File Locations**: Hub components in `frontend/src/pages/Hub/{Role}/Home.tsx`
-- **Database Schema**: `backend/server/db/schema.sql`
+- **Database Schema**: `Database/schema.sql`
 
 ---
 

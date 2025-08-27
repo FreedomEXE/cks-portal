@@ -34,8 +34,11 @@
   "include": [
     "src/**/*.ts",
     "routes/**/*.ts",
+    "hubs/**/*.ts",
+    "resources/**/*.ts",
     "utils/**/*.ts",
-    "db/**/*.ts"
+    "db/**/*.ts",
+    "../../Database/**/*.ts"
   ],
   "exclude": [
     "node_modules",

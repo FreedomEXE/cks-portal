@@ -53,6 +53,13 @@ export default function ContractorHome() {
   const [customers, setCustomers] = useState<CustomerSummary[]>([]);
   const [metricsLoading, setMetricsLoading] = useState(false);
   const [profileTab, setProfileTab] = useState(0);
+  const [reqBucket, setReqBucket] = useState<'pending'|'approved'|'archive'>('pending');
+  const [requests, setRequests] = useState<any[]>([]);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detail, setDetail] = useState<{ order: any; items: any[]; approvals: any[] } | null>(null);
   
   // Get contractor code and company name from profile data
   const session = getContractorSession();
@@ -128,6 +135,72 @@ export default function ContractorHome() {
   }, [code, state.data]);
 
   const base = `/${username}/hub`;
+
+  // Fetch contractor requests per bucket
+  useEffect(() => {
+    if (activeSection !== 'orders') return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const url = buildContractorApiUrl('/requests', { bucket: reqBucket });
+        const r = await contractorApiFetch(url);
+        const j = await r.json();
+        const arr = Array.isArray(j?.data) ? j.data : [];
+        if (!cancelled) setRequests(arr);
+      } catch {
+        if (!cancelled) setRequests([]);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [activeSection, reqBucket]);
+
+  async function approve(id: string) {
+    try {
+      setActionLoading(id);
+      const url = buildContractorApiUrl(`/requests/${id}/approve`);
+      const r = await contractorApiFetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ note: '' }) });
+      if (!r.ok) throw new Error('Approve failed');
+      setRequests(prev => prev.filter(x => x.order_id !== id));
+      setNotice(`Approved ${id}`);
+      setTimeout(()=> setNotice(null), 3000);
+    } catch (e) {
+      alert((e as Error).message || 'Approve failed');
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function deny(id: string) {
+    try {
+      setActionLoading(id);
+      const url = buildContractorApiUrl(`/requests/${id}/deny`);
+      const r = await contractorApiFetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ note: '' }) });
+      if (!r.ok) throw new Error('Deny failed');
+      setRequests(prev => prev.filter(x => x.order_id !== id));
+      setNotice(`Denied ${id}`);
+      setTimeout(()=> setNotice(null), 3000);
+    } catch (e) {
+      alert((e as Error).message || 'Deny failed');
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function openOrderDetail(orderId: string) {
+    try {
+      setDetailOpen(true);
+      setDetailLoading(true);
+      const res = await fetch(`${import.meta.env.VITE_API_URL?.replace(/\/$/, '') || '/api'}/orders/${orderId}`, { credentials: 'include' });
+      const json = await res.json();
+      if (!res.ok || !json?.success) throw new Error(json?.error || 'Failed to load order');
+      setDetail(json.data || null);
+    } catch {
+      setDetail(null);
+    } finally {
+      setDetailLoading(false);
+    }
+  }
+  function closeDetail() { setDetailOpen(false); setDetail(null); }
 
   // Loading state
   if (state.loading) {
@@ -400,6 +473,177 @@ export default function ContractorHome() {
                 </button>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* ORDERS / APPROVALS SECTION */}
+        {activeSection === 'orders' && (
+          <div>
+            <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 12 }}>Requests</h2>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+              {(['pending','approved','archive'] as const).map(b => (
+                <button key={b} onClick={() => setReqBucket(b)} style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #e5e7eb', background: reqBucket===b? '#111827':'white', color: reqBucket===b? 'white':'#111827', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                  {b === 'pending' ? 'Pending Approvals' : b === 'approved' ? 'Approved' : 'Archive'}
+                </button>
+              ))}
+            </div>
+            <div className="ui-card" style={{ padding: 0, overflow: 'hidden' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ background: '#f9fafb' }}>
+                    <th style={{ padding: 10, textAlign: 'left', fontSize: 12 }}>Order ID</th>
+                    <th style={{ padding: 10, textAlign: 'left', fontSize: 12 }}>Customer</th>
+                    <th style={{ padding: 10, textAlign: 'left', fontSize: 12 }}>Center</th>
+                    <th style={{ padding: 10, textAlign: 'left', fontSize: 12 }}>Items</th>
+                    <th style={{ padding: 10, textAlign: 'left', fontSize: 12 }}>Services</th>
+                    <th style={{ padding: 10, textAlign: 'left', fontSize: 12 }}>Products</th>
+                    <th style={{ padding: 10, textAlign: 'left', fontSize: 12 }}>Status</th>
+                    <th style={{ padding: 10, textAlign: 'left', fontSize: 12 }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {requests.map((o, i) => (
+                    <tr key={o.order_id} style={{ borderBottom: i < requests.length - 1 ? '1px solid #e5e7eb' : 'none' }}>
+                      <td style={{ padding: 10, fontFamily: 'ui-monospace' }}>{o.order_id}</td>
+                      <td style={{ padding: 10 }}>{o.customer_id || '—'}</td>
+                      <td style={{ padding: 10 }}>{o.center_id || '—'}</td>
+                      <td style={{ padding: 10 }}>{o.item_count ?? 0}</td>
+                      <td style={{ padding: 10 }}>{o.service_count ?? 0}</td>
+                      <td style={{ padding: 10 }}>{o.product_count ?? 0}</td>
+                      <td style={{ padding: 10 }}>{o.status}</td>
+                      <td style={{ padding: 10 }}>
+                        {reqBucket === 'pending' ? (
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            <button disabled={actionLoading===o.order_id} onClick={() => approve(o.order_id)} style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #e5e7eb', background: '#10b981', color: 'white', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Approve</button>
+                            <button disabled={actionLoading===o.order_id} onClick={() => deny(o.order_id)} style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #e5e7eb', background: '#ef4444', color: 'white', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Deny</button>
+                          </div>
+                        ) : (
+                          <span style={{ fontSize: 12, color: '#6b7280' }}>—</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                  {requests.length === 0 && (
+                    <tr>
+                      <td colSpan={8} style={{ padding: 16, color: '#6b7280' }}>No requests in this bucket.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* ORDERS / APPROVALS SECTION */}
+        {activeSection === 'orders' && (
+          <div>
+            {notice && (
+              <div className="card" style={{ padding: 10, marginBottom: 8, borderLeft: '4px solid #10b981', background: '#ecfdf5', color: '#065f46', fontSize: 13 }}>{notice}</div>
+            )}
+            <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 12 }}>Requests</h2>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+              {(['pending','approved','archive'] as const).map(b => (
+                <button key={b} onClick={() => setReqBucket(b)} style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #e5e7eb', background: reqBucket===b? '#111827':'white', color: reqBucket===b? 'white':'#111827', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                  {b === 'pending' ? 'Pending Approvals' : b === 'approved' ? 'Approved' : 'Archive'}
+                </button>
+              ))}
+            </div>
+            <div className="ui-card" style={{ padding: 0, overflow: 'hidden' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ background: '#f9fafb' }}>
+                    <th style={{ padding: 10, textAlign: 'left', fontSize: 12 }}>Order ID</th>
+                    <th style={{ padding: 10, textAlign: 'left', fontSize: 12 }}>Customer</th>
+                    <th style={{ padding: 10, textAlign: 'left', fontSize: 12 }}>Center</th>
+                    <th style={{ padding: 10, textAlign: 'left', fontSize: 12 }}>Items</th>
+                    <th style={{ padding: 10, textAlign: 'left', fontSize: 12 }}>Services</th>
+                    <th style={{ padding: 10, textAlign: 'left', fontSize: 12 }}>Products</th>
+                    <th style={{ padding: 10, textAlign: 'left', fontSize: 12 }}>Status</th>
+                    <th style={{ padding: 10, textAlign: 'left', fontSize: 12 }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {requests.map((o, i) => (
+                    <tr key={o.order_id} style={{ borderBottom: i < requests.length - 1 ? '1px solid #e5e7eb' : 'none' }}>
+                      <td style={{ padding: 10, fontFamily: 'ui-monospace', color: '#2563eb', cursor: 'pointer' }} onClick={() => openOrderDetail(o.order_id)}>{o.order_id}</td>
+                      <td style={{ padding: 10 }}>{o.customer_id || '—'}</td>
+                      <td style={{ padding: 10 }}>{o.center_id || '—'}</td>
+                      <td style={{ padding: 10 }}>{o.item_count ?? 0}</td>
+                      <td style={{ padding: 10 }}>{o.service_count ?? 0}</td>
+                      <td style={{ padding: 10 }}>{o.product_count ?? 0}</td>
+                      <td style={{ padding: 10 }}>{o.status}</td>
+                      <td style={{ padding: 10 }}>
+                        {reqBucket === 'pending' ? (
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            <button disabled={actionLoading===o.order_id} onClick={(e)=>{ e.stopPropagation?.(); approve(o.order_id); }} style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #e5e7eb', background: '#10b981', color: 'white', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Approve</button>
+                            <button disabled={actionLoading===o.order_id} onClick={(e)=>{ e.stopPropagation?.(); deny(o.order_id); }} style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #e5e7eb', background: '#ef4444', color: 'white', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Deny</button>
+                          </div>
+                        ) : (
+                          <span style={{ fontSize: 12, color: '#6b7280' }}>—</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                  {requests.length === 0 && (
+                    <tr>
+                      <td colSpan={8} style={{ padding: 16, color: '#6b7280' }}>No requests in this bucket.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Order detail overlay */}
+            {detailOpen && (
+              <div onClick={closeDetail} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', zIndex: 50, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: 16 }}>
+                <div onClick={(e) => e.stopPropagation()} className="card" style={{ width: 'min(800px, 95vw)', maxHeight: '85vh', overflowY: 'auto', background: 'white', borderRadius: 12, padding: 16 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <div style={{ fontWeight: 800 }}>Order Details</div>
+                    <button onClick={closeDetail} style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: '6px 10px', background: 'white', cursor: 'pointer' }}>Close</button>
+                  </div>
+                  {detailLoading && <div style={{ padding: 12 }}>Loading…</div>}
+                  {!detailLoading && detail && (
+                    <>
+                      <div style={{ marginBottom: 12, fontSize: 13, color: '#374151' }}>
+                        <div><b>Order ID:</b> {detail.order.order_id}</div>
+                        <div><b>Status:</b> {detail.order.status}</div>
+                        <div><b>Customer:</b> {detail.order.customer_id || '—'}</div>
+                        <div><b>Center:</b> {detail.order.center_id || '—'}</div>
+                        <div><b>Date:</b> {String(detail.order.order_date).slice(0,10)}</div>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                        <div className="card" style={{ padding: 12 }}>
+                          <div style={{ fontWeight: 700, marginBottom: 8 }}>Items</div>
+                          <div style={{ display: 'grid', gap: 6 }}>
+                            {detail.items.map((it, idx) => (
+                              <div key={it.order_item_id || idx} style={{ display: 'flex', gap: 8, alignItems: 'center', border: '1px solid #e5e7eb', borderRadius: 8, padding: 8 }}>
+                                <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 999, background: it.item_type === 'service' ? '#ecfdf5' : '#eff6ff', color: it.item_type === 'service' ? '#065f46' : '#1e40af' }}>{it.item_type}</span>
+                                <span style={{ fontFamily: 'ui-monospace' }}>{it.item_id}</span>
+                                <span style={{ marginLeft: 'auto', fontSize: 12 }}>qty: {it.quantity}</span>
+                              </div>
+                            ))}
+                            {detail.items.length === 0 && <div style={{ fontSize: 13, color: '#6b7280' }}>No items.</div>}
+                          </div>
+                        </div>
+                        <div className="card" style={{ padding: 12 }}>
+                          <div style={{ fontWeight: 700, marginBottom: 8 }}>Approvals</div>
+                          <div style={{ display: 'grid', gap: 6 }}>
+                            {detail.approvals.map((ap, idx) => (
+                              <div key={ap.approval_id || idx} style={{ display: 'flex', gap: 8, alignItems: 'center', border: '1px solid #e5e7eb', borderRadius: 8, padding: 8 }}>
+                                <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 999, background: '#f3f4f6', color: '#111827' }}>{ap.approver_type}</span>
+                                <span style={{ fontSize: 12 }}>{ap.status}</span>
+                                {ap.decided_at && <span style={{ marginLeft: 'auto', fontSize: 12, color: '#6b7280' }}>{String(ap.decided_at).slice(0,10)}</span>}
+                              </div>
+                            ))}
+                            {detail.approvals.length === 0 && <div style={{ fontSize: 13, color: '#6b7280' }}>No approvals yet.</div>}
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
 

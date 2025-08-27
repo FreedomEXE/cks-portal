@@ -26,13 +26,17 @@ import { env } from './src/core/env';
 import { logger, httpLogger } from './src/core/logger';
 import { notFound, errorHandler } from './src/core/errors';
 import { metricsMiddleware, metricsHandler } from './src/core/metrics';
-import pool from './db/pool';  
+import pool from '../../Database/db/pool';  
 import meRouter from './routes/me';
 import hubsRouter from './routes/hubs';
-import crewRouter from './routes/crew';
-import managerRouter from './routes/manager';
-import customerRouter from './routes/customer';
-import contractorRouter from './routes/contractor';
+import adminRouter from './hubs/admin/routes';
+import crewRouter from './hubs/crew/routes';
+import managerRouter from './hubs/manager/routes';
+import customerRouter from './hubs/customer/routes';
+import contractorRouter from './hubs/contractor/routes';
+import centerRouter from './hubs/center/routes';
+import catalogRouter from './resources/catalog';
+import ordersRouter from './resources/orders';
 
 const app = express();
 
@@ -61,174 +65,18 @@ app.get('/test-db', async (_req, res) => {
   }
 });
 
-// Admin list endpoints with modern query building
-app.get('/api/admin/crew', async (req, res) => {
-  try {
-    const limit = Math.min(parseInt(String(req.query.limit ?? '25'), 10), 100);
-    const offset = Math.max(parseInt(String(req.query.offset ?? '0'), 10), 0);
-    const search = String(req.query.q ?? '').trim();
-    
-    let whereClause = '';
-    const values: any[] = [];
-    
-    if (search) {
-      values.push(`%${search}%`);
-      whereClause = `WHERE (crew_id || ' ' || COALESCE(name,'') || ' ' || COALESCE(email,'') || ' ' || COALESCE(phone,'')) ILIKE $1`;
-    }
-    
-    const query = `
-      SELECT crew_id, name, status, role, address, phone, email, assigned_center
-      FROM crew ${whereClause}
-      ORDER BY crew_id
-      LIMIT $${values.length + 1} OFFSET $${values.length + 2}
-    `;
-    
-    const countQuery = `SELECT COUNT(*) FROM crew ${whereClause}`;
-    
-    const [items, total] = await Promise.all([
-      pool.query(query, [...values, limit, offset]),
-      pool.query(countQuery, values)
-    ]);
-    
-    res.json({ 
-      items: items.rows, 
-      total: Number(total.rows[0].count),
-      page: Math.floor(offset / limit) + 1,
-      pageSize: limit
-    });
-  } catch (e: any) {
-    logger.error({ error: e }, 'Admin crew list error');
-    res.status(500).json({ error: 'Failed to fetch crew list' });
-  }
-});
-
-app.get('/api/admin/contractors', async (req, res) => {
-  try {
-    const limit = Math.min(parseInt(String(req.query.limit ?? '25'), 10), 100);
-    const offset = Math.max(parseInt(String(req.query.offset ?? '0'), 10), 0);
-    const search = String(req.query.q ?? '').trim();
-    
-    let whereClause = '';
-    const values: any[] = [];
-    
-    if (search) {
-      values.push(`%${search}%`);
-      whereClause = `WHERE (contractor_id || ' ' || COALESCE(company_name,'') || ' ' || COALESCE(email,'')) ILIKE $1`;
-    }
-    
-    const query = `
-      SELECT contractor_id, cks_manager, company_name, num_customers, main_contact, address, phone, email
-      FROM contractors ${whereClause}
-      ORDER BY contractor_id
-      LIMIT $${values.length + 1} OFFSET $${values.length + 2}
-    `;
-    
-    const countQuery = `SELECT COUNT(*) FROM contractors ${whereClause}`;
-    
-    const [items, total] = await Promise.all([
-      pool.query(query, [...values, limit, offset]),
-      pool.query(countQuery, values)
-    ]);
-    
-    res.json({ 
-      items: items.rows, 
-      total: Number(total.rows[0].count),
-      page: Math.floor(offset / limit) + 1,
-      pageSize: limit
-    });
-  } catch (e: any) {
-    logger.error({ error: e }, 'Admin contractors list error');
-    res.status(500).json({ error: 'Failed to fetch contractors list' });
-  }
-});
-
-app.get('/api/admin/customers', async (req, res) => {
-  try {
-    const limit = Math.min(parseInt(String(req.query.limit ?? '25'), 10), 100);
-    const offset = Math.max(parseInt(String(req.query.offset ?? '0'), 10), 0);
-    const search = String(req.query.q ?? '').trim();
-    
-    let whereClause = '';
-    const values: any[] = [];
-    
-    if (search) {
-      values.push(`%${search}%`);
-      whereClause = `WHERE (customer_id || ' ' || COALESCE(company_name,'') || ' ' || COALESCE(email,'')) ILIKE $1`;
-    }
-    
-    const query = `
-      SELECT customer_id, cks_manager, company_name, num_centers, main_contact, address, phone, email
-      FROM customers ${whereClause}
-      ORDER BY customer_id
-      LIMIT $${values.length + 1} OFFSET $${values.length + 2}
-    `;
-    
-    const countQuery = `SELECT COUNT(*) FROM customers ${whereClause}`;
-    
-    const [items, total] = await Promise.all([
-      pool.query(query, [...values, limit, offset]),
-      pool.query(countQuery, values)
-    ]);
-    
-    res.json({ 
-      items: items.rows, 
-      total: Number(total.rows[0].count),
-      page: Math.floor(offset / limit) + 1,
-      pageSize: limit
-    });
-  } catch (e: any) {
-    logger.error({ error: e }, 'Admin customers list error');
-    res.status(500).json({ error: 'Failed to fetch customers list' });
-  }
-});
-
-app.get('/api/admin/centers', async (req, res) => {
-  try {
-    const limit = Math.min(parseInt(String(req.query.limit ?? '25'), 10), 100);
-    const offset = Math.max(parseInt(String(req.query.offset ?? '0'), 10), 0);
-    const search = String(req.query.q ?? '').trim();
-    
-    let whereClause = '';
-    const values: any[] = [];
-    
-    if (search) {
-      values.push(`%${search}%`);
-      whereClause = `WHERE (center_id || ' ' || COALESCE(name,'') || ' ' || COALESCE(email,'')) ILIKE $1`;
-    }
-    
-    const query = `
-      SELECT center_id, cks_manager, name, main_contact, address, phone, email, contractor_id, customer_id
-      FROM centers ${whereClause}
-      ORDER BY center_id
-      LIMIT $${values.length + 1} OFFSET $${values.length + 2}
-    `;
-    
-    const countQuery = `SELECT COUNT(*) FROM centers ${whereClause}`;
-    
-    const [items, total] = await Promise.all([
-      pool.query(query, [...values, limit, offset]),
-      pool.query(countQuery, values)
-    ]);
-    
-    res.json({ 
-      items: items.rows, 
-      total: Number(total.rows[0].count),
-      page: Math.floor(offset / limit) + 1,
-      pageSize: limit
-    });
-  } catch (e: any) {
-    logger.error({ error: e }, 'Admin centers list error');
-    res.status(500).json({ error: 'Failed to fetch centers list' });
-  }
-});
 
 // Mount modular routes - ALL under /api for consistency
 app.use('/api', meRouter);
 app.use('/api/hub', hubsRouter);
+app.use('/api/admin', adminRouter);
 app.use('/api/crew', crewRouter);
 app.use('/api/manager', managerRouter);
 app.use('/api/customer', customerRouter);
 app.use('/api/contractor', contractorRouter);
+app.use('/api/center', centerRouter);
+app.use('/api/catalog', catalogRouter);
+app.use('/api/orders', ordersRouter);
 
 // Swagger documentation
 const swaggerSpec = {

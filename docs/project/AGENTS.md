@@ -88,8 +88,9 @@ Each role has a completely isolated hub with specific functionality:
 
 ## 📁 Key File Locations
 - **Hub Components**: `frontend/src/pages/Hub/{Role}/Home.tsx`
-- **Backend Routes**: `backend/server/routes/`
-- **Database Schema**: `backend/server/db/schema.sql`
+- **Backend Routes**: `backend/server/hubs/{role}/routes.ts`, `backend/server/resources/`
+- **Database Schema**: `Database/schema.sql`
+- **Database Pool**: `Database/db/pool.ts`
 - **Main Documentation**: `docs/project/CKS-Portal-Project-Outline-PRD.md`
 
 ## 🔑 Test Login Credentials for Playwright Testing
@@ -103,6 +104,15 @@ Use these credentials to test each hub with automated testing:
 - **Crew Hub**: `crw-000` / `CksDemo!2025`
 
 *Note: All non-admin hubs use the same password. These are template accounts for testing.*
+
+### ▶️ Playwright UI Scripts (Repo Root)
+- Install browsers once: `npm run playwright:install`
+- Run a simple login check (Center hub): `npm run test:ui:login:center`
+- Aggregated sample run: `npm run test:ui`
+
+Notes:
+- Ensure frontend (`frontend:5173/5183`) and backend (`backend/server:5000`) dev servers are running.
+- Scripts execute Node-based Playwright helpers in the repo root (e.g., `test-center-login.js`).
 
 ## ⚠️ Important Development Notes
 - **Complete Hub Independence**: No shared components between hubs for security
@@ -126,6 +136,26 @@ A fully functional app where:
 
 ## 🔄 Session Tracking System
 This project uses dated session files (`docs/CURRENT SESSION YYYY-MM-DD.md`) to track detailed progress. Always check the latest session file for the most recent context and accomplishments.
+
+### Latest Sessions
+- 2025-08-27: Global Catalog implemented, requests flow (Customer/Center → Contractor approval → Manager scheduling) wired across backend + hubs. See `docs/CURRENT SESSION 2025-08-27.md`.
+
+## ✅ Next Tasks (Handoff)
+- Database package polish (Claude):
+  - Use commonjs or compiled output for `Database/` and include its TS in backend tsconfig.
+  - Remove backend duplicate schema; keep `Database/schema.sql` canonical.
+  - Verify `/test-db` and DB-backed endpoints under tsx.
+- Migrations & seeds (Claude): scaffold `Database/migrations` and `Database/seeds`.
+- Counts in order lists (Claude): add totals to API so UI badges aren’t page-limited.
+- Admin Catalog CRUD (Claude): item create/update/delete; non-admin remains read-only.
+- Warehouse hub scaffold (Claude): add `backend/server/hubs/warehouse/routes.ts` with basic buckets.
+- Tests/CI (Claude): Playwright smokes, GitHub Action for type-check/lint/build.
+- Frontend polish (This agent): manager order detail overlay, dashboard badges, better empty/skeleton states, toasts, optional deep links, table filters.
+
+## 🧭 Claude Prompt Starters
+- Database finalize: “Switch Database to commonjs or compile to dist; include Database TS in backend tsconfig; remove backend duplicate schema; confirm `/test-db` works; scaffold migrations/seeds; update session notes.”
+- Counts API: “Add `{ totals: { pending, approved, archive } }` to customer/center/contractor/manager list endpoints without breaking `{ success, data }`.”
+- Admin Catalog CRUD: “Implement `/api/admin/catalog/items` CRUD with soft-delete; keep non-admin read-only; update docs and brief usage notes.”
 
 ## 🚨 Common Pitfalls to Avoid
 - Don't assume payment processing is needed (it's not for MVP)

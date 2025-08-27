@@ -24,6 +24,7 @@ import { Routes, Route, Navigate, BrowserRouter, useNavigate } from 'react-route
 import { ClerkProvider, useUser } from '@clerk/clerk-react';
 import HubRoleRouter from './pages/HubRoleRouter';
 import Login from './pages/Login';
+import CatalogPage from './pages/Catalog';
 import './index.css';
 
 // Clerk publishable key from environment
@@ -73,6 +74,8 @@ function App() {
           {/* Authentication routes */}
           <Route path="/login" element={<Login />} />
           <Route path="/auth/redirect" element={<AfterSignInRedirect />} />
+          {/* Global catalog (neutral, read-only) */}
+          <Route path="/catalog" element={<CatalogPage />} />
           
           {/* Hub system - all authenticated routes */}
           <Route path=":username/hub/*" element={<HubRoleRouter />} />

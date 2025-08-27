@@ -1,0 +1,19 @@
+{
+  "name": "@cks/database",
+  "version": "1.0.0",
+  "description": "CKS Portal Database Layer",
+  "main": "index.js",
+  "dependencies": {
+    "pg": "^8.11.3",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.10.7",
+    "typescript": "^5.3.3"
+  },
+  "scripts": {
+    "build": "tsc",
+    "migration:run": "node migrations/run.js",
+    "seed:run": "node seeds/run.js"
+  }
+}

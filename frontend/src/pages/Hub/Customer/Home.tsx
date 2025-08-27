@@ -56,6 +56,12 @@ export default function CustomerHome() {
   const [serviceRequests, setServiceRequests] = useState<ServiceRequest[]>([]);
   const [dataLoading, setDataLoading] = useState(false);
   const [profileTab, setProfileTab] = useState(0);
+  const [ordersBucket, setOrdersBucket] = useState<'pending'|'approved'|'archive'>('pending');
+  const [orders, setOrders] = useState<any[]>([]);
+  const [orderCounts, setOrderCounts] = useState<{pending:number; approved:number; archive:number}>({ pending: 0, approved: 0, archive: 0 });
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detail, setDetail] = useState<{ order: any; items: any[]; approvals: any[] } | null>(null);
   
   // Get customer code and name from profile data
   const session = getCustomerSession();
@@ -126,6 +132,57 @@ export default function CustomerHome() {
     })();
     return () => { cancelled = true; };
   }, [code]);
+
+  // Fetch orders for current bucket
+  useEffect(() => {
+    if (activeSection !== 'orders') return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const url = buildCustomerApiUrl('/orders', { code, bucket: ordersBucket, limit: 25 });
+        const res = await customerApiFetch(url);
+        const json = await res.json();
+        const data = Array.isArray(json?.data) ? json.data : [];
+        if (!cancelled) setOrders(data);
+      } catch {
+        if (!cancelled) setOrders([]);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [activeSection, ordersBucket, code]);
+
+  // Fetch counts for all buckets (shallow, page-limited)
+  useEffect(() => {
+    if (activeSection !== 'orders') return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const [p, a, r] = await Promise.all([
+          customerApiFetch(buildCustomerApiUrl('/orders', { code, bucket: 'pending', limit: 25 })).then(r=>r.json()).catch(()=>({data:[]})),
+          customerApiFetch(buildCustomerApiUrl('/orders', { code, bucket: 'approved', limit: 25 })).then(r=>r.json()).catch(()=>({data:[]})),
+          customerApiFetch(buildCustomerApiUrl('/orders', { code, bucket: 'archive', limit: 25 })).then(r=>r.json()).catch(()=>({data:[]})),
+        ]);
+        if (!cancelled) setOrderCounts({ pending: (p.data||[]).length, approved: (a.data||[]).length, archive: (r.data||[]).length });
+      } catch { /* ignore */ }
+    })();
+    return () => { cancelled = true; };
+  }, [activeSection, code]);
+
+  async function openOrderDetail(orderId: string) {
+    try {
+      setDetailOpen(true);
+      setDetailLoading(true);
+      const res = await fetch(`${import.meta.env.VITE_API_URL?.replace(/\/$/, '') || '/api'}/orders/${orderId}`, { credentials: 'include' });
+      const json = await res.json();
+      if (!res.ok || !json?.success) throw new Error(json?.error || 'Failed to load order');
+      setDetail(json.data || null);
+    } catch (e) {
+      setDetail(null);
+    } finally {
+      setDetailLoading(false);
+    }
+  }
+  function closeDetail() { setDetailOpen(false); setDetail(null); }
 
   const base = `/${username}/hub`;
 
@@ -285,7 +342,7 @@ export default function CustomerHome() {
                 textAlign: 'center',
                 transition: 'all 0.2s',
                 boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-              }}>
+              }} onClick={() => navigate('/catalog?type=service')}>
                 🛠️ REQUEST SERVICES
                 <div style={{ fontSize: 12, fontWeight: 500, marginTop: 4 }}>
                   Cleaning • Maintenance • Security • More
@@ -304,7 +361,7 @@ export default function CustomerHome() {
                 textAlign: 'center',
                 transition: 'all 0.2s',
                 boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-              }}>
+              }} onClick={() => navigate('/catalog?type=product')}>
                 📦 REQUEST PRODUCTS
                 <div style={{ fontSize: 12, fontWeight: 500, marginTop: 4 }}>
                   Supplies • Equipment • Materials • More
@@ -683,13 +740,48 @@ export default function CustomerHome() {
         {/* ORDERS SECTION */}
         {activeSection === 'orders' && (
           <div>
-            <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Orders</h2>
-            <div className="ui-card" style={{ padding: 16 }}>
-              <div style={{ textAlign: 'center', padding: 40, color: '#6b7280' }}>
-                Order management system will be implemented here.<br/>
-                This will show service orders from centers, order status,<br/>
-                and coordination with contractor services.
-              </div>
+            <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 12 }}>Orders</h2>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+              {(['pending','approved','archive'] as const).map(b => (
+                <button key={b} onClick={() => setOrdersBucket(b)} style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #e5e7eb', background: ordersBucket===b? '#111827':'white', color: ordersBucket===b? 'white':'#111827', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                  {b === 'pending' ? 'Pending Requests' : b === 'approved' ? 'Approved Requests' : 'Archive'}
+                </button>
+              ))}
+            </div>
+            <div className="ui-card" style={{ padding: 0, overflow: 'hidden' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ background: '#f9fafb' }}>
+                    <th style={{ padding: 10, textAlign: 'left', fontSize: 12 }}>Order ID</th>
+                    <th style={{ padding: 10, textAlign: 'left', fontSize: 12 }}>Center</th>
+                    <th style={{ padding: 10, textAlign: 'left', fontSize: 12 }}>Items</th>
+                    <th style={{ padding: 10, textAlign: 'left', fontSize: 12 }}>Services</th>
+                    <th style={{ padding: 10, textAlign: 'left', fontSize: 12 }}>Products</th>
+                    <th style={{ padding: 10, textAlign: 'left', fontSize: 12 }}>Status</th>
+                    <th style={{ padding: 10, textAlign: 'left', fontSize: 12 }}>Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {orders.map((o, i) => (
+                    <tr key={o.order_id} onClick={() => openOrderDetail(o.order_id)} style={{ cursor: 'pointer', borderBottom: i < orders.length - 1 ? '1px solid #e5e7eb' : 'none' }}>
+                      <td style={{ padding: 10, fontFamily: 'ui-monospace' }}>{o.order_id}</td>
+                      <td style={{ padding: 10 }}>{o.center_id || '—'}</td>
+                      <td style={{ padding: 10 }}>{o.item_count ?? 0}</td>
+                      <td style={{ padding: 10 }}>{o.service_count ?? 0}</td>
+                      <td style={{ padding: 10 }}>{o.product_count ?? 0}</td>
+                      <td style={{ padding: 10 }}>
+                        <span style={{ padding: '2px 8px', borderRadius: 12, background: '#fef3c7', color: '#92400e', fontSize: 12 }}>{o.status}</span>
+                      </td>
+                      <td style={{ padding: 10 }}>{String(o.order_date).slice(0,10)}</td>
+                    </tr>
+                  ))}
+                  {orders.length === 0 && (
+                    <tr>
+                      <td colSpan={7} style={{ padding: 16, color: '#6b7280' }}>No orders in this bucket yet.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         )}
@@ -726,6 +818,58 @@ export default function CustomerHome() {
 
       {/* Animation styles */}
       <style>{`@keyframes fadeIn{from{opacity:0; transform:translateY(2px)} to{opacity:1; transform:none}}`}</style>
+
+      {/* Order detail overlay */}
+      {detailOpen && (
+        <div onClick={closeDetail} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', zIndex: 50, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: 16 }}>
+          <div onClick={(e) => e.stopPropagation()} className="card" style={{ width: 'min(800px, 95vw)', maxHeight: '85vh', overflowY: 'auto', background: 'white', borderRadius: 12, padding: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <div style={{ fontWeight: 800 }}>Order Details</div>
+              <button onClick={closeDetail} style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: '6px 10px', background: 'white', cursor: 'pointer' }}>Close</button>
+            </div>
+            {detailLoading && <div style={{ padding: 12 }}>Loading…</div>}
+            {!detailLoading && detail && (
+              <>
+                <div style={{ marginBottom: 12, fontSize: 13, color: '#374151' }}>
+                  <div><b>Order ID:</b> {detail.order.order_id}</div>
+                  <div><b>Status:</b> {detail.order.status}</div>
+                  <div><b>Customer:</b> {detail.order.customer_id || '—'}</div>
+                  <div><b>Center:</b> {detail.order.center_id || '—'}</div>
+                  <div><b>Date:</b> {String(detail.order.order_date).slice(0,10)}</div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div className="card" style={{ padding: 12 }}>
+                    <div style={{ fontWeight: 700, marginBottom: 8 }}>Items</div>
+                    <div style={{ display: 'grid', gap: 6 }}>
+                      {detail.items.map((it, idx) => (
+                        <div key={it.order_item_id || idx} style={{ display: 'flex', gap: 8, alignItems: 'center', border: '1px solid #e5e7eb', borderRadius: 8, padding: 8 }}>
+                          <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 999, background: it.item_type === 'service' ? '#ecfdf5' : '#eff6ff', color: it.item_type === 'service' ? '#065f46' : '#1e40af' }}>{it.item_type}</span>
+                          <span style={{ fontFamily: 'ui-monospace' }}>{it.item_id}</span>
+                          <span style={{ marginLeft: 'auto', fontSize: 12 }}>qty: {it.quantity}</span>
+                        </div>
+                      ))}
+                      {detail.items.length === 0 && <div style={{ fontSize: 13, color: '#6b7280' }}>No items.</div>}
+                    </div>
+                  </div>
+                  <div className="card" style={{ padding: 12 }}>
+                    <div style={{ fontWeight: 700, marginBottom: 8 }}>Approvals</div>
+                    <div style={{ display: 'grid', gap: 6 }}>
+                      {detail.approvals.map((ap, idx) => (
+                        <div key={ap.approval_id || idx} style={{ display: 'flex', gap: 8, alignItems: 'center', border: '1px solid #e5e7eb', borderRadius: 8, padding: 8 }}>
+                          <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 999, background: '#f3f4f6', color: '#111827' }}>{ap.approver_type}</span>
+                          <span style={{ fontSize: 12 }}>{ap.status}</span>
+                          {ap.decided_at && <span style={{ marginLeft: 'auto', fontSize: 12, color: '#6b7280' }}>{String(ap.decided_at).slice(0,10)}</span>}
+                        </div>
+                      ))}
+                      {detail.approvals.length === 0 && <div style={{ fontSize: 13, color: '#6b7280' }}>No approvals yet.</div>}
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

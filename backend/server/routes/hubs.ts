@@ -17,7 +17,7 @@
  */
 
 import express, { Request, Response } from 'express';
-import pool from '../db/pool';
+import pool from '../../../Database/db/pool';
 
 const router = express.Router();
 

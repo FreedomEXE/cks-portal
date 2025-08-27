@@ -9,7 +9,8 @@
       "Bash(node:*)",
       "Bash(npm install:*)",
       "Bash(winget install:*)",
-      "Bash(npx playwright install:*)"
+      "Bash(npx playwright install:*)",
+      "Bash(npm run migration:run:*)"
     ],
     "deny": [],
     "ask": []

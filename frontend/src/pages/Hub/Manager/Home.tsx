@@ -44,6 +44,17 @@ export default function ManagerHome() {
   const [newsItems, setNewsItems] = useState<NewsItem[]>([]);
   const [newsLoading, setNewsLoading] = useState(false);
   const [profileTab, setProfileTab] = useState(0);
+  const [reqBucket, setReqBucket] = useState<'needs_scheduling'|'in_progress'|'archive'>('needs_scheduling');
+  const [requests, setRequests] = useState<any[]>([]);
+  const [schedLoading, setSchedLoading] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detail, setDetail] = useState<{ order: any; items: any[]; approvals: any[] } | null>(null);
+  const [counts, setCounts] = useState<{ needs: number; progress: number; archive: number }>({ needs: 0, progress: 0, archive: 0 });
+  const [filter, setFilter] = useState('');
+  const [schedOpen, setSchedOpen] = useState(false);
+  const [schedForm, setSchedForm] = useState<{ order_id: string; center_id: string; start: string; end: string }>({ order_id: '', center_id: '', start: '', end: '' });
   
   // Get manager code and name from profile data
   const session = getManagerSession();
@@ -86,6 +97,90 @@ export default function ManagerHome() {
     })();
     return () => { cancelled = true; };
   }, [code]);
+
+  // Fetch manager requests per bucket
+  useEffect(() => {
+    if (activeSection !== 'orders') return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const url = buildManagerApiUrl('/requests', { bucket: reqBucket });
+        const r = await managerApiFetch(url);
+        const j = await r.json();
+        const arr = Array.isArray(j?.data) ? j.data : [];
+        if (!cancelled) setRequests(arr);
+      } catch {
+        if (!cancelled) setRequests([]);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [activeSection, reqBucket]);
+
+  // Fetch counts for badges (approximate page-limited)
+  useEffect(() => {
+    if (activeSection !== 'orders') return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const [n, p, a] = await Promise.all([
+          managerApiFetch(buildManagerApiUrl('/requests', { bucket: 'needs_scheduling' })).then(r=>r.json()).catch(()=>({data:[]})),
+          managerApiFetch(buildManagerApiUrl('/requests', { bucket: 'in_progress' })).then(r=>r.json()).catch(()=>({data:[]})),
+          managerApiFetch(buildManagerApiUrl('/requests', { bucket: 'archive' })).then(r=>r.json()).catch(()=>({data:[]})),
+        ]);
+        if (!cancelled) setCounts({ needs: (n.data||[]).length, progress: (p.data||[]).length, archive: (a.data||[]).length });
+      } catch { /* ignore */ }
+    })();
+    return () => { cancelled = true; };
+  }, [activeSection]);
+
+  async function openOrderDetail(orderId: string) {
+    try {
+      setDetailOpen(true);
+      setDetailLoading(true);
+      const res = await fetch(`${import.meta.env.VITE_API_URL?.replace(/\/$/, '') || '/api'}/orders/${orderId}`, { credentials: 'include' });
+      const json = await res.json();
+      if (!res.ok || !json?.success) throw new Error(json?.error || 'Failed to load order');
+      setDetail(json.data || null);
+    } catch {
+      setDetail(null);
+    } finally { setDetailLoading(false); }
+  }
+  function closeDetail() { setDetailOpen(false); setDetail(null); }
+
+  // Fetch manager requests per bucket
+  useEffect(() => {
+    if (activeSection !== 'orders') return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const url = buildManagerApiUrl('/requests', { bucket: reqBucket });
+        const r = await managerApiFetch(url);
+        const j = await r.json();
+        const arr = Array.isArray(j?.data) ? j.data : [];
+        if (!cancelled) setRequests(arr);
+      } catch {
+        if (!cancelled) setRequests([]);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [activeSection, reqBucket]);
+
+  async function schedule(id: string) {
+    try {
+      setSchedLoading(id);
+      const start = new Date();
+      const end = new Date(Date.now() + 2*60*60*1000);
+      const body = { center_id: (requests.find(r => r.order_id===id)?.center_id)||'', start: start.toISOString(), end: end.toISOString() };
+      const url = buildManagerApiUrl(`/requests/${id}/schedule`);
+      const r = await managerApiFetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      if (!r.ok) throw new Error('Schedule failed');
+      setRequests(prev => prev.filter(x => x.order_id !== id));
+    } catch (e) {
+      alert((e as Error).message || 'Schedule failed');
+    } finally {
+      setSchedLoading(null);
+    }
+  }
 
   const base = `/${username}/hub`;
 
@@ -340,6 +435,122 @@ export default function ManagerHome() {
           </div>
         )}
 
+        {activeSection === 'orders' && (
+          <div>
+            {notice && (
+              <div className="card" style={{ padding: 10, marginBottom: 8, borderLeft: '4px solid #10b981', background: '#ecfdf5', color: '#065f46', fontSize: 13 }}>{notice}</div>
+            )}
+            <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 12 }}>Service Requests</h2>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+              {(['needs_scheduling','in_progress','archive'] as const).map(b => {
+                const label = b === 'needs_scheduling' ? 'Needs Scheduling' : b === 'in_progress' ? 'In Progress' : 'Archive';
+                const count = b === 'needs_scheduling' ? counts.needs : b === 'in_progress' ? counts.progress : counts.archive;
+                return (
+                  <button key={b} onClick={() => setReqBucket(b)} style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #e5e7eb', background: reqBucket===b? '#111827':'white', color: reqBucket===b? 'white':'#111827', fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'inline-flex', gap: 8, alignItems: 'center' }}>
+                    <span>{label}</span>
+                    <span style={{ fontSize: 11, background: reqBucket===b? '#dbeafe':'#f3f4f6', color: '#111827', borderRadius: 12, padding: '2px 6px' }}>{count}</span>
+                  </button>
+                );
+              })}
+              <input value={filter} onChange={e=>setFilter(e.target.value)} placeholder="Filter by order/center/customer" style={{ padding: '6px 10px', border: '1px solid #e5e7eb', borderRadius: 8 }} />
+            </div>
+            <div className="ui-card" style={{ padding: 0, overflow: 'hidden' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ background: '#f9fafb' }}>
+                    <th style={{ padding: 10, textAlign: 'left', fontSize: 12 }}>Order ID</th>
+                    <th style={{ padding: 10, textAlign: 'left', fontSize: 12 }}>Customer</th>
+                    <th style={{ padding: 10, textAlign: 'left', fontSize: 12 }}>Center</th>
+                    <th style={{ padding: 10, textAlign: 'left', fontSize: 12 }}>Items</th>
+                    <th style={{ padding: 10, textAlign: 'left', fontSize: 12 }}>Services</th>
+                    <th style={{ padding: 10, textAlign: 'left', fontSize: 12 }}>Status</th>
+                    <th style={{ padding: 10, textAlign: 'left', fontSize: 12 }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {requests.filter(o => {
+                    const t = (filter||'').toLowerCase();
+                    if (!t) return true;
+                    return String(o.order_id).toLowerCase().includes(t) || String(o.center_id||'').toLowerCase().includes(t) || String(o.customer_id||'').toLowerCase().includes(t);
+                  }).map((o, i) => (
+                    <tr key={o.order_id} style={{ borderBottom: i < requests.length - 1 ? '1px solid #e5e7eb' : 'none' }}>
+                      <td style={{ padding: 10, fontFamily: 'ui-monospace', color: '#2563eb', cursor: 'pointer' }} onClick={() => openOrderDetail(o.order_id)}>{o.order_id}</td>
+                      <td style={{ padding: 10 }}>{o.customer_id || '—'}</td>
+                      <td style={{ padding: 10 }}>{o.center_id || '—'}</td>
+                      <td style={{ padding: 10 }}>{o.item_count ?? 0}</td>
+                      <td style={{ padding: 10 }}>{o.service_count ?? 0}</td>
+                      <td style={{ padding: 10 }}>{o.status}</td>
+                      <td style={{ padding: 10 }}>
+                        {reqBucket === 'needs_scheduling' ? (
+                          <button disabled={schedLoading===o.order_id} onClick={() => { const now=new Date(); const twoH=new Date(Date.now()+2*60*60*1000); const toLocal=(d:Date)=> new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16); setSchedForm({ order_id:o.order_id, center_id:o.center_id||'', start: toLocal(now), end: toLocal(twoH) }); setSchedOpen(true); }} style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #e5e7eb', background: '#3b7af7', color: 'white', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Schedule</button>
+                        ) : (
+                          <span style={{ fontSize: 12, color: '#6b7280' }}>—</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                  {requests.length === 0 && (
+                    <tr>
+                      <td colSpan={7} style={{ padding: 16, color: '#6b7280' }}>No requests in this bucket.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            {/* Order detail overlay */}
+            {detailOpen && (
+              <div onClick={closeDetail} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', zIndex: 50, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: 16 }}>
+                <div onClick={(e) => e.stopPropagation()} className="card" style={{ width: 'min(800px, 95vw)', maxHeight: '85vh', overflowY: 'auto', background: 'white', borderRadius: 12, padding: 16 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <div style={{ fontWeight: 800 }}>Order Details</div>
+                    <button onClick={closeDetail} style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: '6px 10px', background: 'white', cursor: 'pointer' }}>Close</button>
+                  </div>
+                  {detailLoading && <div style={{ padding: 12 }}>Loading…</div>}
+                  {!detailLoading && detail && (
+                    <>
+                      <div style={{ marginBottom: 12, fontSize: 13, color: '#374151' }}>
+                        <div><b>Order ID:</b> {detail.order.order_id}</div>
+                        <div><b>Status:</b> {detail.order.status}</div>
+                        <div><b>Customer:</b> {detail.order.customer_id || '—'}</div>
+                        <div><b>Center:</b> {detail.order.center_id || '—'}</div>
+                        <div><b>Date:</b> {String(detail.order.order_date).slice(0,10)}</div>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                        <div className="card" style={{ padding: 12 }}>
+                          <div style={{ fontWeight: 700, marginBottom: 8 }}>Items</div>
+                          <div style={{ display: 'grid', gap: 6 }}>
+                            {detail.items.map((it, idx) => (
+                              <div key={it.order_item_id || idx} style={{ display: 'flex', gap: 8, alignItems: 'center', border: '1px solid #e5e7eb', borderRadius: 8, padding: 8 }}>
+                                <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 999, background: it.item_type === 'service' ? '#ecfdf5' : '#eff6ff', color: it.item_type === 'service' ? '#065f46' : '#1e40af' }}>{it.item_type}</span>
+                                <span style={{ fontFamily: 'ui-monospace' }}>{it.item_id}</span>
+                                <span style={{ marginLeft: 'auto', fontSize: 12 }}>qty: {it.quantity}</span>
+                              </div>
+                            ))}
+                            {detail.items.length === 0 && <div style={{ fontSize: 13, color: '#6b7280' }}>No items.</div>}
+                          </div>
+                        </div>
+                        <div className="card" style={{ padding: 12 }}>
+                          <div style={{ fontWeight: 700, marginBottom: 8 }}>Approvals</div>
+                          <div style={{ display: 'grid', gap: 6 }}>
+                            {detail.approvals.map((ap, idx) => (
+                              <div key={ap.approval_id || idx} style={{ display: 'flex', gap: 8, alignItems: 'center', border: '1px solid #e5e7eb', borderRadius: 8, padding: 8 }}>
+                                <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 999, background: '#f3f4f6', color: '#111827' }}>{ap.approver_type}</span>
+                                <span style={{ fontSize: 12 }}>{ap.status}</span>
+                                {ap.decided_at && <span style={{ marginLeft: 'auto', fontSize: 12, color: '#6b7280' }}>{String(ap.decided_at).slice(0,10)}</span>}
+                              </div>
+                            ))}
+                            {detail.approvals.length === 0 && <div style={{ fontSize: 13, color: '#6b7280' }}>No approvals yet.</div>}
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* PROFILE SECTION */}
         {activeSection === 'profile' && (
           <div>
@@ -485,6 +696,33 @@ export default function ManagerHome() {
         )}
 
       </div>
+
+      {/* Schedule dialog */}
+      {schedOpen && (
+        <div onClick={()=>setSchedOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', zIndex: 50, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: 16 }}>
+          <div onClick={(e)=>e.stopPropagation()} className="card" style={{ width: 'min(520px, 95vw)', background: 'white', borderRadius: 12, padding: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <div style={{ fontWeight: 800 }}>Schedule Service</div>
+              <button onClick={()=>setSchedOpen(false)} style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: '6px 10px', background: 'white', cursor: 'pointer' }}>Close</button>
+            </div>
+            <div style={{ display: 'grid', gap: 12 }}>
+              <label style={{ fontSize: 12, color: '#6b7280' }}>Center ID
+                <input value={schedForm.center_id} onChange={e=>setSchedForm(f=>({ ...f, center_id: e.target.value }))} style={{ width: '100%', padding: '8px 12px', border: '1px solid #e5e7eb', borderRadius: 8 }} />
+              </label>
+              <label style={{ fontSize: 12, color: '#6b7280' }}>Start
+                <input type="datetime-local" value={schedForm.start} onChange={e=>setSchedForm(f=>({ ...f, start: e.target.value }))} style={{ width: '100%', padding: '8px 12px', border: '1px solid #e5e7eb', borderRadius: 8 }} />
+              </label>
+              <label style={{ fontSize: 12, color: '#6b7280' }}>End
+                <input type="datetime-local" value={schedForm.end} onChange={e=>setSchedForm(f=>({ ...f, end: e.target.value }))} style={{ width: '100%', padding: '8px 12px', border: '1px solid #e5e7eb', borderRadius: 8 }} />
+              </label>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                <button onClick={()=>setSchedOpen(false)} style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #e5e7eb', background: 'white', cursor: 'pointer' }}>Cancel</button>
+                <button disabled={!!schedLoading} onClick={async ()=>{ try { setSchedLoading(schedForm.order_id); const url = buildManagerApiUrl(`/requests/${schedForm.order_id}/schedule`); const body = { center_id: schedForm.center_id, start: new Date(schedForm.start).toISOString(), end: new Date(schedForm.end).toISOString() }; const r = await managerApiFetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); if (!r.ok) throw new Error('Schedule failed'); setRequests(prev => prev.filter(x => x.order_id !== schedForm.order_id)); setSchedOpen(false); } catch (e) { alert((e as Error).message || 'Schedule failed'); } finally { setSchedLoading(null); } }} style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#111827', color: 'white', cursor: 'pointer' }}>{schedLoading? 'Scheduling…':'Schedule'}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Animation styles */}
       <style>{`@keyframes fadeIn{from{opacity:0; transform:translateY(2px)} to{opacity:1; transform:none}}`}</style>

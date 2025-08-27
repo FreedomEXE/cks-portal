@@ -17,7 +17,7 @@
 
 import fs from 'fs';
 import path from 'path';
-import pool from './pool';
+import pool from '../../../Database/db/pool';
 
 async function initializeDatabase() {
   try {
