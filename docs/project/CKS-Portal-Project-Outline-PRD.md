@@ -63,7 +63,7 @@ The CKS Portal is a role-based web application that centralizes service delivery
 | **Supplies** | `SUP-XXX` | Provided products/supplies |
 | **Procedures** | `PRC-XXX` | Process & operational guides |
 | **Training** | `TRN-XXX` | Training materials |
-| **Warehouses** | `WHS-XXX` | Supply storage facilities |
+| **Warehouses** | `WH-XXX` | Supply storage facilities |
 | **Reports** | `RPT-XXX` | Center-generated reports on job quality/issues |
 
 **Entity Relationships:**

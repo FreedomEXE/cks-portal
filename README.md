@@ -1,6 +1,6 @@
 # CKS Portal
 
-Role‑based service delivery management system with 6 independent hubs (Admin, Manager, Contractor, Customer, Center, Crew). Frontend is Vite + React + Clerk; Backend is Node.js + Express + PostgreSQL. Documentation lives under `docs/` with a project index and session handoffs.
+Role‑based service delivery management system with 7 independent hubs (Admin, Manager, Contractor, Customer, Center, Crew, Warehouse). Frontend is Vite + React + Clerk; Backend is Node.js + Express + PostgreSQL. Documentation lives under `docs/` with a project index and session handoffs.
 
 ## Quick Start
 
@@ -26,7 +26,7 @@ Notes:
 ## Documentation
 
 - Project Index: `docs/project/index.md`
-- Latest Session Handoff: `docs/CURRENT SESSION 2025-08-25.md`
+- Latest Session Handoff: `docs/CURRENT SESSION 2025-08-29.md`
 - Key specs (examples):
   - `docs/project/CKS-Portal-Project-Outline-PRD.md`
   - `docs/project/API_SURFACE_V1.md`
@@ -35,7 +35,7 @@ Notes:
 
 ## Repository Structure
 
-- `frontend/` — React apps for all hubs (each hub isolated: `components/`, `hooks/`, `utils/`).
+- `frontend/` — React apps for all hubs (each hub isolated: `components/`, `hooks/`, `utils/`). Includes `Warehouse` hub.
 - `backend/server/` — Express API, modular routes under `/api`, Postgres pool, health/metrics.
 - `docs/` — Specs, patterns, and session logs (start at `docs/project/index.md`).
 - Playwright test scripts are in repo root (e.g., `test-center-login.js`).
@@ -50,10 +50,21 @@ These are standalone scripts for UI checks.
 - Aggregated sample run: `npm run test:ui`
 - Ensure frontend and backend dev servers are running before tests
 
+## Database: Migrations and Seeds
+
+To initialize or update the database schema locally:
+
+- Configure connection in `backend/server/.env` (use either `DATABASE_URL` or discrete `DB_HOST/DB_PORT/DB_NAME/DB_USER/DB_PASSWORD`).
+- Run migrations: `node Database/migrations/run.js`
+- Optional sample data:
+  - Reports/Feedback samples: use your SQL client to run `Database/seeds/010_reports_feedback_sample.sql`
+  - Warehouse samples: run `Database/seeds/011_warehouse_sample.sql`
+- Reset demo data: call `DELETE /api/admin/cleanup-demo-data` (removes demo/seed rows; preserves structure).
+
 ## Status
 
-- Frontend hubs implemented with consistent Dashboard/Profile/Comms patterns.
-- Backend surface unified under `/api`; many routes return template data pending DB mapping.
+- Frontend hubs implemented with consistent Dashboard/Profile/Comms patterns. New Warehouse hub added with Inventory, Orders, Shipments, and Activity.
+- Backend surface unified under `/api`; added Warehouse, Reports, and Feedback resources. Many routes return template data pending DB mapping.
 - Next steps: wire real DB field mappings, finalize auth (Clerk + custom ID), and broaden tests.
 
 *Property of CKS © 2025 – Manifested by Freedom*

@@ -20,11 +20,11 @@ import { useUser } from '@clerk/clerk-react';
 import { useParams } from 'react-router-dom';
 // Inline role extraction utility
 function getRole(user: any, headers?: Record<string, string | null | undefined>) {
-  // First check for template users (xxx-000 format) - infer role from username
+  // First check for template users (prefix-000 format) - infer role from username
   const username = user?.username || '';
-  if (/^[a-z]{3}-000$/i.test(username)) {
-    const prefix = username.substring(0, 3).toLowerCase();
-    switch(prefix) {
+  if (/^[a-z]{2,3}-\d{3}$/i.test(username)) {
+    const rawPrefix = username.split('-')[0]?.toLowerCase();
+    switch(rawPrefix) {
       case 'mgr': return 'manager';
       case 'cus': return 'customer';
       case 'cen': return 'center';
@@ -32,6 +32,7 @@ function getRole(user: any, headers?: Record<string, string | null | undefined>)
       case 'con': return 'contractor';
       case 'crw': return 'crew';
       case 'adm': return 'admin';
+      case 'wh':  return 'warehouse';
       default: return null;
     }
   }
@@ -51,6 +52,7 @@ import AdminHub from './Hub/Admin';
 import ManagerHub from './Hub/Manager';
 import CenterHub from './Hub/Center';
 import ContractorHub from './Hub/Contractor';
+import WarehouseHub from './Hub/Warehouse';
 import CrewHub from './Hub/Crew';
 import CustomerHub from './Hub/Customer';
 
@@ -76,6 +78,8 @@ export default function HubRoleRouter() {
       return <CrewHub />;
     case 'admin':
       return <AdminHub />;
+    case 'warehouse':
+      return <WarehouseHub />;
     default:
       return <AdminHub />; // Fallback to admin hub
   }

@@ -3,7 +3,7 @@
 *This document provides essential context for new Claude agents joining the CKS Portal development project.*
 
 ## 🎯 Quick Project Summary
-**CKS Portal** is a role-based service delivery management system. CKS acts as an outsourced service provider for contractors, handling service delivery to the contractor's existing customers through a secure web platform with 6 independent hubs.
+**CKS Portal** is a role-based service delivery management system. CKS acts as an outsourced service provider for contractors, handling service delivery to the contractor's existing customers through a secure web platform with 7 independent hubs (Admin, Manager, Contractor, Customer, Center, Crew, Warehouse).
 
 ## 🏗️ Current Status (~40-45% Complete)
 - **✅ Frontend**: All 6 role hubs implemented with template data
@@ -44,7 +44,7 @@
 
 *These IDs become login credentials and determine hub access.*
 
-## 🎨 Hub System (6 Independent Hubs)
+## 🎨 Hub System (Independent Hubs)
 Each role has a completely isolated hub with specific functionality:
 
 ### **Admin Hub** (Black) - System Management
@@ -79,6 +79,11 @@ Each role has a completely isolated hub with specific functionality:
 - View assignments and center context
 - Access training and procedures
 - Basic work schedule and task management
+
+### **Warehouse Hub** (Purple) - Logistics & Inventory
+- Inventory and shipments for product/supply fulfillment
+- Orders assignment and delivery confirmation
+- Staff and activity log visibility
 
 ## 🔧 Tech Stack
 - **Frontend**: React + TypeScript + Vite + Tailwind CSS
@@ -148,7 +153,7 @@ This project uses dated session files (`docs/CURRENT SESSION YYYY-MM-DD.md`) to 
 - Migrations & seeds (Claude): scaffold `Database/migrations` and `Database/seeds`.
 - Counts in order lists (Claude): add totals to API so UI badges aren’t page-limited.
 - Admin Catalog CRUD (Claude): item create/update/delete; non-admin remains read-only.
-- Warehouse hub scaffold (Claude): add `backend/server/hubs/warehouse/routes.ts` with basic buckets.
+- Warehouse hub scaffold (Claude): add `backend/server/hubs/warehouse/routes.ts` with basic buckets. [Done]
 - Tests/CI (Claude): Playwright smokes, GitHub Action for type-check/lint/build.
 - Frontend polish (This agent): manager order detail overlay, dashboard badges, better empty/skeleton states, toasts, optional deep links, table filters.
 
@@ -156,6 +161,32 @@ This project uses dated session files (`docs/CURRENT SESSION YYYY-MM-DD.md`) to 
 - Database finalize: “Switch Database to commonjs or compile to dist; include Database TS in backend tsconfig; remove backend duplicate schema; confirm `/test-db` works; scaffold migrations/seeds; update session notes.”
 - Counts API: “Add `{ totals: { pending, approved, archive } }` to customer/center/contractor/manager list endpoints without breaking `{ success, data }`.”
 - Admin Catalog CRUD: “Implement `/api/admin/catalog/items` CRUD with soft-delete; keep non-admin read-only; update docs and brief usage notes.”
+
+## 📋 Add a New Endpoint: Checklist
+
+1) Define schema with Zod
+- Create request/params schema in the route file.
+- Validate `req.body`/`req.query`; return `{ success: false, error: 'validation_error' }` on failure.
+
+2) Guard with RBAC where needed
+- Use `requirePermission('PERM')` from `backend/server/src/auth/rbac.ts` for sensitive writes.
+- Roles derived from `x-user-role` or `x-user-id` prefix.
+
+3) Implement route under correct module
+- Hub-specific: `backend/server/hubs/<role>/routes.ts` under `/api/<role>`.
+- Shared resource: `backend/server/resources/<resource>.ts` under `/api/<resource>`.
+
+4) Keep response envelope consistent
+- Success: `{ success: true, data, ...extras }`
+- Errors: `{ success: false, error, error_code? }` with proper HTTP status.
+
+5) Update docs
+- Add/modify endpoint in `docs/project/API_SURFACE_V1.md`.
+- Note role/permission requirements.
+
+6) Verify locally
+- Add minimal curl/HTTPie snippets to a session doc if helpful.
+- If applicable, add a quick Playwright smoke or Node script.
 
 ## 🚨 Common Pitfalls to Avoid
 - Don't assume payment processing is needed (it's not for MVP)

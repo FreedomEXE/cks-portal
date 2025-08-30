@@ -202,7 +202,17 @@ router.get('/contractors', async (req: Request, res: Response) => {
     const { where, params } = buildAccessFilter(userId, role, 'contractors');
     
     const query = `
-      SELECT contractor_id, cks_manager, company_name, main_contact, address, phone, email
+      SELECT 
+        contractor_id,
+        cks_manager,
+        company_name,
+        contact_person,
+        email,
+        phone,
+        business_type,
+        status,
+        created_at,
+        updated_at
       FROM contractors 
       ${where}
       ORDER BY company_name ASC
@@ -240,10 +250,19 @@ router.get('/managers', async (req: Request, res: Response) => {
     const { where, params } = buildAccessFilter(userId, role, 'managers');
     
     const query = `
-      SELECT manager_id, name, status, role, address, phone, email
+      SELECT 
+        manager_id,
+        manager_name,
+        assigned_center,
+        email,
+        phone,
+        territory,
+        status,
+        created_at,
+        updated_at
       FROM managers 
       ${where}
-      ORDER BY name ASC
+      ORDER BY manager_name ASC
     `;
     
     const result = await pool.query(query, params);
@@ -278,7 +297,17 @@ router.get('/customers', async (req: Request, res: Response) => {
     const { where, params } = buildAccessFilter(userId, role, 'customers');
     
     const query = `
-      SELECT customer_id, cks_manager, company_name, main_contact, address, phone, email
+      SELECT 
+        customer_id,
+        cks_manager,
+        company_name,
+        contact_person,
+        email,
+        phone,
+        service_tier,
+        status,
+        created_at,
+        updated_at
       FROM customers 
       ${where}
       ORDER BY company_name ASC
@@ -316,10 +345,20 @@ router.get('/centers', async (req: Request, res: Response) => {
     const { where, params } = buildAccessFilter(userId, role, 'centers');
     
     const query = `
-      SELECT center_id, cks_manager, name, main_contact, address, phone, email, contractor_id, customer_id
+      SELECT 
+        center_id,
+        cks_manager,
+        center_name,
+        customer_id,
+        contractor_id,
+        address,
+        operational_hours,
+        status,
+        created_at,
+        updated_at
       FROM centers 
       ${where}
-      ORDER BY name ASC
+      ORDER BY center_name ASC
     `;
     
     const result = await pool.query(query, params);
@@ -354,10 +393,20 @@ router.get('/crew', async (req: Request, res: Response) => {
     const { where, params } = buildAccessFilter(userId, role, 'crew');
     
     const query = `
-      SELECT crew_id, name, status, role, address, phone, email, assigned_center
+      SELECT 
+        crew_id,
+        cks_manager,
+        assigned_center,
+        crew_name,
+        skills,
+        certification_level,
+        status,
+        profile,
+        created_at,
+        updated_at
       FROM crew 
       ${where}
-      ORDER BY name ASC
+      ORDER BY crew_name NULLS LAST ASC
     `;
     
     const result = await pool.query(query, params);

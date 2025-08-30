@@ -67,6 +67,18 @@ export default function CrewHome() {
   const crewName = state.data?.crew_name || 'Mike Johnson';
   const centerId = state.data?.center_id || 'CEN-001';
   const centerName = state.data?.center_assigned || 'Downtown Operations Center';
+  // Reports & Feedback (read-only)
+  const [repTab, setRepTab] = useState<'reports'|'feedback'>('reports');
+  const [repReports, setRepReports] = useState<any[]>([]);
+  const [repFeedback, setRepFeedback] = useState<any[]>([]);
+  const [repTotals, setRepTotals] = useState<any>({});
+  const [repLoading, setRepLoading] = useState(false);
+  const [archReportId, setArchReportId] = useState('');
+  const [archFeedbackId, setArchFeedbackId] = useState('');
+  const [repDetailOpen, setRepDetailOpen] = useState(false);
+  const [repDetail, setRepDetail] = useState<{ report:any; comments:any[] }|null>(null);
+  const [fbDetailOpen, setFbDetailOpen] = useState(false);
+  const [fbDetail, setFbDetail] = useState<any|null>(null);
 
   // Store crew session for navigation context
   useEffect(() => {
@@ -136,6 +148,49 @@ export default function CrewHome() {
     })();
     return () => { cancelled = true; };
   }, [code]);
+
+  // Fetch center reports/feedback when viewing Center section
+  useEffect(() => {
+    if (activeSection !== 'center') return;
+    let cancelled = false;
+    (async () => {
+      try {
+        setRepLoading(true);
+        const base = (import.meta.env.VITE_API_URL?.replace(/\/$/, '') || '/api');
+        if (repTab === 'reports') {
+          const r = await fetch(`${base}/reports?center_id=${encodeURIComponent(centerId)}&limit=25`, { credentials: 'include' });
+          const j = await r.json();
+          if (!cancelled) { setRepReports(Array.isArray(j?.data)?j.data:[]); setRepTotals(j?.totals||{}); }
+        } else {
+          const r = await fetch(`${base}/feedback?center_id=${encodeURIComponent(centerId)}&limit=25`, { credentials: 'include' });
+          const j = await r.json();
+          if (!cancelled) { setRepFeedback(Array.isArray(j?.data)?j.data:[]); setRepTotals(j?.totals||{}); }
+        }
+      } finally { if (!cancelled) setRepLoading(false); }
+    })();
+    return () => { cancelled = true; };
+  }, [activeSection, repTab, centerId]);
+
+  async function openReportDetail(id: string) {
+    try {
+      setRepDetailOpen(true);
+      setRepDetail(null);
+      const base = (import.meta.env.VITE_API_URL?.replace(/\/$/, '') || '/api');
+      const r = await fetch(`${base}/reports/${encodeURIComponent(id)}`, { credentials: 'include' });
+      const j = await r.json();
+      if (j?.success) setRepDetail(j.data);
+    } catch { setRepDetail(null); }
+  }
+  async function openFeedbackDetail(id: string) {
+    try {
+      setFbDetailOpen(true);
+      setFbDetail(null);
+      const base = (import.meta.env.VITE_API_URL?.replace(/\/$/, '') || '/api');
+      const r = await fetch(`${base}/feedback/${encodeURIComponent(id)}`, { credentials: 'include' });
+      const j = await r.json();
+      if (j?.success) setFbDetail(j.data);
+    } catch { setFbDetail(null); }
+  }
 
   const base = `/${username}/hub`;
 
@@ -756,6 +811,146 @@ export default function CrewHome() {
                 </div>
               </div>
             </div>
+
+            {/* Reports & Feedback (read-only) */}
+            <div className="ui-card" style={{ padding: 16, marginTop: 12 }}>
+              <div style={{ display:'flex', gap:8, alignItems:'center', marginBottom: 12 }}>
+                <div style={{ fontWeight: 700 }}>Reports & Feedback</div>
+                <div style={{ display:'inline-flex', gap:8, marginLeft: 12 }}>
+                  <button onClick={()=>setRepTab('reports')} style={{ padding:'6px 10px', borderRadius:8, border:'1px solid #e5e7eb', background: repTab==='reports'?'#ef4444':'white', color: repTab==='reports'?'white':'#111827', fontSize:12, fontWeight:700 }}>Reports</button>
+                  <button onClick={()=>setRepTab('feedback')} style={{ padding:'6px 10px', borderRadius:8, border:'1px solid #e5e7eb', background: repTab==='feedback'?'#ef4444':'white', color: repTab==='feedback'?'white':'#111827', fontSize:12, fontWeight:700 }}>Feedback</button>
+                </div>
+              </div>
+
+              {repTab==='reports' ? (
+                <div>
+                  <div style={{ display:'flex', gap:8, marginBottom: 12 }}>
+                    {['open','in_progress','resolved','closed'].map(k => (
+                      <span key={k} style={{ background:'#f9fafb', border:'1px solid #e5e7eb', borderRadius:999, padding:'6px 10px', fontSize:12, fontWeight:700 }}>{k.replace('_',' ')}: {Number(repTotals?.[k]||0)}</span>
+                    ))}
+                  </div>
+                  <div className="ui-card" style={{ padding:0, overflow:'hidden' }}>
+                    <table style={{ width:'100%', borderCollapse:'collapse' }}>
+                      <thead>
+                        <tr style={{ background:'#f9fafb' }}>
+                          <th style={{ padding:10, textAlign:'left', fontSize:12 }}>Title</th>
+                          <th style={{ padding:10, textAlign:'left', fontSize:12 }}>Type</th>
+                          <th style={{ padding:10, textAlign:'left', fontSize:12 }}>Severity</th>
+                          <th style={{ padding:10, textAlign:'left', fontSize:12 }}>Status</th>
+                          <th style={{ padding:10, textAlign:'left', fontSize:12 }}>Created</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {repLoading && (<tr><td colSpan={5} style={{ padding:16 }}>Loading...</td></tr>)}
+                        {!repLoading && repReports.map((r:any, i:number) => (
+                          <tr key={r.report_id} onClick={()=>openReportDetail(r.report_id)} style={{ cursor:'pointer', borderBottom: i<repReports.length-1? '1px solid #e5e7eb':'none' }}>
+                            <td style={{ padding:10, fontWeight:600 }}>{r.title}</td>
+                            <td style={{ padding:10 }}>{r.type}</td>
+                            <td style={{ padding:10 }}>{r.severity || '—'}</td>
+                            <td style={{ padding:10 }}>{r.status}</td>
+                            <td style={{ padding:10 }}>{new Date(r.created_at).toLocaleString()}</td>
+                          </tr>
+                        ))}
+                        {!repLoading && repReports.length===0 && (<tr><td colSpan={5} style={{ padding:16, color:'#6b7280' }}>No reports.</td></tr>)}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <div style={{ display:'flex', gap:8, marginBottom: 12 }}>
+                    {['praise','request','issue'].map(k => (
+                      <span key={k} style={{ background:'#f9fafb', border:'1px solid #e5e7eb', borderRadius:999, padding:'6px 10px', fontSize:12, fontWeight:700 }}>{k.charAt(0).toUpperCase()+k.slice(1)}: {Number(repTotals?.[k]||0)}</span>
+                    ))}
+                  </div>
+                  <div className="ui-card" style={{ padding:0, overflow:'hidden' }}>
+                    <table style={{ width:'100%', borderCollapse:'collapse' }}>
+                      <thead>
+                        <tr style={{ background:'#f9fafb' }}>
+                          <th style={{ padding:10, textAlign:'left', fontSize:12 }}>Title</th>
+                          <th style={{ padding:10, textAlign:'left', fontSize:12 }}>Kind</th>
+                          <th style={{ padding:10, textAlign:'left', fontSize:12 }}>Created</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {repLoading && (<tr><td colSpan={3} style={{ padding:16 }}>Loading...</td></tr>)}
+                        {!repLoading && repFeedback.map((f:any, i:number) => (
+                          <tr key={f.feedback_id} onClick={()=>openFeedbackDetail(f.feedback_id)} style={{ cursor:'pointer', borderBottom: i<repFeedback.length-1? '1px solid #e5e7eb':'none' }}>
+                            <td style={{ padding:10, fontWeight:600 }}>{f.title}</td>
+                            <td style={{ padding:10 }}>{f.kind}</td>
+                            <td style={{ padding:10 }}>{new Date(f.created_at).toLocaleString()}</td>
+                          </tr>
+                        ))}
+                        {!repLoading && repFeedback.length===0 && (<tr><td colSpan={3} style={{ padding:16, color:'#6b7280' }}>No feedback.</td></tr>)}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Archive - Open by ID */}
+            <div className="ui-card" style={{ padding: 12, marginTop: 12 }}>
+              <div style={{ fontWeight: 700, marginBottom: 8 }}>Archive Search</div>
+              <div style={{ display:'flex', gap: 8, flexWrap:'wrap', alignItems:'center' }}>
+                <input placeholder="Report ID (e.g., RPT-1001)" value={archReportId} onChange={e=>setArchReportId(e.target.value)} onKeyDown={async (e)=>{ if (e.key==='Enter') { const id=archReportId.trim(); if (id) await openReportDetail(id); } }} style={{ padding:8, border:'1px solid #e5e7eb', borderRadius:6, minWidth: 200 }} />
+                <button onClick={async ()=>{ const id=archReportId.trim(); if (id) await openReportDetail(id); }} style={{ padding:'8px 12px', border:'1px solid #e5e7eb', borderRadius:6, background:'white' }}>Open Report</button>
+                <input placeholder="Feedback ID (e.g., FDB-1001)" value={archFeedbackId} onChange={e=>setArchFeedbackId(e.target.value)} onKeyDown={async (e)=>{ if (e.key==='Enter') { const id=archFeedbackId.trim(); if (id) await openFeedbackDetail(id); } }} style={{ padding:8, border:'1px solid #e5e7eb', borderRadius:6, minWidth: 200 }} />
+                <button onClick={async ()=>{ const id=archFeedbackId.trim(); if (id) await openFeedbackDetail(id); }} style={{ padding:'8px 12px', border:'1px solid #e5e7eb', borderRadius:6, background:'white' }}>Open Feedback</button>
+              </div>
+            </div>
+
+            {/* Detail overlays (read-only) */}
+            {repDetailOpen && (
+              <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.4)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:50 }} onClick={()=>{ setRepDetailOpen(false); setRepDetail(null); }}>
+                <div className="ui-card" style={{ width: 700, maxWidth: '90%', padding: 16 }} onClick={e=>e.stopPropagation()}>
+                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom: 8 }}>
+                    <div style={{ fontWeight: 800 }}>Report Detail</div>
+                    <button onClick={()=>{ setRepDetailOpen(false); setRepDetail(null); }} style={{ padding: 6, border:'1px solid #e5e7eb', borderRadius: 999, background:'white' }}>✕</button>
+                  </div>
+                  {!repDetail && <div style={{ color:'#6b7280' }}>Loading...</div>}
+                  {!!repDetail && (
+                    <div>
+                      <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>{repDetail.report.title}</div>
+                      <div style={{ fontSize: 12, color:'#6b7280', marginBottom: 8 }}>{repDetail.report.type} • {repDetail.report.severity || '—'} • {repDetail.report.status}</div>
+                      <div style={{ fontSize: 14, whiteSpace: 'pre-wrap' }}>{repDetail.report.description || 'No description.'}</div>
+                      <div style={{ marginTop: 16 }}>
+                        <div style={{ fontWeight: 700, marginBottom: 8 }}>Comments</div>
+                        <div style={{ display:'flex', flexDirection:'column', gap: 8, maxHeight: 220, overflow: 'auto' }}>
+                          {repDetail.comments.map(c => (
+                            <div key={c.comment_id} style={{ padding: 8, border: '1px solid #e5e7eb', borderRadius: 6 }}>
+                              <div style={{ fontSize: 12, color:'#6b7280', marginBottom: 4 }}>{c.author_role} • {new Date(c.created_at).toLocaleString()}</div>
+                              <div style={{ fontSize: 14 }}>{c.body}</div>
+                            </div>
+                          ))}
+                          {repDetail.comments.length === 0 && (<div style={{ color:'#6b7280' }}>No comments yet.</div>)}
+                        </div>
+                      </div>
+                      <div style={{ fontSize: 12, color:'#6b7280', marginTop: 8 }}>By {repDetail.report.created_by_role}:{repDetail.report.created_by_id}</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+            {fbDetailOpen && (
+              <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.4)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:50 }} onClick={()=>{ setFbDetailOpen(false); setFbDetail(null); }}>
+                <div className="ui-card" style={{ width: 600, maxWidth: '90%', padding: 16 }} onClick={e=>e.stopPropagation()}>
+                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom: 8 }}>
+                    <div style={{ fontWeight: 800 }}>Feedback Detail</div>
+                    <button onClick={()=>{ setFbDetailOpen(false); setFbDetail(null); }} style={{ padding: 6, border:'1px solid #e5e7eb', borderRadius: 999, background:'white' }}>✕</button>
+                  </div>
+                  {!fbDetail && <div style={{ color:'#6b7280' }}>Loading...</div>}
+                  {!!fbDetail && (
+                    <div>
+                      <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>{fbDetail.title}</div>
+                      <div style={{ fontSize: 12, color:'#6b7280', marginBottom: 8 }}>{fbDetail.kind} • {fbDetail.center_id || fbDetail.customer_id} • {new Date(fbDetail.created_at).toLocaleString()}</div>
+                      <div style={{ fontSize: 14, whiteSpace: 'pre-wrap' }}>{fbDetail.message || 'No message.'}</div>
+                      <div style={{ fontSize: 12, color:'#6b7280', marginTop: 8 }}>By {fbDetail.created_by_role}:{fbDetail.created_by_id}</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
 

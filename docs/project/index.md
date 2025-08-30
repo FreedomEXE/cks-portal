@@ -17,7 +17,8 @@ Welcome to the CKS Portal documentation. This directory contains all essential p
  - **[CENTER_HUB_SPEC.md](./CENTER_HUB_SPEC.md)** - Detailed Center hub spec (fields, behavior, API)
  - **[CENTER_QA_CHECKLIST.md](./CENTER_QA_CHECKLIST.md)** - QA checklist for Center hub MVP
  - **[COMMUNICATIONS_SPEC.md](./COMMUNICATIONS_SPEC.md)** - Shared News/Inbox/Support data shapes and API
- - **[API_ERRORS_AND_ENVELOPES.md](./API_ERRORS_AND_ENVELOPES.md)** - Standard response envelope and error codes
+- **[API_ERRORS_AND_ENVELOPES.md](./API_ERRORS_AND_ENVELOPES.md)** - Standard response envelope and error codes
+ - **[TODO.md](./TODO.md)** - Post‑MVP hardening roadmap (RBAC, types, validation, reorg)
 
 ### 📋 **Session Tracking** (`/docs/`)
 - **CURRENT SESSION YYYY-MM-DD.md** - Detailed session progress and handoff notes
@@ -40,16 +41,16 @@ Welcome to the CKS Portal documentation. This directory contains all essential p
 ## 🎯 Key Project Info
 
 ### **What We're Building**
-Role-based service delivery management system with 6 independent hubs (Admin, Manager, Contractor, Customer, Center, Crew).
+Role-based service delivery management system with 7 independent hubs (Admin, Manager, Contractor, Customer, Center, Crew, Warehouse).
 
 ### **Current Status** 
-~40-45% complete. Frontend hubs functional with template data. Backend integration and user creation system needed for MVP.
+~45-50% complete. Frontend hubs functional with template data. Warehouse hub scaffolded (Profile, Dashboard, Inventory, Orders, Shipments, Activity). Backend integration and user creation system needed for MVP.
 
 ### **MVP Goal**
 Fully functional app where Admin creates users → they immediately work → core business operations function end-to-end.
 
 ### **ID System**
-MGR-XXX, CON-XXX, CUS-XXX, CEN-XXX, CRW-XXX, ADM-XXX format determines login and hub access.
+MGR-XXX, CON-XXX, CUS-XXX, CEN-XXX, CRW-XXX, ADM-XXX, WH-XXX format determines login and hub access.
 
 ## 📚 Additional Resources
 

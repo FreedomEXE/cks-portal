@@ -5,6 +5,8 @@
 
 import express, { Request, Response } from 'express';
 import pool from '../../../../Database/db/pool';
+import { z } from 'zod';
+import { requirePermission } from '../../src/auth/rbac';
 
 const router = express.Router();
 
@@ -12,6 +14,38 @@ function getUserId(req: Request): string {
   const v = (req.headers['x-user-id'] || req.headers['x-manager-user-id'] || '').toString();
   return String(v || '');
 }
+
+// GET /api/manager/centers?code=MGR-001
+router.get('/centers', async (req: Request, res: Response) => {
+  try {
+    const code = String(req.query.code || getUserId(req) || '').toUpperCase();
+    if (!code) return res.status(400).json({ success: false, error: 'code required' });
+    const rows = (await pool.query(
+      `SELECT center_id AS id, center_name AS name FROM centers WHERE UPPER(cks_manager)=UPPER($1) ORDER BY center_name`,
+      [code]
+    )).rows;
+    return res.json({ success: true, data: rows });
+  } catch (error) {
+    console.error('[manager] centers list error', error);
+    return res.status(500).json({ success: false, error: 'server_error' });
+  }
+});
+
+// GET /api/manager/customers?code=MGR-001
+router.get('/customers', async (req: Request, res: Response) => {
+  try {
+    const code = String(req.query.code || getUserId(req) || '').toUpperCase();
+    if (!code) return res.status(400).json({ success: false, error: 'code required' });
+    const rows = (await pool.query(
+      `SELECT customer_id AS id, company_name AS name FROM customers WHERE UPPER(cks_manager)=UPPER($1) ORDER BY company_name`,
+      [code]
+    )).rows;
+    return res.json({ success: true, data: rows });
+  } catch (error) {
+    console.error('[manager] customers list error', error);
+    return res.status(500).json({ success: false, error: 'server_error' });
+  }
+});
 
 // GET /api/manager/profile
 router.get('/profile', async (req: Request, res: Response) => {
@@ -70,7 +104,29 @@ router.get('/requests', async (req: Request, res: Response) => {
       LIMIT 100
     `;
     const rows = (await pool.query(q, [statuses])).rows;
-    return res.json({ success: true, data: rows });
+
+    // Totals across all buckets for UI badges
+    const needsStatuses = ['contractor_approved', 'scheduling_pending'];
+    const progressStatuses = ['scheduled', 'in_progress'];
+    const archiveStatuses = ['completed', 'closed', 'cancelled'];
+    let totals = { needs_scheduling: 0, in_progress: 0, archive: 0 };
+    try {
+      const [n, p, a] = await Promise.all([
+        pool.query(`SELECT COUNT(*)::int AS c FROM orders o WHERE o.status = ANY($1)`, [needsStatuses]),
+        pool.query(`SELECT COUNT(*)::int AS c FROM orders o WHERE o.status = ANY($1)`, [progressStatuses]),
+        pool.query(`SELECT COUNT(*)::int AS c FROM orders o WHERE o.status = ANY($1)`, [archiveStatuses]),
+      ]);
+      totals = {
+        needs_scheduling: Number(n.rows?.[0]?.c ?? 0),
+        in_progress: Number(p.rows?.[0]?.c ?? 0),
+        archive: Number(a.rows?.[0]?.c ?? 0),
+      };
+    } catch (e) {
+      const approx = rows.length;
+      if (bucket === 'needs_scheduling') totals.needs_scheduling = approx; else if (bucket === 'in_progress') totals.in_progress = approx; else totals.archive = approx;
+    }
+
+    return res.json({ success: true, data: rows, totals });
   } catch (error) {
     console.error('Manager requests endpoint error:', error);
     return res.status(500).json({ success: false, error: 'Failed to fetch manager requests', error_code: 'server_error' });
@@ -79,13 +135,17 @@ router.get('/requests', async (req: Request, res: Response) => {
 
 // POST /api/manager/requests/:id/schedule
 // Body: { center_id, start, end }
-router.post('/requests/:id/schedule', async (req: Request, res: Response) => {
+const ScheduleSchema = z.object({
+  center_id: z.string().min(1),
+  start: z.string().min(1),
+  end: z.string().min(1)
+});
+router.post('/requests/:id/schedule', requirePermission('MANAGER_SCHEDULE'), async (req: Request, res: Response) => {
   const id = String(req.params.id);
-  const { center_id, start, end } = req.body || {};
+  const parsed = ScheduleSchema.safeParse(req.body || {});
   try {
-    if (!center_id || !start || !end) {
-      return res.status(400).json({ success: false, error: 'center_id, start, end are required', error_code: 'invalid_request' });
-    }
+    if (!parsed.success) return res.status(400).json({ success: false, error: 'Invalid request body', error_code: 'validation_error' });
+    const { center_id, start, end } = parsed.data;
     const jobId = `JOB-${Date.now().toString().slice(-6)}`;
     await pool.query('BEGIN');
     await pool.query(

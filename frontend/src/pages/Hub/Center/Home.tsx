@@ -58,9 +58,28 @@ export default function CenterHome() {
   const [ordersBucket, setOrdersBucket] = useState<'pending'|'approved'|'archive'>('pending');
   const [orders, setOrders] = useState<any[]>([]);
   const [orderCounts, setOrderCounts] = useState<{pending:number; approved:number; archive:number}>({ pending: 0, approved: 0, archive: 0 });
+  const [hasTotals, setHasTotals] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detail, setDetail] = useState<{ order: any; items: any[]; approvals: any[] } | null>(null);
+  // Reports & Feedback state
+  const [repTab, setRepTab] = useState<'reports'|'feedback'>('reports');
+  const [reports, setReports] = useState<any[]>([]);
+  const [feedback, setFeedback] = useState<any[]>([]);
+  const [reportsTotals, setReportsTotals] = useState<{open:number; in_progress:number; resolved:number; closed:number}>({ open: 0, in_progress: 0, resolved: 0, closed: 0 });
+  const [feedbackTotals, setFeedbackTotals] = useState<{praise:number; request:number; issue:number}>({ praise: 0, request: 0, issue: 0 });
+  const [repLoading, setRepLoading] = useState(false);
+  const [archReportId, setArchReportId] = useState('');
+  const [archFeedbackId, setArchFeedbackId] = useState('');
+  const [newReportOpen, setNewReportOpen] = useState(false);
+  const [newFeedbackOpen, setNewFeedbackOpen] = useState(false);
+  const [newReportForm, setNewReportForm] = useState<{ type:'incident'|'quality'|'service_issue'|'general'; severity:string; title:string; description:string }>({ type: 'service_issue', severity: '', title: '', description: '' });
+  const [newFeedbackForm, setNewFeedbackForm] = useState<{ kind:'praise'|'request'|'issue'; title:string; message:string }>({ kind: 'issue', title: '', message: '' });
+  const [repDetailOpen, setRepDetailOpen] = useState(false);
+  const [repDetail, setRepDetail] = useState<{ report:any; comments:any[] }|null>(null);
+  const [repComment, setRepComment] = useState('');
+  const [fbDetailOpen, setFbDetailOpen] = useState(false);
+  const [fbDetail, setFbDetail] = useState<any|null>(null);
   
   // Get center code and name from profile data
   const session = getCenterSession();
@@ -144,7 +163,20 @@ export default function CenterHome() {
         const res = await centerApiFetch(url);
         const json = await res.json();
         const data = Array.isArray(json?.data) ? json.data : [];
-        if (!cancelled) setOrders(data);
+        if (!cancelled) {
+          setOrders(data);
+          if (json && json.totals && typeof json.totals === 'object') {
+            const t = json.totals as { pending?: number; approved?: number; archive?: number };
+            setOrderCounts({
+              pending: Number(t.pending ?? 0),
+              approved: Number(t.approved ?? 0),
+              archive: Number(t.archive ?? 0),
+            });
+            setHasTotals(true);
+          } else {
+            setHasTotals(false);
+          }
+        }
       } catch {
         if (!cancelled) setOrders([]);
       }
@@ -155,6 +187,7 @@ export default function CenterHome() {
   // Fetch counts for buckets
   useEffect(() => {
     if (activeSection !== 'orders') return;
+    if (hasTotals) return; // backend provided totals; skip approximation fetches
     let cancelled = false;
     (async () => {
       try {
@@ -167,7 +200,7 @@ export default function CenterHome() {
       } catch { /* ignore */ }
     })();
     return () => { cancelled = true; };
-  }, [activeSection, code]);
+  }, [activeSection, code, hasTotals]);
 
   async function openOrderDetail(orderId: string) {
     try {
@@ -182,6 +215,109 @@ export default function CenterHome() {
     } finally { setDetailLoading(false); }
   }
   function closeDetail() { setDetailOpen(false); setDetail(null); }
+
+  // Fetch reports/feedback for the center when viewing Reports section
+  useEffect(() => {
+    if (activeSection !== 'reports') return;
+    let cancelled = false;
+    (async () => {
+      try {
+        setRepLoading(true);
+        const base = (import.meta.env.VITE_API_URL?.replace(/\/$/, '') || '/api');
+        if (repTab === 'reports') {
+          const r = await fetch(`${base}/reports?center_id=${encodeURIComponent(code)}&limit=25`, { credentials: 'include' });
+          const j = await r.json();
+          if (!cancelled) {
+            setReports(Array.isArray(j?.data) ? j.data : []);
+            const t = j?.totals || {};
+            setReportsTotals({
+              open: Number(t.open || 0),
+              in_progress: Number(t.in_progress || 0),
+              resolved: Number(t.resolved || 0),
+              closed: Number(t.closed || 0),
+            });
+          }
+        } else {
+          const r = await fetch(`${base}/feedback?center_id=${encodeURIComponent(code)}&limit=25`, { credentials: 'include' });
+          const j = await r.json();
+          if (!cancelled) {
+            setFeedback(Array.isArray(j?.data) ? j.data : []);
+            const t = j?.totals || {};
+            setFeedbackTotals({
+              praise: Number(t.praise || 0),
+              request: Number(t.request || 0),
+              issue: Number(t.issue || 0),
+            });
+          }
+        }
+      } finally { if (!cancelled) setRepLoading(false); }
+    })();
+    return () => { cancelled = true; };
+  }, [activeSection, repTab, code]);
+
+  async function submitNewReport() {
+    try {
+      const base = (import.meta.env.VITE_API_URL?.replace(/\/$/, '') || '/api');
+      const res = await fetch(`${base}/reports`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-user-role': 'center' },
+        credentials: 'include',
+        body: JSON.stringify({ center_id: code, ...newReportForm }),
+      });
+      if (!res.ok) throw new Error('Create report failed');
+      setNewReportOpen(false);
+      setNewReportForm({ type: 'service_issue', severity: '', title: '', description: '' });
+      // refresh list by toggling tab
+      setRepTab('reports');
+    } catch (e) { alert((e as Error).message); }
+  }
+
+  async function submitNewFeedback() {
+    try {
+      const base = (import.meta.env.VITE_API_URL?.replace(/\/$/, '') || '/api');
+      const res = await fetch(`${base}/feedback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-user-role': 'center' },
+        credentials: 'include',
+        body: JSON.stringify({ center_id: code, ...newFeedbackForm }),
+      });
+      if (!res.ok) throw new Error('Create feedback failed');
+      setNewFeedbackOpen(false);
+      setNewFeedbackForm({ kind: 'issue', title: '', message: '' });
+      setRepTab('feedback');
+    } catch (e) { alert((e as Error).message); }
+  }
+
+  async function openReportDetail(id: string) {
+    try {
+      setRepDetailOpen(true);
+      setRepDetail(null);
+      const base = (import.meta.env.VITE_API_URL?.replace(/\/$/, '') || '/api');
+      const r = await fetch(`${base}/reports/${encodeURIComponent(id)}`, { credentials: 'include' });
+      const j = await r.json();
+      if (j?.success) setRepDetail(j.data);
+    } catch { setRepDetail(null); }
+  }
+  function closeReportDetail() { setRepDetailOpen(false); setRepDetail(null); setRepComment(''); }
+  async function addCenterComment() {
+    if (!repDetail?.report?.report_id || !repComment.trim()) return;
+    const base = (import.meta.env.VITE_API_URL?.replace(/\/$/, '') || '/api');
+    const r = await fetch(`${base}/reports/${repDetail.report.report_id}/comments`, {
+      method: 'POST', headers: { 'Content-Type':'application/json', 'x-user-role':'center' }, credentials:'include',
+      body: JSON.stringify({ body: repComment.trim() })
+    });
+    if (r.ok) { setRepComment(''); await openReportDetail(repDetail.report.report_id); }
+  }
+  async function openFeedbackDetail(id: string) {
+    try {
+      setFbDetailOpen(true);
+      setFbDetail(null);
+      const base = (import.meta.env.VITE_API_URL?.replace(/\/$/, '') || '/api');
+      const r = await fetch(`${base}/feedback/${encodeURIComponent(id)}`, { credentials: 'include' });
+      const j = await r.json();
+      if (j?.success) setFbDetail(j.data);
+    } catch { setFbDetail(null); }
+  }
 
   const base = `/${username}/hub`;
 
@@ -517,8 +653,6 @@ export default function CenterHome() {
         const profileTabs = [
           'Center Information',
           'Account Manager',
-          'Service Information',
-          'Management',
           'Operations',
           'Settings'
         ];
@@ -730,31 +864,6 @@ export default function CenterHome() {
                 
                 {profileTab === 2 && (
                   <div>
-                    <div className="title" style={{ marginBottom: 20, color: '#f97316' }}>Management</div>
-                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                      <tbody>
-                        {[
-                          ['Manager ID (CKS)', 'Not Assigned'],
-                          ['Supervisor ID (Crew Lead)', 'Not Assigned'],
-                          ['Contractor ID', 'Not Assigned'],
-                          ['Customer ID', 'Not Assigned']
-                        ].map(([label, value]) => (
-                          <tr key={label} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                            <td style={{ padding: '12px 0', fontWeight: 600, color: '#374151', width: '40%' }}>
-                              {label}:
-                            </td>
-                            <td style={{ padding: '12px 0', color: '#6b7280' }}>
-                              {value}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-                
-                {profileTab === 3 && (
-                  <div>
                     <div className="title" style={{ marginBottom: 20, color: '#f97316' }}>Operations</div>
                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                       <tbody>
@@ -777,7 +886,7 @@ export default function CenterHome() {
                   </div>
                 )}
                 
-                {profileTab === 4 && (
+                {profileTab === 3 && (
                   <div>
                     <div className="title" style={{ marginBottom: 20, color: '#f97316' }}>Settings</div>
                     <div style={{ color: '#6b7280', padding: 20, textAlign: 'center' }}>
@@ -871,14 +980,157 @@ export default function CenterHome() {
 
       case 'reports':
         return (
+          <>
           <div style={{ animation: 'fadeIn .12s ease-out' }}>
-            <div className="ui-card">
-              <div className="title" style={{ marginBottom: 16, color: '#f97316' }}>Reports & Analytics</div>
-              <div style={{ color: '#6b7280' }}>
-                Performance reports, analytics, and data insights coming soon.
+            <div className="title" style={{ marginBottom: 12, color: '#f97316', display: 'flex', alignItems: 'center', gap: 8 }}>
+              Reports & Feedback
+              <div style={{ display: 'inline-flex', gap: 8, marginLeft: 12 }}>
+                <button onClick={()=>setRepTab('reports')} style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid #e5e7eb', background: repTab==='reports'?'#f97316':'white', color: repTab==='reports'?'white':'#111827', fontSize: 12, fontWeight: 700 }}>Reports</button>
+                <button onClick={()=>setRepTab('feedback')} style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid #e5e7eb', background: repTab==='feedback'?'#f97316':'white', color: repTab==='feedback'?'white':'#111827', fontSize: 12, fontWeight: 700 }}>Feedback</button>
               </div>
             </div>
+
+            {repTab==='reports' ? (
+              <div>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                  {[
+                    { k:'open', label:'Open', v: reportsTotals.open },
+                    { k:'in_progress', label:'In Progress', v: reportsTotals.in_progress },
+                    { k:'resolved', label:'Resolved', v: reportsTotals.resolved },
+                    { k:'closed', label:'Closed', v: reportsTotals.closed },
+                  ].map(({k,label,v}) => (
+                    <span key={k} style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 999, padding: '6px 10px', fontSize: 12, fontWeight: 700 }}>{label}: {v}</span>
+                  ))}
+                  <button onClick={()=>setNewReportOpen(o=>!o)} style={{ marginLeft: 'auto', padding: '6px 10px', borderRadius: 8, border: '1px solid #e5e7eb', background: 'white', fontSize: 12, fontWeight: 700 }}>New Report</button>
+                </div>
+
+                {newReportOpen && (
+                  <div className="ui-card" style={{ padding: 12, marginBottom: 12 }}>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <select value={newReportForm.type} onChange={e=>setNewReportForm(f=>({...f, type: e.target.value as any}))} style={{ padding: 8, border: '1px solid #e5e7eb', borderRadius: 6 }}>
+                        <option value="service_issue">Service Issue</option>
+                        <option value="incident">Incident</option>
+                        <option value="quality">Quality</option>
+                        <option value="general">General</option>
+                      </select>
+                      <input placeholder="Severity (optional)" value={newReportForm.severity} onChange={e=>setNewReportForm(f=>({...f, severity: e.target.value}))} style={{ padding: 8, border: '1px solid #e5e7eb', borderRadius: 6, flex: 1, minWidth: 160 }} />
+                      <input placeholder="Title" value={newReportForm.title} onChange={e=>setNewReportForm(f=>({...f, title: e.target.value}))} style={{ padding: 8, border: '1px solid #e5e7eb', borderRadius: 6, flex: 2, minWidth: 220 }} />
+                    </div>
+                    <textarea placeholder="Description" value={newReportForm.description} onChange={e=>setNewReportForm(f=>({...f, description: e.target.value}))} style={{ marginTop: 8, width: '100%', padding: 8, border: '1px solid #e5e7eb', borderRadius: 6 }} />
+                    <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
+                      <button onClick={submitNewReport} style={{ padding: '8px 12px', borderRadius: 6, background: '#f97316', color: 'white', border: '1px solid #ea580c', fontWeight: 700 }}>Submit</button>
+                      <button onClick={()=>setNewReportOpen(false)} style={{ padding: '8px 12px', borderRadius: 6, border: '1px solid #e5e7eb', background: 'white' }}>Cancel</button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="ui-card" style={{ padding: 0, overflow: 'hidden' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: '#f9fafb' }}>
+                        <th style={{ padding: 10, textAlign: 'left', fontSize: 12 }}>Title</th>
+                        <th style={{ padding: 10, textAlign: 'left', fontSize: 12 }}>Type</th>
+                        <th style={{ padding: 10, textAlign: 'left', fontSize: 12 }}>Severity</th>
+                        <th style={{ padding: 10, textAlign: 'left', fontSize: 12 }}>Status</th>
+                        <th style={{ padding: 10, textAlign: 'left', fontSize: 12 }}>By</th>
+                        <th style={{ padding: 10, textAlign: 'left', fontSize: 12 }}>Created</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {repLoading && (
+                        <tr><td colSpan={6} style={{ padding: 16 }}>Loading...</td></tr>
+                      )}
+                      {!repLoading && reports.map((r: any, i: number) => (
+                        <tr key={r.report_id} onClick={()=>openReportDetail(r.report_id)} style={{ cursor:'pointer', borderBottom: i < reports.length - 1 ? '1px solid #e5e7eb' : 'none' }}>
+                          <td style={{ padding: 10, fontWeight: 600 }}>{r.title}</td>
+                          <td style={{ padding: 10 }}>{r.type}</td>
+                          <td style={{ padding: 10 }}>{r.severity || '—'}</td>
+                          <td style={{ padding: 10 }}>{r.status}</td>
+                          <td style={{ padding: 10, fontSize: 12, color: '#6b7280' }}>{r.created_by_role}:{r.created_by_id}</td>
+                          <td style={{ padding: 10 }}>{new Date(r.created_at).toLocaleString()}</td>
+                        </tr>
+                      ))}
+                      {!repLoading && reports.length === 0 && (
+                        <tr><td colSpan={6} style={{ padding: 16, color: '#6b7280' }}>No reports yet.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                  {[
+                    { k:'praise', label:'Praise', v: feedbackTotals.praise },
+                    { k:'request', label:'Requests', v: feedbackTotals.request },
+                    { k:'issue', label:'Issues', v: feedbackTotals.issue },
+                  ].map(({k,label,v}) => (
+                    <span key={k} style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 999, padding: '6px 10px', fontSize: 12, fontWeight: 700 }}>{label}: {v}</span>
+                  ))}
+                  <button onClick={()=>setNewFeedbackOpen(o=>!o)} style={{ marginLeft: 'auto', padding: '6px 10px', borderRadius: 8, border: '1px solid #e5e7eb', background: 'white', fontSize: 12, fontWeight: 700 }}>New Feedback</button>
+                </div>
+
+                {newFeedbackOpen && (
+                  <div className="ui-card" style={{ padding: 12, marginBottom: 12 }}>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <select value={newFeedbackForm.kind} onChange={e=>setNewFeedbackForm(f=>({...f, kind: e.target.value as any}))} style={{ padding: 8, border: '1px solid #e5e7eb', borderRadius: 6 }}>
+                        <option value="praise">Praise</option>
+                        <option value="request">Request</option>
+                        <option value="issue">Issue</option>
+                      </select>
+                      <input placeholder="Title" value={newFeedbackForm.title} onChange={e=>setNewFeedbackForm(f=>({...f, title: e.target.value}))} style={{ padding: 8, border: '1px solid #e5e7eb', borderRadius: 6, flex: 2, minWidth: 220 }} />
+                    </div>
+                    <textarea placeholder="Message" value={newFeedbackForm.message} onChange={e=>setNewFeedbackForm(f=>({...f, message: e.target.value}))} style={{ marginTop: 8, width: '100%', padding: 8, border: '1px solid #e5e7eb', borderRadius: 6 }} />
+                    <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
+                      <button onClick={submitNewFeedback} style={{ padding: '8px 12px', borderRadius: 6, background: '#f97316', color: 'white', border: '1px solid #ea580c', fontWeight: 700 }}>Submit</button>
+                      <button onClick={()=>setNewFeedbackOpen(false)} style={{ padding: '8px 12px', borderRadius: 6, border: '1px solid #e5e7eb', background: 'white' }}>Cancel</button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="ui-card" style={{ padding: 0, overflow: 'hidden' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: '#f9fafb' }}>
+                        <th style={{ padding: 10, textAlign: 'left', fontSize: 12 }}>Title</th>
+                        <th style={{ padding: 10, textAlign: 'left', fontSize: 12 }}>Kind</th>
+                        <th style={{ padding: 10, textAlign: 'left', fontSize: 12 }}>By</th>
+                        <th style={{ padding: 10, textAlign: 'left', fontSize: 12 }}>Created</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {repLoading && (
+                        <tr><td colSpan={4} style={{ padding: 16 }}>Loading...</td></tr>
+                      )}
+                      {!repLoading && feedback.map((f: any, i: number) => (
+                        <tr key={f.feedback_id} onClick={()=>openFeedbackDetail(f.feedback_id)} style={{ cursor:'pointer', borderBottom: i < feedback.length - 1 ? '1px solid #e5e7eb' : 'none' }}>
+                          <td style={{ padding: 10, fontWeight: 600 }}>{f.title}</td>
+                          <td style={{ padding: 10 }}>{f.kind}</td>
+                          <td style={{ padding: 10, fontSize: 12, color: '#6b7280' }}>{f.created_by_role}:{f.created_by_id}</td>
+                          <td style={{ padding: 10 }}>{new Date(f.created_at).toLocaleString()}</td>
+                        </tr>
+                      ))}
+                      {!repLoading && feedback.length === 0 && (
+                        <tr><td colSpan={4} style={{ padding: 16, color: '#6b7280' }}>No feedback yet.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
+          
+          {/* Archive - Open by ID */}
+          <div className="ui-card" style={{ padding: 12, marginTop: 12 }}>
+            <div style={{ fontWeight: 700, marginBottom: 8 }}>Archive Search</div>
+            <div style={{ display:'flex', gap: 8, flexWrap:'wrap', alignItems:'center' }}>
+              <input placeholder="Report ID (e.g., RPT-1001)" value={archReportId} onChange={e=>setArchReportId(e.target.value)} onKeyDown={async (e)=>{ if (e.key==='Enter') { const id=archReportId.trim(); if (id) await openReportDetail(id); } }} style={{ padding:8, border:'1px solid #e5e7eb', borderRadius:6, minWidth: 200 }} />
+              <button onClick={async ()=>{ const id=archReportId.trim(); if (id) await openReportDetail(id); }} style={{ padding:'8px 12px', border:'1px solid #e5e7eb', borderRadius:6, background:'white' }}>Open Report</button>
+              <input placeholder="Feedback ID (e.g., FDB-1001)" value={archFeedbackId} onChange={e=>setArchFeedbackId(e.target.value)} onKeyDown={async (e)=>{ if (e.key==='Enter') { const id=archFeedbackId.trim(); if (id) await openFeedbackDetail(id); } }} style={{ padding:8, border:'1px solid #e5e7eb', borderRadius:6, minWidth: 200 }} />
+              <button onClick={async ()=>{ const id=archFeedbackId.trim(); if (id) await openFeedbackDetail(id); }} style={{ padding:'8px 12px', border:'1px solid #e5e7eb', borderRadius:6, background:'white' }}>Open Feedback</button>
+            </div>
+          </div>
+          </>
         );
 
       case 'support':
@@ -941,8 +1193,8 @@ export default function CenterHome() {
           { key: 'dashboard', label: 'Dashboard' },
           { key: 'profile', label: 'Profile' },
           { key: 'services', label: 'Services' },
-          { key: 'orders', label: 'Orders' },
           { key: 'crew', label: 'Crew' },
+          { key: 'orders', label: 'Orders' },
           { key: 'reports', label: 'Reports' },
           { key: 'support', label: 'Support' }
         ] as const).map((tab) => (
@@ -1017,6 +1269,68 @@ export default function CenterHome() {
                   </div>
                 </div>
               </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Report detail overlay */}
+      {repDetailOpen && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.4)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:50 }} onClick={closeReportDetail}>
+          <div className="ui-card" style={{ width: 720, maxWidth: '90%', padding: 16 }} onClick={e=>e.stopPropagation()}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom: 8 }}>
+              <div style={{ fontWeight: 800 }}>Report Detail</div>
+              <button onClick={closeReportDetail} style={{ padding: 6, border:'1px solid #e5e7eb', borderRadius: 999, background:'white' }}>✕</button>
+            </div>
+            {!repDetail && <div style={{ color:'#6b7280' }}>Loading...</div>}
+            {!!repDetail && (
+              <div style={{ display:'grid', gridTemplateColumns: '1fr 320px', gap: 16 }}>
+                <div>
+                  <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>{repDetail.report.title}</div>
+                  <div style={{ fontSize: 12, color:'#6b7280', marginBottom: 8 }}>{repDetail.report.type} • {repDetail.report.severity || '—'} • {repDetail.report.status}</div>
+                  <div style={{ fontSize: 14, whiteSpace: 'pre-wrap' }}>{repDetail.report.description || 'No description.'}</div>
+                  <div style={{ marginTop: 16 }}>
+                    <div style={{ fontWeight: 700, marginBottom: 8 }}>Comments</div>
+                    <div style={{ display:'flex', flexDirection:'column', gap: 8, maxHeight: 220, overflow: 'auto' }}>
+                      {repDetail.comments.map(c => (
+                        <div key={c.comment_id} style={{ padding: 8, border: '1px solid #e5e7eb', borderRadius: 6 }}>
+                          <div style={{ fontSize: 12, color:'#6b7280', marginBottom: 4 }}>{c.author_role} • {new Date(c.created_at).toLocaleString()}</div>
+                          <div style={{ fontSize: 14 }}>{c.body}</div>
+                        </div>
+                      ))}
+                      {repDetail.comments.length === 0 && (<div style={{ color:'#6b7280' }}>No comments yet.</div>)}
+                    </div>
+                    <div style={{ display:'flex', gap: 8, marginTop: 8 }}>
+                      <input placeholder="Add a comment" value={repComment} onChange={e=>setRepComment(e.target.value)} style={{ flex:1, padding:8, border:'1px solid #e5e7eb', borderRadius:6 }} />
+                      <button onClick={addCenterComment} style={{ padding:'8px 12px', borderRadius:6, background:'#f97316', color:'white', border:'1px solid #ea580c', fontWeight:700 }}>Post</button>
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 12, color:'#6b7280' }}>By {repDetail.report.created_by_role}:{repDetail.report.created_by_id}</div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Feedback detail overlay */}
+      {fbDetailOpen && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.4)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:50 }} onClick={()=>{ setFbDetailOpen(false); setFbDetail(null); }}>
+          <div className="ui-card" style={{ width: 600, maxWidth: '90%', padding: 16 }} onClick={e=>e.stopPropagation()}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom: 8 }}>
+              <div style={{ fontWeight: 800 }}>Feedback Detail</div>
+              <button onClick={()=>{ setFbDetailOpen(false); setFbDetail(null); }} style={{ padding: 6, border:'1px solid #e5e7eb', borderRadius: 999, background:'white' }}>✕</button>
+            </div>
+            {!fbDetail && <div style={{ color:'#6b7280' }}>Loading...</div>}
+            {!!fbDetail && (
+              <div>
+                <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>{fbDetail.title}</div>
+                <div style={{ fontSize: 12, color:'#6b7280', marginBottom: 8 }}>{fbDetail.kind} • {fbDetail.center_id || fbDetail.customer_id} • {new Date(fbDetail.created_at).toLocaleString()}</div>
+                <div style={{ fontSize: 14, whiteSpace: 'pre-wrap' }}>{fbDetail.message || 'No message.'}</div>
+                <div style={{ fontSize: 12, color:'#6b7280', marginTop: 8 }}>By {fbDetail.created_by_role}:{fbDetail.created_by_id}</div>
+              </div>
             )}
           </div>
         </div>

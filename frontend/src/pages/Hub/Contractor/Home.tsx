@@ -60,6 +60,19 @@ export default function ContractorHome() {
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detail, setDetail] = useState<{ order: any; items: any[]; approvals: any[] } | null>(null);
+  // Reports viewer
+  const [repTab, setRepTab] = useState<'reports'|'feedback'>('reports');
+  const [reports, setReports] = useState<any[]>([]);
+  const [feedback, setFeedback] = useState<any[]>([]);
+  const [reportsTotals, setReportsTotals] = useState<any>({});
+  const [feedbackTotals, setFeedbackTotals] = useState<any>({});
+  const [repLoading, setRepLoading] = useState(false);
+  const [archReportId, setArchReportId] = useState('');
+  const [archFeedbackId, setArchFeedbackId] = useState('');
+  const [repDetailOpen, setRepDetailOpen] = useState(false);
+  const [repDetail, setRepDetail] = useState<any>(null);
+  const [fbDetailOpen, setFbDetailOpen] = useState(false);
+  const [fbDetail, setFbDetail] = useState<any>(null);
   
   // Get contractor code and company name from profile data
   const session = getContractorSession();
@@ -154,6 +167,38 @@ export default function ContractorHome() {
     return () => { cancelled = true; };
   }, [activeSection, reqBucket]);
 
+  // Fetch reports/feedback when in Reports section
+  useEffect(() => {
+    if (activeSection !== 'reports') return;
+    let cancelled = false;
+    (async () => {
+      try {
+        setRepLoading(true);
+        const base = (import.meta.env.VITE_API_URL?.replace(/\/$/, '') || '/api');
+        
+        if (repTab === 'reports') {
+          const r = await fetch(`${base}/reports?limit=50`, { credentials: 'include' });
+          const j = await r.json();
+          if (!cancelled) {
+            setReports(Array.isArray(j?.data) ? j.data : []);
+            setReportsTotals(j?.totalsByStatus || {});
+          }
+        } else {
+          const r = await fetch(`${base}/feedback?limit=50`, { credentials: 'include' });
+          const j = await r.json();
+          if (!cancelled) {
+            setFeedback(Array.isArray(j?.data) ? j.data : []);
+            setFeedbackTotals(j?.totalsByKind || {});
+          }
+        }
+      } catch {}
+      finally {
+        if (!cancelled) setRepLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [activeSection, repTab]);
+
   async function approve(id: string) {
     try {
       setActionLoading(id);
@@ -201,6 +246,40 @@ export default function ContractorHome() {
     }
   }
   function closeDetail() { setDetailOpen(false); setDetail(null); }
+
+  // Report detail functions
+  async function openReportDetail(reportId: string) {
+    try {
+      setRepDetailOpen(true);
+      setRepDetail(null);
+      const base = import.meta.env.VITE_API_URL?.replace(/\/$/, '') || '/api';
+      const res = await fetch(`${base}/reports/${reportId}`, { credentials: 'include' });
+      const json = await res.json();
+      if (!res.ok || !json?.success) throw new Error(json?.error || 'Failed to load report');
+      setRepDetail(json.data || null);
+    } catch (e) {
+      console.error('Error loading report:', e);
+      setRepDetail(null);
+    }
+  }
+  function closeReportDetail() { setRepDetailOpen(false); setRepDetail(null); }
+
+  // Feedback detail functions
+  async function openFeedbackDetail(feedbackId: string) {
+    try {
+      setFbDetailOpen(true);
+      setFbDetail(null);
+      const base = import.meta.env.VITE_API_URL?.replace(/\/$/, '') || '/api';
+      const res = await fetch(`${base}/feedback/${feedbackId}`, { credentials: 'include' });
+      const json = await res.json();
+      if (!res.ok || !json?.success) throw new Error(json?.error || 'Failed to load feedback');
+      setFbDetail(json.data || null);
+    } catch (e) {
+      console.error('Error loading feedback:', e);
+      setFbDetail(null);
+    }
+  }
+  function closeFeedbackDetail() { setFbDetailOpen(false); setFbDetail(null); }
 
   // Loading state
   if (state.loading) {
@@ -292,8 +371,8 @@ export default function ContractorHome() {
           { key: 'customers' as ContractorSection, label: 'My Customers' },
           { key: 'centers' as ContractorSection, label: 'My Centers' },
           { key: 'crew' as ContractorSection, label: 'My Crew' },
-          { key: 'reports' as ContractorSection, label: 'Reports' },
           { key: 'orders' as ContractorSection, label: 'Orders' },
+          { key: 'reports' as ContractorSection, label: 'Reports' },
           { key: 'support' as ContractorSection, label: 'Support' }
         ].map(section => (
           <button
@@ -476,63 +555,6 @@ export default function ContractorHome() {
           </div>
         )}
 
-        {/* ORDERS / APPROVALS SECTION */}
-        {activeSection === 'orders' && (
-          <div>
-            <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 12 }}>Requests</h2>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-              {(['pending','approved','archive'] as const).map(b => (
-                <button key={b} onClick={() => setReqBucket(b)} style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #e5e7eb', background: reqBucket===b? '#111827':'white', color: reqBucket===b? 'white':'#111827', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
-                  {b === 'pending' ? 'Pending Approvals' : b === 'approved' ? 'Approved' : 'Archive'}
-                </button>
-              ))}
-            </div>
-            <div className="ui-card" style={{ padding: 0, overflow: 'hidden' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ background: '#f9fafb' }}>
-                    <th style={{ padding: 10, textAlign: 'left', fontSize: 12 }}>Order ID</th>
-                    <th style={{ padding: 10, textAlign: 'left', fontSize: 12 }}>Customer</th>
-                    <th style={{ padding: 10, textAlign: 'left', fontSize: 12 }}>Center</th>
-                    <th style={{ padding: 10, textAlign: 'left', fontSize: 12 }}>Items</th>
-                    <th style={{ padding: 10, textAlign: 'left', fontSize: 12 }}>Services</th>
-                    <th style={{ padding: 10, textAlign: 'left', fontSize: 12 }}>Products</th>
-                    <th style={{ padding: 10, textAlign: 'left', fontSize: 12 }}>Status</th>
-                    <th style={{ padding: 10, textAlign: 'left', fontSize: 12 }}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {requests.map((o, i) => (
-                    <tr key={o.order_id} style={{ borderBottom: i < requests.length - 1 ? '1px solid #e5e7eb' : 'none' }}>
-                      <td style={{ padding: 10, fontFamily: 'ui-monospace' }}>{o.order_id}</td>
-                      <td style={{ padding: 10 }}>{o.customer_id || '—'}</td>
-                      <td style={{ padding: 10 }}>{o.center_id || '—'}</td>
-                      <td style={{ padding: 10 }}>{o.item_count ?? 0}</td>
-                      <td style={{ padding: 10 }}>{o.service_count ?? 0}</td>
-                      <td style={{ padding: 10 }}>{o.product_count ?? 0}</td>
-                      <td style={{ padding: 10 }}>{o.status}</td>
-                      <td style={{ padding: 10 }}>
-                        {reqBucket === 'pending' ? (
-                          <div style={{ display: 'flex', gap: 8 }}>
-                            <button disabled={actionLoading===o.order_id} onClick={() => approve(o.order_id)} style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #e5e7eb', background: '#10b981', color: 'white', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Approve</button>
-                            <button disabled={actionLoading===o.order_id} onClick={() => deny(o.order_id)} style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #e5e7eb', background: '#ef4444', color: 'white', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Deny</button>
-                          </div>
-                        ) : (
-                          <span style={{ fontSize: 12, color: '#6b7280' }}>—</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                  {requests.length === 0 && (
-                    <tr>
-                      <td colSpan={8} style={{ padding: 16, color: '#6b7280' }}>No requests in this bucket.</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
 
         {/* ORDERS / APPROVALS SECTION */}
         {activeSection === 'orders' && (
@@ -827,16 +849,175 @@ export default function ContractorHome() {
 
         {/* REPORTS SECTION */}
         {activeSection === 'reports' && (
-          <div>
-            <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Reports</h2>
-            <div className="ui-card" style={{ padding: 16 }}>
-              <div style={{ textAlign: 'center', padding: 40, color: '#6b7280' }}>
-                Contractor report dashboard and communication center will be implemented here.<br/>
-                This will handle center reports, crew communications, and contractor responses.<br/>
-                Inter-hub communication and reporting functionality.
+          <>
+          <div style={{ animation: 'fadeIn .12s ease-out' }}>
+            <div className="title" style={{ marginBottom: 12, color: '#10b981', display: 'flex', alignItems: 'center', gap: 8 }}>
+              Reports & Feedback
+              <div style={{ display: 'inline-flex', gap: 8, marginLeft: 12 }}>
+                <button onClick={() => setRepTab('reports')} style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid #e5e7eb', background: repTab === 'reports' ? '#10b981' : 'white', color: repTab === 'reports' ? 'white' : '#111827', fontSize: 12, fontWeight: 700 }}>Reports</button>
+                <button onClick={() => setRepTab('feedback')} style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid #e5e7eb', background: repTab === 'feedback' ? '#10b981' : 'white', color: repTab === 'feedback' ? 'white' : '#111827', fontSize: 12, fontWeight: 700 }}>Feedback</button>
               </div>
             </div>
+
+            {repTab === 'reports' ? (
+              <div>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                  {[
+                    { k: 'open', label: 'Open', v: reportsTotals.open },
+                    { k: 'in_progress', label: 'In Progress', v: reportsTotals.in_progress },
+                    { k: 'resolved', label: 'Resolved', v: reportsTotals.resolved },
+                    { k: 'closed', label: 'Closed', v: reportsTotals.closed },
+                  ].map(({ k, label, v }) => (
+                    <span key={k} style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 999, padding: '6px 10px', fontSize: 12, fontWeight: 700 }}>{label}: {v}</span>
+                  ))}
+                </div>
+
+                <div className="ui-card" style={{ padding: 0, overflow: 'hidden' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: '#f9fafb' }}>
+                        <th style={{ padding: 10, textAlign: 'left', fontSize: 12 }}>Title</th>
+                        <th style={{ padding: 10, textAlign: 'left', fontSize: 12 }}>Type</th>
+                        <th style={{ padding: 10, textAlign: 'left', fontSize: 12 }}>Severity</th>
+                        <th style={{ padding: 10, textAlign: 'left', fontSize: 12 }}>Status</th>
+                        <th style={{ padding: 10, textAlign: 'left', fontSize: 12 }}>By</th>
+                        <th style={{ padding: 10, textAlign: 'left', fontSize: 12 }}>Created</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {repLoading && (
+                        <tr><td colSpan={6} style={{ padding: 16 }}>Loading...</td></tr>
+                      )}
+                      {!repLoading && reports.map((r, i) => (
+                        <tr key={r.report_id} onClick={() => openReportDetail(r.report_id)} style={{ cursor: 'pointer', borderBottom: i < reports.length - 1 ? '1px solid #e5e7eb' : 'none' }}>
+                          <td style={{ padding: 10, fontWeight: 600 }}>{r.title}</td>
+                          <td style={{ padding: 10 }}>{r.type}</td>
+                          <td style={{ padding: 10 }}>{r.severity || '—'}</td>
+                          <td style={{ padding: 10 }}>{r.status}</td>
+                          <td style={{ padding: 10, fontSize: 12, color: '#6b7280' }}>{r.created_by_role}:{r.created_by_id}</td>
+                          <td style={{ padding: 10 }}>{new Date(r.created_at).toLocaleString()}</td>
+                        </tr>
+                      ))}
+                      {!repLoading && reports.length === 0 && (
+                        <tr><td colSpan={6} style={{ padding: 16, color: '#6b7280' }}>No reports yet.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                  {[
+                    { k: 'praise', label: 'Praise', v: feedbackTotals.praise },
+                    { k: 'request', label: 'Requests', v: feedbackTotals.request },
+                    { k: 'issue', label: 'Issues', v: feedbackTotals.issue },
+                  ].map(({ k, label, v }) => (
+                    <span key={k} style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 999, padding: '6px 10px', fontSize: 12, fontWeight: 700 }}>{label}: {v}</span>
+                  ))}
+                </div>
+
+                <div className="ui-card" style={{ padding: 0, overflow: 'hidden' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: '#f9fafb' }}>
+                        <th style={{ padding: 10, textAlign: 'left', fontSize: 12 }}>Title</th>
+                        <th style={{ padding: 10, textAlign: 'left', fontSize: 12 }}>Kind</th>
+                        <th style={{ padding: 10, textAlign: 'left', fontSize: 12 }}>By</th>
+                        <th style={{ padding: 10, textAlign: 'left', fontSize: 12 }}>Created</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {repLoading && (
+                        <tr><td colSpan={4} style={{ padding: 16 }}>Loading...</td></tr>
+                      )}
+                      {!repLoading && feedback.map((f, i) => (
+                        <tr key={f.feedback_id} onClick={() => openFeedbackDetail(f.feedback_id)} style={{ cursor: 'pointer', borderBottom: i < feedback.length - 1 ? '1px solid #e5e7eb' : 'none' }}>
+                          <td style={{ padding: 10, fontWeight: 600 }}>{f.title}</td>
+                          <td style={{ padding: 10 }}>{f.kind}</td>
+                          <td style={{ padding: 10, fontSize: 12, color: '#6b7280' }}>{f.created_by_role}:{f.created_by_id}</td>
+                          <td style={{ padding: 10 }}>{new Date(f.created_at).toLocaleString()}</td>
+                        </tr>
+                      ))}
+                      {!repLoading && feedback.length === 0 && (
+                        <tr><td colSpan={4} style={{ padding: 16, color: '#6b7280' }}>No feedback yet.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
+          
+          {/* Archive - Open by ID */}
+          <div className="ui-card" style={{ padding: 12, marginTop: 12 }}>
+            <div style={{ fontWeight: 700, marginBottom: 8 }}>Archive Search</div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+              <input placeholder="Report ID (e.g., RPT-1001)" value={archReportId} onChange={e => setArchReportId(e.target.value)} onKeyDown={async (e) => { if (e.key === 'Enter') { const id = archReportId.trim(); if (id) await openReportDetail(id); } }} style={{ padding: 8, border: '1px solid #e5e7eb', borderRadius: 6, minWidth: 200 }} />
+              <button onClick={async () => { const id = archReportId.trim(); if (id) await openReportDetail(id); }} style={{ padding: '8px 12px', border: '1px solid #e5e7eb', borderRadius: 6, background: 'white' }}>Open Report</button>
+              <input placeholder="Feedback ID (e.g., FDB-1001)" value={archFeedbackId} onChange={e => setArchFeedbackId(e.target.value)} onKeyDown={async (e) => { if (e.key === 'Enter') { const id = archFeedbackId.trim(); if (id) await openFeedbackDetail(id); } }} style={{ padding: 8, border: '1px solid #e5e7eb', borderRadius: 6, minWidth: 200 }} />
+              <button onClick={async () => { const id = archFeedbackId.trim(); if (id) await openFeedbackDetail(id); }} style={{ padding: '8px 12px', border: '1px solid #e5e7eb', borderRadius: 6, background: 'white' }}>Open Feedback</button>
+            </div>
+          </div>
+
+          {/* Report Detail Overlay */}
+          {repDetailOpen && (
+            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }} onClick={closeReportDetail}>
+              <div className="ui-card" style={{ width: 720, maxWidth: '90%', padding: 16 }} onClick={e => e.stopPropagation()}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <div style={{ fontWeight: 800 }}>Report Detail</div>
+                  <button onClick={closeReportDetail} style={{ padding: 6, border: '1px solid #e5e7eb', borderRadius: 999, background: 'white' }}>✕</button>
+                </div>
+                {!repDetail && <div style={{ color: '#6b7280' }}>Loading...</div>}
+                {!!repDetail && (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 16 }}>
+                    <div>
+                      <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>{repDetail.report.title}</div>
+                      <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 8 }}>{repDetail.report.type} • {repDetail.report.severity || '—'} • {repDetail.report.status}</div>
+                      <div style={{ fontSize: 14, whiteSpace: 'pre-wrap' }}>{repDetail.report.description || 'No description.'}</div>
+                      <div style={{ marginTop: 12, fontSize: 12, fontWeight: 600 }}>Comments:</div>
+                      <div style={{ maxHeight: 200, overflowY: 'auto', border: '1px solid #e5e7eb', borderRadius: 6, padding: 8, marginTop: 4 }}>
+                        {repDetail.comments.map(c => (
+                          <div key={c.comment_id} style={{ marginBottom: 8, paddingBottom: 8, borderBottom: '1px solid #f3f4f6' }}>
+                            <div style={{ fontSize: 12, color: '#6b7280' }}>{c.commenter_role}:{c.commenter_id} • {new Date(c.created_at).toLocaleString()}</div>
+                            <div style={{ fontSize: 13, marginTop: 2 }}>{c.content}</div>
+                          </div>
+                        ))}
+                        {repDetail.comments.length === 0 && (<div style={{ color: '#6b7280' }}>No comments yet.</div>)}
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 12, color: '#6b7280' }}>Created: {new Date(repDetail.report.created_at).toLocaleString()}</div>
+                      <div style={{ fontSize: 12, color: '#6b7280' }}>Updated: {new Date(repDetail.report.updated_at).toLocaleString()}</div>
+                      <div style={{ fontSize: 12, color: '#6b7280' }}>By {repDetail.report.created_by_role}:{repDetail.report.created_by_id}</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Feedback Detail Overlay */}
+          {fbDetailOpen && (
+            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }} onClick={closeFeedbackDetail}>
+              <div className="ui-card" style={{ width: 600, maxWidth: '90%', padding: 16 }} onClick={e => e.stopPropagation()}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <div style={{ fontWeight: 800 }}>Feedback Detail</div>
+                  <button onClick={closeFeedbackDetail} style={{ padding: 6, border: '1px solid #e5e7eb', borderRadius: 999, background: 'white' }}>✕</button>
+                </div>
+                {!fbDetail && <div style={{ color: '#6b7280' }}>Loading...</div>}
+                {!!fbDetail && (
+                  <div>
+                    <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>{fbDetail.title}</div>
+                    <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 8 }}>{fbDetail.kind} • {fbDetail.center_id || fbDetail.customer_id} • {new Date(fbDetail.created_at).toLocaleString()}</div>
+                    <div style={{ fontSize: 14, whiteSpace: 'pre-wrap' }}>{fbDetail.message || 'No message.'}</div>
+                    <div style={{ fontSize: 12, color: '#6b7280', marginTop: 8 }}>By {fbDetail.created_by_role}:{fbDetail.created_by_id}</div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+          </>
         )}
 
         {/* ORDERS SECTION */}

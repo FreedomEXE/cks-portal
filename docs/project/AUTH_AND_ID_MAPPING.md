@@ -9,7 +9,7 @@ This document defines how the CKS ID maps to authentication and routing, keeping
 
 ## Role Derivation
 
-- Role = first three letters of the ID, uppercased (`MGR`, `CON`, `CUS`, `CEN`, `CRW`, `ADM`).
+- Role = first three letters of the ID, uppercased (`MGR`, `CON`, `CUS`, `CEN`, `CRW`, `ADM`, `WH`).
 - Validate prefix on login; reject unknown prefixes.
 
 ## Routing
@@ -26,7 +26,7 @@ This document defines how the CKS ID maps to authentication and routing, keeping
 
 - Username = CKS ID. Password managed by Clerk.
 - Optionally mirror fields into `publicMetadata` (e.g., `{ cksId, role }`) for future flexibility; not required for MVP.
-- Authorization for API endpoints is role-based using the derived prefix and CKS ID.
+- Authorization for API endpoints is role-based using the derived prefix and CKS ID (includes `warehouse`).
 
 ## Future Enhancements (Optional)
 
@@ -37,4 +37,3 @@ This document defines how the CKS ID maps to authentication and routing, keeping
 ---
 
 Property of CKS © 2025 – Manifested by Freedom
-

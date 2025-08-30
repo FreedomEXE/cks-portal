@@ -35,8 +35,11 @@ import managerRouter from './hubs/manager/routes';
 import customerRouter from './hubs/customer/routes';
 import contractorRouter from './hubs/contractor/routes';
 import centerRouter from './hubs/center/routes';
+import warehouseRouter from './hubs/warehouse/routes';
 import catalogRouter from './resources/catalog';
 import ordersRouter from './resources/orders';
+import reportsRouter from './resources/reports';
+import feedbackRouter from './resources/feedback';
 
 const app = express();
 
@@ -66,6 +69,8 @@ app.get('/test-db', async (_req, res) => {
 });
 
 
+
+
 // Mount modular routes - ALL under /api for consistency
 app.use('/api', meRouter);
 app.use('/api/hub', hubsRouter);
@@ -75,8 +80,11 @@ app.use('/api/manager', managerRouter);
 app.use('/api/customer', customerRouter);
 app.use('/api/contractor', contractorRouter);
 app.use('/api/center', centerRouter);
+app.use('/api/warehouse', warehouseRouter);
 app.use('/api/catalog', catalogRouter);
 app.use('/api/orders', ordersRouter);
+app.use('/api/reports', reportsRouter);
+app.use('/api/feedback', feedbackRouter);
 
 // Swagger documentation
 const swaggerSpec = {

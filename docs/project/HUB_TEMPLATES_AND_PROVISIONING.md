@@ -11,11 +11,19 @@ This document explains how role-specific hub templates are used to provision per
 
 ## Provisioning Flow
 
-1. Admin creates a user with a CKS ID (e.g., `MGR-123`, `CEN-005`).
-2. The system infers the role from the ID prefix (`MGR`, `CON`, `CUS`, `CEN`, `CRW`, `ADM`).
+1. Admin creates a user with a CKS ID (e.g., `MGR-123`, `CEN-005`, `WH-001`).
+2. The system infers the role from the ID prefix (`MGR`, `CON`, `CUS`, `CEN`, `CRW`, `ADM`, `WH`).
 3. Minimal seed records are created in the database for that entity (role table + relationships as available).
 4. On login, the app routes to `/:idLower/hub` and renders the role’s hub template.
 5. The hub fetches user-specific data and related records; the template “materializes” a personalized view from the shared role template.
+
+### Create → Assign (Revised)
+
+- Create focuses on stable identity + profile; relationships are set later.
+- Crew/Managers are created with an owner manager (`cks_manager`) but no center assignment.
+- `crew.assigned_center` is nullable to support an Unassigned pool.
+- Assignments (Crew→Center, Manager→Centers, Warehouses↔Entities) happen in the Assign tab, optionally with approvals.
+  - Warehouse assignment: product/supply Orders can be assigned to a Warehouse for fulfillment; shipments update inventory and activity logs.
 
 ## Data Binding (Per Role)
 
@@ -27,6 +35,19 @@ The template defines what to display; the backend provides role-filtered data. F
 - Customer: profile, centers[], visibility into services and requests/orders for their centers.
 - Center: profile, contractor, customer, assigned crew[], requests/orders[], reports[].
 - Crew: profile, assigned center, training[], procedures[].
+- Warehouse: profile, manager, inventory[], orders (pending/shipped/archive), shipments[], staff[], activity[].
+
+### Crew Profile Fields at Create (Admin)
+
+- Required: `crew_name`, `status` (default `active`).
+- Manager assignment occurs later in Assign; `cks_manager` is optional at creation.
+- Optional (captured to `crew.profile` JSONB):
+  - Contact: `email`, `phone`, `languages[]`
+  - Work: `role`, `employment_type`, `start_date`, `availability`, `skills[]`, `certification_level`
+  - Emergency: `emergency_contact{name,relationship,phone,email}`
+  - Address/Department/Shift can be added later as needed.
+
+These align with Crew hub Profile tabs (Personal Info, Work Details, Certifications, Emergency Contact).
 
 ## Isolation & Session Keys
 
@@ -58,4 +79,3 @@ These map to the current schema in `backend/server/db/schema.sql`. Arrays are ac
 ---
 
 Property of CKS © 2025 – Manifested by Freedom
-

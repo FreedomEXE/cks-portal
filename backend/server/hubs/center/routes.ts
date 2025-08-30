@@ -5,6 +5,8 @@
 
 import express, { Request, Response } from 'express';
 import pool from '../../../../Database/db/pool';
+import { z } from 'zod';
+import { requirePermission } from '../../src/auth/rbac';
 
 const router = express.Router();
 
@@ -31,13 +33,25 @@ router.get('/requests', async (req: Request, res: Response) => {
 
 // POST /api/center/requests
 // Body: { center_id, customer_id?, items:[{type:'service'|'product', id, qty?, notes?}], notes? }
-router.post('/requests', async (req: Request, res: Response) => {
+const CreateCenterRequestSchema = z.object({
+  center_id: z.string().min(1),
+  customer_id: z.string().min(1).optional(),
+  notes: z.string().max(2000).optional(),
+  items: z.array(
+    z.object({
+      type: z.enum(['service','product']),
+      id: z.string().min(1),
+      qty: z.number().int().positive().optional().default(1),
+      notes: z.string().max(2000).optional()
+    })
+  ).min(1)
+});
+router.post('/requests', requirePermission('CENTER_CREATE_REQUEST'), async (req: Request, res: Response) => {
   const userId = getUserId(req);
   try {
-    const { center_id, customer_id, items, notes } = req.body || {};
-    if (!center_id || !Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({ success: false, error: 'center_id and items are required', error_code: 'invalid_request' });
-    }
+    const parsed = CreateCenterRequestSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ success: false, error: 'Invalid request body', error_code: 'validation_error' });
+    const { center_id, customer_id, items, notes } = parsed.data;
 
     // Generate order id (simple for MVP)
     const orderId = `REQ-${Date.now().toString().slice(-6)}`;
@@ -52,7 +66,6 @@ router.post('/requests', async (req: Request, res: Response) => {
       );
       for (const it of items) {
         const typ = String(it.type || '').toLowerCase();
-        if (typ !== 'service' && typ !== 'product') continue;
         const qty = Number(it.qty || 1);
         await pool.query(
           `INSERT INTO order_items(order_id, item_type, item_id, quantity, notes) VALUES ($1,$2,$3,$4,$5)`,
@@ -102,7 +115,41 @@ router.get('/orders', async (req: Request, res: Response) => {
       )
     ).rows;
 
-    return res.json({ success: true, data: rows });
+    // Totals for all buckets (for UI badges)
+    const pendingStatuses = ['submitted', 'contractor_pending'];
+    const approvedStatuses = ['contractor_approved', 'scheduling_pending', 'scheduled', 'in_progress', 'picking', 'shipped'];
+    const archiveStatuses = ['completed', 'delivered', 'closed', 'contractor_denied', 'cancelled'];
+
+    let totals = { pending: 0, approved: 0, archive: 0 };
+    try {
+      const [p, a, r] = await Promise.all([
+        pool.query(
+          `SELECT COUNT(*)::int AS c FROM orders o WHERE UPPER(o.center_id)=UPPER($1) AND o.status = ANY($2)`,
+          [code, pendingStatuses]
+        ),
+        pool.query(
+          `SELECT COUNT(*)::int AS c FROM orders o WHERE UPPER(o.center_id)=UPPER($1) AND o.status = ANY($2)`,
+          [code, approvedStatuses]
+        ),
+        pool.query(
+          `SELECT COUNT(*)::int AS c FROM orders o WHERE UPPER(o.center_id)=UPPER($1) AND o.status = ANY($2)`,
+          [code, archiveStatuses]
+        ),
+      ]);
+      totals = {
+        pending: Number(p.rows?.[0]?.c ?? 0),
+        approved: Number(a.rows?.[0]?.c ?? 0),
+        archive: Number(r.rows?.[0]?.c ?? 0),
+      };
+    } catch (e) {
+      // If totals query fails (e.g., DB not available), fall back to page-limited approximation
+      const approx = rows.length;
+      if (bucket === 'pending') totals.pending = approx;
+      else if (bucket === 'approved') totals.approved = approx;
+      else totals.archive = approx;
+    }
+
+    return res.json({ success: true, data: rows, totals });
   } catch (error) {
     console.error('[center] orders endpoint error', error);
     return res.status(500).json({ success: false, error: 'Failed to fetch center orders', error_code: 'server_error' });

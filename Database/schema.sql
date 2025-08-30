@@ -69,12 +69,13 @@ CREATE TABLE IF NOT EXISTS centers (
 -- Crew (Red hub)
 CREATE TABLE IF NOT EXISTS crew (
     crew_id VARCHAR(20) PRIMARY KEY,
-    cks_manager VARCHAR(20) NOT NULL,
-    assigned_center VARCHAR(20) NOT NULL,
+    cks_manager VARCHAR(20), -- nullable; manager assignment happens later
+    assigned_center VARCHAR(20), -- nullable to support Unassigned pool
     crew_name VARCHAR(255),
     skills TEXT[], -- PostgreSQL array for multiple skills
     certification_level VARCHAR(50),
     status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'pending')),
+    profile JSONB DEFAULT '{}'::jsonb, -- extended profile fields captured at creation
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -157,6 +158,10 @@ CREATE TABLE IF NOT EXISTS warehouses (
     warehouse_name VARCHAR(255) NOT NULL,
     address TEXT,
     manager_id VARCHAR(20),
+    warehouse_type VARCHAR(50),
+    phone VARCHAR(50),
+    email VARCHAR(255),
+    date_acquired DATE,
     capacity INTEGER,
     current_utilization INTEGER,
     status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'pending')),
@@ -173,6 +178,10 @@ CREATE TABLE IF NOT EXISTS orders (
     order_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     completion_date TIMESTAMP,
     total_amount DECIMAL(10,2),
+    order_kind VARCHAR(20) NOT NULL DEFAULT 'one_time' CHECK (order_kind IN ('one_time','recurring')),
+    recurrence_interval VARCHAR(20), -- e.g., weekly, monthly (optional for recurring)
+    created_by_role VARCHAR(20),
+    created_by_id VARCHAR(60),
     status VARCHAR(30) DEFAULT 'submitted' CHECK (
         status IN (
             'draft',
@@ -199,7 +208,7 @@ CREATE TABLE IF NOT EXISTS orders (
 CREATE TABLE IF NOT EXISTS order_items (
     order_item_id SERIAL PRIMARY KEY,
     order_id VARCHAR(20) NOT NULL,
-    item_type VARCHAR(20) NOT NULL CHECK (item_type IN ('product','service')),
+    item_type VARCHAR(20) NOT NULL CHECK (item_type IN ('product','service','supply')),
     item_id VARCHAR(40) NOT NULL,
     quantity INTEGER DEFAULT 1 CHECK (quantity > 0),
     notes TEXT,
@@ -217,6 +226,124 @@ CREATE TABLE IF NOT EXISTS approvals (
     decided_at TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- ============================================
+-- WAREHOUSE MODULE (Inventory, Shipments, Activity)
+-- ============================================
+
+-- Expand orders with assigned warehouse for fulfillment
+ALTER TABLE orders
+  ADD COLUMN IF NOT EXISTS assigned_warehouse VARCHAR(20);
+CREATE INDEX IF NOT EXISTS idx_orders_assigned_warehouse ON orders(assigned_warehouse);
+
+-- Per-warehouse inventory items
+CREATE TABLE IF NOT EXISTS inventory_items (
+  warehouse_id VARCHAR(20) NOT NULL REFERENCES warehouses(warehouse_id) ON DELETE CASCADE,
+  item_id VARCHAR(40) NOT NULL,
+  item_type VARCHAR(20) NOT NULL CHECK (item_type IN ('product','supply')),
+  sku VARCHAR(60),
+  item_name VARCHAR(255),
+  category VARCHAR(100),
+  quantity_on_hand INTEGER DEFAULT 0 CHECK (quantity_on_hand >= 0),
+  quantity_reserved INTEGER DEFAULT 0 CHECK (quantity_reserved >= 0),
+  quantity_available INTEGER GENERATED ALWAYS AS (GREATEST(quantity_on_hand - quantity_reserved, 0)) STORED,
+  min_stock_level INTEGER DEFAULT 0,
+  max_stock_level INTEGER,
+  unit_cost DECIMAL(10,2),
+  location_code VARCHAR(60),
+  status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active','inactive')),
+  last_received_date TIMESTAMP,
+  last_shipped_date TIMESTAMP,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (warehouse_id, item_id)
+);
+CREATE INDEX IF NOT EXISTS idx_inventory_items_category ON inventory_items(category);
+CREATE INDEX IF NOT EXISTS idx_inventory_items_status ON inventory_items(status);
+
+-- Shipments
+CREATE TABLE IF NOT EXISTS warehouse_shipments (
+  shipment_id VARCHAR(40) PRIMARY KEY,
+  warehouse_id VARCHAR(20) NOT NULL REFERENCES warehouses(warehouse_id) ON DELETE CASCADE,
+  shipment_type VARCHAR(20) NOT NULL CHECK (shipment_type IN ('inbound','outbound')),
+  carrier VARCHAR(60),
+  tracking_number VARCHAR(80),
+  origin_address TEXT,
+  destination_address TEXT,
+  shipment_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  expected_delivery_date TIMESTAMP,
+  actual_delivery_date TIMESTAMP,
+  status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending','in_transit','delivered','cancelled')),
+  total_weight DECIMAL(10,2),
+  total_value DECIMAL(12,2),
+  notes TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_shipments_warehouse ON warehouse_shipments(warehouse_id);
+CREATE INDEX IF NOT EXISTS idx_shipments_status ON warehouse_shipments(status);
+
+CREATE TABLE IF NOT EXISTS shipment_items (
+  shipment_item_id SERIAL PRIMARY KEY,
+  shipment_id VARCHAR(40) NOT NULL REFERENCES warehouse_shipments(shipment_id) ON DELETE CASCADE,
+  order_id VARCHAR(20),
+  item_id VARCHAR(40) NOT NULL,
+  item_type VARCHAR(20) NOT NULL CHECK (item_type IN ('product','supply')),
+  sku VARCHAR(60),
+  item_name VARCHAR(255),
+  quantity INTEGER NOT NULL CHECK (quantity > 0),
+  unit_cost DECIMAL(10,2)
+);
+CREATE INDEX IF NOT EXISTS idx_shipment_items_shipment ON shipment_items(shipment_id);
+
+-- Staff (optional for MVP)
+CREATE TABLE IF NOT EXISTS warehouse_staff (
+  staff_id VARCHAR(40) PRIMARY KEY,
+  warehouse_id VARCHAR(20) NOT NULL REFERENCES warehouses(warehouse_id) ON DELETE CASCADE,
+  staff_name VARCHAR(255) NOT NULL,
+  position VARCHAR(100),
+  email VARCHAR(255),
+  phone VARCHAR(50),
+  shift_schedule VARCHAR(100),
+  certifications TEXT[],
+  status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active','inactive')),
+  hire_date DATE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_warehouse_staff_warehouse ON warehouse_staff(warehouse_id);
+
+-- Activity log
+CREATE TABLE IF NOT EXISTS warehouse_activity_log (
+  log_id SERIAL PRIMARY KEY,
+  warehouse_id VARCHAR(20) NOT NULL REFERENCES warehouses(warehouse_id) ON DELETE CASCADE,
+  activity_type VARCHAR(30) NOT NULL CHECK (activity_type IN ('stock_adjustment','receipt','pick','ship')),
+  item_id VARCHAR(40),
+  quantity_change INTEGER,
+  description TEXT,
+  staff_id VARCHAR(40),
+  shipment_id VARCHAR(40),
+  activity_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_warehouse_activity_warehouse ON warehouse_activity_log(warehouse_id);
+
+-- ============================================
+-- SAMPLE DATA (Warehouse)
+-- ============================================
+
+INSERT INTO warehouses (warehouse_id, warehouse_name, address, manager_id, warehouse_type, phone, email, date_acquired, capacity, current_utilization, status)
+VALUES 
+  ('WH-000', 'Template Warehouse', '1000 Logistics Drive, Metro City, MC 12345', 'MGR-001', NULL, NULL, NULL, NULL, 50000, 32500, 'active'),
+  ('WH-001', 'Central Distribution Hub', '2000 Supply Way, Metro City, MC 12345', 'MGR-001', 'Distribution', '(555) 312-9001', 'wh-001@cks.com', '2024-06-15', 40000, 18000, 'active')
+ON CONFLICT (warehouse_id) DO NOTHING;
+
+-- Sample inventory rows (free SKUs for MVP)
+INSERT INTO inventory_items (warehouse_id, item_id, item_type, sku, item_name, category, quantity_on_hand, min_stock_level, unit_cost, location_code)
+VALUES 
+  ('WH-000', 'SUP-001', 'supply', 'SKU-CLN-001', 'Cleaning Solution (1L)', 'Cleaning', 120, 20, 4.50, 'A-01'),
+  ('WH-000', 'SUP-002', 'supply', 'SKU-GLV-002', 'Latex Gloves (Box 100)', 'Safety', 75, 30, 6.75, 'A-02'),
+  ('WH-000', 'PRD-001', 'product', 'SKU-MOP-001', 'Industrial Mop', 'Equipment', 40, 10, 18.00, 'B-01'),
+  ('WH-001', 'SUP-001', 'supply', 'SKU-CLN-001', 'Cleaning Solution (1L)', 'Cleaning', 60, 20, 4.50, 'A-01')
+ON CONFLICT (warehouse_id, item_id) DO NOTHING;
 
 -- Service Jobs (scheduling)
 CREATE TABLE IF NOT EXISTS service_jobs (
@@ -376,8 +503,77 @@ INSERT INTO crew (crew_id, cks_manager, assigned_center, crew_name, skills, stat
 ('CRW-002', 'MGR-002', 'CEN-002', 'Team Beta One', ARRAY['janitorial', 'security'], 'active')
 ON CONFLICT (crew_id) DO NOTHING;
 
+-- ============================================
+-- CREW REQUIREMENTS (training/procedures readiness)
+-- ============================================
+CREATE TABLE IF NOT EXISTS crew_requirements (
+  requirement_id SERIAL PRIMARY KEY,
+  crew_id VARCHAR(20) NOT NULL REFERENCES crew(crew_id) ON DELETE CASCADE,
+  kind VARCHAR(20) NOT NULL CHECK (kind IN ('training','procedure')),
+  item_id VARCHAR(40),
+  title VARCHAR(255) NOT NULL,
+  required BOOLEAN DEFAULT true,
+  due_date DATE,
+  status VARCHAR(20) DEFAULT 'not_started' CHECK (status IN ('not_started','in_progress','completed','waived')),
+  source VARCHAR(20) DEFAULT 'manager' CHECK (source IN ('manager','admin','center_policy')),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_crew_requirements_crew ON crew_requirements(crew_id);
+
 -- Insert sample services
 INSERT INTO services (service_id, service_name, category, description, status) VALUES
 ('SRV-001', 'Daily Cleaning', 'Cleaning', 'Standard daily cleaning services', 'active'),
 ('SRV-002', 'Maintenance Check', 'Maintenance', 'Regular maintenance inspections', 'active')
 ON CONFLICT (service_id) DO NOTHING;
+
+-- ============================================
+-- REPORTS & FEEDBACK (MVP)
+-- ============================================
+
+-- Reports: center/customer-visible issues tracking (no pricing)
+CREATE TABLE IF NOT EXISTS reports (
+  report_id VARCHAR(40) PRIMARY KEY,
+  type VARCHAR(40) NOT NULL, -- incident|quality|service_issue|general
+  severity VARCHAR(20),
+  title VARCHAR(200) NOT NULL,
+  description TEXT,
+  center_id VARCHAR(40),
+  customer_id VARCHAR(40),
+  status VARCHAR(20) NOT NULL DEFAULT 'open', -- open|in_progress|resolved|closed
+  created_by_role VARCHAR(20) NOT NULL,
+  created_by_id VARCHAR(60) NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_reports_center ON reports(center_id);
+CREATE INDEX IF NOT EXISTS idx_reports_customer ON reports(customer_id);
+CREATE INDEX IF NOT EXISTS idx_reports_status ON reports(status);
+CREATE INDEX IF NOT EXISTS idx_reports_created_at ON reports(created_at);
+
+-- Report comments for collaboration
+CREATE TABLE IF NOT EXISTS report_comments (
+  comment_id SERIAL PRIMARY KEY,
+  report_id VARCHAR(40) NOT NULL REFERENCES reports(report_id) ON DELETE CASCADE,
+  author_role VARCHAR(20) NOT NULL,
+  author_id VARCHAR(60) NOT NULL,
+  body TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_report_comments_report ON report_comments(report_id);
+
+-- Feedback: lightweight praise/request/issue
+CREATE TABLE IF NOT EXISTS feedback (
+  feedback_id VARCHAR(40) PRIMARY KEY,
+  kind VARCHAR(20) NOT NULL, -- praise|request|issue
+  title VARCHAR(200) NOT NULL,
+  message TEXT,
+  center_id VARCHAR(40),
+  customer_id VARCHAR(40),
+  created_by_role VARCHAR(20) NOT NULL,
+  created_by_id VARCHAR(60) NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_feedback_center ON feedback(center_id);
+CREATE INDEX IF NOT EXISTS idx_feedback_customer ON feedback(customer_id);
+CREATE INDEX IF NOT EXISTS idx_feedback_created_at ON feedback(created_at);

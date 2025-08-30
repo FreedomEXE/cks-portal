@@ -5,6 +5,8 @@
 
 import express, { Request, Response } from 'express';
 import pool from '../../../../Database/db/pool';
+import { z } from 'zod';
+import { requirePermission } from '../../src/auth/rbac';
 
 const router = express.Router();
 
@@ -70,6 +72,22 @@ router.get('/customers', async (req: Request, res: Response) => {
   }
 });
 
+// GET /api/contractor/centers?code=CON-001
+router.get('/centers', async (req: Request, res: Response) => {
+  try {
+    const code = String(req.query.code || getUserId(req) || '').toUpperCase();
+    if (!code) return res.status(400).json({ success: false, error: 'code required', error_code: 'invalid_request' });
+    const rows = (await pool.query(
+      `SELECT center_id AS id, center_name AS name FROM centers WHERE UPPER(contractor_id)=UPPER($1) ORDER BY center_name`,
+      [code]
+    )).rows;
+    return res.json({ success: true, data: rows });
+  } catch (error) {
+    console.error('Contractor centers endpoint error:', error);
+    return res.status(500).json({ success: false, error: 'Failed to fetch contractor centers', error_code: 'server_error' });
+  }
+});
+
 // GET /api/contractor/requests (pending)
 router.get('/requests', async (req: Request, res: Response) => {
   try {
@@ -92,7 +110,29 @@ router.get('/requests', async (req: Request, res: Response) => {
       LIMIT 100
     `;
     const rows = (await pool.query(q, [statuses])).rows;
-    return res.json({ success: true, data: rows });
+
+    // Totals across all buckets for UI badges
+    const pendingStatuses = ['submitted', 'contractor_pending'];
+    const approvedStatuses = ['contractor_approved', 'scheduling_pending', 'scheduled', 'in_progress', 'picking', 'shipped'];
+    const archiveStatuses = ['completed', 'delivered', 'closed', 'contractor_denied', 'cancelled'];
+    let totals = { pending: 0, approved: 0, archive: 0 };
+    try {
+      const [p, a, r] = await Promise.all([
+        pool.query(`SELECT COUNT(*)::int AS c FROM orders o WHERE o.status = ANY($1)`, [pendingStatuses]),
+        pool.query(`SELECT COUNT(*)::int AS c FROM orders o WHERE o.status = ANY($1)`, [approvedStatuses]),
+        pool.query(`SELECT COUNT(*)::int AS c FROM orders o WHERE o.status = ANY($1)`, [archiveStatuses]),
+      ]);
+      totals = {
+        pending: Number(p.rows?.[0]?.c ?? 0),
+        approved: Number(a.rows?.[0]?.c ?? 0),
+        archive: Number(r.rows?.[0]?.c ?? 0),
+      };
+    } catch (e) {
+      const approx = rows.length;
+      if (bucket === 'pending') totals.pending = approx; else if (bucket === 'approved') totals.approved = approx; else totals.archive = approx;
+    }
+
+    return res.json({ success: true, data: rows, totals });
   } catch (error) {
     console.error('Contractor requests endpoint error:', error);
     return res.status(500).json({ success: false, error: 'Failed to fetch contractor requests', error_code: 'server_error' });
@@ -100,9 +140,11 @@ router.get('/requests', async (req: Request, res: Response) => {
 });
 
 // POST /api/contractor/requests/:id/approve
-router.post('/requests/:id/approve', async (req: Request, res: Response) => {
+const ApproveDenySchema = z.object({ note: z.string().max(2000).optional() });
+router.post('/requests/:id/approve', requirePermission('CONTRACTOR_APPROVE'), async (req: Request, res: Response) => {
   const id = String(req.params.id);
-  const note = String((req.body?.note ?? '') || '');
+  const parsed = ApproveDenySchema.safeParse(req.body || {});
+  const note = parsed.success ? (parsed.data.note || '') : '';
   try {
     await pool.query('BEGIN');
     await pool.query(`UPDATE orders SET status='contractor_approved', updated_at=NOW() WHERE order_id=$1`, [id]);
@@ -117,9 +159,10 @@ router.post('/requests/:id/approve', async (req: Request, res: Response) => {
 });
 
 // POST /api/contractor/requests/:id/deny
-router.post('/requests/:id/deny', async (req: Request, res: Response) => {
+router.post('/requests/:id/deny', requirePermission('CONTRACTOR_APPROVE'), async (req: Request, res: Response) => {
   const id = String(req.params.id);
-  const note = String((req.body?.note ?? '') || '');
+  const parsed = ApproveDenySchema.safeParse(req.body || {});
+  const note = parsed.success ? (parsed.data.note || '') : '';
   try {
     await pool.query('BEGIN');
     await pool.query(`UPDATE orders SET status='contractor_denied', updated_at=NOW() WHERE order_id=$1`, [id]);

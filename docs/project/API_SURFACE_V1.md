@@ -7,7 +7,8 @@ Defines minimal, consistent API patterns used by hubs. Start with Crew; other hu
 - Base path per hub: `/api/{hub}` (e.g., `/api/crew`).
 - Auth headers: client sends both `x-user-id` and hub-specific header (e.g., `x-crew-user-id`) when available. Server should accept either.
 - Response shape: `{ success: boolean, data: <payload>, ...optional }`.
-- IDs: Use uppercase prefixes (`MGR-XXX`, `CON-XXX`, `CUS-XXX`, `CEN-XXX`, `CRW-XXX`, `ADM-XXX`) in data. Route segments may be lowercase.
+- IDs: Use uppercase prefixes (`MGR-XXX`, `CON-XXX`, `CUS-XXX`, `CEN-XXX`, `CRW-XXX`, `ADM-XXX`, `WH-XXX`) in data. Route segments may be lowercase.
+- RBAC: Sensitive routes are guarded via middleware like `requirePermission('PERM')`. Role can be inferred from `x-user-id` prefix or explicit `x-user-role`.
 
 ## Crew Endpoints
 
@@ -36,11 +37,88 @@ Defines minimal, consistent API patterns used by hubs. Start with Crew; other hu
 - Data: Prefer snake_case keys; keep IDs uppercase with documented prefixes.
 - Errors: Use `{ error: string }` with appropriate HTTP status.
 
+---
+
+## Warehouse Surface (MVP)
+
+For inventory and logistics operations. Warehouse routes live under `/api/warehouse`.
+
+- Profile & Dashboard
+  - `GET /api/warehouse/profile` → warehouse info (+manager details best‑effort)
+  - `GET /api/warehouse/dashboard` → KPI cards for at‑a‑glance metrics
+
+- Inventory
+  - `GET /api/warehouse/inventory?category&low_stock&limit` → items with computed `quantity_available` and low‑stock flag
+  - `POST /api/warehouse/inventory/adjust` (perm: `WAREHOUSE_ADJUST`) → `{ item_id, quantity_change, reason? }`
+
+- Shipments
+  - `GET /api/warehouse/shipments?type=inbound|outbound&status&limit` → shipment headers (+counts)
+  - `POST /api/warehouse/shipments` (perm: `WAREHOUSE_SHIP`) → create outbound shipment for an order
+  - `PATCH /api/warehouse/shipments/:id/deliver` (perm: `WAREHOUSE_SHIP`) → mark delivered and decrement stock
+
+- Orders Fulfillment
+  - `GET /api/warehouse/orders?status=pending|shipped|all&limit` → product/supply orders relevant to the warehouse
+  - `POST /api/warehouse/orders/:id/assign` (perm: `WAREHOUSE_ASSIGN`) → assign order to this warehouse
+
+Notes:
+- Warehouses use `WH-XXX` IDs. Role may be derived from `x-user-id` or `x-user-role: warehouse`.
+- Inventory tables are per‑warehouse; fulfillment via shipments updates stock and logs activity.
+
 ## Rationale
 
 Keeping a consistent response envelope and headers across hubs simplifies client hooks and reduces glue code. We tolerate light normalization in hooks (e.g., `name` → `*_name`), but aim to converge server responses over time.
 
 ---
 
-Property of CKS © 2025 – Manifested by Freedom
+## Admin Surface (MVP)
 
+For provisioning and oversight. Admin routes live under `/api/admin`.
+
+- Users
+  - `POST /api/admin/users` → create `{ role: manager|contractor|customer|center|crew, ...fields }`
+  - Lists: `GET /api/admin/{managers|contractors|customers|centers|crew}?q&limit&offset`
+
+- Catalog & Resources
+  - Services: `GET/POST/PUT/DELETE /api/admin/catalog/items`
+  - Procedures: `GET /api/admin/procedures` (list), `POST /api/admin/procedures` (create)
+  - Training: `GET /api/admin/training` (list), `POST /api/admin/training` (create)
+  - Inventory: `GET /api/admin/{products|supplies|warehouses}` (list)
+
+- Operations
+  - Orders: `GET /api/admin/orders?q&limit&offset` → `{ order_id, type, requester, status, date }`
+  - Crew Assignment:
+    - `GET /api/admin/crew/unassigned` → lists crew without center assignment
+    - `GET /api/admin/crew/:crew_id/requirements` → readiness status for assignment
+    - `POST /api/admin/crew/:crew_id/assign-center` → assign crew to center
+
+- Read-only cross-resource (shared)
+  - Reports: `GET /api/reports`
+  - Feedback: `GET /api/feedback`
+
+- Utilities
+  - `DELETE /api/admin/cleanup-demo-data` → removes all demo/seed data for fresh testing
+
+Notes:
+- Crew created without center assignment (Unassigned pool); assignment happens separately in Admin Assign tab.
+- Extended Crew profile is captured to `crew.profile` JSONB.
+- Crew→Center assignment includes readiness validation with admin override capability.
+- Database cleanup removes all demo data while preserving structure and admin access.
+
+---
+
+## Cross‑Resource Surfaces
+
+### Reports
+- Base: `/api/reports`
+- `GET /api/reports?center_id&customer_id&status&type&from&to&limit&offset` → list + status totals
+- `POST /api/reports` (perm: `REPORT_CREATE`) → `{ center_id?, customer_id?, type, severity?, title, description? }`
+- `GET /api/reports/:id` → `{ report, comments[] }`
+- `POST /api/reports/:id/comments` (perm: `REPORT_COMMENT`) → `{ body }`
+- `PATCH /api/reports/:id/status` (perm: `REPORT_STATUS`) → `{ status }`
+
+### Feedback
+- Base: `/api/feedback`
+- `GET /api/feedback?center_id&customer_id&kind&from&to&limit&offset` → list + kind totals
+- `POST /api/feedback` (perm: `FEEDBACK_CREATE`) → `{ center_id?, customer_id?, kind, title, body? }`
+
+Property of CKS © 2025 – Manifested by Freedom
