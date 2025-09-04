@@ -24,6 +24,8 @@ import { Routes, Route, Navigate, BrowserRouter, useNavigate } from 'react-route
 import { ClerkProvider, useUser } from '@clerk/clerk-react';
 import HubRoleRouter from './pages/HubRoleRouter';
 import Login from './pages/Login';
+import { UserProfile, SignedIn } from '@clerk/clerk-react';
+import ForgotPassword from './pages/ForgotPassword';
 import CatalogPage from './pages/Catalog';
 import './index.css';
 
@@ -76,6 +78,16 @@ function App() {
           <Route path="/auth/redirect" element={<AfterSignInRedirect />} />
           {/* Global catalog (neutral, read-only) */}
           <Route path="/catalog" element={<CatalogPage />} />
+          {/* Account management (password, email, profile) */}
+          <Route path="/account" element={
+            <SignedIn>
+              <div style={{ maxWidth: 720, margin: '24px auto', padding: '0 16px' }}>
+                <UserProfile routing="hash" />
+              </div>
+            </SignedIn>
+          } />
+          {/* Forgot password flow */}
+          <Route path="/forgot" element={<ForgotPassword />} />
           
           {/* Hub system - all authenticated routes */}
           <Route path=":username/hub/*" element={<HubRoleRouter />} />

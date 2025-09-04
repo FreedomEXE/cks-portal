@@ -15,21 +15,71 @@ function getUserId(req: Request): string {
   return String(v || '');
 }
 
-// GET /api/contractor/profile
+// GET /api/contractor/profile?code=CON-001
 router.get('/profile', async (req: Request, res: Response) => {
   try {
-    const userId = getUserId(req);
-    const sample = {
-      contractor_id: userId || 'CON-000',
-      company_name: 'Contractor Demo LLC',
-      account_manager: 'MGR-001',
-      email: 'contact@contractor-demo.com',
-      phone: '(555) 987-6543',
-      address: '123 Business Ave, Suite 100',
-      payment_status: 'Current',
-      services_purchased: ['Cleaning', 'Maintenance']
+    const code = String(req.query.code || '').trim() || getUserId(req);
+    if (!code) return res.status(400).json({ success: false, error: 'code required', error_code: 'invalid_request' });
+
+    const q = `
+      SELECT 
+        contractor_id,
+        company_name,
+        cks_manager,
+        contact_person AS main_contact,
+        email,
+        phone,
+        address,
+        website,
+        status,
+        created_at
+      FROM contractors
+      WHERE UPPER(contractor_id) = UPPER($1)
+      LIMIT 1
+    `;
+    const r = await pool.query(q, [code]);
+    if (r.rowCount === 0) {
+      return res.status(404).json({ success: false, error: 'Contractor not found', error_code: 'not_found' });
+    }
+
+    const row = r.rows[0];
+
+    // Compute derived fields
+    const start = row.created_at ? new Date(row.created_at) : null;
+    const now = new Date();
+    let years = 1;
+    if (start) {
+      const diff = now.getTime() - start.getTime();
+      const y = Math.floor(diff / (365 * 24 * 60 * 60 * 1000));
+      years = Math.max(1, y + 1);
+    }
+    const yearsLabel = years === 1 ? '1 Year' : `${years} Years`;
+
+    // Count customers for this contractor
+    let numCustomers = 0;
+    try {
+      const c = await pool.query(`SELECT COUNT(*)::int AS c FROM customers WHERE UPPER(contractor_id)=UPPER($1)`, [row.contractor_id]);
+      numCustomers = Number(c.rows?.[0]?.c ?? 0);
+    } catch {}
+
+    const data = {
+      contractor_id: row.contractor_id,
+      company_name: row.company_name,
+      cks_manager: row.cks_manager || null,
+      main_contact: row.main_contact || null,
+      email: row.email || null,
+      phone: row.phone || null,
+      address: row.address || null,
+      website: row.website || null,
+      years_with_cks: yearsLabel,
+      num_customers: numCustomers,
+      contract_start_date: start ? start.toISOString().slice(0, 10) : null,
+      status: row.status || 'active',
+      services_specialized: 'Not Set',
+      payment_status: 'Not Set'
     };
-    return res.json({ success: true, data: sample });
+
+    return res.json({ success: true, data });
   } catch (error) {
     console.error('Contractor profile endpoint error:', error);
     return res.status(500).json({ success: false, error: 'Failed to fetch contractor profile', error_code: 'server_error' });
@@ -39,13 +89,14 @@ router.get('/profile', async (req: Request, res: Response) => {
 // GET /api/contractor/dashboard
 router.get('/dashboard', async (_req: Request, res: Response) => {
   try {
+    // Empty template data - will be populated through admin assignment system
     const data = [
-      { label: 'Active Customers', value: 15, trend: '+3', color: '#3b7af7' },
-      { label: 'Active Centers', value: 8, trend: '+2', color: '#8b5cf6' },
-      { label: 'Account Status', value: 'Current', color: '#10b981' },
-      { label: 'Services Used', value: 3, color: '#f59e0b' },
-      { label: 'Active Crew', value: 12, trend: '+1', color: '#ef4444' },
-      { label: 'Pending Orders', value: 4, color: '#f97316' }
+      { label: 'Active Customers', value: 0, trend: 'No activity', color: '#3b7af7' },
+      { label: 'Active Centers', value: 0, trend: 'No activity', color: '#8b5cf6' },
+      { label: 'Account Status', value: 'Not Set', color: '#6b7280' },
+      { label: 'Services Used', value: 0, color: '#f59e0b' },
+      { label: 'Active Crew', value: 0, trend: 'No activity', color: '#ef4444' },
+      { label: 'Pending Orders', value: 0, color: '#f97316' }
     ];
     return res.json({ success: true, data });
   } catch (error) {
@@ -57,14 +108,8 @@ router.get('/dashboard', async (_req: Request, res: Response) => {
 // GET /api/contractor/customers
 router.get('/customers', async (req: Request, res: Response) => {
   try {
-    const limit = Number(req.query.limit || 5);
-    const data = [
-      { id: 'CUS-001', name: 'Metro Office Plaza', centers: 3, status: 'Active', last_service: '2025-08-22' },
-      { id: 'CUS-002', name: 'Riverside Shopping Center', centers: 2, status: 'Active', last_service: '2025-08-21' },
-      { id: 'CUS-003', name: 'Downtown Business Tower', centers: 4, status: 'Active', last_service: '2025-08-20' },
-      { id: 'CUS-004', name: 'Suburban Medical Complex', centers: 1, status: 'Pending', last_service: '2025-08-15' },
-      { id: 'CUS-005', name: 'Industrial Park West', centers: 2, status: 'Active', last_service: '2025-08-18' }
-    ].slice(0, Math.max(1, Math.min(10, limit)));
+    // Empty template data - customers will be assigned through admin system
+    const data = [];
     return res.json({ success: true, data });
   } catch (error) {
     console.error('Contractor customers endpoint error:', error);

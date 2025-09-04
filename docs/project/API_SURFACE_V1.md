@@ -122,3 +122,26 @@ Notes:
 - `POST /api/feedback` (perm: `FEEDBACK_CREATE`) → `{ center_id?, customer_id?, kind, title, body? }`
 
 Property of CKS © 2025 – Manifested by Freedom
+
+Index
+- Overview & Handoff: docs/project/OVERVIEW_AND_HANDOFF.md
+- Hub Specs: docs/project/hubs/
+ 
+---
+
+## Contractor Surface (MVP)
+
+For top‑tier clients. Contractor routes live under `/api/contractor`.
+
+- Profile & Dashboard
+  - `GET /api/contractor/profile?code=CON-###` → contractor profile including derived fields
+    - Returns: `{ success, data: { contractor_id, company_name, cks_manager, main_contact, email, phone, address, website, status, years_with_cks, contract_start_date, num_customers, services_specialized } }`
+  - `GET /api/contractor/dashboard` → KPI cards for contractor (customers, centers, services used)
+
+- Customers & Centers
+  - `GET /api/contractor/customers?code=CON-###&limit` → list of customers served by contractor
+  - `GET /api/contractor/centers?code=CON-###` → centers under this contractor
+
+Notes:
+- Client sends `?code=CON-###` where possible to avoid relying on Clerk user mapping.
+- Server tolerates `x-user-id`/`x-contractor-user-id` as a fallback.

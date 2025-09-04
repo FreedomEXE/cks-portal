@@ -105,6 +105,7 @@ router.get('/managers', async (req, res) => {
       pool.query(countQuery, values)
     ]);
 
+    // Return managers list as-is; no warehouse template filtering in this endpoint
     res.json({
       items: items.rows,
       total: Number(total.rows[0].count),
@@ -114,6 +115,54 @@ router.get('/managers', async (req, res) => {
   } catch (e: any) {
     logger.error({ error: e }, 'Admin managers list error');
     res.status(500).json({ error: 'Failed to fetch managers list' });
+  }
+});
+
+// GET /api/admin/contractors/unassigned - Get contractors without manager assignment
+router.get('/contractors/unassigned', async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(String(req.query.limit ?? '25'), 10), 100);
+    const offset = Math.max(parseInt(String(req.query.offset ?? '0'), 10), 0);
+    const search = String(req.query.q ?? '').trim();
+    
+    let whereClause = 'WHERE cks_manager IS NULL';
+    const values: any[] = [];
+    
+    if (search) {
+      values.push(`%${search}%`);
+      whereClause += ` AND (contractor_id || ' ' || COALESCE(company_name,'') || ' ' || COALESCE(email,'')) ILIKE $1`;
+    }
+    
+    const query = `
+      SELECT 
+        contractor_id, 
+        company_name, 
+        main_contact, 
+        address, 
+        phone, 
+        email,
+        'unassigned'::text as status
+      FROM contractors ${whereClause}
+      ORDER BY contractor_id
+      LIMIT $${values.length + 1} OFFSET $${values.length + 2}
+    `;
+    
+    const countQuery = `SELECT COUNT(*) FROM contractors ${whereClause}`;
+    
+    const [items, total] = await Promise.all([
+      pool.query(query, [...values, limit, offset]),
+      pool.query(countQuery, values)
+    ]);
+    
+    res.json({ 
+      items: items.rows, 
+      total: Number(total.rows[0].count),
+      page: Math.floor(offset / limit) + 1,
+      pageSize: limit
+    });
+  } catch (e: any) {
+    logger.error({ error: e }, 'Admin unassigned contractors list error');
+    res.status(500).json({ error: 'Failed to fetch unassigned contractors' });
   }
 });
 
@@ -133,7 +182,16 @@ router.get('/contractors', async (req, res) => {
     }
     
     const query = `
-      SELECT contractor_id, cks_manager, company_name, num_customers, main_contact, address, phone, email
+      SELECT 
+        contractor_id, 
+        cks_manager, 
+        company_name, 
+        0::int AS num_customers, 
+        main_contact, 
+        address, 
+        phone, 
+        email,
+        'active'::text as status
       FROM contractors ${whereClause}
       ORDER BY contractor_id
       LIMIT $${values.length + 1} OFFSET $${values.length + 2}
@@ -677,10 +735,18 @@ router.get('/catalog/items', async (req, res) => {
       pool.query(query, values),
       pool.query(countQuery, values.slice(0, -2))
     ]);
-    
+    // Filter out template/demo services (placeholder names or IDs ending in -000)
+    const filtered = (items.rows || []).filter((r: any) => {
+      const id = String(r.id || '');
+      const name = String(r.name || '');
+      if (/template/i.test(name)) return false;
+      if (/(^|-)000$/i.test(id)) return false;
+      return true;
+    });
+
     res.json({
-      items: items.rows,
-      total: Number(total.rows[0].count),
+      items: filtered,
+      total: filtered.length,
       page: Math.floor(offset / limit) + 1,
       pageSize: limit
     });
@@ -809,7 +875,8 @@ router.delete('/catalog/items/:id', async (req, res) => {
 */
 router.post('/users', async (req: Request, res: Response) => {
   try {
-    const role = String(req.body.role || '').toLowerCase();
+    const rawRole = String(req.body.role || '').toLowerCase();
+    const role = ['management','managers','mgr'].includes(rawRole) ? 'manager' : rawRole;
     if (!['manager', 'contractor', 'customer', 'center', 'crew'].includes(role)) {
       return res.status(400).json({ error: 'Invalid role' });
     }
@@ -831,15 +898,17 @@ router.post('/users', async (req: Request, res: Response) => {
     if (role === 'contractor') {
       const id = await getNextIdGeneric('contractors', 'contractor_id', 'CON-');
       const company = req.body.company_name || req.body.name;
-      const cks_manager = req.body.cks_manager;
       if (!company) return res.status(400).json({ error: 'company_name is required' });
-      if (!cks_manager) return res.status(400).json({ error: 'cks_manager is required' });
-      const { contact_person, email, phone, business_type, status } = req.body;
+      // cks_manager is optional at creation (assigned later)
+      const cks_manager = req.body.cks_manager || null;
+      const { contact_person, email, phone, address, website, status } = req.body;
       const r = await pool.query(
-        `INSERT INTO contractors(contractor_id, cks_manager, company_name, contact_person, email, phone, business_type, status)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-         RETURNING contractor_id, cks_manager, company_name, status`,
-        [id, cks_manager, company, contact_person || null, email || null, phone || null, business_type || null, status || 'active']
+        `INSERT INTO contractors(
+            contractor_id, cks_manager, company_name, main_contact, email, phone, address
+         )
+         VALUES ($1,$2,$3,$4,$5,$6,$7)
+         RETURNING contractor_id, cks_manager, company_name`,
+        [id, cks_manager, company, contact_person || null, email || null, phone || null, address || null]
       );
       return res.status(201).json({ success: true, data: r.rows[0] });
     }
@@ -906,8 +975,217 @@ router.post('/users', async (req: Request, res: Response) => {
 
     return res.status(400).json({ error: 'Unsupported role' });
   } catch (e: any) {
-    logger.error({ error: e }, 'Admin user create error');
-    res.status(500).json({ error: 'Failed to create user' });
+    logger.error({ error: e, body: req.body }, 'Admin user create error');
+    const payload: any = { error: 'Failed to create user' };
+    if (process.env.NODE_ENV !== 'production') {
+      payload.details = e?.message || String(e);
+      if (e?.code) payload.code = e.code;
+    }
+    res.status(500).json(payload);
+  }
+});
+
+// Lightweight schema introspection for troubleshooting (dev only)
+router.get('/schema/contractors', async (_req, res) => {
+  try {
+    const rows = (await pool.query(
+      `SELECT column_name, data_type, is_nullable
+       FROM information_schema.columns
+       WHERE table_name = 'contractors'
+       ORDER BY ordinal_position`
+    )).rows;
+    res.json({ success: true, data: rows });
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: 'Schema introspection failed', details: process.env.NODE_ENV !== 'production' ? e?.message : undefined });
+  }
+});
+
+// ============================================
+// DELETE ENTITIES (MVP convenience)
+// ============================================
+
+router.delete('/contractors/:id', async (req, res) => {
+  const id = String(req.params.id);
+  try {
+    const r = await pool.query('DELETE FROM contractors WHERE contractor_id = $1 RETURNING contractor_id', [id]);
+    if (r.rowCount === 0) return res.status(404).json({ error: 'Not found' });
+    return res.json({ success: true, data: { contractor_id: id } });
+  } catch (e: any) {
+    if (e?.code === '23503') return res.status(409).json({ error: 'in_use' });
+    logger.error({ error: e }, 'Admin delete contractor error');
+    return res.status(500).json({ error: 'Delete failed' });
+  }
+});
+
+router.delete('/customers/:id', async (req, res) => {
+  const id = String(req.params.id);
+  try {
+    const r = await pool.query('DELETE FROM customers WHERE customer_id = $1 RETURNING customer_id', [id]);
+    if (r.rowCount === 0) return res.status(404).json({ error: 'Not found' });
+    return res.json({ success: true, data: { customer_id: id } });
+  } catch (e: any) {
+    if (e?.code === '23503') return res.status(409).json({ error: 'in_use' });
+    logger.error({ error: e }, 'Admin delete customer error');
+    return res.status(500).json({ error: 'Delete failed' });
+  }
+});
+
+router.delete('/centers/:id', async (req, res) => {
+  const id = String(req.params.id);
+  try {
+    const r = await pool.query('DELETE FROM centers WHERE center_id = $1 RETURNING center_id', [id]);
+    if (r.rowCount === 0) return res.status(404).json({ error: 'Not found' });
+    return res.json({ success: true, data: { center_id: id } });
+  } catch (e: any) {
+    if (e?.code === '23503') return res.status(409).json({ error: 'in_use' });
+    logger.error({ error: e }, 'Admin delete center error');
+    return res.status(500).json({ error: 'Delete failed' });
+  }
+});
+
+router.delete('/crew/:id', async (req, res) => {
+  const id = String(req.params.id);
+  try {
+    const r = await pool.query('DELETE FROM crew WHERE crew_id = $1 RETURNING crew_id', [id]);
+    if (r.rowCount === 0) return res.status(404).json({ error: 'Not found' });
+    return res.json({ success: true, data: { crew_id: id } });
+  } catch (e: any) {
+    if (e?.code === '23503') return res.status(409).json({ error: 'in_use' });
+    logger.error({ error: e }, 'Admin delete crew error');
+    return res.status(500).json({ error: 'Delete failed' });
+  }
+});
+
+router.delete('/warehouses/:id', async (req, res) => {
+  const id = String(req.params.id);
+  try {
+    const r = await pool.query('DELETE FROM warehouses WHERE warehouse_id = $1 RETURNING warehouse_id', [id]);
+    if (r.rowCount === 0) return res.status(404).json({ error: 'Not found' });
+    return res.json({ success: true, data: { warehouse_id: id } });
+  } catch (e: any) {
+    if (e?.code === '23503') return res.status(409).json({ error: 'in_use' });
+    logger.error({ error: e }, 'Admin delete warehouse error');
+    return res.status(500).json({ error: 'Delete failed' });
+  }
+});
+
+router.delete('/managers/:id', async (req, res) => {
+  const id = String(req.params.id);
+  try {
+    const r = await pool.query('DELETE FROM managers WHERE manager_id = $1 RETURNING manager_id', [id]);
+    if (r.rowCount === 0) return res.status(404).json({ error: 'Not found' });
+    return res.json({ success: true, data: { manager_id: id } });
+  } catch (e: any) {
+    if (e?.code === '23503') return res.status(409).json({ error: 'in_use' });
+    logger.error({ error: e }, 'Admin delete manager error');
+    return res.status(500).json({ error: 'Delete failed' });
+  }
+});
+
+// ============================================
+// AUTH/INVITES (Clerk integration - optional)
+// ============================================
+
+/*
+  POST /api/admin/auth/invite
+  Body: { role: 'manager'|'contractor'|'customer'|'center'|'crew'|'warehouse', code: 'MGR-001'|'CON-001'|..., email: string }
+  Behavior: Creates a Clerk user (if Clerk SDK available) and sends an invite email for first sign-in.
+  Notes: This endpoint is a no-op if CLERK_SECRET_KEY is not configured or the SDK is not installed.
+*/
+router.post('/auth/invite', async (req: Request, res: Response) => {
+  const { role: rawRole, code, email } = req.body || {};
+  const role = String(rawRole || '').toLowerCase();
+  if (!email || !code || !role) {
+    return res.status(400).json({ error: 'role, code, and email are required' });
+  }
+  // Map role to metadata key for internal linkage
+  const metaKey = role === 'manager' ? 'manager_id'
+                : role === 'contractor' ? 'contractor_id'
+                : role === 'customer' ? 'customer_id'
+                : role === 'center' ? 'center_id'
+                : role === 'crew' ? 'crew_id'
+                : role === 'warehouse' ? 'warehouse_id'
+                : undefined;
+  if (!metaKey) return res.status(400).json({ error: 'unsupported_role' });
+
+  const secret = process.env.CLERK_SECRET_KEY;
+  let clerk: any = null;
+  try { clerk = require('@clerk/clerk-sdk-node'); } catch {}
+  if (!secret || !clerk) {
+    return res.status(501).json({ error: 'clerk_not_configured', details: 'Set CLERK_SECRET_KEY and install @clerk/clerk-sdk-node' });
+  }
+
+  try {
+    // Initialize Clerk client
+    const { createClerkClient } = clerk;
+    const client = createClerkClient({ secretKey: secret });
+
+    const username = String(code).toLowerCase();
+    const publicMetadata: any = { role, [metaKey]: code };
+
+    // Create user and send invitation (production only)
+    // In development, add a default password for testing
+    const isDevelopment = process.env.NODE_ENV === 'development' || !process.env.NODE_ENV;
+    const userParams: any = {
+      emailAddress: [email],
+      username,
+      publicMetadata
+    };
+    
+    if (isDevelopment) {
+      userParams.password = 'test123'; // Default password for development testing
+    }
+    
+    const user = await client.users.createUser(userParams);
+
+    const invitation = await client.invitations.createInvitation({
+      emailAddress: email,
+      publicMetadata,
+      redirectUrl: `${process.env.CORS_ORIGIN || 'http://localhost:5173'}/login`
+    });
+      
+    return res.json({ 
+      success: true, 
+      data: { 
+        clerk_user_id: user?.id || null,
+        invitation_id: invitation?.id,
+        invitation_status: invitation?.status
+      } 
+    });
+  } catch (e: any) {
+    logger.error({ error: e?.message }, 'Clerk invite failed');
+    return res.status(500).json({ error: 'clerk_invite_failed', details: e?.message });
+  }
+});
+
+// Assign contractor to manager
+router.post('/contractors/:id/assign-manager', async (req: Request, res: Response) => {
+  const contractorId = String(req.params.id || '').trim();
+  const managerId = String(req.body?.manager_id || '').trim();
+  if (!contractorId) return res.status(400).json({ error: 'contractor_id required' });
+  if (!managerId) return res.status(400).json({ error: 'manager_id required' });
+  try {
+    // Ensure manager exists (case-insensitive)
+    const mgr = await pool.query('SELECT 1 FROM managers WHERE UPPER(manager_id) = UPPER($1)', [managerId]);
+    if (mgr.rowCount === 0) return res.status(404).json({ error: 'manager_not_found' });
+    const r = await pool.query(
+      `UPDATE contractors 
+       SET cks_manager = $2
+       WHERE UPPER(contractor_id) = UPPER($1)
+       RETURNING contractor_id, cks_manager`,
+      [contractorId, managerId]
+    );
+    if (r.rowCount === 0) return res.status(404).json({ error: 'contractor_not_found' });
+    return res.json({ success: true, data: r.rows[0] });
+  } catch (e: any) {
+    logger.error({ error: e, contractorId, managerId }, 'Assign contractor->manager failed');
+    const payload: any = { error: 'assign_failed' };
+    if (process.env.NODE_ENV !== 'production') {
+      payload.details = e?.detail || e?.message || String(e);
+      if (e?.code) payload.code = e.code;
+    }
+    if (e?.code === '23503') return res.status(409).json(payload);
+    return res.status(500).json(payload);
   }
 });
 
@@ -1048,6 +1326,191 @@ router.post('/crew/:crew_id/assign-center', async (req, res) => {
   } catch (e: any) {
     logger.error({ error: e }, 'Admin crew assignment error');
     res.status(500).json({ error: 'Failed to assign crew to center' });
+  }
+});
+
+// DELETE /api/admin/contractors/:id - Delete a contractor
+router.delete('/contractors/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    if (!id) {
+      return res.status(400).json({ error: 'Contractor ID is required' });
+    }
+    
+    // Check if contractor exists
+    const existsCheck = await pool.query('SELECT contractor_id FROM contractors WHERE contractor_id = $1', [id]);
+    if (existsCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Contractor not found' });
+    }
+    
+    // Delete the contractor
+    await pool.query('DELETE FROM contractors WHERE contractor_id = $1', [id]);
+    
+    res.json({ 
+      success: true, 
+      message: `Contractor ${id} deleted successfully`
+    });
+  } catch (e: any) {
+    logger.error({ error: e, contractor_id: req.params.id }, 'Admin contractor delete error');
+    res.status(500).json({ error: 'Failed to delete contractor' });
+  }
+});
+
+// DELETE /api/admin/customers/:id - Delete a customer
+router.delete('/customers/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    if (!id) {
+      return res.status(400).json({ error: 'Customer ID is required' });
+    }
+    
+    // Check if customer exists
+    const existsCheck = await pool.query('SELECT customer_id FROM customers WHERE customer_id = $1', [id]);
+    if (existsCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Customer not found' });
+    }
+    
+    // Delete the customer
+    await pool.query('DELETE FROM customers WHERE customer_id = $1', [id]);
+    
+    res.json({ 
+      success: true, 
+      message: `Customer ${id} deleted successfully`
+    });
+  } catch (e: any) {
+    logger.error({ error: e, customer_id: req.params.id }, 'Admin customer delete error');
+    res.status(500).json({ error: 'Failed to delete customer' });
+  }
+});
+
+// DELETE /api/admin/centers/:id - Delete a center
+router.delete('/centers/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    if (!id) {
+      return res.status(400).json({ error: 'Center ID is required' });
+    }
+    
+    // Check if center exists
+    const existsCheck = await pool.query('SELECT center_id FROM centers WHERE center_id = $1', [id]);
+    if (existsCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Center not found' });
+    }
+    
+    // Delete the center
+    await pool.query('DELETE FROM centers WHERE center_id = $1', [id]);
+    
+    res.json({ 
+      success: true, 
+      message: `Center ${id} deleted successfully`
+    });
+  } catch (e: any) {
+    logger.error({ error: e, center_id: req.params.id }, 'Admin center delete error');
+    res.status(500).json({ error: 'Failed to delete center' });
+  }
+});
+
+// DELETE /api/admin/crew/:id - Delete a crew member
+router.delete('/crew/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    if (!id) {
+      return res.status(400).json({ error: 'Crew ID is required' });
+    }
+    
+    // Check if crew member exists
+    const existsCheck = await pool.query('SELECT crew_id FROM crew WHERE crew_id = $1', [id]);
+    if (existsCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Crew member not found' });
+    }
+    
+    // Delete the crew member
+    await pool.query('DELETE FROM crew WHERE crew_id = $1', [id]);
+    
+    res.json({ 
+      success: true, 
+      message: `Crew member ${id} deleted successfully`
+    });
+  } catch (e: any) {
+    logger.error({ error: e, crew_id: req.params.id }, 'Admin crew delete error');
+    res.status(500).json({ error: 'Failed to delete crew member' });
+  }
+});
+
+// DELETE /api/admin/warehouses/:id - Delete a warehouse
+router.delete('/warehouses/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    if (!id) {
+      return res.status(400).json({ error: 'Warehouse ID is required' });
+    }
+    
+    // Check if warehouse exists
+    const existsCheck = await pool.query('SELECT warehouse_id FROM warehouses WHERE warehouse_id = $1', [id]);
+    if (existsCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Warehouse not found' });
+    }
+    
+    // Delete the warehouse
+    await pool.query('DELETE FROM warehouses WHERE warehouse_id = $1', [id]);
+    
+    res.json({ 
+      success: true, 
+      message: `Warehouse ${id} deleted successfully`
+    });
+  } catch (e: any) {
+    logger.error({ error: e, warehouse_id: req.params.id }, 'Admin warehouse delete error');
+    res.status(500).json({ error: 'Failed to delete warehouse' });
+  }
+});
+
+// PATCH /api/admin/contractors/:id/assign-manager - Assign contractor to manager
+router.patch('/contractors/:id/assign-manager', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { manager_id } = req.body;
+    
+    if (!id) {
+      return res.status(400).json({ error: 'Contractor ID is required' });
+    }
+    
+    if (!manager_id) {
+      return res.status(400).json({ error: 'Manager ID is required' });
+    }
+    
+    // Check if contractor exists
+    const contractorCheck = await pool.query('SELECT contractor_id FROM contractors WHERE contractor_id = $1', [id]);
+    if (contractorCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Contractor not found' });
+    }
+    
+    // Check if manager exists
+    const managerCheck = await pool.query('SELECT manager_id, manager_name FROM managers WHERE manager_id = $1', [manager_id]);
+    if (managerCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Manager not found' });
+    }
+    
+    // Update contractor with manager assignment
+    const result = await pool.query(`
+      UPDATE contractors 
+      SET cks_manager = $1 
+      WHERE contractor_id = $2 
+      RETURNING contractor_id, cks_manager, company_name
+    `, [manager_id, id]);
+    
+    res.json({ 
+      success: true, 
+      data: result.rows[0],
+      message: `Contractor ${id} assigned to manager ${manager_id}`
+    });
+  } catch (e: any) {
+    logger.error({ error: e, contractor_id: req.params.id }, 'Admin contractor assign manager error');
+    res.status(500).json({ error: 'Failed to assign contractor to manager' });
   }
 });
 

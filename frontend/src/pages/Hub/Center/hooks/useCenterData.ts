@@ -187,10 +187,10 @@ function makeCenterDemoData(code?: string) {
     customer_account: 'Customer Demo Corp',
     contractor_assigned: 'Contractor Demo LLC',
     operation_hours: '24/7',
-    crew_capacity: 6,
-    active_crew: 4,
-    pending_tasks: 3,
-    equipment_count: 12,
+    crew_capacity: 0,
+    active_crew: 0,
+    pending_tasks: 0,
+    equipment_count: 0,
     _stub: true 
   };
 }

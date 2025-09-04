@@ -36,6 +36,7 @@
     "validate": "npm run type-check && npm run lint && npm run format:check && npm run test"
   },
   "dependencies": {
+    "@clerk/clerk-sdk-node": "^5.0.0",
     "@fastify/cors": "^9.0.1",
     "@fastify/rate-limit": "^10.3.0",
     "@prisma/client": "^5.22.0",

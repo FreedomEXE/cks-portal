@@ -26,7 +26,8 @@ Notes:
 ## Documentation
 
 - Project Index: `docs/project/index.md`
-- Latest Session Handoff: `docs/CURRENT SESSION 2025-08-29.md`
+- Latest Session Handoff: `docs/CURRENT SESSION 2025-09-02.md`
+- Session Archive: see `docs/session-archive/`
 - Key specs (examples):
   - `docs/project/CKS-Portal-Project-Outline-PRD.md`
   - `docs/project/API_SURFACE_V1.md`

@@ -20,14 +20,21 @@ function getUserId(req: Request): string {
 router.get('/profile', async (req: Request, res: Response) => {
   try {
     const userId = getUserId(req);
+    // Empty template data - will be populated when customer is created via admin
     const sample = {
       customer_id: userId || 'CUS-000',
-      customer_name: 'Customer Demo Corp',
-      cks_manager: 'MGR-001',
-      email: 'customer@demo.com',
-      phone: '(555) 222-3344',
-      address: '100 Customer Way',
-      status: 'Active'
+      customer_name: 'Not Set',
+      company_name: 'Not Set',
+      address: 'Not Set',
+      cks_manager: 'Not Assigned',
+      email: 'Not Set',
+      phone: 'Not Set',
+      main_contact: 'Not Set',
+      website: 'Not Set',
+      years_with_cks: '0 Years',
+      num_centers: '0',
+      contract_start_date: 'Not Set',
+      status: 'Not Set'
     };
     return res.json({ success: true, data: sample });
   } catch (error) {
@@ -39,11 +46,8 @@ router.get('/profile', async (req: Request, res: Response) => {
 // GET /api/customer/centers
 router.get('/centers', async (req: Request, res: Response) => {
   try {
-    const code = String(req.query.code || 'CUS-000');
-    const data = [
-      { id: 'CEN-001', name: 'Downtown Office Complex', location: 'Downtown', status: 'Active', crew_count: 3, last_service: '2025-08-22' },
-      { id: 'CEN-002', name: 'North District Plaza', location: 'North District', status: 'Active', crew_count: 2, last_service: '2025-08-21' }
-    ];
+    // Empty template data - centers will be assigned through admin system
+    const data = [];
     return res.json({ success: true, data });
   } catch (error) {
     console.error('Customer centers endpoint error:', error);
@@ -54,12 +58,8 @@ router.get('/centers', async (req: Request, res: Response) => {
 // GET /api/customer/requests
 router.get('/requests', async (req: Request, res: Response) => {
   try {
-    const limit = Number(req.query.limit || 5);
-    const data = [
-      { id: 'REQ-001', center: 'Downtown Office Complex', type: 'Cleaning', priority: 'High', status: 'Open', date: '2025-08-23' },
-      { id: 'REQ-002', center: 'North District Plaza', type: 'Maintenance', priority: 'Medium', status: 'In Progress', date: '2025-08-22' },
-      { id: 'REQ-003', center: 'West Side Mall', type: 'Security', priority: 'Low', status: 'Completed', date: '2025-08-21' }
-    ].slice(0, Math.max(1, Math.min(10, limit)));
+    // Empty template data - requests will be created as customer uses the system
+    const data = [];
     return res.json({ success: true, data });
   } catch (error) {
     console.error('Customer requests endpoint error:', error);

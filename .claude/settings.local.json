@@ -12,7 +12,12 @@
       "Bash(npx playwright install:*)",
       "Bash(npm run migration:run:*)",
       "Bash(npm run seed:run:*)",
-      "Bash(npm run migrate:*)"
+      "Bash(npm run migrate:*)",
+      "Bash(psql:*)",
+      "Bash(npx tsc:*)",
+      "Bash(git checkout:*)",
+      "Bash(npx playwright test:*)",
+      "Bash(taskkill:*)"
     ],
     "deny": [],
     "ask": []

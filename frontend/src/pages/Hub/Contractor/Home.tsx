@@ -40,7 +40,7 @@ type CustomerSummary = {
   last_service: string;
 };
 
-type ContractorSection = 'dashboard' | 'profile' | 'services' | 'customers' | 'centers' | 'crew' | 'reports' | 'orders' | 'support';
+type ContractorSection = 'dashboard' | 'profile' | 'services' | 'customers' | 'reports' | 'orders' | 'support';
 
 export default function ContractorHome() {
   const navigate = useNavigate();
@@ -113,12 +113,12 @@ export default function ContractorHome() {
           } else {
             // Demo business metrics for contractors (no revenue data)
             setBusinessMetrics([
-              { label: 'Active Customers', value: state.data?.customers_served || 15, trend: '+3', color: '#3b7af7' },
-              { label: 'Active Centers', value: state.data?.locations_active || 8, trend: '+2', color: '#8b5cf6' },
+              { label: 'Active Customers', value: state.data?.customers_served || 0, trend: 'No activity', color: '#3b7af7' },
+              { label: 'Active Centers', value: state.data?.locations_active || 0, trend: 'No activity', color: '#8b5cf6' },
               { label: 'Account Status', value: state.data?.payment_status || 'Current', color: '#10b981' },
-              { label: 'Services Used', value: state.data?.services_purchased?.length || 3, color: '#f59e0b' },
-              { label: 'Active Crew', value: state.data?.crew_assigned || 12, trend: '+1', color: '#ef4444' },
-              { label: 'Pending Orders', value: state.data?.pending_orders || 4, color: '#f97316' }
+              { label: 'Services Used', value: state.data?.services_purchased?.length || 0, color: '#f59e0b' },
+              { label: 'Active Crew', value: state.data?.crew_assigned || 0, trend: 'No activity', color: '#ef4444' },
+              { label: 'Pending Orders', value: state.data?.pending_orders || 0, color: '#f97316' }
             ]);
           }
           
@@ -129,13 +129,7 @@ export default function ContractorHome() {
             setCustomers(items);
           } else {
             // Demo customer data
-            setCustomers([
-              { id: 'cust-001', name: 'Metro Office Plaza', centers: 3, status: 'Active', last_service: '2025-08-22' },
-              { id: 'cust-002', name: 'Riverside Shopping Center', centers: 2, status: 'Active', last_service: '2025-08-21' },
-              { id: 'cust-003', name: 'Downtown Business Tower', centers: 4, status: 'Active', last_service: '2025-08-20' },
-              { id: 'cust-004', name: 'Suburban Medical Complex', centers: 1, status: 'Pending', last_service: '2025-08-15' },
-              { id: 'cust-005', name: 'Industrial Park West', centers: 2, status: 'Active', last_service: '2025-08-18' }
-            ]);
+            setCustomers([]);
           }
         }
       } catch (error) {
@@ -369,8 +363,6 @@ export default function ContractorHome() {
           { key: 'profile' as ContractorSection, label: 'Company Profile' },
           { key: 'services' as ContractorSection, label: 'My Services' },
           { key: 'customers' as ContractorSection, label: 'My Customers' },
-          { key: 'centers' as ContractorSection, label: 'My Centers' },
-          { key: 'crew' as ContractorSection, label: 'My Crew' },
           { key: 'orders' as ContractorSection, label: 'Orders' },
           { key: 'reports' as ContractorSection, label: 'Reports' },
           { key: 'support' as ContractorSection, label: 'Support' }
@@ -417,39 +409,13 @@ export default function ContractorHome() {
             </div>
 
             {/* Recent Customers */}
-            <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>Recent Customer Activity</h3>
-            <div className="ui-card" style={{ padding: 0, overflow: 'hidden' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ background: '#f9fafb' }}>
-                    <th style={{ padding: 12, textAlign: 'left', fontSize: 12, fontWeight: 600 }}>Customer</th>
-                    <th style={{ padding: 12, textAlign: 'left', fontSize: 12, fontWeight: 600 }}>Centers</th>
-                    <th style={{ padding: 12, textAlign: 'left', fontSize: 12, fontWeight: 600 }}>Status</th>
-                    <th style={{ padding: 12, textAlign: 'left', fontSize: 12, fontWeight: 600 }}>Last Service</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {customers.map((customer, i) => (
-                    <tr key={customer.id} style={{ borderBottom: i < customers.length - 1 ? '1px solid #e5e7eb' : 'none' }}>
-                      <td style={{ padding: 12, fontSize: 14, fontWeight: 500 }}>{customer.name}</td>
-                      <td style={{ padding: 12, fontSize: 14 }}>{customer.centers}</td>
-                      <td style={{ padding: 12 }}>
-                        <span style={{
-                          padding: '2px 8px',
-                          borderRadius: 12,
-                          fontSize: 12,
-                          fontWeight: 500,
-                          background: customer.status === 'Active' ? '#dcfce7' : customer.status === 'Pending' ? '#fef3c7' : '#fee2e2',
-                          color: customer.status === 'Active' ? '#166534' : customer.status === 'Pending' ? '#92400e' : '#991b1b'
-                        }}>
-                          {customer.status}
-                        </span>
-                      </td>
-                      <td style={{ padding: 12, fontSize: 14 }}>{customer.last_service}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>Recent Activity</h3>
+            <div className="ui-card" style={{ padding: 16 }}>
+              <div style={{ textAlign: 'center', padding: 32, color: '#6b7280', background: '#f9fafb', borderRadius: 8 }}>
+                <div style={{ fontSize: 48, marginBottom: 8 }}>📋</div>
+                <div style={{ fontSize: 14, fontWeight: 500 }}>No recent activity</div>
+                <div style={{ fontSize: 12, marginTop: 4 }}>Business activity will appear here as it occurs</div>
+              </div>
             </div>
 
             {/* Communication Hub */}
@@ -459,22 +425,8 @@ export default function ContractorHome() {
                 <div className="title" style={{ marginBottom: 16, color: '#10b981', display: 'flex', alignItems: 'center', gap: 8 }}>
                   📰 News & Updates
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {[
-                    { id: 1, title: "New customer opportunities available", date: "2025-08-20", priority: "High" },
-                    { id: 2, title: "Performance bonus program launched", date: "2025-08-18", priority: "Medium" },
-                    { id: 3, title: "Quarterly business review scheduled", date: "2025-08-15", priority: "Low" }
-                  ].map((item) => (
-                    <div key={item.id} style={{ 
-                      padding: 8,
-                      border: '1px solid #f3f4f6',
-                      borderRadius: 4,
-                      borderLeft: '3px solid #10b981'
-                    }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: '#111827' }}>{item.title}</div>
-                      <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>{item.date} • {item.priority} Priority</div>
-                    </div>
-                  ))}
+                <div style={{ textAlign: 'center', padding: 20, color: '#6b7280' }}>
+                  No news or updates available.
                 </div>
                 <button style={{
                   width: '100%',
@@ -499,39 +451,9 @@ export default function ContractorHome() {
               <div className="ui-card" style={{ padding: 16 }}>
                 <div className="title" style={{ marginBottom: 16, color: '#10b981', display: 'flex', alignItems: 'center', gap: 8 }}>
                   📬 Mail
-                  <span style={{ 
-                    background: '#ef4444', 
-                    color: 'white', 
-                    fontSize: 10, 
-                    padding: '2px 6px', 
-                    borderRadius: 12, 
-                    fontWeight: 600 
-                  }}>
-                    2
-                  </span>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  <div style={{ 
-                    padding: 12, 
-                    border: '1px solid #e5e7eb', 
-                    borderRadius: 6,
-                    borderLeft: '3px solid #10b981'
-                  }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>From Business Development</div>
-                    <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>New customer prospect requires immediate attention</div>
-                    <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>30 minutes ago • High Priority</div>
-                  </div>
-                  
-                  <div style={{ 
-                    padding: 12, 
-                    border: '1px solid #e5e7eb', 
-                    borderRadius: 6,
-                    borderLeft: '3px solid #10b981'
-                  }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>From Operations - Service Team</div>
-                    <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Weekly performance metrics ready for review</div>
-                    <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>2 hours ago • Medium Priority</div>
-                  </div>
+                <div style={{ textAlign: 'center', padding: 20, color: '#6b7280' }}>
+                  No messages available.
                 </div>
                 <button style={{
                   width: '100%',
@@ -728,17 +650,17 @@ export default function ContractorHome() {
                           {[
                             ['Contractor ID', state.data?.contractor_id || code],
                             ['Company Name', state.data?.company_name || companyName],
-                            ['Address', state.data?.address || '123 Business Ave, Suite 100'],
-                            ['CKS Manager (Assigned)', state.data?.cks_manager || 'Manager Demo'],
-                            ['Main Contact', state.data?.main_contact || 'John Contractor'],
-                            ['Phone', state.data?.phone || '(555) 987-6543'],
-                            ['Email', state.data?.email || 'contact@contractor-demo.com'],
-                            ['Website', state.data?.website || 'www.contractor-demo.com'],
-                            ['Years with CKS', state.data?.years_with_cks || '4 Years'],
-                            ['# of Customers', state.data?.num_customers || '8'],
-                            ['Contract Start Date', state.data?.contract_start_date || '2020-01-01'],
-                            ['Status', state.data?.status || 'Active'],
-                            ['Services Specialized In', state.data?.services_specialized || 'Cleaning, Maintenance, Security']
+                            ['Address', state.data?.address || 'Not Set'],
+                            ['CKS Manager (Assigned)', state.data?.cks_manager || 'Not Assigned'],
+                            ['Main Contact', state.data?.main_contact || 'Not Set'],
+                            ['Phone', state.data?.phone || 'Not Set'],
+                            ['Email', state.data?.email || 'Not Set'],
+                            ['Website', state.data?.website || 'Not Set'],
+                            ['Years with CKS', state.data?.years_with_cks || '0 Years'],
+                            ['# of Customers', state.data?.num_customers || '0'],
+                            ['Contract Start Date', state.data?.contract_start_date || 'Not Set'],
+                            ['Status', state.data?.status || 'Not Set'],
+                            ['Services Specialized In', state.data?.services_specialized || 'Not Set']
                           ].map(([label, value]) => (
                             <tr key={label}>
                               <td style={{ padding: '8px 0', fontWeight: 600, width: '30%' }}>{label}</td>
@@ -771,7 +693,7 @@ export default function ContractorHome() {
                         margin: '0 auto 12px',
                         border: '2px solid #3b7af7'
                       }}>
-                        {'Manager Demo'.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2) || 'MD'}
+                        '--'
                       </div>
                       <div style={{ fontSize: 12, color: '#6b7280' }}>Account Manager</div>
                     </div>
@@ -781,14 +703,14 @@ export default function ContractorHome() {
                       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                         <tbody>
                           {[
-                            ['Manager Name', 'Manager Demo'],
-                            ['Manager ID', 'MGR-001'],
-                            ['Territory', 'Demo Territory'],
-                            ['Email', 'manager@cksdemo.com'],
-                            ['Phone', '(555) 123-4567'],
-                            ['Years with CKS', '5 Years'],
-                            ['Assigned Since', '2020-01-01'],
-                            ['Contact Preference', 'Email']
+                            ['Manager Name', 'Not Assigned'],
+                            ['Manager ID', 'Not Assigned'],
+                            ['Territory', 'Not Assigned'],
+                            ['Email', 'Not Assigned'],
+                            ['Phone', 'Not Assigned'],
+                            ['Years with CKS', '0 Years'],
+                            ['Assigned Since', 'Not Assigned'],
+                            ['Contact Preference', 'Not Set']
                           ].map(([label, value]) => (
                             <tr key={label}>
                               <td style={{ padding: '8px 0', fontWeight: 600, width: '40%' }}>{label}</td>
@@ -805,43 +727,29 @@ export default function ContractorHome() {
           </div>
         )}
 
-        {/* CUSTOMERS SECTION */}
+        {/* CUSTOMERS SECTION - Hierarchical View */}
         {activeSection === 'customers' && (
           <div>
-            <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Customer Management</h2>
+            <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>My Customers</h2>
+            
+            {/* Empty State - Template Hub */}
             <div className="ui-card" style={{ padding: 16 }}>
-              <div style={{ textAlign: 'center', padding: 40, color: '#6b7280' }}>
-                Customer management portal will be implemented here.<br/>
-                This will show all customers purchasing services through this contractor,<br/>
-                their service centers, payment status, and service requests.
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* CENTERS SECTION */}
-        {activeSection === 'centers' && (
-          <div>
-            <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>My Centers</h2>
-            <div className="ui-card" style={{ padding: 16 }}>
-              <div style={{ textAlign: 'center', padding: 40, color: '#6b7280' }}>
-                Center management portal will be implemented here.<br/>
-                This will show all active centers under this contractor,<br/>
-                their status, location details, and service schedules.
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* CREW SECTION */}
-        {activeSection === 'crew' && (
-          <div>
-            <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>My Crew</h2>
-            <div className="ui-card" style={{ padding: 16 }}>
-              <div style={{ textAlign: 'center', padding: 40, color: '#6b7280' }}>
-                Crew management portal will be implemented here.<br/>
-                This will show all crew members assigned to this contractor,<br/>
-                their schedules, performance, and assignments.
+              <div style={{ textAlign: 'center', padding: 40, color: '#6b7280', background: '#f9fafb', borderRadius: 8 }}>
+                <div style={{ fontSize: 48, marginBottom: 8 }}>👤</div>
+                <div style={{ fontSize: 16, fontWeight: 500, marginBottom: 4 }}>No Customers Assigned</div>
+                <div style={{ fontSize: 12, marginTop: 4, lineHeight: 1.5 }}>
+                  When customers are assigned to this contractor via the Admin Hub,<br />
+                  they will appear here in a hierarchical view:<br />
+                  <strong>Customer → Centers → Crew</strong>
+                </div>
+                <div style={{ marginTop: 16, padding: 12, background: '#eff6ff', borderRadius: 6, border: '1px solid #dbeafe' }}>
+                  <div style={{ fontSize: 12, color: '#1e40af', fontWeight: 500, marginBottom: 4 }}>Expected Hierarchy</div>
+                  <div style={{ fontSize: 11, color: '#1e40af', textAlign: 'left' }}>
+                    👤 <strong>Customer</strong> - Top level client<br />
+                    &nbsp;&nbsp;└── 🏬 <strong>Center</strong> - Customer's service location<br />
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└── 👷 <strong>Crew</strong> - Assigned to center
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -1038,11 +946,146 @@ export default function ContractorHome() {
         {activeSection === 'support' && (
           <div>
             <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Support</h2>
+            
+            {/* Support ticket form */}
+            <div className="ui-card" style={{ padding: 16, marginBottom: 16 }}>
+              <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>Submit Support Ticket</h3>
+              <div style={{ display: 'grid', gap: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div>
+                    <label style={{ fontSize: 12, color: '#6b7280' }}>Issue Type</label>
+                    <select style={{ width: '100%', padding: 8, border: '1px solid #e5e7eb', borderRadius: 8, marginTop: 4 }}>
+                      <option value="bug">Bug Report</option>
+                      <option value="how_to">How-To Question</option>
+                      <option value="feature_question">Feature Question</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 12, color: '#6b7280' }}>Priority</label>
+                    <select style={{ width: '100%', padding: 8, border: '1px solid #e5e7eb', borderRadius: 8, marginTop: 4 }}>
+                      <option value="low">Low</option>
+                      <option value="medium">Medium</option>
+                      <option value="high">High</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, color: '#6b7280' }}>Subject</label>
+                  <input 
+                    placeholder="Brief description of your issue"
+                    style={{ width: '100%', padding: 8, border: '1px solid #e5e7eb', borderRadius: 8, marginTop: 4 }} 
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, color: '#6b7280' }}>Description</label>
+                  <textarea 
+                    rows={4}
+                    placeholder="Please provide detailed information about your issue"
+                    style={{ width: '100%', padding: 8, border: '1px solid #e5e7eb', borderRadius: 8, marginTop: 4 }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, color: '#6b7280' }}>Steps to Reproduce (optional)</label>
+                  <textarea 
+                    rows={3}
+                    placeholder="If applicable, list the steps that lead to this issue"
+                    style={{ width: '100%', padding: 8, border: '1px solid #e5e7eb', borderRadius: 8, marginTop: 4 }}
+                  />
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
+                  <button 
+                    style={{ 
+                      padding: '8px 16px', 
+                      borderRadius: 8, 
+                      border: '1px solid #e5e7eb', 
+                      background: 'white', 
+                      fontSize: 14, 
+                      cursor: 'pointer' 
+                    }}
+                  >
+                    Clear
+                  </button>
+                  <button 
+                    onClick={async (e) => {
+                      const form = e.target.closest('.ui-card');
+                      const issueType = form.querySelector('select').value;
+                      const priority = form.querySelectorAll('select')[1].value;
+                      const subject = form.querySelector('input').value;
+                      const description = form.querySelector('textarea').value;
+                      const stepsToReproduce = form.querySelectorAll('textarea')[1].value;
+                      
+                      if (!subject || !description) {
+                        alert('Please fill in subject and description');
+                        return;
+                      }
+                      
+                      try {
+                        const response = await fetch('/api/support/tickets', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          credentials: 'include',
+                          body: JSON.stringify({
+                            user_id: code,
+                            user_role: 'contractor',
+                            user_hub: 'contractor',
+                            issue_type: issueType,
+                            priority: priority,
+                            subject: subject,
+                            description: description,
+                            steps_to_reproduce: stepsToReproduce,
+                            browser_info: navigator.userAgent,
+                            current_url: window.location.href
+                          })
+                        });
+                        
+                        if (!response.ok) {
+                          throw new Error('Failed to submit support ticket');
+                        }
+                        
+                        const result = await response.json();
+                        alert(`Support ticket ${result.data.ticket_id} submitted successfully!`);
+                        
+                        // Clear form
+                        form.querySelector('input').value = '';
+                        form.querySelector('textarea').value = '';
+                        form.querySelectorAll('textarea')[1].value = '';
+                      } catch (error) {
+                        alert('Failed to submit support ticket. Please try again.');
+                        console.error('Support ticket submission error:', error);
+                      }
+                    }}
+                    style={{ 
+                      padding: '8px 16px', 
+                      borderRadius: 8, 
+                      border: 'none', 
+                      background: '#10b981', 
+                      color: 'white', 
+                      fontSize: 14, 
+                      fontWeight: 600, 
+                      cursor: 'pointer' 
+                    }}
+                  >
+                    Submit Ticket
+                  </button>
+                </div>
+              </div>
+            </div>
+            
+            {/* Support info */}
             <div className="ui-card" style={{ padding: 16 }}>
-              <div style={{ textAlign: 'center', padding: 40, color: '#6b7280' }}>
-                Contractor support center will be implemented here.<br/>
-                This will include help documentation, support tickets,<br/>
-                and direct contact with contractor support representatives.
+              <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>Premium Support</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>Technical Support</div>
+                  <div style={{ fontSize: 13, color: '#6b7280' }}>For app-related issues and questions</div>
+                  <div style={{ fontSize: 13, color: '#10b981', marginTop: 4, fontWeight: 600 }}>Priority Response: 1-4 hours</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>Account Manager</div>
+                  <div style={{ fontSize: 13, color: '#6b7280' }}>For business and contract questions</div>
+                  <div style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>See Profile → Account Manager</div>
+                </div>
               </div>
             </div>
           </div>

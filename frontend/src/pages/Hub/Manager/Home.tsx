@@ -33,7 +33,7 @@ type NewsItem = {
   center_id?: string; 
 };
 
-type ManagerSection = 'dashboard' | 'profile' | 'services' | 'contractors' | 'customers' | 'centers' | 'crew' | 'orders' | 'reports';
+type ManagerSection = 'dashboard' | 'profile' | 'services' | 'contractors' | 'assign' | 'orders' | 'reports' | 'support';
 
 export default function ManagerHome() {
   const navigate = useNavigate();
@@ -76,6 +76,11 @@ export default function ManagerHome() {
   const [fbDetail, setFbDetail] = useState<any|null>(null);
   const [archReportId, setArchReportId] = useState('');
   const [archFeedbackId, setArchFeedbackId] = useState('');
+  // Contractor hierarchical expansion state
+  const [expandedContractors, setExpandedContractors] = useState<Set<string>>(new Set());
+  const [expandedCustomers, setExpandedCustomers] = useState<Set<string>>(new Set());
+  // Assignment type selection state
+  const [assignmentType, setAssignmentType] = useState<'training' | 'services' | 'crew'>('training');
   // (Support section removed per template parity request)
   
   // Get manager code and name from profile data
@@ -291,6 +296,31 @@ export default function ManagerHome() {
     } catch { setFbDetail(null); }
   }
 
+  // Helper functions for hierarchical expansion
+  function toggleContractorExpansion(contractorId: string) {
+    setExpandedContractors(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(contractorId)) {
+        newSet.delete(contractorId);
+      } else {
+        newSet.add(contractorId);
+      }
+      return newSet;
+    });
+  }
+
+  function toggleCustomerExpansion(customerId: string) {
+    setExpandedCustomers(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(customerId)) {
+        newSet.delete(customerId);
+      } else {
+        newSet.add(customerId);
+      }
+      return newSet;
+    });
+  }
+
   const base = `/${username}/hub`;
 
   // Icon button style for navigation
@@ -395,11 +425,10 @@ export default function ManagerHome() {
           { key: 'profile' as ManagerSection, label: 'My Profile' },
           { key: 'services' as ManagerSection, label: 'My Services' },
           { key: 'contractors' as ManagerSection, label: 'My Contractors' },
-          { key: 'customers' as ManagerSection, label: 'My Customers' },
-          { key: 'centers' as ManagerSection, label: 'My Centers' },
-          { key: 'crew' as ManagerSection, label: 'My Crew' },
+          { key: 'assign' as ManagerSection, label: 'Assign' },
           { key: 'orders' as ManagerSection, label: 'Orders' },
-          { key: 'reports' as ManagerSection, label: 'Reports' }
+          { key: 'reports' as ManagerSection, label: 'Reports' },
+          { key: 'support' as ManagerSection, label: 'Support' }
         ].map(section => (
           <button
             key={section.key}
@@ -429,79 +458,30 @@ export default function ManagerHome() {
           <div>
             <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Manager Dashboard</h2>
             
-            {/* Key Metrics Overview */}
+            {/* Simple Entity Count Metrics */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', gap: 16, marginBottom: 24 }}>
               {[
-                { title: 'Territory Overview', value: '12 Contractors', subtitle: '8 Centers • 45 Crew Members', color: '#3b7af7', trend: '+2 this month' },
-                { title: 'Active Orders', value: '23', subtitle: '15 Needs Scheduling • 8 In Progress', color: '#10b981', trend: '+5 today' },
-                { title: 'Open Reports', value: '7', subtitle: '3 High Priority • 4 Medium', color: '#f59e0b', trend: '2 resolved today' },
-                { title: 'Performance', value: '92%', subtitle: 'Customer Satisfaction Score', color: '#8b5cf6', trend: '+3% this week' },
+                { title: 'My Contractors', value: '0', subtitle: 'Total contractors managed', color: '#3b7af7' },
+                { title: 'My Customers', value: '0', subtitle: 'Total customers served', color: '#10b981' },
+                { title: 'My Centers', value: '0', subtitle: 'Service centers managed', color: '#8b5cf6' },
+                { title: 'My Crew', value: '0', subtitle: 'Total crew members', color: '#f59e0b' },
               ].map(metric => (
-                <div key={metric.title} className="ui-card" style={{ padding: 16, textAlign: 'left' }}>
+                <div key={metric.title} className="ui-card" style={{ padding: 16, textAlign: 'center' }}>
                   <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>{metric.title}</div>
-                  <div style={{ fontSize: 24, fontWeight: 700, color: metric.color, marginBottom: 2 }}>{metric.value}</div>
-                  <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>{metric.subtitle}</div>
-                  <div style={{ fontSize: 11, color: metric.color, fontWeight: 600 }}>{metric.trend}</div>
+                  <div style={{ fontSize: 32, fontWeight: 700, color: metric.color, marginBottom: 2 }}>{metric.value}</div>
+                  <div style={{ fontSize: 12, color: '#6b7280' }}>{metric.subtitle}</div>
                 </div>
               ))}
             </div>
 
-            {/* Quick Actions */}
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16, marginBottom: 24 }}>
-              <div className="ui-card" style={{ padding: 16 }}>
-                <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 12, color: '#3b7af7' }}>Priority Actions</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {[
-                    { action: 'Review pending contractor approvals', count: 3, urgency: 'High', color: '#ef4444' },
-                    { action: 'Schedule crew assignments', count: 5, urgency: 'Medium', color: '#f59e0b' },
-                    { action: 'Process service requests', count: 8, urgency: 'Medium', color: '#f59e0b' },
-                    { action: 'Update center capacity reports', count: 2, urgency: 'Low', color: '#10b981' },
-                  ].map((item, i) => (
-                    <div key={i} style={{ 
-                      display: 'flex', 
-                      justifyContent: 'space-between', 
-                      alignItems: 'center',
-                      padding: 8,
-                      border: '1px solid #f3f4f6',
-                      borderRadius: 6,
-                      borderLeft: `3px solid ${item.color}`
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ fontSize: 13, fontWeight: 500 }}>{item.action}</span>
-                        <span style={{ fontSize: 11, padding: '2px 6px', borderRadius: 12, background: item.color, color: 'white' }}>
-                          {item.count}
-                        </span>
-                      </div>
-                      <span style={{ fontSize: 11, color: item.color, fontWeight: 600 }}>{item.urgency}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              
-              <div className="ui-card" style={{ padding: 16 }}>
-                <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 12, color: '#3b7af7' }}>Territory Health</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  {[
-                    { metric: 'Contractor Performance', value: 88, color: '#10b981' },
-                    { metric: 'Center Utilization', value: 76, color: '#f59e0b' },
-                    { metric: 'Crew Efficiency', value: 94, color: '#10b981' },
-                    { metric: 'Service Quality', value: 91, color: '#10b981' },
-                  ].map((item, i) => (
-                    <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: 12, color: '#6b7280' }}>{item.metric}</span>
-                        <span style={{ fontSize: 12, fontWeight: 600, color: item.color }}>{item.value}%</span>
-                      </div>
-                      <div style={{ width: '100%', height: 4, background: '#f3f4f6', borderRadius: 2, overflow: 'hidden' }}>
-                        <div style={{ 
-                          width: `${item.value}%`, 
-                          height: '100%', 
-                          background: item.color,
-                          transition: 'width 0.3s ease'
-                        }}></div>
-                      </div>
-                    </div>
-                  ))}
+            {/* Recent Actions */}
+            <div className="ui-card" style={{ padding: 16, marginBottom: 24 }}>
+              <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 12, color: '#3b7af7' }}>Recent Actions</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ textAlign: 'center', padding: 32, color: '#6b7280', background: '#f9fafb', borderRadius: 8 }}>
+                  <div style={{ fontSize: 48, marginBottom: 8 }}>📋</div>
+                  <div style={{ fontSize: 14, fontWeight: 500 }}>No recent actions</div>
+                  <div style={{ fontSize: 12, marginTop: 4 }}>Manager actions will appear here as they occur</div>
                 </div>
               </div>
             </div>
@@ -513,103 +493,302 @@ export default function ManagerHome() {
                 <div className="title" style={{ marginBottom: 16, color: '#3b7af7', display: 'flex', alignItems: 'center', gap: 8 }}>
                   📰 News & Updates
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {[
-                    { id: 1, title: "Territory performance review scheduled for Q4", date: "2025-08-20", priority: "High" },
-                    { id: 2, title: "New contractor onboarding process updated", date: "2025-08-18", priority: "Medium" },
-                    { id: 3, title: "Center capacity reports now available", date: "2025-08-15", priority: "Low" }
-                  ].map((item) => (
-                    <div key={item.id} style={{ 
-                      padding: 8,
-                      border: '1px solid #f3f4f6',
-                      borderRadius: 4,
-                      borderLeft: '3px solid #3b7af7'
-                    }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: '#111827' }}>{item.title}</div>
-                      <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>{item.date} • {item.priority} Priority</div>
-                    </div>
-                  ))}
+                <div style={{ textAlign: 'center', padding: 32, color: '#6b7280', background: '#f9fafb', borderRadius: 8 }}>
+                  <div style={{ fontSize: 48, marginBottom: 8 }}>📰</div>
+                  <div style={{ fontSize: 14, fontWeight: 500 }}>No recent news</div>
+                  <div style={{ fontSize: 12, marginTop: 4 }}>Company news and updates will appear here</div>
                 </div>
-                <button style={{
-                  width: '100%',
-                  padding: '8px 16px',
-                  fontSize: 12,
-                  backgroundColor: '#dbeafe',
-                  color: '#3b7af7',
-                  border: '1px solid #60a5fa',
-                  borderRadius: 4,
-                  cursor: 'pointer',
-                  marginTop: 8
-                }}
-                onClick={() => {
-                  alert('Full News - Coming Soon!');
-                }}
-                >
-                  View All News
-                </button>
               </div>
               
               {/* Mail & Messages */}
               <div className="ui-card" style={{ padding: 16 }}>
                 <div className="title" style={{ marginBottom: 16, color: '#3b7af7', display: 'flex', alignItems: 'center', gap: 8 }}>
                   📬 Mail
-                  <span style={{ 
-                    background: '#ef4444', 
-                    color: 'white', 
-                    fontSize: 10, 
-                    padding: '2px 6px', 
-                    borderRadius: 12, 
-                    fontWeight: 600 
-                  }}>
-                    4
-                  </span>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  <div style={{ 
-                    padding: 12, 
-                    border: '1px solid #e5e7eb', 
-                    borderRadius: 6,
-                    borderLeft: '3px solid #3b7af7'
-                  }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>From Regional Director</div>
-                    <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Quarterly territory review meeting scheduled</div>
-                    <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>45 minutes ago • High Priority</div>
-                  </div>
-                  
-                  <div style={{ 
-                    padding: 12, 
-                    border: '1px solid #e5e7eb', 
-                    borderRadius: 6,
-                    borderLeft: '3px solid #3b7af7'
-                  }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>From HR - Personnel Team</div>
-                    <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Contractor performance evaluations due</div>
-                    <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>1 hour ago • Medium Priority</div>
-                  </div>
+                <div style={{ textAlign: 'center', padding: 32, color: '#6b7280', background: '#f9fafb', borderRadius: 8 }}>
+                  <div style={{ fontSize: 48, marginBottom: 8 }}>📬</div>
+                  <div style={{ fontSize: 14, fontWeight: 500 }}>No messages</div>
+                  <div style={{ fontSize: 12, marginTop: 4 }}>Internal messages and notifications will appear here</div>
                 </div>
-                <button style={{
-                  width: '100%',
-                  padding: '8px 16px',
-                  fontSize: 12,
-                  backgroundColor: '#dbeafe',
-                  color: '#3b7af7',
-                  border: '1px solid #60a5fa',
-                  borderRadius: 4,
-                  cursor: 'pointer',
-                  marginTop: 8
-                }}
-                onClick={() => {
-                  alert('Full Mailbox - Coming Soon!');
-                }}
-                >
-                  View Mailbox
-                </button>
               </div>
             </div>
           </div>
         )}
 
-        
+        {/* ASSIGN SECTION */}
+        {activeSection === 'assign' && (
+          <div>
+            <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Assignment Management</h2>
+            
+            {/* Assignment Type Selection */}
+            <div className="ui-card" style={{ padding: 16, marginBottom: 24 }}>
+              <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 16, color: '#3b7af7' }}>What would you like to assign?</div>
+              <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
+                {[
+                  { key: 'training' as const, label: '📚 Training', desc: 'Assign training programs to crew' },
+                  { key: 'services' as const, label: '⚙️ Services', desc: 'Assign services to contractors/crew' },
+                  { key: 'crew' as const, label: '👥 Crew', desc: 'Assign crew to centers/jobs' }
+                ].map((option) => (
+                  <button
+                    key={option.key}
+                    onClick={() => setAssignmentType(option.key)}
+                    style={{
+                      flex: 1,
+                      padding: 16,
+                      borderRadius: 8,
+                      border: assignmentType === option.key ? '2px solid #3b7af7' : '1px solid #e5e7eb',
+                      background: assignmentType === option.key ? '#eff6ff' : 'white',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    <div style={{ fontSize: 14, fontWeight: 600, color: assignmentType === option.key ? '#3b7af7' : '#111827', marginBottom: 4 }}>
+                      {option.label}
+                    </div>
+                    <div style={{ fontSize: 12, color: '#6b7280' }}>
+                      {option.desc}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Assignment Content Based on Type */}
+            {assignmentType === 'training' && (
+              <div>
+                <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 16 }}>Training Assignment</h3>
+                
+                {/* Training Catalog Browser */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                  <div className="ui-card" style={{ padding: 16 }}>
+                    <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 16, color: '#3b7af7' }}>Available Training Programs</div>
+                    <div style={{ textAlign: 'center', padding: 40, color: '#6b7280', background: '#f9fafb', borderRadius: 8 }}>
+                      <div style={{ fontSize: 48, marginBottom: 8 }}>📚</div>
+                      <div style={{ fontSize: 14, fontWeight: 500 }}>No Training Catalog</div>
+                      <div style={{ fontSize: 12, marginTop: 4 }}>Training programs will be created by Admin and appear here</div>
+                    </div>
+                  </div>
+
+                  <div className="ui-card" style={{ padding: 16 }}>
+                    <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 16, color: '#3b7af7' }}>Assignment Target</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                      <div>
+                        <label style={{ fontSize: 12, color: '#6b7280' }}>Assign To</label>
+                        <select style={{ width: '100%', padding: 8, border: '1px solid #e5e7eb', borderRadius: 6, marginTop: 4 }}>
+                          <option value="">Select crew member or team</option>
+                          <option value="individual">Individual Crew Member</option>
+                          <option value="team">Entire Team</option>
+                          <option value="center">All Crew at Center</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label style={{ fontSize: 12, color: '#6b7280' }}>Due Date</label>
+                        <input type="date" style={{ width: '100%', padding: 8, border: '1px solid #e5e7eb', borderRadius: 6, marginTop: 4 }} />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: 12, color: '#6b7280' }}>Notes (optional)</label>
+                        <textarea rows={3} placeholder="Assignment notes..." style={{ width: '100%', padding: 8, border: '1px solid #e5e7eb', borderRadius: 6, marginTop: 4 }}></textarea>
+                      </div>
+                      <button style={{ 
+                        padding: '8px 16px', 
+                        background: '#10b981', 
+                        color: 'white', 
+                        border: 'none', 
+                        borderRadius: 6, 
+                        cursor: 'pointer',
+                        fontWeight: 600,
+                        opacity: 0.5
+                      }} disabled>
+                        Assign Training
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {assignmentType === 'services' && (
+              <div>
+                <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 16 }}>Service Assignment</h3>
+                <div className="ui-card" style={{ padding: 16 }}>
+                  <div style={{ textAlign: 'center', padding: 40, color: '#6b7280', background: '#f9fafb', borderRadius: 8 }}>
+                    <div style={{ fontSize: 48, marginBottom: 8 }}>⚙️</div>
+                    <div style={{ fontSize: 14, fontWeight: 500 }}>Service Assignment</div>
+                    <div style={{ fontSize: 12, marginTop: 4 }}>Service assignment workflow will be implemented based on services catalog</div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {assignmentType === 'crew' && (
+              <div>
+                <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 16 }}>Crew Assignment</h3>
+                <div className="ui-card" style={{ padding: 16 }}>
+                  <div style={{ textAlign: 'center', padding: 40, color: '#6b7280', background: '#f9fafb', borderRadius: 8 }}>
+                    <div style={{ fontSize: 48, marginBottom: 8 }}>👥</div>
+                    <div style={{ fontSize: 14, fontWeight: 500 }}>Crew Assignment</div>
+                    <div style={{ fontSize: 12, marginTop: 4 }}>Crew assignment workflow for assigning crew to centers and jobs</div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* SUPPORT SECTION */}
+        {activeSection === 'support' && (
+          <div>
+            <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Support</h2>
+            
+            {/* Support ticket form */}
+            <div className="ui-card" style={{ padding: 16, marginBottom: 16 }}>
+              <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>Submit Support Ticket</h3>
+              <div style={{ display: 'grid', gap: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div>
+                    <label style={{ fontSize: 12, color: '#6b7280' }}>Issue Type</label>
+                    <select style={{ width: '100%', padding: 8, border: '1px solid #e5e7eb', borderRadius: 8, marginTop: 4 }}>
+                      <option value="bug">Bug Report</option>
+                      <option value="how_to">How-To Question</option>
+                      <option value="feature_question">Feature Question</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 12, color: '#6b7280' }}>Priority</label>
+                    <select style={{ width: '100%', padding: 8, border: '1px solid #e5e7eb', borderRadius: 8, marginTop: 4 }}>
+                      <option value="low">Low</option>
+                      <option value="medium">Medium</option>
+                      <option value="high">High</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, color: '#6b7280' }}>Subject</label>
+                  <input 
+                    placeholder="Brief description of your issue"
+                    style={{ width: '100%', padding: 8, border: '1px solid #e5e7eb', borderRadius: 8, marginTop: 4 }} 
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, color: '#6b7280' }}>Description</label>
+                  <textarea 
+                    rows={4}
+                    placeholder="Please provide detailed information about your issue"
+                    style={{ width: '100%', padding: 8, border: '1px solid #e5e7eb', borderRadius: 8, marginTop: 4 }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, color: '#6b7280' }}>Steps to Reproduce (optional)</label>
+                  <textarea 
+                    rows={3}
+                    placeholder="If applicable, list the steps that lead to this issue"
+                    style={{ width: '100%', padding: 8, border: '1px solid #e5e7eb', borderRadius: 8, marginTop: 4 }}
+                  />
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
+                  <button 
+                    style={{ 
+                      padding: '8px 16px', 
+                      borderRadius: 8, 
+                      border: '1px solid #e5e7eb', 
+                      background: 'white', 
+                      fontSize: 14, 
+                      cursor: 'pointer' 
+                    }}
+                  >
+                    Clear
+                  </button>
+                  <button 
+                    onClick={async (e) => {
+                      const form = e.target.closest('.ui-card');
+                      const issueType = form.querySelector('select').value;
+                      const priority = form.querySelectorAll('select')[1].value;
+                      const subject = form.querySelector('input').value;
+                      const description = form.querySelector('textarea').value;
+                      const stepsToReproduce = form.querySelectorAll('textarea')[1].value;
+                      
+                      if (!subject || !description) {
+                        alert('Please fill in subject and description');
+                        return;
+                      }
+                      
+                      try {
+                        const response = await fetch('/api/support/tickets', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          credentials: 'include',
+                          body: JSON.stringify({
+                            user_id: code,
+                            user_role: 'manager',
+                            user_hub: 'manager',
+                            issue_type: issueType,
+                            priority: priority,
+                            subject: subject,
+                            description: description,
+                            steps_to_reproduce: stepsToReproduce,
+                            browser_info: navigator.userAgent,
+                            current_url: window.location.href
+                          })
+                        });
+                        
+                        if (!response.ok) {
+                          throw new Error('Failed to submit support ticket');
+                        }
+                        
+                        const result = await response.json();
+                        alert(`Support ticket ${result.data.ticket_id} submitted successfully!`);
+                        
+                        // Clear form
+                        form.querySelector('input').value = '';
+                        form.querySelector('textarea').value = '';
+                        form.querySelectorAll('textarea')[1].value = '';
+                      } catch (error) {
+                        alert('Failed to submit support ticket. Please try again.');
+                        console.error('Support ticket submission error:', error);
+                      }
+                    }}
+                    style={{ 
+                      padding: '8px 16px', 
+                      borderRadius: 8, 
+                      border: 'none', 
+                      background: '#10b981', 
+                      color: 'white', 
+                      fontSize: 14, 
+                      fontWeight: 600,
+                      cursor: 'pointer' 
+                    }}
+                  >
+                    Submit Ticket
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Help Resources */}
+            <div className="ui-card" style={{ padding: 16 }}>
+              <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>Help Resources</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 12 }}>
+                <div style={{ padding: 12, border: '1px solid #e5e7eb', borderRadius: 8, textAlign: 'center' }}>
+                  <div style={{ fontSize: 20, marginBottom: 8 }}>📖</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>Manager Guide</div>
+                  <div style={{ fontSize: 12, color: '#6b7280' }}>Complete guide to manager operations</div>
+                </div>
+                <div style={{ padding: 12, border: '1px solid #e5e7eb', borderRadius: 8, textAlign: 'center' }}>
+                  <div style={{ fontSize: 20, marginBottom: 8 }}>🎥</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>Video Tutorials</div>
+                  <div style={{ fontSize: 12, color: '#6b7280' }}>Step-by-step video instructions</div>
+                </div>
+                <div style={{ padding: 12, border: '1px solid #e5e7eb', borderRadius: 8, textAlign: 'center' }}>
+                  <div style={{ fontSize: 20, marginBottom: 8 }}>❓</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>FAQ</div>
+                  <div style={{ fontSize: 12, color: '#6b7280' }}>Frequently asked questions</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ORDERS SECTION */}
         {activeSection === 'orders' && (
@@ -784,7 +963,7 @@ export default function ManagerHome() {
             
             {/* Profile Tabs */}
             <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
-              {['Profile', 'Centers', 'Crew', 'Services', 'Performance'].map((tab, i) => (
+              {['Profile', 'Settings'].map((tab, i) => (
                 <button
                   key={tab}
                   onClick={() => setProfileTab(i)}
@@ -853,9 +1032,70 @@ export default function ManagerHome() {
                   </div>
                 </div>
               )}
-              {profileTab !== 0 && (
-                <div style={{ textAlign: 'center', padding: 40, color: '#6b7280' }}>
-                  Manager {['', 'Centers', 'Crew', 'Services', 'Performance'][profileTab]} data will be populated from Manager API
+              {profileTab === 1 && (
+                <div>
+                  <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16 }}>Manager Settings</h3>
+                  <div style={{ display: 'grid', gap: 16 }}>
+                    {/* Notification Settings */}
+                    <div>
+                      <h4 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>Notifications</h4>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+                          <input type="checkbox" defaultChecked />
+                          Email notifications for new assignments
+                        </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+                          <input type="checkbox" defaultChecked />
+                          SMS alerts for urgent issues
+                        </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+                          <input type="checkbox" />
+                          Weekly performance reports
+                        </label>
+                      </div>
+                    </div>
+
+                    {/* Display Settings */}
+                    <div>
+                      <h4 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>Display</h4>
+                      <div style={{ display: 'grid', gap: 8 }}>
+                        <div>
+                          <label style={{ fontSize: 12, color: '#6b7280' }}>Dashboard Refresh Rate</label>
+                          <select style={{ width: '200px', padding: 8, border: '1px solid #e5e7eb', borderRadius: 6, marginTop: 4 }}>
+                            <option value="30">30 seconds</option>
+                            <option value="60" selected>1 minute</option>
+                            <option value="300">5 minutes</option>
+                            <option value="600">10 minutes</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label style={{ fontSize: 12, color: '#6b7280' }}>Time Zone</label>
+                          <select style={{ width: '200px', padding: 8, border: '1px solid #e5e7eb', borderRadius: 6, marginTop: 4 }}>
+                            <option value="America/New_York">Eastern Time</option>
+                            <option value="America/Chicago">Central Time</option>
+                            <option value="America/Denver">Mountain Time</option>
+                            <option value="America/Los_Angeles">Pacific Time</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Save Button */}
+                    <div style={{ marginTop: 16 }}>
+                      <button style={{ 
+                        padding: '8px 16px', 
+                        background: '#10b981', 
+                        color: 'white', 
+                        border: 'none', 
+                        borderRadius: 6, 
+                        fontSize: 14, 
+                        fontWeight: 600, 
+                        cursor: 'pointer' 
+                      }}>
+                        Save Settings
+                      </button>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -1026,197 +1266,46 @@ export default function ManagerHome() {
           <div>
             <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>My Services</h2>
             <div className="ui-card" style={{ padding: 16 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))', gap: 16 }}>
-                {[
-                  { name: 'Territory Management', description: 'Oversee contractor operations across assigned territory', status: 'Active', priority: 'High' },
-                  { name: 'Quality Assurance', description: 'Monitor service quality and customer satisfaction', status: 'Active', priority: 'High' },
-                  { name: 'Resource Coordination', description: 'Coordinate crew and equipment allocation', status: 'Active', priority: 'Medium' },
-                  { name: 'Performance Analytics', description: 'Track KPIs and generate performance reports', status: 'Active', priority: 'Medium' },
-                  { name: 'Training & Development', description: 'Manage contractor training programs', status: 'Planned', priority: 'Low' },
-                  { name: 'Compliance Monitoring', description: 'Ensure regulatory and safety compliance', status: 'Active', priority: 'High' }
-                ].map((service, i) => (
-                  <div key={i} className="ui-card" style={{ padding: 16, borderLeft: `4px solid ${service.status === 'Active' ? '#10b981' : service.status === 'Planned' ? '#f59e0b' : '#6b7280'}` }}>
-                    <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>{service.name}</div>
-                    <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 8 }}>{service.description}</div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: 12, padding: '4px 8px', borderRadius: 12, background: service.status === 'Active' ? '#dcfce7' : service.status === 'Planned' ? '#fef3c7' : '#f3f4f6', color: service.status === 'Active' ? '#166534' : service.status === 'Planned' ? '#92400e' : '#6b7280' }}>{service.status}</span>
-                      <span style={{ fontSize: 11, color: service.priority === 'High' ? '#dc2626' : service.priority === 'Medium' ? '#d97706' : '#6b7280' }}>{service.priority} Priority</span>
-                    </div>
-                  </div>
-                ))}
+              <div style={{ textAlign: 'center', padding: 40, color: '#6b7280', background: '#f9fafb', borderRadius: 8 }}>
+                <div style={{ fontSize: 48, marginBottom: 8 }}>⚙️</div>
+                <div style={{ fontSize: 16, fontWeight: 500, marginBottom: 4 }}>No Services Assigned</div>
+                <div style={{ fontSize: 12, marginTop: 4, lineHeight: 1.5 }}>
+                  Services will be assigned to this manager territory via the Admin Hub.<br />
+                  Available services will appear here once assigned.
+                </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* CONTRACTORS SECTION */}
+        {/* CONTRACTORS SECTION - Hierarchical View */}
         {activeSection === 'contractors' && (
           <div>
             <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>My Contractors</h2>
+            
+            {/* Empty State - Template Hub */}
             <div className="ui-card" style={{ padding: 16 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(320px,1fr))', gap: 16 }}>
-                {[
-                  { id: 'CON-001', name: 'Elite Services Co.', status: 'Active', performance: 94, orders: 23, region: 'North District' },
-                  { id: 'CON-002', name: 'ProTech Solutions', status: 'Active', performance: 89, orders: 18, region: 'South District' },
-                  { id: 'CON-003', name: 'Quality First LLC', status: 'Active', performance: 91, orders: 31, region: 'East District' },
-                  { id: 'CON-004', name: 'Swift Services', status: 'Under Review', performance: 76, orders: 12, region: 'West District' },
-                  { id: 'CON-005', name: 'Advanced Tech Corp', status: 'Active', performance: 88, orders: 27, region: 'Central District' },
-                  { id: 'CON-006', name: 'Reliable Solutions', status: 'Active', performance: 92, orders: 19, region: 'North District' }
-                ].map((contractor) => (
-                  <div key={contractor.id} className="ui-card" style={{ padding: 16, borderLeft: `4px solid ${contractor.status === 'Active' ? '#10b981' : '#f59e0b'}` }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
-                      <div>
-                        <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>{contractor.name}</div>
-                        <div style={{ fontSize: 12, color: '#6b7280' }}>{contractor.id} • {contractor.region}</div>
-                      </div>
-                      <span style={{ fontSize: 11, padding: '3px 8px', borderRadius: 12, background: contractor.status === 'Active' ? '#dcfce7' : '#fef3c7', color: contractor.status === 'Active' ? '#166534' : '#92400e' }}>{contractor.status}</span>
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, fontSize: 12 }}>
-                      <div style={{ textAlign: 'center' }}>
-                        <div style={{ fontWeight: 600, color: contractor.performance >= 90 ? '#10b981' : contractor.performance >= 80 ? '#f59e0b' : '#ef4444' }}>{contractor.performance}%</div>
-                        <div style={{ color: '#6b7280' }}>Performance</div>
-                      </div>
-                      <div style={{ textAlign: 'center' }}>
-                        <div style={{ fontWeight: 600, color: '#3b7af7' }}>{contractor.orders}</div>
-                        <div style={{ color: '#6b7280' }}>Active Orders</div>
-                      </div>
-                      <div style={{ textAlign: 'center' }}>
-                        <button style={{ fontSize: 10, padding: '4px 8px', background: '#3b7af7', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}>Manage</button>
-                      </div>
-                    </div>
+              <div style={{ textAlign: 'center', padding: 40, color: '#6b7280', background: '#f9fafb', borderRadius: 8 }}>
+                <div style={{ fontSize: 48, marginBottom: 8 }}>🏢</div>
+                <div style={{ fontSize: 16, fontWeight: 500, marginBottom: 4 }}>No Contractors Assigned</div>
+                <div style={{ fontSize: 12, marginTop: 4, lineHeight: 1.5 }}>
+                  When contractors are assigned to your territory via the Admin Hub,<br />
+                  they will appear here in a hierarchical view:<br />
+                  <strong>Contractor → Customers → Centers → Crew</strong>
+                </div>
+                <div style={{ marginTop: 16, padding: 12, background: '#eff6ff', borderRadius: 6, border: '1px solid #dbeafe' }}>
+                  <div style={{ fontSize: 12, color: '#1e40af', fontWeight: 500, marginBottom: 4 }}>Expected Hierarchy</div>
+                  <div style={{ fontSize: 11, color: '#1e40af', textAlign: 'left' }}>
+                    📋 <strong>Contractor</strong> - Top level entity<br />
+                    &nbsp;&nbsp;└── 👤 <strong>Customer</strong> - Served by contractor<br />
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└── 🏬 <strong>Center</strong> - Customer's service location<br />
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└── 👷 <strong>Crew</strong> - Assigned to center
                   </div>
-                ))}
+                </div>
               </div>
             </div>
           </div>
         )}
-
-        {/* CUSTOMERS SECTION */}
-        {activeSection === 'customers' && (
-          <div>
-            <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>My Customers</h2>
-            <div className="ui-card" style={{ padding: 16 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(300px,1fr))', gap: 16 }}>
-                {[
-                  { id: 'CUS-001', name: 'Metro Property Group', type: 'Commercial', orders: 45, satisfaction: 96, region: 'Downtown' },
-                  { id: 'CUS-002', name: 'Johnson Family Trust', type: 'Residential', orders: 12, satisfaction: 92, region: 'Suburbs' },
-                  { id: 'CUS-003', name: 'Corporate Plaza LLC', type: 'Commercial', orders: 78, satisfaction: 89, region: 'Business District' },
-                  { id: 'CUS-004', name: 'Riverside Apartments', type: 'Multi-Unit', orders: 34, satisfaction: 94, region: 'Riverside' },
-                  { id: 'CUS-005', name: 'Tech Campus Inc.', type: 'Commercial', orders: 23, satisfaction: 88, region: 'Tech Park' },
-                  { id: 'CUS-006', name: 'Heritage Homes', type: 'Residential', orders: 67, satisfaction: 91, region: 'Heritage District' }
-                ].map((customer) => (
-                  <div key={customer.id} className="ui-card" style={{ padding: 16, borderLeft: `4px solid ${customer.type === 'Commercial' ? '#3b7af7' : customer.type === 'Multi-Unit' ? '#8b5cf6' : '#10b981'}` }}>
-                    <div style={{ marginBottom: 12 }}>
-                      <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>{customer.name}</div>
-                      <div style={{ fontSize: 12, color: '#6b7280' }}>{customer.id} • {customer.type} • {customer.region}</div>
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, fontSize: 12 }}>
-                      <div style={{ textAlign: 'center' }}>
-                        <div style={{ fontWeight: 600, color: '#3b7af7' }}>{customer.orders}</div>
-                        <div style={{ color: '#6b7280' }}>Total Orders</div>
-                      </div>
-                      <div style={{ textAlign: 'center' }}>
-                        <div style={{ fontWeight: 600, color: customer.satisfaction >= 90 ? '#10b981' : customer.satisfaction >= 85 ? '#f59e0b' : '#ef4444' }}>{customer.satisfaction}%</div>
-                        <div style={{ color: '#6b7280' }}>Satisfaction</div>
-                      </div>
-                      <div style={{ textAlign: 'center' }}>
-                        <button style={{ fontSize: 10, padding: '4px 8px', background: '#10b981', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}>View</button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* CENTERS SECTION */}
-        {activeSection === 'centers' && (
-          <div>
-            <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>My Centers</h2>
-            <div className="ui-card" style={{ padding: 16 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(320px,1fr))', gap: 16 }}>
-                {[
-                  { id: 'CTR-001', name: 'Downtown Service Center', capacity: 85, utilization: 92, crew: 12, orders: 34 },
-                  { id: 'CTR-002', name: 'North District Hub', capacity: 120, utilization: 78, crew: 18, orders: 28 },
-                  { id: 'CTR-003', name: 'East Side Operations', capacity: 95, utilization: 88, crew: 15, orders: 41 },
-                  { id: 'CTR-004', name: 'West End Facility', capacity: 110, utilization: 73, crew: 16, orders: 22 },
-                  { id: 'CTR-005', name: 'South Point Center', capacity: 75, utilization: 94, crew: 10, orders: 37 },
-                  { id: 'CTR-006', name: 'Central Processing Hub', capacity: 150, utilization: 81, crew: 22, orders: 45 }
-                ].map((center) => (
-                  <div key={center.id} className="ui-card" style={{ padding: 16, borderLeft: `4px solid ${center.utilization >= 85 ? '#10b981' : center.utilization >= 70 ? '#f59e0b' : '#ef4444'}` }}>
-                    <div style={{ marginBottom: 12 }}>
-                      <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>{center.name}</div>
-                      <div style={{ fontSize: 12, color: '#6b7280' }}>{center.id}</div>
-                    </div>
-                    <div style={{ marginBottom: 12 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                        <span style={{ fontSize: 12, color: '#6b7280' }}>Utilization</span>
-                        <span style={{ fontSize: 12, fontWeight: 600, color: center.utilization >= 85 ? '#10b981' : center.utilization >= 70 ? '#f59e0b' : '#ef4444' }}>{center.utilization}%</span>
-                      </div>
-                      <div style={{ width: '100%', height: 4, background: '#f3f4f6', borderRadius: 2, overflow: 'hidden' }}>
-                        <div style={{ width: `${center.utilization}%`, height: '100%', background: center.utilization >= 85 ? '#10b981' : center.utilization >= 70 ? '#f59e0b' : '#ef4444', transition: 'width 0.3s ease' }}></div>
-                      </div>
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, fontSize: 12 }}>
-                      <div style={{ textAlign: 'center' }}>
-                        <div style={{ fontWeight: 600, color: '#3b7af7' }}>{center.capacity}</div>
-                        <div style={{ color: '#6b7280' }}>Capacity</div>
-                      </div>
-                      <div style={{ textAlign: 'center' }}>
-                        <div style={{ fontWeight: 600, color: '#8b5cf6' }}>{center.crew}</div>
-                        <div style={{ color: '#6b7280' }}>Crew</div>
-                      </div>
-                      <div style={{ textAlign: 'center' }}>
-                        <div style={{ fontWeight: 600, color: '#10b981' }}>{center.orders}</div>
-                        <div style={{ color: '#6b7280' }}>Orders</div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* CREW SECTION */}
-        {activeSection === 'crew' && (
-          <div>
-            <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>My Crew</h2>
-            <div className="ui-card" style={{ padding: 16 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))', gap: 16 }}>
-                {[
-                  { id: 'CRW-001', name: 'Team Alpha', lead: 'Sarah Johnson', members: 4, center: 'CTR-001', status: 'Active', efficiency: 94 },
-                  { id: 'CRW-002', name: 'Team Beta', lead: 'Mike Chen', members: 5, center: 'CTR-002', status: 'Active', efficiency: 87 },
-                  { id: 'CRW-003', name: 'Team Gamma', lead: 'Lisa Rodriguez', members: 3, center: 'CTR-001', status: 'On Break', efficiency: 91 },
-                  { id: 'CRW-004', name: 'Team Delta', lead: 'James Wilson', members: 6, center: 'CTR-003', status: 'Active', efficiency: 89 },
-                  { id: 'CRW-005', name: 'Team Epsilon', lead: 'Amy Foster', members: 4, center: 'CTR-004', status: 'Active', efficiency: 92 },
-                  { id: 'CRW-006', name: 'Team Zeta', lead: 'David Kim', members: 5, center: 'CTR-002', status: 'Training', efficiency: 85 }
-                ].map((crew) => (
-                  <div key={crew.id} className="ui-card" style={{ padding: 16, borderLeft: `4px solid ${crew.status === 'Active' ? '#10b981' : crew.status === 'Training' ? '#f59e0b' : '#6b7280'}` }}>
-                    <div style={{ marginBottom: 12 }}>
-                      <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>{crew.name}</div>
-                      <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 2 }}>Lead: {crew.lead}</div>
-                      <div style={{ fontSize: 12, color: '#6b7280' }}>{crew.id} • {crew.center}</div>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                      <span style={{ fontSize: 11, padding: '3px 8px', borderRadius: 12, background: crew.status === 'Active' ? '#dcfce7' : crew.status === 'Training' ? '#fef3c7' : '#f3f4f6', color: crew.status === 'Active' ? '#166534' : crew.status === 'Training' ? '#92400e' : '#6b7280' }}>{crew.status}</span>
-                      <span style={{ fontSize: 12, color: '#6b7280' }}>{crew.members} members</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <span style={{ fontSize: 12, color: '#6b7280' }}>Efficiency: </span>
-                        <span style={{ fontSize: 12, fontWeight: 600, color: crew.efficiency >= 90 ? '#10b981' : crew.efficiency >= 85 ? '#f59e0b' : '#ef4444' }}>{crew.efficiency}%</span>
-                      </div>
-                      <button style={{ fontSize: 10, padding: '4px 8px', background: '#8b5cf6', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}>Assign</button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
 
       </div>
 

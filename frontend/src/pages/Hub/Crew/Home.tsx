@@ -43,7 +43,7 @@ type TrainingModule = {
   due_date: string;
 };
 
-type CrewSection = 'dashboard' | 'profile' | 'schedule' | 'tasks' | 'timecard' | 'training' | 'center' | 'services';
+type CrewSection = 'dashboard' | 'profile' | 'schedule' | 'tasks' | 'timecard' | 'training' | 'reports' | 'center' | 'services' | 'support';
 
 export default function CrewHome() {
   const navigate = useNavigate();
@@ -64,9 +64,9 @@ export default function CrewHome() {
   const storedCode = session.code || '';
   const rawCode = storedCode || state.data?.crew_id || state.data?.code || 'crew-000';
   const code = String(rawCode);
-  const crewName = state.data?.crew_name || 'Mike Johnson';
-  const centerId = state.data?.center_id || 'CEN-001';
-  const centerName = state.data?.center_assigned || 'Downtown Operations Center';
+  const crewName = state.data?.crew_name || 'Crew Member';
+  const centerId = state.data?.center_id || 'Not Assigned';
+  const centerName = state.data?.center_assigned || 'Not Assigned';
   // Reports & Feedback (read-only)
   const [repTab, setRepTab] = useState<'reports'|'feedback'>('reports');
   const [repReports, setRepReports] = useState<any[]>([]);
@@ -118,12 +118,8 @@ export default function CrewHome() {
             const items = Array.isArray(tasksData?.data) ? tasksData.data : (Array.isArray(tasksData?.tasks) ? tasksData.tasks : []);
             setDailyTasks(items);
           } else {
-            // Demo task data
-            setDailyTasks([
-              { id: 'task-001', title: 'Clean main lobby', area: 'Main Floor', priority: 'High', status: 'Completed', estimated_time: '1.5 hrs', due_time: '9:00 AM' },
-              { id: 'task-002', title: 'Restock restroom supplies', area: 'Upper Level', priority: 'Medium', status: 'In Progress', estimated_time: '30 min', due_time: '11:00 AM' },
-              { id: 'task-003', title: 'Vacuum parking garage', area: 'Parking Garage', priority: 'Low', status: 'Pending', estimated_time: '45 min', due_time: '2:00 PM' }
-            ]);
+            // No task data available
+            setDailyTasks([]);
           }
           
           // Training modules
@@ -132,12 +128,8 @@ export default function CrewHome() {
             const items = Array.isArray(trainingData?.data) ? trainingData.data : (Array.isArray(trainingData?.modules) ? trainingData.modules : []);
             setTrainingModules(items);
           } else {
-            // Demo training data
-            setTrainingModules([
-              { id: 'train-001', title: 'Chemical Safety Refresher', type: 'Safety', status: 'Required', due_date: '2025-09-15' },
-              { id: 'train-002', title: 'Equipment Maintenance', type: 'Equipment', status: 'Optional', due_date: '2025-10-01' },
-              { id: 'train-003', title: 'Emergency Procedures', type: 'Safety', status: 'Completed', due_date: '2025-08-01' }
-            ]);
+            // No training data available
+            setTrainingModules([]);
           }
         }
       } catch (error) {
@@ -149,9 +141,9 @@ export default function CrewHome() {
     return () => { cancelled = true; };
   }, [code]);
 
-  // Fetch center reports/feedback when viewing Center section
+  // Fetch center reports/feedback when viewing Reports section  
   useEffect(() => {
-    if (activeSection !== 'center') return;
+    if (activeSection !== 'reports') return;
     let cancelled = false;
     (async () => {
       try {
@@ -283,7 +275,8 @@ export default function CrewHome() {
           { key: 'center' as CrewSection, label: 'My Center' },
           { key: 'services' as CrewSection, label: 'My Services' },
           { key: 'training' as CrewSection, label: 'My Training' },
-          { key: 'supplies' as CrewSection, label: 'Supplies/Equipment' }
+          { key: 'reports' as CrewSection, label: 'Reports' },
+          { key: 'support' as CrewSection, label: 'Support' }
         ].map(section => (
           <button
             key={section.key}
@@ -316,12 +309,11 @@ export default function CrewHome() {
             {/* Quick Stats Grid */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 16, marginBottom: 24 }}>
               {[
-                { label: 'Hours This Week', value: state.data?.hours_this_week || 32, color: '#ef4444' },
-                { label: 'Tasks Completed', value: state.data?.tasks_completed || 15, trend: '+3', color: '#ef4444' },
-                { label: 'Current Status', value: state.data?.current_status || 'On Duty', color: '#10b981' },
-                { label: 'Shift Schedule', value: state.data?.shift_schedule || '6 AM - 2 PM', color: '#3b82f6' },
-                { label: 'Training Due', value: '1 Module', color: '#eab308' },
-                { label: 'Hourly Rate', value: state.data?.hourly_rate || '$18.50', color: '#8b5cf6' }
+                { label: 'Hours This Week', value: state.data?.hours_this_week || 0, color: '#ef4444' },
+                { label: 'Tasks Completed', value: state.data?.tasks_completed || 0, color: '#ef4444' },
+                { label: 'Current Status', value: state.data?.current_status || 'Off Duty', color: '#ef4444' },
+                { label: 'Shift Schedule', value: state.data?.shift_schedule || 'Not scheduled', color: '#3b82f6' },
+                { label: 'Training Due', value: trainingModules.filter(m => m.status === 'Required').length + ' Modules', color: '#eab308' }
               ].map((metric, i) => (
                 <div key={i} className="ui-card" style={{ padding: 16, textAlign: 'left' }}>
                   <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>{metric.label}</div>
@@ -360,7 +352,7 @@ export default function CrewHome() {
               
               <div className="ui-card" style={{ padding: 16, textAlign: 'center' }}>
                 <div style={{ fontSize: 12, color: '#6b7280' }}>Today's Hours</div>
-                <div style={{ fontSize: 28, fontWeight: 700, color: '#ef4444' }}>6.5</div>
+                <div style={{ fontSize: 28, fontWeight: 700, color: '#ef4444' }}>{state.data?.hours_today || 0}</div>
                 <div style={{ fontSize: 12, color: '#10b981' }}>Standard Day</div>
               </div>
             </div>
@@ -424,66 +416,37 @@ export default function CrewHome() {
                   📰 News & Updates
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  <div style={{ 
-                    padding: 12, 
-                    border: '1px solid #e5e7eb', 
-                    borderRadius: 6,
-                    borderLeft: '3px solid #ef4444'
-                  }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>Safety Reminder - PPE Required</div>
-                    <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>All crew members must wear safety equipment at all times during work hours</div>
-                    <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>1 day ago • Important</div>
-                  </div>
-                  
-                  <div style={{ 
-                    padding: 12, 
-                    border: '1px solid #e5e7eb', 
-                    borderRadius: 6,
-                    borderLeft: '3px solid #10b981'
-                  }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>New Training Module Available</div>
-                    <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Equipment maintenance training is now available in My Training section</div>
-                    <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>3 days ago • Training</div>
+                  <div style={{ color: '#6b7280', textAlign: 'center', padding: 24 }}>
+                    No news updates available.
                   </div>
                 </div>
+                <button style={{
+                  width: '100%',
+                  padding: '8px 16px',
+                  fontSize: 12,
+                  backgroundColor: '#fef2f2',
+                  color: '#ef4444',
+                  border: '1px solid #fecaca',
+                  borderRadius: 4,
+                  cursor: 'pointer',
+                  marginTop: 8
+                }}
+                onClick={() => {
+                  alert('Full News - Coming Soon!');
+                }}
+                >
+                  View All News
+                </button>
               </div>
               
               {/* Mail & Messages */}
               <div className="ui-card" style={{ padding: 16 }}>
                 <div className="title" style={{ marginBottom: 16, color: '#ef4444', display: 'flex', alignItems: 'center', gap: 8 }}>
                   📬 Mail
-                  <span style={{ 
-                    background: '#ef4444', 
-                    color: 'white', 
-                    fontSize: 10, 
-                    padding: '2px 6px', 
-                    borderRadius: 12, 
-                    fontWeight: 600 
-                  }}>
-                    2
-                  </span>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  <div style={{ 
-                    padding: 12, 
-                    border: '1px solid #e5e7eb', 
-                    borderRadius: 6,
-                    borderLeft: '3px solid #ef4444'
-                  }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>From Manager - Sarah Johnson</div>
-                    <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Your performance review is scheduled for Friday at 2 PM</div>
-                    <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>4 hours ago • High Priority</div>
-                  </div>
-                  
-                  <div style={{ 
-                    padding: 12, 
-                    border: '1px solid #e5e7eb', 
-                    borderRadius: 6,
-                    borderLeft: '3px solid #3b82f6'
-                  }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>From Center - Facility Update</div>
-                    <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Break room will be closed for maintenance tomorrow 12-2 PM</div>
-                    <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>1 day ago • Info</div>
+                  <div style={{ color: '#6b7280', textAlign: 'center', padding: 24 }}>
+                    No mail messages available.
                   </div>
                   
                   <button
@@ -583,8 +546,6 @@ export default function CrewHome() {
                             ['Home Address', 'Not Set'],
                             ['LinkedIn', 'Not Set'],
                             ['Status', 'Active'],
-                            ['Availability', 'Not Set'],
-                            ['Preferred Areas', 'Not Set'],
                             ['QR Code', 'Not Set']
                           ].map(([label, value]) => (
                             <tr key={label}>
@@ -611,8 +572,8 @@ export default function CrewHome() {
                         ['Shift Schedule', 'Not Set'],
                         ['Employment Type', 'Not Set'],
                         ['Department', 'Not Set'],
-                        ['Pay Rate', 'Not Set'],
-                        ['Availability', 'Not Set']
+                        ['Availability', 'Not Set'],
+                        ['Preferred Areas', 'Not Set']
                       ].map(([label, value]) => (
                         <tr key={label} style={{ borderBottom: '1px solid #f3f4f6' }}>
                           <td style={{ padding: '12px 0', fontWeight: 600, color: '#374151', width: '40%' }}>
@@ -797,25 +758,242 @@ export default function CrewHome() {
                 </div>
               </div>
 
-              {/* Communication Card */}
-              <div className="ui-card" style={{ padding: 20, borderLeft: '4px solid #06b6d4' }}>
-                <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
-                  <div style={{ fontSize: 16, fontWeight: 600, color: '#1f2937' }}>💬 Communication</div>
+            </div>
+
+          </div>
+        )}
+
+        {/* MY SERVICES SECTION */}
+        {activeSection === 'services' && (
+          <div>
+            <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 20 }}>My Services</h2>
+            
+            {/* Services Subsections Grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: 16, marginBottom: 24 }}>
+              
+              {/* Active Services Card */}
+              <div className="ui-card" style={{ padding: 20, borderLeft: '4px solid #10b981' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                  <div style={{ fontSize: 16, fontWeight: 600, color: '#1f2937' }}>🔥 Active Services</div>
+                  <span style={{ background: '#d1fae5', color: '#047857', padding: '2px 6px', borderRadius: 12, fontSize: 12, fontWeight: 600 }}>
+                    Live
+                  </span>
                 </div>
                 <div style={{ fontSize: 14, color: '#6b7280', lineHeight: 1.5, marginBottom: 16 }}>
-                  Messages, announcements, and team communication
+                  Currently assigned services and ongoing work orders
                 </div>
+                
+                {/* Active Services List */}
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ color: '#6b7280', textAlign: 'center', padding: 24 }}>
+                    No active services.
+                  </div>
+                </div>
+                
                 <div style={{ display: 'flex', gap: 8, fontSize: 12 }}>
-                  <span style={{ background: '#cffafe', color: '#0891b2', padding: '4px 8px', borderRadius: 4 }}>Messages</span>
-                  <span style={{ background: '#f3f4f6', color: '#4b5563', padding: '4px 8px', borderRadius: 4 }}>Updates</span>
+                  <span style={{ background: '#d1fae5', color: '#047857', padding: '4px 8px', borderRadius: 4 }}>0 Active</span>
+                  <span style={{ background: '#f3f4f6', color: '#4b5563', padding: '4px 8px', borderRadius: 4 }}>View All</span>
+                </div>
+              </div>
+
+              {/* Scheduled Services Card */}
+              <div className="ui-card" style={{ padding: 20, borderLeft: '4px solid #3b82f6' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                  <div style={{ fontSize: 16, fontWeight: 600, color: '#1f2937' }}>📅 Scheduled Services</div>
+                  <span style={{ background: '#dbeafe', color: '#1e40af', padding: '2px 6px', borderRadius: 12, fontSize: 12, fontWeight: 600 }}>
+                    Upcoming
+                  </span>
+                </div>
+                <div style={{ fontSize: 14, color: '#6b7280', lineHeight: 1.5, marginBottom: 16 }}>
+                  Future service assignments and planned work orders
+                </div>
+                
+                {/* Scheduled Services List */}
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ color: '#6b7280', textAlign: 'center', padding: 24 }}>
+                    No scheduled services.
+                  </div>
+                </div>
+                
+                <div style={{ display: 'flex', gap: 8, fontSize: 12 }}>
+                  <span style={{ background: '#dbeafe', color: '#1e40af', padding: '4px 8px', borderRadius: 4 }}>0 Upcoming</span>
+                  <span style={{ background: '#f3f4f6', color: '#4b5563', padding: '4px 8px', borderRadius: 4 }}>Calendar</span>
+                </div>
+              </div>
+
+              {/* Service History Card - Full Width */}
+              <div className="ui-card" style={{ padding: 20, borderLeft: '4px solid #6b7280', gridColumn: '1 / -1' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                  <div style={{ fontSize: 16, fontWeight: 600, color: '#1f2937' }}>📋 Service History</div>
+                  <span style={{ background: '#f3f4f6', color: '#4b5563', padding: '2px 6px', borderRadius: 12, fontSize: 12, fontWeight: 600 }}>
+                    Archive
+                  </span>
+                </div>
+                <div style={{ fontSize: 14, color: '#6b7280', lineHeight: 1.5, marginBottom: 16 }}>
+                  Search and view completed services and work order history
+                </div>
+                
+                {/* Search Bar */}
+                <div style={{ marginBottom: 16 }}>
+                  <input
+                    type="text"
+                    placeholder="Search services by location, type, date, or service ID..."
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: 6,
+                      fontSize: 14,
+                      background: 'white'
+                    }}
+                  />
+                </div>
+                
+                {/* Recent Service History */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 12, marginBottom: 16 }}>
+                  <div style={{ color: '#6b7280', textAlign: 'center', padding: 24, gridColumn: '1 / -1' }}>
+                    No service history available.
+                  </div>
+                </div>
+                
+                <div style={{ display: 'flex', gap: 8, fontSize: 12 }}>
+                  <span style={{ background: '#e5e7eb', color: '#374151', padding: '4px 8px', borderRadius: 4 }}>0 Total</span>
+                  <span style={{ background: '#f3f4f6', color: '#4b5563', padding: '4px 8px', borderRadius: 4 }}>Export</span>
+                  <span style={{ background: '#f3f4f6', color: '#4b5563', padding: '4px 8px', borderRadius: 4 }}>Filter</span>
                 </div>
               </div>
             </div>
+          </div>
+        )}
 
+        {/* MY TRAINING SECTION */}
+        {activeSection === 'training' && (
+          <div>
+            <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 20 }}>My Training</h2>
+            
+            {/* Training Subsections Grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: 16, marginBottom: 24 }}>
+              
+              {/* Completed Training Card */}
+              <div className="ui-card" style={{ padding: 20, borderLeft: '4px solid #10b981' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                  <div style={{ fontSize: 16, fontWeight: 600, color: '#1f2937' }}>✅ Completed Training</div>
+                  <span style={{ background: '#d1fae5', color: '#047857', padding: '2px 6px', borderRadius: 12, fontSize: 12, fontWeight: 600 }}>
+                    Certified
+                  </span>
+                </div>
+                <div style={{ fontSize: 14, color: '#6b7280', lineHeight: 1.5, marginBottom: 16 }}>
+                  Successfully completed training modules and certifications
+                </div>
+                
+                {/* Completed Training List */}
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ color: '#6b7280', textAlign: 'center', padding: 24 }}>
+                    No completed training available.
+                  </div>
+                </div>
+                
+                <div style={{ display: 'flex', gap: 8, fontSize: 12 }}>
+                  <span style={{ background: '#d1fae5', color: '#047857', padding: '4px 8px', borderRadius: 4 }}>0 Modules</span>
+                  <span style={{ background: '#f3f4f6', color: '#4b5563', padding: '4px 8px', borderRadius: 4 }}>Certificates</span>
+                </div>
+              </div>
+
+              {/* Scheduled Training Card */}
+              <div className="ui-card" style={{ padding: 20, borderLeft: '4px solid #3b82f6' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                  <div style={{ fontSize: 16, fontWeight: 600, color: '#1f2937' }}>📅 Scheduled Training</div>
+                  <span style={{ background: '#dbeafe', color: '#1e40af', padding: '2px 6px', borderRadius: 12, fontSize: 12, fontWeight: 600 }}>
+                    Upcoming
+                  </span>
+                </div>
+                <div style={{ fontSize: 14, color: '#6b7280', lineHeight: 1.5, marginBottom: 16 }}>
+                  Upcoming training sessions and required modules
+                </div>
+                
+                {/* Scheduled Training List */}
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ color: '#6b7280', textAlign: 'center', padding: 24 }}>
+                    No scheduled training available.
+                  </div>
+                </div>
+                
+                <div style={{ display: 'flex', gap: 8, fontSize: 12 }}>
+                  <span style={{ background: '#dbeafe', color: '#1e40af', padding: '4px 8px', borderRadius: 4 }}>0 Pending</span>
+                  <span style={{ background: '#f3f4f6', color: '#4b5563', padding: '4px 8px', borderRadius: 4 }}>Calendar</span>
+                </div>
+              </div>
+
+              {/* Training Progress Card */}
+              <div className="ui-card" style={{ padding: 20, borderLeft: '4px solid #8b5cf6' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                  <div style={{ fontSize: 16, fontWeight: 600, color: '#1f2937' }}>📊 Training Progress</div>
+                  <span style={{ background: '#ede9fe', color: '#7c3aed', padding: '2px 6px', borderRadius: 12, fontSize: 12, fontWeight: 600 }}>
+                    0%
+                  </span>
+                </div>
+                <div style={{ fontSize: 14, color: '#6b7280', lineHeight: 1.5, marginBottom: 16 }}>
+                  Current training progress and annual requirements
+                </div>
+                
+                {/* Progress Items */}
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ marginBottom: 8 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: '#1f2937', marginBottom: 4 }}>Annual Training Hours</div>
+                    <div style={{ background: '#f3f4f6', borderRadius: 4, height: 8, marginBottom: 4 }}>
+                      <div style={{ background: '#e5e7eb', borderRadius: 4, height: 8, width: '0%' }}></div>
+                    </div>
+                    <div style={{ fontSize: 12, color: '#6b7280' }}>0 of 40 hours completed</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: '#1f2937', marginBottom: 4 }}>Certification Renewal</div>
+                    <div style={{ fontSize: 12, color: '#6b7280' }}>0 certifications expire within 90 days</div>
+                  </div>
+                </div>
+                
+                <div style={{ display: 'flex', gap: 8, fontSize: 12 }}>
+                  <span style={{ background: '#ede9fe', color: '#7c3aed', padding: '4px 8px', borderRadius: 4 }}>Progress</span>
+                  <span style={{ background: '#f3f4f6', color: '#4b5563', padding: '4px 8px', borderRadius: 4 }}>Reports</span>
+                </div>
+              </div>
+
+              {/* Certifications Card */}
+              <div className="ui-card" style={{ padding: 20, borderLeft: '4px solid #f59e0b' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                  <div style={{ fontSize: 16, fontWeight: 600, color: '#1f2937' }}>🏆 Certifications</div>
+                  <span style={{ background: '#fef3c7', color: '#92400e', padding: '2px 6px', borderRadius: 12, fontSize: 12, fontWeight: 600 }}>
+                    Active
+                  </span>
+                </div>
+                <div style={{ fontSize: 14, color: '#6b7280', lineHeight: 1.5, marginBottom: 16 }}>
+                  Current certifications and professional credentials
+                </div>
+                
+                {/* Certifications List */}
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ color: '#6b7280', textAlign: 'center', padding: 24 }}>
+                    No certifications available.
+                  </div>
+                </div>
+                
+                <div style={{ display: 'flex', gap: 8, fontSize: 12 }}>
+                  <span style={{ background: '#fef3c7', color: '#92400e', padding: '4px 8px', borderRadius: 4 }}>0 Active</span>
+                  <span style={{ background: '#f3f4f6', color: '#4b5563', padding: '4px 8px', borderRadius: 4 }}>Renew</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* REPORTS SECTION */}
+        {activeSection === 'reports' && (
+          <div>
+            <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 20 }}>Reports & Feedback</h2>
+            
             {/* Reports & Feedback (read-only) */}
-            <div className="ui-card" style={{ padding: 16, marginTop: 12 }}>
+            <div className="ui-card" style={{ padding: 16 }}>
               <div style={{ display:'flex', gap:8, alignItems:'center', marginBottom: 12 }}>
-                <div style={{ fontWeight: 700 }}>Reports & Feedback</div>
+                <div style={{ fontWeight: 700 }}>Center Reports & Feedback</div>
                 <div style={{ display:'inline-flex', gap:8, marginLeft: 12 }}>
                   <button onClick={()=>setRepTab('reports')} style={{ padding:'6px 10px', borderRadius:8, border:'1px solid #e5e7eb', background: repTab==='reports'?'#ef4444':'white', color: repTab==='reports'?'white':'#111827', fontSize:12, fontWeight:700 }}>Reports</button>
                   <button onClick={()=>setRepTab('feedback')} style={{ padding:'6px 10px', borderRadius:8, border:'1px solid #e5e7eb', background: repTab==='feedback'?'#ef4444':'white', color: repTab==='feedback'?'white':'#111827', fontSize:12, fontWeight:700 }}>Feedback</button>
@@ -954,269 +1132,8 @@ export default function CrewHome() {
           </div>
         )}
 
-        {/* MY SERVICES SECTION */}
-        {activeSection === 'services' && (
-          <div>
-            <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 20 }}>My Services</h2>
-            
-            {/* Services Subsections Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: 16, marginBottom: 24 }}>
-              
-              {/* Active Services Card */}
-              <div className="ui-card" style={{ padding: 20, borderLeft: '4px solid #10b981' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                  <div style={{ fontSize: 16, fontWeight: 600, color: '#1f2937' }}>🔥 Active Services</div>
-                  <span style={{ background: '#d1fae5', color: '#047857', padding: '2px 6px', borderRadius: 12, fontSize: 12, fontWeight: 600 }}>
-                    Live
-                  </span>
-                </div>
-                <div style={{ fontSize: 14, color: '#6b7280', lineHeight: 1.5, marginBottom: 16 }}>
-                  Currently assigned services and ongoing work orders
-                </div>
-                
-                {/* Active Services List */}
-                <div style={{ marginBottom: 16 }}>
-                  <div style={{ background: '#f9fafb', padding: 12, borderRadius: 6, marginBottom: 8, borderLeft: '3px solid #10b981' }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#1f2937' }}>Downtown Office Complex - Floor Care</div>
-                    <div style={{ fontSize: 12, color: '#6b7280' }}>Started: Today 8:00 AM • Progress: 60%</div>
-                  </div>
-                  <div style={{ background: '#f9fafb', padding: 12, borderRadius: 6, marginBottom: 8, borderLeft: '3px solid #f59e0b' }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#1f2937' }}>Medical Center - Deep Clean</div>
-                    <div style={{ fontSize: 12, color: '#6b7280' }}>Started: 2:00 PM • Progress: 25%</div>
-                  </div>
-                </div>
-                
-                <div style={{ display: 'flex', gap: 8, fontSize: 12 }}>
-                  <span style={{ background: '#d1fae5', color: '#047857', padding: '4px 8px', borderRadius: 4 }}>2 Active</span>
-                  <span style={{ background: '#f3f4f6', color: '#4b5563', padding: '4px 8px', borderRadius: 4 }}>View All</span>
-                </div>
-              </div>
-
-              {/* Scheduled Services Card */}
-              <div className="ui-card" style={{ padding: 20, borderLeft: '4px solid #3b82f6' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                  <div style={{ fontSize: 16, fontWeight: 600, color: '#1f2937' }}>📅 Scheduled Services</div>
-                  <span style={{ background: '#dbeafe', color: '#1e40af', padding: '2px 6px', borderRadius: 12, fontSize: 12, fontWeight: 600 }}>
-                    Upcoming
-                  </span>
-                </div>
-                <div style={{ fontSize: 14, color: '#6b7280', lineHeight: 1.5, marginBottom: 16 }}>
-                  Future service assignments and planned work orders
-                </div>
-                
-                {/* Scheduled Services List */}
-                <div style={{ marginBottom: 16 }}>
-                  <div style={{ background: '#f9fafb', padding: 12, borderRadius: 6, marginBottom: 8, borderLeft: '3px solid #3b82f6' }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#1f2937' }}>Retail Plaza - Window Cleaning</div>
-                    <div style={{ fontSize: 12, color: '#6b7280' }}>Tomorrow 9:00 AM • Duration: 4 hours</div>
-                  </div>
-                  <div style={{ background: '#f9fafb', padding: 12, borderRadius: 6, marginBottom: 8, borderLeft: '3px solid #8b5cf6' }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#1f2937' }}>Corporate HQ - Carpet Care</div>
-                    <div style={{ fontSize: 12, color: '#6b7280' }}>Friday 6:00 AM • Duration: 8 hours</div>
-                  </div>
-                </div>
-                
-                <div style={{ display: 'flex', gap: 8, fontSize: 12 }}>
-                  <span style={{ background: '#dbeafe', color: '#1e40af', padding: '4px 8px', borderRadius: 4 }}>5 Upcoming</span>
-                  <span style={{ background: '#f3f4f6', color: '#4b5563', padding: '4px 8px', borderRadius: 4 }}>Calendar</span>
-                </div>
-              </div>
-
-              {/* Service History Card - Full Width */}
-              <div className="ui-card" style={{ padding: 20, borderLeft: '4px solid #6b7280', gridColumn: '1 / -1' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                  <div style={{ fontSize: 16, fontWeight: 600, color: '#1f2937' }}>📋 Service History</div>
-                  <span style={{ background: '#f3f4f6', color: '#4b5563', padding: '2px 6px', borderRadius: 12, fontSize: 12, fontWeight: 600 }}>
-                    Archive
-                  </span>
-                </div>
-                <div style={{ fontSize: 14, color: '#6b7280', lineHeight: 1.5, marginBottom: 16 }}>
-                  Search and view completed services and work order history
-                </div>
-                
-                {/* Search Bar */}
-                <div style={{ marginBottom: 16 }}>
-                  <input
-                    type="text"
-                    placeholder="Search services by location, type, date, or service ID..."
-                    style={{
-                      width: '100%',
-                      padding: '10px 12px',
-                      border: '1px solid #d1d5db',
-                      borderRadius: 6,
-                      fontSize: 14,
-                      background: 'white'
-                    }}
-                  />
-                </div>
-                
-                {/* Recent Service History */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 12, marginBottom: 16 }}>
-                  <div style={{ background: '#f9fafb', padding: 12, borderRadius: 6, borderLeft: '3px solid #10b981', cursor: 'pointer' }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#1f2937' }}>Bank Branch - Sanitization • SRV-001234</div>
-                    <div style={{ fontSize: 12, color: '#6b7280' }}>Aug 23, 2025 • Completed • 6 hours</div>
-                    <div style={{ fontSize: 11, color: '#10b981', marginTop: 4 }}>✓ Completed Successfully</div>
-                  </div>
-                  
-                  <div style={{ background: '#f9fafb', padding: 12, borderRadius: 6, borderLeft: '3px solid #10b981', cursor: 'pointer' }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#1f2937' }}>Shopping Center - Floor Wax • SRV-001233</div>
-                    <div style={{ fontSize: 12, color: '#6b7280' }}>Aug 22, 2025 • Completed • 8 hours</div>
-                    <div style={{ fontSize: 11, color: '#10b981', marginTop: 4 }}>✓ Completed Successfully</div>
-                  </div>
-                  
-                  <div style={{ background: '#f9fafb', padding: 12, borderRadius: 6, borderLeft: '3px solid #10b981', cursor: 'pointer' }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#1f2937' }}>Office Building - Deep Clean • SRV-001232</div>
-                    <div style={{ fontSize: 12, color: '#6b7280' }}>Aug 21, 2025 • Completed • 10 hours</div>
-                    <div style={{ fontSize: 11, color: '#10b981', marginTop: 4 }}>✓ Completed Successfully</div>
-                  </div>
-                </div>
-                
-                <div style={{ display: 'flex', gap: 8, fontSize: 12 }}>
-                  <span style={{ background: '#e5e7eb', color: '#374151', padding: '4px 8px', borderRadius: 4 }}>147 Total</span>
-                  <span style={{ background: '#f3f4f6', color: '#4b5563', padding: '4px 8px', borderRadius: 4 }}>Export</span>
-                  <span style={{ background: '#f3f4f6', color: '#4b5563', padding: '4px 8px', borderRadius: 4 }}>Filter</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* MY TRAINING SECTION */}
-        {activeSection === 'training' && (
-          <div>
-            <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 20 }}>My Training</h2>
-            
-            {/* Training Subsections Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: 16, marginBottom: 24 }}>
-              
-              {/* Completed Training Card */}
-              <div className="ui-card" style={{ padding: 20, borderLeft: '4px solid #10b981' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                  <div style={{ fontSize: 16, fontWeight: 600, color: '#1f2937' }}>✅ Completed Training</div>
-                  <span style={{ background: '#d1fae5', color: '#047857', padding: '2px 6px', borderRadius: 12, fontSize: 12, fontWeight: 600 }}>
-                    Certified
-                  </span>
-                </div>
-                <div style={{ fontSize: 14, color: '#6b7280', lineHeight: 1.5, marginBottom: 16 }}>
-                  Successfully completed training modules and certifications
-                </div>
-                
-                {/* Completed Training List */}
-                <div style={{ marginBottom: 16 }}>
-                  <div style={{ background: '#f9fafb', padding: 12, borderRadius: 6, marginBottom: 8, borderLeft: '3px solid #10b981' }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#1f2937' }}>OSHA Safety Training</div>
-                    <div style={{ fontSize: 12, color: '#6b7280' }}>Completed: Aug 15, 2025 • Valid until: Aug 15, 2026</div>
-                  </div>
-                  <div style={{ background: '#f9fafb', padding: 12, borderRadius: 6, marginBottom: 8, borderLeft: '3px solid #10b981' }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#1f2937' }}>Floor Care Specialist</div>
-                    <div style={{ fontSize: 12, color: '#6b7280' }}>Completed: Jul 28, 2025 • Certificate ID: FC-2025-001</div>
-                  </div>
-                </div>
-                
-                <div style={{ display: 'flex', gap: 8, fontSize: 12 }}>
-                  <span style={{ background: '#d1fae5', color: '#047857', padding: '4px 8px', borderRadius: 4 }}>12 Modules</span>
-                  <span style={{ background: '#f3f4f6', color: '#4b5563', padding: '4px 8px', borderRadius: 4 }}>Certificates</span>
-                </div>
-              </div>
-
-              {/* Scheduled Training Card */}
-              <div className="ui-card" style={{ padding: 20, borderLeft: '4px solid #3b82f6' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                  <div style={{ fontSize: 16, fontWeight: 600, color: '#1f2937' }}>📅 Scheduled Training</div>
-                  <span style={{ background: '#dbeafe', color: '#1e40af', padding: '2px 6px', borderRadius: 12, fontSize: 12, fontWeight: 600 }}>
-                    Upcoming
-                  </span>
-                </div>
-                <div style={{ fontSize: 14, color: '#6b7280', lineHeight: 1.5, marginBottom: 16 }}>
-                  Upcoming training sessions and required modules
-                </div>
-                
-                {/* Scheduled Training List */}
-                <div style={{ marginBottom: 16 }}>
-                  <div style={{ background: '#f9fafb', padding: 12, borderRadius: 6, marginBottom: 8, borderLeft: '3px solid #3b82f6' }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#1f2937' }}>Fire Safety Refresher</div>
-                    <div style={{ fontSize: 12, color: '#6b7280' }}>Sep 15, 2025 • 2:00 PM • Duration: 2 hours</div>
-                  </div>
-                  <div style={{ background: '#f9fafb', padding: 12, borderRadius: 6, marginBottom: 8, borderLeft: '3px solid #f59e0b' }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#1f2937' }}>Chemical Handling Training</div>
-                    <div style={{ fontSize: 12, color: '#6b7280' }}>Sep 22, 2025 • 10:00 AM • Duration: 4 hours</div>
-                  </div>
-                </div>
-                
-                <div style={{ display: 'flex', gap: 8, fontSize: 12 }}>
-                  <span style={{ background: '#dbeafe', color: '#1e40af', padding: '4px 8px', borderRadius: 4 }}>3 Pending</span>
-                  <span style={{ background: '#f3f4f6', color: '#4b5563', padding: '4px 8px', borderRadius: 4 }}>Calendar</span>
-                </div>
-              </div>
-
-              {/* Training Progress Card */}
-              <div className="ui-card" style={{ padding: 20, borderLeft: '4px solid #8b5cf6' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                  <div style={{ fontSize: 16, fontWeight: 600, color: '#1f2937' }}>📊 Training Progress</div>
-                  <span style={{ background: '#ede9fe', color: '#7c3aed', padding: '2px 6px', borderRadius: 12, fontSize: 12, fontWeight: 600 }}>
-                    85%
-                  </span>
-                </div>
-                <div style={{ fontSize: 14, color: '#6b7280', lineHeight: 1.5, marginBottom: 16 }}>
-                  Current training progress and annual requirements
-                </div>
-                
-                {/* Progress Items */}
-                <div style={{ marginBottom: 16 }}>
-                  <div style={{ marginBottom: 8 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#1f2937', marginBottom: 4 }}>Annual Training Hours</div>
-                    <div style={{ background: '#f3f4f6', borderRadius: 4, height: 8, marginBottom: 4 }}>
-                      <div style={{ background: '#8b5cf6', borderRadius: 4, height: 8, width: '75%' }}></div>
-                    </div>
-                    <div style={{ fontSize: 12, color: '#6b7280' }}>24 of 32 hours completed</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#1f2937', marginBottom: 4 }}>Certification Renewal</div>
-                    <div style={{ fontSize: 12, color: '#6b7280' }}>2 certifications expire within 90 days</div>
-                  </div>
-                </div>
-                
-                <div style={{ display: 'flex', gap: 8, fontSize: 12 }}>
-                  <span style={{ background: '#ede9fe', color: '#7c3aed', padding: '4px 8px', borderRadius: 4 }}>Progress</span>
-                  <span style={{ background: '#f3f4f6', color: '#4b5563', padding: '4px 8px', borderRadius: 4 }}>Reports</span>
-                </div>
-              </div>
-
-              {/* Certifications Card */}
-              <div className="ui-card" style={{ padding: 20, borderLeft: '4px solid #f59e0b' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                  <div style={{ fontSize: 16, fontWeight: 600, color: '#1f2937' }}>🏆 Certifications</div>
-                  <span style={{ background: '#fef3c7', color: '#92400e', padding: '2px 6px', borderRadius: 12, fontSize: 12, fontWeight: 600 }}>
-                    Active
-                  </span>
-                </div>
-                <div style={{ fontSize: 14, color: '#6b7280', lineHeight: 1.5, marginBottom: 16 }}>
-                  Current certifications and professional credentials
-                </div>
-                
-                {/* Certifications List */}
-                <div style={{ marginBottom: 16 }}>
-                  <div style={{ background: '#f9fafb', padding: 12, borderRadius: 6, marginBottom: 8, borderLeft: '3px solid #f59e0b' }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#1f2937' }}>Level 3 Certified Cleaner</div>
-                    <div style={{ fontSize: 12, color: '#6b7280' }}>Issued: Jan 2025 • Valid until: Jan 2027</div>
-                  </div>
-                  <div style={{ background: '#f9fafb', padding: 12, borderRadius: 6, marginBottom: 8, borderLeft: '3px solid #10b981' }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#1f2937' }}>Equipment Operator Certified</div>
-                    <div style={{ fontSize: 12, color: '#6b7280' }}>Issued: Mar 2025 • Valid until: Mar 2026</div>
-                  </div>
-                </div>
-                
-                <div style={{ display: 'flex', gap: 8, fontSize: 12 }}>
-                  <span style={{ background: '#fef3c7', color: '#92400e', padding: '4px 8px', borderRadius: 4 }}>5 Active</span>
-                  <span style={{ background: '#f3f4f6', color: '#4b5563', padding: '4px 8px', borderRadius: 4 }}>Renew</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* SUPPLIES/EQUIPMENT SECTION */}
-        {activeSection === 'supplies' && (
+        {/* SUPPLIES/EQUIPMENT SECTION - Future feature */}
+        {false && (
           <div>
             <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 20 }}>Supplies & Equipment</h2>
             
@@ -1237,20 +1154,13 @@ export default function CrewHome() {
                 
                 {/* Active Supplies List */}
                 <div style={{ marginBottom: 16 }}>
-                  <div style={{ background: '#f9fafb', padding: 12, borderRadius: 6, marginBottom: 8, borderLeft: '3px solid #10b981' }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#1f2937' }}>Floor Buffer - Model FB200</div>
-                    <div style={{ fontSize: 12, color: '#6b7280' }}>Assigned: Aug 20, 2025 • Condition: Good</div>
-                    <div style={{ fontSize: 11, color: '#10b981', marginTop: 4 }}>Status: In Use</div>
-                  </div>
-                  <div style={{ background: '#f9fafb', padding: 12, borderRadius: 6, marginBottom: 8, borderLeft: '3px solid #f59e0b' }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#1f2937' }}>Cleaning Cart - Standard Kit</div>
-                    <div style={{ fontSize: 12, color: '#6b7280' }}>Assigned: Aug 1, 2025 • Condition: Fair</div>
-                    <div style={{ fontSize: 11, color: '#f59e0b', marginTop: 4 }}>Status: Needs Maintenance</div>
+                  <div style={{ color: '#6b7280', textAlign: 'center', padding: 24 }}>
+                    No active supplies assigned.
                   </div>
                 </div>
                 
                 <div style={{ display: 'flex', gap: 8, fontSize: 12 }}>
-                  <span style={{ background: '#d1fae5', color: '#047857', padding: '4px 8px', borderRadius: 4 }}>8 Items</span>
+                  <span style={{ background: '#d1fae5', color: '#047857', padding: '4px 8px', borderRadius: 4 }}>0 Items</span>
                   <span style={{ background: '#f3f4f6', color: '#4b5563', padding: '4px 8px', borderRadius: 4 }}>Request New</span>
                 </div>
               </div>
@@ -1269,13 +1179,8 @@ export default function CrewHome() {
                 
                 {/* Recent Requests */}
                 <div style={{ marginBottom: 16 }}>
-                  <div style={{ background: '#f9fafb', padding: 12, borderRadius: 6, marginBottom: 8, borderLeft: '3px solid #3b82f6' }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#1f2937' }}>Vacuum Cleaner Replacement</div>
-                    <div style={{ fontSize: 12, color: '#6b7280' }}>Requested: Aug 24, 2025 • Status: Approved</div>
-                  </div>
-                  <div style={{ background: '#f9fafb', padding: 12, borderRadius: 6, marginBottom: 8, borderLeft: '3px solid #f59e0b' }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#1f2937' }}>Floor Cleaner Refill</div>
-                    <div style={{ fontSize: 12, color: '#6b7280' }}>Requested: Aug 23, 2025 • Status: Processing</div>
+                  <div style={{ color: '#6b7280', textAlign: 'center', padding: 24 }}>
+                    No recent requests.
                   </div>
                 </div>
                 
@@ -1315,29 +1220,164 @@ export default function CrewHome() {
                 
                 {/* Historical Supply Records */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 12, marginBottom: 16 }}>
-                  <div style={{ background: '#f9fafb', padding: 12, borderRadius: 6, borderLeft: '3px solid #6b7280' }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#1f2937' }}>Carpet Cleaner - Model CC150</div>
-                    <div style={{ fontSize: 12, color: '#6b7280' }}>Used: Jun 15 - Aug 10, 2025 • Condition: Returned Good</div>
-                    <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>Status: Archived</div>
-                  </div>
-                  
-                  <div style={{ background: '#f9fafb', padding: 12, borderRadius: 6, borderLeft: '3px solid #ef4444' }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#1f2937' }}>Window Squeegee Set</div>
-                    <div style={{ fontSize: 12, color: '#6b7280' }}>Used: May 20 - Jul 30, 2025 • Condition: Damaged</div>
-                    <div style={{ fontSize: 11, color: '#ef4444', marginTop: 4 }}>Status: Replaced</div>
-                  </div>
-                  
-                  <div style={{ background: '#f9fafb', padding: 12, borderRadius: 6, borderLeft: '3px solid #6b7280' }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#1f2937' }}>Safety Gear Set - PPE Kit</div>
-                    <div style={{ fontSize: 12, color: '#6b7280' }}>Used: Apr 1 - Jun 30, 2025 • Condition: Worn Out</div>
-                    <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>Status: Archived</div>
+                  <div style={{ color: '#6b7280', textAlign: 'center', padding: 24, gridColumn: '1 / -1' }}>
+                    No supply history available.
                   </div>
                 </div>
                 
                 <div style={{ display: 'flex', gap: 8, fontSize: 12 }}>
-                  <span style={{ background: '#e5e7eb', color: '#374151', padding: '4px 8px', borderRadius: 4 }}>89 Records</span>
+                  <span style={{ background: '#e5e7eb', color: '#374151', padding: '4px 8px', borderRadius: 4 }}>0 Records</span>
                   <span style={{ background: '#f3f4f6', color: '#4b5563', padding: '4px 8px', borderRadius: 4 }}>Export</span>
                   <span style={{ background: '#f3f4f6', color: '#4b5563', padding: '4px 8px', borderRadius: 4 }}>Filter</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* SUPPORT SECTION */}
+        {activeSection === 'support' && (
+          <div>
+            <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Support</h2>
+            
+            {/* Support ticket form */}
+            <div className="ui-card" style={{ padding: 16, marginBottom: 16 }}>
+              <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>Submit Support Ticket</h3>
+              <div style={{ display: 'grid', gap: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div>
+                    <label style={{ fontSize: 12, color: '#6b7280' }}>Issue Type</label>
+                    <select style={{ width: '100%', padding: 8, border: '1px solid #e5e7eb', borderRadius: 8, marginTop: 4 }}>
+                      <option value="bug">Bug Report</option>
+                      <option value="how_to">How-To Question</option>
+                      <option value="feature_question">Feature Question</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 12, color: '#6b7280' }}>Priority</label>
+                    <select style={{ width: '100%', padding: 8, border: '1px solid #e5e7eb', borderRadius: 8, marginTop: 4 }}>
+                      <option value="low">Low</option>
+                      <option value="medium">Medium</option>
+                      <option value="high">High</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, color: '#6b7280' }}>Subject</label>
+                  <input 
+                    placeholder="Brief description of your issue"
+                    style={{ width: '100%', padding: 8, border: '1px solid #e5e7eb', borderRadius: 8, marginTop: 4 }} 
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, color: '#6b7280' }}>Description</label>
+                  <textarea 
+                    rows={4}
+                    placeholder="Please provide detailed information about your issue"
+                    style={{ width: '100%', padding: 8, border: '1px solid #e5e7eb', borderRadius: 8, marginTop: 4 }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, color: '#6b7280' }}>Steps to Reproduce (optional)</label>
+                  <textarea 
+                    rows={3}
+                    placeholder="If applicable, list the steps that lead to this issue"
+                    style={{ width: '100%', padding: 8, border: '1px solid #e5e7eb', borderRadius: 8, marginTop: 4 }}
+                  />
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
+                  <button 
+                    style={{ 
+                      padding: '8px 16px', 
+                      borderRadius: 8, 
+                      border: '1px solid #e5e7eb', 
+                      background: 'white', 
+                      fontSize: 14, 
+                      cursor: 'pointer' 
+                    }}
+                  >
+                    Clear
+                  </button>
+                  <button 
+                    onClick={async (e) => {
+                      const form = e.target.closest('.ui-card');
+                      const issueType = form.querySelector('select').value;
+                      const priority = form.querySelectorAll('select')[1].value;
+                      const subject = form.querySelector('input').value;
+                      const description = form.querySelector('textarea').value;
+                      const stepsToReproduce = form.querySelectorAll('textarea')[1].value;
+                      
+                      if (!subject || !description) {
+                        alert('Please fill in subject and description');
+                        return;
+                      }
+                      
+                      try {
+                        const response = await fetch('/api/support/tickets', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          credentials: 'include',
+                          body: JSON.stringify({
+                            user_id: code,
+                            user_role: 'crew',
+                            user_hub: 'crew',
+                            issue_type: issueType,
+                            priority: priority,
+                            subject: subject,
+                            description: description,
+                            steps_to_reproduce: stepsToReproduce,
+                            browser_info: navigator.userAgent,
+                            current_url: window.location.href
+                          })
+                        });
+                        
+                        if (!response.ok) {
+                          throw new Error('Failed to submit support ticket');
+                        }
+                        
+                        const result = await response.json();
+                        alert(`Support ticket ${result.data.ticket_id} submitted successfully!`);
+                        
+                        // Clear form
+                        form.querySelector('input').value = '';
+                        form.querySelector('textarea').value = '';
+                        form.querySelectorAll('textarea')[1].value = '';
+                      } catch (error) {
+                        alert('Failed to submit support ticket. Please try again.');
+                        console.error('Support ticket submission error:', error);
+                      }
+                    }}
+                    style={{ 
+                      padding: '8px 16px', 
+                      borderRadius: 8, 
+                      border: 'none', 
+                      background: '#10b981', 
+                      color: 'white', 
+                      fontSize: 14, 
+                      fontWeight: 600, 
+                      cursor: 'pointer' 
+                    }}
+                  >
+                    Submit Ticket
+                  </button>
+                </div>
+              </div>
+            </div>
+            
+            {/* Support info */}
+            <div className="ui-card" style={{ padding: 16 }}>
+              <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>Contact Information</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>Technical Support</div>
+                  <div style={{ fontSize: 13, color: '#6b7280' }}>For app-related issues and questions</div>
+                  <div style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>Response: 4-24 hours</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>Center Coordinator</div>
+                  <div style={{ fontSize: 13, color: '#6b7280' }}>For work-related questions and support</div>
+                  <div style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>Contact your center coordinator</div>
                 </div>
               </div>
             </div>

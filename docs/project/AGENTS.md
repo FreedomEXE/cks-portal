@@ -1,6 +1,10 @@
-# CKS Portal - Agent Context & Handoff Guide
+## Deprecated
 
-*This document provides essential context for new Claude agents joining the CKS Portal development project.*
+This document has been consolidated.
+
+Please see the single entry point for context and handoff:
+
+- Project Overview & Handoff: docs/project/OVERVIEW_AND_HANDOFF.md
 
 ## 🎯 Quick Project Summary
 **CKS Portal** is a role-based service delivery management system. CKS acts as an outsourced service provider for contractors, handling service delivery to the contractor's existing customers through a secure web platform with 7 independent hubs (Admin, Manager, Contractor, Customer, Center, Crew, Warehouse).

@@ -43,7 +43,7 @@ type ServiceRequest = {
   date: string;
 };
 
-type CustomerSection = 'dashboard' | 'profile' | 'services' | 'centers' | 'crew' | 'reports' | 'orders' | 'support';
+type CustomerSection = 'dashboard' | 'profile' | 'services' | 'centers' | 'reports' | 'orders' | 'support';
 
 export default function CustomerHome() {
   const navigate = useNavigate();
@@ -119,14 +119,8 @@ export default function CustomerHome() {
             const items = Array.isArray(centersData?.data) ? centersData.data : (Array.isArray(centersData?.centers) ? centersData.centers : []);
             setCenters(items);
           } else {
-            // Demo center data
-            setCenters([
-              { id: 'center-001', name: 'Downtown Office Complex', location: 'Downtown', status: 'Active', crew_count: 3, last_service: '2025-08-22' },
-              { id: 'center-002', name: 'North District Plaza', location: 'North District', status: 'Active', crew_count: 2, last_service: '2025-08-21' },
-              { id: 'center-003', name: 'West Side Mall', location: 'West Side', status: 'Maintenance', crew_count: 4, last_service: '2025-08-20' },
-              { id: 'center-004', name: 'East End Warehouse', location: 'East End', status: 'Active', crew_count: 2, last_service: '2025-08-19' },
-              { id: 'center-005', name: 'South Park Complex', location: 'South Park', status: 'Active', crew_count: 3, last_service: '2025-08-18' }
-            ]);
+            // No demo data - empty state
+            setCenters([]);
           }
           
           // Service requests
@@ -135,12 +129,8 @@ export default function CustomerHome() {
             const items = Array.isArray(requestsData?.data) ? requestsData.data : (Array.isArray(requestsData?.requests) ? requestsData.requests : []);
             setServiceRequests(items);
           } else {
-            // Demo service requests
-            setServiceRequests([
-              { id: 'req-001', center: 'Downtown Office Complex', type: 'Cleaning', priority: 'High', status: 'Open', date: '2025-08-23' },
-              { id: 'req-002', center: 'North District Plaza', type: 'Maintenance', priority: 'Medium', status: 'In Progress', date: '2025-08-22' },
-              { id: 'req-003', center: 'West Side Mall', type: 'Security', priority: 'Low', status: 'Completed', date: '2025-08-21' }
-            ]);
+            // No demo data - empty state
+            setServiceRequests([]);
           }
         }
       } catch (error) {
@@ -406,11 +396,10 @@ export default function CustomerHome() {
       {/* Section Navigation Tabs */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 24, flexWrap: 'wrap' }}>
         {[
-          { key: 'dashboard' as CustomerSection, label: 'Center Dashboard' },
+          { key: 'dashboard' as CustomerSection, label: 'Dashboard' },
           { key: 'profile' as CustomerSection, label: 'Customer Profile' },
           { key: 'services' as CustomerSection, label: 'My Services' },
           { key: 'centers' as CustomerSection, label: 'My Centers' },
-          { key: 'crew' as CustomerSection, label: 'My Crew' },
           { key: 'orders' as CustomerSection, label: 'Orders' },
           { key: 'reports' as CustomerSection, label: 'Reports' },
           { key: 'support' as CustomerSection, label: 'Support' }
@@ -441,24 +430,21 @@ export default function CustomerHome() {
         {/* CENTER DASHBOARD SECTION */}
         {activeSection === 'dashboard' && (
           <div>
-            <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Center Management Overview</h2>
+            <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Overview</h2>
             
             {/* Center Overview Grid */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 16, marginBottom: 24 }}>
               {[
-                { label: 'Active Centers', value: state.data?.centers_managed || 5, trend: '+1', color: '#eab308' },
-                { label: 'Total Locations', value: state.data?.total_locations || 8, trend: '+2', color: '#8b5cf6' },
-                { label: 'Account Status', value: state.data?.account_status || 'Active', color: '#10b981' },
-                { label: 'Service Level', value: state.data?.service_level || 'Standard', color: '#f59e0b' },
-                { label: 'Crew Assigned', value: state.data?.crew_assigned || 8, trend: '+1', color: '#ef4444' },
-                { label: 'Pending Requests', value: state.data?.pending_requests || 2, color: '#f97316' }
+                { label: 'Active Centers', value: state.data?.centers_managed || 0, color: '#eab308' },
+                { label: 'Total Locations', value: state.data?.total_locations || 0, color: '#8b5cf6' },
+                { label: 'Account Status', value: state.data?.account_status || 'Not Set', color: '#10b981' },
+                { label: 'Service Level', value: state.data?.service_level || 'Not Set', color: '#f59e0b' },
+                { label: 'Crew Assigned', value: state.data?.crew_assigned || 0, color: '#ef4444' },
+                { label: 'Pending Requests', value: state.data?.pending_requests || 0, color: '#f97316' }
               ].map((metric, i) => (
                 <div key={i} className="ui-card" style={{ padding: 16, textAlign: 'left' }}>
                   <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>{metric.label}</div>
                   <div style={{ fontSize: 24, fontWeight: 700, color: metric.color || '#111827' }}>{metric.value}</div>
-                  {metric.trend && (
-                    <div style={{ fontSize: 12, color: metric.color || '#eab308', marginTop: 4 }}>{metric.trend}</div>
-                  )}
                 </div>
               ))}
             </div>
@@ -505,41 +491,13 @@ export default function CustomerHome() {
             </div>
 
             {/* Centers Overview */}
-            <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>Center Status Overview</h3>
-            <div className="ui-card" style={{ padding: 0, overflow: 'hidden' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ background: '#f9fafb' }}>
-                    <th style={{ padding: 12, textAlign: 'left', fontSize: 12, fontWeight: 600 }}>Center</th>
-                    <th style={{ padding: 12, textAlign: 'left', fontSize: 12, fontWeight: 600 }}>Location</th>
-                    <th style={{ padding: 12, textAlign: 'left', fontSize: 12, fontWeight: 600 }}>Status</th>
-                    <th style={{ padding: 12, textAlign: 'left', fontSize: 12, fontWeight: 600 }}>Crew</th>
-                    <th style={{ padding: 12, textAlign: 'left', fontSize: 12, fontWeight: 600 }}>Last Service</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {centers.map((center, i) => (
-                    <tr key={center.id} style={{ borderBottom: i < centers.length - 1 ? '1px solid #e5e7eb' : 'none' }}>
-                      <td style={{ padding: 12, fontSize: 14, fontWeight: 500 }}>{center.name}</td>
-                      <td style={{ padding: 12, fontSize: 14 }}>{center.location}</td>
-                      <td style={{ padding: 12 }}>
-                        <span style={{
-                          padding: '2px 8px',
-                          borderRadius: 12,
-                          fontSize: 12,
-                          fontWeight: 500,
-                          background: center.status === 'Active' ? '#dbeafe' : center.status === 'Maintenance' ? '#fef3c7' : '#fee2e2',
-                          color: center.status === 'Active' ? '#1e40af' : center.status === 'Maintenance' ? '#92400e' : '#991b1b'
-                        }}>
-                          {center.status}
-                        </span>
-                      </td>
-                      <td style={{ padding: 12, fontSize: 14 }}>{center.crew_count}</td>
-                      <td style={{ padding: 12, fontSize: 14 }}>{center.last_service}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>Recent Activity</h3>
+            <div className="ui-card" style={{ padding: 16 }}>
+              <div style={{ textAlign: 'center', padding: 32, color: '#6b7280', background: '#f9fafb', borderRadius: 8 }}>
+                <div style={{ fontSize: 48, marginBottom: 8 }}>📋</div>
+                <div style={{ fontSize: 14, fontWeight: 500 }}>No recent activity</div>
+                <div style={{ fontSize: 12, marginTop: 4 }}>Center activity will appear here as it occurs</div>
+              </div>
             </div>
 
             {/* Communication Hub */}
@@ -550,21 +508,9 @@ export default function CustomerHome() {
                   📰 News & Updates
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {[
-                    { id: 1, title: "Service agreement renewal available", date: "2025-08-20", priority: "Medium" },
-                    { id: 2, title: "New premium services now available", date: "2025-08-18", priority: "Low" },
-                    { id: 3, title: "Center maintenance schedule updated", date: "2025-08-15", priority: "High" }
-                  ].map((item) => (
-                    <div key={item.id} style={{ 
-                      padding: 8,
-                      border: '1px solid #f3f4f6',
-                      borderRadius: 4,
-                      borderLeft: '3px solid #eab308'
-                    }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: '#111827' }}>{item.title}</div>
-                      <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>{item.date} • {item.priority} Priority</div>
-                    </div>
-                  ))}
+                  <div style={{ color: '#6b7280', textAlign: 'center', padding: 24 }}>
+                    No news updates available.
+                  </div>
                 </div>
                 <button style={{
                   width: '100%',
@@ -589,38 +535,10 @@ export default function CustomerHome() {
               <div className="ui-card" style={{ padding: 16 }}>
                 <div className="title" style={{ marginBottom: 16, color: '#eab308', display: 'flex', alignItems: 'center', gap: 8 }}>
                   📬 Mail
-                  <span style={{ 
-                    background: '#ef4444', 
-                    color: 'white', 
-                    fontSize: 10, 
-                    padding: '2px 6px', 
-                    borderRadius: 12, 
-                    fontWeight: 600 
-                  }}>
-                    3
-                  </span>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  <div style={{ 
-                    padding: 12, 
-                    border: '1px solid #e5e7eb', 
-                    borderRadius: 6,
-                    borderLeft: '3px solid #eab308'
-                  }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>From Manager - Customer Success</div>
-                    <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Your service agreement is up for renewal</div>
-                    <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>1 hour ago • High Priority</div>
-                  </div>
-                  
-                  <div style={{ 
-                    padding: 12, 
-                    border: '1px solid #e5e7eb', 
-                    borderRadius: 6,
-                    borderLeft: '3px solid #eab308'
-                  }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>From Billing - Finance Team</div>
-                    <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Monthly invoice ready for review</div>
-                    <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>3 hours ago • Medium Priority</div>
+                  <div style={{ color: '#6b7280', textAlign: 'center', padding: 24 }}>
+                    No mail messages available.
                   </div>
                 </div>
                 <button style={{
@@ -704,16 +622,16 @@ export default function CustomerHome() {
                           {[
                             ['Customer ID', state.data?.customer_id || code],
                             ['Company Name', state.data?.company_name || customerName],
-                            ['Address', state.data?.address || '456 Corporate Blvd, Suite 200'],
-                            ['CKS Manager (Assigned)', state.data?.cks_manager || 'Manager Demo'],
-                            ['Email', state.data?.email || 'contact@customer-demo.com'],
-                            ['Phone', state.data?.phone || '(555) 456-7890'],
-                            ['Main Contact', state.data?.main_contact || 'Jane Customer'],
-                            ['Website', state.data?.website || 'www.customer-demo.com'],
-                            ['Years with CKS', state.data?.years_with_cks || '3 Years'],
-                            ['# of Centers', state.data?.num_centers || '5'],
-                            ['Contract Start Date', state.data?.contract_start_date || '2021-01-01'],
-                            ['Status', state.data?.status || 'Active']
+                            ['Address', state.data?.address || 'Not Set'],
+                            ['CKS Manager (Assigned)', state.data?.cks_manager || 'Not Assigned'],
+                            ['Email', state.data?.email || 'Not Set'],
+                            ['Phone', state.data?.phone || 'Not Set'],
+                            ['Main Contact', state.data?.main_contact || 'Not Set'],
+                            ['Website', state.data?.website || 'Not Set'],
+                            ['Years with CKS', state.data?.years_with_cks || 'Not Set'],
+                            ['# of Centers', state.data?.num_centers || '0'],
+                            ['Contract Start Date', state.data?.contract_start_date || 'Not Set'],
+                            ['Status', state.data?.status || 'Not Set']
                           ].map(([label, value]) => (
                             <tr key={label}>
                               <td style={{ padding: '8px 0', fontWeight: 600, width: '30%' }}>{label}</td>
@@ -757,18 +675,16 @@ export default function CustomerHome() {
                       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                         <tbody>
                           {[
-                            ['Manager Name', 'Manager Demo'],
-                            ['Title', 'Senior Account Manager'],
-                            ['Department', 'Customer Success'],
-                            ['Email', 'manager.demo@cks-portal.com'],
-                            ['Phone', '(555) 123-4567'],
-                            ['Direct Line', '(555) 123-4567 ext. 1001'],
-                            ['Office Location', 'CKS HQ - Building A, Floor 3'],
-                            ['Assigned Since', 'January 2023'],
-                            ['Specialty', 'Commercial Facility Management'],
-                            ['Response Time', '< 4 hours during business hours'],
-                            ['Emergency Contact', '(555) 999-0000 (24/7)'],
-                            ['Preferred Contact', 'Email for non-urgent, Phone for urgent']
+                            ['Manager Name', 'Not Assigned'],
+                            ['Title', 'Not Set'],
+                            ['Department', 'Not Set'],
+                            ['Email', 'Not Set'],
+                            ['Phone', 'Not Set'],
+                            ['Direct Line', 'Not Set'],
+                            ['Office Location', 'Not Set'],
+                            ['Assigned Since', 'Not Set'],
+                            ['Specialty', 'Not Set'],
+                            ['Response Time', 'Not Set']
                           ].map(([label, value]) => (
                             <tr key={label}>
                               <td style={{ padding: '8px 0', fontWeight: 600, width: '35%' }}>{label}</td>
@@ -777,46 +693,6 @@ export default function CustomerHome() {
                           ))}
                         </tbody>
                       </table>
-                      
-                      {/* Contact Actions */}
-                      <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
-                        <button style={{
-                          padding: '8px 16px',
-                          backgroundColor: '#eab308',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: 4,
-                          fontSize: 12,
-                          fontWeight: 600,
-                          cursor: 'pointer'
-                        }}>
-                          Send Email
-                        </button>
-                        <button style={{
-                          padding: '8px 16px',
-                          backgroundColor: '#f59e0b',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: 4,
-                          fontSize: 12,
-                          fontWeight: 600,
-                          cursor: 'pointer'
-                        }}>
-                          Schedule Call
-                        </button>
-                        <button style={{
-                          padding: '8px 16px',
-                          backgroundColor: '#ef4444',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: 4,
-                          fontSize: 12,
-                          fontWeight: 600,
-                          cursor: 'pointer'
-                        }}>
-                          Emergency Contact
-                        </button>
-                      </div>
                     </div>
                   </div>
                 </div>
@@ -861,26 +737,38 @@ export default function CustomerHome() {
         {/* CENTERS SECTION */}
         {activeSection === 'centers' && (
           <div>
-            <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Center Management</h2>
-            <div className="ui-card" style={{ padding: 16 }}>
-              <div style={{ textAlign: 'center', padding: 40, color: '#6b7280' }}>
-                Detailed center management portal will be implemented here.<br/>
-                This will show comprehensive center information, schedules, and management tools<br/>
-                for all centers under this customer account.
+            <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>My Centers</h2>
+            
+            {/* Hierarchical Centers Overview */}
+            <div className="ui-card" style={{ padding: 16, marginBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+                <div style={{ fontSize: 16, fontWeight: 600, color: '#eab308' }}>📍 Centers Overview</div>
+                <div style={{ fontSize: 12, color: '#6b7280', background: '#f9fafb', padding: '4px 8px', borderRadius: 12 }}>
+                  Hierarchical View: Centers → Crew Assignments
+                </div>
               </div>
-            </div>
-          </div>
-        )}
-
-        {/* CREW SECTION */}
-        {activeSection === 'crew' && (
-          <div>
-            <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>My Crew</h2>
-            <div className="ui-card" style={{ padding: 16 }}>
-              <div style={{ textAlign: 'center', padding: 40, color: '#6b7280' }}>
-                Crew coordination portal will be implemented here.<br/>
-                This will show crew members assigned to customer centers,<br/>
-                their schedules, and coordination with center operations.
+              
+              <div style={{ textAlign: 'center', padding: 32, color: '#6b7280', background: '#f9fafb', borderRadius: 8 }}>
+                <div style={{ fontSize: 48, marginBottom: 8 }}>🏢</div>
+                <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>No Centers Assigned</div>
+                <div style={{ fontSize: 14, marginBottom: 16 }}>Your centers will appear here once assigned by your CKS Manager</div>
+                
+                {/* Expected Hierarchy Visual Guide */}
+                <div style={{ background: 'white', borderRadius: 8, padding: 16, marginTop: 16, border: '1px solid #e5e7eb' }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 12, color: '#111827' }}>Expected Structure:</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center', fontSize: 13 }}>
+                    <div style={{ background: '#fef3c7', color: '#92400e', padding: '4px 8px', borderRadius: 6, fontWeight: 600 }}>
+                      🏢 Center A
+                    </div>
+                    <span style={{ color: '#9ca3af' }}>→</span>
+                    <div style={{ background: '#ecfdf5', color: '#065f46', padding: '4px 8px', borderRadius: 6, fontWeight: 600 }}>
+                      👥 Assigned Crew
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 12, color: '#6b7280', marginTop: 8 }}>
+                    Each center will show its assigned crew members, schedules, and coordination details
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -1168,11 +1056,146 @@ export default function CustomerHome() {
         {activeSection === 'support' && (
           <div>
             <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Support</h2>
+            
+            {/* Support ticket form */}
+            <div className="ui-card" style={{ padding: 16, marginBottom: 16 }}>
+              <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>Submit Support Ticket</h3>
+              <div style={{ display: 'grid', gap: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div>
+                    <label style={{ fontSize: 12, color: '#6b7280' }}>Issue Type</label>
+                    <select style={{ width: '100%', padding: 8, border: '1px solid #e5e7eb', borderRadius: 8, marginTop: 4 }}>
+                      <option value="bug">Bug Report</option>
+                      <option value="how_to">How-To Question</option>
+                      <option value="feature_question">Feature Question</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 12, color: '#6b7280' }}>Priority</label>
+                    <select style={{ width: '100%', padding: 8, border: '1px solid #e5e7eb', borderRadius: 8, marginTop: 4 }}>
+                      <option value="low">Low</option>
+                      <option value="medium">Medium</option>
+                      <option value="high">High</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, color: '#6b7280' }}>Subject</label>
+                  <input 
+                    placeholder="Brief description of your issue"
+                    style={{ width: '100%', padding: 8, border: '1px solid #e5e7eb', borderRadius: 8, marginTop: 4 }} 
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, color: '#6b7280' }}>Description</label>
+                  <textarea 
+                    rows={4}
+                    placeholder="Please provide detailed information about your issue"
+                    style={{ width: '100%', padding: 8, border: '1px solid #e5e7eb', borderRadius: 8, marginTop: 4 }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, color: '#6b7280' }}>Steps to Reproduce (optional)</label>
+                  <textarea 
+                    rows={3}
+                    placeholder="If applicable, list the steps that lead to this issue"
+                    style={{ width: '100%', padding: 8, border: '1px solid #e5e7eb', borderRadius: 8, marginTop: 4 }}
+                  />
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
+                  <button 
+                    style={{ 
+                      padding: '8px 16px', 
+                      borderRadius: 8, 
+                      border: '1px solid #e5e7eb', 
+                      background: 'white', 
+                      fontSize: 14, 
+                      cursor: 'pointer' 
+                    }}
+                  >
+                    Clear
+                  </button>
+                  <button 
+                    onClick={async (e) => {
+                      const form = e.target.closest('.ui-card');
+                      const issueType = form.querySelector('select').value;
+                      const priority = form.querySelectorAll('select')[1].value;
+                      const subject = form.querySelector('input').value;
+                      const description = form.querySelector('textarea').value;
+                      const stepsToReproduce = form.querySelectorAll('textarea')[1].value;
+                      
+                      if (!subject || !description) {
+                        alert('Please fill in subject and description');
+                        return;
+                      }
+                      
+                      try {
+                        const response = await fetch('/api/support/tickets', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          credentials: 'include',
+                          body: JSON.stringify({
+                            user_id: code,
+                            user_role: 'customer',
+                            user_hub: 'customer',
+                            issue_type: issueType,
+                            priority: priority,
+                            subject: subject,
+                            description: description,
+                            steps_to_reproduce: stepsToReproduce,
+                            browser_info: navigator.userAgent,
+                            current_url: window.location.href
+                          })
+                        });
+                        
+                        if (!response.ok) {
+                          throw new Error('Failed to submit support ticket');
+                        }
+                        
+                        const result = await response.json();
+                        alert(`Support ticket ${result.data.ticket_id} submitted successfully!`);
+                        
+                        // Clear form
+                        form.querySelector('input').value = '';
+                        form.querySelector('textarea').value = '';
+                        form.querySelectorAll('textarea')[1].value = '';
+                      } catch (error) {
+                        alert('Failed to submit support ticket. Please try again.');
+                        console.error('Support ticket submission error:', error);
+                      }
+                    }}
+                    style={{ 
+                      padding: '8px 16px', 
+                      borderRadius: 8, 
+                      border: 'none', 
+                      background: '#eab308', 
+                      color: 'white', 
+                      fontSize: 14, 
+                      fontWeight: 600, 
+                      cursor: 'pointer' 
+                    }}
+                  >
+                    Submit Ticket
+                  </button>
+                </div>
+              </div>
+            </div>
+            
+            {/* Support info */}
             <div className="ui-card" style={{ padding: 16 }}>
-              <div style={{ textAlign: 'center', padding: 40, color: '#6b7280' }}>
-                Customer support center will be implemented here.<br/>
-                This will include help documentation, support tickets,<br/>
-                and direct contact with customer service representatives.
+              <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>Contact Information</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>Technical Support</div>
+                  <div style={{ fontSize: 13, color: '#6b7280' }}>For app-related issues and questions</div>
+                  <div style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>Response: 4-24 hours</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>Account Manager</div>
+                  <div style={{ fontSize: 13, color: '#6b7280' }}>For service and business questions</div>
+                  <div style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>See Profile → Account Manager</div>
+                </div>
               </div>
             </div>
           </div>

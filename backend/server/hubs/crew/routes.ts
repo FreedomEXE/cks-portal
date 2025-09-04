@@ -57,25 +57,25 @@ router.get('/profile', async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'No user ID provided' });
     }
     
-    // For admin, return sample crew profile
+    // For admin, return empty template crew profile
     if (role === 'admin') {
-      const sampleProfile = {
-        crew_id: 'CRW-001',
-        name: 'Sample Crew Member',
-        role: 'Supervisor',
-        status: 'Active',
-        assigned_center: 'CEN-001',
-        phone: '416-555-0123',
-        email: 'crew@cks.com',
-        skills: ['cleaning', 'maintenance'],
-        certification_level: 'Level 2',
-        hire_date: '2024-01-15',
-        manager: 'MGR-001'
+      const templateProfile = {
+        crew_id: userId || 'CRW-000',
+        name: 'Not Set',
+        role: 'Not Set',
+        status: 'Not Set',
+        assigned_center: 'Not Assigned',
+        phone: 'Not Set',
+        email: 'Not Set',
+        skills: [],
+        certification_level: 'Not Set',
+        hire_date: 'Not Set',
+        manager: 'Not Assigned'
       };
       
       return res.json({
         success: true,
-        data: sampleProfile
+        data: templateProfile
       });
     }
     
@@ -120,43 +120,12 @@ router.get('/tasks', async (req: Request, res: Response) => {
     const code = String(req.query.code || '');
     const date = String(req.query.date || 'today');
     
-    // Sample daily tasks
-    const sampleTasks = [
-      {
-        id: 'task-001',
-        title: 'Morning Facility Inspection',
-        area: 'Main Entrance',
-        priority: 'High',
-        status: 'Pending',
-        estimated_time: '30 minutes',
-        due_time: '09:00 AM',
-        description: 'Complete visual inspection of main entrance area'
-      },
-      {
-        id: 'task-002', 
-        title: 'Equipment Maintenance Check',
-        area: 'Equipment Room',
-        priority: 'Medium',
-        status: 'In Progress',
-        estimated_time: '45 minutes',
-        due_time: '11:00 AM',
-        description: 'Check all cleaning equipment for proper operation'
-      },
-      {
-        id: 'task-003',
-        title: 'Afternoon Cleaning Round',
-        area: 'Common Areas',
-        priority: 'High',
-        status: 'Pending',
-        estimated_time: '2 hours',
-        due_time: '02:00 PM',
-        description: 'Complete cleaning of all common areas'
-      }
-    ];
+    // Empty template tasks - will be populated when tasks are assigned
+    const templateTasks = [];
     
     res.json({
       success: true,
-      data: sampleTasks,
+      data: templateTasks,
       date: date,
       crew_code: code || userId
     });
@@ -177,40 +146,12 @@ router.get('/training', async (req: Request, res: Response) => {
     const role = getUserRole(userId);
     const code = String(req.query.code || '');
     
-    // Sample training modules
-    const sampleTraining = [
-      {
-        id: 'training-001',
-        title: 'Safety Protocol Updates',
-        type: 'Safety',
-        status: 'Required',
-        due_date: '2025-09-01',
-        duration: '30 minutes',
-        description: 'Updated safety protocols for facility operations'
-      },
-      {
-        id: 'training-002',
-        title: 'New Equipment Training',
-        type: 'Equipment', 
-        status: 'Optional',
-        due_date: '2025-09-15',
-        duration: '1 hour',
-        description: 'Training on new cleaning equipment'
-      },
-      {
-        id: 'training-003',
-        title: 'Customer Service Excellence',
-        type: 'Procedure',
-        status: 'Completed',
-        due_date: '2025-08-15',
-        duration: '45 minutes',
-        description: 'Customer interaction best practices'
-      }
-    ];
+    // Empty template training - will be populated when training is assigned
+    const templateTraining = [];
     
     res.json({
       success: true,
-      data: sampleTraining,
+      data: templateTraining,
       crew_code: code || userId
     });
     
@@ -262,26 +203,26 @@ router.get('/member', async (req: Request, res: Response) => {
     const userId = String((req.headers['x-user-id'] || req.headers['x-crew-user-id'] || '').toString());
     const role = getUserRole(userId);
     
-    // Sample crew member details
-    const memberDetails = {
-      crew_id: userId,
-      name: 'Sample Crew Member',
-      position: 'Field Technician',
-      department: 'Operations',
-      assigned_center: 'CEN-001',
-      shift: 'Day Shift (8AM - 5PM)',
-      supervisor: 'MGR-001',
-      start_date: '2024-01-15',
-      certifications: ['Safety Level 2', 'Equipment Operation'],
+    // Empty template member details - will be populated when crew is created
+    const templateMemberDetails = {
+      crew_id: userId || 'CRW-000',
+      name: 'Not Set',
+      position: 'Not Set',
+      department: 'Not Set',
+      assigned_center: 'Not Assigned',
+      shift: 'Not Set',
+      supervisor: 'Not Assigned',
+      start_date: 'Not Set',
+      certifications: [],
       contact: {
-        phone: '416-555-0123',
-        email: 'crew@cks.com'
+        phone: 'Not Set',
+        email: 'Not Set'
       }
     };
     
     res.json({
       success: true,
-      data: memberDetails
+      data: templateMemberDetails
     });
     
   } catch (error) {
@@ -298,11 +239,8 @@ router.get('/news', async (req: Request, res: Response) => {
   try {
     const userId = String((req.headers['x-user-id'] || req.headers['x-crew-user-id'] || '').toString());
     const limit = Number(req.query.limit || 3);
-    const items = [
-      { id: 'news-001', title: 'Safety training reminder - complete by Friday', date: '2025-08-10' },
-      { id: 'news-002', title: 'New time tracking system goes live Monday', date: '2025-08-05' },
-      { id: 'news-003', title: 'Employee appreciation event next week', date: '2025-08-01' }
-    ].slice(0, Math.max(1, Math.min(10, limit)));
+    // Empty template news - will be populated with actual company news
+    const items = [];
     return res.json({ success: true, data: items });
   } catch (error) {
     console.error('Crew news endpoint error:', error);
@@ -318,11 +256,8 @@ router.get('/inbox', async (req: Request, res: Response) => {
   try {
     const userId = String((req.headers['x-user-id'] || req.headers['x-crew-user-id'] || '').toString());
     const limit = Number(req.query.limit || 5);
-    const data = [
-      { id: 'msg-001', from: 'Manager', subject: 'Shift update', snippet: 'Your shift starts at 6AM tomorrow', date: '2025-08-10', unread: true, priority: 'normal' },
-      { id: 'msg-002', from: 'Admin', subject: 'Policy change', snippet: 'Please review the updated safety policy', date: '2025-08-09', unread: true, priority: 'high' },
-      { id: 'msg-003', from: 'Center', subject: 'Supplies restock', snippet: 'Restocking scheduled for Friday', date: '2025-08-08', unread: false, priority: 'low' }
-    ].slice(0, Math.max(1, Math.min(10, limit)));
+    // Empty template inbox - will be populated with actual messages
+    const data = [];
     return res.json({ success: true, data });
   } catch (error) {
     console.error('Crew inbox endpoint error:', error);

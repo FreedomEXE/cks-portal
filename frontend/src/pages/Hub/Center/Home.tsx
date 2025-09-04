@@ -118,13 +118,8 @@ export default function CenterHome() {
             const items = Array.isArray(crewData?.data) ? crewData.data : (Array.isArray(crewData?.crew) ? crewData.crew : []);
             setCrewMembers(items);
           } else {
-            // Demo crew data
-            setCrewMembers([
-              { id: 'crew-001', name: 'Sarah Johnson', status: 'On Duty', shift: 'Day', area: 'North Wing', last_update: '10:30 AM' },
-              { id: 'crew-002', name: 'Mike Chen', status: 'On Duty', shift: 'Day', area: 'South Wing', last_update: '10:25 AM' },
-              { id: 'crew-003', name: 'Lisa Rodriguez', status: 'Break', shift: 'Day', area: 'Main Lobby', last_update: '10:15 AM' },
-              { id: 'crew-004', name: 'James Wilson', status: 'Off Duty', shift: 'Night', area: 'Security', last_update: '6:00 AM' }
-            ]);
+            // No crew data available
+            setCrewMembers([]);
           }
           
           // Metrics data
@@ -133,15 +128,8 @@ export default function CenterHome() {
             const items = Array.isArray(metricsData?.data) ? metricsData.data : (Array.isArray(metricsData?.metrics) ? metricsData.metrics : []);
             setMetrics(items);
           } else {
-            // Demo metrics
-            setMetrics([
-              { label: 'Active Crew', value: 3, status: 'Good', change: '+1' },
-              { label: 'Areas Covered', value: '4/5', status: 'Warning' },
-              { label: 'Last Inspection', value: '2 hours ago', status: 'Good' },
-              { label: 'Safety Score', value: '98%', status: 'Good', change: '+2%' },
-              { label: 'Equipment Status', value: '95%', status: 'Good' },
-              { label: 'Incident Reports', value: 0, status: 'Good' }
-            ]);
+            // No metrics available
+            setMetrics([]);
           }
         }
       } catch (error) {
@@ -414,7 +402,7 @@ export default function CenterHome() {
                 }}>
                   <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>Open Requests</div>
                   <div style={{ fontSize: 20, fontWeight: 700, color: '#111827' }}>
-                    3
+                    0
                     <span style={{ fontSize: 12, color: '#f97316', marginLeft: 8 }}>
                       Pending
                     </span>
@@ -429,7 +417,7 @@ export default function CenterHome() {
                 }}>
                   <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>This Week</div>
                   <div style={{ fontSize: 20, fontWeight: 700, color: '#111827' }}>
-                    12
+                    0
                     <span style={{ fontSize: 12, color: '#3b82f6', marginLeft: 8 }}>
                       Services
                     </span>
@@ -444,9 +432,9 @@ export default function CenterHome() {
                 }}>
                   <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>Facility Status</div>
                   <div style={{ fontSize: 20, fontWeight: 700, color: '#111827' }}>
-                    Good
-                    <span style={{ fontSize: 12, color: '#10b981', marginLeft: 8 }}>
-                      ✓
+                    Not Set
+                    <span style={{ fontSize: 12, color: '#6b7280', marginLeft: 8 }}>
+                      --
                     </span>
                   </div>
                 </div>
@@ -571,56 +559,38 @@ export default function CenterHome() {
                 <div className="title" style={{ marginBottom: 16, color: '#f97316', display: 'flex', alignItems: 'center', gap: 8 }}>
                   📰 News & Updates
                 </div>
-                <CenterNewsPreview code={code} />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div style={{ color: '#6b7280', textAlign: 'center', padding: 24 }}>
+                    No news updates available.
+                  </div>
+                </div>
+                <button style={{
+                  width: '100%',
+                  padding: '8px 16px',
+                  fontSize: 12,
+                  backgroundColor: '#fff7ed',
+                  color: '#f97316',
+                  border: '1px solid #fed7aa',
+                  borderRadius: 4,
+                  cursor: 'pointer',
+                  marginTop: 8
+                }}
+                onClick={() => {
+                  alert('Full News - Coming Soon!');
+                }}
+                >
+                  View All News
+                </button>
               </div>
               
               {/* Mail & Messages */}
               <div className="ui-card" style={{ padding: 16 }}>
                 <div className="title" style={{ marginBottom: 16, color: '#f97316', display: 'flex', alignItems: 'center', gap: 8 }}>
                   📬 Mail
-                  <span style={{ 
-                    background: '#ef4444', 
-                    color: 'white', 
-                    fontSize: 10, 
-                    padding: '2px 6px', 
-                    borderRadius: 12, 
-                    fontWeight: 600 
-                  }}>
-                    3
-                  </span>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  <div style={{ 
-                    padding: 12, 
-                    border: '1px solid #e5e7eb', 
-                    borderRadius: 6,
-                    borderLeft: '3px solid #f97316'
-                  }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>From Manager - John Center</div>
-                    <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Equipment inspection scheduled for tomorrow at 10 AM</div>
-                    <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>2 hours ago • High Priority</div>
-                  </div>
-                  
-                  <div style={{ 
-                    padding: 12, 
-                    border: '1px solid #e5e7eb', 
-                    borderRadius: 6,
-                    borderLeft: '3px solid #3b82f6'
-                  }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>From Admin - Safety Update</div>
-                    <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>New safety protocols effective immediately</div>
-                    <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>5 hours ago • Information</div>
-                  </div>
-                  
-                  <div style={{ 
-                    padding: 12, 
-                    border: '1px solid #e5e7eb', 
-                    borderRadius: 6,
-                    borderLeft: '3px solid #10b981'
-                  }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>From Crew - Mike Johnson</div>
-                    <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Floor cleaning in lobby completed ahead of schedule</div>
-                    <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>1 day ago • Update</div>
+                  <div style={{ color: '#6b7280', textAlign: 'center', padding: 24 }}>
+                    No mail messages available.
                   </div>
                   
                   <button
@@ -759,9 +729,9 @@ export default function CenterHome() {
                         margin: '0 auto 12px',
                         border: '2px solid #f97316'
                       }}>
-                        MD
+                        --
                       </div>
-                      <div style={{ fontSize: 14, fontWeight: 600, color: '#111827' }}>Manager Demo</div>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: '#111827' }}>Not Assigned</div>
                       <div style={{ fontSize: 12, color: '#6b7280' }}>Account Manager</div>
                     </div>
 
@@ -770,18 +740,18 @@ export default function CenterHome() {
                       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                         <tbody>
                           {[
-                            ['Manager Name', 'Manager Demo'],
-                            ['Title', 'Senior Account Manager'],
-                            ['Department', 'Customer Success'],
-                            ['Email', 'manager.demo@cks-portal.com'],
-                            ['Phone', '(555) 123-4567'],
-                            ['Direct Line', '(555) 123-4567 ext. 1001'],
-                            ['Office Location', 'CKS HQ - Building A, Floor 3'],
-                            ['Assigned Since', 'January 2023'],
-                            ['Specialty', 'Commercial Facility Management'],
-                            ['Response Time', '< 4 hours during business hours'],
-                            ['Emergency Contact', '(555) 999-0000 (24/7)'],
-                            ['Preferred Contact', 'Email for non-urgent, Phone for urgent']
+                            ['Manager Name', 'Not Set'],
+                            ['Title', 'Not Set'],
+                            ['Department', 'Not Set'],
+                            ['Email', 'Not Set'],
+                            ['Phone', 'Not Set'],
+                            ['Direct Line', 'Not Set'],
+                            ['Office Location', 'Not Set'],
+                            ['Assigned Since', 'Not Set'],
+                            ['Specialty', 'Not Set'],
+                            ['Response Time', 'Not Set'],
+                            ['Emergency Contact', 'Not Set'],
+                            ['Preferred Contact', 'Not Set']
                           ].map(([label, value]) => (
                             <tr key={label}>
                               <td style={{ padding: '8px 0', fontWeight: 600, width: '35%' }}>{label}</td>
@@ -791,45 +761,6 @@ export default function CenterHome() {
                         </tbody>
                       </table>
                       
-                      {/* Contact Actions */}
-                      <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
-                        <button style={{
-                          padding: '8px 16px',
-                          backgroundColor: '#f97316',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: 4,
-                          fontSize: 12,
-                          fontWeight: 600,
-                          cursor: 'pointer'
-                        }}>
-                          Send Email
-                        </button>
-                        <button style={{
-                          padding: '8px 16px',
-                          backgroundColor: '#f59e0b',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: 4,
-                          fontSize: 12,
-                          fontWeight: 600,
-                          cursor: 'pointer'
-                        }}>
-                          Schedule Call
-                        </button>
-                        <button style={{
-                          padding: '8px 16px',
-                          backgroundColor: '#ef4444',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: 4,
-                          fontSize: 12,
-                          fontWeight: 600,
-                          cursor: 'pointer'
-                        }}>
-                          Emergency Contact
-                        </button>
-                      </div>
                     </div>
                   </div>
                 </div>
@@ -1136,10 +1067,147 @@ export default function CenterHome() {
       case 'support':
         return (
           <div style={{ animation: 'fadeIn .12s ease-out' }}>
-            <div className="ui-card">
-              <div className="title" style={{ marginBottom: 16, color: '#f97316' }}>Support & Help</div>
-              <div style={{ color: '#6b7280' }}>
-                Documentation, help resources, and support contacts coming soon.
+            <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Support</h2>
+            
+            {/* Support ticket form */}
+            <div className="ui-card" style={{ padding: 16, marginBottom: 16 }}>
+              <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>Submit Support Ticket</h3>
+              <div style={{ display: 'grid', gap: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div>
+                    <label style={{ fontSize: 12, color: '#6b7280' }}>Issue Type</label>
+                    <select style={{ width: '100%', padding: 8, border: '1px solid #e5e7eb', borderRadius: 8, marginTop: 4 }}>
+                      <option value="bug">Bug Report</option>
+                      <option value="how_to">How-To Question</option>
+                      <option value="feature_question">Feature Question</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 12, color: '#6b7280' }}>Priority</label>
+                    <select style={{ width: '100%', padding: 8, border: '1px solid #e5e7eb', borderRadius: 8, marginTop: 4 }}>
+                      <option value="low">Low</option>
+                      <option value="medium">Medium</option>
+                      <option value="high">High</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, color: '#6b7280' }}>Subject</label>
+                  <input 
+                    placeholder="Brief description of your issue"
+                    style={{ width: '100%', padding: 8, border: '1px solid #e5e7eb', borderRadius: 8, marginTop: 4 }} 
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, color: '#6b7280' }}>Description</label>
+                  <textarea 
+                    rows={4}
+                    placeholder="Please provide detailed information about your issue"
+                    style={{ width: '100%', padding: 8, border: '1px solid #e5e7eb', borderRadius: 8, marginTop: 4 }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, color: '#6b7280' }}>Steps to Reproduce (optional)</label>
+                  <textarea 
+                    rows={3}
+                    placeholder="If applicable, list the steps that lead to this issue"
+                    style={{ width: '100%', padding: 8, border: '1px solid #e5e7eb', borderRadius: 8, marginTop: 4 }}
+                  />
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
+                  <button 
+                    style={{ 
+                      padding: '8px 16px', 
+                      borderRadius: 8, 
+                      border: '1px solid #e5e7eb', 
+                      background: 'white', 
+                      fontSize: 14, 
+                      cursor: 'pointer' 
+                    }}
+                  >
+                    Clear
+                  </button>
+                  <button 
+                    onClick={async (e) => {
+                      const form = e.target.closest('.ui-card');
+                      const issueType = form.querySelector('select').value;
+                      const priority = form.querySelectorAll('select')[1].value;
+                      const subject = form.querySelector('input').value;
+                      const description = form.querySelector('textarea').value;
+                      const stepsToReproduce = form.querySelectorAll('textarea')[1].value;
+                      
+                      if (!subject || !description) {
+                        alert('Please fill in subject and description');
+                        return;
+                      }
+                      
+                      try {
+                        const response = await fetch('/api/support/tickets', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          credentials: 'include',
+                          body: JSON.stringify({
+                            user_id: code,
+                            user_role: 'center',
+                            user_hub: 'center',
+                            issue_type: issueType,
+                            priority: priority,
+                            subject: subject,
+                            description: description,
+                            steps_to_reproduce: stepsToReproduce,
+                            browser_info: navigator.userAgent,
+                            current_url: window.location.href
+                          })
+                        });
+                        
+                        if (!response.ok) {
+                          throw new Error('Failed to submit support ticket');
+                        }
+                        
+                        const result = await response.json();
+                        alert(`Support ticket ${result.data.ticket_id} submitted successfully!`);
+                        
+                        // Clear form
+                        form.querySelector('input').value = '';
+                        form.querySelector('textarea').value = '';
+                        form.querySelectorAll('textarea')[1].value = '';
+                      } catch (error) {
+                        alert('Failed to submit support ticket. Please try again.');
+                        console.error('Support ticket submission error:', error);
+                      }
+                    }}
+                    style={{ 
+                      padding: '8px 16px', 
+                      borderRadius: 8, 
+                      border: 'none', 
+                      background: '#f97316', 
+                      color: 'white', 
+                      fontSize: 14, 
+                      fontWeight: 600, 
+                      cursor: 'pointer' 
+                    }}
+                  >
+                    Submit Ticket
+                  </button>
+                </div>
+              </div>
+            </div>
+            
+            {/* Support info */}
+            <div className="ui-card" style={{ padding: 16 }}>
+              <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>Contact Information</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>Technical Support</div>
+                  <div style={{ fontSize: 13, color: '#6b7280' }}>For app-related issues and questions</div>
+                  <div style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>Response: 4-24 hours</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>Operations Team</div>
+                  <div style={{ fontSize: 13, color: '#6b7280' }}>For operational and service questions</div>
+                  <div style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>Contact via center management</div>
+                </div>
               </div>
             </div>
           </div>

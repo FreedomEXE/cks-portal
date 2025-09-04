@@ -25,17 +25,18 @@ router.get('/profile', async (req: Request, res: Response) => {
       [userId]
     );
     if (r.rows.length === 0) {
-      const sample = {
+      // Empty template data - will be populated when warehouse is created via admin
+      const template = {
         warehouse_id: userId,
-        warehouse_name: 'Central Distribution Hub',
-        manager_id: 'MGR-001',
-        address: '1000 Logistics Drive, Metro City, MC 12345',
-        capacity: 50000,
-        current_utilization: 32500,
-        utilization_percentage: 65,
-        status: 'active'
+        warehouse_name: 'Not Set',
+        manager_id: 'Not Assigned',
+        address: 'Not Set',
+        capacity: 0,
+        current_utilization: 0,
+        utilization_percentage: 0,
+        status: 'Not Set'
       };
-      return res.json({ success: true, data: sample });
+      return res.json({ success: true, data: template });
     }
     const row = r.rows[0];
     const utilization_percentage = row.capacity ? Math.round((Number(row.current_utilization || 0) / Number(row.capacity)) * 100) : 0;
@@ -55,13 +56,14 @@ router.get('/profile', async (req: Request, res: Response) => {
 // GET /api/warehouse/dashboard
 router.get('/dashboard', async (_req: Request, res: Response) => {
   try {
+    // Empty template data - will be populated through warehouse operations
     const data = [
-      { label: 'Total Inventory Items', value: 2847, trend: '+12', color: '#8b5cf6' },
-      { label: 'Low Stock Alerts', value: 23, trend: '-3', color: '#ef4444' },
-      { label: 'Pending Shipments', value: 18, trend: '+7', color: '#f59e0b' },
-      { label: 'Warehouse Utilization', value: '65%', color: '#10b981' },
-      { label: 'Active Staff', value: 24, trend: '+2', color: '#3b7af7' },
-      { label: 'Orders Processed Today', value: 47, trend: '+8', color: '#f97316' }
+      { label: 'Total Inventory Items', value: 0, trend: 'No activity', color: '#8b5cf6' },
+      { label: 'Low Stock Alerts', value: 0, trend: 'No activity', color: '#ef4444' },
+      { label: 'Pending Shipments', value: 0, trend: 'No activity', color: '#f59e0b' },
+      { label: 'Warehouse Utilization', value: '0%', color: '#10b981' },
+      { label: 'Active Staff', value: 0, trend: 'No activity', color: '#3b7af7' },
+      { label: 'Orders Processed Today', value: 0, trend: 'No activity', color: '#f97316' }
     ];
     return res.json({ success: true, data });
   } catch (error) {

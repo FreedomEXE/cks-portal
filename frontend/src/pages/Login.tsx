@@ -316,6 +316,9 @@ export default function Login() {
           <button type="submit" className="btn btn-primary w-full text-base md:text-lg py-3" disabled={loading || !isLoaded}>
             {loading ? 'Signing in…' : 'Sign in'}
           </button>
+          <div className="flex items-center justify-center mt-2 text-xs md:text-sm text-gray-400">
+            <a href="/forgot" className="hover:underline">Forgot password?</a>
+          </div>
         </form>
 
         <div className="my-1.5 flex items-center gap-4 text-gray-400">

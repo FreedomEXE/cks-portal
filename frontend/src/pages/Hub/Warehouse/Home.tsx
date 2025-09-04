@@ -23,10 +23,7 @@ export default function WarehouseHome() {
   const [supportForm, setSupportForm] = useState<{ subject: string; type: 'issue'|'request'|'question'; body: string }>({ subject: '', type: 'issue', body: '' });
   const [supportSending, setSupportSending] = useState(false);
   const [supportNotice, setSupportNotice] = useState<string|null>(null);
-  const [supportItems, setSupportItems] = useState<any[]>([
-    { id: 'WH-SUP-1001', subject: 'Request additional pallets', type: 'request', date: '2025-08-20', status: 'open' },
-    { id: 'WH-SUP-1000', subject: 'Scanner connectivity issues', type: 'issue', date: '2025-08-18', status: 'resolved' },
-  ]);
+  const [supportItems, setSupportItems] = useState<any[]>([]);
   // Shipments state & filters
   const [shipments, setShipments] = useState<any[]>([]);
   const [shipPendingOneQuery, setShipPendingOneQuery] = useState('');
@@ -797,16 +794,9 @@ export default function WarehouseHome() {
                 📰 News & Updates
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {[
-                  { id: 1, title: 'New safety procedures for loading docks', date: '2025-08-20', priority: 'High' },
-                  { id: 2, title: 'Inventory counts scheduled for EOM', date: '2025-08-18', priority: 'Medium' },
-                  { id: 3, title: 'Scanner firmware update available', date: '2025-08-15', priority: 'Low' }
-                ].map(item => (
-                  <div key={item.id} style={{ padding: 8, border: '1px solid #f3f4f6', borderRadius: 4, borderLeft: '3px solid #8b5cf6' }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: '#111827' }}>{item.title}</div>
-                    <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>{item.date} • {item.priority} Priority</div>
-                  </div>
-                ))}
+                <div style={{ color: '#6b7280', textAlign: 'center', padding: 24 }}>
+                  No news available.
+                </div>
               </div>
               <button
                 style={{ width: '100%', padding: '8px 16px', fontSize: 12, backgroundColor: '#ede9fe', color: '#6d28d9', border: '1px solid #c4b5fd', borderRadius: 4, cursor: 'pointer', marginTop: 8 }}
@@ -820,18 +810,10 @@ export default function WarehouseHome() {
             <Card>
               <div style={{ marginBottom: 16, color: '#8b5cf6', display: 'flex', alignItems: 'center', gap: 8 }}>
                 📬 Mail
-                <span style={{ background: '#ef4444', color: 'white', fontSize: 10, padding: '2px 6px', borderRadius: 12, fontWeight: 600 }}>3</span>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <div style={{ padding: 12, border: '1px solid #e5e7eb', borderRadius: 6, borderLeft: '3px solid #8b5cf6' }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>From Logistics</div>
-                  <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Upcoming shipment scheduling changes</div>
-                  <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>30 minutes ago • High Priority</div>
-                </div>
-                <div style={{ padding: 12, border: '1px solid #e5e7eb', borderRadius: 6, borderLeft: '3px solid #8b5cf6' }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>From Inventory Control</div>
-                  <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Cycle count plan for aisle B</div>
-                  <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>2 hours ago • Medium Priority</div>
+                <div style={{ color: '#6b7280', textAlign: 'center', padding: 24 }}>
+                  No mail available.
                 </div>
               </div>
               <button
@@ -900,11 +882,35 @@ export default function WarehouseHome() {
                       if (!supportForm.subject || !supportForm.body) return;
                       setSupportSending(true);
                       try {
-                        const id = `WH-SUP-${(Date.now().toString().slice(-4))}`;
-                        setSupportItems([{ id, subject: supportForm.subject, type: supportForm.type, date: new Date().toISOString().slice(0,10), status: 'open' }, ...supportItems]);
-                        setSupportNotice('Support request submitted.');
+                        // Submit ticket to centralized support system
+                        const response = await fetch('/api/support/tickets', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          credentials: 'include',
+                          body: JSON.stringify({
+                            user_id: profile?.warehouse_id || 'WH-000',
+                            user_role: 'warehouse',
+                            user_hub: 'warehouse',
+                            issue_type: supportForm.type === 'issue' ? 'bug' : supportForm.type === 'request' ? 'feature_question' : 'how_to',
+                            priority: 'medium',
+                            subject: supportForm.subject,
+                            description: supportForm.body,
+                            browser_info: navigator.userAgent,
+                            current_url: window.location.href
+                          })
+                        });
+                        
+                        if (!response.ok) {
+                          throw new Error('Failed to submit support ticket');
+                        }
+                        
+                        const result = await response.json();
+                        setSupportNotice(`Support ticket ${result.data.ticket_id} submitted successfully.`);
                         setSupportTab('inbox');
                         setSupportForm({ subject: '', type: 'issue', body: '' });
+                      } catch (error) {
+                        setSupportNotice('Failed to submit support ticket. Please try again.');
+                        console.error('Support ticket submission error:', error);
                       } finally {
                         setSupportSending(false);
                       }

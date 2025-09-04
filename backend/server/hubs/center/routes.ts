@@ -18,12 +18,8 @@ function getUserId(req: Request): string {
 // GET /api/center/requests (recent)
 router.get('/requests', async (req: Request, res: Response) => {
   try {
-    const limit = Math.min(parseInt(String(req.query.limit ?? '10'), 10), 50);
-    // Demo data until DB wiring is fully in place
-    const data = [
-      { id: 'REQ-1001', center: 'CEN-001', type: 'service', label: 'Daily Cleaning', status: 'contractor_pending', date: '2025-08-25' },
-      { id: 'REQ-1002', center: 'CEN-001', type: 'product', label: 'Floor Cleaner (5L)', status: 'submitted', date: '2025-08-24' }
-    ].slice(0, limit);
+    // Empty template data - requests will be created as center uses the system
+    const data = [];
     return res.json({ success: true, data });
   } catch (error) {
     console.error('[center] get requests error', error);

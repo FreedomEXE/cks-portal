@@ -90,6 +90,62 @@ Based on Crew Hub analysis, when Admin creates a new Crew member, the form needs
 
 ---
 
+## 🟢 CONTRACTOR HUB - Profile Field Mapping (MVP)
+
+This section defines the Contractor profile fields, their data sources, and creation vs. post‑creation responsibilities.
+
+### Admin Create → Contractor (Required at Creation)
+
+UI: Admin Hub → Create → Contractor
+
+- Company Name → DB: contractors.company_name (TEXT, required)
+- Address → DB: contractors.address (TEXT, required)
+- Main Contact → DB: contractors.contact_person (TEXT, required)
+- Phone → DB: contractors.phone (VARCHAR, required)
+- Email → DB: contractors.email (VARCHAR, required)
+- Website → DB: contractors.website (TEXT, required)
+
+System behavior at creation:
+- Contractor ID auto‑generate → CON-### sequence (CON-001, CON-002, …)
+- Status defaults to active → contractors.status = 'active'
+- cks_manager remains NULL (assigned later via Admin Assign)
+
+API: POST /api/admin/users with body:
+```
+{
+  "role": "contractor",
+  "company_name": "Acme Services LLC",
+  "contact_person": "Jane Doe",
+  "phone": "(555) 555-1212",
+  "email": "ops@acme.com",
+  "address": "123 Main St, Springfield, ST 12345",
+  "website": "https://acme.com"
+}
+```
+
+### Post‑Creation (Derived/Assigned)
+
+- Contractor ID → already generated at creation
+- CKS Manager (Assigned) → contractors.cks_manager (NULL until assignment)
+- Years with CKS → computed from contractors.created_at (>= 1)
+- Contract Start Date → contractors.created_at (YYYY‑MM‑DD)
+- Status → contractors.status (default active)
+- Services Specialized In → derived later from catalog selections
+
+### Contractor Hub → Company Profile (Read API)
+
+API: GET /api/contractor/profile?code=CON-###
+
+Returns:
+- contractor_id, company_name, cks_manager, main_contact, email, phone, address, website, status
+- years_with_cks (computed), contract_start_date (computed), num_customers (computed)
+- services_specialized (placeholder for future), payment_status (placeholder)
+
+Notes:
+- The frontend hook will pass ?code= from URL/path/session to ensure correct record resolution.
+
+---
+
 ---
 
 ## 🔴 CREW HUB - MY PROFILE TABS (Detailed Analysis)

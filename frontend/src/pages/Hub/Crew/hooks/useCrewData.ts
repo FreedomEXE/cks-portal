@@ -193,8 +193,8 @@ function makeCrewDemoData(code?: string) {
     supervisor: 'John Center',
     certifications: ['Safety Training', 'Equipment Operation'],
     current_status: 'On Duty',
-    hours_this_week: 32,
-    tasks_completed: 15,
+    hours_this_week: 0,
+    tasks_completed: 0,
     training_due: 'Chemical Safety - Due: 2025-09-15',
     _stub: true 
   };

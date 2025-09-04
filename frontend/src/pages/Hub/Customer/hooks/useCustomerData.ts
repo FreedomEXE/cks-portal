@@ -189,14 +189,14 @@ function makeCustomerDemoData(code?: string) {
     phone: '(555) 456-7890',
     address: '456 Corporate Blvd, Suite 200',
     established: '2021-01-01',
-    centers_managed: 5,
-    total_locations: 8,
+    centers_managed: 0,
+    total_locations: 0,
     service_areas: ['Downtown', 'North District', 'West Side'],
     account_status: 'Active',
     contract_manager: 'John Contractor',
     service_level: 'Standard',
-    crew_assigned: 8,
-    pending_requests: 2,
+    crew_assigned: 0,
+    pending_requests: 0,
     _stub: true 
   };
 }

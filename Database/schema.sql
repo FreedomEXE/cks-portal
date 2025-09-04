@@ -14,11 +14,13 @@
 -- Contractors (Green hub)
 CREATE TABLE IF NOT EXISTS contractors (
     contractor_id VARCHAR(20) PRIMARY KEY,
-    cks_manager VARCHAR(20) NOT NULL,
+    cks_manager VARCHAR(20),
     company_name VARCHAR(255) NOT NULL,
     contact_person VARCHAR(255),
     email VARCHAR(255),
     phone VARCHAR(50),
+    address TEXT,
+    website TEXT,
     business_type VARCHAR(100),
     status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'pending')),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

@@ -42,9 +42,13 @@ export function useContractorData() {
       // Check for URL param overrides (dev/testing)
       const params = new URLSearchParams(window.location.search);
       const codeOverride = params.get('code') || undefined;
+      // Derive contractor code from pathname or stored session when available
+      const pathUser = (window.location.pathname.split('/')[1] || '').trim();
+      const pathCode = /^con-\d+$/i.test(pathUser) ? pathUser.toUpperCase() : undefined;
       
       // Check localStorage fallbacks (only in dev/offline)
-      const lastCode = user?.id ? undefined : (safeGet('contractor:lastCode') || undefined);
+      const lastCodeAny = (safeGet('contractor:lastCode') || sessionStorage.getItem('contractor:lastCode') || undefined) as string | undefined;
+      const lastCode = lastCodeAny ? lastCodeAny.toUpperCase() : undefined;
 
       // If explicit overrides exist, use demo data
       if (codeOverride) {
@@ -69,7 +73,9 @@ export function useContractorData() {
         return;
       }
 
-      const url = buildContractorApiUrl("/profile", codeOverride ? { code: codeOverride } : {});
+      // Prefer explicit code param to avoid relying on Clerk user id mapping
+      const resolvedCode = (codeOverride || pathCode || lastCode) as string | undefined;
+      const url = buildContractorApiUrl("/profile", resolvedCode ? { code: resolvedCode } : {});
       console.debug('[useContractorData] fetching', url);
       
       const res = await contractorApiFetch(url);
@@ -180,10 +186,10 @@ function makeContractorDemoData(code?: string) {
     services_purchased: ['Cleaning', 'Maintenance', 'Security'],
     payment_status: 'Current',
     account_manager: 'CKS Manager Demo',
-    customers_served: 15,
-    locations_active: 8,
-    crew_assigned: 12,
-    pending_orders: 4,
+    customers_served: 0,
+    locations_active: 0,
+    crew_assigned: 0,
+    pending_orders: 0,
     _stub: true 
   };
 }
