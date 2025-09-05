@@ -771,23 +771,27 @@ export default function CenterHome() {
                     <div className="title" style={{ marginBottom: 20, color: '#f97316' }}>Service Information</div>
                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                       <tbody>
-                        {[
-                          ['Service Start Date', 'Not Set'],
-                          ['Status', 'Active'],
-                          ['Services Active', 'Not Set'],
-                          ['Service Frequency', 'Not Set'],
-                          ['Facility Type', 'Commercial'],
-                          ['Square Footage', 'Not Set']
-                        ].map(([label, value]) => (
-                          <tr key={label} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                            <td style={{ padding: '12px 0', fontWeight: 600, color: '#374151', width: '40%' }}>
-                              {label}:
-                            </td>
-                            <td style={{ padding: '12px 0', color: '#6b7280' }}>
-                              {value}
-                            </td>
-                          </tr>
-                        ))}
+                        {(() => {
+                          function fmtDate(v: any) { try { if (!v) return 'Not Set'; const d=new Date(v); if(isNaN(d.getTime())) return String(v); return d.toLocaleDateString(undefined,{year:'numeric',month:'short',day:'2-digit'});} catch { return String(v||'Not Set'); } }
+                          const rows: Array<[string, any]> = [
+                            ['Service Start Date', (state as any)?.data?.service_start_date || ''],
+                            ['Status', 'Active'],
+                            ['Services Active', 'Not Set'],
+                            ['Service Frequency', 'Not Set'],
+                            ['Facility Type', 'Commercial'],
+                            ['Square Footage', 'Not Set']
+                          ];
+                          return rows.map(([label, val]) => (
+                            <tr key={label} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                              <td style={{ padding: '12px 0', fontWeight: 600, color: '#374151', width: '40%' }}>
+                                {label}:
+                              </td>
+                              <td style={{ padding: '12px 0', color: '#6b7280' }}>
+                                {label==='Service Start Date'?fmtDate(val):String(val ?? '')}
+                              </td>
+                            </tr>
+                          ));
+                        })()}
                       </tbody>
                     </table>
                   </div>

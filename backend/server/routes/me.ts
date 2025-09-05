@@ -1,4 +1,5 @@
 import express, { Request, Response } from 'express';
+import pool from '../../../Database/db/pool';
 
 const router = express.Router();
 
@@ -170,28 +171,52 @@ router.get('/me/manager', async (req: Request, res: Response) => {
  */
 router.get('/me/bootstrap', async (req: Request, res: Response) => {
   try {
-    const userId = String(req.headers['x-user-id'] || '');
-    
-    if (!userId) {
-      return res.json({ 
-        linked: false,
-        message: 'No user ID provided' 
-      });
+    const rawId = String(req.headers['x-user-id'] || '').trim();
+    const emailHeader = String(req.headers['x-user-email'] || '').trim();
+    const emailQuery = String((req.query.email || '') as string).trim();
+    const userId = rawId || '';
+
+    // If caller already provides a CKS code (MGR-/CON-/CUS-/CEN-/CRW-/WH-), derive role directly
+    const upper = userId.toUpperCase();
+    const roleByPrefix = upper.startsWith('ADM-') ? 'admin'
+      : upper.startsWith('MGR-') ? 'manager'
+      : upper.startsWith('CON-') ? 'contractor'
+      : upper.startsWith('CUS-') ? 'customer'
+      : upper.startsWith('CEN-') ? 'center'
+      : upper.startsWith('CRW-') ? 'crew'
+      : upper.startsWith('WH-') ? 'warehouse'
+      : '';
+    if (roleByPrefix) {
+      return res.json({ linked: true, user_id: userId, role: roleByPrefix, code: upper });
     }
-    
-    // TODO: Implement actual database lookup
-    // For now, return unlinked to show onboarding flow
-    return res.json({ 
-      linked: false,
-      user_id: userId,
-      note: 'Database integration pending' 
-    });
+
+    // For Clerk users (user_XXXX), resolve via app_users by clerk_user_id or email
+    if (!userId) {
+      return res.json({ linked: false, message: 'No user ID provided' });
+    }
+
+    // Look up mapping in app_users
+    const emailToMatch = emailHeader || emailQuery || null;
+    const { rows } = await pool.query(
+      `SELECT role, code, email, name, clerk_user_id FROM app_users WHERE clerk_user_id=$1 OR (email IS NOT NULL AND email=$2)`,
+      [userId, emailToMatch]
+    );
+
+    if (rows.length === 0) {
+      return res.json({ linked: false, user_id: userId, message: 'No app_users mapping found' });
+    }
+
+    const m = rows[0];
+    // If matched by email, attach Clerk user id for future lookups
+    if (!m.clerk_user_id && emailToMatch) {
+      try {
+        await pool.query(`UPDATE app_users SET clerk_user_id=$1, updated_at=NOW() WHERE email=$2`, [userId, emailToMatch]);
+      } catch { /* ignore */ }
+    }
+    return res.json({ linked: true, user_id: userId, role: m.role, code: m.code, email: m.email, name: m.name });
   } catch (error: any) {
     console.error('[/me/bootstrap] Error:', error);
-    return res.status(500).json({ 
-      linked: false,
-      error: error.message 
-    });
+    return res.status(500).json({ linked: false, error: error.message });
   }
 });
 

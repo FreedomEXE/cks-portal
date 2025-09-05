@@ -619,25 +619,34 @@ export default function CustomerHome() {
                     <div>
                       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                         <tbody>
-                          {[
-                            ['Customer ID', state.data?.customer_id || code],
-                            ['Company Name', state.data?.company_name || customerName],
-                            ['Address', state.data?.address || 'Not Set'],
-                            ['CKS Manager (Assigned)', state.data?.cks_manager || 'Not Assigned'],
-                            ['Email', state.data?.email || 'Not Set'],
-                            ['Phone', state.data?.phone || 'Not Set'],
-                            ['Main Contact', state.data?.main_contact || 'Not Set'],
-                            ['Website', state.data?.website || 'Not Set'],
-                            ['Years with CKS', state.data?.years_with_cks || 'Not Set'],
-                            ['# of Centers', state.data?.num_centers || '0'],
-                            ['Contract Start Date', state.data?.contract_start_date || 'Not Set'],
-                            ['Status', state.data?.status || 'Not Set']
-                          ].map(([label, value]) => (
-                            <tr key={label}>
-                              <td style={{ padding: '8px 0', fontWeight: 600, width: '30%' }}>{label}</td>
-                              <td style={{ padding: '8px 0' }}>{value}</td>
-                            </tr>
-                          ))}
+                          {(() => {
+                            const rows: Array<[string, any]> = [
+                              ['Customer ID', state.data?.customer_id || code],
+                              ['Company Name', state.data?.company_name || customerName],
+                              ['Address', state.data?.address || 'Not Set'],
+                              ['CKS Manager (Assigned)', state.data?.cks_manager || 'Not Assigned'],
+                              ['Email', state.data?.email || 'Not Set'],
+                              ['Phone', state.data?.phone || 'Not Set'],
+                              ['Main Contact', state.data?.main_contact || 'Not Set'],
+                              ['Website', state.data?.website || 'Not Set'],
+                              ['Years with CKS', state.data?.years_with_cks || 'Not Set'],
+                              ['# of Centers', state.data?.num_centers || '0'],
+                              ['Contract Start Date', state.data?.contract_start_date || ''],
+                              ['Status', state.data?.status || 'Not Set']
+                            ];
+                            function fmtDate(v: any) {
+                              try { if (!v) return 'Not Set'; const d=new Date(v); if(isNaN(d.getTime())) return String(v); return d.toLocaleDateString(undefined,{year:'numeric',month:'short',day:'2-digit'});} catch { return String(v||'Not Set'); }
+                            }
+                            return rows.map(([label, val]) => {
+                              const display = label === 'Contract Start Date' ? fmtDate(val) : String(val ?? '');
+                              return (
+                                <tr key={label}>
+                                  <td style={{ padding: '8px 0', fontWeight: 600, width: '30%' }}>{label}</td>
+                                  <td style={{ padding: '8px 0' }}>{display}</td>
+                                </tr>
+                              );
+                            });
+                          })()}
                         </tbody>
                       </table>
                     </div>

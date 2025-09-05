@@ -17,7 +17,8 @@
       "Bash(npx tsc:*)",
       "Bash(git checkout:*)",
       "Bash(npx playwright test:*)",
-      "Bash(taskkill:*)"
+      "Bash(taskkill:*)",
+      "Bash(set PORT=5001)"
     ],
     "deny": [],
     "ask": []

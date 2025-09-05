@@ -38,15 +38,23 @@ export function getManagerRole(user: any, headers?: Record<string, string | null
 // Validate that user has manager role access
 export function validateManagerRole(user: any): boolean {
   const role = getManagerRole(user);
-  const isValidManager = role === 'manager';
-  
-  console.debug('[validateManagerRole]', { 
-    userId: user?.id, 
-    role, 
+  let isValidManager = role === 'manager';
+
+  // Dev/MVP fallback: allow session-mapped role
+  if (!isValidManager) {
+    try {
+      const fallback = (typeof sessionStorage !== 'undefined') ? (sessionStorage.getItem('me:lastRole') || sessionStorage.getItem('manager:lastRole')) : null;
+      if ((fallback || '').toLowerCase() === 'manager') isValidManager = true;
+    } catch { /* ignore */ }
+  }
+
+  console.debug('[validateManagerRole]', {
+    userId: user?.id,
+    role,
     isValidManager,
-    metadata: user?.publicMetadata 
+    metadata: user?.publicMetadata
   });
-  
+
   return isValidManager;
 }
 

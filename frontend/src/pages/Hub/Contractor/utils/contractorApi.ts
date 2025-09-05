@@ -56,7 +56,17 @@ function getContractorClerkUserId(): string | null {
 
 // Contractor-specific fetch wrapper with dedicated authentication
 export async function contractorApiFetch(input: string, init: RequestInit = {}) {
-  const userId = getContractorClerkUserId();
+  let overrideCode: string | null = null;
+  let overrideRole: string | null = null;
+  let impersonate = false;
+  try {
+    impersonate = sessionStorage.getItem('impersonate') === 'true';
+    if (impersonate) {
+      overrideCode = sessionStorage.getItem('me:lastCode');
+      overrideRole = sessionStorage.getItem('me:lastRole');
+    }
+  } catch {}
+  const userId = (impersonate && overrideCode) ? overrideCode : getContractorClerkUserId();
   const headers = new Headers(init.headers || {});
   
   // Contractor-specific headers
@@ -67,6 +77,7 @@ export async function contractorApiFetch(input: string, init: RequestInit = {}) 
   if (userId && !headers.has('x-user-id')) {
     headers.set('x-user-id', userId);
   }
+  if (impersonate && overrideRole && !headers.has('x-user-role')) headers.set('x-user-role', overrideRole);
   if (!headers.has('Accept')) headers.set('Accept', 'application/json');
   if (!headers.has('x-hub-type')) headers.set('x-hub-type', 'contractor');
   if (!headers.has('x-client-tier')) headers.set('x-client-tier', 'premium'); // Contractors are paying clients

@@ -152,3 +152,27 @@ router.patch('/:id/status', requirePermission('REPORT_STATUS'), async (req: Requ
 
 export default router;
 
+
+
+// DELETE /api/reports/:id - archive or delete report
+router.delete('/:id', requirePermission('REPORT_STATUS'), async (req: Request, res: Response) => {
+  try {
+    const id = String(req.params.id);
+    const has = await pool.query(`SELECT EXISTS (
+      SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='reports' AND column_name='archived_at'
+    ) as e`);
+    const exists = Boolean(has.rows[0]?.e);
+    if (exists) {
+      const r = await pool.query(`UPDATE reports SET archived_at=NOW() WHERE report_id=$1 RETURNING report_id`, [id]);
+      if (r.rowCount === 0) return res.status(404).json({ success: false, error: 'not_found' });
+      return res.json({ success: true, data: { report_id: id }, message: 'Report archived' });
+    } else {
+      const r = await pool.query(`DELETE FROM reports WHERE report_id=$1 RETURNING report_id`, [id]);
+      if (r.rowCount === 0) return res.status(404).json({ success: false, error: 'not_found' });
+      return res.json({ success: true, data: { report_id: id }, message: 'Report deleted' });
+    }
+  } catch (error) {
+    console.error('[reports] delete error', error);
+    return res.status(500).json({ success: false, error: 'server_error' });
+  }
+});

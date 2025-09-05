@@ -230,7 +230,11 @@ export default function WarehouseHome() {
                             ['Location', String(profile.warehouse_id || '').toUpperCase() === 'WH-000' ? '—' : (profile.address || '—')],
                             ['Phone', String(profile.warehouse_id || '').toUpperCase() === 'WH-000' ? '—' : (profile.phone || '—')],
                             ['Email', String(profile.warehouse_id || '').toUpperCase() === 'WH-000' ? '—' : (profile.email || '—')],
-                            ['Date Acquired', String(profile.warehouse_id || '').toUpperCase() === 'WH-000' ? '—' : (profile.date_acquired ? String(profile.date_acquired).slice(0,10) : '—')]
+                            ['Date Acquired', (() => { 
+                              if (String(profile.warehouse_id || '').toUpperCase() === 'WH-000') return '—';
+                              const v = profile.date_acquired; if (!v) return '—';
+                              const d = new Date(v); return isNaN(d.getTime()) ? String(v) : d.toLocaleDateString(undefined,{year:'numeric',month:'short',day:'2-digit'});
+                            })()]
                           ].map(([label, value]) => (
                             <tr key={label as string}>
                               <td style={{ padding: '8px 0', fontWeight: 600, width: '34%' }}>{label}</td>

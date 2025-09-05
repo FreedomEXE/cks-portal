@@ -55,7 +55,14 @@ function getManagerClerkUserId(): string | null {
 
 // Manager-specific fetch wrapper with dedicated authentication
 export async function managerApiFetch(input: string, init: RequestInit = {}) {
-  const userId = getManagerClerkUserId();
+  // Prefer dev/session override code only when impersonating
+  let overrideCode: string | null = null;
+  let impersonate = false;
+  try { 
+    impersonate = sessionStorage.getItem('impersonate') === 'true';
+    if (impersonate) overrideCode = sessionStorage.getItem('me:lastCode') || sessionStorage.getItem('manager:lastCode');
+  } catch {}
+  const userId = (impersonate && overrideCode) ? overrideCode : getManagerClerkUserId();
   const headers = new Headers(init.headers || {});
   
   // Manager-specific headers
@@ -66,6 +73,10 @@ export async function managerApiFetch(input: string, init: RequestInit = {}) {
   if (userId && !headers.has('x-user-id')) {
     headers.set('x-user-id', userId);
   }
+  try {
+    const role = sessionStorage.getItem('me:lastRole');
+    if (impersonate && role && !headers.has('x-user-role')) headers.set('x-user-role', role);
+  } catch { /* ignore */ }
   if (!headers.has('Accept')) headers.set('Accept', 'application/json');
   if (!headers.has('x-hub-type')) headers.set('x-hub-type', 'manager');
   

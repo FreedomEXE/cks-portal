@@ -540,7 +540,7 @@ function UnifiedUserCreateForm({
           <>
             {renderField('company_name', 'Company Name')}
             {renderField('address', 'Address')}
-            {renderField('contact_person', 'Main Contact')}
+            {renderField('main_contact', 'Main Contact')}
             {renderField('phone', 'Phone')}
             {renderField('email', 'Email', 'email')}
             {renderField('website', 'Website')}
@@ -551,7 +551,7 @@ function UnifiedUserCreateForm({
         return (
           <>
             {renderField('company_name', 'Company Name')}
-            {renderField('contact_person', 'Contact Person')}
+            {renderField('main_contact', 'Main Contact')}
             {renderField('email', 'Email', 'email')}
             {renderField('phone', 'Phone')}
             {renderSelectField('cks_manager', 'Assigned Manager', [
@@ -1263,7 +1263,7 @@ function CreateWarehouseCard() {
 // New Bucket-Based Assignment System Components
 
 // Individual User Card Component
-function UserCard({ user, userType, isSelected, onSelect, onDelete }: any) {
+function UserCard({ user, userType, isSelected, onSelect }: any) {
   const getId = () => {
     switch(userType) {
       case 'contractors': return user.contractor_id;
@@ -1287,16 +1287,7 @@ function UserCard({ user, userType, isSelected, onSelect, onDelete }: any) {
   };
 
   const handleCardClick = (e: any) => {
-    // Don't trigger selection if delete button was clicked
-    if (e.target.closest('.delete-button')) return;
     onSelect();
-  };
-
-  const handleDelete = (e: any) => {
-    e.stopPropagation();
-    if (confirm(`Are you sure you want to delete ${getName()} (${getId()})?`)) {
-      onDelete(getId());
-    }
   };
 
   return (
@@ -1328,32 +1319,14 @@ function UserCard({ user, userType, isSelected, onSelect, onDelete }: any) {
             </div>
           )}
         </div>
-        <button
-          className="delete-button"
-          onClick={handleDelete}
-          style={{
-            background: '#dc2626',
-            border: 'none',
-            borderRadius: 6,
-            color: 'white',
-            padding: '6px 8px',
-            fontSize: 12,
-            cursor: 'pointer',
-            transition: 'background 0.2s',
-            opacity: 0.8
-          }}
-          onMouseOver={(e) => e.currentTarget.style.opacity = '1'}
-          onMouseOut={(e) => e.currentTarget.style.opacity = '0.8'}
-        >
-          🗑️
-        </button>
+        {/* Delete button removed - use Directory tab for deletion */}
       </div>
     </div>
   );
 }
 
 // Unassigned Bucket Component
-function UnassignedBucket({ title, userType, users, selectedUsers, onSelectUser, onSelectAll, onDelete, loading }: any) {
+function UnassignedBucket({ title, userType, users, selectedUsers, onSelectUser, onSelectAll, loading }: any) {
   const allSelected = users.length > 0 && selectedUsers.length === users.length;
   const someSelected = selectedUsers.length > 0;
 
@@ -1416,7 +1389,6 @@ function UnassignedBucket({ title, userType, users, selectedUsers, onSelectUser,
                   userType={userType}
                   isSelected={selectedUsers.includes(userId)}
                   onSelect={() => onSelectUser(userId)}
-                  onDelete={onDelete}
                 />
               );
             })}
@@ -1619,11 +1591,8 @@ function SimplifiedAssignmentSystem() {
           response = await adminApiFetch(buildAdminApiUrl('/crew/unassigned'));
           break;
         case 'contractors':
-          response = await adminApiFetch(buildAdminApiUrl('/contractors', { limit: 100 }));
-          const contractorsData = await response.json();
-          setUnassignedUsers((contractorsData.items || []).filter((c: any) => !c.cks_manager));
-          setLoading(false);
-          return;
+          response = await adminApiFetch(buildAdminApiUrl('/contractors/unassigned', { limit: 100 }));
+          break;
         case 'customers':
           response = await adminApiFetch(buildAdminApiUrl('/customers', { limit: 100 }));
           const customersData = await response.json();
@@ -1988,8 +1957,8 @@ function BucketAssignmentSystem() {
         const requests = [
           // Use existing unassigned crew endpoint
           adminApiFetch(buildAdminApiUrl('/crew/unassigned')),
-          // For others, we'll need to filter by null assignment fields
-          adminApiFetch(buildAdminApiUrl('/contractors', { limit: 100 })),
+          // Use explicit unassigned endpoint for contractors
+          adminApiFetch(buildAdminApiUrl('/contractors/unassigned', { limit: 100 })),
           adminApiFetch(buildAdminApiUrl('/customers', { limit: 100 })),
           adminApiFetch(buildAdminApiUrl('/centers', { limit: 100 })),
           adminApiFetch(buildAdminApiUrl('/warehouses', { limit: 100 }))
@@ -1999,8 +1968,8 @@ function BucketAssignmentSystem() {
         const [crewData, contractorsData, customersData, centersData, warehousesData] = 
           await Promise.all(responses.map(r => r.json()));
 
-        // Filter unassigned users based on assignment fields
-        const unassignedContractors = (contractorsData.items || []).filter((c: any) => !c.cks_manager);
+        // Unassigned contractors provided directly by endpoint
+        const unassignedContractors = contractorsData.items || [];
         const unassignedCustomers = (customersData.items || []).filter((c: any) => !c.cks_manager);
         const unassignedCenters = (centersData.items || []).filter((c: any) => !c.customer_id);
         const unassignedWarehouses = (warehousesData.items || []).filter((w: any) => !w.manager_id);
@@ -2208,7 +2177,6 @@ function BucketAssignmentSystem() {
           selectedUsers={selectedUsers.contractors}
           onSelectUser={(userId: string) => handleSelectUser('contractors', userId)}
           onSelectAll={() => handleSelectAll('contractors')}
-          onDelete={(userId: string) => handleDeleteUser('contractors', userId)}
           loading={loading.contractors}
         />
         
@@ -2219,7 +2187,6 @@ function BucketAssignmentSystem() {
           selectedUsers={selectedUsers.customers}
           onSelectUser={(userId: string) => handleSelectUser('customers', userId)}
           onSelectAll={() => handleSelectAll('customers')}
-          onDelete={(userId: string) => handleDeleteUser('customers', userId)}
           loading={loading.customers}
         />
         
@@ -2230,7 +2197,6 @@ function BucketAssignmentSystem() {
           selectedUsers={selectedUsers.centers}
           onSelectUser={(userId: string) => handleSelectUser('centers', userId)}
           onSelectAll={() => handleSelectAll('centers')}
-          onDelete={(userId: string) => handleDeleteUser('centers', userId)}
           loading={loading.centers}
         />
         
@@ -2241,7 +2207,6 @@ function BucketAssignmentSystem() {
           selectedUsers={selectedUsers.crew}
           onSelectUser={(userId: string) => handleSelectUser('crew', userId)}
           onSelectAll={() => handleSelectAll('crew')}
-          onDelete={(userId: string) => handleDeleteUser('crew', userId)}
           loading={loading.crew}
         />
         
@@ -2252,7 +2217,6 @@ function BucketAssignmentSystem() {
           selectedUsers={selectedUsers.warehouses}
           onSelectUser={(userId: string) => handleSelectUser('warehouses', userId)}
           onSelectAll={() => handleSelectAll('warehouses')}
-          onDelete={(userId: string) => handleDeleteUser('warehouses', userId)}
           loading={loading.warehouses}
         />
         
@@ -2958,6 +2922,7 @@ export default function AdminHome() {
     { id: 'directory', label: '📋 Directory', description: 'Search, filter, and review' },
     { id: 'create', label: '➕ Create', description: 'Create users and services' },
     { id: 'assign', label: '🔗 Assign', description: 'Link users and warehouses' },
+    { id: 'archive', label: '🗃️ Archive', description: 'Restore deleted records' },
     { 
       id: 'support', 
       label: '🎧 Support', 
@@ -3001,6 +2966,45 @@ export default function AdminHome() {
     { key: 'training_procedures' as DirectoryTab, label: 'Training & Procedures', color: '#f59e0b', icon: '🎓' },
     { key: 'reports_feedback' as DirectoryTab, label: 'Reports & Feedback', color: '#059669', icon: '📈' }
   ];
+
+  // Archive state
+  const [archiveType, setArchiveType] = useState<'contractors'|'customers'|'centers'|'warehouses'>('contractors');
+  const [archiveItems, setArchiveItems] = useState<any[]>([]);
+  const [archiveLoading, setArchiveLoading] = useState(false);
+  const [archiveMsg, setArchiveMsg] = useState<string|null>(null);
+
+  useEffect(() => {
+    if (activeSection !== 'archive') return;
+    let cancelled = false;
+    (async () => {
+      try {
+        setArchiveLoading(true); setArchiveMsg(null);
+        const url = buildAdminApiUrl('/archive', { type: archiveType, limit: 50 });
+        const r = await adminApiFetch(url);
+        const j = await r.json();
+        if (!cancelled) setArchiveItems(Array.isArray(j?.items) ? j.items : []);
+      } catch (e:any) {
+        if (!cancelled) setArchiveMsg('Failed to load archive');
+      } finally {
+        if (!cancelled) setArchiveLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [activeSection, archiveType]);
+
+  async function handleRestore(item: any) {
+    try {
+      setArchiveMsg(null);
+      const id = item.id;
+      const r = await adminApiFetch(buildAdminApiUrl(`/${archiveType}/${encodeURIComponent(id)}/restore`), { method: 'POST' });
+      const j = await r.json();
+      if (!r.ok || !j?.success) throw new Error(j?.error || 'Restore failed');
+      setArchiveItems(prev => prev.filter(x => x.id !== id));
+      setArchiveMsg(`Restored ${id}`);
+    } catch (e:any) {
+      setArchiveMsg(e?.message || 'Restore failed');
+    }
+  }
 
 
   // Action: create user
@@ -3058,6 +3062,8 @@ export default function AdminHome() {
       }
       
       setCreateMsg('Created successfully');
+      // Reset search to avoid filtering out the new record
+      setSearchTerm('');
       // Switch to relevant directory tab
       const map: Record<string, DirectoryTab> = { 
         manager: 'management', 
@@ -3092,7 +3098,7 @@ export default function AdminHome() {
         return { 
           manager_id: 'MANAGER ID', 
           manager_name: 'MANAGER NAME',
-          assigned_center: 'ASSIGNED CENTER',
+          territory: 'TERRITORY',
           status: 'STATUS',
           actions: 'ACTIONS'
         };
@@ -3394,7 +3400,7 @@ export default function AdminHome() {
         const rows = items.map((it: any) => {
           switch (activeDirectoryTab) {
             case 'management':
-              return { manager_id: it.manager_id, manager_name: it.manager_name, assigned_center: it.assigned_center, status: it.status, email: it.email };
+              return { manager_id: it.manager_id, manager_name: it.manager_name, territory: it.territory, status: it.status, email: it.email };
             case 'contractors':
               return { contractor_id: it.contractor_id, cks_manager: it.cks_manager, company_name: it.company_name, status: it.status, email: it.email };
             case 'customers':
@@ -3483,10 +3489,8 @@ export default function AdminHome() {
           return true;
         });
 
-        // IMPORTANT: For a clean Admin Directory until real records are created,
-        // force an empty result set for Services and Warehouses so the UI shows
-        // the intended empty-state instead of seeded/demo/template items.
-        const final = (activeDirectoryTab === 'services' || activeDirectoryTab === 'warehouses') ? [] : filtered;
+        // Show filtered results for all tabs; seeded/template rows are already excluded above.
+        const final = filtered;
         setDirectoryData(final);
       } catch (e) {
         if (!cancelled) setError('Failed to load directory');
@@ -3501,9 +3505,9 @@ export default function AdminHome() {
   // Smart field detection for user creation - COMPREHENSIVE FORMS
   const getRequiredFieldsForUserType = (userType: DirectoryTab) => {
     const fieldsMap = {
-      contractors: ['company_name', 'address', 'contact_person', 'phone', 'email', 'website'],
-      management: ['id', 'name', 'status', 'assigned_center', 'territory', 'phone', 'email', 'start_date'],
-      customers: ['id', 'name', 'status', 'manager_id', 'contact_person', 'phone', 'email', 'address'],
+      contractors: ['company_name', 'address', 'main_contact', 'phone', 'email', 'website'],
+      management: ['id', 'name', 'status', 'territory', 'phone', 'email', 'start_date'],
+      customers: ['id', 'name', 'status', 'manager_id', 'main_contact', 'phone', 'email', 'address'],
       centers: ['id', 'name', 'status', 'manager_id', 'customer_id', 'contractor_id', 'address', 'phone', 'supervisor_notes'],
       crew: ['id', 'name', 'status', 'manager_id', 'center_id', 'role', 'phone', 'email', 'start_date', 'skills'],
       services: ['id', 'name', 'status', 'category', 'description', 'requirements'],
@@ -3695,6 +3699,33 @@ export default function AdminHome() {
                                   if (needsAssign.includes(key) && (v === null || v === undefined || v === '')) {
                                     return 'Unassigned';
                                   }
+                                  // Make the primary ID fields clickable for quick impersonation in dev
+                                  const idKeys = ['manager_id','contractor_id','customer_id','center_id','crew_id','warehouse_id','id'];
+                                  if (idKeys.includes(key)) {
+                                    const code = String(v || '').toUpperCase();
+                                    const role = code.startsWith('MGR-') ? 'manager'
+                                      : code.startsWith('CON-') ? 'contractor'
+                                      : code.startsWith('CUS-') ? 'customer'
+                                      : code.startsWith('CEN-') || code.startsWith('CTR-') ? 'center'
+                                      : code.startsWith('CRW-') ? 'crew'
+                                      : code.startsWith('WH-') ? 'warehouse'
+                                      : '';
+                                    const canClick = !!role;
+                                    return (
+                                      <span
+                                        onClick={() => {
+                                          try { 
+                                            sessionStorage.setItem('me:lastRole', role); 
+                                            sessionStorage.setItem('me:lastCode', code);
+                                            sessionStorage.setItem('impersonate', 'true');
+                                          } catch {}
+                                          window.open(`/${code}/hub`, '_blank');
+                                        }}
+                                        style={{ color: canClick ? '#60a5fa' : '#ffffff', cursor: canClick ? 'pointer' : 'default' }}
+                                        title={canClick ? 'Open hub as this user (dev)' : ''}
+                                      >{String(v ?? '')}</span>
+                                    );
+                                  }
                                   return String(v ?? '');
                                 })()
                               ) : (
@@ -3764,6 +3795,62 @@ export default function AdminHome() {
 
         {/* Create UI is not shown in Directory. Use the Create tab. */}
       </div>
+        );
+
+      case 'archive':
+        return (
+          <div>
+            <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Archive</h2>
+            <div className="ui-card" style={{ padding: 12, marginBottom: 12 }}>
+              <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                <div style={{ fontWeight: 600 }}>Type:</div>
+                <select value={archiveType} onChange={e=>setArchiveType(e.target.value as any)} style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #333', background: '#000', color: '#fff' }}>
+                  <option value="contractors">Contractors</option>
+                  <option value="customers">Customers</option>
+                  <option value="centers">Centers</option>
+                  <option value="crew">Crew</option>
+                  <option value="management">Managers</option>
+                  <option value="warehouses">Warehouses</option>
+                  <option value="services">Services</option>
+                  <option value="products">Products</option>
+                  <option value="supplies">Supplies</option>
+                  <option value="procedures">Procedures</option>
+                  <option value="training">Training</option>
+                  <option value="reports">Reports</option>
+                  <option value="feedback">Feedback</option>
+                  <option value="orders">Orders</option>
+                </select>
+                {archiveLoading && <div style={{ fontSize: 12, color: '#9ca3af' }}>Loading…</div>}
+                {archiveMsg && <div style={{ fontSize: 12, color: '#9ca3af' }}>{archiveMsg}</div>}
+              </div>
+            </div>
+            <div className="ui-card" style={{ padding: 12 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr>
+                    <th style={{ textAlign: 'left', padding: 8, borderBottom: '1px solid #222' }}>ID</th>
+                    <th style={{ textAlign: 'left', padding: 8, borderBottom: '1px solid #222' }}>Name</th>
+                    <th style={{ textAlign: 'left', padding: 8, borderBottom: '1px solid #222' }}>Date</th>
+                    <th style={{ textAlign: 'left', padding: 8, borderBottom: '1px solid #222' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {archiveItems.length === 0 ? (
+                    <tr><td colSpan={4} style={{ padding: 16, color: '#9ca3af' }}>No archived records.</td></tr>
+                  ) : archiveItems.map((it:any) => (
+                    <tr key={it.id}>
+                      <td style={{ padding: 8 }}>{it.id}</td>
+                      <td style={{ padding: 8 }}>{it.name}</td>
+                      <td style={{ padding: 8 }}>{String(it.date || '').replace('T',' ').slice(0,19)}</td>
+                      <td style={{ padding: 8 }}>
+                        <button onClick={()=>handleRestore(it)} style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #e5e7eb', background: '#10b981', color: '#000', fontWeight: 700 }}>Restore</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
         );
 
       case 'dashboard':

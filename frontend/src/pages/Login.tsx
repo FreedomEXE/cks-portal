@@ -54,9 +54,28 @@ function getClerkUserId(): string | null {
 }
 
 async function apiFetch(input: string, init: RequestInit = {}) {
-  const userId = getClerkUserId();
+  // Prefer dev/session override code only when impersonating
+  let overrideCode: string | null = null;
+  let overrideRole: string | null = null;
+  let impersonate = false;
+  try {
+    impersonate = sessionStorage.getItem('impersonate') === 'true';
+    if (impersonate) {
+      overrideCode = sessionStorage.getItem('me:lastCode');
+      overrideRole = sessionStorage.getItem('me:lastRole');
+    }
+  } catch { /* ignore */ }
+  const userId = (impersonate && overrideCode) ? overrideCode : getClerkUserId();
   const headers = new Headers(init.headers || {});
   if (userId && !headers.has('x-user-id')) headers.set('x-user-id', userId);
+  if (impersonate && overrideRole && !headers.has('x-user-role')) headers.set('x-user-role', overrideRole);
+  try {
+    // Provide user email to help backend map Clerk user to app user
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const w: any = typeof window !== 'undefined' ? (window as any) : null;
+    const email = w?.Clerk?.user?.primaryEmailAddress?.emailAddress || w?.Clerk?.session?.user?.primaryEmailAddress?.emailAddress || null;
+    if (email && !headers.has('x-user-email')) headers.set('x-user-email', String(email));
+  } catch { /* ignore */ }
   if (!headers.has('Accept')) headers.set('Accept', 'application/json');
   const opts: RequestInit = { credentials: 'include', ...init, headers };
   return fetch(input, opts);
@@ -72,6 +91,11 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const redirectedRef = useRef(false);
+
+  // Clear any prior impersonation when landing on login
+  useEffect(() => {
+    try { sessionStorage.removeItem('impersonate'); } catch {}
+  }, []);
 
   // If already signed in (e.g., after OAuth redirect), compute destination and leave /login immediately
   // But check if user was intentionally logged out
@@ -321,20 +345,15 @@ export default function Login() {
           </div>
         </form>
 
-        <div className="my-1.5 flex items-center gap-4 text-gray-400">
-          <div className="flex-1 h-px bg-gray-800" />
-          <div className="text-sm md:text-base">or</div>
-          <div className="flex-1 h-px bg-gray-800" />
-        </div>
-
         {/* Google OAuth via Clerk; redirect straight to Google */}
+        <div className="my-1.5" />
         <button onClick={signInWithGoogle} className="btn w-full bg-white text-black text-base md:text-lg py-2.5" disabled={!isLoaded || loading}>
           Continue with Google
         </button>
 
-        <div className="mt-2 text-center text-sm md:text-base text-gray-400">
-          Secured by Clerk
-        </div>
+        <div className="mt-2 text-center text-sm md:text-base text-gray-400">Secured by Clerk</div>
+
+        
       </div>
     </div>
   );

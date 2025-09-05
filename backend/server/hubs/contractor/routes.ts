@@ -44,23 +44,59 @@ router.get('/profile', async (req: Request, res: Response) => {
 
     const row = r.rows[0];
 
-    // Compute derived fields
-    const start = row.created_at ? new Date(row.created_at) : null;
-    const now = new Date();
-    let years = 1;
-    if (start) {
-      const diff = now.getTime() - start.getTime();
-      const y = Math.floor(diff / (365 * 24 * 60 * 60 * 1000));
-      years = Math.max(1, y + 1);
+    // Use the actual customer count from the database if available
+    let numCustomers = Number(row.num_customers) || 0;
+    
+    // If num_customers is 0, try to get actual count from customers table
+    if (numCustomers === 0) {
+      try {
+        const c = await pool.query(`SELECT COUNT(*)::int AS c FROM customers WHERE UPPER(contractor_id)=UPPER($1)`, [row.contractor_id]);
+        numCustomers = Number(c.rows?.[0]?.c ?? 0);
+      } catch {}
     }
-    const yearsLabel = years === 1 ? '1 Year' : `${years} Years`;
 
-    // Count customers for this contractor
-    let numCustomers = 0;
+    // Calculate years with CKS from created_at
+    let yearsWithCks = '1 Year';
+    let contractStartDate = null;
+    if (row.created_at) {
+      const startDate = new Date(row.created_at);
+      contractStartDate = startDate.toISOString().slice(0, 10);
+      const now = new Date();
+      const diffTime = Math.abs(now.getTime() - startDate.getTime());
+      const diffYears = Math.ceil(diffTime / (1000 * 60 * 60 * 24 * 365));
+      yearsWithCks = diffYears === 1 ? '1 Year' : `${diffYears} Years`;
+    }
+
+    // Load up to 3 favorite services for "Services Specialized In"
+    let servicesSpecialized = 'Not Set';
     try {
-      const c = await pool.query(`SELECT COUNT(*)::int AS c FROM customers WHERE UPPER(contractor_id)=UPPER($1)`, [row.contractor_id]);
-      numCustomers = Number(c.rows?.[0]?.c ?? 0);
+      const fav = await pool.query(
+        `SELECT s.service_name
+         FROM contractor_services cs
+         JOIN services s ON s.service_id = cs.service_id
+         WHERE UPPER(cs.contractor_id)=UPPER($1) AND cs.is_favorite = TRUE
+         ORDER BY s.service_name
+         LIMIT 3`,
+        [row.contractor_id]
+      );
+      const names = fav.rows.map((r:any) => r.service_name).filter(Boolean);
+      if (names.length) servicesSpecialized = names.join(', ');
     } catch {}
+
+    // Load manager details if assigned
+    let accountManager: any = null;
+    if (row.cks_manager) {
+      try {
+        const m = await pool.query(
+          `SELECT manager_id, manager_name, email, phone, territory, assigned_center
+           FROM managers
+           WHERE UPPER(manager_id) = UPPER($1)
+           LIMIT 1`,
+          [row.cks_manager]
+        );
+        if (m.rowCount > 0) accountManager = m.rows[0];
+      } catch {}
+    }
 
     const data = {
       contractor_id: row.contractor_id,
@@ -71,12 +107,13 @@ router.get('/profile', async (req: Request, res: Response) => {
       phone: row.phone || null,
       address: row.address || null,
       website: row.website || null,
-      years_with_cks: yearsLabel,
+      years_with_cks: yearsWithCks,
       num_customers: numCustomers,
-      contract_start_date: start ? start.toISOString().slice(0, 10) : null,
+      contract_start_date: contractStartDate,
       status: row.status || 'active',
-      services_specialized: 'Not Set',
-      payment_status: 'Not Set'
+      services_specialized: servicesSpecialized,
+      payment_status: 'Not Set',
+      account_manager: accountManager
     };
 
     return res.json({ success: true, data });
@@ -133,6 +170,116 @@ router.get('/centers', async (req: Request, res: Response) => {
   }
 });
 
+// GET /api/contractor/my-services?code=CON-###
+router.get('/my-services', async (req: Request, res: Response) => {
+  try {
+    const code = String(req.query.code || '').trim() || getUserId(req);
+    if (!code) return res.status(400).json({ success: false, error: 'code required', error_code: 'invalid_request' });
+
+    const selected = await pool.query(
+      `SELECT cs.service_id, cs.is_favorite, s.service_name, s.category, s.description
+       FROM contractor_services cs
+       JOIN services s ON s.service_id = cs.service_id
+       WHERE UPPER(cs.contractor_id) = UPPER($1)
+       ORDER BY s.service_name`,
+      [code]
+    );
+
+    const catalog = await pool.query(
+      `SELECT service_id, service_name, category, description
+       FROM services
+       WHERE status = 'active'
+       ORDER BY service_name`
+    );
+
+    return res.json({ success: true, data: { selected: selected.rows, catalog: catalog.rows } });
+  } catch (error) {
+    console.error('Contractor my-services endpoint error:', error);
+    return res.status(500).json({ success: false, error: 'Failed to fetch services', error_code: 'server_error' });
+  }
+});
+
+// POST /api/contractor/my-services  { code, services: string[] }
+router.post('/my-services', async (req: Request, res: Response) => {
+  try {
+    const code = String(req.body.code || '').trim() || getUserId(req);
+    const services: string[] = Array.isArray(req.body.services) ? req.body.services.map(String) : [];
+    if (!code) return res.status(400).json({ success: false, error: 'code required' });
+
+    await pool.query('BEGIN');
+    // Remove deselected
+    await pool.query(`DELETE FROM contractor_services WHERE UPPER(contractor_id)=UPPER($1) AND service_id <> ALL($2)`, [code, services.length ? services : ['#none#']]);
+    // Upsert selected
+    for (const sid of services) {
+      await pool.query(
+        `INSERT INTO contractor_services(contractor_id, service_id, is_favorite)
+         VALUES ($1,$2,FALSE)
+         ON CONFLICT (contractor_id, service_id) DO NOTHING`,
+        [code, sid]
+      );
+    }
+    await pool.query('COMMIT');
+    return res.json({ success: true });
+  } catch (error) {
+    await pool.query('ROLLBACK').catch(()=>{});
+    console.error('Contractor save my-services error:', error);
+    return res.status(500).json({ success: false, error: 'Failed to save services' });
+  }
+});
+
+// POST /api/contractor/my-services/add { code, service_id }
+router.post('/my-services/add', async (req: Request, res: Response) => {
+  try {
+    const code = String(req.body.code || '').trim() || getUserId(req);
+    const serviceId = String(req.body.service_id || '').trim();
+    if (!code) return res.status(400).json({ success: false, error: 'code required' });
+    if (!serviceId) return res.status(400).json({ success: false, error: 'service_id required' });
+    await pool.query(
+      `INSERT INTO contractor_services(contractor_id, service_id, is_favorite)
+       VALUES ($1,$2,FALSE)
+       ON CONFLICT (contractor_id, service_id) DO NOTHING`,
+      [code, serviceId]
+    );
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('Contractor add my-service error:', error);
+    return res.status(500).json({ success: false, error: 'Failed to add service' });
+  }
+});
+
+// PATCH /api/contractor/my-services/favorites { code, favorites: string[] } (max 3)
+router.patch('/my-services/favorites', async (req: Request, res: Response) => {
+  try {
+    const code = String(req.body.code || '').trim() || getUserId(req);
+    const favorites: string[] = Array.isArray(req.body.favorites) ? req.body.favorites.map(String) : [];
+    if (!code) return res.status(400).json({ success: false, error: 'code required' });
+    if (favorites.length > 3) return res.status(400).json({ success: false, error: 'Max 3 favorites' });
+
+    await pool.query('BEGIN');
+    // Ensure rows exist and set favorite flags
+    for (const sid of favorites) {
+      await pool.query(
+        `INSERT INTO contractor_services(contractor_id, service_id, is_favorite)
+         VALUES ($1,$2,TRUE)
+         ON CONFLICT (contractor_id, service_id) DO UPDATE SET is_favorite = TRUE, updated_at = NOW()`,
+        [code, sid]
+      );
+    }
+    // Clear favorite for non-favorites among selected
+    await pool.query(
+      `UPDATE contractor_services
+       SET is_favorite = FALSE, updated_at = NOW()
+       WHERE UPPER(contractor_id) = UPPER($1) AND (ARRAY[$2]::varchar[] IS NULL OR service_id <> ALL($2))`,
+      [code, favorites]
+    );
+    await pool.query('COMMIT');
+    return res.json({ success: true });
+  } catch (error) {
+    await pool.query('ROLLBACK').catch(()=>{});
+    console.error('Contractor favorites error:', error);
+    return res.status(500).json({ success: false, error: 'Failed to update favorites' });
+  }
+});
 // GET /api/contractor/requests (pending)
 router.get('/requests', async (req: Request, res: Response) => {
   try {

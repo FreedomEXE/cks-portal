@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS inventory_items (
     sku VARCHAR(100) UNIQUE,
     quantity_on_hand INTEGER DEFAULT 0,
     quantity_reserved INTEGER DEFAULT 0,
-    quantity_available AS (quantity_on_hand - quantity_reserved) STORED,
+    quantity_available INTEGER GENERATED ALWAYS AS (quantity_on_hand - quantity_reserved) STORED,
     min_stock_level INTEGER DEFAULT 0,
     max_stock_level INTEGER DEFAULT 1000,
     unit_cost DECIMAL(10,2),

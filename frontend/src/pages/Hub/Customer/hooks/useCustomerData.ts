@@ -184,7 +184,7 @@ function makeCustomerDemoData(code?: string) {
     customer_name: 'Customer Demo Corp', 
     code: code || 'cust-000',
     account_type: 'Corporate',
-    contact_person: 'Jane Customer',
+    main_contact: 'Jane Customer',
     email: 'contact@customer-demo.com',
     phone: '(555) 456-7890',
     address: '456 Corporate Blvd, Suite 200',

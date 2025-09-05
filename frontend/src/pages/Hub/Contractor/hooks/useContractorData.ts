@@ -67,14 +67,33 @@ export function useContractorData() {
         return;
       }
 
-      // Validate contractor role first
-      if (!validateContractorRole(user)) {
+      // Check for impersonation mode (admin viewing contractor)
+      let isImpersonating = false;
+      let impersonateRole = '';
+      try {
+        isImpersonating = sessionStorage.getItem('impersonate') === 'true';
+        impersonateRole = sessionStorage.getItem('me:lastRole') || '';
+      } catch { /* ignore */ }
+
+      // Validate contractor role (allow impersonation from admin)
+      const hasContractorRole = validateContractorRole(user);
+      const isAdminImpersonating = isImpersonating && impersonateRole === 'contractor';
+      
+      if (!hasContractorRole && !isAdminImpersonating) {
         setState({ loading: false, error: 'Unauthorized: Contractor access required', kind: "", data: null, _source: 'auth-error' });
         return;
       }
 
-      // Prefer explicit code param to avoid relying on Clerk user id mapping
-      const resolvedCode = (codeOverride || pathCode || lastCode) as string | undefined;
+      // Get impersonation code if in impersonation mode
+      let impersonateCode = '';
+      if (isImpersonating) {
+        try {
+          impersonateCode = sessionStorage.getItem('me:lastCode') || '';
+        } catch { /* ignore */ }
+      }
+
+      // Prefer explicit code param, then impersonation code, then path/session codes
+      const resolvedCode = (codeOverride || impersonateCode || pathCode || lastCode) as string | undefined;
       const url = buildContractorApiUrl("/profile", resolvedCode ? { code: resolvedCode } : {});
       console.debug('[useContractorData] fetching', url);
       
@@ -178,7 +197,7 @@ function makeContractorDemoData(code?: string) {
     company_name: 'Contractor Demo LLC', 
     code: code || 'con-000',
     business_license: 'BL-123456',
-    contact_person: 'John Contractor',
+    main_contact: 'John Contractor',
     email: 'contact@contractor-demo.com',
     phone: '(555) 987-6543',
     address: '123 Business Ave, Suite 100',

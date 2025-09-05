@@ -73,6 +73,9 @@ export default function ContractorHome() {
   const [repDetail, setRepDetail] = useState<any>(null);
   const [fbDetailOpen, setFbDetailOpen] = useState(false);
   const [fbDetail, setFbDetail] = useState<any>(null);
+  // Manager profile data for Account Manager tab
+  const [managerProfile, setManagerProfile] = useState<any | null>(null);
+  const [managerLoading, setManagerLoading] = useState(false);
   
   // Get contractor code and company name from profile data
   const session = getContractorSession();
@@ -140,6 +143,28 @@ export default function ContractorHome() {
     })();
     return () => { cancelled = true; };
   }, [code, state.data]);
+
+  // Load manager profile when Account Manager tab is active
+  useEffect(() => {
+    const mgrCode = (state.data?.cks_manager || '').toString();
+    if (profileTab !== 1 || !mgrCode) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        setManagerLoading(true);
+        const baseApi = (import.meta.env.VITE_API_URL?.replace(/\/$/, '') || '/api');
+        const url = `${baseApi}/manager/profile?code=${encodeURIComponent(mgrCode)}`;
+        const res = await fetch(url, { credentials: 'include', headers: { Accept: 'application/json' } });
+        const j = await res.json();
+        if (!cancelled) setManagerProfile(res.ok ? (j?.data || null) : null);
+      } catch {
+        if (!cancelled) setManagerProfile(null);
+      } finally {
+        if (!cancelled) setManagerLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [profileTab, state.data?.cks_manager]);
 
   const base = `/${username}/hub`;
 
@@ -647,26 +672,35 @@ export default function ContractorHome() {
                     <div>
                       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                         <tbody>
-                          {[
-                            ['Contractor ID', state.data?.contractor_id || code],
-                            ['Company Name', state.data?.company_name || companyName],
-                            ['Address', state.data?.address || 'Not Set'],
-                            ['CKS Manager (Assigned)', state.data?.cks_manager || 'Not Assigned'],
-                            ['Main Contact', state.data?.main_contact || 'Not Set'],
-                            ['Phone', state.data?.phone || 'Not Set'],
-                            ['Email', state.data?.email || 'Not Set'],
-                            ['Website', state.data?.website || 'Not Set'],
-                            ['Years with CKS', state.data?.years_with_cks || '0 Years'],
-                            ['# of Customers', state.data?.num_customers || '0'],
-                            ['Contract Start Date', state.data?.contract_start_date || 'Not Set'],
-                            ['Status', state.data?.status || 'Not Set'],
-                            ['Services Specialized In', state.data?.services_specialized || 'Not Set']
-                          ].map(([label, value]) => (
-                            <tr key={label}>
-                              <td style={{ padding: '8px 0', fontWeight: 600, width: '30%' }}>{label}</td>
-                              <td style={{ padding: '8px 0' }}>{value}</td>
-                            </tr>
-                          ))}
+                          {(() => {
+                            const rows: Array<[string, any]> = [
+                              ['Contractor ID', state.data?.contractor_id || code],
+                              ['Company Name', state.data?.company_name || companyName],
+                              ['Address', state.data?.address || 'Not Set'],
+                              ['CKS Manager (Assigned)', state.data?.cks_manager || 'Not Assigned'],
+                              ['Main Contact', state.data?.main_contact || 'Not Set'],
+                              ['Phone', state.data?.phone || 'Not Set'],
+                              ['Email', state.data?.email || 'Not Set'],
+                              ['Website', state.data?.website || 'Not Set'],
+                              ['Years with CKS', state.data?.years_with_cks || '0 Years'],
+                              ['# of Customers', state.data?.num_customers || '0'],
+                              ['Contract Start Date', state.data?.contract_start_date || ''],
+                              ['Status', state.data?.status || 'Not Set'],
+                              ['Services Specialized In', state.data?.services_specialized || 'Not Set']
+                            ];
+                            function fmtDate(v: any) {
+                              try { if (!v) return 'Not Set'; const d=new Date(v); if(isNaN(d.getTime())) return String(v); return d.toLocaleDateString(undefined,{year:'numeric',month:'short',day:'2-digit'});} catch { return String(v||'Not Set'); }
+                            }
+                            return rows.map(([label, val]) => {
+                              const display = label === 'Contract Start Date' ? fmtDate(val) : String(val ?? '');
+                              return (
+                                <tr key={label}>
+                                  <td style={{ padding: '8px 0', fontWeight: 600, width: '30%' }}>{label}</td>
+                                  <td style={{ padding: '8px 0' }}>{display}</td>
+                                </tr>
+                              );
+                            });
+                          })()}
                         </tbody>
                       </table>
                     </div>
@@ -702,27 +736,30 @@ export default function ContractorHome() {
                     <div>
                       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                         <tbody>
-                          {[
-                            ['Manager Name', 'Not Assigned'],
-                            ['Manager ID', 'Not Assigned'],
-                            ['Territory', 'Not Assigned'],
-                            ['Email', 'Not Assigned'],
-                            ['Phone', 'Not Assigned'],
-                            ['Years with CKS', '0 Years'],
-                            ['Assigned Since', 'Not Assigned'],
-                            ['Contact Preference', 'Not Set']
-                          ].map(([label, value]) => (
-                            <tr key={label}>
-                              <td style={{ padding: '8px 0', fontWeight: 600, width: '40%' }}>{label}</td>
-                              <td style={{ padding: '8px 0', color: '#6b7280' }}>{value}</td>
-                            </tr>
-                          ))}
+                          {(() => {
+                            const mgr = (state.data as any)?.account_manager || null;
+                            const rows: Array<[string, any]> = [
+                              ['Manager Name', (mgr?.name || mgr?.manager_name) || 'Not Assigned'],
+                              ['Manager ID', mgr?.manager_id || 'Not Assigned'],
+                              ['Territory', mgr?.territory || 'Not Assigned'],
+                              ['Email', mgr?.email || 'Not Assigned'],
+                              ['Phone', mgr?.phone || 'Not Assigned'],
+                              ['Assigned Center', mgr?.assigned_center || 'Not Assigned']
+                            ];
+                            return rows.map(([label, value]) => (
+                              <tr key={label}>
+                                <td style={{ padding: '8px 0', fontWeight: 600, width: '40%' }}>{label}</td>
+                                <td style={{ padding: '8px 0', color: '#6b7280' }}>{value}</td>
+                              </tr>
+                            ));
+                          })()}
                         </tbody>
                       </table>
                     </div>
                   </div>
                 </div>
               )}
+              
             </div>
           </div>
         )}
@@ -1095,13 +1132,16 @@ export default function ContractorHome() {
         {activeSection === 'services' && (
           <div>
             <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>My Services</h2>
-            <div className="ui-card" style={{ padding: 16 }}>
-              <div style={{ textAlign: 'center', padding: 40, color: '#6b7280' }}>
-                Service management portal will be implemented here.<br/>
-                This will show purchased services, service agreements,<br/>
-                billing details, and service upgrade options.
-              </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <div style={{ fontSize: 13, color: '#6b7280' }}>Manage your selected services and favorites. Favorites (max 3) appear on your profile as “Services Specialized In”.</div>
+              <button
+                onClick={() => window.location.assign('/catalog?type=service&context=contractor')}
+                style={{ padding: '8px 12px', border: '1px solid #e5e7eb', borderRadius: 6, background: '#111827', color: 'white', fontSize: 12, fontWeight: 600 }}
+              >
+                Browse CKS Catalog
+              </button>
             </div>
+            <ContractorMyServices code={code} />
           </div>
         )}
 
@@ -1109,6 +1149,128 @@ export default function ContractorHome() {
 
       {/* Animation styles */}
       <style>{`@keyframes fadeIn{from{opacity:0; transform:translateY(2px)} to{opacity:1; transform:none}}`}</style>
+    </div>
+  );
+}
+
+function ContractorMyServices({ code }: { code?: string }) {
+  const [loading, setLoading] = React.useState(false);
+  const [selectedRows, setSelectedRows] = React.useState<any[]>([]);
+  const [selected, setSelected] = React.useState<string[]>([]);
+  const [favorites, setFavorites] = React.useState<string[]>([]);
+  const [msg, setMsg] = React.useState<string | null>(null);
+
+  const base = '/api/contractor';
+
+  async function load() {
+    try {
+      setLoading(true);
+      const url = code ? `${base}/my-services?code=${encodeURIComponent(code)}` : `${base}/my-services`;
+      const r = await fetch(url, { headers: { 'Accept': 'application/json' } });
+      const j = await r.json();
+      if (r.ok && j?.success) {
+        const rows = j.data.selected || [];
+        setSelectedRows(rows);
+        setSelected(rows.map((s:any)=>s.service_id));
+        setFavorites(rows.filter((s:any)=>s.is_favorite).map((s:any)=>s.service_id));
+      } else {
+        setMsg(j?.error || 'Failed to load services');
+      }
+    } catch (e:any) {
+      setMsg(e?.message || 'Failed to load services');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  React.useEffect(() => { load(); }, [code]);
+
+  function toggleSelected(id: string) {
+    setSelected(prev => prev.includes(id) ? prev.filter(x=>x!==id) : [...prev, id]);
+    setFavorites(prev => prev.filter(x => x !== id));
+  }
+
+  function toggleFavorite(id: string) {
+    setFavorites(prev => {
+      if (prev.includes(id)) return prev.filter(x=>x!==id);
+      if (prev.length >= 3) { setMsg('You can only favorite up to 3 services'); return prev; }
+      if (!selected.includes(id)) setSelected(s => [...s, id]);
+      return [...prev, id];
+    });
+  }
+
+  async function saveSelected() {
+    try {
+      setMsg(null);
+      const r = await fetch(`${base}/my-services`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code, services: selected })
+      });
+      const j = await r.json();
+      if (!r.ok || !j?.success) throw new Error(j?.error || 'Save failed');
+      setMsg('Saved selections');
+    } catch (e:any) {
+      setMsg(e?.message || 'Save failed');
+    }
+  }
+
+  async function saveFavorites() {
+    try {
+      setMsg(null);
+      const r = await fetch(`${base}/my-services/favorites`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code, favorites })
+      });
+      const j = await r.json();
+      if (!r.ok || !j?.success) throw new Error(j?.error || 'Save favorites failed');
+      setMsg('Saved favorites');
+    } catch (e:any) {
+      setMsg(e?.message || 'Save favorites failed');
+    }
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 12 }}>
+        <div style={{ fontSize: 16, fontWeight: 600, color: '#10b981' }}>My Services</div>
+        {loading && <div style={{ fontSize: 12, color: '#6b7280' }}>Loading…</div>}
+      </div>
+      {msg && <div style={{ marginBottom: 12, fontSize: 12, color: '#6b7280' }}>{msg}</div>}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        <div className="ui-card" style={{ padding: 12 }}>
+          <div style={{ fontWeight: 600, marginBottom: 8 }}>My Selected Services</div>
+          <div style={{ maxHeight: 300, overflowY: 'auto' }}>
+            {selected.length === 0 ? (
+              <div style={{ fontSize: 12, color: '#6b7280' }}>No services selected yet.</div>
+            ) : (
+              selected.map(id => {
+                const svc = selectedRows.find((s:any)=>s.service_id===id);
+                const isFav = favorites.includes(id);
+                if (!svc) return null;
+                return (
+                  <div key={id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px dashed #e5e7eb' }}>
+                    <div>
+                      <div style={{ fontWeight: 600 }}>{svc.service_name}</div>
+                      <div style={{ fontSize: 12, color: '#6b7280' }}>{svc.category || ''}</div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <button onClick={() => toggleFavorite(id)} style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid #e5e7eb', background: isFav ? '#10b981' : 'white', color: isFav ? 'white' : '#111827' }}>★</button>
+                      <button onClick={() => toggleSelected(id)} style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid #e5e7eb' }}>Remove</button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+            <button onClick={saveSelected} className="btn" style={{ padding: '8px 12px', background: '#10b981', color: 'white', borderRadius: 6, border: 'none' }}>Save Selections</button>
+            <button onClick={saveFavorites} className="btn" style={{ padding: '8px 12px', background: '#0ea5e9', color: 'white', borderRadius: 6, border: 'none' }}>Save Favorites (max 3)</button>
+          </div>
+          <div style={{ fontSize: 12, color: '#6b7280', marginTop: 8 }}>Tip: Use “Browse CKS Catalog” to add more services. Favorite up to 3; they appear on your profile.</div>
+        </div>
+      </div>
     </div>
   );
 }

@@ -49,7 +49,9 @@ function resolveWarehouseId(): string {
     const path = window.location.pathname.toLowerCase().replace(/^\/+|\/+$/g, '');
     const seg = path.split('/')[0];
     if (seg && /^wh-\d{3}$/i.test(seg)) return seg.toUpperCase();
-    // Try sessionStorage 'code'
+    // Try session overrides
+    const ssDev = (sessionStorage.getItem('me:lastCode') || '').toUpperCase();
+    if (ssDev.startsWith('WH-')) return ssDev;
     const ss = (sessionStorage.getItem('code') || '').toUpperCase();
     if (ss.startsWith('WH-')) return ss;
   } catch {}
@@ -59,7 +61,11 @@ function resolveWarehouseId(): string {
 export async function warehouseApiFetch(url: string, options: RequestInit = {}): Promise<Response> {
   const headers = new Headers(options.headers);
   headers.set('Content-Type', 'application/json');
-  headers.set('x-user-role', 'warehouse');
+  try {
+    const isImp = sessionStorage.getItem('impersonate') === 'true';
+    const role = sessionStorage.getItem('me:lastRole');
+    if (isImp && role) headers.set('x-user-role', role);
+  } catch {}
   
   // Set warehouse-specific headers for authentication
   const warehouseId = resolveWarehouseId();

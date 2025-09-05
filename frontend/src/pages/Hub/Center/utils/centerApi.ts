@@ -56,7 +56,17 @@ function getCenterClerkUserId(): string | null {
 
 // Center-specific fetch wrapper with dedicated authentication
 export async function centerApiFetch(input: string, init: RequestInit = {}) {
-  const userId = getCenterClerkUserId();
+  let overrideCode: string | null = null;
+  let overrideRole: string | null = null;
+  let impersonate = false;
+  try {
+    impersonate = sessionStorage.getItem('impersonate') === 'true';
+    if (impersonate) {
+      overrideCode = sessionStorage.getItem('me:lastCode');
+      overrideRole = sessionStorage.getItem('me:lastRole');
+    }
+  } catch {}
+  const userId = (impersonate && overrideCode) ? overrideCode : getCenterClerkUserId();
   const headers = new Headers(init.headers || {});
   
   // Center-specific headers
@@ -67,6 +77,7 @@ export async function centerApiFetch(input: string, init: RequestInit = {}) {
   if (userId && !headers.has('x-user-id')) {
     headers.set('x-user-id', userId);
   }
+  if (impersonate && overrideRole && !headers.has('x-user-role')) headers.set('x-user-role', overrideRole);
   if (!headers.has('Accept')) headers.set('Accept', 'application/json');
   if (!headers.has('x-hub-type')) headers.set('x-hub-type', 'center');
   if (!headers.has('x-crew-coordinator')) headers.set('x-crew-coordinator', 'true'); // Center coordinates crew

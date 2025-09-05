@@ -50,15 +50,50 @@ router.get('/customers', async (req: Request, res: Response) => {
 // GET /api/manager/profile
 router.get('/profile', async (req: Request, res: Response) => {
   try {
-    const userId = getUserId(req);
+    const headerId = getUserId(req);
+    let code = '';
+    let email = String(req.headers['x-user-email'] || '').trim();
+    // Resolve manager code
+    if (headerId && /^MGR-\d{3,}$/i.test(headerId)) {
+      code = headerId.toUpperCase();
+    } else if (headerId) {
+      const r = await pool.query(`SELECT code, email FROM app_users WHERE clerk_user_id=$1`, [headerId]);
+      if (r.rows.length) { code = r.rows[0].code; email = r.rows[0].email || email; }
+    }
+    if (!code && email) {
+      const r = await pool.query(`SELECT code FROM app_users WHERE email=$1`, [email]);
+      if (r.rows.length) code = r.rows[0].code;
+    }
+    // Attempt to load real manager record from DB
+    if (code) {
+      const m = await pool.query(
+        `SELECT manager_id, manager_name, email, phone, territory, status, created_at
+         FROM managers WHERE UPPER(manager_id)=UPPER($1) LIMIT 1`, [code]
+      );
+      if (m.rows.length) {
+        const row = m.rows[0];
+        return res.json({ success: true, data: {
+          manager_id: row.manager_id,
+          name: row.manager_name,
+          role: 'Territory Manager',
+          email: row.email || email || null,
+          phone: row.phone || null,
+          territory: row.territory || null,
+          status: row.status || 'active',
+          start_date: row.created_at
+        }});
+      }
+    }
+    // Fallback sample if no DB record
     const sample = {
-      manager_id: userId || 'MGR-000',
+      manager_id: code || 'MGR-000',
       name: 'Manager Demo',
       role: 'Territory Manager',
-      email: 'manager@demo.com',
+      email: email || 'manager@demo.com',
       phone: '(555) 123-4567',
       territory: 'Demo Territory',
-      status: 'Active'
+      status: 'Active',
+      start_date: '2024-01-01'
     };
     return res.json({ success: true, data: sample });
   } catch (error) {
@@ -179,6 +214,69 @@ router.post('/jobs/:id/assign', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Manager assign error:', error);
     return res.status(500).json({ success: false, error: 'Failed to assign crew', error_code: 'server_error' });
+  }
+});
+
+// GET /api/manager/dashboard - Get dashboard metrics
+router.get('/dashboard', async (req: Request, res: Response) => {
+  try {
+    const code = String(req.query.code || '').trim() || getUserId(req);
+    if (!code) return res.status(400).json({ success: false, error: 'code required' });
+
+    // Get counts for manager's entities (crew table doesn't have manager relationship)
+    const [contractors, customers, centers] = await Promise.all([
+      pool.query('SELECT COUNT(*)::int as count FROM contractors WHERE UPPER(cks_manager) = UPPER($1)', [code]),
+      pool.query('SELECT COUNT(*)::int as count FROM customers WHERE UPPER(cks_manager) = UPPER($1)', [code]),
+      pool.query('SELECT COUNT(*)::int as count FROM centers WHERE UPPER(cks_manager) = UPPER($1)', [code])
+    ]);
+
+    const metrics = {
+      contractors: contractors.rows[0]?.count || 0,
+      customers: customers.rows[0]?.count || 0,
+      centers: centers.rows[0]?.count || 0,
+      crew: 0 // Crew table doesn't have manager relationship
+    };
+
+    return res.json({ success: true, data: metrics });
+  } catch (error) {
+    console.error('Manager dashboard endpoint error:', error);
+    return res.status(500).json({ success: false, error: 'Failed to fetch dashboard metrics', error_code: 'server_error' });
+  }
+});
+
+// GET /api/manager/contractors - Get list of contractors managed by this manager
+router.get('/contractors', async (req: Request, res: Response) => {
+  try {
+    const code = String(req.query.code || '').trim() || getUserId(req);
+    if (!code) return res.status(400).json({ success: false, error: 'code required' });
+
+    const contractors = await pool.query(
+      `SELECT 
+        contractor_id,
+        company_name,
+        main_contact,
+        email,
+        phone,
+        address,
+        website,
+        created_at
+      FROM contractors 
+      WHERE UPPER(cks_manager) = UPPER($1) 
+      ORDER BY company_name`,
+      [code]
+    );
+
+    // Simple response without customer counts for now (customers table schema issues)
+    const contractorsData = contractors.rows.map((contractor: any) => ({
+      ...contractor,
+      customer_count: 0, // Will implement when customers table schema is fixed
+      status: 'active' // Default status since column doesn't exist
+    }));
+
+    return res.json({ success: true, data: contractorsData });
+  } catch (error) {
+    console.error('Manager contractors endpoint error:', error);
+    return res.status(500).json({ success: false, error: 'Failed to fetch contractors', error_code: 'server_error' });
   }
 });
 

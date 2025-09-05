@@ -531,28 +531,34 @@ export default function CrewHome() {
                     <div>
                       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                         <tbody>
-                          {[
-                            ['Full Name', crewName || 'Not Set'],
-                            ['Reports To (Manager ID)', 'Not Set'],
-                            ['Crew ID', code || 'Not Set'],
-                            ['Role', 'Not Set'],
-                            ['Start Date', 'Not Set'],
-                            ['Years with Company', 'Not Set'],
-                            ['Primary Region', 'Not Set'],
-                            ['Email', 'Not Set'],
-                            ['Languages', 'Not Set'],
-                            ['Phone', 'Not Set'],
-                            ['Emergency Contact', 'Not Set'],
-                            ['Home Address', 'Not Set'],
-                            ['LinkedIn', 'Not Set'],
-                            ['Status', 'Active'],
-                            ['QR Code', 'Not Set']
-                          ].map(([label, value]) => (
-                            <tr key={label}>
-                              <td style={{ padding: '8px 0', fontWeight: 600, width: '30%' }}>{label}</td>
-                              <td style={{ padding: '8px 0' }}>{value}</td>
-                            </tr>
-                          ))}
+                          {(() => {
+                            function fmtDate(v: any) {
+                              try { if (!v) return 'Not Set'; const d=new Date(v); if(isNaN(d.getTime())) return String(v); return d.toLocaleDateString(undefined,{year:'numeric',month:'short',day:'2-digit'});} catch { return String(v||'Not Set'); }
+                            }
+                            const rows: Array<[string, any]> = [
+                              ['Full Name', crewName || 'Not Set'],
+                              ['Reports To (Manager ID)', 'Not Set'],
+                              ['Crew ID', code || 'Not Set'],
+                              ['Role', 'Not Set'],
+                              ['Start Date', ''],
+                              ['Years with Company', 'Not Set'],
+                              ['Primary Region', 'Not Set'],
+                              ['Email', 'Not Set'],
+                              ['Languages', 'Not Set'],
+                              ['Phone', 'Not Set'],
+                              ['Emergency Contact', 'Not Set'],
+                              ['Home Address', 'Not Set'],
+                              ['LinkedIn', 'Not Set'],
+                              ['Status', 'Active'],
+                              ['QR Code', 'Not Set']
+                            ];
+                            return rows.map(([label, val]) => (
+                              <tr key={label}>
+                                <td style={{ padding: '8px 0', fontWeight: 600, width: '30%' }}>{label}</td>
+                                <td style={{ padding: '8px 0' }}>{label==='Start Date'?fmtDate(val):String(val ?? '')}</td>
+                              </tr>
+                            ));
+                          })()}
                         </tbody>
                       </table>
                     </div>

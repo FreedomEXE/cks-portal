@@ -56,7 +56,17 @@ function getCustomerClerkUserId(): string | null {
 
 // Customer-specific fetch wrapper with dedicated authentication
 export async function customerApiFetch(input: string, init: RequestInit = {}) {
-  const userId = getCustomerClerkUserId();
+  let overrideCode: string | null = null;
+  let overrideRole: string | null = null;
+  let impersonate = false;
+  try {
+    impersonate = sessionStorage.getItem('impersonate') === 'true';
+    if (impersonate) {
+      overrideCode = sessionStorage.getItem('me:lastCode');
+      overrideRole = sessionStorage.getItem('me:lastRole');
+    }
+  } catch {}
+  const userId = (impersonate && overrideCode) ? overrideCode : getCustomerClerkUserId();
   const headers = new Headers(init.headers || {});
   
   // Customer-specific headers
@@ -67,6 +77,7 @@ export async function customerApiFetch(input: string, init: RequestInit = {}) {
   if (userId && !headers.has('x-user-id')) {
     headers.set('x-user-id', userId);
   }
+  if (impersonate && overrideRole && !headers.has('x-user-role')) headers.set('x-user-role', overrideRole);
   if (!headers.has('Accept')) headers.set('Accept', 'application/json');
   if (!headers.has('x-hub-type')) headers.set('x-hub-type', 'customer');
   if (!headers.has('x-center-manager')) headers.set('x-center-manager', 'true'); // Customer manages centers

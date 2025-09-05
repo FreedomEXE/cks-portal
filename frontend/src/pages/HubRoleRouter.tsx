@@ -20,6 +20,15 @@ import { useUser } from '@clerk/clerk-react';
 import { useParams } from 'react-router-dom';
 // Inline role extraction utility
 function getRole(user: any, headers?: Record<string, string | null | undefined>) {
+  // Dev override only when impersonation flag is set
+  try {
+    const ss = typeof sessionStorage !== 'undefined' ? sessionStorage : null;
+    const isImp = ss?.getItem('impersonate') === 'true';
+    if (isImp) {
+      const ssRole = ss?.getItem('me:lastRole') || ss?.getItem('manager:lastRole');
+      if (ssRole) return ssRole.toLowerCase();
+    }
+  } catch { /* ignore */ }
   // First check for template users (prefix-000 format) - infer role from username
   const username = user?.username || '';
   if (/^[a-z]{2,3}-\d{3}$/i.test(username)) {

@@ -18,6 +18,7 @@
 import express, { Request, Response } from 'express';
 import pool from '../../../../Database/db/pool';
 import { logger } from '../../src/core/logger';
+import { logActivity } from '../../resources/activity';
 
 const router = express.Router();
 
@@ -35,6 +36,37 @@ async function getNextIdGeneric(table: string, idColumn: string, prefix: string)
   const lastId: string = result.rows[0][idColumn];
   const number = parseInt(lastId.slice(prefix.length)) + 1;
   return `${prefix}${number.toString().padStart(3, '0')}`;
+}
+
+// Create or update app_users mapping by email (when Clerk user not yet known)
+async function upsertAppUserByEmail(email: string | null | undefined, role: string, code: string, name?: string) {
+  if (!email) return; // mapping by email is optional
+  try {
+    await pool.query(
+      `INSERT INTO app_users (email, role, code, name, status)
+       VALUES ($1,$2,$3,$4,'active')
+       ON CONFLICT (email) DO UPDATE SET role=EXCLUDED.role, code=EXCLUDED.code, name=COALESCE(EXCLUDED.name, app_users.name), updated_at=NOW()`,
+      [email, role, code, name || null]
+    );
+  } catch (e) {
+    logger.warn({ e }, 'app_users upsert by email failed');
+  }
+}
+
+// Check if a table has a specific column (public schema)
+async function hasColumn(table: string, column: string): Promise<boolean> {
+  try {
+    const r = await pool.query(
+      `SELECT EXISTS (
+         SELECT 1 FROM information_schema.columns
+         WHERE table_schema='public' AND table_name=$1 AND column_name=$2
+       ) AS exists`,
+      [table, column]
+    );
+    return Boolean(r.rows[0]?.exists);
+  } catch {
+    return false;
+  }
 }
 
 // GET /api/admin/crew
@@ -93,7 +125,7 @@ router.get('/managers', async (req, res) => {
     }
 
     const query = `
-      SELECT manager_id, manager_name, status, assigned_center, email, phone
+      SELECT manager_id, manager_name, status, email, phone, territory
       FROM managers ${whereClause}
       ORDER BY manager_id
       LIMIT $${values.length + 1} OFFSET $${values.length + 2}
@@ -180,6 +212,10 @@ router.get('/contractors', async (req, res) => {
       values.push(`%${search}%`);
       whereClause = `WHERE (contractor_id || ' ' || COALESCE(company_name,'') || ' ' || COALESCE(email,'')) ILIKE $1`;
     }
+    // Exclude archived if present
+    if (await hasColumn('contractors','archived_at')) {
+      whereClause = whereClause ? `${whereClause} AND archived_at IS NULL` : 'WHERE archived_at IS NULL';
+    }
     
     const query = `
       SELECT 
@@ -187,7 +223,7 @@ router.get('/contractors', async (req, res) => {
         cks_manager, 
         company_name, 
         0::int AS num_customers, 
-        main_contact, 
+        COALESCE(contact_person, main_contact) AS main_contact, 
         address, 
         phone, 
         email,
@@ -216,6 +252,39 @@ router.get('/contractors', async (req, res) => {
   }
 });
 
+
+// GET /api/admin/customers/unassigned - Customers without contractor assignment
+router.get('/customers/unassigned', async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(String(req.query.limit ?? '25'), 10), 100);
+    const offset = Math.max(parseInt(String(req.query.offset ?? '0'), 10), 0);
+    const search = String(req.query.q ?? '').trim();
+
+    let whereClause = 'WHERE contractor_id IS NULL';
+    const values = [] as any[];
+    if (search) {
+      values.push(`%${search}%`);
+      whereClause += ` AND (customer_id || ' ' || COALESCE(company_name,'') || ' ' || COALESCE(email,'')) ILIKE $${values.length}`;
+    }
+    if (await hasColumn('customers', 'archived_at')) whereClause += ' AND archived_at IS NULL';
+
+    const query = `
+      SELECT customer_id, contractor_id, company_name, COALESCE(contact_person, main_contact) AS main_contact, email, phone
+      FROM customers ${whereClause}
+      ORDER BY customer_id
+      LIMIT $${values.length + 1} OFFSET $${values.length + 2}
+    `;
+    const countQuery = `SELECT COUNT(*) FROM customers ${whereClause}`;
+    const [items, total] = await Promise.all([
+      pool.query(query, [...values, limit, offset]),
+      pool.query(countQuery, values)
+    ]);
+    res.json({ items: items.rows, total: Number(total.rows[0].count), page: Math.floor(offset/limit)+1, pageSize: limit });
+  } catch (e:any) {
+    logger.error({ error: e }, 'Admin unassigned customers list error');
+    res.status(500).json({ error: 'Failed to fetch unassigned customers' });
+  }
+});
 // GET /api/admin/customers
 router.get('/customers', async (req, res) => {
   try {
@@ -230,9 +299,12 @@ router.get('/customers', async (req, res) => {
       values.push(`%${search}%`);
       whereClause = `WHERE (customer_id || ' ' || COALESCE(company_name,'') || ' ' || COALESCE(email,'')) ILIKE $1`;
     }
+    if (await hasColumn('customers','archived_at')) {
+      whereClause = whereClause ? `${whereClause} AND archived_at IS NULL` : 'WHERE archived_at IS NULL';
+    }
     
     const query = `
-      SELECT customer_id, cks_manager, company_name, num_centers, main_contact, address, phone, email
+      SELECT customer_id, contractor_id, company_name, COALESCE(contact_person, main_contact) AS main_contact, phone, email
       FROM customers ${whereClause}
       ORDER BY customer_id
       LIMIT $${values.length + 1} OFFSET $${values.length + 2}
@@ -257,6 +329,39 @@ router.get('/customers', async (req, res) => {
   }
 });
 
+
+// GET /api/admin/centers/unassigned - Centers without customer or contractor assignment
+router.get('/centers/unassigned', async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(String(req.query.limit ?? '25'), 10), 100);
+    const offset = Math.max(parseInt(String(req.query.offset ?? '0'), 10), 0);
+    const search = String(req.query.q ?? '').trim();
+
+    let whereClause = 'WHERE (customer_id IS NULL OR contractor_id IS NULL)';
+    const values: any[] = [];
+    if (search) {
+      values.push(`%${search}%`);
+      whereClause += ` AND (center_id || ' ' || COALESCE(center_name,'')) ILIKE $${values.length}`;
+    }
+    if (await hasColumn('centers', 'archived_at')) whereClause += ' AND archived_at IS NULL';
+
+    const query = `
+      SELECT center_id, center_name AS name, customer_id, contractor_id, address
+      FROM centers ${whereClause}
+      ORDER BY center_id
+      LIMIT $${values.length + 1} OFFSET $${values.length + 2}
+    `;
+    const countQuery = `SELECT COUNT(*) FROM centers ${whereClause}`;
+    const [items, total] = await Promise.all([
+      pool.query(query, [...values, limit, offset]),
+      pool.query(countQuery, values)
+    ]);
+    res.json({ items: items.rows, total: Number(total.rows[0].count), page: Math.floor(offset/limit)+1, pageSize: limit });
+  } catch (e:any) {
+    logger.error({ error: e }, 'Admin unassigned centers list error');
+    res.status(500).json({ error: 'Failed to fetch unassigned centers' });
+  }
+});
 // GET /api/admin/centers
 router.get('/centers', async (req, res) => {
   try {
@@ -271,9 +376,12 @@ router.get('/centers', async (req, res) => {
       values.push(`%${search}%`);
       whereClause = `WHERE (center_id || ' ' || COALESCE(name,'') || ' ' || COALESCE(email,'')) ILIKE $1`;
     }
+    if (await hasColumn('centers','archived_at')) {
+      whereClause = whereClause ? `${whereClause} AND archived_at IS NULL` : 'WHERE archived_at IS NULL';
+    }
     
     const query = `
-      SELECT center_id, cks_manager, name, main_contact, address, phone, email, contractor_id, customer_id
+      SELECT center_id, center_name AS name, address, contractor_id, customer_id
       FROM centers ${whereClause}
       ORDER BY center_id
       LIMIT $${values.length + 1} OFFSET $${values.length + 2}
@@ -466,6 +574,171 @@ router.post('/procedures', async (req, res) => {
   }
 });
 
+// ============================================
+// CREATE USERS AND WAREHOUSES (Admin)
+// ============================================
+
+// POST /api/admin/users
+// Body: { role: manager|contractor|customer|center|crew, ...fields }
+router.post('/users', async (req: Request, res: Response) => {
+  try {
+    const { role } = req.body || {};
+    if (!role || !['manager','contractor','customer','center','crew'].includes(String(role))) {
+      return res.status(400).json({ error: 'Invalid or missing role' });
+    }
+
+    if (role === 'manager') {
+      const name = String(req.body.manager_name || req.body.name || '').trim();
+      if (!name) return res.status(400).json({ error: 'manager_name is required' });
+      const manager_id = await getNextIdGeneric('managers', 'manager_id', 'MGR-');
+      const r = await pool.query(
+        `INSERT INTO managers(manager_id, manager_name, email, phone, territory, status)
+         VALUES ($1,$2,$3,$4,$5,'active') RETURNING manager_id, manager_name, email, phone, territory, status`,
+        [manager_id, name, req.body.email || null, req.body.phone || null, req.body.territory || null]
+      );
+      await upsertAppUserByEmail(req.body.email, 'manager', manager_id, name);
+      try { await logActivity('user_created', `Manager ${manager_id} created`, String(req.headers['x-admin-user-id']||'admin'), 'admin', manager_id, 'manager', { email: req.body.email||null }); } catch {}
+      try { await logActivity('user_created', `Manager ${manager_id} created`, String(req.headers['x-admin-user-id']||'admin'), 'admin', manager_id, 'manager', { email: req.body.email||null }); } catch {}
+      return res.status(201).json({ success: true, data: { ...r.rows[0] } });
+    }
+
+    if (role === 'contractor') {
+      const company = String(req.body.company_name || '').trim();
+      if (!company) return res.status(400).json({ error: 'company_name is required' });
+      const contractor_id = await getNextIdGeneric('contractors', 'contractor_id', 'CON-');
+      // Dynamically include optional columns if they exist in the target DB
+      const cols: string[] = ['contractor_id', 'cks_manager', 'company_name'];
+      const vals: any[] = [contractor_id, req.body.cks_manager || null, company];
+      const optional: Array<[key: string, value: any]> = [
+        // Accept UI field name 'main_contact' while storing in contact_person column
+        ['contact_person', (req.body.main_contact ?? req.body.contact_person) || null],
+        ['email', req.body.email || null],
+        ['phone', req.body.phone || null],
+        ['address', req.body.address || null],
+        ['website', req.body.website || null],
+        ['business_type', req.body.business_type || null],
+      ];
+      for (const [key, value] of optional) {
+        // email/phone are very likely present; contact_person/address/website/business_type may be missing on older DBs
+        // Include only columns that actually exist
+        // eslint-disable-next-line no-await-in-loop
+        if (await hasColumn('contractors', key)) {
+          cols.push(key);
+          vals.push(value);
+        }
+      }
+      const hasStatusCol = await hasColumn('contractors', 'status');
+      if (hasStatusCol) {
+        cols.push('status');
+        vals.push('active');
+      }
+
+      const placeholders = cols.map((_, i) => `$${i + 1}`).join(',');
+      const returningCols = ['contractor_id', 'cks_manager', 'company_name', ...(hasStatusCol ? ['status'] : [])];
+      const insertSql = `INSERT INTO contractors(${cols.join(',')}) VALUES (${placeholders}) RETURNING ${returningCols.join(', ')}`;
+      const r = await pool.query(insertSql, vals);
+      // If status column doesn't exist, synthesize active status for response consistency
+      const data = hasStatusCol ? r.rows[0] : { ...r.rows[0], status: 'active' };
+      await upsertAppUserByEmail(req.body.email, 'contractor', contractor_id, company);
+      return res.status(201).json({ success: true, data });
+    }
+
+    if (role === 'customer') {
+      const company = String(req.body.company_name || '').trim();
+      const cks_manager = String(req.body.cks_manager || '').trim();
+      if (!company) return res.status(400).json({ error: 'company_name is required' });
+      if (!cks_manager) return res.status(400).json({ error: 'cks_manager is required' });
+      const customer_id = await getNextIdGeneric('customers', 'customer_id', 'CUS-');
+      const r = await pool.query(
+        `INSERT INTO customers(customer_id, cks_manager, company_name, contact_person, email, phone, service_tier, status)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,'active')
+         RETURNING customer_id, cks_manager, company_name, contact_person, email, phone, service_tier, status`,
+        [
+          customer_id,
+          cks_manager,
+          company,
+          (req.body.main_contact ?? req.body.contact_person) || null,
+          req.body.email || null,
+          req.body.phone || null,
+          req.body.service_tier || null
+        ]
+      );
+      await upsertAppUserByEmail(req.body.email, 'customer', customer_id, company);
+      try { await logActivity('user_created', `Customer ${customer_id} created`, String(req.headers['x-admin-user-id']||'admin'), 'admin', customer_id, 'customer', { email: req.body.email||null }); } catch {}
+      return res.status(201).json({ success: true, data: { ...r.rows[0] } });
+    }
+
+    if (role === 'center') {
+      const center_name = String(req.body.center_name || '').trim();
+      const customer_id = String(req.body.customer_id || '').trim();
+      const contractor_id = String(req.body.contractor_id || '').trim();
+      const cks_manager = String(req.body.cks_manager || '').trim();
+      if (!center_name) return res.status(400).json({ error: 'center_name is required' });
+      if (!customer_id) return res.status(400).json({ error: 'customer_id is required' });
+      if (!contractor_id) return res.status(400).json({ error: 'contractor_id is required' });
+      if (!cks_manager) return res.status(400).json({ error: 'cks_manager is required' });
+      const center_id = await getNextIdGeneric('centers', 'center_id', 'CEN-');
+      const r = await pool.query(
+        `INSERT INTO centers(center_id, cks_manager, center_name, customer_id, contractor_id, address, operational_hours, status)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,'active')
+         RETURNING center_id, cks_manager, center_name, customer_id, contractor_id, address, operational_hours, status`,
+        [
+          center_id,
+          cks_manager,
+          center_name,
+          customer_id,
+          contractor_id,
+          req.body.address || null,
+          req.body.operational_hours || null
+        ]
+      );
+      await upsertAppUserByEmail(req.body.email, 'center', center_id, center_name);
+      try { await logActivity('user_created', `Center ${center_id} created`, String(req.headers['x-admin-user-id']||'admin'), 'admin', center_id, 'center', {}); } catch {}
+      return res.status(201).json({ success: true, data: { ...r.rows[0] } });
+    }
+
+    if (role === 'crew') {
+      const crew_name = String(req.body.crew_name || req.body.name || '').trim();
+      const crew_id = await getNextIdGeneric('crew', 'crew_id', 'CRW-');
+      const r = await pool.query(
+        `INSERT INTO crew(crew_id, cks_manager, assigned_center, crew_name, skills, certification_level, status, profile)
+         VALUES ($1,$2,$3,$4,$5,$6,'active',$7)
+         RETURNING crew_id, cks_manager, assigned_center, crew_name, skills, certification_level, status`,
+        [
+          crew_id,
+          req.body.cks_manager || null,
+          req.body.assigned_center || null,
+          crew_name || null,
+          Array.isArray(req.body.skills) ? req.body.skills : (req.body.skills ? String(req.body.skills).split(',').map((s:string)=>s.trim()) : null),
+          req.body.certification_level || null,
+          req.body.profile || null
+        ]
+      );
+      await upsertAppUserByEmail(req.body.email, 'crew', crew_id, crew_name);
+      try { await logActivity('user_created', `Crew ${crew_id} created`, String(req.headers['x-admin-user-id']||'admin'), 'admin', crew_id, 'crew', {}); } catch {}
+      return res.status(201).json({ success: true, data: { ...r.rows[0] } });
+    }
+
+    return res.status(400).json({ error: 'Unsupported role' });
+  } catch (e: any) {
+    const msg = e?.message || String(e);
+    logger.error({ error: e }, 'Admin create user error');
+    res.status(500).json({ error: 'Failed to create user', details: msg });
+  }
+});
+
+// (Removed duplicate simple POST /warehouses; using the more complete one below)
+
+// POST /api/admin/auth/invite - stubbed in dev if Clerk is not configured
+router.post('/auth/invite', async (_req: Request, res: Response) => {
+  try {
+    // For MVP dev/testing, we do not integrate Clerk server-side invites here
+    return res.status(501).json({ error: 'clerk_not_configured' });
+  } catch (e:any) {
+    return res.status(500).json({ error: 'invite_failed' });
+  }
+});
+
 // POST /api/admin/training - create training
 router.post('/training', async (req, res) => {
   try {
@@ -492,6 +765,26 @@ router.post('/training', async (req, res) => {
     logger.error({ error: e }, 'Admin create training error');
     res.status(500).json({ error: 'Failed to create training' });
   }
+
+// DELETE /api/admin/training/:id - archive or delete training
+router.delete('/training/:id', async (req, res) => {
+  try {
+    const id = String(req.params.id || '').trim();
+    if (!id) return res.status(400).json({ error: 'training_id required' });
+    if (await hasColumn('training','archived_at')) {
+      const r = await pool.query(`UPDATE training SET archived_at=NOW() WHERE training_id=$1 RETURNING training_id`, [id]);
+      if (r.rowCount === 0) return res.status(404).json({ error: 'not_found' });
+      return res.json({ success: true, message: 'Training archived' });
+    } else {
+      const r = await pool.query(`DELETE FROM training WHERE training_id=$1 RETURNING training_id`, [id]);
+      if (r.rowCount === 0) return res.status(404).json({ error: 'not_found' });
+      return res.json({ success: true, message: 'Training deleted' });
+    }
+  } catch (e:any) {
+    logger.error({ error: e }, 'Admin delete training error');
+    res.status(500).json({ error: 'Failed to delete training' });
+  }
+});
 });
 
 // GET /api/admin/warehouses
@@ -581,6 +874,8 @@ router.post('/warehouses', async (req, res) => {
       [id]
     );
 
+    // Map warehouse login if an email was provided
+    try { await upsertAppUserByEmail(email, 'warehouse', id, warehouse_name); } catch {}
     await pool.query('COMMIT');
     return res.status(201).json({ success: true, data: inserted.rows[0] });
   } catch (e:any) {
@@ -844,21 +1139,17 @@ router.put('/catalog/items/:id', async (req, res) => {
 router.delete('/catalog/items/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    
-    const result = await pool.query(`
-      DELETE FROM services 
-      WHERE service_id = $1
-      RETURNING service_id as id
-    `, [id]);
-    
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Service not found' });
+    // Soft-delete if archived_at exists, else hard delete
+    const has = await hasColumn('services','archived_at');
+    if (has) {
+      const r = await pool.query(`UPDATE services SET archived_at=NOW() WHERE service_id=$1 RETURNING service_id as id`, [id]);
+      if (r.rowCount === 0) return res.status(404).json({ error: 'Service not found' });
+      return res.json({ success: true, message: 'Service archived' });
+    } else {
+      const result = await pool.query(`DELETE FROM services WHERE service_id=$1 RETURNING service_id as id`, [id]);
+      if (result.rowCount === 0) return res.status(404).json({ error: 'Service not found' });
+      return res.json({ success: true, message: 'Service deleted' });
     }
-    
-    res.json({
-      success: true,
-      message: 'Service deleted successfully'
-    });
   } catch (e: any) {
     logger.error({ error: e }, 'Admin catalog delete error');
     res.status(500).json({ error: 'Failed to delete catalog item' });
@@ -885,12 +1176,12 @@ router.post('/users', async (req: Request, res: Response) => {
       const id = await getNextIdGeneric('managers', 'manager_id', 'MGR-');
       const name = req.body.manager_name || req.body.name;
       if (!name) return res.status(400).json({ error: 'manager_name is required' });
-      const { email, phone, assigned_center, territory, status } = req.body;
+      const { email, phone, territory, status } = req.body;
       const r = await pool.query(
-        `INSERT INTO managers(manager_id, manager_name, assigned_center, email, phone, territory, status)
-         VALUES ($1,$2,$3,$4,$5,$6,$7)
-         RETURNING manager_id, manager_name, status, email, phone, assigned_center`,
-        [id, name, assigned_center || null, email || null, phone || null, territory || null, status || 'active']
+        `INSERT INTO managers(manager_id, manager_name, email, phone, territory, status)
+         VALUES ($1,$2,$3,$4,$5,$6)
+         RETURNING manager_id, manager_name, status, email, phone, territory`,
+        [id, name, email || null, phone || null, territory || null, status || 'active']
       );
       return res.status(201).json({ success: true, data: r.rows[0] });
     }
@@ -910,6 +1201,7 @@ router.post('/users', async (req: Request, res: Response) => {
          RETURNING contractor_id, cks_manager, company_name`,
         [id, cks_manager, company, contact_person || null, email || null, phone || null, address || null]
       );
+      await upsertAppUserByEmail(req.body.email, 'contractor', id, company);
       return res.status(201).json({ success: true, data: r.rows[0] });
     }
 
@@ -1004,18 +1296,7 @@ router.get('/schema/contractors', async (_req, res) => {
 // DELETE ENTITIES (MVP convenience)
 // ============================================
 
-router.delete('/contractors/:id', async (req, res) => {
-  const id = String(req.params.id);
-  try {
-    const r = await pool.query('DELETE FROM contractors WHERE contractor_id = $1 RETURNING contractor_id', [id]);
-    if (r.rowCount === 0) return res.status(404).json({ error: 'Not found' });
-    return res.json({ success: true, data: { contractor_id: id } });
-  } catch (e: any) {
-    if (e?.code === '23503') return res.status(409).json({ error: 'in_use' });
-    logger.error({ error: e }, 'Admin delete contractor error');
-    return res.status(500).json({ error: 'Delete failed' });
-  }
-});
+// Removed duplicate - using the more complete version below
 
 router.delete('/customers/:id', async (req, res) => {
   const id = String(req.params.id);
@@ -1176,6 +1457,14 @@ router.post('/contractors/:id/assign-manager', async (req: Request, res: Respons
       [contractorId, managerId]
     );
     if (r.rowCount === 0) return res.status(404).json({ error: 'contractor_not_found' });
+    // Log activity
+    try {
+      await pool.query(
+        `INSERT INTO system_activity(activity_type, actor_id, actor_role, target_id, target_type, description, metadata)
+         VALUES ('assignment', $1, 'admin', $2, 'contractor', $3, $4)` ,
+        [String(req.headers['x-admin-user-id'] || 'admin'), contractorId, `Contractor ${contractorId} assigned to manager ${managerId}`, { manager_id: managerId }]
+      );
+    } catch {}
     return res.json({ success: true, data: r.rows[0] });
   } catch (e: any) {
     logger.error({ error: e, contractorId, managerId }, 'Assign contractor->manager failed');
@@ -1344,13 +1633,22 @@ router.delete('/contractors/:id', async (req, res) => {
       return res.status(404).json({ error: 'Contractor not found' });
     }
     
-    // Delete the contractor
-    await pool.query('DELETE FROM contractors WHERE contractor_id = $1', [id]);
-    
-    res.json({ 
-      success: true, 
-      message: `Contractor ${id} deleted successfully`
-    });
+    await pool.query('BEGIN');
+    try {
+      if (await hasColumn('contractors', 'archived_at')) {
+        await pool.query('UPDATE contractors SET archived_at=NOW() WHERE contractor_id=$1', [id]);
+        await pool.query('UPDATE customers SET contractor_id=NULL WHERE contractor_id=$1', [id]);
+        await pool.query('UPDATE centers SET contractor_id=NULL WHERE contractor_id=$1', [id]);
+      } else {
+        await pool.query('DELETE FROM contractors WHERE contractor_id = $1', [id]);
+      }
+      try { await pool.query('DELETE FROM app_users WHERE code = $1', [id]); } catch {}
+      await pool.query('COMMIT');
+      return res.json({ success: true, message: `Contractor ${id} archived and unassigned` });
+    } catch (deleteError) {
+      await pool.query('ROLLBACK');
+      throw deleteError;
+    }
   } catch (e: any) {
     logger.error({ error: e, contractor_id: req.params.id }, 'Admin contractor delete error');
     res.status(500).json({ error: 'Failed to delete contractor' });
@@ -1372,13 +1670,20 @@ router.delete('/customers/:id', async (req, res) => {
       return res.status(404).json({ error: 'Customer not found' });
     }
     
-    // Delete the customer
-    await pool.query('DELETE FROM customers WHERE customer_id = $1', [id]);
-    
-    res.json({ 
-      success: true, 
-      message: `Customer ${id} deleted successfully`
-    });
+    await pool.query('BEGIN');
+    try {
+      if (await hasColumn('customers', 'archived_at')) {
+        await pool.query('UPDATE customers SET archived_at=NOW() WHERE customer_id=$1', [id]);
+        await pool.query('UPDATE centers SET customer_id=NULL WHERE customer_id=$1', [id]);
+      } else {
+        await pool.query('DELETE FROM customers WHERE customer_id = $1', [id]);
+      }
+      await pool.query('COMMIT');
+      return res.json({ success: true, message: `Customer ${id} archived and unassigned` });
+    } catch (err) {
+      await pool.query('ROLLBACK');
+      throw err;
+    }
   } catch (e: any) {
     logger.error({ error: e, customer_id: req.params.id }, 'Admin customer delete error');
     res.status(500).json({ error: 'Failed to delete customer' });
@@ -1400,13 +1705,20 @@ router.delete('/centers/:id', async (req, res) => {
       return res.status(404).json({ error: 'Center not found' });
     }
     
-    // Delete the center
-    await pool.query('DELETE FROM centers WHERE center_id = $1', [id]);
-    
-    res.json({ 
-      success: true, 
-      message: `Center ${id} deleted successfully`
-    });
+    await pool.query('BEGIN');
+    try {
+      if (await hasColumn('centers', 'archived_at')) {
+        await pool.query('UPDATE centers SET archived_at=NOW() WHERE center_id=$1', [id]);
+        await pool.query('UPDATE crew SET assigned_center=NULL WHERE assigned_center=$1', [id]);
+      } else {
+        await pool.query('DELETE FROM centers WHERE center_id = $1', [id]);
+      }
+      await pool.query('COMMIT');
+      return res.json({ success: true, message: `Center ${id} archived and unassigned` });
+    } catch (err) {
+      await pool.query('ROLLBACK');
+      throw err;
+    }
   } catch (e: any) {
     logger.error({ error: e, center_id: req.params.id }, 'Admin center delete error');
     res.status(500).json({ error: 'Failed to delete center' });
@@ -1456,13 +1768,19 @@ router.delete('/warehouses/:id', async (req, res) => {
       return res.status(404).json({ error: 'Warehouse not found' });
     }
     
-    // Delete the warehouse
-    await pool.query('DELETE FROM warehouses WHERE warehouse_id = $1', [id]);
-    
-    res.json({ 
-      success: true, 
-      message: `Warehouse ${id} deleted successfully`
-    });
+    await pool.query('BEGIN');
+    try {
+      if (await hasColumn('warehouses', 'archived_at')) {
+        await pool.query('UPDATE warehouses SET archived_at=NOW() WHERE warehouse_id=$1', [id]);
+      } else {
+        await pool.query('DELETE FROM warehouses WHERE warehouse_id = $1', [id]);
+      }
+      await pool.query('COMMIT');
+      return res.json({ success: true, message: `Warehouse ${id} archived` });
+    } catch (err) {
+      await pool.query('ROLLBACK');
+      throw err;
+    }
   } catch (e: any) {
     logger.error({ error: e, warehouse_id: req.params.id }, 'Admin warehouse delete error');
     res.status(500).json({ error: 'Failed to delete warehouse' });
@@ -1495,14 +1813,23 @@ router.patch('/contractors/:id/assign-manager', async (req, res) => {
       return res.status(404).json({ error: 'Manager not found' });
     }
     
-    // Update contractor with manager assignment
-    const result = await pool.query(`
+  // Update contractor with manager assignment
+  const result = await pool.query(`
       UPDATE contractors 
       SET cks_manager = $1 
       WHERE contractor_id = $2 
       RETURNING contractor_id, cks_manager, company_name
     `, [manager_id, id]);
     
+    // Log activity
+    try {
+      await pool.query(
+        `INSERT INTO system_activity(activity_type, actor_id, actor_role, target_id, target_type, description, metadata)
+         VALUES ('assignment', $1, 'admin', $2, 'contractor', $3, $4)` ,
+        [String(req.headers['x-admin-user-id'] || 'admin'), id, `Contractor ${id} assigned to manager ${manager_id}`, { manager_id }]
+      );
+    } catch {}
+
     res.json({ 
       success: true, 
       data: result.rows[0],
@@ -1594,3 +1921,82 @@ router.post('/cleanup-demo-data', async (req, res) => {
 });
 
 export default router;
+
+
+// ============================================
+// ARCHIVE: LIST + RESTORE
+// ============================================
+
+// GET /api/admin/archive?type=contractors|customers|centers|warehouses
+router.get('/archive', async (req: Request, res: Response) => {
+  try {
+    const type = String(req.query.type || '').toLowerCase();
+    const limit = Math.min(parseInt(String(req.query.limit ?? '25'), 10), 100);
+    const offset = Math.max(parseInt(String(req.query.offset ?? '0'), 10), 0);
+    let table = '';
+    let cols = '';
+    switch (type) {
+      case 'contractors': table = 'contractors'; cols = `contractor_id AS id, company_name AS name, archived_at AS date`; break;
+      case 'customers': table = 'customers'; cols = `customer_id AS id, company_name AS name, archived_at AS date`; break;
+      case 'centers': table = 'centers'; cols = `center_id AS id, center_name AS name, archived_at AS date`; break;
+      case 'warehouses': table = 'warehouses'; cols = `warehouse_id AS id, warehouse_name AS name, archived_at AS date`; break;
+      case 'managers': table = 'managers'; cols = `manager_id AS id, manager_name AS name, archived_at AS date`; break;
+      case 'crew': table = 'crew'; cols = `crew_id AS id, crew_name AS name, archived_at AS date`; break;
+      case 'services': table = 'services'; cols = `service_id AS id, service_name AS name, archived_at AS date`; break;
+      case 'products': table = 'products'; cols = `product_id AS id, product_name AS name, archived_at AS date`; break;
+      case 'supplies': table = 'supplies'; cols = `supply_id AS id, supply_name AS name, archived_at AS date`; break;
+      case 'procedures': table = 'procedures'; cols = `procedure_id AS id, procedure_name AS name, archived_at AS date`; break;
+      case 'training': table = 'training'; cols = `training_id AS id, training_name AS name, archived_at AS date`; break;
+      case 'reports': table = 'reports'; cols = `report_id AS id, title AS name, archived_at AS date`; break;
+      case 'feedback': table = 'feedback'; cols = `feedback_id AS id, title AS name, archived_at AS date`; break;
+      case 'orders': table = 'orders'; cols = `order_id AS id, COALESCE(notes,'') AS name, archived_at AS date`; break;
+      default: return res.status(400).json({ error: 'invalid_type' });
+    }
+    if (!(await hasColumn(table, 'archived_at'))) return res.json({ items: [], total: 0, page: 1, pageSize: limit });
+    const q = `SELECT ${cols} FROM ${table} WHERE archived_at IS NOT NULL ORDER BY archived_at DESC LIMIT $1 OFFSET $2`;
+    const c = `SELECT COUNT(*) FROM ${table} WHERE archived_at IS NOT NULL`;
+    const [items, total] = await Promise.all([
+      pool.query(q, [limit, offset]),
+      pool.query(c)
+    ]);
+    return res.json({ items: items.rows, total: Number(total.rows[0].count), page: Math.floor(offset/limit)+1, pageSize: limit });
+  } catch (e:any) {
+    logger.error({ error: e }, 'Admin archive list error');
+    return res.status(500).json({ error: 'Failed to list archive' });
+  }
+});
+
+// POST /api/admin/:type/:id/restore
+router.post('/:type/:id/restore', async (req: Request, res: Response) => {
+  try {
+    const type = String(req.params.type || '').toLowerCase();
+    const id = String(req.params.id || '').trim();
+    if (!id) return res.status(400).json({ error: 'id_required' });
+    let table = '';
+    let idCol = '';
+    switch (type) {
+      case 'contractors': table = 'contractors'; idCol = 'contractor_id'; break;
+      case 'customers': table = 'customers'; idCol = 'customer_id'; break;
+      case 'centers': table = 'centers'; idCol = 'center_id'; break;
+      case 'warehouses': table = 'warehouses'; idCol = 'warehouse_id'; break;
+      case 'managers': table = 'managers'; idCol = 'manager_id'; break;
+      case 'crew': table = 'crew'; idCol = 'crew_id'; break;
+      case 'services': table = 'services'; idCol = 'service_id'; break;
+      case 'products': table = 'products'; idCol = 'product_id'; break;
+      case 'supplies': table = 'supplies'; idCol = 'supply_id'; break;
+      case 'procedures': table = 'procedures'; idCol = 'procedure_id'; break;
+      case 'training': table = 'training'; idCol = 'training_id'; break;
+      case 'reports': table = 'reports'; idCol = 'report_id'; break;
+      case 'feedback': table = 'feedback'; idCol = 'feedback_id'; break;
+      case 'orders': table = 'orders'; idCol = 'order_id'; break;
+      default: return res.status(400).json({ error: 'invalid_type' });
+    }
+    if (!(await hasColumn(table, 'archived_at'))) return res.status(400).json({ error: 'archive_not_supported' });
+    const r = await pool.query(`UPDATE ${table} SET archived_at=NULL WHERE ${idCol}=$1 RETURNING ${idCol} AS id`, [id]);
+    if (r.rowCount === 0) return res.status(404).json({ error: 'not_found' });
+    return res.json({ success: true, data: r.rows[0] });
+  } catch (e:any) {
+    logger.error({ error: e }, 'Admin restore error');
+    return res.status(500).json({ error: 'Failed to restore record' });
+  }
+});

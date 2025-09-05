@@ -56,13 +56,24 @@ function getCrewClerkUserId(): string | null {
 
 // Crew-specific fetch wrapper with dedicated authentication
 export async function crewApiFetch(input: string, init: RequestInit = {}) {
-  const userId = getCrewClerkUserId();
+  let overrideCode: string | null = null;
+  let overrideRole: string | null = null;
+  let impersonate = false;
+  try {
+    impersonate = sessionStorage.getItem('impersonate') === 'true';
+    if (impersonate) {
+      overrideCode = sessionStorage.getItem('me:lastCode');
+      overrideRole = sessionStorage.getItem('me:lastRole');
+    }
+  } catch {}
+  const userId = (impersonate && overrideCode) ? overrideCode : getCrewClerkUserId();
   const headers = new Headers(init.headers || {});
   
   // Crew-specific headers
   if (userId && !headers.has('x-crew-user-id')) headers.set('x-crew-user-id', userId);
   // Align with backend: also provide generic x-user-id
   if (userId && !headers.has('x-user-id')) headers.set('x-user-id', userId);
+  if (impersonate && overrideRole && !headers.has('x-user-role')) headers.set('x-user-role', overrideRole);
   if (!headers.has('Accept')) headers.set('Accept', 'application/json');
   if (!headers.has('x-hub-type')) headers.set('x-hub-type', 'crew');
   if (!headers.has('x-field-worker')) headers.set('x-field-worker', 'true'); // Crew are field workers

@@ -1011,21 +1011,35 @@ export default function ManagerHome() {
                     <div>
                       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                         <tbody>
-                          {[
-                            ['Full Name', state.data?.name || 'Manager Demo'],
-                            ['Manager ID', state.data?.manager_id || code],
-                            ['Territory', state.data?.territory || 'Demo Territory'],
-                            ['Reports To', state.data?.reports_to || 'Senior Manager'],
-                            ['Email', state.data?.email || 'manager@demo.com'],
-                            ['Phone', state.data?.phone || '(555) 123-4567'],
-                            ['Start Date', state.data?.start_date || '2024-01-01'],
-                            ['Role', state.data?.role || 'Territory Manager']
-                          ].map(([label, value]) => (
-                            <tr key={label}>
-                              <td style={{ padding: '8px 0', fontWeight: 600, width: '30%' }}>{label}</td>
-                              <td style={{ padding: '8px 0' }}>{value}</td>
-                            </tr>
-                          ))}
+                          {(() => {
+                            const rows: Array<[string, any]> = [
+                              ['Full Name', state.data?.name || 'Manager Demo'],
+                              ['Manager ID', state.data?.manager_id || code],
+                              ['Territory', state.data?.territory || 'Demo Territory'],
+                              ['Reports To', state.data?.reports_to || 'Senior Manager'],
+                              ['Email', state.data?.email || 'manager@demo.com'],
+                              ['Phone', state.data?.phone || '(555) 123-4567'],
+                              ['Start Date', state.data?.start_date || ''],
+                              ['Role', state.data?.role || 'Territory Manager']
+                            ];
+                            function fmtDate(v: any) {
+                              try {
+                                if (!v) return '—';
+                                const dt = new Date(v);
+                                if (isNaN(dt.getTime())) return String(v);
+                                return dt.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: '2-digit' });
+                              } catch { return String(v || '—'); }
+                            }
+                            return rows.map(([label, val]) => {
+                              const display = label === 'Start Date' ? fmtDate(val) : String(val ?? '');
+                              return (
+                                <tr key={label}>
+                                  <td style={{ padding: '8px 0', fontWeight: 600, width: '30%' }}>{label}</td>
+                                  <td style={{ padding: '8px 0' }}>{display}</td>
+                                </tr>
+                              );
+                            });
+                          })()}
                         </tbody>
                       </table>
                     </div>

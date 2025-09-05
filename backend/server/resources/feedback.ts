@@ -108,3 +108,27 @@ router.get('/:id', async (req: Request, res: Response) => {
 
 export default router;
 
+
+
+// DELETE /api/feedback/:id - archive or delete feedback
+router.delete('/:id', requirePermission('FEEDBACK_CREATE'), async (req: Request, res: Response) => {
+  try {
+    const id = String(req.params.id);
+    const has = await pool.query(`SELECT EXISTS (
+      SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='feedback' AND column_name='archived_at'
+    ) as e`);
+    const exists = Boolean(has.rows[0]?.e);
+    if (exists) {
+      const r = await pool.query(`UPDATE feedback SET archived_at=NOW() WHERE feedback_id=$1 RETURNING feedback_id`, [id]);
+      if (r.rowCount === 0) return res.status(404).json({ success: false, error: 'not_found' });
+      return res.json({ success: true, data: { feedback_id: id }, message: 'Feedback archived' });
+    } else {
+      const r = await pool.query(`DELETE FROM feedback WHERE feedback_id=$1 RETURNING feedback_id`, [id]);
+      if (r.rowCount === 0) return res.status(404).json({ success: false, error: 'not_found' });
+      return res.json({ success: true, data: { feedback_id: id }, message: 'Feedback deleted' });
+    }
+  } catch (error) {
+    console.error('[feedback] delete error', error);
+    return res.status(500).json({ success: false, error: 'server_error' });
+  }
+});

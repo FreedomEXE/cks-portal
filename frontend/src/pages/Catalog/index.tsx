@@ -206,10 +206,35 @@ export default function CatalogPage() {
             {item.category && <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>{item.category}</div>}
             <div style={{ fontSize: 14, color: '#374151', minHeight: 44 }}>{item.description || '—'}</div>
             {/* No pricing shown for MVP (quotes happen off-portal) */}
-            <div style={{ marginTop: 12 }}>
+            <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
               <button onClick={() => addToCart(item)} style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #e5e7eb', background: '#111827', color: 'white', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
                 Add to Request
               </button>
+              {/* Allow contractors to add services to My Services when context=contractor */}
+              {item.type === 'service' && new URLSearchParams(location.search).get('context') === 'contractor' && (
+                <button
+                  onClick={async () => {
+                    try {
+                      const code = sessionStorage.getItem('contractor:lastCode') || '';
+                      if (!code) { alert('Open Contractor Hub first to set context.'); return; }
+                      const res = await fetch(`${API_BASE}/contractor/my-services/add`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify({ code, service_id: item.id })
+                      });
+                      const js = await res.json();
+                      if (!res.ok || !js?.success) throw new Error(js?.error || 'Failed to add');
+                      alert('Added to My Services');
+                    } catch (e: any) {
+                      alert(e?.message || 'Failed to add');
+                    }
+                  }}
+                  style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #e5e7eb', background: '#10b981', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+                >
+                  Add to My Services
+                </button>
+              )}
             </div>
             {!item.active && <div style={{ marginTop: 8, fontSize: 12, color: '#b91c1c' }}>inactive</div>}
           </div>

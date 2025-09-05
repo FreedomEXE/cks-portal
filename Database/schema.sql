@@ -16,12 +16,12 @@ CREATE TABLE IF NOT EXISTS contractors (
     contractor_id VARCHAR(20) PRIMARY KEY,
     cks_manager VARCHAR(20),
     company_name VARCHAR(255) NOT NULL,
-    contact_person VARCHAR(255),
+    main_contact VARCHAR(255),
     email VARCHAR(255),
     phone VARCHAR(50),
     address TEXT,
-    website TEXT,
-    business_type VARCHAR(100),
+    website VARCHAR(255),
+    num_customers INTEGER DEFAULT 0,
     status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'pending')),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -31,7 +31,6 @@ CREATE TABLE IF NOT EXISTS contractors (
 CREATE TABLE IF NOT EXISTS managers (
     manager_id VARCHAR(20) PRIMARY KEY,
     manager_name VARCHAR(255) NOT NULL,
-    assigned_center VARCHAR(20),
     email VARCHAR(255),
     phone VARCHAR(50),
     territory VARCHAR(255),
@@ -81,6 +80,24 @@ CREATE TABLE IF NOT EXISTS crew (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Contractor Services mapping (contractor ↔ services selections + favorites)
+CREATE TABLE IF NOT EXISTS contractor_services (
+    contractor_id VARCHAR(20) NOT NULL,
+    service_id VARCHAR(20) NOT NULL,
+    is_favorite BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (contractor_id, service_id)
+);
+
+-- Optional FKs (skip if target tables may not exist yet)
+-- ALTER TABLE contractor_services
+--   ADD CONSTRAINT fk_contractor_services_contractor
+--   FOREIGN KEY (contractor_id) REFERENCES contractors(contractor_id) ON DELETE CASCADE;
+-- ALTER TABLE contractor_services
+--   ADD CONSTRAINT fk_contractor_services_service
+--   FOREIGN KEY (service_id) REFERENCES services(service_id) ON DELETE CASCADE;
 
 -- ============================================
 -- SUPPORTING ENTITY TABLES
@@ -476,15 +493,15 @@ CREATE INDEX IF NOT EXISTS idx_assign_job ON job_assignments(job_id);
 -- ============================================
 
 -- Insert sample managers first (required for foreign keys)
-INSERT INTO managers (manager_id, manager_name, assigned_center, email, status) VALUES
-('MGR-001', 'John Manager', 'CEN-001', 'john.manager@cks.com', 'active'),
-('MGR-002', 'Sarah Director', 'CEN-002', 'sarah.director@cks.com', 'active')
+INSERT INTO managers (manager_id, manager_name, email, status) VALUES
+('MGR-001', 'John Manager', 'john.manager@cks.com', 'active'),
+('MGR-002', 'Sarah Director', 'sarah.director@cks.com', 'active')
 ON CONFLICT (manager_id) DO NOTHING;
 
 -- Insert sample contractors
-INSERT INTO contractors (contractor_id, cks_manager, company_name, contact_person, email, status) VALUES
-('CON-001', 'MGR-001', 'Alpha Cleaning Services', 'Mike Alpha', 'mike@alphaclean.com', 'active'),
-('CON-002', 'MGR-002', 'Beta Maintenance Co', 'Lisa Beta', 'lisa@betamaint.com', 'active')
+INSERT INTO contractors (contractor_id, cks_manager, company_name, main_contact, email, phone, address, website, status) VALUES
+('CON-001', 'MGR-001', 'Network', 'Maria Johnson', 'contact@network.ca', '5556667777', 'network street', 'https://network-services.ca', 'active'),
+('CON-002', 'MGR-002', 'contractor 1', 'Maria Rodriguez', 'contractor1@email.ca', '6667778888', 'contract 1 street', 'https://contractor1.ca', 'active')
 ON CONFLICT (contractor_id) DO NOTHING;
 
 -- Insert sample customers
