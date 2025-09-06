@@ -17,8 +17,15 @@
 
 import express, { Request, Response } from 'express';
 import pool from '../../../../Database/db/pool';
-import { logger } from '../../src/core/logger';
 import { logActivity } from '../../resources/activity';
+
+// Fallback lightweight logger (original '../../core/logger' module not found)
+const logger = {
+  info: (...args: any[]) => console.log('[INFO]', ...args),
+  warn: (...args: any[]) => console.warn('[WARN]', ...args),
+  error: (...args: any[]) => console.error('[ERROR]', ...args),
+  debug: (...args: any[]) => console.debug('[DEBUG]', ...args),
+};
 
 const router = express.Router();
 
@@ -598,7 +605,6 @@ router.post('/users', async (req: Request, res: Response) => {
       );
       await upsertAppUserByEmail(req.body.email, 'manager', manager_id, name);
       try { await logActivity('user_created', `Manager ${manager_id} created`, String(req.headers['x-admin-user-id']||'admin'), 'admin', manager_id, 'manager', { email: req.body.email||null }); } catch {}
-      try { await logActivity('user_created', `Manager ${manager_id} created`, String(req.headers['x-admin-user-id']||'admin'), 'admin', manager_id, 'manager', { email: req.body.email||null }); } catch {}
       return res.status(201).json({ success: true, data: { ...r.rows[0] } });
     }
 
@@ -640,6 +646,7 @@ router.post('/users', async (req: Request, res: Response) => {
       // If status column doesn't exist, synthesize active status for response consistency
       const data = hasStatusCol ? r.rows[0] : { ...r.rows[0], status: 'active' };
       await upsertAppUserByEmail(req.body.email, 'contractor', contractor_id, company);
+      try { await logActivity('user_created', `Contractor ${contractor_id} created`, String(req.headers['x-admin-user-id']||'admin'), 'admin', contractor_id, 'contractor', { email: req.body.email||null }); } catch {}
       return res.status(201).json({ success: true, data });
     }
 
@@ -1164,118 +1171,8 @@ router.delete('/catalog/items/:id', async (req, res) => {
   POST /api/admin/users
   Body: { role: 'manager'|'contractor'|'customer'|'center'|'crew', ...fields }
 */
-router.post('/users', async (req: Request, res: Response) => {
-  try {
-    const rawRole = String(req.body.role || '').toLowerCase();
-    const role = ['management','managers','mgr'].includes(rawRole) ? 'manager' : rawRole;
-    if (!['manager', 'contractor', 'customer', 'center', 'crew'].includes(role)) {
-      return res.status(400).json({ error: 'Invalid role' });
-    }
-
-    if (role === 'manager') {
-      const id = await getNextIdGeneric('managers', 'manager_id', 'MGR-');
-      const name = req.body.manager_name || req.body.name;
-      if (!name) return res.status(400).json({ error: 'manager_name is required' });
-      const { email, phone, territory, status } = req.body;
-      const r = await pool.query(
-        `INSERT INTO managers(manager_id, manager_name, email, phone, territory, status)
-         VALUES ($1,$2,$3,$4,$5,$6)
-         RETURNING manager_id, manager_name, status, email, phone, territory`,
-        [id, name, email || null, phone || null, territory || null, status || 'active']
-      );
-      return res.status(201).json({ success: true, data: r.rows[0] });
-    }
-
-    if (role === 'contractor') {
-      const id = await getNextIdGeneric('contractors', 'contractor_id', 'CON-');
-      const company = req.body.company_name || req.body.name;
-      if (!company) return res.status(400).json({ error: 'company_name is required' });
-      // cks_manager is optional at creation (assigned later)
-      const cks_manager = req.body.cks_manager || null;
-      const { contact_person, email, phone, address, website, status } = req.body;
-      const r = await pool.query(
-        `INSERT INTO contractors(
-            contractor_id, cks_manager, company_name, main_contact, email, phone, address
-         )
-         VALUES ($1,$2,$3,$4,$5,$6,$7)
-         RETURNING contractor_id, cks_manager, company_name`,
-        [id, cks_manager, company, contact_person || null, email || null, phone || null, address || null]
-      );
-      await upsertAppUserByEmail(req.body.email, 'contractor', id, company);
-      return res.status(201).json({ success: true, data: r.rows[0] });
-    }
-
-    if (role === 'customer') {
-      const id = await getNextIdGeneric('customers', 'customer_id', 'CUS-');
-      const company = req.body.company_name || req.body.name;
-      const cks_manager = req.body.cks_manager;
-      if (!company) return res.status(400).json({ error: 'company_name is required' });
-      if (!cks_manager) return res.status(400).json({ error: 'cks_manager is required' });
-      const { contact_person, email, phone, service_tier, status } = req.body;
-      const r = await pool.query(
-        `INSERT INTO customers(customer_id, cks_manager, company_name, contact_person, email, phone, service_tier, status)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-         RETURNING customer_id, cks_manager, company_name, status`,
-        [id, cks_manager, company, contact_person || null, email || null, phone || null, service_tier || null, status || 'active']
-      );
-      return res.status(201).json({ success: true, data: r.rows[0] });
-    }
-
-    if (role === 'center') {
-      const id = await getNextIdGeneric('centers', 'center_id', 'CEN-');
-      const name = req.body.center_name || req.body.name;
-      const cks_manager = req.body.cks_manager;
-      const customer_id = req.body.customer_id;
-      const contractor_id = req.body.contractor_id;
-      if (!name) return res.status(400).json({ error: 'center_name is required' });
-      if (!cks_manager) return res.status(400).json({ error: 'cks_manager is required' });
-      if (!customer_id) return res.status(400).json({ error: 'customer_id is required' });
-      if (!contractor_id) return res.status(400).json({ error: 'contractor_id is required' });
-      const { address, operational_hours, status } = req.body;
-      const r = await pool.query(
-        `INSERT INTO centers(center_id, cks_manager, center_name, customer_id, contractor_id, address, operational_hours, status)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-         RETURNING center_id, cks_manager, center_name, customer_id, contractor_id, status`,
-        [id, cks_manager, name, customer_id, contractor_id, address || null, operational_hours || null, status || 'active']
-      );
-      return res.status(201).json({ success: true, data: r.rows[0] });
-    }
-
-    if (role === 'crew') {
-      const id = await getNextIdGeneric('crew', 'crew_id', 'CRW-');
-      const crew_name = req.body.crew_name || req.body.name;
-      if (!crew_name) return res.status(400).json({ error: 'crew_name is required' });
-      
-      // Map to actual crew table columns
-      const r = await pool.query(
-        `INSERT INTO crew(crew_id, name, status, role, address, phone, email, assigned_center)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-         RETURNING crew_id, name, status, role, address, phone, email, assigned_center`,
-        [
-          id, 
-          crew_name, 
-          req.body.status || 'Active', 
-          req.body.crew_role || 'Crew', 
-          req.body.address || null, 
-          req.body.phone || null, 
-          req.body.email || null, 
-          null // assigned_center starts as null (unassigned)
-        ]
-      );
-      return res.status(201).json({ success: true, data: r.rows[0] });
-    }
-
-    return res.status(400).json({ error: 'Unsupported role' });
-  } catch (e: any) {
-    logger.error({ error: e, body: req.body }, 'Admin user create error');
-    const payload: any = { error: 'Failed to create user' };
-    if (process.env.NODE_ENV !== 'production') {
-      payload.details = e?.message || String(e);
-      if (e?.code) payload.code = e.code;
-    }
-    res.status(500).json(payload);
-  }
-});
+// REMOVED: Duplicate /users route that was causing triple activity entries
+// The original /users route above (line ~583) handles all user creation with proper activity logging
 
 // Lightweight schema introspection for troubleshooting (dev only)
 router.get('/schema/contractors', async (_req, res) => {
@@ -1353,9 +1250,21 @@ router.delete('/warehouses/:id', async (req, res) => {
 router.delete('/managers/:id', async (req, res) => {
   const id = String(req.params.id);
   try {
-    const r = await pool.query('DELETE FROM managers WHERE manager_id = $1 RETURNING manager_id', [id]);
+    // Get manager info before archiving
+    const existing = await pool.query('SELECT manager_id, manager_name FROM managers WHERE manager_id = $1', [id]);
+    if (existing.rowCount === 0) return res.status(404).json({ error: 'Not found' });
+    const managerName = existing.rows[0].manager_name;
+    
+    // Soft delete (archive) instead of hard delete
+    const r = await pool.query('UPDATE managers SET archived_at = NOW() WHERE manager_id = $1 RETURNING manager_id', [id]);
     if (r.rowCount === 0) return res.status(404).json({ error: 'Not found' });
-    return res.json({ success: true, data: { manager_id: id } });
+    
+    // Log the deletion activity
+    try { 
+      await logActivity('user_deleted', `Manager ${id} (${managerName}) archived`, String(req.headers['x-admin-user-id']||'admin'), 'admin', id, 'manager', { name: managerName }); 
+    } catch {}
+    
+    return res.json({ success: true, data: { manager_id: id }, message: `Manager ${id} archived` });
   } catch (e: any) {
     if (e?.code === '23503') return res.status(409).json({ error: 'in_use' });
     logger.error({ error: e }, 'Admin delete manager error');

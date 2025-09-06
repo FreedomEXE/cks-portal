@@ -13,7 +13,14 @@
 
 import express, { Request, Response } from 'express';
 import pool from '../../../Database/db/pool';
-import { logger } from '../src/core/logger';
+
+// Fallback logger implementation
+const logger = {
+  error: (...args: any[]) => console.error(...args),
+  info: (...args: any[]) => console.info(...args),
+  warn: (...args: any[]) => console.warn(...args),
+  debug: (...args: any[]) => console.debug(...args),
+};
 
 const router = express.Router();
 
