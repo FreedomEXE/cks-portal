@@ -29,25 +29,8 @@ router.get('/', async (req: Request, res: Response) => {
   try {
     const { limit = 25, offset = 0, type } = req.query;
     
-    // Check if table exists first
-    const tableCheck = await pool.query(`
-      SELECT EXISTS (
-        SELECT FROM information_schema.tables 
-        WHERE table_schema = 'public' 
-        AND table_name = 'system_activity'
-      )
-    `);
-    
-    if (!tableCheck.rows[0].exists) {
-      // Return empty data if table doesn't exist yet
-      return res.json({
-        success: true,
-        data: [],
-        total: 0,
-        page: 1,
-        pageSize: Number(limit)
-      });
-    }
+    // Ensure table exists
+    await ensureActivityTable();
     
     let whereClause = 'WHERE 1=1';
     const params: any[] = [];
@@ -135,6 +118,8 @@ router.post('/', async (req: Request, res: Response) => {
 // GET /api/activity/stats - Get activity statistics for admin dashboard
 router.get('/stats', async (req: Request, res: Response) => {
   try {
+    // Ensure table exists
+    await ensureActivityTable();
     const statsQuery = `
       SELECT 
         COUNT(*) as total_activities,
@@ -173,6 +158,33 @@ router.get('/stats', async (req: Request, res: Response) => {
   }
 });
 
+// Create system_activity table if it doesn't exist
+async function ensureActivityTable() {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS system_activity (
+        activity_id SERIAL PRIMARY KEY,
+        activity_type VARCHAR(50) NOT NULL,
+        actor_id VARCHAR(60),
+        actor_role VARCHAR(20),
+        target_id VARCHAR(60),
+        target_type VARCHAR(20),
+        description TEXT NOT NULL,
+        metadata JSONB,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      )
+    `);
+    
+    // Create indexes
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_system_activity_type ON system_activity(activity_type)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_system_activity_created_at ON system_activity(created_at)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_system_activity_actor ON system_activity(actor_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_system_activity_target ON system_activity(target_id, target_type)`);
+  } catch (error) {
+    logger.error({ error }, 'Failed to ensure system_activity table exists');
+  }
+}
+
 // Utility function to log activity (can be imported by other modules)
 export async function logActivity(
   activity_type: string,
@@ -184,13 +196,22 @@ export async function logActivity(
   metadata?: any
 ) {
   try {
+    // Ensure table exists
+    await ensureActivityTable();
+    
     await pool.query(`
       INSERT INTO system_activity (
         activity_type, actor_id, actor_role, target_id, target_type, description, metadata
       ) VALUES ($1, $2, $3, $4, $5, $6, $7)
     `, [activity_type, actor_id, actor_role, target_id, target_type, description, metadata]);
+    
+    logger.info({ activity_type, target_id, actor_id }, 'Activity logged successfully');
   } catch (error) {
-    logger.error({ error, activity_type, description }, 'Failed to log activity');
+    logger.error({ error, activity_type, description, actor_id, target_id }, 'Failed to log activity');
+    // Log detailed error info for debugging
+    if (error instanceof Error) {
+      logger.error(`Activity logging error details: ${error.message}`);
+    }
   }
 }
 

@@ -280,4 +280,46 @@ router.get('/contractors', async (req: Request, res: Response) => {
   }
 });
 
+// GET /api/manager/activity - Get activity feed for this manager
+router.get('/activity', async (req: Request, res: Response) => {
+  try {
+    const code = String(req.query.code || '').trim() || getUserId(req);
+    if (!code) return res.status(400).json({ success: false, error: 'code required' });
+
+    const activities = await pool.query(
+      `SELECT 
+        activity_id,
+        activity_type,
+        actor_id,
+        actor_role,
+        target_id,
+        target_type,
+        description,
+        metadata,
+        created_at
+      FROM system_activity 
+      WHERE 
+        (actor_id = $1 AND actor_role = 'manager') OR
+        (activity_type IN ('contractor_assigned_to_manager', 'contractor_removed_from_manager') AND metadata->>'manager_id' = $1) OR
+        (activity_type LIKE 'contractor_%' AND target_id IN (
+          SELECT contractor_id FROM contractors WHERE UPPER(cks_manager) = UPPER($1)
+        )) OR
+        (activity_type LIKE 'customer_%' AND target_id IN (
+          SELECT customer_id FROM customers WHERE UPPER(cks_manager) = UPPER($1)
+        )) OR
+        (activity_type LIKE 'center_%' AND target_id IN (
+          SELECT center_id FROM centers WHERE UPPER(cks_manager) = UPPER($1)
+        ))
+      ORDER BY created_at DESC
+      LIMIT 50`,
+      [code]
+    );
+
+    return res.json({ success: true, data: activities.rows });
+  } catch (error) {
+    console.error('Manager activity endpoint error:', error);
+    return res.status(500).json({ success: false, error: 'Failed to fetch activity', error_code: 'server_error' });
+  }
+});
+
 export default router;

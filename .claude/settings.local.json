@@ -20,7 +20,8 @@
       "Bash(taskkill:*)",
       "Bash(set PORT=5001)",
       "Bash(find:*)",
-      "Read(/c:\\Users\\rizz5\\OneDrive\\Desktop\\Claude/**)"
+      "Read(/c:\\Users\\rizz5\\OneDrive\\Desktop\\Claude/**)",
+      "Bash(npm run:*)"
     ],
     "deny": [],
     "ask": []

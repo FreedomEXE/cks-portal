@@ -64,6 +64,50 @@ Notes:
 - Warehouses use `WH-XXX` IDs. Role may be derived from `x-user-id` or `x-user-role: warehouse`.
 - Inventory tables are per‑warehouse; fulfillment via shipments updates stock and logs activity.
 
+## Hub Activity Endpoints (v1.1)
+
+Each hub now has its own activity feed showing relevant activities for that user type.
+
+### Manager Activity
+- `GET /api/manager/activity?code=<MGR-XXX>`
+  - Returns: `{ success, data: Activity[] }` - Activities related to this manager
+  - Filters: Contractor assignments, customer/center activities under this manager
+
+### Contractor Activity  
+- `GET /api/contractor/activity?code=<CON-XXX>`
+  - Returns: `{ success, data: Activity[] }` - Activities related to this contractor
+  - Filters: Contractor assignments, customer orders, manager changes
+
+### Customer Activity
+- `GET /api/customer/activity?code=<CUS-XXX>`
+  - Returns: `{ success, data: Activity[] }` - Activities related to this customer  
+  - Filters: Customer creation, center assignments, order activities
+
+### Center Activity
+- `GET /api/center/activity?code=<CEN-XXX>`
+  - Returns: `{ success, data: Activity[] }` - Activities related to this center
+  - Filters: Crew assignments, service scheduling, reports
+
+### Crew Activity
+- `GET /api/crew/activity?code=<CRW-XXX>`
+  - Returns: `{ success, data: Activity[] }` - Activities related to this crew member
+  - Filters: Task assignments, training, schedule updates
+
+### Activity Data Structure
+```javascript
+Activity {
+  activity_id: string,
+  activity_type: string,        // e.g., 'contractor_assigned_to_manager'
+  actor_id: string,            // Who performed the action
+  actor_role: string,          // 'admin', 'manager', etc.
+  target_id: string,           // What was acted upon
+  target_type: string,         // 'contractor', 'customer', etc.  
+  description: string,         // Human readable description
+  metadata: object,            // Additional context (JSON)
+  created_at: datetime
+}
+```
+
 ## Rationale
 
 Keeping a consistent response envelope and headers across hubs simplifies client hooks and reduces glue code. We tolerate light normalization in hooks (e.g., `name` → `*_name`), but aim to converge server responses over time.

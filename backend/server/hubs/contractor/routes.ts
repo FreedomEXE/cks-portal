@@ -88,7 +88,7 @@ router.get('/profile', async (req: Request, res: Response) => {
     if (row.cks_manager) {
       try {
         const m = await pool.query(
-          `SELECT manager_id, manager_name, email, phone, territory, assigned_center
+          `SELECT manager_id, manager_name, email, phone, territory
            FROM managers
            WHERE UPPER(manager_id) = UPPER($1)
            LIMIT 1`,
@@ -365,6 +365,47 @@ router.post('/requests/:id/deny', requirePermission('CONTRACTOR_APPROVE'), async
     await pool.query('ROLLBACK').catch(() => {});
     console.error('Contractor deny error:', error);
     return res.status(500).json({ success: false, error: 'Failed to deny request', error_code: 'server_error' });
+  }
+});
+
+// GET /api/contractor/activity - Get activity feed for this contractor
+router.get('/activity', async (req: Request, res: Response) => {
+  try {
+    const code = String(req.query.code || '').trim() || getUserId(req);
+    if (!code) return res.status(400).json({ success: false, error: 'code required' });
+
+    const activities = await pool.query(
+      `SELECT 
+        activity_id,
+        activity_type,
+        actor_id,
+        actor_role,
+        target_id,
+        target_type,
+        description,
+        metadata,
+        created_at
+      FROM system_activity 
+      WHERE 
+        (target_id = $1 AND target_type = 'contractor') OR
+        (actor_id = $1 AND actor_role = 'contractor') OR
+        (activity_type LIKE 'customer_%' AND target_id IN (
+          SELECT customer_id FROM customers WHERE UPPER(contractor_id) = UPPER($1)
+        )) OR
+        (activity_type LIKE 'order_%' AND target_id IN (
+          SELECT order_id FROM orders WHERE customer_id IN (
+            SELECT customer_id FROM customers WHERE UPPER(contractor_id) = UPPER($1)
+          )
+        ))
+      ORDER BY created_at DESC
+      LIMIT 50`,
+      [code]
+    );
+
+    return res.json({ success: true, data: activities.rows });
+  } catch (error) {
+    console.error('Contractor activity endpoint error:', error);
+    return res.status(500).json({ success: false, error: 'Failed to fetch activity', error_code: 'server_error' });
   }
 });
 

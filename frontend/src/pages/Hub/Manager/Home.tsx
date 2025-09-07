@@ -475,16 +475,7 @@ export default function ManagerHome() {
             </div>
 
             {/* Recent Actions */}
-            <div className="ui-card" style={{ padding: 16, marginBottom: 24 }}>
-              <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 12, color: '#3b7af7' }}>Recent Actions</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <div style={{ textAlign: 'center', padding: 32, color: '#6b7280', background: '#f9fafb', borderRadius: 8 }}>
-                  <div style={{ fontSize: 48, marginBottom: 8 }}>📋</div>
-                  <div style={{ fontSize: 14, fontWeight: 500 }}>No recent actions</div>
-                  <div style={{ fontSize: 12, marginTop: 4 }}>Manager actions will appear here as they occur</div>
-                </div>
-              </div>
-            </div>
+            <ManagerRecentActions code={code} />
 
             {/* Communication Hub */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 24 }}>
@@ -1297,27 +1288,7 @@ export default function ManagerHome() {
           <div>
             <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>My Contractors</h2>
             
-            {/* Empty State - Template Hub */}
-            <div className="ui-card" style={{ padding: 16 }}>
-              <div style={{ textAlign: 'center', padding: 40, color: '#6b7280', background: '#f9fafb', borderRadius: 8 }}>
-                <div style={{ fontSize: 48, marginBottom: 8 }}>🏢</div>
-                <div style={{ fontSize: 16, fontWeight: 500, marginBottom: 4 }}>No Contractors Assigned</div>
-                <div style={{ fontSize: 12, marginTop: 4, lineHeight: 1.5 }}>
-                  When contractors are assigned to your territory via the Admin Hub,<br />
-                  they will appear here in a hierarchical view:<br />
-                  <strong>Contractor → Customers → Centers → Crew</strong>
-                </div>
-                <div style={{ marginTop: 16, padding: 12, background: '#eff6ff', borderRadius: 6, border: '1px solid #dbeafe' }}>
-                  <div style={{ fontSize: 12, color: '#1e40af', fontWeight: 500, marginBottom: 4 }}>Expected Hierarchy</div>
-                  <div style={{ fontSize: 11, color: '#1e40af', textAlign: 'left' }}>
-                    📋 <strong>Contractor</strong> - Top level entity<br />
-                    &nbsp;&nbsp;└── 👤 <strong>Customer</strong> - Served by contractor<br />
-                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└── 🏬 <strong>Center</strong> - Customer's service location<br />
-                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└── 👷 <strong>Crew</strong> - Assigned to center
-                  </div>
-                </div>
-              </div>
-            </div>
+            <ContractorsSection code={code} />
           </div>
         )}
 
@@ -1352,6 +1323,209 @@ export default function ManagerHome() {
 
       {/* Animation styles */}
       <style>{`@keyframes fadeIn{from{opacity:0; transform:translateY(2px)} to{opacity:1; transform:none}}`}</style>
+    </div>
+  );
+}
+
+function ManagerRecentActions({ code }: { code: string }) {
+  const [activities, setActivities] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        setLoading(true);
+        const baseApi = (import.meta.env.VITE_API_URL?.replace(/\/$/, '') || '/api');
+        const url = `${baseApi}/manager/activity?code=${encodeURIComponent(code)}`;
+        const res = await fetch(url, { credentials: 'include' });
+        const json = await res.json();
+        
+        if (!res.ok) {
+          console.error('Failed to load manager activities:', json?.error);
+          if (!cancelled) setActivities([]);
+          return;
+        }
+        
+        if (!cancelled) {
+          setActivities(Array.isArray(json?.data) ? json.data.slice(0, 5) : []);
+        }
+      } catch (err: any) {
+        console.error('[ManagerRecentActions] fetch error:', err);
+        if (!cancelled) setActivities([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [code]);
+
+  return (
+    <div className="ui-card" style={{ padding: 16, marginBottom: 24 }}>
+      <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 12, color: '#3b7af7' }}>Recent Actions</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: 20, color: '#6b7280' }}>
+            Loading recent actions...
+          </div>
+        ) : activities.length > 0 ? (
+          activities.map((activity, index) => (
+            <div key={activity.activity_id} style={{ 
+              padding: 12, 
+              background: '#f8fafc', 
+              borderRadius: 8, 
+              borderLeft: '3px solid #3b7af7',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 2 }}>
+                  {activity.description}
+                </div>
+                <div style={{ fontSize: 12, color: '#6b7280' }}>
+                  {activity.activity_type} • {activity.actor_role}
+                </div>
+              </div>
+              <div style={{ fontSize: 11, color: '#9ca3af' }}>
+                {new Date(activity.created_at).toLocaleDateString()}
+              </div>
+            </div>
+          ))
+        ) : (
+          <div style={{ textAlign: 'center', padding: 32, color: '#6b7280', background: '#f9fafb', borderRadius: 8 }}>
+            <div style={{ fontSize: 48, marginBottom: 8 }}>📋</div>
+            <div style={{ fontSize: 14, fontWeight: 500 }}>No recent actions</div>
+            <div style={{ fontSize: 12, marginTop: 4 }}>Manager actions will appear here as they occur</div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ContractorsSection({ code }: { code: string }) {
+  const [contractors, setContractors] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const baseApi = (import.meta.env.VITE_API_URL?.replace(/\/$/, '') || '/api');
+        const url = `${baseApi}/manager/contractors?code=${encodeURIComponent(code)}`;
+        const res = await fetch(url, { credentials: 'include' });
+        const json = await res.json();
+        
+        if (!res.ok) {
+          throw new Error(json?.error || `HTTP ${res.status}`);
+        }
+        
+        if (!cancelled) {
+          setContractors(Array.isArray(json?.data) ? json.data : []);
+        }
+      } catch (err: any) {
+        console.error('[ContractorsSection] fetch error:', err);
+        if (!cancelled) {
+          setError(err?.message || 'Failed to load contractors');
+          setContractors([]);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [code]);
+
+  if (loading) {
+    return (
+      <div className="ui-card" style={{ padding: 16 }}>
+        <div style={{ textAlign: 'center', padding: 20, color: '#6b7280' }}>
+          Loading contractors...
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="ui-card" style={{ padding: 16 }}>
+        <div style={{ textAlign: 'center', padding: 20, color: '#dc2626' }}>
+          Error loading contractors: {error}
+        </div>
+      </div>
+    );
+  }
+
+  if (contractors.length === 0) {
+    return (
+      <div className="ui-card" style={{ padding: 16 }}>
+        <div style={{ textAlign: 'center', padding: 40, color: '#6b7280', background: '#f9fafb', borderRadius: 8 }}>
+          <div style={{ fontSize: 48, marginBottom: 8 }}>🏢</div>
+          <div style={{ fontSize: 16, fontWeight: 500, marginBottom: 4 }}>No Contractors Assigned</div>
+          <div style={{ fontSize: 12, marginTop: 4, lineHeight: 1.5 }}>
+            When contractors are assigned to your territory via the Admin Hub,<br />
+            they will appear here in a hierarchical view:<br />
+            <strong>Contractor → Customers → Centers → Crew</strong>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="ui-card" style={{ padding: 0, overflow: 'hidden' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <thead>
+          <tr style={{ background: '#f9fafb' }}>
+            <th style={{ padding: 12, textAlign: 'left', fontSize: 12, fontWeight: 600 }}>Contractor</th>
+            <th style={{ padding: 12, textAlign: 'left', fontSize: 12, fontWeight: 600 }}>Company</th>
+            <th style={{ padding: 12, textAlign: 'left', fontSize: 12, fontWeight: 600 }}>Contact</th>
+            <th style={{ padding: 12, textAlign: 'left', fontSize: 12, fontWeight: 600 }}>Email</th>
+            <th style={{ padding: 12, textAlign: 'left', fontSize: 12, fontWeight: 600 }}>Phone</th>
+            <th style={{ padding: 12, textAlign: 'left', fontSize: 12, fontWeight: 600 }}>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {contractors.map((contractor, index) => (
+            <tr key={contractor.contractor_id} style={{ 
+              borderBottom: index < contractors.length - 1 ? '1px solid #e5e7eb' : 'none',
+              backgroundColor: 'white'
+            }}>
+              <td style={{ padding: 12, fontFamily: 'ui-monospace', color: '#2563eb', fontWeight: 600 }}>
+                {contractor.contractor_id}
+              </td>
+              <td style={{ padding: 12, fontWeight: 500 }}>
+                {contractor.company_name || '—'}
+              </td>
+              <td style={{ padding: 12 }}>
+                {contractor.main_contact || '—'}
+              </td>
+              <td style={{ padding: 12 }}>
+                {contractor.email || '—'}
+              </td>
+              <td style={{ padding: 12 }}>
+                {contractor.phone || '—'}
+              </td>
+              <td style={{ padding: 12 }}>
+                <span style={{
+                  padding: '2px 8px',
+                  borderRadius: 12,
+                  fontSize: 11,
+                  fontWeight: 600,
+                  background: contractor.status === 'active' ? '#d1fae5' : '#fef3c7',
+                  color: contractor.status === 'active' ? '#065f46' : '#92400e'
+                }}>
+                  {contractor.status || 'active'}
+                </span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

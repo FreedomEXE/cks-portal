@@ -26,7 +26,7 @@ Notes:
 ## Documentation
 
 - Project Index: `docs/project/index.md`
-- Latest Session Handoff: `docs/CURRENT SESSION 2025-09-02.md`
+- Latest Session Handoff: `docs/CURRENT SESSION 2025-09-07.md`
 - Session Archive: see `docs/session-archive/`
 - Key specs (examples):
   - `docs/project/CKS-Portal-Project-Outline-PRD.md`
@@ -65,7 +65,9 @@ To initialize or update the database schema locally:
 ## Status
 
 - Frontend hubs implemented with consistent Dashboard/Profile/Comms patterns. New Warehouse hub added with Inventory, Orders, Shipments, and Activity.
-- Backend surface unified under `/api`; added Warehouse, Reports, and Feedback resources. Many routes return template data pending DB mapping.
-- Next steps: wire real DB field mappings, finalize auth (Clerk + custom ID), and broaden tests.
+- **Assignment System Complete**: Contractor-to-Manager assignments now work end-to-end with proper activity logging and hub displays.
+- **Hub-Specific Activity Feeds**: Each hub now has its own activity endpoint showing relevant activities.
+- Backend surface unified under `/api`; added Warehouse, Reports, and Feedback resources. Activity logging standardized with centralized `logActivity()` function.
+- Next steps: finalize auth (Clerk + custom ID), broaden tests, and add remaining business logic.
 
 *Property of CKS © 2025 – Manifested by Freedom*

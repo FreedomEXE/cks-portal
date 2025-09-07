@@ -1368,11 +1368,7 @@ router.post('/contractors/:id/assign-manager', async (req: Request, res: Respons
     if (r.rowCount === 0) return res.status(404).json({ error: 'contractor_not_found' });
     // Log activity
     try {
-      await pool.query(
-        `INSERT INTO system_activity(activity_type, actor_id, actor_role, target_id, target_type, description, metadata)
-         VALUES ('assignment', $1, 'admin', $2, 'contractor', $3, $4)` ,
-        [String(req.headers['x-admin-user-id'] || 'admin'), contractorId, `Contractor ${contractorId} assigned to manager ${managerId}`, { manager_id: managerId }]
-      );
+      await logActivity('contractor_assigned_to_manager', `Contractor ${contractorId} assigned to manager ${managerId}`, String(req.headers['x-admin-user-id'] || 'admin'), 'admin', contractorId, 'contractor', { manager_id: managerId });
     } catch {}
     return res.json({ success: true, data: r.rows[0] });
   } catch (e: any) {
@@ -1732,11 +1728,7 @@ router.patch('/contractors/:id/assign-manager', async (req, res) => {
     
     // Log activity
     try {
-      await pool.query(
-        `INSERT INTO system_activity(activity_type, actor_id, actor_role, target_id, target_type, description, metadata)
-         VALUES ('assignment', $1, 'admin', $2, 'contractor', $3, $4)` ,
-        [String(req.headers['x-admin-user-id'] || 'admin'), id, `Contractor ${id} assigned to manager ${manager_id}`, { manager_id }]
-      );
+      await logActivity('contractor_assigned_to_manager', `Contractor ${id} assigned to manager ${manager_id}`, String(req.headers['x-admin-user-id'] || 'admin'), 'admin', id, 'contractor', { manager_id });
     } catch {}
 
     res.json({ 

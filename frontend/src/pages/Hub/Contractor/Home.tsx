@@ -741,10 +741,8 @@ export default function ContractorHome() {
                             const rows: Array<[string, any]> = [
                               ['Manager Name', (mgr?.name || mgr?.manager_name) || 'Not Assigned'],
                               ['Manager ID', mgr?.manager_id || 'Not Assigned'],
-                              ['Territory', mgr?.territory || 'Not Assigned'],
                               ['Email', mgr?.email || 'Not Assigned'],
-                              ['Phone', mgr?.phone || 'Not Assigned'],
-                              ['Assigned Center', mgr?.assigned_center || 'Not Assigned']
+                              ['Phone', mgr?.phone || 'Not Assigned']
                             ];
                             return rows.map(([label, value]) => (
                               <tr key={label}>

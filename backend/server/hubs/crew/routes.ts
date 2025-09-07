@@ -265,4 +265,40 @@ router.get('/inbox', async (req: Request, res: Response) => {
   }
 });
 
+// GET /api/crew/activity - Get activity feed for this crew member
+router.get('/activity', async (req: Request, res: Response) => {
+  try {
+    const code = String(req.query.code || '').trim() || getUserId(req);
+    if (!code) return res.status(400).json({ success: false, error: 'code required' });
+
+    const activities = await pool.query(
+      `SELECT 
+        activity_id,
+        activity_type,
+        actor_id,
+        actor_role,
+        target_id,
+        target_type,
+        description,
+        metadata,
+        created_at
+      FROM system_activity 
+      WHERE 
+        (target_id = $1 AND target_type = 'crew') OR
+        (actor_id = $1 AND actor_role = 'crew') OR
+        (activity_type LIKE 'task_%' AND metadata->>'crew_id' = $1) OR
+        (activity_type LIKE 'training_%' AND metadata->>'crew_id' = $1) OR
+        (activity_type LIKE 'schedule_%' AND metadata->>'crew_id' = $1)
+      ORDER BY created_at DESC
+      LIMIT 50`,
+      [code]
+    );
+
+    return res.json({ success: true, data: activities.rows });
+  } catch (error) {
+    console.error('Crew activity endpoint error:', error);
+    return res.status(500).json({ success: false, error: 'Failed to fetch activity', error_code: 'server_error' });
+  }
+});
+
 export default router;
