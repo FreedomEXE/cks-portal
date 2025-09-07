@@ -124,11 +124,11 @@ router.get('/managers', async (req, res) => {
     const offset = Math.max(parseInt(String(req.query.offset ?? '0'), 10), 0);
     const search = String(req.query.q ?? '').trim();
 
-    let whereClause = '';
+    let whereClause = 'WHERE archived_at IS NULL';
     const values: any[] = [];
     if (search) {
       values.push(`%${search}%`);
-      whereClause = `WHERE (manager_id || ' ' || COALESCE(manager_name,'') || ' ' || COALESCE(email,'') || ' ' || COALESCE(phone,'')) ILIKE $1`;
+      whereClause = `WHERE archived_at IS NULL AND (manager_id || ' ' || COALESCE(manager_name,'') || ' ' || COALESCE(email,'') || ' ' || COALESCE(phone,'')) ILIKE $1`;
     }
 
     const query = `
@@ -1826,6 +1826,196 @@ router.post('/cleanup-demo-data', async (req, res) => {
   } catch (e: any) {
     logger.error({ error: e }, 'Demo data cleanup error');
     res.status(500).json({ error: 'Failed to cleanup demo data' });
+  }
+});
+
+// Temporary endpoint to add archived_at column
+router.post('/setup-archive', async (req, res) => {
+  try {
+    // Add archived_at columns to all entity tables
+    const tables = ['managers', 'contractors', 'customers', 'centers', 'crew', 'warehouses'];
+    
+    for (const table of tables) {
+      await pool.query(`
+        DO $$ 
+        BEGIN
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                           WHERE table_name = '${table}' AND column_name = 'archived_at') THEN
+                ALTER TABLE ${table} ADD COLUMN archived_at TIMESTAMP NULL;
+            END IF;
+        END $$;
+      `);
+      
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_${table}_archived_at ON ${table}(archived_at)`);
+    }
+    
+    return res.json({ success: true, message: 'Archive setup completed for all entity tables' });
+  } catch (error) {
+    console.error('Archive setup error:', error);
+    return res.status(500).json({ error: 'Setup failed' });
+  }
+});
+
+// GET /api/admin/archive/:type - Get archived entities
+router.get('/archive/:type', async (req, res) => {
+  try {
+    const { type } = req.params;
+    const { limit = 25, offset = 0, search } = req.query;
+    
+    if (!['managers', 'contractors', 'customers', 'centers', 'crew', 'warehouses'].includes(type)) {
+      return res.status(400).json({ error: 'Invalid entity type' });
+    }
+    
+    const { getArchivedEntities } = await import('../../../../Database/hubs/admin/archive-operations');
+    const result = await getArchivedEntities(type as any, {
+      limit: Number(limit),
+      offset: Number(offset),
+      search: String(search || '')
+    });
+    
+    return res.json({ success: true, ...result });
+  } catch (error) {
+    console.error('Archive fetch error:', error);
+    return res.status(500).json({ error: 'Failed to fetch archive' });
+  }
+});
+
+// POST /api/admin/archive/:type/:id/restore - Restore archived entity
+router.post('/archive/:type/:id/restore', async (req, res) => {
+  try {
+    const { type, id } = req.params;
+    const adminUserId = String(req.headers['x-admin-user-id'] || 'admin');
+    
+    if (!['managers', 'contractors', 'customers', 'centers', 'crew', 'warehouses'].includes(type)) {
+      return res.status(400).json({ error: 'Invalid entity type' });
+    }
+    
+    const { restoreEntity } = await import('../../../../Database/hubs/admin/archive-operations');
+    const result = await restoreEntity(type as any, id, adminUserId);
+    
+    return res.json({ success: true, ...result });
+  } catch (error) {
+    console.error('Restore error:', error);
+    return res.status(500).json({ error: error.message || 'Restore failed' });
+  }
+});
+
+// GET /api/admin/archive/stats - Get archive statistics
+router.get('/archive-stats', async (req, res) => {
+  try {
+    const { getArchiveStatistics } = await import('../../../../Database/hubs/admin/archive-operations');
+    const stats = await getArchiveStatistics();
+    
+    return res.json({ success: true, data: stats });
+  } catch (error) {
+    console.error('Archive stats error:', error);
+    return res.status(500).json({ error: 'Failed to fetch archive statistics' });
+  }
+});
+
+// POST /api/admin/clear-all-users - Clear all users from all tables
+router.post('/clear-all-users', async (req, res) => {
+  try {
+    const tables = ['managers', 'contractors', 'customers', 'centers', 'crew', 'warehouses'];
+    
+    for (const table of tables) {
+      await pool.query(`DELETE FROM ${table}`);
+    }
+    
+    // Also clear app_users table
+    await pool.query(`DELETE FROM app_users`);
+    
+    return res.json({ 
+      success: true, 
+      message: 'All users cleared from all tables',
+      cleared_tables: [...tables, 'app_users']
+    });
+  } catch (error) {
+    console.error('Clear users error:', error);
+    return res.status(500).json({ error: 'Failed to clear users' });
+  }
+});
+
+// POST /api/admin/clear-activity - Clear all system activity
+router.post('/clear-activity', async (req, res) => {
+  try {
+    await pool.query(`DELETE FROM system_activity`);
+    
+    return res.json({ 
+      success: true, 
+      message: 'All system activity cleared'
+    });
+  } catch (error) {
+    console.error('Clear activity error:', error);
+    return res.status(500).json({ error: 'Failed to clear activity' });
+  }
+});
+
+// DELETE /api/admin/archive/:type/:id/hard-delete - Hard delete from archive
+router.delete('/archive/:type/:id/hard-delete', async (req, res) => {
+  try {
+    const entityType = req.params.type as 'managers' | 'contractors' | 'customers' | 'centers' | 'crew' | 'warehouses';
+    const entityId = req.params.id;
+    
+    const tableConfig = {
+      managers: { table: 'managers', idColumn: 'manager_id', nameColumn: 'manager_name' },
+      contractors: { table: 'contractors', idColumn: 'contractor_id', nameColumn: 'company_name' },
+      customers: { table: 'customers', idColumn: 'customer_id', nameColumn: 'company_name' },
+      centers: { table: 'centers', idColumn: 'center_id', nameColumn: 'center_name' },
+      crew: { table: 'crew', idColumn: 'crew_id', nameColumn: 'crew_name' },
+      warehouses: { table: 'warehouses', idColumn: 'warehouse_id', nameColumn: 'warehouse_name' }
+    };
+
+    const config = tableConfig[entityType];
+    if (!config) {
+      return res.status(400).json({ error: 'Invalid entity type' });
+    }
+
+    // Check if entity exists and is archived
+    const checkResult = await pool.query(
+      `SELECT ${config.idColumn}, ${config.nameColumn}, archived_at 
+       FROM ${config.table} 
+       WHERE ${config.idColumn} = $1`,
+      [entityId]
+    );
+
+    if (checkResult.rowCount === 0) {
+      return res.status(404).json({ error: `${entityType.slice(0, -1)} not found` });
+    }
+
+    if (!checkResult.rows[0].archived_at) {
+      return res.status(400).json({ error: `${entityType.slice(0, -1)} is not archived` });
+    }
+
+    // Hard delete the entity
+    const deleteResult = await pool.query(
+      `DELETE FROM ${config.table} WHERE ${config.idColumn} = $1 RETURNING ${config.idColumn}`,
+      [entityId]
+    );
+
+    if (deleteResult.rowCount === 0) {
+      return res.status(500).json({ error: `Failed to delete ${entityType.slice(0, -1)}` });
+    }
+
+    const entityName = checkResult.rows[0][config.nameColumn];
+    
+    // Log the hard delete activity
+    try {
+      await logActivity('user_deleted', `${entityType.slice(0, -1)} ${entityId} (${entityName}) permanently deleted`, String(req.headers['x-admin-user-id']||'admin'), 'admin', entityId, entityType.slice(0, -1), { 
+        name: entityName,
+        action: 'hard_deleted'
+      });
+    } catch (e) {
+      console.error('Activity logging failed:', e);
+    }
+
+    return res.json({
+      success: true,
+      message: `${entityType.slice(0, -1)} ${entityId} permanently deleted`
+    });
+  } catch (error) {
+    console.error('Hard delete error:', error);
+    return res.status(500).json({ error: 'Failed to hard delete entity' });
   }
 });
 

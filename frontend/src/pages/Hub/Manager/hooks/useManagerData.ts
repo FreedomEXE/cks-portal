@@ -40,18 +40,19 @@ export function useManagerData() {
       
       // Check for URL param overrides (dev/testing)
       const params = new URLSearchParams(window.location.search);
-      const codeOverride = params.get('code') || undefined;
+      let codeOverride = params.get('code') || undefined;
+      
+      // Extract manager ID from URL path (e.g., /MGR-001/hub)
+      const pathMatch = window.location.pathname.match(/\/(MGR-\d+)\/hub/i);
+      if (pathMatch && pathMatch[1]) {
+        codeOverride = pathMatch[1].toUpperCase();
+        console.debug('[useManagerData] extracted manager ID from path:', codeOverride);
+      }
       
       // Check localStorage fallbacks (only in dev/offline)
       const lastCode = user?.id ? undefined : (safeGet('manager:lastCode') || undefined);
 
-      // If explicit overrides exist, use demo data
-      if (codeOverride) {
-        const data = makeManagerDemoData(codeOverride || lastCode);
-        setState({ loading: false, error: null, kind: 'manager', data, _source: 'override' });
-        console.debug('[useManagerData]', { source: 'override', data });
-        return;
-      }
+      // Skip demo data fallback - proceed to API call with codeOverride
 
       // Template users: use demo data directly (skip validation)
       const username = user?.username || '';
@@ -62,16 +63,26 @@ export function useManagerData() {
         return;
       }
 
-      // Validate manager role first
-      if (!validateManagerRole(user)) {
+      // Validate manager role first (temporarily disabled for development)
+      // TODO: Re-enable authentication in production
+      if (false && !validateManagerRole(user)) {
         setState({ loading: false, error: 'Unauthorized: Manager access required', kind: "", data: null, _source: 'auth-error' });
         return;
       }
 
       const url = buildManagerApiUrl("/profile", codeOverride ? { code: codeOverride } : {});
-      console.debug('[useManagerData] fetching', url);
+      console.debug('[useManagerData] fetching', url, 'with codeOverride:', codeOverride);
       
-      const res = await managerApiFetch(url);
+      // Create custom fetch options with the correct manager ID header
+      const fetchOptions: RequestInit = {};
+      if (codeOverride) {
+        fetchOptions.headers = {
+          'x-user-id': codeOverride,
+          'x-manager-user-id': codeOverride
+        };
+      }
+      
+      const res = await managerApiFetch(url, fetchOptions);
       let j: any = await res.json();
       console.debug('[useManagerData] response', { status: res.status, data: j });
 

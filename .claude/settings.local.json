@@ -19,7 +19,8 @@
       "Bash(npx playwright test:*)",
       "Bash(taskkill:*)",
       "Bash(set PORT=5001)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Read(/c:\\Users\\rizz5\\OneDrive\\Desktop\\Claude/**)"
     ],
     "deny": [],
     "ask": []

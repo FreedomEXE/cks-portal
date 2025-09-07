@@ -78,9 +78,11 @@ const ssl = getSSLConfig(connectionString);
 const pool = new Pool({
   connectionString,
   ssl,
-  max: 20, // Maximum number of clients in the pool
-  idleTimeoutMillis: 30000, // Close idle clients after 30 seconds
-  connectionTimeoutMillis: 5000, // Return an error after 5 seconds if connection could not be established (give DNS / cloud a bit more time)
+  max: 2, // Lower limit for Render free tier
+  idleTimeoutMillis: 10000, // Close idle clients after 10 seconds
+  connectionTimeoutMillis: 10000, // Longer timeout for Render wake-up
+  query_timeout: 30000, // Query timeout for slow Render free tier
+  statement_timeout: 30000, // Statement timeout
 });
 
 // Log connection info (without password)

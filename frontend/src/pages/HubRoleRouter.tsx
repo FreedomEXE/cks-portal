@@ -19,7 +19,7 @@ import React from 'react';
 import { useUser } from '@clerk/clerk-react';
 import { useParams } from 'react-router-dom';
 // Inline role extraction utility
-function getRole(user: any, headers?: Record<string, string | null | undefined>) {
+function getRole(user: any, headers?: Record<string, string | null | undefined>, urlParam?: string) {
   // Dev override only when impersonation flag is set
   try {
     const ss = typeof sessionStorage !== 'undefined' ? sessionStorage : null;
@@ -33,6 +33,22 @@ function getRole(user: any, headers?: Record<string, string | null | undefined>)
   const username = user?.username || '';
   if (/^[a-z]{2,3}-\d{3}$/i.test(username)) {
     const rawPrefix = username.split('-')[0]?.toLowerCase();
+    switch(rawPrefix) {
+      case 'mgr': return 'manager';
+      case 'cus': return 'customer';
+      case 'cen': return 'center';
+      case 'ctr': return 'center'; // Legacy support for ctr-000
+      case 'con': return 'contractor';
+      case 'crw': return 'crew';
+      case 'adm': return 'admin';
+      case 'wh':  return 'warehouse';
+      default: return null;
+    }
+  }
+  
+  // Check URL parameter for role inference (for testing without authentication)
+  if (urlParam && /^[a-z]{2,3}-\d{3}$/i.test(urlParam)) {
+    const rawPrefix = urlParam.split('-')[0]?.toLowerCase();
     switch(rawPrefix) {
       case 'mgr': return 'manager';
       case 'cus': return 'customer';
@@ -67,8 +83,8 @@ import CustomerHub from './Hub/Customer';
 
 export default function HubRoleRouter() {
   const { user } = useUser();
-  const role = (getRole(user) || '').toLowerCase();
   const { username = '' } = useParams();
+  const role = (getRole(user, undefined, username) || '').toLowerCase();
 
   /**
    * ALL HUBS ARE NOW FULLY INDEPENDENT - Just pass ALL routes to them

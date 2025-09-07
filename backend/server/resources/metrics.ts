@@ -20,14 +20,14 @@ const router = express.Router();
 // GET /api/metrics - Get admin dashboard metrics
 router.get('/', async (req: Request, res: Response) => {
   try {
-    // Get total users count from all user tables
+    // Get total users count from all user tables (excluding archived)
     const usersQuery = `
       SELECT 
-        (SELECT COUNT(*) FROM managers) +
-        (SELECT COUNT(*) FROM contractors) +
-        (SELECT COUNT(*) FROM customers) +
-        (SELECT COUNT(*) FROM centers) +
-        (SELECT COUNT(*) FROM crew) as total_users
+        (SELECT COUNT(*) FROM managers WHERE archived_at IS NULL) +
+        (SELECT COUNT(*) FROM contractors WHERE archived_at IS NULL) +
+        (SELECT COUNT(*) FROM customers WHERE archived_at IS NULL) +
+        (SELECT COUNT(*) FROM centers WHERE archived_at IS NULL) +
+        (SELECT COUNT(*) FROM crew WHERE archived_at IS NULL) as total_users
     `;
     
     // Get support tickets metrics

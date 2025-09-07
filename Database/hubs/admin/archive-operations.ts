@@ -33,7 +33,7 @@ export async function getArchivedEntities(
   // Define table and column mappings
   const tableConfig = {
     managers: { table: 'managers', idColumn: 'manager_id', nameColumn: 'manager_name' },
-    contractors: { table: 'contractors', idColumn: 'contractor_id', nameColumn: 'contractor_name' },
+    contractors: { table: 'contractors', idColumn: 'contractor_id', nameColumn: 'company_name' },
     customers: { table: 'customers', idColumn: 'customer_id', nameColumn: 'company_name' },
     centers: { table: 'centers', idColumn: 'center_id', nameColumn: 'center_name' },
     crew: { table: 'crew', idColumn: 'crew_id', nameColumn: 'crew_name' },
@@ -105,7 +105,7 @@ export async function restoreEntity(
   
   const tableConfig = {
     managers: { table: 'managers', idColumn: 'manager_id', nameColumn: 'manager_name' },
-    contractors: { table: 'contractors', idColumn: 'contractor_id', nameColumn: 'contractor_name' },
+    contractors: { table: 'contractors', idColumn: 'contractor_id', nameColumn: 'company_name' },
     customers: { table: 'customers', idColumn: 'customer_id', nameColumn: 'company_name' },
     centers: { table: 'centers', idColumn: 'center_id', nameColumn: 'center_name' },
     crew: { table: 'crew', idColumn: 'crew_id', nameColumn: 'crew_name' },
@@ -147,13 +147,14 @@ export async function restoreEntity(
       throw new Error(`Failed to restore ${entityType.slice(0, -1)}`);
     }
 
-    const entityName = checkResult.rows[0][config.nameColumn.replace('_', '')];
+    const entityName = checkResult.rows[0][config.nameColumn];
     
     // Log the restore activity
     try {
       const { logActivity } = await import('../../../backend/server/resources/activity');
-      await logActivity('user_restored', `${entityType.slice(0, -1)} ${entityId} (${entityName}) restored`, admin_user_id, 'admin', entityId, entityType.slice(0, -1), { 
-        name: entityName 
+      await logActivity('user_updated', `${entityType.slice(0, -1)} ${entityId} (${entityName}) restored`, admin_user_id, 'admin', entityId, entityType.slice(0, -1), { 
+        name: entityName,
+        action: 'restored'
       });
     } catch (e) {
       console.error('Activity logging failed:', e);

@@ -2968,7 +2968,7 @@ export default function AdminHome() {
   ];
 
   // Archive state
-  const [archiveType, setArchiveType] = useState<'contractors'|'customers'|'centers'|'warehouses'>('contractors');
+  const [archiveType, setArchiveType] = useState<'managers'|'contractors'|'customers'|'centers'|'crew'|'warehouses'>('managers');
   const [archiveItems, setArchiveItems] = useState<any[]>([]);
   const [archiveLoading, setArchiveLoading] = useState(false);
   const [archiveMsg, setArchiveMsg] = useState<string|null>(null);
@@ -2979,7 +2979,7 @@ export default function AdminHome() {
     (async () => {
       try {
         setArchiveLoading(true); setArchiveMsg(null);
-        const url = buildAdminApiUrl('/archive', { type: archiveType, limit: 50 });
+        const url = buildAdminApiUrl(`/archive/${archiveType}`, { limit: 50 });
         const r = await adminApiFetch(url);
         const j = await r.json();
         if (!cancelled) setArchiveItems(Array.isArray(j?.items) ? j.items : []);
@@ -2996,13 +2996,46 @@ export default function AdminHome() {
     try {
       setArchiveMsg(null);
       const id = item.id;
-      const r = await adminApiFetch(buildAdminApiUrl(`/${archiveType}/${encodeURIComponent(id)}/restore`), { method: 'POST' });
+      const r = await adminApiFetch(buildAdminApiUrl(`/archive/${archiveType}/${encodeURIComponent(id)}/restore`), { method: 'POST' });
       const j = await r.json();
       if (!r.ok || !j?.success) throw new Error(j?.error || 'Restore failed');
       setArchiveItems(prev => prev.filter(x => x.id !== id));
       setArchiveMsg(`Restored ${id}`);
     } catch (e:any) {
       setArchiveMsg(e?.message || 'Restore failed');
+    }
+  }
+
+  async function handleHardDelete(item: any) {
+    if (!confirm(`Are you sure you want to PERMANENTLY DELETE ${item.id} (${item.name})? This action cannot be undone.`)) {
+      return;
+    }
+    try {
+      setArchiveMsg(null);
+      const id = item.id;
+      const r = await adminApiFetch(buildAdminApiUrl(`/archive/${archiveType}/${encodeURIComponent(id)}/hard-delete`), { method: 'DELETE' });
+      const j = await r.json();
+      if (!r.ok || !j?.success) throw new Error(j?.error || 'Hard delete failed');
+      setArchiveItems(prev => prev.filter(x => x.id !== id));
+      setArchiveMsg(`Permanently deleted ${id}`);
+    } catch (e:any) {
+      setArchiveMsg(e?.message || 'Hard delete failed');
+    }
+  }
+
+  async function handleClearActivity() {
+    if (!confirm('Are you sure you want to clear all recent activity? This action cannot be undone.')) {
+      return;
+    }
+    try {
+      const r = await adminApiFetch(buildAdminApiUrl('/clear-activity'), { method: 'POST' });
+      const j = await r.json();
+      if (!r.ok || !j?.success) throw new Error(j?.error || 'Failed to clear activity');
+      setActivityItems([]);
+      // Optional: Refresh metrics as well
+      fetchMetricsAndActivity();
+    } catch (e:any) {
+      console.error('Failed to clear activity:', e);
     }
   }
 
@@ -3809,7 +3842,7 @@ export default function AdminHome() {
                   <option value="customers">Customers</option>
                   <option value="centers">Centers</option>
                   <option value="crew">Crew</option>
-                  <option value="management">Managers</option>
+                  <option value="managers">Managers</option>
                   <option value="warehouses">Warehouses</option>
                   <option value="services">Services</option>
                   <option value="products">Products</option>
@@ -3841,9 +3874,12 @@ export default function AdminHome() {
                     <tr key={it.id}>
                       <td style={{ padding: 8 }}>{it.id}</td>
                       <td style={{ padding: 8 }}>{it.name}</td>
-                      <td style={{ padding: 8 }}>{String(it.date || '').replace('T',' ').slice(0,19)}</td>
+                      <td style={{ padding: 8 }}>{String(it.archived_at || '').replace('T',' ').slice(0,19)}</td>
                       <td style={{ padding: 8 }}>
-                        <button onClick={()=>handleRestore(it)} style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #e5e7eb', background: '#10b981', color: '#000', fontWeight: 700 }}>Restore</button>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button onClick={()=>handleRestore(it)} style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #e5e7eb', background: '#10b981', color: '#000', fontWeight: 700, fontSize: 12 }}>Restore</button>
+                          <button onClick={()=>handleHardDelete(it)} style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #e5e7eb', background: '#ef4444', color: '#fff', fontWeight: 700, fontSize: 12 }}>Delete</button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -3944,7 +3980,24 @@ export default function AdminHome() {
               padding: 20,
               color: '#ffffff'
             }}>
-              <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 16 }}>Recent System Activity</div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                <div style={{ fontSize: 18, fontWeight: 600 }}>Recent System Activity</div>
+                <button 
+                  onClick={handleClearActivity}
+                  style={{ 
+                    padding: '4px 8px', 
+                    fontSize: 11, 
+                    background: '#ef4444', 
+                    color: '#fff', 
+                    border: 'none', 
+                    borderRadius: 4, 
+                    cursor: 'pointer',
+                    fontWeight: 600
+                  }}
+                >
+                  Clear
+                </button>
+              </div>
               {loadingActivity ? (
                 <div style={{ color: '#888', textAlign: 'center', padding: 20 }}>Loading activities...</div>
               ) : recentActivities.length === 0 ? (
