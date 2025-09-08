@@ -32,9 +32,9 @@ export interface CrewSession {
 export function validateCrewRole(user: User | null | undefined): boolean {
   if (!user) return false;
   
-  // Allow template users (xxx-000 format)
+  // Check for template crew users (crw-XXX format) - same logic as HubRoleRouter
   const username = user.username || '';
-  if (username === 'crw-000' || /^[a-z]{3}-000$/i.test(username)) {
+  if (/^crw-\d{3}$/i.test(username)) {
     return true;
   }
   

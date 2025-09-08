@@ -71,3 +71,30 @@ To initialize or update the database schema locally:
 - Next steps: finalize auth (Clerk + custom ID), broaden tests, and add remaining business logic.
 
 *Property of CKS © 2025 – Manifested by Freedom*
+
+## Dev Workflow (Both Services)
+
+- Install deps: `npm run install:all`
+- Foreground (recommended during development): `npm run dev:all`
+  - Frontend: `http://localhost:5183`
+  - Backend: `http://localhost:5000`
+  - Health: `GET http://localhost:5000/health`
+  - API docs: `http://localhost:5000/api/docs`
+- Background control (run from repo root):
+  - Start both: `npm run start:all`
+  - Restart both: `npm run restart:all`
+  - Stop both: `npm run stop:all`
+  - Status: `npm run status:dev`
+- Individual targets:
+  - Frontend only (fg): `cd frontend && npm run dev`
+  - Backend only (fg): `cd backend/server && npm run dev`
+  - Frontend only (bg): `npm run start:frontend`
+  - Backend only (bg): `npm run start:backend`
+- Logs (when using background mode):
+  - Frontend log: `frontend/frontend-dev.log`
+  - Backend log: `backend/server/backend-dev.log`
+- Notes:
+  - The frontend dev server proxies `/api` to `http://localhost:5000` (see `frontend/vite.config.ts`).
+  - PID files for background mode are written to repo root: `.frontend_dev_pid`, `.backend_dev_pid`.
+  - Stop foreground `dev:all` with `Ctrl+C`.
+  - If a port is already in use, stop existing processes (use the `stop:*` scripts) and retry.

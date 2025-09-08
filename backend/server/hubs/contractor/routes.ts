@@ -83,19 +83,28 @@ router.get('/profile', async (req: Request, res: Response) => {
       if (names.length) servicesSpecialized = names.join(', ');
     } catch {}
 
-    // Load manager details if assigned
+    // Load manager details if assigned (handle deleted managers gracefully)
     let accountManager: any = null;
     if (row.cks_manager) {
       try {
         const m = await pool.query(
           `SELECT manager_id, manager_name, email, phone, territory
            FROM managers
-           WHERE UPPER(manager_id) = UPPER($1)
+           WHERE UPPER(manager_id) = UPPER($1) AND archived_at IS NULL
            LIMIT 1`,
           [row.cks_manager]
         );
-        if (m.rowCount > 0) accountManager = m.rows[0];
-      } catch {}
+        if (m.rowCount > 0) {
+          accountManager = m.rows[0];
+        } else {
+          // Manager might be deleted/archived, set to null but continue
+          console.log(`Manager ${row.cks_manager} not found or archived for contractor ${row.contractor_id}`);
+          accountManager = null;
+        }
+      } catch (error) {
+        console.error(`Error loading manager ${row.cks_manager}:`, error);
+        accountManager = null;
+      }
     }
 
     const data = {

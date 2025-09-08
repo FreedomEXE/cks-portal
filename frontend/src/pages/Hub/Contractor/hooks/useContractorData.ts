@@ -31,39 +31,76 @@ type ContractorState = {
 };
 
 export function useContractorData() {
-  const { user } = useUser();
+  const { user, isLoaded } = useUser();
   const [state, setState] = useState<ContractorState>({ loading: true, error: null, kind: "contractor", data: null });
   const didInitialFetchRef = useRef(false);
 
   const fetchContractorData = useCallback(async () => {
     try {
       setState((s) => ({ ...s, loading: true, error: null }));
-      
-      // Check for URL param overrides (dev/testing)
+      // Check for URL param overrides and template path first (bypass Clerk load for templates)
       const params = new URLSearchParams(window.location.search);
       const codeOverride = params.get('code') || undefined;
-      // Derive contractor code from pathname or stored session when available
       const pathUser = (window.location.pathname.split('/')[1] || '').trim();
       const pathCode = /^con-\d+$/i.test(pathUser) ? pathUser.toUpperCase() : undefined;
-      
-      // Check localStorage fallbacks (only in dev/offline)
-      const lastCodeAny = (safeGet('contractor:lastCode') || sessionStorage.getItem('contractor:lastCode') || undefined) as string | undefined;
-      const lastCode = lastCodeAny ? lastCodeAny.toUpperCase() : undefined;
+      const isTemplatePath = /^con-000$/i.test(pathUser);
 
-      // If explicit overrides exist, use demo data
+      // If explicit overrides or template path exist, use demo data immediately
       if (codeOverride) {
-        const data = makeContractorDemoData(codeOverride || lastCode);
+        const data = makeContractorDemoData(codeOverride);
         setState({ loading: false, error: null, kind: 'contractor', data, _source: 'override' });
         console.debug('[useContractorData]', { source: 'override', data });
         return;
       }
+      if (isTemplatePath) {
+        const data = makeContractorDemoData('CON-000');
+        setState({ loading: false, error: null, kind: 'contractor', data, _source: 'template-path' });
+        console.debug('[useContractorData]', { source: 'template-path', data });
+        return;
+      }
 
-      // Template users: use demo data directly (skip validation)
+      // CRITICAL: Wait for Clerk to load before any auth checks (non-template)
+      if (!isLoaded) {
+        console.debug('[useContractorData] Clerk not loaded yet, waiting...');
+        setState({ loading: true, error: null, kind: "contractor", data: null });
+        return;
+      }
+      console.debug('[useContractorData] Clerk loaded, proceeding with auth checks');
+
+      // Check localStorage fallbacks (only in dev/offline)
+      const lastCodeAny = (safeGet('contractor:lastCode') || sessionStorage.getItem('contractor:lastCode') || undefined) as string | undefined;
+      const lastCode = lastCodeAny ? lastCodeAny.toUpperCase() : undefined;
+
+      // Template users or path-based template access: use demo data directly (skip validation)
       const username = user?.username || '';
       if (username.includes('-000') || username === 'con-000' || username === 'CON-000') {
         const data = makeContractorDemoData(username || 'CON-000');
         setState({ loading: false, error: null, kind: 'contractor', data, _source: 'template-user' });
         console.debug('[useContractorData]', { source: 'template-user', username, data });
+        return;
+      }
+
+      // Admin viewer mode: allow admins to view any contractor by path code
+      const isAdminUser = (() => {
+        try {
+          const meta: any = (user as any)?.publicMetadata || {};
+          const role = (meta.role || meta.hub_role || '').toString().toLowerCase();
+          const uname = (user as any)?.username || '';
+          return role === 'admin' || uname === 'freedom_exe' || uname === 'admin';
+        } catch { return false; }
+      })();
+      if (isAdminUser && pathCode) {
+        const url = buildContractorApiUrl("/profile", { code: pathCode });
+        console.debug('[useContractorData] admin viewer mode fetch', url);
+        const res = await contractorApiFetch(url);
+        const j = await res.json();
+        if (!res.ok) {
+          setState({ loading: false, error: j?.error || 'Failed to load contractor (admin view)', kind: '', data: null, _source: 'admin-view' });
+          return;
+        }
+        const data = j?.data || j || {};
+        if (!data.contractor_id) data.contractor_id = pathCode;
+        setState({ loading: false, error: null, kind: 'contractor', data, _source: 'admin-view' });
         return;
       }
 
@@ -172,13 +209,20 @@ export function useContractorData() {
       
       setState({ loading: false, error: msg, kind: "", data: null, _source: 'error' });
     }
-  }, [user]);
+  }, [user, isLoaded]);
 
   useEffect(() => {
-    if (didInitialFetchRef.current) return; // Prevent double fetch in StrictMode
-    didInitialFetchRef.current = true;
-    fetchContractorData();
-  }, [fetchContractorData]);
+    // Run once after Clerk load state stabilizes; allow earlier runs for template/override paths
+    if (!didInitialFetchRef.current) {
+      didInitialFetchRef.current = true;
+      fetchContractorData();
+      return;
+    }
+    // If Clerk just finished loading, re-fetch to enable admin viewer mode
+    if (isLoaded) {
+      fetchContractorData();
+    }
+  }, [isLoaded, fetchContractorData]);
 
   const refetch = useCallback(() => {
     didInitialFetchRef.current = false;

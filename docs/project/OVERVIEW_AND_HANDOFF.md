@@ -16,7 +16,7 @@ Purpose: Single entry point for context, priorities, and where to find things. R
 - API map: docs/project/API_SURFACE_V1.md
 - Auth & IDs: docs/project/AUTH_AND_ID_MAPPING.md
 - Field mapping overview: docs/CKS-FIELD-MAPPING-DOCUMENTATION.md
-- Current session: docs/CURRENT SESSION 2025-09-05.md (older in docs/session-archive/)
+- Current session: docs/CURRENT SESSION 2025-09-08.md (older in docs/session-archive/)
 - Testing creds: docs/TESTING_CREDENTIALS.md
 
 ## Hub Specs

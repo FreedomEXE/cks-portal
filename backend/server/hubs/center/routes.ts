@@ -22,6 +22,51 @@ function getUserId(req: Request): string {
   return String(v || '');
 }
 
+// GET /api/center/profile
+router.get('/profile', async (req: Request, res: Response) => {
+  try {
+    const code = String((req.query.code || getUserId(req) || '')).toUpperCase();
+    if (!code) return res.status(400).json({ success: false, error: 'code required' });
+    const r = await pool.query(
+      `SELECT center_id, center_name, cks_manager, customer_id, contractor_id, address, created_at
+       FROM centers WHERE UPPER(center_id)=UPPER($1) LIMIT 1`, [code]
+    );
+    if (r.rowCount === 0) return res.status(404).json({ success: false, error: 'Center not found' });
+    const row = r.rows[0];
+    let manager: any = null;
+    if (row.cks_manager) {
+      try {
+        const m = await pool.query(`SELECT manager_id, manager_name, email, phone FROM managers WHERE UPPER(manager_id)=UPPER($1) AND archived_at IS NULL LIMIT 1`, [row.cks_manager]);
+        manager = m.rows[0] || null;
+      } catch {}
+    }
+    let yearsWithCks = '0 Years';
+    let contractStartDate = null;
+    if (row.created_at) {
+      const start = new Date(row.created_at);
+      contractStartDate = start.toISOString().slice(0,10);
+      const diffYears = Math.max(0, Math.floor((Date.now()-start.getTime())/(1000*60*60*24*365)));
+      yearsWithCks = diffYears === 1 ? '1 Year' : `${diffYears} Years`;
+    }
+    const data = {
+      center_id: row.center_id,
+      center_name: row.center_name,
+      cks_manager: row.cks_manager || null,
+      customer_id: row.customer_id || null,
+      contractor_id: row.contractor_id || null,
+      address: row.address || null,
+      years_with_cks: yearsWithCks,
+      contract_start_date: contractStartDate,
+      status: 'active',
+      manager
+    };
+    return res.json({ success: true, data });
+  } catch (error) {
+    console.error('Center profile endpoint error:', error);
+    return res.status(500).json({ success: false, error: 'Failed to fetch center profile', error_code: 'server_error' });
+  }
+});
+
 // GET /api/center/requests (recent)
 router.get('/requests', async (req: Request, res: Response) => {
   try {

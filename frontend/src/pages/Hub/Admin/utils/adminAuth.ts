@@ -32,6 +32,21 @@ export interface AdminSession {
 export function validateAdminRole(user: User | null | undefined): boolean {
   if (!user) return false;
   
+  // Check for specific admin users
+  const username = user.username || '';
+  const userId = (user.publicMetadata as any)?.userId || '';
+  
+  // Check for freedom_exe and ADM-000 (the main admin accounts)
+  if (username === 'freedom_exe' || username === 'admin' || 
+      userId === 'ADM-000' || userId === 'freedom_exe') {
+    return true;
+  }
+  
+  // Check for template admin users (adm-XXX format)
+  if (/^adm-\d{3}$/i.test(username)) {
+    return true;
+  }
+  
   const role = getAdminRole(user);
   return role === 'admin';
 }

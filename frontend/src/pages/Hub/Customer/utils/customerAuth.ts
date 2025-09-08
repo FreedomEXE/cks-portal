@@ -31,6 +31,12 @@ export interface CustomerSession {
 export function validateCustomerRole(user: User | null | undefined): boolean {
   if (!user) return false;
   
+  // Check for template customer users (cus-XXX format) - same logic as HubRoleRouter
+  const username = user.username || '';
+  if (/^cus-\d{3}$/i.test(username)) {
+    return true;
+  }
+  
   const role = getCustomerRole(user);
   return role === 'customer';
 }

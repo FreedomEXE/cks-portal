@@ -31,17 +31,39 @@ type CrewState = {
 };
 
 export function useCrewData() {
-  const { user } = useUser();
+  const { user, isLoaded } = useUser();
   const [state, setState] = useState<CrewState>({ loading: true, error: null, kind: "crew", data: null });
   const didInitialFetchRef = useRef(false);
 
   const fetchCrewData = useCallback(async () => {
     try {
       setState((s) => ({ ...s, loading: true, error: null }));
-      
-      // Check for URL param overrides (dev/testing)
+      // Check for URL overrides and template path first (bypass Clerk for templates)
       const params = new URLSearchParams(window.location.search);
       const codeOverride = params.get('code') || undefined;
+      const pathUser = (window.location.pathname.split('/')[1] || '').trim();
+      const isTemplatePath = /^crw-000$/i.test(pathUser);
+
+      if (codeOverride) {
+        const data = makeCrewDemoData(codeOverride);
+        setState({ loading: false, error: null, kind: 'crew', data, _source: 'override' });
+        console.debug('[useCrewData]', { source: 'override', data });
+        return;
+      }
+      if (isTemplatePath) {
+        const data = makeCrewDemoData('CRW-000');
+        setState({ loading: false, error: null, kind: 'crew', data, _source: 'template-path' });
+        console.debug('[useCrewData]', { source: 'template-path', data });
+        return;
+      }
+
+      // CRITICAL: Wait for Clerk to load before any auth checks (non-template)
+      if (!isLoaded) {
+        console.debug('[useCrewData] Clerk not loaded yet, waiting...');
+        setState({ loading: true, error: null, kind: "crew", data: null });
+        return;
+      }
+      console.debug('[useCrewData] Clerk loaded, proceeding with auth checks');
       
       // Check localStorage fallbacks (only in dev/offline)
       const lastCode = user?.id ? undefined : (safeGet('crew:lastCode') || undefined);
@@ -60,6 +82,22 @@ export function useCrewData() {
         const data = makeCrewDemoData(username || 'crw-000');
         setState({ loading: false, error: null, kind: 'crew', data, _source: 'template-user' });
         console.debug('[useCrewData]', { source: 'template-user', username, data });
+        return;
+      }
+
+      // Admin viewer mode: allow admins to view any crew by path code
+      const isAdminUser = (() => {
+        try {
+          const meta: any = (user as any)?.publicMetadata || {};
+          const role = (meta.role || meta.hub_role || '').toString().toLowerCase();
+          const uname = (user as any)?.username || '';
+          return role === 'admin' || uname === 'freedom_exe' || uname === 'admin';
+        } catch { return false; }
+      })();
+      const pathCode = /^crw-\d+$/i.test(pathUser) ? pathUser.toUpperCase() : undefined;
+      if (isAdminUser && pathCode) {
+        const data = makeCrewDemoData(pathCode);
+        setState({ loading: false, error: null, kind: 'crew', data, _source: 'admin-view' });
         return;
       }
 
@@ -155,13 +193,16 @@ export function useCrewData() {
       
       setState({ loading: false, error: msg, kind: "", data: null, _source: 'error' });
     }
-  }, [user]);
+  }, [user, isLoaded]);
 
   useEffect(() => {
-    if (didInitialFetchRef.current) return; // Prevent double fetch in StrictMode
-    didInitialFetchRef.current = true;
-    fetchCrewData();
-  }, [fetchCrewData]);
+    if (!didInitialFetchRef.current) {
+      didInitialFetchRef.current = true;
+      fetchCrewData();
+      return;
+    }
+    if (isLoaded) fetchCrewData();
+  }, [isLoaded, fetchCrewData]);
 
   const refetch = useCallback(() => {
     didInitialFetchRef.current = false;

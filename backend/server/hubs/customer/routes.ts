@@ -19,24 +19,45 @@ function getUserId(req: Request): string {
 // GET /api/customer/profile
 router.get('/profile', async (req: Request, res: Response) => {
   try {
-    const userId = getUserId(req);
-    // Empty template data - will be populated when customer is created via admin
-    const sample = {
-      customer_id: userId || 'CUS-000',
-      customer_name: 'Not Set',
-      company_name: 'Not Set',
-      address: 'Not Set',
-      cks_manager: 'Not Assigned',
-      email: 'Not Set',
-      phone: 'Not Set',
-      main_contact: 'Not Set',
-      website: 'Not Set',
-      years_with_cks: '0 Years',
-      num_centers: '0',
-      contract_start_date: 'Not Set',
-      status: 'Not Set'
+    const code = String((req.query.code || getUserId(req) || '')).toUpperCase();
+    if (!code) return res.status(400).json({ success: false, error: 'code required' });
+    const r = await pool.query(
+      `SELECT customer_id, company_name, cks_manager, contact_person AS main_contact, email, phone, address, website, created_at
+       FROM customers WHERE UPPER(customer_id)=UPPER($1) LIMIT 1`, [code]
+    );
+    if (r.rowCount === 0) return res.status(404).json({ success: false, error: 'Customer not found' });
+    const row = r.rows[0];
+    let manager: any = null;
+    if (row.cks_manager) {
+      try {
+        const m = await pool.query(`SELECT manager_id, manager_name, email, phone FROM managers WHERE UPPER(manager_id)=UPPER($1) AND archived_at IS NULL LIMIT 1`, [row.cks_manager]);
+        manager = m.rows[0] || null;
+      } catch {}
+    }
+    let yearsWithCks = '0 Years';
+    let contractStartDate = null;
+    if (row.created_at) {
+      const start = new Date(row.created_at);
+      contractStartDate = start.toISOString().slice(0,10);
+      const diffYears = Math.max(0, Math.floor((Date.now()-start.getTime())/(1000*60*60*24*365)));
+      yearsWithCks = diffYears === 1 ? '1 Year' : `${diffYears} Years`;
+    }
+    const data = {
+      customer_id: row.customer_id,
+      company_name: row.company_name,
+      cks_manager: row.cks_manager || null,
+      main_contact: row.main_contact || null,
+      email: row.email || null,
+      phone: row.phone || null,
+      address: row.address || null,
+      website: row.website || null,
+      years_with_cks: yearsWithCks,
+      num_centers: 0,
+      contract_start_date: contractStartDate,
+      status: 'active',
+      manager
     };
-    return res.json({ success: true, data: sample });
+    return res.json({ success: true, data });
   } catch (error) {
     console.error('Customer profile endpoint error:', error);
     return res.status(500).json({ success: false, error: 'Failed to fetch customer profile', error_code: 'server_error' });

@@ -18,6 +18,7 @@
 import express, { Request, Response } from 'express';
 import pool from '../../../../Database/db/pool';
 import { logActivity } from '../../resources/activity';
+import { sendWelcomeMessage } from '../../utils/welcomeMessages';
 
 // Fallback lightweight logger (original '../../core/logger' module not found)
 const logger = {
@@ -604,7 +605,8 @@ router.post('/users', async (req: Request, res: Response) => {
         [manager_id, name, req.body.email || null, req.body.phone || null, req.body.territory || null]
       );
       await upsertAppUserByEmail(req.body.email, 'manager', manager_id, name);
-      try { await logActivity('user_created', `Manager ${manager_id} created`, String(req.headers['x-admin-user-id']||'admin'), 'admin', manager_id, 'manager', { email: req.body.email||null }); } catch {}
+      try { await logActivity('user_created', `New Manager Created: ${manager_id} (${name}) — Welcome Message Sent`, String(req.headers['x-admin-user-id']||'admin'), 'admin', manager_id, 'manager', { email: req.body.email||null }); } catch {}
+      try { await sendWelcomeMessage({ userId: manager_id, userName: name, userRole: 'manager', email: req.body.email || undefined }, String(req.headers['x-admin-user-id']||'admin')); } catch {}
       return res.status(201).json({ success: true, data: { ...r.rows[0] } });
     }
 
@@ -646,7 +648,8 @@ router.post('/users', async (req: Request, res: Response) => {
       // If status column doesn't exist, synthesize active status for response consistency
       const data = hasStatusCol ? r.rows[0] : { ...r.rows[0], status: 'active' };
       await upsertAppUserByEmail(req.body.email, 'contractor', contractor_id, company);
-      try { await logActivity('user_created', `Contractor ${contractor_id} created`, String(req.headers['x-admin-user-id']||'admin'), 'admin', contractor_id, 'contractor', { email: req.body.email||null }); } catch {}
+      try { await logActivity('user_created', `New Contractor Created: ${contractor_id} (${company}) — Welcome Message Sent`, String(req.headers['x-admin-user-id']||'admin'), 'admin', contractor_id, 'contractor', { email: req.body.email||null }); } catch {}
+      try { await sendWelcomeMessage({ userId: contractor_id, userName: company, userRole: 'contractor', email: req.body.email || undefined }, String(req.headers['x-admin-user-id']||'admin')); } catch {}
       return res.status(201).json({ success: true, data });
     }
 
@@ -671,7 +674,8 @@ router.post('/users', async (req: Request, res: Response) => {
         ]
       );
       await upsertAppUserByEmail(req.body.email, 'customer', customer_id, company);
-      try { await logActivity('user_created', `Customer ${customer_id} created`, String(req.headers['x-admin-user-id']||'admin'), 'admin', customer_id, 'customer', { email: req.body.email||null }); } catch {}
+      try { await logActivity('user_created', `New Customer Created: ${customer_id} (${company}) — Welcome Message Sent`, String(req.headers['x-admin-user-id']||'admin'), 'admin', customer_id, 'customer', { email: req.body.email||null }); } catch {}
+      try { await sendWelcomeMessage({ userId: customer_id, userName: company, userRole: 'customer', email: req.body.email || undefined }, String(req.headers['x-admin-user-id']||'admin')); } catch {}
       return res.status(201).json({ success: true, data: { ...r.rows[0] } });
     }
 
@@ -700,7 +704,8 @@ router.post('/users', async (req: Request, res: Response) => {
         ]
       );
       await upsertAppUserByEmail(req.body.email, 'center', center_id, center_name);
-      try { await logActivity('user_created', `Center ${center_id} created`, String(req.headers['x-admin-user-id']||'admin'), 'admin', center_id, 'center', {}); } catch {}
+      try { await logActivity('user_created', `New Center Created: ${center_id} (${center_name}) — Welcome Message Sent`, String(req.headers['x-admin-user-id']||'admin'), 'admin', center_id, 'center', {}); } catch {}
+      try { await sendWelcomeMessage({ userId: center_id, userName: center_name, userRole: 'center', email: req.body.email || undefined }, String(req.headers['x-admin-user-id']||'admin')); } catch {}
       return res.status(201).json({ success: true, data: { ...r.rows[0] } });
     }
 
@@ -722,7 +727,8 @@ router.post('/users', async (req: Request, res: Response) => {
         ]
       );
       await upsertAppUserByEmail(req.body.email, 'crew', crew_id, crew_name);
-      try { await logActivity('user_created', `Crew ${crew_id} created`, String(req.headers['x-admin-user-id']||'admin'), 'admin', crew_id, 'crew', {}); } catch {}
+      try { await logActivity('user_created', `New Crew Created: ${crew_id} (${crew_name}) — Welcome Message Sent`, String(req.headers['x-admin-user-id']||'admin'), 'admin', crew_id, 'crew', {}); } catch {}
+      try { await sendWelcomeMessage({ userId: crew_id, userName: crew_name, userRole: 'crew', email: req.body.email || undefined }, String(req.headers['x-admin-user-id']||'admin')); } catch {}
       return res.status(201).json({ success: true, data: { ...r.rows[0] } });
     }
 
@@ -1255,16 +1261,47 @@ router.delete('/managers/:id', async (req, res) => {
     if (existing.rowCount === 0) return res.status(404).json({ error: 'Not found' });
     const managerName = existing.rows[0].manager_name;
     
-    // Soft delete (archive) instead of hard delete
-    const r = await pool.query('UPDATE managers SET archived_at = NOW() WHERE manager_id = $1 RETURNING manager_id', [id]);
-    if (r.rowCount === 0) return res.status(404).json({ error: 'Not found' });
-    
-    // Log the deletion activity
-    try { 
-      await logActivity('user_deleted', `Manager ${id} (${managerName}) archived`, String(req.headers['x-admin-user-id']||'admin'), 'admin', id, 'manager', { name: managerName }); 
-    } catch {}
-    
-    return res.json({ success: true, data: { manager_id: id }, message: `Manager ${id} archived` });
+    await pool.query('BEGIN');
+    try {
+      // Find affected contractors BEFORE deletion
+      const affectedContractors = await pool.query(
+        'SELECT contractor_id, company_name FROM contractors WHERE cks_manager = $1',
+        [id]
+      );
+      
+      // Unassign contractors
+      await pool.query('UPDATE contractors SET cks_manager = NULL WHERE cks_manager = $1', [id]);
+      
+      // Soft delete (archive) the manager (use archived_at; no boolean column required)
+      const r = await pool.query('UPDATE managers SET archived_at = NOW() WHERE manager_id = $1 RETURNING manager_id', [id]);
+      if (r.rowCount === 0) {
+        await pool.query('ROLLBACK');
+        return res.status(404).json({ error: 'Not found' });
+      }
+      
+      await pool.query('COMMIT');
+      
+      // Log the deletion activity
+      try { 
+        await logActivity('manager_deleted', `Manager ${id} (${managerName}) archived`, 'freedom_exe', 'admin', id, 'manager', { name: managerName }); 
+      } catch (error) {
+        console.error('Failed to log manager deletion:', error);
+      }
+      
+      // Log contractor unassignments
+      for (const contractor of affectedContractors.rows) {
+        try {
+          await logActivity('contractor_unassigned', `Contractor ${contractor.contractor_id} unassigned due to Manager ${id} deletion`, 'freedom_exe', 'admin', contractor.contractor_id, 'contractor', { manager_id: id, manager_name: managerName });
+        } catch (error) {
+          console.error('Failed to log contractor unassignment:', error);
+        }
+      }
+      
+      return res.json({ success: true, data: { manager_id: id }, message: `Manager ${id} archived` });
+    } catch (transactionError) {
+      await pool.query('ROLLBACK');
+      throw transactionError;
+    }
   } catch (e: any) {
     if (e?.code === '23503') return res.status(409).json({ error: 'in_use' });
     logger.error({ error: e }, 'Admin delete manager error');
@@ -1368,8 +1405,10 @@ router.post('/contractors/:id/assign-manager', async (req: Request, res: Respons
     if (r.rowCount === 0) return res.status(404).json({ error: 'contractor_not_found' });
     // Log activity
     try {
-      await logActivity('contractor_assigned_to_manager', `Contractor ${contractorId} assigned to manager ${managerId}`, String(req.headers['x-admin-user-id'] || 'admin'), 'admin', contractorId, 'contractor', { manager_id: managerId });
-    } catch {}
+      await logActivity('contractor_assigned', `Contractor ${contractorId} assigned to Manager ${managerId}`, 'freedom_exe', 'admin', contractorId, 'contractor', { manager_id: managerId });
+    } catch (error) {
+      console.error('Failed to log contractor assignment:', error);
+    }
     return res.json({ success: true, data: r.rows[0] });
   } catch (e: any) {
     logger.error({ error: e, contractorId, managerId }, 'Assign contractor->manager failed');
@@ -1532,29 +1571,47 @@ router.delete('/contractors/:id', async (req, res) => {
       return res.status(400).json({ error: 'Contractor ID is required' });
     }
     
-    // Check if contractor exists
-    const existsCheck = await pool.query('SELECT contractor_id FROM contractors WHERE contractor_id = $1', [id]);
-    if (existsCheck.rows.length === 0) {
-      return res.status(404).json({ error: 'Contractor not found' });
-    }
+    // Get contractor info before archiving
+    const existing = await pool.query('SELECT contractor_id, company_name FROM contractors WHERE contractor_id = $1', [id]);
+    if (existing.rowCount === 0) return res.status(404).json({ error: 'Contractor not found' });
+    const contractorName = existing.rows[0].company_name;
     
     await pool.query('BEGIN');
     try {
+      // Proactively unlink references that may block deletion/archiving
+      try { await pool.query('UPDATE customers SET contractor_id=NULL WHERE contractor_id=$1', [id]); } catch {}
+      try { await pool.query('UPDATE centers SET contractor_id=NULL WHERE contractor_id=$1', [id]); } catch {}
+      try { await pool.query('DELETE FROM contractor_services WHERE contractor_id=$1', [id]); } catch {}
+
       if (await hasColumn('contractors', 'archived_at')) {
-        await pool.query('UPDATE contractors SET archived_at=NOW() WHERE contractor_id=$1', [id]);
-        await pool.query('UPDATE customers SET contractor_id=NULL WHERE contractor_id=$1', [id]);
-        await pool.query('UPDATE centers SET contractor_id=NULL WHERE contractor_id=$1', [id]);
+        // Soft delete (archive) the contractor and clear manager link
+        await pool.query('UPDATE contractors SET archived_at=NOW(), cks_manager=NULL WHERE contractor_id=$1', [id]);
       } else {
+        // Hard delete as a fallback when archive column is absent
         await pool.query('DELETE FROM contractors WHERE contractor_id = $1', [id]);
       }
+      
+      // Remove from authentication system
       try { await pool.query('DELETE FROM app_users WHERE code = $1', [id]); } catch {}
+      
       await pool.query('COMMIT');
+      
+      // Log the deletion activity
+      try { 
+        await logActivity('user_deleted', `Contractor ${id} (${contractorName}) archived`, String(req.headers['x-admin-user-id']||'admin'), 'admin', id, 'contractor', { name: contractorName }); 
+      } catch {}
+      
       return res.json({ success: true, message: `Contractor ${id} archived and unassigned` });
     } catch (deleteError) {
       await pool.query('ROLLBACK');
       throw deleteError;
     }
   } catch (e: any) {
+    const code = e?.code;
+    if (code === '23503') {
+      // Foreign key violation – report a clearer message
+      return res.status(409).json({ error: 'in_use', message: 'Contractor is referenced by other records. Try again after unlinking related entities.' });
+    }
     logger.error({ error: e, contractor_id: req.params.id }, 'Admin contractor delete error');
     res.status(500).json({ error: 'Failed to delete contractor' });
   }
@@ -1728,8 +1785,10 @@ router.patch('/contractors/:id/assign-manager', async (req, res) => {
     
     // Log activity
     try {
-      await logActivity('contractor_assigned_to_manager', `Contractor ${id} assigned to manager ${manager_id}`, String(req.headers['x-admin-user-id'] || 'admin'), 'admin', id, 'contractor', { manager_id });
-    } catch {}
+      await logActivity('contractor_assigned', `Contractor ${id} assigned to Manager ${manager_id}`, 'freedom_exe', 'admin', id, 'contractor', { manager_id });
+    } catch (error) {
+      console.error('Failed to log contractor assignment:', error);
+    }
 
     res.json({ 
       success: true, 
@@ -2008,6 +2067,30 @@ router.delete('/archive/:type/:id/hard-delete', async (req, res) => {
   } catch (error) {
     console.error('Hard delete error:', error);
     return res.status(500).json({ error: 'Failed to hard delete entity' });
+  }
+});
+
+// GET /api/admin/debug-info - Debug endpoint for testing activity logging
+router.get('/debug-info', async (req: Request, res: Response) => {
+  try {
+    const [activities, contractors, managers] = await Promise.all([
+      pool.query('SELECT * FROM system_activity ORDER BY created_at DESC LIMIT 10'),
+      pool.query('SELECT contractor_id, cks_manager, archived FROM contractors LIMIT 10'),
+      pool.query('SELECT manager_id, archived FROM managers LIMIT 10')
+    ]);
+    
+    res.json({
+      success: true,
+      data: {
+        recentActivities: activities.rows,
+        contractors: contractors.rows,
+        managers: managers.rows,
+        timestamp: new Date().toISOString()
+      }
+    });
+  } catch (error) {
+    console.error('Debug endpoint error:', error);
+    res.status(500).json({ error: 'Debug failed' });
   }
 });
 

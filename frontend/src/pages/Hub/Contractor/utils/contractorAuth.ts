@@ -31,6 +31,12 @@ export interface ContractorSession {
 export function validateContractorRole(user: User | null | undefined): boolean {
   if (!user) return false;
   
+  // Check for template contractor users (con-XXX format) - same logic as HubRoleRouter
+  const username = user.username || '';
+  if (/^con-\d{3}$/i.test(username)) {
+    return true;
+  }
+  
   const role = getContractorRole(user);
   return role === 'contractor';
 }

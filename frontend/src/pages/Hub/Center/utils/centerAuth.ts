@@ -31,9 +31,9 @@ export interface CenterSession {
 export function validateCenterRole(user: User | null | undefined): boolean {
   if (!user) return false;
   
-  // Allow template users (xxx-000 format)
+  // Check for template center users (cen-XXX or ctr-XXX format) - same logic as HubRoleRouter
   const username = user.username || '';
-  if (username === 'cen-000' || /^[a-z]{3}-000$/i.test(username)) {
+  if (/^(cen|ctr)-\d{3}$/i.test(username)) {
     return true;
   }
   

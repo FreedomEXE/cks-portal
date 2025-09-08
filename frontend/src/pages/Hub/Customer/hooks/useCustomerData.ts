@@ -31,7 +31,7 @@ type CustomerState = {
 };
 
 export function useCustomerData() {
-  const { user } = useUser();
+  const { user, isLoaded } = useUser();
   const [state, setState] = useState<CustomerState>({ loading: true, error: null, kind: "customer", data: null });
   const didInitialFetchRef = useRef(false);
 
@@ -39,9 +39,32 @@ export function useCustomerData() {
     try {
       setState((s) => ({ ...s, loading: true, error: null }));
       
-      // Check for URL param overrides (dev/testing)
+      // Check for URL param overrides and template path first (bypass Clerk for templates)
       const params = new URLSearchParams(window.location.search);
       const codeOverride = params.get('code') || undefined;
+      const pathUser = (window.location.pathname.split('/')[1] || '').trim();
+      const isTemplatePath = /^cus-000$/i.test(pathUser);
+
+      if (codeOverride) {
+        const data = makeCustomerDemoData(codeOverride);
+        setState({ loading: false, error: null, kind: 'customer', data, _source: 'override' });
+        console.debug('[useCustomerData]', { source: 'override', data });
+        return;
+      }
+      if (isTemplatePath) {
+        const data = makeCustomerDemoData('CUS-000');
+        setState({ loading: false, error: null, kind: 'customer', data, _source: 'template-path' });
+        console.debug('[useCustomerData]', { source: 'template-path', data });
+        return;
+      }
+
+      // CRITICAL: Wait for Clerk to load before any auth checks (non-template)
+      if (!isLoaded) {
+        console.debug('[useCustomerData] Clerk not loaded yet, waiting...');
+        setState({ loading: true, error: null, kind: "customer", data: null });
+        return;
+      }
+      console.debug('[useCustomerData] Clerk loaded, proceeding with auth checks');
       
       // Check localStorage fallbacks (only in dev/offline)
       const lastCode = user?.id ? undefined : (safeGet('customer:lastCode') || undefined);
@@ -54,12 +77,29 @@ export function useCustomerData() {
         return;
       }
 
-      // Template users: use demo data directly (skip validation)
+      // Template users or path-based template access: use demo data directly (skip validation)
       const username = user?.username || '';
       if (username.includes('-000') || username === 'cus-000' || username === 'CUS-000') {
         const data = makeCustomerDemoData(username || 'CUS-000');
         setState({ loading: false, error: null, kind: 'customer', data, _source: 'template-user' });
         console.debug('[useCustomerData]', { source: 'template-user', username, data });
+        return;
+      }
+
+      // Admin viewer mode: allow admins to view any customer by path code
+      const isAdminUser = (() => {
+        try {
+          const meta: any = (user as any)?.publicMetadata || {};
+          const role = (meta.role || meta.hub_role || '').toString().toLowerCase();
+          const uname = (user as any)?.username || '';
+          return role === 'admin' || uname === 'freedom_exe' || uname === 'admin';
+        } catch { return false; }
+      })();
+      const pathCode = (/^cus-\d+$/i.test(pathUser) ? pathUser.toUpperCase() : undefined);
+      if (isAdminUser && pathCode) {
+        // Backend profile returns stub; set demo with code to avoid hangs
+        const data = makeCustomerDemoData(pathCode);
+        setState({ loading: false, error: null, kind: 'customer', data, _source: 'admin-view' });
         return;
       }
 
@@ -159,13 +199,16 @@ export function useCustomerData() {
       
       setState({ loading: false, error: msg, kind: "", data: null, _source: 'error' });
     }
-  }, [user]);
+  }, [user, isLoaded]);
 
   useEffect(() => {
-    if (didInitialFetchRef.current) return; // Prevent double fetch in StrictMode
-    didInitialFetchRef.current = true;
-    fetchCustomerData();
-  }, [fetchCustomerData]);
+    if (!didInitialFetchRef.current) {
+      didInitialFetchRef.current = true;
+      fetchCustomerData();
+      return;
+    }
+    if (isLoaded) fetchCustomerData();
+  }, [isLoaded, fetchCustomerData]);
 
   const refetch = useCallback(() => {
     didInitialFetchRef.current = false;

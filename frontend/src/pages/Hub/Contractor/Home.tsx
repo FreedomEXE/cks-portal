@@ -73,6 +73,9 @@ export default function ContractorHome() {
   const [repDetail, setRepDetail] = useState<any>(null);
   const [fbDetailOpen, setFbDetailOpen] = useState(false);
   const [fbDetail, setFbDetail] = useState<any>(null);
+  // Activity feed
+  const [activityLoading, setActivityLoading] = useState(false);
+  const [activities, setActivities] = useState<any[]>([]);
   // Manager profile data for Account Manager tab
   const [managerProfile, setManagerProfile] = useState<any | null>(null);
   const [managerLoading, setManagerLoading] = useState(false);
@@ -185,6 +188,26 @@ export default function ContractorHome() {
     })();
     return () => { cancelled = true; };
   }, [activeSection, reqBucket]);
+
+  // Fetch recent activity when on dashboard
+  useEffect(() => {
+    if (activeSection !== 'dashboard') return;
+    let cancelled = false;
+    (async () => {
+      try {
+        setActivityLoading(true);
+        const baseApi = (import.meta.env.VITE_API_URL?.replace(/\/$/, '') || '/api');
+        const r = await fetch(`${baseApi}/contractor/activity?code=${encodeURIComponent(code)}`, { credentials: 'include' });
+        const j = await r.json().catch(()=>({}));
+        if (!cancelled && Array.isArray(j?.data)) setActivities(j.data);
+      } catch {
+        if (!cancelled) setActivities([]);
+      } finally {
+        if (!cancelled) setActivityLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [activeSection, code]);
 
   // Fetch reports/feedback when in Reports section
   useEffect(() => {
@@ -433,14 +456,29 @@ export default function ContractorHome() {
               ))}
             </div>
 
-            {/* Recent Customers */}
+            {/* Recent Activity */}
             <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>Recent Activity</h3>
             <div className="ui-card" style={{ padding: 16 }}>
-              <div style={{ textAlign: 'center', padding: 32, color: '#6b7280', background: '#f9fafb', borderRadius: 8 }}>
-                <div style={{ fontSize: 48, marginBottom: 8 }}>📋</div>
-                <div style={{ fontSize: 14, fontWeight: 500 }}>No recent activity</div>
-                <div style={{ fontSize: 12, marginTop: 4 }}>Business activity will appear here as it occurs</div>
-              </div>
+              {activityLoading ? (
+                <div style={{ textAlign: 'center', padding: 24, color: '#6b7280' }}>Loading activity...</div>
+              ) : activities.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: 32, color: '#6b7280', background: '#f9fafb', borderRadius: 8 }}>
+                  <div style={{ fontSize: 48, marginBottom: 8 }}>📋</div>
+                  <div style={{ fontSize: 14, fontWeight: 500 }}>No recent activity</div>
+                  <div style={{ fontSize: 12, marginTop: 4 }}>Business activity will appear here as it occurs</div>
+                </div>
+              ) : (
+                <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+                  {activities.slice(0, 8).map((a:any) => (
+                    <li key={a.activity_id || `${a.description}-${a.created_at}`}
+                        style={{ padding: '8px 0', borderBottom: '1px solid #e5e7eb', fontSize: 13 }}>
+                      <div style={{ fontWeight: 600 }}>{(a.activity_type || 'activity').toString().replace(/_/g,' ')}</div>
+                      <div style={{ opacity: 0.8 }}>{a.description}</div>
+                      <div style={{ fontSize: 11, color: '#6b7280' }}>{a.created_at ? new Date(a.created_at).toLocaleString() : ''}</div>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
 
             {/* Communication Hub */}

@@ -683,23 +683,21 @@ export default function CustomerHome() {
                     <div>
                       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                         <tbody>
-                          {[
-                            ['Manager Name', 'Not Assigned'],
-                            ['Title', 'Not Set'],
-                            ['Department', 'Not Set'],
-                            ['Email', 'Not Set'],
-                            ['Phone', 'Not Set'],
-                            ['Direct Line', 'Not Set'],
-                            ['Office Location', 'Not Set'],
-                            ['Assigned Since', 'Not Set'],
-                            ['Specialty', 'Not Set'],
-                            ['Response Time', 'Not Set']
-                          ].map(([label, value]) => (
-                            <tr key={label}>
-                              <td style={{ padding: '8px 0', fontWeight: 600, width: '35%' }}>{label}</td>
-                              <td style={{ padding: '8px 0' }}>{value}</td>
-                            </tr>
-                          ))}
+                          {(() => {
+                            const m = (state.data as any)?.manager || {};
+                            const rows: Array<[string, any]> = [
+                              ['Manager Name', m.manager_name || 'Not Assigned'],
+                              ['Manager ID', m.manager_id || (state.data?.cks_manager || 'Not Assigned')],
+                              ['Email', m.email || 'Not Assigned'],
+                              ['Phone', m.phone || 'Not Assigned']
+                            ];
+                            return rows.map(([label, value]) => (
+                              <tr key={label}>
+                                <td style={{ padding: '8px 0', fontWeight: 600, width: '35%' }}>{label}</td>
+                                <td style={{ padding: '8px 0' }}>{String(value)}</td>
+                              </tr>
+                            ));
+                          })()}
                         </tbody>
                       </table>
                     </div>

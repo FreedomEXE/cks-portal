@@ -26,18 +26,19 @@ export default function ManagerHub() {
     <Routes>
       {/* All Manager functionality in single Home component */}
       <Route path="/" element={<ManagerHome />} />
-      <Route path="/profile" element={<ManagerHome />} />
-      <Route path="/dashboard" element={<ManagerHome />} />
-      <Route path="/reports" element={<ManagerHome />} />
-      <Route path="/news" element={<ManagerHome />} />
+      <Route path="profile" element={<ManagerHome />} />
+      <Route path="dashboard" element={<ManagerHome />} />
+      <Route path="reports" element={<ManagerHome />} />
+      <Route path="news" element={<ManagerHome />} />
+      
       
       {/* Legacy routes redirect to home */}
-      <Route path="/contractors" element={<ManagerHome />} />
-      <Route path="/centers" element={<ManagerHome />} />
-      <Route path="/crew" element={<ManagerHome />} />
-      <Route path="/services" element={<ManagerHome />} />
-      <Route path="/documents" element={<ManagerHome />} />
-      <Route path="/support" element={<ManagerHome />} />
+      <Route path="contractors" element={<ManagerHome />} />
+      <Route path="centers" element={<ManagerHome />} />
+      <Route path="crew" element={<ManagerHome />} />
+      <Route path="services" element={<ManagerHome />} />
+      <Route path="documents" element={<ManagerHome />} />
+      <Route path="support" element={<ManagerHome />} />
       
       {/* Catch any unknown routes and redirect to home */}
       <Route path="/*" element={<Navigate to="/" replace />} />

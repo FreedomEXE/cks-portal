@@ -43,20 +43,6 @@ function AdminSupportSection() {
   async function loadSupportData() {
     try {
       setLoading(true);
-      // Capture created ID for optional Clerk invite
-      try {
-        let createdId = '';
-        if (createRole === 'manager') createdId = js?.data?.manager_id || '';
-        else if (createRole === 'contractor') createdId = js?.data?.contractor_id || '';
-        else if (createRole === 'customer') createdId = js?.data?.customer_id || '';
-        else if (createRole === 'center') createdId = js?.data?.center_id || '';
-        else if (createRole === 'crew') createdId = js?.data?.crew_id || '';
-        else if (createRole === 'warehouse') createdId = js?.data?.warehouse_id || '';
-        if (createdId) {
-          setLastCreated({ role: createRole, id: createdId, email: (createPayload as any)?.email });
-        }
-      } catch {}
-
       
       // Build query params
       const params = new URLSearchParams();
@@ -2802,7 +2788,7 @@ type AdminSection = 'dashboard' | 'directory' | 'create' | 'assign' | 'support' 
 type DirectoryTab = 'management' | 'contractors' | 'customers' | 'centers' | 'crew' | 'services' | 'products_supplies' | 'training_procedures' | 'warehouses' | 'orders' | 'reports_feedback';
 
 export default function AdminHome() {
-  const { user } = useUser();
+  const { user, isLoaded, isSignedIn } = useUser();
   const location = useLocation();
   const [activeSection, setActiveSection] = useState<AdminSection>('dashboard');
   const [activeDirectoryTab, setActiveDirectoryTab] = useState<DirectoryTab>('contractors');
@@ -2883,38 +2869,35 @@ export default function AdminHome() {
     }
   }
 
-  // Validate admin access
-  if (!user || !validateAdminRole(user)) {
-    return (
-      <div style={{ 
-        minHeight: '100vh', 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'center', 
-        background: '#000000',
-        color: '#ffffff' 
-      }}>
-        <div style={{ textAlign: 'center', padding: 32 }}>
-          <div style={{ fontSize: 48, marginBottom: 16 }}>🔒</div>
-          <div style={{ fontSize: 20, fontWeight: 600, marginBottom: 8 }}>Access Denied</div>
-          <div style={{ fontSize: 14, opacity: 0.8 }}>Admin privileges required</div>
-        </div>
-      </div>
-    );
-  }
+  // Allow template admin access via path (e.g., /adm-000/hub) even without auth
+  const pathUser = (typeof window !== 'undefined' ? (window.location.pathname.split('/')[1] || '').trim() : '').toLowerCase();
+  const isTemplateAdminPath = /^adm-000$/.test(pathUser);
+
+  // Auth/view gating flags (do not early-return; keep hook order stable)
+  const showLoadingGate = !isTemplateAdminPath && !isLoaded;
+  const showSigninGate = !isTemplateAdminPath && isLoaded && !isSignedIn;
+  const showDeniedGate = !isTemplateAdminPath && isLoaded && isSignedIn && (!user || !validateAdminRole(user));
 
   // Get admin info
   const adminInfo = getAdminOperationalInfo(user);
   const adminSession = getAdminSession();
-  const adminCode = adminSession.code || adminInfo.adminId || 'admin-000';
-  const adminName = adminInfo.adminName || user.fullName || 'System Administrator';
+  const rawUsername = (user?.username || '').trim();
+  // Prefer actual username for display code; fall back to session or metadata
+  const adminCode = rawUsername || adminSession.code || adminInfo.adminId || 'admin';
+  // Prefer first name from full name; otherwise derive from username
+  const fullName = (user?.fullName || '').trim();
+  const derivedFromUsername = (rawUsername ? rawUsername.split(/[_.-]/)[0] : 'Admin');
+  const properCase = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
+  const friendlyFirst = fullName ? fullName.split(/\s+/)[0] : properCase(derivedFromUsername);
+  // Prefer first name for greeting/UI, fallback to stored admin name
+  const adminName = friendlyFirst || adminInfo.adminName || 'System Administrator';
 
   // Set admin session
   useEffect(() => {
-    if (adminCode && adminName && adminInfo.adminId) {
-      setAdminSession(adminCode, adminName, adminInfo.adminId);
+    if (adminCode && adminName) {
+      setAdminSession(adminCode, adminName, adminInfo.adminId || rawUsername || 'admin');
     }
-  }, [adminCode, adminName, adminInfo.adminId]);
+  }, [adminCode, adminName, adminInfo.adminId, rawUsername]);
 
   // Navigation sections
   const sections = [
@@ -3066,33 +3049,10 @@ export default function AdminHome() {
         return; 
       }
       
-      // Log system activity
-      try {
-        const activityType = createRole === 'warehouse' ? 'warehouse_created' : 'user_created';
-        const targetType = createRole === 'warehouse' ? 'warehouse' : 'user';
-        const targetName = createRole === 'warehouse' 
-          ? createPayload.warehouse_name 
-          : (createPayload.name || createPayload.manager_name || createPayload.company_name || createPayload.center_name || createPayload.crew_name || createPayload.email);
-          
-        await adminApiFetch('/api/activity', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            activity_type: activityType,
-            actor_id: user?.id || 'admin',
-            actor_role: 'admin',
-            target_id: js?.data?.id || targetName,
-            target_type: targetType,
-            description: `New ${createRole} ${createRole === 'warehouse' ? 'created' : 'user created'}: ${targetName || 'unknown'}`,
-            metadata: { role: createRole, ...createPayload }
-          })
-        });
-        // Refresh activities and metrics to show the new data
-        loadRecentActivities();
-        loadMetrics();
-      } catch (activityError) {
-        console.error('Failed to log creation activity:', activityError);
-      }
+      // Activity is logged server-side with a single consolidated entry
+      // Refresh dashboard to show it
+      loadRecentActivities();
+      loadMetrics();
       
       setCreateMsg('Created successfully');
       // Reset search to avoid filtering out the new record
@@ -4802,6 +4762,28 @@ export default function AdminHome() {
       background: '#000000',
       color: '#ffffff' 
     }}>
+      {/* Gates */}
+      {(showLoadingGate || showSigninGate || showDeniedGate) ? (
+        <div style={{ 
+          minHeight: '100vh', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center' 
+        }}>
+          <div style={{ textAlign: 'center', padding: 32 }}>
+            <div style={{ fontSize: 48, marginBottom: 16 }}>
+              {showLoadingGate ? '⏳' : '🔒'}
+            </div>
+            <div style={{ fontSize: 20, fontWeight: 600, marginBottom: 8 }}>
+              {showLoadingGate ? 'Loading Admin Hub...' : showSigninGate ? 'Please Sign In' : 'Access Denied'}
+            </div>
+            {!showLoadingGate && !showSigninGate && showDeniedGate && (
+              <div style={{ fontSize: 14, opacity: 0.8 }}>Admin privileges required</div>
+            )}
+          </div>
+        </div>
+      ) : (
+        <>
       {/* Header */}
       <div style={{
         background: '#111111',
@@ -4885,6 +4867,8 @@ export default function AdminHome() {
       <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 24px' }}>
         {renderSectionContent()}
       </div>
+        </>
+      )}
     </div>
   );
 }

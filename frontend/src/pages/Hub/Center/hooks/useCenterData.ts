@@ -31,17 +31,39 @@ type CenterState = {
 };
 
 export function useCenterData() {
-  const { user } = useUser();
+  const { user, isLoaded } = useUser();
   const [state, setState] = useState<CenterState>({ loading: true, error: null, kind: "center", data: null });
   const didInitialFetchRef = useRef(false);
 
   const fetchCenterData = useCallback(async () => {
     try {
       setState((s) => ({ ...s, loading: true, error: null }));
-      
-      // Check for URL param overrides (dev/testing)
+      // Check for URL overrides and template path first (bypass Clerk for templates)
       const params = new URLSearchParams(window.location.search);
       const codeOverride = params.get('code') || undefined;
+      const pathUser = (window.location.pathname.split('/')[1] || '').trim();
+      const isTemplatePath = /^cen-000$/i.test(pathUser) || /^ctr-000$/i.test(pathUser);
+
+      if (codeOverride) {
+        const data = makeCenterDemoData(codeOverride);
+        setState({ loading: false, error: null, kind: 'center', data, _source: 'override' });
+        console.debug('[useCenterData]', { source: 'override', data });
+        return;
+      }
+      if (isTemplatePath) {
+        const data = makeCenterDemoData('CEN-000');
+        setState({ loading: false, error: null, kind: 'center', data, _source: 'template-path' });
+        console.debug('[useCenterData]', { source: 'template-path', data });
+        return;
+      }
+
+      // CRITICAL: Wait for Clerk to load before any auth checks (non-template)
+      if (!isLoaded) {
+        console.debug('[useCenterData] Clerk not loaded yet, waiting...');
+        setState({ loading: true, error: null, kind: "center", data: null });
+        return;
+      }
+      console.debug('[useCenterData] Clerk loaded, proceeding with auth checks');
       
       // Check localStorage fallbacks (only in dev/offline)
       const lastCode = user?.id ? undefined : (safeGet('center:lastCode') || undefined);
@@ -60,6 +82,22 @@ export function useCenterData() {
         const data = makeCenterDemoData(username || 'cen-000');
         setState({ loading: false, error: null, kind: 'center', data, _source: 'template-user' });
         console.debug('[useCenterData]', { source: 'template-user', username, data });
+        return;
+      }
+
+      // Admin viewer mode: allow admins to view any center by path code
+      const isAdminUser = (() => {
+        try {
+          const meta: any = (user as any)?.publicMetadata || {};
+          const role = (meta.role || meta.hub_role || '').toString().toLowerCase();
+          const uname = (user as any)?.username || '';
+          return role === 'admin' || uname === 'freedom_exe' || uname === 'admin';
+        } catch { return false; }
+      })();
+      const pathCodeCenter = (/^cen-\d+$/i.test(pathUser) || /^ctr-\d+$/i.test(pathUser)) ? pathUser.toUpperCase().replace(/^CTR-/i,'CEN-') : undefined;
+      if (isAdminUser && pathCodeCenter) {
+        const data = makeCenterDemoData(pathCodeCenter);
+        setState({ loading: false, error: null, kind: 'center', data, _source: 'admin-view' });
         return;
       }
 
@@ -153,13 +191,16 @@ export function useCenterData() {
       
       setState({ loading: false, error: msg, kind: "", data: null, _source: 'error' });
     }
-  }, [user]);
+  }, [user, isLoaded]);
 
   useEffect(() => {
-    if (didInitialFetchRef.current) return; // Prevent double fetch in StrictMode
-    didInitialFetchRef.current = true;
-    fetchCenterData();
-  }, [fetchCenterData]);
+    if (!didInitialFetchRef.current) {
+      didInitialFetchRef.current = true;
+      fetchCenterData();
+      return;
+    }
+    if (isLoaded) fetchCenterData();
+  }, [isLoaded, fetchCenterData]);
 
   const refetch = useCallback(() => {
     didInitialFetchRef.current = false;

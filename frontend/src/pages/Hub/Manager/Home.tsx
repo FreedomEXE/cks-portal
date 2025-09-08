@@ -81,6 +81,9 @@ export default function ManagerHome() {
   const [expandedCustomers, setExpandedCustomers] = useState<Set<string>>(new Set());
   // Assignment type selection state
   const [assignmentType, setAssignmentType] = useState<'training' | 'services' | 'crew'>('training');
+  // Dashboard metrics state
+  const [dashboardMetrics, setDashboardMetrics] = useState<{ contractors: number; customers: number; centers: number; crew: number }>({ contractors: 0, customers: 0, centers: 0, crew: 0 });
+  const [dashboardLoading, setDashboardLoading] = useState(false);
   // (Support section removed per template parity request)
   
   // Get manager code and name from profile data
@@ -120,6 +123,36 @@ export default function ManagerHome() {
         }
       } finally {
         if (!cancelled) setNewsLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [code]);
+
+  // Fetch dashboard metrics
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        setDashboardLoading(true);
+        const url = buildManagerApiUrl('/dashboard', { code });
+        const r = await managerApiFetch(url);
+        if (!r.ok) throw new Error(String(r.status));
+        const j = await r.json();
+        if (!cancelled && j?.success) {
+          setDashboardMetrics({
+            contractors: j.data?.contractors || 0,
+            customers: j.data?.customers || 0,
+            centers: j.data?.centers || 0,
+            crew: j.data?.crew || 0
+          });
+        }
+      } catch (err) {
+        console.error('Failed to load dashboard metrics:', err);
+        if (!cancelled) {
+          setDashboardMetrics({ contractors: 0, customers: 0, centers: 0, crew: 0 });
+        }
+      } finally {
+        if (!cancelled) setDashboardLoading(false);
       }
     })();
     return () => { cancelled = true; };
@@ -323,6 +356,24 @@ export default function ManagerHome() {
 
   const base = `/${username}/hub`;
 
+  // Impersonation helper
+  function jumpToId(id: string) {
+    const up = (id || '').toUpperCase();
+    let role = '';
+    if (up.startsWith('CON-')) role = 'contractor';
+    else if (up.startsWith('CUS-')) role = 'customer';
+    else if (up.startsWith('CEN-') || up.startsWith('CTR-')) role = 'center';
+    else if (up.startsWith('CRW-')) role = 'crew';
+    if (role) {
+      try {
+        sessionStorage.setItem('impersonate','true');
+        sessionStorage.setItem('me:lastRole', role);
+        sessionStorage.setItem('me:lastCode', up);
+      } catch {}
+      navigate(`/${up}/hub`);
+    }
+  }
+
   // Icon button style for navigation
   const iconBtnStyle = {
     width: 38,
@@ -461,10 +512,10 @@ export default function ManagerHome() {
             {/* Simple Entity Count Metrics */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', gap: 16, marginBottom: 24 }}>
               {[
-                { title: 'My Contractors', value: '0', subtitle: 'Total contractors managed', color: '#3b7af7' },
-                { title: 'My Customers', value: '0', subtitle: 'Total customers served', color: '#10b981' },
-                { title: 'My Centers', value: '0', subtitle: 'Service centers managed', color: '#8b5cf6' },
-                { title: 'My Crew', value: '0', subtitle: 'Total crew members', color: '#f59e0b' },
+                { title: 'My Contractors', value: dashboardLoading ? '—' : String(dashboardMetrics.contractors), subtitle: 'Total contractors managed', color: '#3b7af7' },
+                { title: 'My Customers', value: dashboardLoading ? '—' : String(dashboardMetrics.customers), subtitle: 'Total customers served', color: '#10b981' },
+                { title: 'My Centers', value: dashboardLoading ? '—' : String(dashboardMetrics.centers), subtitle: 'Service centers managed', color: '#8b5cf6' },
+                { title: 'My Crew', value: dashboardLoading ? '—' : String(dashboardMetrics.crew), subtitle: 'Total crew members', color: '#f59e0b' },
               ].map(metric => (
                 <div key={metric.title} className="ui-card" style={{ padding: 16, textAlign: 'center' }}>
                   <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>{metric.title}</div>
@@ -858,8 +909,16 @@ export default function ManagerHome() {
                               <td style={{ padding: 10, fontFamily: 'ui-monospace', color: '#2563eb', cursor: 'pointer' }} onClick={() => openOrderDetail(o.order_id)}>
                                 {o.order_id}
                               </td>
-                              <td style={{ padding: 10 }}>{o.customer_id || '—'}</td>
-                              <td style={{ padding: 10 }}>{o.center_id || '—'}</td>
+                              <td style={{ padding: 10 }}>
+                                {o.customer_id ? (
+                                  <a onClick={() => jumpToId(o.customer_id)} style={{ color:'#2563eb', cursor:'pointer', textDecoration:'underline' }}>{o.customer_id}</a>
+                                ) : '—'}
+                              </td>
+                              <td style={{ padding: 10 }}>
+                                {o.center_id ? (
+                                  <a onClick={() => jumpToId(o.center_id)} style={{ color:'#2563eb', cursor:'pointer', textDecoration:'underline' }}>{o.center_id}</a>
+                                ) : '—'}
+                              </td>
                               <td style={{ padding: 10 }}>{o.item_count ?? 0}</td>
                               <td style={{ padding: 10 }}>{o.service_count ?? 0}</td>
                               <td style={{ padding: 10 }}>{o.status}</td>
@@ -907,8 +966,12 @@ export default function ManagerHome() {
                       <div style={{ marginBottom: 12, fontSize: 13, color: '#374151' }}>
                         <div><b>Order ID:</b> {detail.order.order_id}</div>
                         <div><b>Status:</b> {detail.order.status}</div>
-                        <div><b>Customer:</b> {detail.order.customer_id || '—'}</div>
-                        <div><b>Center:</b> {detail.order.center_id || '—'}</div>
+                        <div><b>Customer:</b> {detail.order.customer_id ? (
+                          <a onClick={() => jumpToId(detail.order.customer_id)} style={{ color:'#2563eb', cursor:'pointer', textDecoration:'underline' }}>{detail.order.customer_id}</a>
+                        ) : '—'}</div>
+                        <div><b>Center:</b> {detail.order.center_id ? (
+                          <a onClick={() => jumpToId(detail.order.center_id)} style={{ color:'#2563eb', cursor:'pointer', textDecoration:'underline' }}>{detail.order.center_id}</a>
+                        ) : '—'}</div>
                         <div><b>Date:</b> {String(detail.order.order_date).slice(0,10)}</div>
                       </div>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -1495,8 +1558,15 @@ function ContractorsSection({ code }: { code: string }) {
               borderBottom: index < contractors.length - 1 ? '1px solid #e5e7eb' : 'none',
               backgroundColor: 'white'
             }}>
-              <td style={{ padding: 12, fontFamily: 'ui-monospace', color: '#2563eb', fontWeight: 600 }}>
-                {contractor.contractor_id}
+              <td style={{ padding: 12, fontFamily: 'ui-monospace', fontWeight: 600 }}>
+                <Link
+                  to={`/${contractor.contractor_id}/hub`}
+                  onClick={() => { try { sessionStorage.setItem('impersonate','true'); sessionStorage.setItem('me:lastRole','contractor'); sessionStorage.setItem('me:lastCode', contractor.contractor_id); } catch {} }}
+                  className="text-blue-600 hover:underline cursor-pointer font-medium"
+                  style={{ textDecoration: 'none', color: '#2563eb' }}
+                >
+                  {contractor.contractor_id}
+                </Link>
               </td>
               <td style={{ padding: 12, fontWeight: 500 }}>
                 {contractor.company_name || '—'}

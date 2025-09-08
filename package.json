@@ -11,7 +11,18 @@
     "dev:frontend": "cd frontend && npm run dev",
     "install:backend": "cd backend/server && npm install",
     "install:frontend": "cd frontend && npm install",
-    "install:all": "npm run install:backend && npm run install:frontend"
+    "install:all": "npm run install:backend && npm run install:frontend",
+    "dev:all": "node scripts/dev-all.js",
+    "start:backend": "node scripts/devctl.js start backend",
+    "start:frontend": "node scripts/devctl.js start frontend",
+    "start:all": "node scripts/devctl.js start all",
+    "stop:backend": "node scripts/devctl.js stop backend",
+    "stop:frontend": "node scripts/devctl.js stop frontend",
+    "stop:all": "node scripts/devctl.js stop all",
+    "restart:backend": "node scripts/devctl.js restart backend",
+    "restart:frontend": "node scripts/devctl.js restart frontend",
+    "restart:all": "node scripts/devctl.js restart all",
+    "status:dev": "node scripts/devctl.js status"
   },
   "repository": {
     "type": "git",

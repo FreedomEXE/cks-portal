@@ -254,7 +254,7 @@ router.get('/contractors', async (req: Request, res: Response) => {
       `SELECT 
         contractor_id,
         company_name,
-        main_contact,
+        COALESCE(contact_person, main_contact) AS main_contact,
         email,
         phone,
         address,
@@ -300,6 +300,7 @@ router.get('/activity', async (req: Request, res: Response) => {
       FROM system_activity 
       WHERE 
         (actor_id = $1 AND actor_role = 'manager') OR
+        (target_id = $1 AND target_type = 'manager') OR
         (activity_type IN ('contractor_assigned_to_manager', 'contractor_removed_from_manager') AND metadata->>'manager_id' = $1) OR
         (activity_type LIKE 'contractor_%' AND target_id IN (
           SELECT contractor_id FROM contractors WHERE UPPER(cks_manager) = UPPER($1)
@@ -319,6 +320,59 @@ router.get('/activity', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Manager activity endpoint error:', error);
     return res.status(500).json({ success: false, error: 'Failed to fetch activity', error_code: 'server_error' });
+  }
+});
+
+// GET /api/manager/contractor/:contractorId - Get specific contractor details
+router.get('/contractor/:contractorId', async (req: Request, res: Response) => {
+  try {
+    const { contractorId } = req.params;
+    const managerId = String(req.query.code || '').trim() || getUserId(req);
+    
+    if (!managerId) {
+      return res.status(400).json({ error: 'Manager ID required' });
+    }
+    
+    // Query contractor and ensure it belongs to this manager
+    const result = await pool.query(
+      `SELECT 
+        contractor_id,
+        company_name,
+        COALESCE(contact_person, main_contact) AS main_contact,
+        email,
+        phone,
+        address,
+        website,
+        cks_manager,
+        created_at
+      FROM contractors 
+      WHERE UPPER(contractor_id) = UPPER($1) AND UPPER(cks_manager) = UPPER($2)`,
+      [contractorId, managerId]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Contractor not found or not assigned to this manager' });
+    }
+    
+    const row = result.rows[0];
+    const contractor = {
+      contractor_id: row.contractor_id,
+      company_name: row.company_name,
+      email: row.email,
+      contact: row.phone || row.main_contact || null,
+      main_contact: row.main_contact || null,
+      phone: row.phone || null,
+      address: row.address || null,
+      website: row.website || null,
+      cks_manager: row.cks_manager || null,
+      created_at: row.created_at || null,
+      archived: false
+    };
+    return res.json({ success: true, data: contractor });
+    
+  } catch (error) {
+    console.error('Manager contractor profile error:', error);
+    return res.status(500).json({ error: 'Failed to fetch contractor profile' });
   }
 });
 

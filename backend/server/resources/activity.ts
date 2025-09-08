@@ -32,7 +32,7 @@ router.get('/', async (req: Request, res: Response) => {
     // Ensure table exists
     await ensureActivityTable();
     
-    let whereClause = 'WHERE 1=1';
+    let whereClause = "WHERE activity_type <> 'user_welcome'"; // hide welcome from admin feed by default
     const params: any[] = [];
     let paramIndex = 1;
     
@@ -175,6 +175,14 @@ async function ensureActivityTable() {
       )
     `);
     
+    // Drop any existing check constraints that might be too restrictive
+    await pool.query(`
+      ALTER TABLE system_activity 
+      DROP CONSTRAINT IF EXISTS system_activity_activity_type_check
+    `).catch(() => {
+      // Ignore if constraint doesn't exist
+    });
+    
     // Create indexes
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_system_activity_type ON system_activity(activity_type)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_system_activity_created_at ON system_activity(created_at)`);
@@ -195,23 +203,40 @@ export async function logActivity(
   target_type?: string,
   metadata?: any
 ) {
+  console.log('=== LOGGING ACTIVITY ===');
+  console.log({ 
+    activity_type, 
+    description, 
+    actor_id, 
+    actor_role, 
+    target_id, 
+    target_type, 
+    metadata 
+  });
+  
   try {
     // Ensure table exists
     await ensureActivityTable();
     
-    await pool.query(`
+    const result = await pool.query(`
       INSERT INTO system_activity (
-        activity_type, actor_id, actor_role, target_id, target_type, description, metadata
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-    `, [activity_type, actor_id, actor_role, target_id, target_type, description, metadata]);
+        activity_type, actor_id, actor_role, target_id, target_type, description, metadata, created_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+      RETURNING *
+    `, [activity_type, actor_id, actor_role, target_id, target_type, description, JSON.stringify(metadata)]);
     
+    console.log('✅ Activity logged successfully:', result.rows[0]);
     logger.info({ activity_type, target_id, actor_id }, 'Activity logged successfully');
+    return result.rows[0];
   } catch (error) {
+    console.error('❌ Failed to log activity:', error);
     logger.error({ error, activity_type, description, actor_id, target_id }, 'Failed to log activity');
     // Log detailed error info for debugging
     if (error instanceof Error) {
       logger.error(`Activity logging error details: ${error.message}`);
+      console.error(`Activity logging error details: ${error.message}`);
     }
+    throw error; // Re-throw to make errors visible
   }
 }
 
