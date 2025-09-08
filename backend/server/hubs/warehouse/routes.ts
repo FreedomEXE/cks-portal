@@ -318,6 +318,35 @@ router.get('/activity', async (req: Request, res: Response) => {
   }
 });
 
+// POST /api/warehouse/clear-activity - Clear activity for this warehouse
+router.post('/clear-activity', async (req: Request, res: Response) => {
+  try {
+    const raw = String(req.query.code || '').trim() || getUserId(req);
+    const warehouseId = raw.toUpperCase();
+    if (!warehouseId) return res.status(400).json({ success: false, error: 'code required' });
+
+    // Clear both system activity and warehouse activity log
+    await pool.query(
+      `DELETE FROM system_activity 
+       WHERE (UPPER(target_id) = $1 AND target_type = 'warehouse') OR (UPPER(actor_id) = $1 AND actor_role = 'warehouse')`,
+      [warehouseId]
+    );
+    
+    await pool.query(
+      `DELETE FROM warehouse_activity_log WHERE warehouse_id = $1`,
+      [warehouseId]
+    );
+    
+    return res.json({ 
+      success: true, 
+      message: `Activity cleared for warehouse ${warehouseId}`
+    });
+  } catch (error) {
+    console.error('Clear warehouse activity error:', error);
+    return res.status(500).json({ success: false, error: 'Failed to clear activity' });
+  }
+});
+
 // POST /api/warehouse/inventory/adjust
 router.post('/inventory/adjust', requirePermission('WAREHOUSE_ADJUST'), async (req: Request, res: Response) => {
   try {

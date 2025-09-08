@@ -196,8 +196,8 @@ export function useContractorData() {
     } catch (e: any) {
       const msg = e?.message || String(e);
       
-      // Network error fallback
-      if (/Failed to fetch|NetworkError|ECONNREFUSED/i.test(msg)) {
+      // Network/parse error fallback
+      if (/Failed to fetch|NetworkError|ECONNREFUSED|Unexpected end of JSON input/i.test(msg)) {
         const params = new URLSearchParams(window.location.search);
         const codeOverride = params.get('code') || undefined;
         const lastCode = safeGet('contractor:lastCode') || undefined;

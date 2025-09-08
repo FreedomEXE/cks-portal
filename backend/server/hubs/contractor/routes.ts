@@ -380,8 +380,9 @@ router.post('/requests/:id/deny', requirePermission('CONTRACTOR_APPROVE'), async
 // GET /api/contractor/activity - Get activity feed for this contractor
 router.get('/activity', async (req: Request, res: Response) => {
   try {
-    const code = String(req.query.code || '').trim() || getUserId(req);
-    if (!code) return res.status(400).json({ success: false, error: 'code required' });
+    const raw = String(req.query.code || '').trim() || getUserId(req);
+    const contractorId = raw.toUpperCase();
+    if (!contractorId) return res.status(400).json({ success: false, error: 'code required' });
 
     const activities = await pool.query(
       `SELECT 
@@ -396,25 +397,43 @@ router.get('/activity', async (req: Request, res: Response) => {
         created_at
       FROM system_activity 
       WHERE 
-        (target_id = $1 AND target_type = 'contractor') OR
-        (actor_id = $1 AND actor_role = 'contractor') OR
-        (activity_type LIKE 'customer_%' AND target_id IN (
-          SELECT customer_id FROM customers WHERE UPPER(contractor_id) = UPPER($1)
-        )) OR
-        (activity_type LIKE 'order_%' AND target_id IN (
-          SELECT order_id FROM orders WHERE customer_id IN (
-            SELECT customer_id FROM customers WHERE UPPER(contractor_id) = UPPER($1)
-          )
-        ))
+        (
+          (UPPER(target_id) = $1 AND target_type = 'contractor') OR
+          (UPPER(actor_id) = $1 AND actor_role = 'contractor')
+        ) AND
+        activity_type NOT IN ('user_deleted', 'user_updated', 'user_created', 'user_welcome')
       ORDER BY created_at DESC
       LIMIT 50`,
-      [code]
+      [contractorId]
     );
 
     return res.json({ success: true, data: activities.rows });
   } catch (error) {
     console.error('Contractor activity endpoint error:', error);
     return res.status(500).json({ success: false, error: 'Failed to fetch activity', error_code: 'server_error' });
+  }
+});
+
+// POST /api/contractor/clear-activity - Clear activity for this contractor
+router.post('/clear-activity', async (req: Request, res: Response) => {
+  try {
+    const raw = String(req.query.code || '').trim() || getUserId(req);
+    const contractorId = raw.toUpperCase();
+    if (!contractorId) return res.status(400).json({ success: false, error: 'code required' });
+
+    await pool.query(
+      `DELETE FROM system_activity 
+       WHERE (UPPER(target_id) = $1 AND target_type = 'contractor') OR (UPPER(actor_id) = $1 AND actor_role = 'contractor')`,
+      [contractorId]
+    );
+    
+    return res.json({ 
+      success: true, 
+      message: `Activity cleared for contractor ${contractorId}`
+    });
+  } catch (error) {
+    console.error('Clear contractor activity error:', error);
+    return res.status(500).json({ success: false, error: 'Failed to clear activity' });
   }
 });
 

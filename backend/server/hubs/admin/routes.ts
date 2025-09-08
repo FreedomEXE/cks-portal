@@ -605,7 +605,12 @@ router.post('/users', async (req: Request, res: Response) => {
         [manager_id, name, req.body.email || null, req.body.phone || null, req.body.territory || null]
       );
       await upsertAppUserByEmail(req.body.email, 'manager', manager_id, name);
-      try { await logActivity('user_created', `New Manager Created: ${manager_id} (${name}) — Welcome Message Sent`, String(req.headers['x-admin-user-id']||'admin'), 'admin', manager_id, 'manager', { email: req.body.email||null }); } catch {}
+      try {
+        const actor = String(req.headers['x-admin-user-id']||'admin');
+        await logActivity('user_created', `New Manager Created: ${manager_id} (${name}) — Welcome Message Sent`, actor, 'admin', manager_id, 'manager', { email: req.body.email||null });
+        // Explicit manager-targeted welcome entry for manager hub visibility
+        await logActivity('welcome_message', `Welcome to your CKS Portal account, ${name}! Your user ID is ${manager_id}.`, actor, 'admin', manager_id, 'manager', { is_welcome: true, show_tutorial: true, user_name: name });
+      } catch {}
       try { await sendWelcomeMessage({ userId: manager_id, userName: name, userRole: 'manager', email: req.body.email || undefined }, String(req.headers['x-admin-user-id']||'admin')); } catch {}
       return res.status(201).json({ success: true, data: { ...r.rows[0] } });
     }
@@ -648,7 +653,12 @@ router.post('/users', async (req: Request, res: Response) => {
       // If status column doesn't exist, synthesize active status for response consistency
       const data = hasStatusCol ? r.rows[0] : { ...r.rows[0], status: 'active' };
       await upsertAppUserByEmail(req.body.email, 'contractor', contractor_id, company);
-      try { await logActivity('user_created', `New Contractor Created: ${contractor_id} (${company}) — Welcome Message Sent`, String(req.headers['x-admin-user-id']||'admin'), 'admin', contractor_id, 'contractor', { email: req.body.email||null }); } catch {}
+      try {
+        const actor = String(req.headers['x-admin-user-id']||'admin');
+        await logActivity('user_created', `New Contractor Created: ${contractor_id} (${company}) — Welcome Message Sent`, actor, 'admin', contractor_id, 'contractor', { email: req.body.email||null });
+        // Explicit contractor-targeted welcome entry for contractor hub visibility
+        await logActivity('welcome_message', `Welcome to your CKS Portal account, ${company}! Your user ID is ${contractor_id}.`, actor, 'admin', contractor_id, 'contractor', { is_welcome: true, show_tutorial: true, user_name: company });
+      } catch {}
       try { await sendWelcomeMessage({ userId: contractor_id, userName: company, userRole: 'contractor', email: req.body.email || undefined }, String(req.headers['x-admin-user-id']||'admin')); } catch {}
       return res.status(201).json({ success: true, data });
     }
@@ -674,7 +684,12 @@ router.post('/users', async (req: Request, res: Response) => {
         ]
       );
       await upsertAppUserByEmail(req.body.email, 'customer', customer_id, company);
-      try { await logActivity('user_created', `New Customer Created: ${customer_id} (${company}) — Welcome Message Sent`, String(req.headers['x-admin-user-id']||'admin'), 'admin', customer_id, 'customer', { email: req.body.email||null }); } catch {}
+      try {
+        const actor = String(req.headers['x-admin-user-id']||'admin');
+        await logActivity('user_created', `New Customer Created: ${customer_id} (${company}) — Welcome Message Sent`, actor, 'admin', customer_id, 'customer', { email: req.body.email||null });
+        // Explicit customer-targeted welcome entry for customer hub visibility
+        await logActivity('welcome_message', `Welcome to your CKS Portal account, ${company}! Your user ID is ${customer_id}.`, actor, 'admin', customer_id, 'customer', { is_welcome: true, show_tutorial: true, user_name: company });
+      } catch {}
       try { await sendWelcomeMessage({ userId: customer_id, userName: company, userRole: 'customer', email: req.body.email || undefined }, String(req.headers['x-admin-user-id']||'admin')); } catch {}
       return res.status(201).json({ success: true, data: { ...r.rows[0] } });
     }
@@ -704,7 +719,12 @@ router.post('/users', async (req: Request, res: Response) => {
         ]
       );
       await upsertAppUserByEmail(req.body.email, 'center', center_id, center_name);
-      try { await logActivity('user_created', `New Center Created: ${center_id} (${center_name}) — Welcome Message Sent`, String(req.headers['x-admin-user-id']||'admin'), 'admin', center_id, 'center', {}); } catch {}
+      try {
+        const actor = String(req.headers['x-admin-user-id']||'admin');
+        await logActivity('user_created', `New Center Created: ${center_id} (${center_name}) — Welcome Message Sent`, actor, 'admin', center_id, 'center', {});
+        // Explicit center-targeted welcome entry for center hub visibility
+        await logActivity('welcome_message', `Welcome to your CKS Portal account, ${center_name}! Your user ID is ${center_id}.`, actor, 'admin', center_id, 'center', { is_welcome: true, show_tutorial: true, user_name: center_name });
+      } catch {}
       try { await sendWelcomeMessage({ userId: center_id, userName: center_name, userRole: 'center', email: req.body.email || undefined }, String(req.headers['x-admin-user-id']||'admin')); } catch {}
       return res.status(201).json({ success: true, data: { ...r.rows[0] } });
     }
@@ -727,7 +747,12 @@ router.post('/users', async (req: Request, res: Response) => {
         ]
       );
       await upsertAppUserByEmail(req.body.email, 'crew', crew_id, crew_name);
-      try { await logActivity('user_created', `New Crew Created: ${crew_id} (${crew_name}) — Welcome Message Sent`, String(req.headers['x-admin-user-id']||'admin'), 'admin', crew_id, 'crew', {}); } catch {}
+      try {
+        const actor = String(req.headers['x-admin-user-id']||'admin');
+        await logActivity('user_created', `New Crew Created: ${crew_id} (${crew_name}) — Welcome Message Sent`, actor, 'admin', crew_id, 'crew', {});
+        // Explicit crew-targeted welcome entry for crew hub visibility
+        await logActivity('welcome_message', `Welcome to your CKS Portal account, ${crew_name}! Your user ID is ${crew_id}.`, actor, 'admin', crew_id, 'crew', { is_welcome: true, show_tutorial: true, user_name: crew_name });
+      } catch {}
       try { await sendWelcomeMessage({ userId: crew_id, userName: crew_name, userRole: 'crew', email: req.body.email || undefined }, String(req.headers['x-admin-user-id']||'admin')); } catch {}
       return res.status(201).json({ success: true, data: { ...r.rows[0] } });
     }
@@ -889,6 +914,13 @@ router.post('/warehouses', async (req, res) => {
 
     // Map warehouse login if an email was provided
     try { await upsertAppUserByEmail(email, 'warehouse', id, warehouse_name); } catch {}
+    
+    // Add personalized welcome message for warehouse
+    try {
+      const actor = String(req.headers['x-admin-user-id']||'admin');
+      await logActivity('welcome_message', `Welcome to your CKS Portal account, ${warehouse_name}! Your user ID is ${id}.`, actor, 'admin', id, 'warehouse', { is_welcome: true, show_tutorial: true, user_name: warehouse_name });
+    } catch {}
+    
     await pool.query('COMMIT');
     return res.status(201).json({ success: true, data: inserted.rows[0] });
   } catch (e:any) {
@@ -1297,6 +1329,11 @@ router.delete('/managers/:id', async (req, res) => {
         }
       }
       
+      // Delete all activity history for this manager (after logging above)
+      try { 
+        await pool.query('DELETE FROM system_activity WHERE target_id = $1 OR actor_id = $1', [id]); 
+      } catch {}
+      
       return res.json({ success: true, data: { manager_id: id }, message: `Manager ${id} archived` });
     } catch (transactionError) {
       await pool.query('ROLLBACK');
@@ -1392,9 +1429,15 @@ router.post('/contractors/:id/assign-manager', async (req: Request, res: Respons
   if (!contractorId) return res.status(400).json({ error: 'contractor_id required' });
   if (!managerId) return res.status(400).json({ error: 'manager_id required' });
   try {
-    // Ensure manager exists (case-insensitive)
-    const mgr = await pool.query('SELECT 1 FROM managers WHERE UPPER(manager_id) = UPPER($1)', [managerId]);
+    // Ensure manager exists and load names for personalized messages
+    const mgr = await pool.query('SELECT manager_id, manager_name FROM managers WHERE UPPER(manager_id) = UPPER($1) LIMIT 1', [managerId]);
     if (mgr.rowCount === 0) return res.status(404).json({ error: 'manager_not_found' });
+    const managerName = String(mgr.rows[0].manager_name || managerId);
+
+    const ctr = await pool.query('SELECT contractor_id, company_name FROM contractors WHERE UPPER(contractor_id) = UPPER($1) LIMIT 1', [contractorId]);
+    if (ctr.rowCount === 0) return res.status(404).json({ error: 'contractor_not_found' });
+    const contractorName = String(ctr.rows[0].company_name || contractorId);
+
     const r = await pool.query(
       `UPDATE contractors 
        SET cks_manager = $2
@@ -1403,11 +1446,44 @@ router.post('/contractors/:id/assign-manager', async (req: Request, res: Respons
       [contractorId, managerId]
     );
     if (r.rowCount === 0) return res.status(404).json({ error: 'contractor_not_found' });
-    // Log activity
+
+    // Log activities for all affected parties (admin, manager, contractor)
+    const actorId = String(req.headers['x-admin-user-id'] || 'freedom_exe');
     try {
-      await logActivity('contractor_assigned', `Contractor ${contractorId} assigned to Manager ${managerId}`, 'freedom_exe', 'admin', contractorId, 'contractor', { manager_id: managerId });
+      // Admin-facing audit entry (concise)
+      await logActivity(
+        'assignment_made',
+        `Assigned ${contractorId} to ${managerId}`,
+        actorId,
+        'admin',
+        actorId,
+        'admin',
+        { contractor_id: contractorId, contractor_name: contractorName, manager_id: managerId, manager_name: managerName }
+      );
+
+      // Manager personalized message
+      await logActivity(
+        'contractor_assigned',
+        `You have been assigned a new contractor: ${contractorName} (${contractorId}). Click here to view their profile.`,
+        actorId,
+        'admin',
+        managerId,
+        'manager',
+        { contractor_id: contractorId, contractor_name: contractorName, action_link: `/${contractorId}/hub` }
+      );
+
+      // Contractor personalized message
+      await logActivity(
+        'manager_assigned',
+        `You have been assigned to manager ${managerName} (${managerId}). They will be your primary point of contact.`,
+        actorId,
+        'admin',
+        contractorId,
+        'contractor',
+        { manager_id: managerId, manager_name: managerName }
+      );
     } catch (error) {
-      console.error('Failed to log contractor assignment:', error);
+      console.error('Failed to log contractor assignment (personalized):', error);
     }
     return res.json({ success: true, data: r.rows[0] });
   } catch (e: any) {
@@ -1550,7 +1626,64 @@ router.post('/crew/:crew_id/assign-center', async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Crew member not found' });
     }
-    
+    // Personalized activity logs for admin, center, crew, and (optionally) manager
+    try {
+      const actorId = String(req.headers['x-admin-user-id'] || 'freedom_exe');
+      // Load center context
+      const c = await pool.query('SELECT center_id, center_name, cks_manager FROM centers WHERE UPPER(center_id)=UPPER($1) LIMIT 1', [center_id]);
+      const centerName = c.rows?.[0]?.center_name || String(center_id);
+      const managerId = c.rows?.[0]?.cks_manager || null;
+      const crewName = result.rows[0]?.crew_name || String(crew_id);
+
+      // Admin audit
+      await logActivity(
+        'crew_assignment_made',
+        `Assigned ${crew_id} to ${center_id}`,
+        actorId,
+        'admin',
+        actorId,
+        'admin',
+        { crew_id, crew_name: crewName, center_id, center_name: centerName, manager_id: managerId }
+      );
+
+      // Crew-facing
+      await logActivity(
+        'center_assigned',
+        `You have been assigned to center ${centerName} (${center_id}).`,
+        actorId,
+        'admin',
+        crew_id,
+        'crew',
+        { center_id, center_name: centerName }
+      );
+
+      // Center-facing
+      await logActivity(
+        'crew_assigned',
+        `New crew member assigned: ${crewName} (${crew_id}).`,
+        actorId,
+        'admin',
+        center_id,
+        'center',
+        { crew_id, crew_name: crewName }
+      );
+
+      // Manager-facing (if available)
+      if (managerId) {
+        await logActivity(
+          'crew_assigned',
+          `A new crew member ${crewName} (${crew_id}) has been assigned to center ${centerName} (${center_id}).`,
+          actorId,
+          'admin',
+          managerId,
+          'manager',
+          { crew_id, crew_name: crewName, center_id, center_name: centerName }
+        );
+      }
+    } catch (logErr) {
+      console.error('Failed to log crew assignment activities:', logErr);
+    }
+
     res.json({ 
       success: true, 
       data: result.rows[0],
@@ -1596,9 +1729,14 @@ router.delete('/contractors/:id', async (req, res) => {
       
       await pool.query('COMMIT');
       
-      // Log the deletion activity
+      // Log the deletion activity first
       try { 
         await logActivity('user_deleted', `Contractor ${id} (${contractorName}) archived`, String(req.headers['x-admin-user-id']||'admin'), 'admin', id, 'contractor', { name: contractorName }); 
+      } catch {}
+      
+      // Then delete all activity history for this contractor (including the deletion log above)
+      try { 
+        await pool.query('DELETE FROM system_activity WHERE target_id = $1 OR actor_id = $1', [id]); 
       } catch {}
       
       return res.json({ success: true, message: `Contractor ${id} archived and unassigned` });
@@ -1783,9 +1921,17 @@ router.patch('/contractors/:id/assign-manager', async (req, res) => {
       RETURNING contractor_id, cks_manager, company_name
     `, [manager_id, id]);
     
-    // Log activity
+    // Log activity (admin-style, contractor target)
     try {
-      await logActivity('contractor_assigned', `Contractor ${id} assigned to Manager ${manager_id}`, 'freedom_exe', 'admin', id, 'contractor', { manager_id });
+      await logActivity(
+        'contractor_assigned',
+        `Contractor ${id} assigned to Manager ${manager_id}`,
+        'freedom_exe',
+        'admin',
+        id,
+        'contractor',
+        { manager_id }
+      );
     } catch (error) {
       console.error('Failed to log contractor assignment:', error);
     }

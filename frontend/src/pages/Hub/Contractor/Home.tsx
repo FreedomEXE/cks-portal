@@ -197,7 +197,8 @@ export default function ContractorHome() {
       try {
         setActivityLoading(true);
         const baseApi = (import.meta.env.VITE_API_URL?.replace(/\/$/, '') || '/api');
-        const r = await fetch(`${baseApi}/contractor/activity?code=${encodeURIComponent(code)}`, { credentials: 'include' });
+        const uc = String(code || '').toUpperCase();
+        const r = await fetch(`${baseApi}/contractor/activity?code=${encodeURIComponent(uc)}`, { credentials: 'include' });
         const j = await r.json().catch(()=>({}));
         if (!cancelled && Array.isArray(j?.data)) setActivities(j.data);
       } catch {
@@ -322,6 +323,27 @@ export default function ContractorHome() {
     }
   }
   function closeFeedbackDetail() { setFbDetailOpen(false); setFbDetail(null); }
+
+  // Clear activity function
+  async function handleClearActivity() {
+    if (!confirm('Are you sure you want to clear your recent activity? This action cannot be undone.')) {
+      return;
+    }
+    try {
+      const code = state.data?.code || '';
+      const baseApi = (import.meta.env.VITE_API_URL?.replace(/\/$/, '') || '/api');
+      const r = await fetch(`${baseApi}/contractor/clear-activity?code=${encodeURIComponent(code)}`, { 
+        method: 'POST',
+        credentials: 'include' 
+      });
+      const j = await r.json();
+      if (!r.ok || !j?.success) throw new Error(j?.error || 'Failed to clear activity');
+      setActivities([]);
+    } catch (e: any) {
+      console.error('Failed to clear activity:', e);
+      alert('Failed to clear activity: ' + (e?.message || 'Unknown error'));
+    }
+  }
 
   // Loading state
   if (state.loading) {
@@ -457,7 +479,26 @@ export default function ContractorHome() {
             </div>
 
             {/* Recent Activity */}
-            <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>Recent Activity</h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <h3 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>Recent Activity</h3>
+              {activities.length > 0 && (
+                <button 
+                  onClick={handleClearActivity}
+                  style={{ 
+                    padding: '4px 8px', 
+                    fontSize: 11, 
+                    background: '#ef4444', 
+                    color: '#fff', 
+                    border: 'none', 
+                    borderRadius: 4, 
+                    cursor: 'pointer',
+                    fontWeight: 600
+                  }}
+                >
+                  Clear
+                </button>
+              )}
+            </div>
             <div className="ui-card" style={{ padding: 16 }}>
               {activityLoading ? (
                 <div style={{ textAlign: 'center', padding: 24, color: '#6b7280' }}>Loading activity...</div>
@@ -469,14 +510,48 @@ export default function ContractorHome() {
                 </div>
               ) : (
                 <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-                  {activities.slice(0, 8).map((a:any) => (
-                    <li key={a.activity_id || `${a.description}-${a.created_at}`}
-                        style={{ padding: '8px 0', borderBottom: '1px solid #e5e7eb', fontSize: 13 }}>
-                      <div style={{ fontWeight: 600 }}>{(a.activity_type || 'activity').toString().replace(/_/g,' ')}</div>
-                      <div style={{ opacity: 0.8 }}>{a.description}</div>
-                      <div style={{ fontSize: 11, color: '#6b7280' }}>{a.created_at ? new Date(a.created_at).toLocaleString() : ''}</div>
-                    </li>
-                  ))}
+                  {activities.slice(0, 8).map((a:any) => {
+                    const type = String(a.activity_type || '');
+                    const isWelcome = type === 'user_welcome' || type === 'welcome_message';
+                    if (isWelcome) {
+                      return (
+                        <li key={a.activity_id || `${a.description}-${a.created_at}`}
+                            style={{ padding: 12, borderBottom: '1px solid #e5e7eb', fontSize: 13, background: '#ecfdf5', borderRadius: 8 }}>
+                          <div style={{ fontWeight: 700, color: '#065f46' }}>Welcome</div>
+                          <div style={{ margin: '2px 0', color: '#065f46' }}>{a.description}</div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div style={{ fontSize: 11, color: '#047857' }}>{a.created_at ? new Date(a.created_at).toLocaleString() : ''}</div>
+                            <button
+                              style={{ padding: '6px 10px', fontSize: 12, background: '#10b981', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer' }}
+                              onClick={() => alert('Interactive walkthrough coming soon!')}
+                            >
+                              Launch Walkthrough
+                            </button>
+                          </div>
+                        </li>
+                      );
+                    }
+                    if (type === 'manager_assigned') {
+                      const meta = a?.metadata || {};
+                      return (
+                        <li key={a.activity_id || `${a.description}-${a.created_at}`}
+                            style={{ padding: 12, borderBottom: '1px solid #e5e7eb', fontSize: 13, background: '#eff6ff', borderRadius: 8 }}>
+                          <div style={{ fontWeight: 700, color: '#1e3a8a' }}>Manager Assigned</div>
+                          <div style={{ margin: '2px 0', color: '#1e3a8a' }}>{a.description}</div>
+                          <div style={{ fontSize: 11, color: '#1d4ed8' }}>{a.created_at ? new Date(a.created_at).toLocaleString() : ''}</div>
+                        </li>
+                      );
+                    }
+
+                    return (
+                      <li key={a.activity_id || `${a.description}-${a.created_at}`}
+                          style={{ padding: '8px 0', borderBottom: '1px solid #e5e7eb', fontSize: 13 }}>
+                        <div style={{ fontWeight: 600 }}>{(a.activity_type || 'activity').toString().replace(/_/g,' ')}</div>
+                        <div style={{ opacity: 0.8 }}>{a.description}</div>
+                        <div style={{ fontSize: 11, color: '#6b7280' }}>{a.created_at ? new Date(a.created_at).toLocaleString() : ''}</div>
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
             </div>

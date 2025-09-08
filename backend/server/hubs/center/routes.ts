@@ -223,13 +223,16 @@ router.get('/activity', async (req: Request, res: Response) => {
         created_at
       FROM system_activity 
       WHERE 
-        (target_id = $1 AND target_type = 'center') OR
-        (actor_id = $1 AND actor_role = 'center') OR
-        (activity_type LIKE 'crew_%' AND target_id IN (
-          SELECT crew_id FROM crew WHERE UPPER(assigned_center) = UPPER($1)
-        )) OR
-        (activity_type LIKE 'service_%' AND metadata->>'center_id' = $1) OR
-        (activity_type LIKE 'report_%' AND metadata->>'center_id' = $1)
+        (
+          (target_id = $1 AND target_type = 'center') OR
+          (actor_id = $1 AND actor_role = 'center') OR
+          (activity_type LIKE 'crew_%' AND target_id IN (
+            SELECT crew_id FROM crew WHERE UPPER(assigned_center) = UPPER($1)
+          )) OR
+          (activity_type LIKE 'service_%' AND metadata->>'center_id' = $1) OR
+          (activity_type LIKE 'report_%' AND metadata->>'center_id' = $1)
+        ) AND
+        activity_type NOT IN ('user_deleted', 'user_updated', 'user_created', 'user_welcome')
       ORDER BY created_at DESC
       LIMIT 50`,
       [code]
@@ -239,6 +242,29 @@ router.get('/activity', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Center activity endpoint error:', error);
     return res.status(500).json({ success: false, error: 'Failed to fetch activity', error_code: 'server_error' });
+  }
+});
+
+// POST /api/center/clear-activity - Clear activity for this center
+router.post('/clear-activity', async (req: Request, res: Response) => {
+  try {
+    const raw = String(req.query.code || '').trim() || getUserId(req);
+    const centerId = raw.toUpperCase();
+    if (!centerId) return res.status(400).json({ success: false, error: 'code required' });
+
+    await pool.query(
+      `DELETE FROM system_activity 
+       WHERE (UPPER(target_id) = $1 AND target_type = 'center') OR (UPPER(actor_id) = $1 AND actor_role = 'center')`,
+      [centerId]
+    );
+    
+    return res.json({ 
+      success: true, 
+      message: `Activity cleared for center ${centerId}`
+    });
+  } catch (error) {
+    console.error('Clear center activity error:', error);
+    return res.status(500).json({ success: false, error: 'Failed to clear activity' });
   }
 });
 

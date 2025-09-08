@@ -280,6 +280,70 @@ router.get('/contractors', async (req: Request, res: Response) => {
   }
 });
 
+// GET /api/manager/ecosystem - Hierarchical view of manager -> contractors -> customers (+counts)
+router.get('/ecosystem', async (req: Request, res: Response) => {
+  try {
+    const managerId = String(req.query.code || '').trim() || getUserId(req);
+    if (!managerId) return res.status(400).json({ success: false, error: 'code required' });
+
+    // First, get contractors under this manager with customer/center counts
+    const contractors = await pool.query(
+      `SELECT 
+         c.contractor_id   AS id,
+         c.company_name    AS name,
+         'contractor'      AS type,
+         COUNT(DISTINCT cu.customer_id) AS customer_count,
+         COUNT(DISTINCT ce.center_id)   AS center_count
+       FROM contractors c
+       LEFT JOIN customers cu ON cu.contractor_id = c.contractor_id
+       LEFT JOIN centers   ce ON ce.customer_id   = cu.customer_id
+       WHERE UPPER(c.cks_manager) = UPPER($1)
+       GROUP BY c.contractor_id, c.company_name
+       ORDER BY c.company_name`,
+      [managerId]
+    );
+
+    // For each contractor, fetch their customers with center counts
+    const ecosystem = await Promise.all(contractors.rows.map(async (ctr: any) => {
+      const customers = await pool.query(
+        `SELECT 
+           cu.customer_id AS id,
+           cu.company_name AS name,
+           'customer' AS type,
+           COUNT(DISTINCT ce.center_id) AS center_count
+         FROM customers cu
+         LEFT JOIN centers ce ON ce.customer_id = cu.customer_id
+         WHERE UPPER(cu.contractor_id) = UPPER($1)
+         GROUP BY cu.customer_id, cu.company_name
+         ORDER BY cu.company_name`,
+        [ctr.id]
+      );
+
+      return {
+        id: ctr.id,
+        name: ctr.name,
+        type: 'contractor',
+        stats: {
+          customers: Number(ctr.customer_count) || 0,
+          centers: Number(ctr.center_count) || 0,
+        },
+        children: customers.rows.map((cu: any) => ({
+          id: cu.id,
+          name: cu.name,
+          type: 'customer',
+          stats: { centers: Number(cu.center_count) || 0 },
+          children: [],
+        })),
+      };
+    }));
+
+    return res.json({ success: true, data: ecosystem });
+  } catch (error) {
+    console.error('Manager ecosystem endpoint error:', error);
+    return res.status(500).json({ success: false, error: 'Failed to load ecosystem' });
+  }
+});
+
 // GET /api/manager/activity - Get activity feed for this manager
 router.get('/activity', async (req: Request, res: Response) => {
   try {
@@ -299,18 +363,21 @@ router.get('/activity', async (req: Request, res: Response) => {
         created_at
       FROM system_activity 
       WHERE 
-        (actor_id = $1 AND actor_role = 'manager') OR
-        (target_id = $1 AND target_type = 'manager') OR
-        (activity_type IN ('contractor_assigned_to_manager', 'contractor_removed_from_manager') AND metadata->>'manager_id' = $1) OR
-        (activity_type LIKE 'contractor_%' AND target_id IN (
-          SELECT contractor_id FROM contractors WHERE UPPER(cks_manager) = UPPER($1)
-        )) OR
-        (activity_type LIKE 'customer_%' AND target_id IN (
-          SELECT customer_id FROM customers WHERE UPPER(cks_manager) = UPPER($1)
-        )) OR
-        (activity_type LIKE 'center_%' AND target_id IN (
-          SELECT center_id FROM centers WHERE UPPER(cks_manager) = UPPER($1)
-        ))
+        (
+          (actor_id = $1 AND actor_role = 'manager') OR
+          (target_id = $1 AND target_type = 'manager') OR
+          (activity_type IN ('contractor_assigned_to_manager', 'contractor_removed_from_manager') AND metadata->>'manager_id' = $1) OR
+          (activity_type LIKE 'contractor_%' AND target_id IN (
+            SELECT contractor_id FROM contractors WHERE UPPER(cks_manager) = UPPER($1)
+          )) OR
+          (activity_type LIKE 'customer_%' AND target_id IN (
+            SELECT customer_id FROM customers WHERE UPPER(cks_manager) = UPPER($1)
+          )) OR
+          (activity_type LIKE 'center_%' AND target_id IN (
+            SELECT center_id FROM centers WHERE UPPER(cks_manager) = UPPER($1)
+          ))
+        ) AND
+        activity_type NOT IN ('user_deleted', 'user_updated', 'user_created', 'user_welcome')
       ORDER BY created_at DESC
       LIMIT 50`,
       [code]
@@ -373,6 +440,29 @@ router.get('/contractor/:contractorId', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Manager contractor profile error:', error);
     return res.status(500).json({ error: 'Failed to fetch contractor profile' });
+  }
+});
+
+// POST /api/manager/clear-activity - Clear activity for this manager
+router.post('/clear-activity', async (req: Request, res: Response) => {
+  try {
+    const raw = String(req.query.code || '').trim() || getUserId(req);
+    const managerId = raw.toUpperCase();
+    if (!managerId) return res.status(400).json({ success: false, error: 'code required' });
+
+    await pool.query(
+      `DELETE FROM system_activity 
+       WHERE (UPPER(target_id) = $1 AND target_type = 'manager') OR (UPPER(actor_id) = $1 AND actor_role = 'manager')`,
+      [managerId]
+    );
+    
+    return res.json({ 
+      success: true, 
+      message: `Activity cleared for manager ${managerId}`
+    });
+  } catch (error) {
+    console.error('Clear manager activity error:', error);
+    return res.status(500).json({ success: false, error: 'Failed to clear activity' });
   }
 });
 

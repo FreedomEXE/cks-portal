@@ -230,14 +230,17 @@ router.get('/activity', async (req: Request, res: Response) => {
         created_at
       FROM system_activity 
       WHERE 
-        (target_id = $1 AND target_type = 'customer') OR
-        (actor_id = $1 AND actor_role = 'customer') OR
-        (activity_type LIKE 'center_%' AND target_id IN (
-          SELECT center_id FROM centers WHERE UPPER(customer_id) = UPPER($1)
-        )) OR
-        (activity_type LIKE 'order_%' AND target_id IN (
-          SELECT order_id FROM orders WHERE UPPER(customer_id) = UPPER($1)
-        ))
+        (
+          (target_id = $1 AND target_type = 'customer') OR
+          (actor_id = $1 AND actor_role = 'customer') OR
+          (activity_type LIKE 'center_%' AND target_id IN (
+            SELECT center_id FROM centers WHERE UPPER(customer_id) = UPPER($1)
+          )) OR
+          (activity_type LIKE 'order_%' AND target_id IN (
+            SELECT order_id FROM orders WHERE UPPER(customer_id) = UPPER($1)
+          ))
+        ) AND
+        activity_type NOT IN ('user_deleted', 'user_updated', 'user_created', 'user_welcome')
       ORDER BY created_at DESC
       LIMIT 50`,
       [code]
@@ -247,6 +250,29 @@ router.get('/activity', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Customer activity endpoint error:', error);
     return res.status(500).json({ success: false, error: 'Failed to fetch activity', error_code: 'server_error' });
+  }
+});
+
+// POST /api/customer/clear-activity - Clear activity for this customer
+router.post('/clear-activity', async (req: Request, res: Response) => {
+  try {
+    const raw = String(req.query.code || '').trim() || getUserId(req);
+    const customerId = raw.toUpperCase();
+    if (!customerId) return res.status(400).json({ success: false, error: 'code required' });
+
+    await pool.query(
+      `DELETE FROM system_activity 
+       WHERE (UPPER(target_id) = $1 AND target_type = 'customer') OR (UPPER(actor_id) = $1 AND actor_role = 'customer')`,
+      [customerId]
+    );
+    
+    return res.json({ 
+      success: true, 
+      message: `Activity cleared for customer ${customerId}`
+    });
+  } catch (error) {
+    console.error('Clear customer activity error:', error);
+    return res.status(500).json({ success: false, error: 'Failed to clear activity' });
   }
 });
 

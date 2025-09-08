@@ -284,11 +284,14 @@ router.get('/activity', async (req: Request, res: Response) => {
         created_at
       FROM system_activity 
       WHERE 
-        (target_id = $1 AND target_type = 'crew') OR
-        (actor_id = $1 AND actor_role = 'crew') OR
-        (activity_type LIKE 'task_%' AND metadata->>'crew_id' = $1) OR
-        (activity_type LIKE 'training_%' AND metadata->>'crew_id' = $1) OR
-        (activity_type LIKE 'schedule_%' AND metadata->>'crew_id' = $1)
+        (
+          (target_id = $1 AND target_type = 'crew') OR
+          (actor_id = $1 AND actor_role = 'crew') OR
+          (activity_type LIKE 'task_%' AND metadata->>'crew_id' = $1) OR
+          (activity_type LIKE 'training_%' AND metadata->>'crew_id' = $1) OR
+          (activity_type LIKE 'schedule_%' AND metadata->>'crew_id' = $1)
+        ) AND
+        activity_type NOT IN ('user_deleted', 'user_updated', 'user_created', 'user_welcome')
       ORDER BY created_at DESC
       LIMIT 50`,
       [code]
@@ -298,6 +301,29 @@ router.get('/activity', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Crew activity endpoint error:', error);
     return res.status(500).json({ success: false, error: 'Failed to fetch activity', error_code: 'server_error' });
+  }
+});
+
+// POST /api/crew/clear-activity - Clear activity for this crew
+router.post('/clear-activity', async (req: Request, res: Response) => {
+  try {
+    const raw = String(req.query.code || '').trim() || getUserId(req);
+    const crewId = raw.toUpperCase();
+    if (!crewId) return res.status(400).json({ success: false, error: 'code required' });
+
+    await pool.query(
+      `DELETE FROM system_activity 
+       WHERE (UPPER(target_id) = $1 AND target_type = 'crew') OR (UPPER(actor_id) = $1 AND actor_role = 'crew')`,
+      [crewId]
+    );
+    
+    return res.json({ 
+      success: true, 
+      message: `Activity cleared for crew ${crewId}`
+    });
+  } catch (error) {
+    console.error('Clear crew activity error:', error);
+    return res.status(500).json({ success: false, error: 'Failed to clear activity' });
   }
 });
 

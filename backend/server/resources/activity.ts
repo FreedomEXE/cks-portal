@@ -32,7 +32,9 @@ router.get('/', async (req: Request, res: Response) => {
     // Ensure table exists
     await ensureActivityTable();
     
-    let whereClause = "WHERE activity_type <> 'user_welcome'"; // hide welcome from admin feed by default
+    // Hide user-targeted/personalized activity types from the admin feed by default
+    // Admin feed should focus on audit-style events (e.g., user_created, assignment_made, deletes/archives)
+    let whereClause = "WHERE activity_type NOT IN ('user_welcome','welcome_message','manager_assigned','contractor_assigned','center_assigned','crew_assigned')";
     const params: any[] = [];
     let paramIndex = 1;
     

@@ -441,6 +441,55 @@ export default function CenterHome() {
               </div>
             </div>
 
+            {/* Recent Activity */}
+            <div className="ui-card" style={{ padding: 16, marginBottom: 24 }}>
+              <div className="title" style={{ marginBottom: 12 }}>Recent Activity</div>
+              {activityLoading ? (
+                <div style={{ textAlign: 'center', padding: 24, color: '#6b7280' }}>Loading activity...</div>
+              ) : activities.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: 32, color: '#6b7280', background: '#f9fafb', borderRadius: 8 }}>
+                  <div style={{ fontSize: 48, marginBottom: 8 }}>📋</div>
+                  <div style={{ fontSize: 14, fontWeight: 500 }}>No recent activity</div>
+                  <div style={{ fontSize: 12, marginTop: 4 }}>Activity will appear here as it occurs</div>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {activities.slice(0, 6).map((a:any) => {
+                    const type = String(a.activity_type || '');
+                    const isWelcome = type === 'user_welcome' || type === 'welcome_message';
+                    if (isWelcome) {
+                      return (
+                        <div key={a.activity_id || `${a.description}-${a.created_at}`}
+                             style={{ padding: 12, background: '#ecfdf5', borderLeft: '4px solid #10b981', borderRadius: 8 }}>
+                          <div style={{ fontWeight: 700, color: '#065f46' }}>Welcome</div>
+                          <div style={{ margin: '2px 0', color: '#065f46' }}>{a.description}</div>
+                          <div style={{ fontSize: 11, color: '#047857' }}>{a.created_at ? new Date(a.created_at).toLocaleString() : ''}</div>
+                        </div>
+                      );
+                    }
+                    if (type === 'crew_assigned') {
+                      return (
+                        <div key={a.activity_id || `${a.description}-${a.created_at}`}
+                             style={{ padding: 12, background: '#eff6ff', borderLeft: '4px solid #3b82f6', borderRadius: 8 }}>
+                          <div style={{ fontWeight: 700, color: '#1e3a8a' }}>Crew Assigned</div>
+                          <div style={{ margin: '2px 0', color: '#1e3a8a' }}>{a.description}</div>
+                          <div style={{ fontSize: 11, color: '#1d4ed8' }}>{a.created_at ? new Date(a.created_at).toLocaleString() : ''}</div>
+                        </div>
+                      );
+                    }
+                    return (
+                      <div key={a.activity_id || `${a.description}-${a.created_at}`}
+                           style={{ padding: 12, background: '#f8fafc', borderLeft: '3px solid #e5e7eb', borderRadius: 8 }}>
+                        <div style={{ fontWeight: 600 }}>{(a.activity_type || 'activity').toString().replace(/_/g,' ')}</div>
+                        <div style={{ opacity: 0.9 }}>{a.description}</div>
+                        <div style={{ fontSize: 11, color: '#6b7280' }}>{a.created_at ? new Date(a.created_at).toLocaleString() : ''}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
             {/* Active Crew */}
             <div className="ui-card" style={{ marginBottom: 24 }}>
               <div className="title" style={{ marginBottom: 16 }}>Active Crew Status</div>

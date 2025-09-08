@@ -24,6 +24,7 @@ import { setManagerSession, getManagerSession } from './utils/managerAuth';
 import { buildManagerApiUrl, managerApiFetch } from './utils/managerApi';
 import ManagerLogoutButton from './components/LogoutButton';
 import ReactDOM from 'react-dom';
+import EcosystemView from './components/EcosystemView';
 
 type NewsItem = { 
   id: string | number; 
@@ -475,7 +476,7 @@ export default function ManagerHome() {
           { key: 'dashboard' as ManagerSection, label: 'Dashboard' },
           { key: 'profile' as ManagerSection, label: 'My Profile' },
           { key: 'services' as ManagerSection, label: 'My Services' },
-          { key: 'contractors' as ManagerSection, label: 'My Contractors' },
+          { key: 'contractors' as ManagerSection, label: 'Ecosystem' },
           { key: 'assign' as ManagerSection, label: 'Assign' },
           { key: 'orders' as ManagerSection, label: 'Orders' },
           { key: 'reports' as ManagerSection, label: 'Reports' },
@@ -1346,12 +1347,11 @@ export default function ManagerHome() {
           </div>
         )}
 
-        {/* CONTRACTORS SECTION - Hierarchical View */}
+        {/* ECOSYSTEM SECTION */}
         {activeSection === 'contractors' && (
           <div>
-            <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>My Contractors</h2>
-            
-            <ContractorsSection code={code} />
+            <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Ecosystem</h2>
+            <EcosystemView code={code} />
           </div>
         )}
 
@@ -1394,6 +1394,26 @@ function ManagerRecentActions({ code }: { code: string }) {
   const [activities, setActivities] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
+  // Clear activity function
+  async function handleClearActivity() {
+    if (!confirm('Are you sure you want to clear your recent activity? This action cannot be undone.')) {
+      return;
+    }
+    try {
+      const baseApi = (import.meta.env.VITE_API_URL?.replace(/\/$/, '') || '/api');
+      const r = await fetch(`${baseApi}/manager/clear-activity?code=${encodeURIComponent(code)}`, { 
+        method: 'POST',
+        credentials: 'include' 
+      });
+      const j = await r.json();
+      if (!r.ok || !j?.success) throw new Error(j?.error || 'Failed to clear activity');
+      setActivities([]);
+    } catch (e: any) {
+      console.error('Failed to clear activity:', e);
+      alert('Failed to clear activity: ' + (e?.message || 'Unknown error'));
+    }
+  }
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -1425,36 +1445,102 @@ function ManagerRecentActions({ code }: { code: string }) {
 
   return (
     <div className="ui-card" style={{ padding: 16, marginBottom: 24 }}>
-      <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 12, color: '#3b7af7' }}>Recent Actions</div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <div style={{ fontSize: 16, fontWeight: 600, color: '#3b7af7' }}>Recent Actions</div>
+        {activities.length > 0 && (
+          <button 
+            onClick={handleClearActivity}
+            style={{ 
+              padding: '4px 8px', 
+              fontSize: 11, 
+              background: '#ef4444', 
+              color: '#fff', 
+              border: 'none', 
+              borderRadius: 4, 
+              cursor: 'pointer',
+              fontWeight: 600
+            }}
+          >
+            Clear
+          </button>
+        )}
+      </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {loading ? (
           <div style={{ textAlign: 'center', padding: 20, color: '#6b7280' }}>
             Loading recent actions...
           </div>
         ) : activities.length > 0 ? (
-          activities.map((activity, index) => (
-            <div key={activity.activity_id} style={{ 
-              padding: 12, 
-              background: '#f8fafc', 
-              borderRadius: 8, 
-              borderLeft: '3px solid #3b7af7',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center'
-            }}>
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 2 }}>
-                  {activity.description}
+          activities.map((activity) => {
+            const type = String(activity.activity_type || '');
+            const isWelcome = type === 'user_welcome' || type === 'welcome_message';
+            if (isWelcome) {
+              return (
+                <div key={activity.activity_id} style={{ padding: 12, background: '#ecfdf5', borderRadius: 8, borderLeft: '4px solid #10b981' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: '#065f46' }}>{activity.description}</div>
+                      <div style={{ fontSize: 12, color: '#047857' }}>Welcome • {new Date(activity.created_at).toLocaleString()}</div>
+                    </div>
+                    <button
+                      style={{ padding: '6px 10px', fontSize: 12, background: '#10b981', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer' }}
+                      onClick={() => alert('Interactive walkthrough coming soon!')}
+                    >
+                      Launch Walkthrough
+                    </button>
+                  </div>
                 </div>
-                <div style={{ fontSize: 12, color: '#6b7280' }}>
-                  {activity.activity_type} • {activity.actor_role}
+              );
+            }
+            // Personalized contractor assignment for manager
+            if (type === 'contractor_assigned') {
+              const meta = activity?.metadata || {};
+              return (
+                <div key={activity.activity_id} style={{ padding: 12, background: '#eff6ff', borderRadius: 8, borderLeft: '4px solid #3b82f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: '#1e3a8a' }}>{activity.description}</div>
+                    <div style={{ fontSize: 12, color: '#1d4ed8' }}>Assignment • {new Date(activity.created_at).toLocaleString()}</div>
+                  </div>
+                  {meta?.action_link && (
+                    <button
+                      style={{ padding: '6px 10px', fontSize: 12, background: '#1d4ed8', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer' }}
+                      onClick={() => { 
+                        try { 
+                          // Get contractor ID from metadata
+                          const contractorId = meta?.contractor_id;
+                          console.log('Contractor ID from metadata:', contractorId);
+                          console.log('Full metadata:', meta);
+                          if (contractorId) {
+                            // Use same impersonation logic as admin hub
+                            sessionStorage.setItem('me:lastRole', 'contractor'); 
+                            sessionStorage.setItem('me:lastCode', contractorId);
+                            sessionStorage.setItem('impersonate', 'true');
+                            window.open(`/${contractorId}/hub`, '_blank');
+                          } else {
+                            console.error('No contractor_id found in metadata');
+                          }
+                        } catch (e) { 
+                          console.error('Navigation error:', e);
+                        } 
+                      }}
+                    >
+                      View Contractor
+                    </button>
+                  )}
                 </div>
+              );
+            }
+
+            return (
+              <div key={activity.activity_id} style={{ padding: 12, background: '#f8fafc', borderRadius: 8, borderLeft: '3px solid #3b7af7', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 2 }}>{activity.description}</div>
+                  <div style={{ fontSize: 12, color: '#6b7280' }}>{activity.activity_type} • {activity.actor_role}</div>
+                </div>
+                <div style={{ fontSize: 11, color: '#9ca3af' }}>{new Date(activity.created_at).toLocaleDateString()}</div>
               </div>
-              <div style={{ fontSize: 11, color: '#9ca3af' }}>
-                {new Date(activity.created_at).toLocaleDateString()}
-              </div>
-            </div>
-          ))
+            );
+          })
         ) : (
           <div style={{ textAlign: 'center', padding: 32, color: '#6b7280', background: '#f9fafb', borderRadius: 8 }}>
             <div style={{ fontSize: 48, marginBottom: 8 }}>📋</div>

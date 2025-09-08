@@ -81,6 +81,9 @@ export default function CustomerHome() {
   const [repComment, setRepComment] = useState('');
   const [fbDetailOpen, setFbDetailOpen] = useState(false);
   const [fbDetail, setFbDetail] = useState<any|null>(null);
+  // Activity state
+  const [activities, setActivities] = useState<any[]>([]);
+  const [activityLoading, setActivityLoading] = useState(false);
   
   // Get customer code and name from profile data
   const session = getCustomerSession();
@@ -95,6 +98,27 @@ export default function CustomerHome() {
       setCustomerSession(code, customerName);
     }
   }, [state.loading, state.error, code, customerName]);
+
+  // Fetch recent activity when on dashboard
+  useEffect(() => {
+    if (activeSection !== 'dashboard') return;
+    let cancelled = false;
+    (async () => {
+      try {
+        setActivityLoading(true);
+        const baseApi = (import.meta.env.VITE_API_URL?.replace(/\/$/, '') || '/api');
+        const res = await fetch(`${baseApi}/customer/activity?code=${encodeURIComponent(code)}`, { credentials: 'include' });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json?.error || 'Failed to load activity');
+        if (!cancelled) setActivities(Array.isArray(json?.data) ? json.data : []);
+      } catch (e) {
+        if (!cancelled) setActivities([]);
+      } finally {
+        if (!cancelled) setActivityLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [activeSection, code]);
 
   // Fetch customer centers and service data
   useEffect(() => {
@@ -493,11 +517,48 @@ export default function CustomerHome() {
             {/* Centers Overview */}
             <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>Recent Activity</h3>
             <div className="ui-card" style={{ padding: 16 }}>
-              <div style={{ textAlign: 'center', padding: 32, color: '#6b7280', background: '#f9fafb', borderRadius: 8 }}>
-                <div style={{ fontSize: 48, marginBottom: 8 }}>📋</div>
-                <div style={{ fontSize: 14, fontWeight: 500 }}>No recent activity</div>
-                <div style={{ fontSize: 12, marginTop: 4 }}>Center activity will appear here as it occurs</div>
-              </div>
+              {activityLoading ? (
+                <div style={{ textAlign: 'center', padding: 24, color: '#6b7280' }}>Loading activity...</div>
+              ) : activities.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: 32, color: '#6b7280', background: '#f9fafb', borderRadius: 8 }}>
+                  <div style={{ fontSize: 48, marginBottom: 8 }}>📋</div>
+                  <div style={{ fontSize: 14, fontWeight: 500 }}>No recent activity</div>
+                  <div style={{ fontSize: 12, marginTop: 4 }}>Activity will appear here as it occurs</div>
+                </div>
+              ) : (
+                <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+                  {activities.slice(0, 8).map((a:any) => {
+                    const type = String(a.activity_type || '');
+                    const isWelcome = type === 'user_welcome' || type === 'welcome_message';
+                    if (isWelcome) {
+                      return (
+                        <li key={a.activity_id || `${a.description}-${a.created_at}`}
+                            style={{ padding: 12, borderBottom: '1px solid #e5e7eb', fontSize: 13, background: '#ecfdf5', borderRadius: 8 }}>
+                          <div style={{ fontWeight: 700, color: '#065f46' }}>Welcome</div>
+                          <div style={{ margin: '2px 0', color: '#065f46' }}>{a.description}</div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div style={{ fontSize: 11, color: '#047857' }}>{a.created_at ? new Date(a.created_at).toLocaleString() : ''}</div>
+                            <button
+                              style={{ padding: '6px 10px', fontSize: 12, background: '#10b981', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer' }}
+                              onClick={() => alert('Interactive walkthrough coming soon!')}
+                            >
+                              Launch Walkthrough
+                            </button>
+                          </div>
+                        </li>
+                      );
+                    }
+                    return (
+                      <li key={a.activity_id || `${a.description}-${a.created_at}`}
+                          style={{ padding: '8px 0', borderBottom: '1px solid #e5e7eb', fontSize: 13 }}>
+                        <div style={{ fontWeight: 600 }}>{(a.activity_type || 'activity').toString().replace(/_/g,' ')}</div>
+                        <div style={{ opacity: 0.8 }}>{a.description}</div>
+                        <div style={{ fontSize: 11, color: '#6b7280' }}>{a.created_at ? new Date(a.created_at).toLocaleString() : ''}</div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
             </div>
 
             {/* Communication Hub */}
