@@ -24,6 +24,7 @@ import useContractorData from './hooks/useContractorData';
 import { setContractorSession, getContractorSession } from './utils/contractorAuth';
 import { buildContractorApiUrl, contractorApiFetch } from './utils/contractorApi';
 import ContractorLogoutButton from './components/LogoutButton';
+import ContractorEcosystemView from './components/EcosystemView';
 
 type BusinessMetric = {
   label: string;
@@ -40,7 +41,7 @@ type CustomerSummary = {
   last_service: string;
 };
 
-type ContractorSection = 'dashboard' | 'profile' | 'services' | 'customers' | 'reports' | 'orders' | 'support';
+type ContractorSection = 'dashboard' | 'profile' | 'services' | 'ecosystem' | 'reports' | 'orders' | 'support';
 
 export default function ContractorHome() {
   const navigate = useNavigate();
@@ -432,7 +433,7 @@ export default function ContractorHome() {
           { key: 'dashboard' as ContractorSection, label: 'Business Dashboard' },
           { key: 'profile' as ContractorSection, label: 'Company Profile' },
           { key: 'services' as ContractorSection, label: 'My Services' },
-          { key: 'customers' as ContractorSection, label: 'My Customers' },
+          { key: 'ecosystem' as ContractorSection, label: 'Ecosystem' },
           { key: 'orders' as ContractorSection, label: 'Orders' },
           { key: 'reports' as ContractorSection, label: 'Reports' },
           { key: 'support' as ContractorSection, label: 'Support' }
@@ -875,31 +876,11 @@ export default function ContractorHome() {
           </div>
         )}
 
-        {/* CUSTOMERS SECTION - Hierarchical View */}
-        {activeSection === 'customers' && (
+        {/* ECOSYSTEM SECTION */}
+        {activeSection === 'ecosystem' && (
           <div>
-            <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>My Customers</h2>
-            
-            {/* Empty State - Template Hub */}
-            <div className="ui-card" style={{ padding: 16 }}>
-              <div style={{ textAlign: 'center', padding: 40, color: '#6b7280', background: '#f9fafb', borderRadius: 8 }}>
-                <div style={{ fontSize: 48, marginBottom: 8 }}>👤</div>
-                <div style={{ fontSize: 16, fontWeight: 500, marginBottom: 4 }}>No Customers Assigned</div>
-                <div style={{ fontSize: 12, marginTop: 4, lineHeight: 1.5 }}>
-                  When customers are assigned to this contractor via the Admin Hub,<br />
-                  they will appear here in a hierarchical view:<br />
-                  <strong>Customer → Centers → Crew</strong>
-                </div>
-                <div style={{ marginTop: 16, padding: 12, background: '#eff6ff', borderRadius: 6, border: '1px solid #dbeafe' }}>
-                  <div style={{ fontSize: 12, color: '#1e40af', fontWeight: 500, marginBottom: 4 }}>Expected Hierarchy</div>
-                  <div style={{ fontSize: 11, color: '#1e40af', textAlign: 'left' }}>
-                    👤 <strong>Customer</strong> - Top level client<br />
-                    &nbsp;&nbsp;└── 🏬 <strong>Center</strong> - Customer's service location<br />
-                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└── 👷 <strong>Crew</strong> - Assigned to center
-                  </div>
-                </div>
-              </div>
-            </div>
+            <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Ecosystem</h2>
+            <ContractorEcosystemView code={code} />
           </div>
         )}
 

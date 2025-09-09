@@ -1,0 +1,12 @@
+{
+  "_tag": "Property of CKS © 2025 — Manifested by Freedom",
+  "_meta": {
+    "file": "config.v1.json",
+    "description": "Manager tab layout: Dashboard, My Profile, My Services, Ecosystem, Orders, Reports, Support (+ optional widgets).",
+    "function": "Define tab registry references and layout for Manager role.",
+    "importance": "Drives what UI is shown for Manager and how it is gated.",
+    "connectsTo": "RoleHub.tsx, roleConfigLoader.ts, backend caps via requires[].",
+    "notes": "Skeleton only — actual config structure to be added later."
+  }
+}
+

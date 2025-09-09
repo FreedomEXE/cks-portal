@@ -1,0 +1,16 @@
+/*───────────────────────────────────────────────
+  Property of CKS  © 2025
+  Manifested by Freedom
+───────────────────────────────────────────────*/
+
+/**
+ * File: orders.schema.ts
+ * 
+ * Description: Validates order create/update DTOs.
+ * Function: Define and export validation schema for orders.
+ * Importance: Ensures correctness of order workflow inputs.
+ * Connects to: orders.ts routes, orders.service.ts.
+ * 
+ * Notes: Skeleton only — schema to be defined later.
+ */
+

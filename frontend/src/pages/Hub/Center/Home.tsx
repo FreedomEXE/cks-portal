@@ -25,6 +25,7 @@ import { setCenterSession, getCenterSession } from './utils/centerAuth';
 import { buildCenterApiUrl, centerApiFetch } from './utils/centerApi';
 import CenterLogoutButton from './components/LogoutButton';
 import CenterNewsPreview from './components/NewsPreview';
+import CenterEcosystemView from './components/EcosystemView';
 
 type CrewMember = {
   id: string;
@@ -42,7 +43,7 @@ type OperationalMetric = {
   change?: string;
 };
 
-type CenterSection = 'dashboard' | 'profile' | 'services' | 'orders' | 'crew' | 'reports' | 'support';
+type CenterSection = 'dashboard' | 'profile' | 'services' | 'orders' | 'ecosystem' | 'reports' | 'support';
 
 export default function CenterHome() {
   const navigate = useNavigate();
@@ -62,6 +63,9 @@ export default function CenterHome() {
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detail, setDetail] = useState<{ order: any; items: any[]; approvals: any[] } | null>(null);
+  // Activity feed state
+  const [activities, setActivities] = useState<any[]>([]);
+  const [activityLoading, setActivityLoading] = useState(false);
   // Reports & Feedback state
   const [repTab, setRepTab] = useState<'reports'|'feedback'>('reports');
   const [reports, setReports] = useState<any[]>([]);
@@ -118,8 +122,23 @@ export default function CenterHome() {
             const items = Array.isArray(crewData?.data) ? crewData.data : (Array.isArray(crewData?.crew) ? crewData.crew : []);
             setCrewMembers(items);
           } else {
-            // No crew data available
-            setCrewMembers([]);
+            // Fallback: try unified hub crew endpoint with center code as user id for role-based filter
+            try {
+              const baseApi = (import.meta.env.VITE_API_URL?.replace(/\/$/, '') || '/api');
+              const r = await fetch(`${baseApi}/hub/crew`, { 
+                credentials: 'include',
+                headers: { 'Accept': 'application/json', 'x-user-id': code }
+              });
+              if (r.ok) {
+                const j = await r.json();
+                const items = Array.isArray(j?.data) ? j.data : [];
+                setCrewMembers(items);
+              } else {
+                setCrewMembers([]);
+              }
+            } catch {
+              setCrewMembers([]);
+            }
           }
           
           // Metrics data
@@ -136,6 +155,30 @@ export default function CenterHome() {
         console.error('[CenterHome] data fetch error:', error);
       } finally {
         if (!cancelled) setDataLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [code]);
+
+  // Fetch recent activity for this center
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        setActivityLoading(true);
+        const url = buildCenterApiUrl('/activity', { code });
+        const res = await centerApiFetch(url);
+        if (res.ok) {
+          const j = await res.json();
+          const data = Array.isArray(j?.data) ? j.data : [];
+          if (!cancelled) setActivities(data);
+        } else {
+          if (!cancelled) setActivities([]);
+        }
+      } catch {
+        if (!cancelled) setActivities([]);
+      } finally {
+        if (!cancelled) setActivityLoading(false);
       }
     })();
     return () => { cancelled = true; };
@@ -490,55 +533,7 @@ export default function CenterHome() {
               )}
             </div>
 
-            {/* Active Crew */}
-            <div className="ui-card" style={{ marginBottom: 24 }}>
-              <div className="title" style={{ marginBottom: 16 }}>Active Crew Status</div>
-              {dataLoading ? (
-                <div style={{ color: '#6b7280' }}>Loading crew data...</div>
-              ) : (
-                <div style={{ display: 'grid', gap: 12 }}>
-                  {crewMembers.map((member) => (
-                    <div key={member.id} style={{ 
-                      display: 'flex', 
-                      justifyContent: 'space-between', 
-                      alignItems: 'center',
-                      padding: 12,
-                      border: '1px solid #e5e7eb',
-                      borderRadius: 8,
-                      borderLeft: `4px solid ${
-                        member.status === 'On Duty' ? '#10b981' : 
-                        member.status === 'Break' ? '#eab308' : '#6b7280'
-                      }`
-                    }}>
-                      <div>
-                        <div style={{ fontWeight: 600 }}>{member.name}</div>
-                        <div style={{ fontSize: 12, color: '#6b7280' }}>
-                          {member.area} • {member.shift} Shift
-                        </div>
-                      </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <div style={{ 
-                          fontSize: 12, 
-                          fontWeight: 600,
-                          color: member.status === 'On Duty' ? '#10b981' : 
-                                member.status === 'Break' ? '#eab308' : '#6b7280'
-                        }}>
-                          {member.status}
-                        </div>
-                        <div style={{ fontSize: 11, color: '#6b7280' }}>
-                          {member.last_update}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                  {crewMembers.length === 0 && (
-                    <div style={{ color: '#6b7280', textAlign: 'center', padding: 24 }}>
-                      No active crew members
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+            {/* Active Crew Status removed per request */}
 
             {/* Primary Action Buttons */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
@@ -945,15 +940,11 @@ export default function CenterHome() {
           </div>
         );
 
-      case 'crew':
+      case 'ecosystem':
         return (
           <div style={{ animation: 'fadeIn .12s ease-out' }}>
-            <div className="ui-card">
-              <div className="title" style={{ marginBottom: 16, color: '#f97316' }}>Crew Management</div>
-              <div style={{ color: '#6b7280' }}>
-                Crew assignments, schedules, and performance tracking coming soon.
-              </div>
-            </div>
+            <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Ecosystem</h2>
+            <CenterEcosystemView code={code} />
           </div>
         );
 
@@ -1309,7 +1300,7 @@ export default function CenterHome() {
           { key: 'dashboard', label: 'Dashboard' },
           { key: 'profile', label: 'Profile' },
           { key: 'services', label: 'Services' },
-          { key: 'crew', label: 'Crew' },
+          { key: 'ecosystem', label: 'Ecosystem' },
           { key: 'orders', label: 'Orders' },
           { key: 'reports', label: 'Reports' },
           { key: 'support', label: 'Support' }

@@ -24,6 +24,7 @@ import useCustomerData from './hooks/useCustomerData';
 import { setCustomerSession, getCustomerSession } from './utils/customerAuth';
 import { buildCustomerApiUrl, customerApiFetch } from './utils/customerApi';
 import CustomerLogoutButton from './components/LogoutButton';
+import CustomerEcosystemView from './components/EcosystemView';
 
 type CenterSummary = {
   id: string;
@@ -43,7 +44,7 @@ type ServiceRequest = {
   date: string;
 };
 
-type CustomerSection = 'dashboard' | 'profile' | 'services' | 'centers' | 'reports' | 'orders' | 'support';
+type CustomerSection = 'dashboard' | 'profile' | 'services' | 'ecosystem' | 'reports' | 'orders' | 'support';
 
 export default function CustomerHome() {
   const navigate = useNavigate();
@@ -423,7 +424,7 @@ export default function CustomerHome() {
           { key: 'dashboard' as CustomerSection, label: 'Dashboard' },
           { key: 'profile' as CustomerSection, label: 'Customer Profile' },
           { key: 'services' as CustomerSection, label: 'My Services' },
-          { key: 'centers' as CustomerSection, label: 'My Centers' },
+          { key: 'ecosystem' as CustomerSection, label: 'Ecosystem' },
           { key: 'orders' as CustomerSection, label: 'Orders' },
           { key: 'reports' as CustomerSection, label: 'Reports' },
           { key: 'support' as CustomerSection, label: 'Support' }
@@ -802,43 +803,11 @@ export default function CustomerHome() {
           </div>
         )}
 
-        {/* CENTERS SECTION */}
-        {activeSection === 'centers' && (
+        {/* ECOSYSTEM SECTION */}
+        {activeSection === 'ecosystem' && (
           <div>
-            <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>My Centers</h2>
-            
-            {/* Hierarchical Centers Overview */}
-            <div className="ui-card" style={{ padding: 16, marginBottom: 16 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-                <div style={{ fontSize: 16, fontWeight: 600, color: '#eab308' }}>📍 Centers Overview</div>
-                <div style={{ fontSize: 12, color: '#6b7280', background: '#f9fafb', padding: '4px 8px', borderRadius: 12 }}>
-                  Hierarchical View: Centers → Crew Assignments
-                </div>
-              </div>
-              
-              <div style={{ textAlign: 'center', padding: 32, color: '#6b7280', background: '#f9fafb', borderRadius: 8 }}>
-                <div style={{ fontSize: 48, marginBottom: 8 }}>🏢</div>
-                <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>No Centers Assigned</div>
-                <div style={{ fontSize: 14, marginBottom: 16 }}>Your centers will appear here once assigned by your CKS Manager</div>
-                
-                {/* Expected Hierarchy Visual Guide */}
-                <div style={{ background: 'white', borderRadius: 8, padding: 16, marginTop: 16, border: '1px solid #e5e7eb' }}>
-                  <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 12, color: '#111827' }}>Expected Structure:</div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center', fontSize: 13 }}>
-                    <div style={{ background: '#fef3c7', color: '#92400e', padding: '4px 8px', borderRadius: 6, fontWeight: 600 }}>
-                      🏢 Center A
-                    </div>
-                    <span style={{ color: '#9ca3af' }}>→</span>
-                    <div style={{ background: '#ecfdf5', color: '#065f46', padding: '4px 8px', borderRadius: 6, fontWeight: 600 }}>
-                      👥 Assigned Crew
-                    </div>
-                  </div>
-                  <div style={{ fontSize: 12, color: '#6b7280', marginTop: 8 }}>
-                    Each center will show its assigned crew members, schedules, and coordination details
-                  </div>
-                </div>
-              </div>
-            </div>
+            <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Ecosystem</h2>
+            <CustomerEcosystemView code={code} />
           </div>
         )}
 

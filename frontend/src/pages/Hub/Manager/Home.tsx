@@ -82,6 +82,7 @@ export default function ManagerHome() {
   const [expandedCustomers, setExpandedCustomers] = useState<Set<string>>(new Set());
   // Assignment type selection state
   const [assignmentType, setAssignmentType] = useState<'training' | 'services' | 'crew'>('training');
+  
   // Dashboard metrics state
   const [dashboardMetrics, setDashboardMetrics] = useState<{ contractors: number; customers: number; centers: number; crew: number }>({ contractors: 0, customers: 0, centers: 0, crew: 0 });
   const [dashboardLoading, setDashboardLoading] = useState(false);
@@ -477,7 +478,6 @@ export default function ManagerHome() {
           { key: 'profile' as ManagerSection, label: 'My Profile' },
           { key: 'services' as ManagerSection, label: 'My Services' },
           { key: 'contractors' as ManagerSection, label: 'Ecosystem' },
-          { key: 'assign' as ManagerSection, label: 'Assign' },
           { key: 'orders' as ManagerSection, label: 'Orders' },
           { key: 'reports' as ManagerSection, label: 'Reports' },
           { key: 'support' as ManagerSection, label: 'Support' }
