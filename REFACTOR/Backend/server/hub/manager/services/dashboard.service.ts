@@ -10,7 +10,16 @@
  * Function: Aggregate data to produce Manager dashboard KPIs.
  * Importance: Drives Dashboard tab insights and metrics.
  * Connects to: orders.repo.ts, activity.repo.ts.
- * 
- * Notes: Skeleton only — implementation to be added later.
  */
 
+import type { DashboardKPI } from '../validators/dashboard.schema';
+
+export async function getDashboardKPIs(managerId: string): Promise<DashboardKPI> {
+  // TODO: Replace with actual queries
+  return {
+    contractors: 0,
+    customers: 0,
+    centers: 0,
+    crew: 0
+  };
+}

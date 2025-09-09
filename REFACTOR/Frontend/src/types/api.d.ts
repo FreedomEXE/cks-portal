@@ -10,7 +10,10 @@
  * Function: Provide common API result and pagination types.
  * Importance: Aligns API consumers on response shapes.
  * Connects to: api/* modules and consuming components.
- * 
- * Notes: Skeleton only — types to be defined later.
  */
 
+export interface ApiResponse<T> {
+  success: boolean;
+  data?: T;
+  error?: string;
+}

@@ -11,6 +11,17 @@
  * Importance: Core identity and org scoping for the Manager hub.
  * Connects to: Backend auth middleware (loads user+role), Manager routes.
  * 
- * Notes: Schema only placeholder — implementation to follow in later step.
+ * Notes: Initial schema per review.
  */
 
+-- users table (minimal fields for Manager vertical slice)
+CREATE TABLE IF NOT EXISTS users (
+  user_id TEXT PRIMARY KEY,
+  user_name TEXT NOT NULL,
+  email TEXT,
+  phone TEXT,
+  role_code TEXT NOT NULL,
+  template_version TEXT DEFAULT 'v1',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  archived BOOLEAN DEFAULT FALSE
+);

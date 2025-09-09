@@ -10,7 +10,11 @@
  * Function: Declare types consumed by Manager frontend and API.
  * Importance: Ensures type safety and shared contracts.
  * Connects to: api/manager.ts, Manager tabs.
- * 
- * Notes: Skeleton only — types to be defined later.
  */
 
+export interface ManagerKPI {
+  contractors: number;
+  customers: number;
+  centers: number;
+  crew: number;
+}

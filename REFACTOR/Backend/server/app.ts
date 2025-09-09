@@ -10,7 +10,18 @@
  * Function: Initialize HTTP server, register middleware, and route modules.
  * Importance: Entry point for backend server and Manager API mount.
  * Connects to: middleware/auth.ts, hub/manager/routes/index.ts.
- * 
- * Notes: Skeleton only — implementation to be added later.
  */
 
+import express from 'express';
+import managerRouter from './hub/manager/routes';
+
+const app = express();
+
+app.use(express.json());
+
+// TODO: attach auth middleware when implemented
+// app.use(auth);
+
+app.use('/api/manager', managerRouter);
+
+export default app;
