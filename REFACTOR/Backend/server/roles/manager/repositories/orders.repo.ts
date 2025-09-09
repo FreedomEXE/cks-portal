@@ -4,13 +4,13 @@
 ───────────────────────────────────────────────*/
 
 /**
- * File: Support.tsx
+ * File: orders.repo.ts
  * 
- * Description: Support center / contact actions. for Manager Users
- * Function: Provide links or forms for help and support.
- * Importance: Streamlines access to knowledge base and support channels.
- * Connects to: api/manager.ts (GET /support) or external helpdesk.
+ * Description: DB access for orders (org/center scoped). for Manager Users
+ * Function: Implement queries for listing and updating orders.
+ * Importance: Underpins Manager order workflows and KPIs.
+ * Connects to: orders.service.ts, dashboard KPIs.
  * 
- * Notes: Skeleton only — UI implementation to be added later.
+ * Notes: Skeleton only — query implementations to be added later.
  */
 

@@ -4,13 +4,13 @@
 ───────────────────────────────────────────────*/
 
 /**
- * File: Support.tsx
+ * File: profile.schema.ts
  * 
- * Description: Support center / contact actions. for Manager Users
- * Function: Provide links or forms for help and support.
- * Importance: Streamlines access to knowledge base and support channels.
- * Connects to: api/manager.ts (GET /support) or external helpdesk.
+ * Description: Validates profile update DTOs. for Manager Users
+ * Function: Define and export validation schema for profile updates.
+ * Importance: Ensures safe, consistent input for profile APIs.
+ * Connects to: profile.ts routes, profile.service.ts.
  * 
- * Notes: Skeleton only — UI implementation to be added later.
+ * Notes: Skeleton only — schema to be defined later.
  */
 

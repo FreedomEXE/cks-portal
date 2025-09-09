@@ -4,12 +4,12 @@
   Manifested by Freedom
 ───────────────────────────────────────────────
 
-File: Permissions.md
+File: Testing.md
 
-Description: Tab visibility vs. server caps, with scenarios. for Manager Users
-Function: Document how UI requires[] maps to backend capabilities.
-Importance: Keeps RBAC consistent from server to client.
-Connects to: backend Permissions.md, config.v1.json.
-Notes: Placeholder — scenarios and mappings TBD.
+Description: Unit/integration strategy, fixtures, mocks for Manager Users
+Function: Outline test approaches for Manager backend.
+Importance: Ensures reliability and reduces regressions.
+Connects to: services/*, repositories/*, routes/*.
+Notes: Placeholder — test scenarios and tooling TBD.
 -->
 

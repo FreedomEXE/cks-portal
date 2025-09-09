@@ -4,13 +4,13 @@
 ───────────────────────────────────────────────*/
 
 /**
- * File: Support.tsx
+ * File: activity.repo.ts
  * 
- * Description: Support center / contact actions. for Manager Users
- * Function: Provide links or forms for help and support.
- * Importance: Streamlines access to knowledge base and support channels.
- * Connects to: api/manager.ts (GET /support) or external helpdesk.
+ * Description: Read/write activity logs for Manager Users
+ * Function: Provide insert and query helpers for activity_logs.
+ * Importance: Enables audits, feeds dashboard/activity UI.
+ * Connects to: Services that log actions; Activity UI.
  * 
- * Notes: Skeleton only — UI implementation to be added later.
+ * Notes: Skeleton only — query implementations to be added later.
  */
 

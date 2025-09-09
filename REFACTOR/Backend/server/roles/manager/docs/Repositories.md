@@ -4,12 +4,12 @@
   Manifested by Freedom
 ───────────────────────────────────────────────
 
-File: Permissions.md
+File: Repositories.md
 
-Description: Tab visibility vs. server caps, with scenarios. for Manager Users
-Function: Document how UI requires[] maps to backend capabilities.
-Importance: Keeps RBAC consistent from server to client.
-Connects to: backend Permissions.md, config.v1.json.
-Notes: Placeholder — scenarios and mappings TBD.
+Description: DB access patterns, indices, and performance notes for Manager users
+Function: Standardize repository conventions and query patterns.
+Importance: Improves maintainability and performance predictability.
+Connects to: repositories/*, Database/docs/DataModel.md.
+Notes: Placeholder — patterns and examples TBD.
 -->
 

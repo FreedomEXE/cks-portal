@@ -6,7 +6,7 @@
 
 File: DataModel.md
 
-Description: Front-end view of entities (Profile, Service, Order, Report).
+Description: Front-end view of entities (Profile, Service, Order, Report). for Manager Users
 Function: Define UI-facing shapes and relationships.
 Importance: Guides component props and state structures.
 Connects to: types/manager.d.ts, backend DataModel.

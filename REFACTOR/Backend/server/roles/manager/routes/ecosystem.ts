@@ -4,13 +4,13 @@
 ───────────────────────────────────────────────*/
 
 /**
- * File: Ecosystem.tsx
+ * File: ecosystem.ts
  * 
- * Description: Relations map (centers, crews, customers/partners). for Manager Users
- * Function: Visualize and browse ecosystem entities and linkages.
+ * Description: Aggregated view of centers/crews/customers (GET /ecosystem). for Manager Users
+ * Function: Return composed ecosystem data for Manager overview.
  * Importance: Helps managers understand operational relationships.
- * Connects to: api/manager.ts (GET /ecosystem), multiple repos.
+ * Connects to: ecosystem.service.ts, multiple repos.
  * 
- * Notes: Skeleton only — UI implementation to be added later.
+ * Notes: Skeleton only — implementation to be added later.
  */
 

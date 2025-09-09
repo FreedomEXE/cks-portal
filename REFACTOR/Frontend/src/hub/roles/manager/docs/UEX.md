@@ -6,7 +6,7 @@
 
 File: UEX.md
 
-Description: User flows/feel (first-run tour, empty states, loading).
+Description: User flows/feel (first-run tour, empty states, loading). for Manager Users
 Function: Describe experiential aspects of Manager UI.
 Importance: Drives coherent, empathetic user experience.
 Connects to: UI.md, Skeleton.md, tab components.

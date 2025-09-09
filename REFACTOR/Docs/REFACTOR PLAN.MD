@@ -1,6 +1,158 @@
-REFACTOR PLAN SKELETON FOR CODEBASE
+REFACTOR PLAN SKELETON FOR CODEBASE (MANAGER USERS)
 EACH FILE THAT YOU CREATE NEEDS TO HAVE MY CODER TAG AND THE BEST PRACTICES. SEE BELOW AN EXAMPLE 
 
+EDIT* 2025-09-09 I HAVE CHANGED THE STRUCTURE A BIT PLEASE READ FROM HERE LINE 4 TO LINE 155. 
+
+ok so i had to go in add "for Manager Users" to some of the file descriptions just so we dont get confused. also i have some     
+▌things i want to mention. In the backend we have a docs folder in the hub/manager section. thats fine. i think we should also    
+▌have at least a readme at the root of the backend if nothing else. 2. for database I notice that both the docs and the migration 
+▌folder in the database are manager specific, if so, shouldnt they be in Database/hub/manager/docs and database/hub/manager/      
+▌migrations respectfully? if so lets also add a simple read me at the database root as well. and finally for the front end similar▌to the nbackend we have all the docs and read me in the hub specific folder which is good I want to have that but lets also add a▌simple read me at the root of the frontend folder.
+
+Improved Directory Structure
+REFACTOR/
+├── DATABASE/
+│   ├── README.md                    # "Database module for CKS Portal refactor"
+│   └── roles/
+│       └── manager/
+│           ├── migrations/
+│           │   ├── 001_manager_users.sql
+│           │   ├── 002_manager_rbac.sql
+│           │   ├── 003_manager_domain.sql
+│           │   ├── 004_manager_activity_logs.sql
+│           │   └── 010_seed_manager_caps.sql
+│           └── docs/
+│               ├── README.md
+│               ├── DataModel.md
+│               ├── Migrations.md
+│               ├── RLS_Policies.md
+│               ├── Seeds.md
+│               └── Changelog.md
+│
+├── BACKEND/
+│   ├── README.md                    # "Backend module for CKS Portal refactor"
+│   ├── package.json
+│   ├── tsconfig.json
+│   └── server/
+│       ├── app.ts
+│       ├── middleware/
+│       │   ├── auth.ts
+│       │   └── requireCaps.ts
+│       └── roles/
+│           └── manager/
+│               ├── routes/
+│               ├── services/
+│               ├── repositories/
+│               ├── validators/
+│               └── docs/
+│
+└── FRONTEND/
+    ├── README.md                    # "Frontend module for CKS Portal refactor"
+    ├── package.json
+    ├── tsconfig.json
+    └── src/
+        ├── shared/
+        │   ├── api/
+        │   │   └── base.ts      # Shared API utilities
+        │   ├── types/
+        │   │   └── api.d.ts     # Shared types
+        │   └── schemas/
+        │       └── roleConfig.ts
+        ├── hub/
+        │   ├── RoleHub.tsx
+        │   ├── roleConfigLoader.ts
+        │   └── roles/
+        │       └── manager/
+        │           ├── config.v1.json
+        │           ├── index.ts
+        │           ├── api/
+        │           │   └── manager.ts
+        │           ├── types/
+        │           │   └── manager.d.ts
+        │           ├── tabs/
+        │           └── docs/
+Root README Files
+DATABASE/README.md
+markdown# CKS Portal Database Module
+
+This module contains database migrations, seeds, and documentation for the CKS Portal refactor.
+
+## Structure
+- `roles/` - Role-specific database schemas and migrations
+  - `manager/` - Manager role database components
+  - `contractor/` - (future) Contractor role database components
+  - `customer/` - (future) Customer role database components
+
+## Setup
+1. Create database: `createdb cks_portal_v2`
+2. Run migrations: See role-specific migration guides
+
+## Conventions
+- Migrations numbered: `XXX_description.sql`
+- Tables use snake_case
+- Role-specific tables prefixed with role code
+BACKEND/README.md
+markdown# CKS Portal Backend Module
+
+Express/TypeScript backend for the CKS Portal refactor.
+
+## Structure
+- `server/` - Core server code
+  - `middleware/` - Shared middleware (auth, RBAC)
+  - `roles/` - Role-specific modules
+    - `manager/` - Manager API endpoints and services
+
+## Setup
+1. Install dependencies: `npm install`
+2. Configure environment: `cp .env.example .env`
+3. Run development: `npm run dev`
+
+## Architecture
+- Routes → Services → Repositories → Database
+- Zod validation on all inputs
+- Capability-based authorization
+FRONTEND/README.md
+markdown# CKS Portal Frontend Module
+
+React/TypeScript frontend for the CKS Portal refactor.
+
+## Structure
+- `shared/` - Cross-role utilities and types
+- `hub/` - Role-based hub system
+  - `roles/` - Role-specific implementations
+    - `manager/` - Manager hub components
+
+## Setup
+1. Install dependencies: `npm install`
+2. Configure environment: `cp .env.example .env`
+3. Run development: `npm run dev`
+
+## Architecture
+- Config-driven role rendering
+- TypeScript throughout
+- Zod validation for configs
+- API types match backend exactly
+Prompt for Codex to Reorganize
+Reorganize the REFACTOR directory structure as follows:
+
+1. Move Database/migrations/* to Database/roles/manager/migrations/
+2. Move Database/docs/* to Database/roles/manager/docs/
+3. Rename migration files to prefix with "manager_" (e.g., 001_manager_users.sql)
+4. Update all file descriptions to specify "for Manager role" where appropriate
+
+5. Move Backend/server/hub/manager/* to Backend/server/roles/manager/
+6. Update imports and paths accordingly
+
+7. Move Frontend/src/api/manager.ts to Frontend/src/hub/roles/manager/api/
+8. Move Frontend/src/types/manager.d.ts to Frontend/src/hub/roles/manager/types/
+9. Keep Frontend/src/types/api.d.ts in Frontend/src/shared/types/
+
+10. Create README.md at the root of each main folder (DATABASE, BACKEND, FRONTEND) with the content provided above
+
+11. Update all "Connects to:" references in file headers to reflect new paths
+
+This structure will support multiple roles without confusion and maintain clear separation.
+===================================================================================================================
 /*───────────────────────────────────────────────
   Property of CKS  © 2025
   Manifested by Freedom

@@ -6,7 +6,7 @@
 
 File: Skeleton.md
 
-Description: How this hub’s front-end structure connects to backend+DB.
+Description: How this hub’s front-end structure connects to backend+DB. for Manager Users
 Function: Map UI modules to backend services and schema.
 Importance: Clarifies cross-tier integration points.
 Connects to: API.md, backend ServicesDesign.md, Database DataModel.

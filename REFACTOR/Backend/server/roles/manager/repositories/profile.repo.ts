@@ -4,13 +4,13 @@
 ───────────────────────────────────────────────*/
 
 /**
- * File: Support.tsx
+ * File: profile.repo.ts
  * 
- * Description: Support center / contact actions. for Manager Users
- * Function: Provide links or forms for help and support.
- * Importance: Streamlines access to knowledge base and support channels.
- * Connects to: api/manager.ts (GET /support) or external helpdesk.
+ * Description: DB access for user/org profile fields. for Manager Users
+ * Function: Encapsulate queries for profile read/write operations.
+ * Importance: Provides single source of data access for profiles.
+ * Connects to: profile.service.ts.
  * 
- * Notes: Skeleton only — UI implementation to be added later.
+ * Notes: Skeleton only — query implementations to be added later.
  */
 

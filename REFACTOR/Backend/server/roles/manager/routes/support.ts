@@ -4,12 +4,13 @@
 ───────────────────────────────────────────────*/
 
 /**
- * File: RoleHub.tsx
+ * File: support.ts
  * 
- * Description: Shared renderer — loads the role bundle (config + registry), applies capability gating, renders the active tab.
- * Function: Orchestrate role UI composition and rendering.
- * Importance: Core runtime component for role-driven UI.
- * Connects to: roleConfigLoader.ts, shared/schemas/roleConfig.ts, Manager registry.
+ * Description: Support/KB or ticket bootstrap (GET /support). for Manager Users
+ * Function: Provide support content or initiate ticketing actions.
+ * Importance: Streamlines Manager access to help resources.
+ * Connects to: support.service.ts, external helpdesk API (if any).
  * 
  * Notes: Skeleton only — implementation to be added later.
  */
+

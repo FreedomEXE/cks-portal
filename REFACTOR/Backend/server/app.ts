@@ -9,11 +9,11 @@
  * Description: Express app setup (JSON parser, auth attach, mounts /api/manager).
  * Function: Initialize HTTP server, register middleware, and route modules.
  * Importance: Entry point for backend server and Manager API mount.
- * Connects to: middleware/auth.ts, hub/manager/routes/index.ts.
+ * Connects to: middleware/auth.ts, roles/manager/routes/index.ts.
  */
 
 import express from 'express';
-import managerRouter from './hub/manager/routes';
+import managerRouter from './roles/manager/routes';
 
 const app = express();
 

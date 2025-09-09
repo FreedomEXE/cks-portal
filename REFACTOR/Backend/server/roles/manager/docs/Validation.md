@@ -4,12 +4,12 @@
   Manifested by Freedom
 ───────────────────────────────────────────────
 
-File: Permissions.md
+File: Validation.md
 
-Description: Tab visibility vs. server caps, with scenarios. for Manager Users
-Function: Document how UI requires[] maps to backend capabilities.
-Importance: Keeps RBAC consistent from server to client.
-Connects to: backend Permissions.md, config.v1.json.
-Notes: Placeholder — scenarios and mappings TBD.
+Description: DTO schemas, error codes, examples for Manager Users
+Function: Document validation contracts used by routes and services.
+Importance: Reduces integration errors and clarifies failure cases.
+Connects to: validators/*, routes/*, types/api.d.ts.
+Notes: Placeholder — schema references and examples TBD.
 -->
 

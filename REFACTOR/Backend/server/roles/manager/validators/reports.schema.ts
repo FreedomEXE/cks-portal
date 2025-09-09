@@ -4,13 +4,13 @@
 ───────────────────────────────────────────────*/
 
 /**
- * File: Support.tsx
+ * File: reports.schema.ts
  * 
- * Description: Support center / contact actions. for Manager Users
- * Function: Provide links or forms for help and support.
- * Importance: Streamlines access to knowledge base and support channels.
- * Connects to: api/manager.ts (GET /support) or external helpdesk.
+ * Description: Validates report request params. for Manager Users
+ * Function: Define and export validation schema for report filters/params.
+ * Importance: Supports robustness of reporting endpoints.
+ * Connects to: reports.ts routes, reports.service.ts.
  * 
- * Notes: Skeleton only — UI implementation to be added later.
+ * Notes: Skeleton only — schema to be defined later.
  */
 

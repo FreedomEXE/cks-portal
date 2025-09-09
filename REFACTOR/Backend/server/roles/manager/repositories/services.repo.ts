@@ -4,13 +4,13 @@
 ───────────────────────────────────────────────*/
 
 /**
- * File: Support.tsx
+ * File: services.repo.ts
  * 
- * Description: Support center / contact actions. for Manager Users
- * Function: Provide links or forms for help and support.
- * Importance: Streamlines access to knowledge base and support channels.
- * Connects to: api/manager.ts (GET /support) or external helpdesk.
+ * Description: DB access for service catalog entities. for Manager Users
+ * Function: Provide CRUD queries for Manager services.
+ * Importance: Supports service management workflows.
+ * Connects to: services.service.ts.
  * 
- * Notes: Skeleton only — UI implementation to be added later.
+ * Notes: Skeleton only — query implementations to be added later.
  */
 

@@ -4,12 +4,13 @@
 ───────────────────────────────────────────────*/
 
 /**
- * File: RoleHub.tsx
+ * File: services.ts
  * 
- * Description: Shared renderer — loads the role bundle (config + registry), applies capability gating, renders the active tab.
- * Function: Orchestrate role UI composition and rendering.
- * Importance: Core runtime component for role-driven UI.
- * Connects to: roleConfigLoader.ts, shared/schemas/roleConfig.ts, Manager registry.
+ * Description: Manage “My Services” catalog (GET/POST/PATCH /services). for Manager Users
+ * Function: Handle listing and CRUD of Manager service offerings.
+ * Importance: Central to configuring org-level services.
+ * Connects to: services.service.ts, services.repo.ts, validators.
  * 
  * Notes: Skeleton only — implementation to be added later.
  */
+

@@ -13,8 +13,8 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { fetchDashboardKPIs } from '../../../../api/manager';
-import type { ManagerKPI } from '../../../../types/manager';
+import { fetchDashboardKPIs } from '../api/manager';
+import type { ManagerKPI } from '../types/manager';
 
 export default function Dashboard() {
   const [kpis, setKpis] = useState<ManagerKPI | null>(null);
