@@ -1,12 +1,98 @@
 {
   "_tag": "Property of CKS © 2025 — Manifested by Freedom",
-  "_meta": {
-    "file": "config.v1.json",
-    "description": "Manager tab layout: Dashboard, My Profile, My Services, Ecosystem, Orders, Reports, Support (+ optional widgets).",
-    "function": "Define tab registry references and layout for Manager role.",
-    "importance": "Drives what UI is shown for Manager and how it is gated.",
-    "connectsTo": "RoleHub.tsx, roleConfigLoader.ts, backend caps via requires[].",
-    "notes": "Skeleton only — actual config structure to be added later."
+  "role": "manager",
+  "displayName": "Manager Hub",
+  "version": "1.0.0",
+  "theme": {
+    "primaryColor": "#3b7af7",
+    "headerClass": "bg-blue-600",
+    "accentColor": "#1d4ed8"
+  },
+  "tabs": [
+    {
+      "id": "dashboard",
+      "label": "Dashboard",
+      "component": "Dashboard",
+      "icon": "LayoutDashboard",
+      "default": true,
+      "requires": ["dashboard:view"]
+    },
+    {
+      "id": "profile",
+      "label": "My Profile", 
+      "component": "MyProfile",
+      "icon": "User",
+      "requires": ["profile:view"]
+    },
+    {
+      "id": "services",
+      "label": "My Services",
+      "component": "MyServices", 
+      "icon": "Settings",
+      "requires": ["services:manage"]
+    },
+    {
+      "id": "contractors",
+      "label": "Ecosystem",
+      "component": "Ecosystem",
+      "icon": "Network",
+      "requires": ["ecosystem:view"]
+    },
+    {
+      "id": "orders",
+      "label": "Orders",
+      "component": "Orders",
+      "icon": "ShoppingCart", 
+      "requires": ["orders:view"]
+    },
+    {
+      "id": "reports",
+      "label": "Reports",
+      "component": "Reports",
+      "icon": "FileText",
+      "requires": ["reports:view"]
+    },
+    {
+      "id": "support",
+      "label": "Support",
+      "component": "Support", 
+      "icon": "HelpCircle",
+      "requires": ["support:access"]
+    }
+  ],
+  "features": {
+    "showRecentActions": true,
+    "showDashboardMetrics": true,
+    "allowContractorAssignment": true,
+    "allowServiceManagement": true,
+    "viewHierarchy": ["contractor", "customer", "center", "crew"]
+  },
+  "api": {
+    "baseUrl": "/api/manager",
+    "endpoints": {
+      "profile": "/profile",
+      "dashboard": "/dashboard", 
+      "activity": "/activity",
+      "services": "/services",
+      "ecosystem": "/ecosystem",
+      "requests": "/requests",
+      "orders": "/orders",
+      "reports": "/reports",
+      "feedback": "/feedback",
+      "support": "/support"
+    }
+  },
+  "permissions": {
+    "default": ["dashboard:view", "profile:view"],
+    "required": {
+      "services:manage": "Manage service catalog",
+      "ecosystem:view": "View ecosystem relationships", 
+      "orders:view": "View and manage orders",
+      "orders:schedule": "Schedule service requests",
+      "reports:view": "View reports and feedback",
+      "reports:manage": "Manage report status and comments",
+      "support:access": "Access support system"
+    }
   }
 }
 

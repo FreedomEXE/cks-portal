@@ -22,7 +22,9 @@
       "Bash(find:*)",
       "Read(/c:\\Users\\rizz5\\OneDrive\\Desktop\\Claude/**)",
       "Bash(npm run:*)",
-      "Bash(npx ts-node:*)"
+      "Bash(npx ts-node:*)",
+      "Bash(git push:*)",
+      "Bash(git add:*)"
     ],
     "deny": [],
     "ask": []

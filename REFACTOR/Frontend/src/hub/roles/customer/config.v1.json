@@ -1,0 +1,100 @@
+{
+  "_tag": "Property of CKS © 2025 — Manifested by Freedom",
+  "role": "customer",
+  "displayName": "Customer Hub",
+  "version": "1.0.0",
+  "theme": {
+    "primaryColor": "#eab308",
+    "headerClass": "bg-yellow-500",
+    "accentColor": "#d97706"
+  },
+  "tabs": [
+    {
+      "id": "dashboard",
+      "label": "Dashboard",
+      "component": "Dashboard",
+      "icon": "LayoutDashboard",
+      "default": true,
+      "requires": ["dashboard:view"]
+    },
+    {
+      "id": "profile",
+      "label": "Customer Profile",
+      "component": "MyProfile",
+      "icon": "Building",
+      "requires": ["profile:view"]
+    },
+    {
+      "id": "services",
+      "label": "My Services",
+      "component": "MyServices",
+      "icon": "Settings",
+      "requires": ["services:request"]
+    },
+    {
+      "id": "ecosystem",
+      "label": "Ecosystem",
+      "component": "Ecosystem",
+      "icon": "Network",
+      "requires": ["ecosystem:view"]
+    },
+    {
+      "id": "orders",
+      "label": "Orders",
+      "component": "Orders",
+      "icon": "ShoppingCart",
+      "requires": ["orders:view"]
+    },
+    {
+      "id": "reports",
+      "label": "Reports",
+      "component": "Reports",
+      "icon": "FileText",
+      "requires": ["reports:submit"]
+    },
+    {
+      "id": "support",
+      "label": "Support",
+      "component": "Support",
+      "icon": "HelpCircle",
+      "requires": ["support:access"]
+    }
+  ],
+  "features": {
+    "showCenterOverview": true,
+    "allowServiceRequests": true,
+    "enableEcosystemView": true,
+    "showAccountManager": true,
+    "supportTicketSystem": true,
+    "feedbackSystem": true,
+    "viewHierarchy": ["center", "contractor", "crew"]
+  },
+  "api": {
+    "baseUrl": "/api/customer",
+    "endpoints": {
+      "profile": "/profile",
+      "dashboard": "/dashboard",
+      "centers": "/centers",
+      "services": "/services",
+      "orders": "/orders",
+      "reports": "/reports",
+      "feedback": "/feedback",
+      "support": "/support",
+      "ecosystem": "/ecosystem",
+      "metrics": "/metrics",
+      "health": "/health"
+    }
+  },
+  "permissions": {
+    "default": ["dashboard:view", "profile:view"],
+    "required": {
+      "services:request": "Request services for customer centers",
+      "ecosystem:view": "View business network and center operations",
+      "orders:view": "View and track service orders",
+      "orders:modify": "Modify pending service orders",
+      "reports:submit": "Submit reports and provide feedback",
+      "reports:view": "View submitted reports and responses",
+      "support:access": "Access customer support services"
+    }
+  }
+}

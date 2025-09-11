@@ -1,0 +1,69 @@
+{
+  "_tag": "Property of CKS © 2025 — Manifested by Freedom",
+  "role": "warehouse",
+  "displayName": "Warehouse Hub",
+  "version": "1.0.0",
+  "theme": {
+    "primaryColor": "#8b5cf6",
+    "headerClass": "bg-violet-600",
+    "accentColor": "#7c3aed"
+  },
+  "tabs": [
+    {
+      "id": "dashboard",
+      "label": "Dashboard",
+      "component": "Dashboard",
+      "icon": "LayoutDashboard",
+      "default": true,
+      "requires": ["dashboard:view"]
+    },
+    {
+      "id": "profile",
+      "label": "My Profile", 
+      "component": "MyProfile",
+      "icon": "User",
+      "requires": ["profile:view"]
+    },
+    {
+      "id": "inventory",
+      "label": "Inventory",
+      "component": "Inventory", 
+      "icon": "Package",
+      "requires": ["inventory:manage"]
+    },
+    {
+      "id": "orders",
+      "label": "Orders",
+      "component": "Orders",
+      "icon": "ShoppingCart",
+      "requires": ["orders:process"]
+    }
+  ],
+  "features": {
+    "showInventoryMetrics": true,
+    "showOrderTracking": true,
+    "allowStockAdjustments": true,
+    "shippingIntegration": true,
+    "viewHierarchy": ["manager"]
+  },
+  "api": {
+    "baseUrl": "/api/warehouse",
+    "endpoints": {
+      "profile": "/profile",
+      "dashboard": "/dashboard", 
+      "inventory": "/inventory",
+      "orders": "/orders",
+      "shipping": "/shipping",
+      "reports": "/reports"
+    }
+  },
+  "permissions": {
+    "default": ["dashboard:view", "profile:view"],
+    "required": {
+      "inventory:manage": "Manage inventory levels",
+      "orders:process": "Process and fulfill orders", 
+      "shipping:track": "Track shipments",
+      "reports:generate": "Generate warehouse reports"
+    }
+  }
+}

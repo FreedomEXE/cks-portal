@@ -229,3 +229,92 @@ export interface ManagerFeedbackTotals {
   request?: number;
   issue?: number;
 }
+
+/**
+ * ManagerProfile: Complete manager profile data structure.
+ */
+export interface ManagerProfile {
+  manager_id: string;
+  name: string;
+  code: string;
+  territory?: string;
+  reports_to?: string;
+  email?: string;
+  phone?: string;
+  start_date?: string;
+  role?: string;
+  _stub?: boolean;
+}
+
+/**
+ * ManagerService: Service managed by this manager.
+ */
+export interface ManagerService {
+  service_id: string;
+  name: string;
+  description?: string;
+  category: string;
+  status: 'active' | 'inactive' | 'pending';
+  pricing?: {
+    base_rate?: number;
+    currency?: string;
+  };
+  requirements?: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * ManagerActivity: Activity log entry for manager dashboard.
+ */
+export interface ManagerActivity {
+  activity_id: string;
+  activity_type: string;
+  description: string;
+  actor_role?: string;
+  created_at: string;
+  metadata?: {
+    action_link?: boolean;
+    contractor_id?: string;
+    [key: string]: any;
+  };
+}
+
+/**
+ * EcosystemNode: Node in the ecosystem tree view.
+ */
+export interface EcosystemNode {
+  id: string;
+  name: string;
+  type: 'manager' | 'contractor' | 'customer' | 'center' | 'crew';
+  stats?: {
+    customers?: number;
+    centers?: number;
+    crew?: number;
+  };
+  children?: EcosystemNode[];
+}
+
+/**
+ * ManagerDashboardData: Aggregated dashboard data.
+ */
+export interface ManagerDashboardData {
+  metrics: ManagerKPI;
+  recentActivity: ManagerActivity[];
+  news: NewsItem[];
+}
+
+/**
+ * ManagerPreferences: User preference settings.
+ */
+export interface ManagerPreferences {
+  notifications: {
+    email_assignments: boolean;
+    sms_alerts: boolean;
+    weekly_reports: boolean;
+  };
+  display: {
+    refresh_rate: number;
+    timezone: string;
+  };
+}
