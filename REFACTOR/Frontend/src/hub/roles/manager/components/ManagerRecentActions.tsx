@@ -78,7 +78,7 @@ export default function ManagerRecentActions({ code }: ManagerRecentActionsProps
   return (
     <div className="ui-card" style={{ padding: 16, marginBottom: 24 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <div style={{ fontSize: 16, fontWeight: 600, color: '#3b7af7' }}>Recent Actions</div>
+        <div style={{ fontSize: 16, fontWeight: 600, color: '#3b7af7' }}>Recent Activity</div>
         {activities.length > 0 && (
           <button 
             onClick={handleClearActivity}

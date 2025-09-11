@@ -22,78 +22,91 @@ interface OrdersProps {
 }
 
 interface Order {
-  id: string;
-  order_number: string;
-  destination: string;
-  items: Array<{ name: string; quantity: number; sku: string }>;
-  status: 'Pending' | 'Processing' | 'Packed' | 'Shipped' | 'Delivered';
-  priority: 'High' | 'Medium' | 'Low';
+  order_id: string;
+  approved_by?: string;
+  created_by_role?: string;
+  created_by_id?: string;
   order_date: string;
-  requested_delivery: string;
-  assigned_to?: string;
+  total_qty?: number;
+  item_count?: number;
+  center_id?: string;
+  customer_id?: string;
 }
 
 export default function Orders({ userId, config, features, api }: OrdersProps) {
-  const [activeTab, setActiveTab] = useState<'active' | 'completed'>('active');
-  const [activeOrders, setActiveOrders] = useState<Order[]>([]);
-  const [completedOrders, setCompletedOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [ordersArchive, setOrdersArchive] = useState<Order[]>([]);
+  const [ordersPendingQuery, setOrdersPendingQuery] = useState('');
+  const [ordersArchiveQuery, setOrdersArchiveQuery] = useState('');
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const loadOrders = async () => {
       try {
         setLoading(true);
         
-        // Mock active orders
-        const mockActiveOrders: Order[] = [
+        // Mock pending orders data
+        const mockOrders: Order[] = [
           {
-            id: 'ORD-001',
-            order_number: 'WO-2025-001',
-            destination: 'Downtown Service Center',
-            items: [
-              { name: 'Industrial Cleaning Solution', quantity: 5, sku: 'ICS-500' },
-              { name: 'Microfiber Towels', quantity: 10, sku: 'MFT-200' }
-            ],
-            status: 'Pending',
-            priority: 'High',
+            order_id: 'WH-2025-001',
+            approved_by: 'Manager Smith',
+            created_by_role: 'Customer',
+            created_by_id: 'CUST-001',
             order_date: '2025-09-11',
-            requested_delivery: '2025-09-12',
-            assigned_to: 'Warehouse Team A'
+            total_qty: 15,
+            item_count: 15,
+            center_id: 'CTR-001',
+            customer_id: 'CUST-001'
           },
           {
-            id: 'ORD-002',
-            order_number: 'WO-2025-002',
-            destination: 'North Campus Center',
-            items: [
-              { name: 'Safety Gloves', quantity: 8, sku: 'SG-100' },
-              { name: 'Floor Mop Heads', quantity: 15, sku: 'FMH-75' }
-            ],
-            status: 'Processing',
-            priority: 'Medium',
+            order_id: 'WH-2025-002',
+            approved_by: '',
+            created_by_role: 'Center',
+            created_by_id: 'CTR-002',
             order_date: '2025-09-10',
-            requested_delivery: '2025-09-13'
+            total_qty: 8,
+            item_count: 8,
+            center_id: 'CTR-002'
+          },
+          {
+            order_id: 'WH-2025-003',
+            approved_by: 'Supervisor Johnson',
+            created_by_role: 'Contractor',
+            created_by_id: 'CONTR-005',
+            order_date: '2025-09-11',
+            total_qty: 22,
+            item_count: 22,
+            customer_id: 'CUST-003'
           }
         ];
 
-        // Mock completed orders
-        const mockCompletedOrders: Order[] = [
+        // Mock archive orders data
+        const mockOrdersArchive: Order[] = [
           {
-            id: 'ORD-003',
-            order_number: 'WO-2025-003',
-            destination: 'Industrial Park Center',
-            items: [
-              { name: 'Industrial Cleaning Solution', quantity: 3, sku: 'ICS-500' }
-            ],
-            status: 'Delivered',
-            priority: 'Low',
+            order_id: 'WH-2025-004',
+            approved_by: 'Manager Davis',
+            created_by_role: 'Customer',
+            created_by_id: 'CUST-002',
             order_date: '2025-09-08',
-            requested_delivery: '2025-09-10',
-            assigned_to: 'Warehouse Team B'
+            total_qty: 12,
+            item_count: 12,
+            center_id: 'CTR-003',
+            customer_id: 'CUST-002'
+          },
+          {
+            order_id: 'WH-2025-005',
+            approved_by: 'Supervisor Williams',
+            created_by_role: 'Center',
+            created_by_id: 'CTR-004',
+            order_date: '2025-09-07',
+            total_qty: 30,
+            item_count: 30,
+            center_id: 'CTR-004'
           }
         ];
         
-        setActiveOrders(mockActiveOrders);
-        setCompletedOrders(mockCompletedOrders);
+        setOrders(mockOrders);
+        setOrdersArchive(mockOrdersArchive);
         
       } catch (error) {
         console.error('Error loading orders:', error);
@@ -105,17 +118,24 @@ export default function Orders({ userId, config, features, api }: OrdersProps) {
     loadOrders();
   }, [userId]);
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Pending': return '#6b7280';
-      case 'Processing': return '#3b82f6';
-      case 'Packed': return '#f59e0b';
-      case 'Shipped': return '#10b981';
-      case 'Delivered': return '#10b981';
-      case 'High': return '#ef4444';
-      case 'Medium': return '#f59e0b';
-      case 'Low': return '#10b981';
-      default: return '#6b7280';
+  const handleAssignOrder = async (orderId: string) => {
+    try {
+      // Mock assign order functionality
+      console.log('Assigning order:', orderId);
+      // In real implementation, would call API to assign order
+    } catch (error) {
+      console.error('Error assigning order:', error);
+    }
+  };
+
+  const handleCreateShipment = async (order: Order) => {
+    try {
+      // Mock create shipment functionality
+      const dest = order.center_id ? `Center ${order.center_id}` : (order.customer_id ? `Customer ${order.customer_id}` : 'Destination');
+      console.log('Creating shipment for order:', order.order_id, 'to:', dest);
+      // In real implementation, would call API to create shipment
+    } catch (error) {
+      console.error('Error creating shipment:', error);
     }
   };
 
@@ -128,154 +148,117 @@ export default function Orders({ userId, config, features, api }: OrdersProps) {
     );
   }
 
-  const currentOrders = activeTab === 'active' ? activeOrders : completedOrders;
-
   return (
     <div>
-      {/* Header */}
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center', 
-        marginBottom: 16 
-      }}>
-        <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>Order Management</h2>
+      {/* Two stacked panels: Current and Archive */}
+      {/* Current Orders (Pending) */}
+      <div style={{ border: '1px solid #edf2f7', borderRadius: 10, background: '#fafafa', padding: 12, marginBottom: 16 }}>
+        <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 10, color: '#111827' }}>Orders</div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+          <input
+            value={ordersPendingQuery}
+            onChange={(e) => setOrdersPendingQuery(e.target.value)}
+            placeholder="Search by order/customer/center"
+            style={{ flex: 1, minWidth: 220, padding: 8, border: '1px solid #e5e7eb', borderRadius: 8, background: 'white' }}
+          />
+          <span style={{ fontSize: 12, color: '#6b7280' }}>max 10</span>
+        </div>
+        <div style={{ overflowX: 'auto', background: 'white', border: '1px solid #e5e7eb', borderRadius: 8 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr>
+                {['Order ID', 'Approved By', 'Created By', 'Order Date', 'Quantity', 'Destination', ''].map(h => (
+                  <th key={h} style={{ textAlign: 'left', background: '#f9fafb', borderBottom: '1px solid #e5e7eb', padding: 10, fontSize: 12, color: '#6b7280' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {orders
+                .filter((o: any) => {
+                  const q = ordersPendingQuery.trim().toLowerCase();
+                  if (!q) return true;
+                  return (
+                    String(o.order_id || '').toLowerCase().includes(q) ||
+                    String(o.customer_id || '').toLowerCase().includes(q) ||
+                    String(o.center_id || '').toLowerCase().includes(q)
+                  );
+                })
+                .slice(0, 10)
+                .map((o: any) => (
+                  <tr key={o.order_id}>
+                    <td style={{ padding: 10, fontWeight: 600 }}>{o.order_id}</td>
+                    <td style={{ padding: 10 }}>{o.approved_by || '—'}</td>
+                    <td style={{ padding: 10 }}>{(o.created_by_role || o.created_by_id) ? `${o.created_by_role || ''} ${o.created_by_id || ''}`.trim() : '—'}</td>
+                    <td style={{ padding: 10 }}>{o.order_date ? String(o.order_date).slice(0, 10) : '—'}</td>
+                    <td style={{ padding: 10 }}>{o.total_qty ?? o.item_count}</td>
+                    <td style={{ padding: 10 }}>{o.center_id || '—'}</td>
+                    <td style={{ padding: 10, display: 'flex', gap: 8 }}>
+                      <button
+                        onClick={() => handleAssignOrder(o.order_id)}
+                        style={{ padding: '6px 10px', background: '#e5e7eb', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 11, cursor: 'pointer' }}
+                      >
+                        Assign
+                      </button>
+                      <button
+                        onClick={() => handleCreateShipment(o)}
+                        style={{ padding: '6px 10px', background: '#8b5cf6', color: 'white', border: 'none', borderRadius: 8, fontSize: 11, cursor: 'pointer' }}
+                      >
+                        Create Shipment
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      {/* Tab Navigation */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-        {(['active', 'completed'] as const).map(tab => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            style={{
-              padding: '8px 16px',
-              borderRadius: 6,
-              border: '1px solid #e5e7eb',
-              background: activeTab === tab ? '#8b5cf6' : 'white',
-              color: activeTab === tab ? 'white' : '#111827',
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: 'pointer',
-              textTransform: 'capitalize'
-            }}
-          >
-            {tab === 'active' ? `Active Orders (${activeOrders.length})` : `Completed Orders (${completedOrders.length})`}
-          </button>
-        ))}
-      </div>
-
-      {/* Orders List */}
-      <div className="ui-card" style={{ padding: 0, overflow: 'hidden' }}>
-        {currentOrders.length === 0 ? (
-          <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>
-            <div style={{ fontSize: 48, marginBottom: 8 }}>
-              {activeTab === 'active' ? '📦' : '✅'}
-            </div>
-            <div style={{ fontSize: 16, fontWeight: 500, marginBottom: 4 }}>
-              {activeTab === 'active' ? 'No Active Orders' : 'No Completed Orders'}
-            </div>
-            <div style={{ fontSize: 12 }}>
-              {activeTab === 'active' 
-                ? 'New orders will appear here' 
-                : 'Completed orders will appear here'}
-            </div>
-          </div>
-        ) : (
-          <div style={{ padding: 16 }}>
-            <div style={{ display: 'grid', gap: 16 }}>
-              {currentOrders.map(order => (
-                <div key={order.id} style={{
-                  padding: 16,
-                  border: '1px solid #e5e7eb',
-                  borderRadius: 8,
-                  background: activeTab === 'active' ? '#f9fafb' : '#f7f7f7'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                    <div>
-                      <h3 style={{ fontSize: 16, fontWeight: 600, margin: 0, color: '#111827' }}>
-                        {order.order_number}
-                      </h3>
-                      <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
-                        {order.destination} • Ordered: {order.order_date} • Delivery: {order.requested_delivery}
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                      <div style={{
-                        padding: '2px 6px',
-                        borderRadius: 4,
-                        fontSize: 10,
-                        fontWeight: 600,
-                        background: getStatusColor(order.priority),
-                        color: 'white'
-                      }}>
-                        {order.priority}
-                      </div>
-                      <div style={{
-                        padding: '4px 8px',
-                        borderRadius: 4,
-                        fontSize: 11,
-                        fontWeight: 600,
-                        background: getStatusColor(order.status),
-                        color: 'white'
-                      }}>
-                        {order.status}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Order Items */}
-                  <div style={{ marginBottom: 12 }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
-                      Items ({order.items.length}):
-                    </div>
-                    <div style={{ display: 'grid', gap: 4 }}>
-                      {order.items.map((item, index) => (
-                        <div key={index} style={{ fontSize: 12, color: '#6b7280' }}>
-                          • {item.name} (SKU: {item.sku}) - Qty: {item.quantity}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12 }}>
-                    <div style={{ color: '#6b7280' }}>
-                      {order.assigned_to && `Assigned to: ${order.assigned_to}`}
-                    </div>
-                    {activeTab === 'active' && (
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        <button style={{
-                          padding: '6px 12px',
-                          background: '#3b82f6',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: 4,
-                          fontSize: 11,
-                          fontWeight: 600,
-                          cursor: 'pointer'
-                        }}>
-                          Process Order
-                        </button>
-                        <button style={{
-                          padding: '6px 12px',
-                          background: '#f3f4f6',
-                          color: '#111827',
-                          border: '1px solid #e5e7eb',
-                          borderRadius: 4,
-                          fontSize: 11,
-                          fontWeight: 600,
-                          cursor: 'pointer'
-                        }}>
-                          View Details
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+      {/* Orders Archive (Shipped) */}
+      <div style={{ border: '1px solid #edf2f7', borderRadius: 10, background: '#fafafa', padding: 12 }}>
+        <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 10, color: '#111827' }}>Archive</div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+          <input
+            value={ordersArchiveQuery}
+            onChange={(e) => setOrdersArchiveQuery(e.target.value)}
+            placeholder="Search shipped orders"
+            style={{ flex: 1, minWidth: 220, padding: 8, border: '1px solid #e5e7eb', borderRadius: 8, background: 'white' }}
+          />
+          <span style={{ fontSize: 12, color: '#6b7280' }}>max 10</span>
+        </div>
+        <div style={{ overflowX: 'auto', background: 'white', border: '1px solid #e5e7eb', borderRadius: 8 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr>
+                {['Order ID', 'Approved By', 'Created By', 'Order Date', 'Quantity', 'Destination'].map(h => (
+                  <th key={h} style={{ textAlign: 'left', background: '#f9fafb', borderBottom: '1px solid #e5e7eb', padding: 10, fontSize: 12, color: '#6b7280' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {ordersArchive
+                .filter((o: any) => {
+                  const q = ordersArchiveQuery.trim().toLowerCase();
+                  if (!q) return true;
+                  return (
+                    String(o.order_id || '').toLowerCase().includes(q) ||
+                    String(o.customer_id || '').toLowerCase().includes(q) ||
+                    String(o.center_id || '').toLowerCase().includes(q)
+                  );
+                })
+                .slice(0, 10)
+                .map((o: any) => (
+                  <tr key={o.order_id}>
+                    <td style={{ padding: 10, fontWeight: 600 }}>{o.order_id}</td>
+                    <td style={{ padding: 10 }}>{o.approved_by || '—'}</td>
+                    <td style={{ padding: 10 }}>{(o.created_by_role || o.created_by_id) ? `${o.created_by_role || ''} ${o.created_by_id || ''}`.trim() : '—'}</td>
+                    <td style={{ padding: 10 }}>{o.order_date ? String(o.order_date).slice(0, 10) : '—'}</td>
+                    <td style={{ padding: 10 }}>{o.total_qty ?? o.item_count}</td>
+                    <td style={{ padding: 10 }}>{o.center_id || '—'}</td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

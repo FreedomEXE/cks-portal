@@ -21,13 +21,15 @@ import Dashboard from './tabs/Dashboard';
 import MyProfile from './tabs/MyProfile';
 import Inventory from './tabs/Inventory';
 import Orders from './tabs/Orders';
+import Shipments from './tabs/Shipments';
 
 // Export all components for dynamic resolution
 export const components = {
   Dashboard,
   MyProfile,
   Inventory,
-  Orders
+  Orders,
+  Shipments
 } as const;
 
 // Export utility components (to be added as needed)

@@ -196,14 +196,6 @@ export default function MyProfile({ userId, config, features, api }: MyProfilePr
                   </tr>
                   <tr>
                     <td style={{ fontSize: 16, color: '#111827', fontWeight: 500, verticalAlign: 'top' }}>
-                      Reports To
-                    </td>
-                    <td style={{ fontSize: 16, color: '#111827' }}>
-                      {profileData.cks_manager}
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style={{ fontSize: 16, color: '#111827', fontWeight: 500, verticalAlign: 'top' }}>
                       Email
                     </td>
                     <td style={{ fontSize: 16, color: '#111827' }}>
@@ -224,14 +216,6 @@ export default function MyProfile({ userId, config, features, api }: MyProfilePr
                     </td>
                     <td style={{ fontSize: 16, color: '#111827' }}>
                       {formatDate(profileData.contract_start_date)}
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style={{ fontSize: 16, color: '#111827', fontWeight: 500, verticalAlign: 'top' }}>
-                      Role
-                    </td>
-                    <td style={{ fontSize: 16, color: '#111827' }}>
-                      Contractor
                     </td>
                   </tr>
                 </tbody>
@@ -286,9 +270,7 @@ export default function MyProfile({ userId, config, features, api }: MyProfilePr
                         ['Manager Name', managerProfile.name],
                         ['Manager ID', managerProfile.manager_id],
                         ['Email', managerProfile.email],
-                        ['Phone', managerProfile.phone],
-                        ['Territory', managerProfile.territory],
-                        ['Role', managerProfile.role]
+                        ['Phone', managerProfile.phone]
                       ].map(([label, value]) => (
                         <tr key={label}>
                           <td style={{ 

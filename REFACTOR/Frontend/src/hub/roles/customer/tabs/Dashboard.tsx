@@ -145,7 +145,7 @@ export default function CustomerDashboard({ userId, config, features, api }: Cus
   }
 
   return (
-    <div style={{ padding: 24 }}>
+    <div>
       <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16, color: '#111827' }}>
         Overview
       </h2>
@@ -235,28 +235,44 @@ export default function CustomerDashboard({ userId, config, features, api }: Cus
         </button>
       </div>
 
-      {/* Recent Activity Section */}
-      <div style={{ marginBottom: 24 }}>
-        <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12, color: '#111827' }}>
-          Recent Activity
-        </h3>
-        <div className="ui-card" style={{ padding: 24, textAlign: 'center' }}>
-          <div style={{ fontSize: 48, marginBottom: 12 }}>📋</div>
-          <div style={{ color: '#6b7280', marginBottom: 8 }}>No recent activity</div>
-          <div style={{ fontSize: 14, color: '#9ca3af' }}>Activity will appear here as it occurs</div>
+      {/* Recent Activity */}
+      <div className="ui-card" style={{ padding: 16, marginBottom: 24 }}>
+        <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 12, color: '#eab308' }}>Recent Activity</div>
+        <div style={{ textAlign: 'center', padding: 20, color: '#6b7280' }}>
+          <div style={{ fontSize: 32, marginBottom: 8 }}>📋</div>
+          <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 4 }}>No recent activity</div>
+          <div style={{ fontSize: 12 }}>Activity will appear here as it occurs</div>
         </div>
       </div>
 
-      {/* News & Mail Section - Like original */}
+      {/* Communication Hub */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
         <div>
           <h4 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12, color: '#eab308', display: 'flex', alignItems: 'center', gap: 8 }}>
             📰 News & Updates
           </h4>
-          <div className="ui-card" style={{ padding: 16, minHeight: 120 }}>
+          <div className="ui-card" style={{ padding: 16 }}>
             <div style={{ color: '#6b7280', textAlign: 'center', padding: 20 }}>
-              No news updates available
+              <div style={{ fontSize: 32, marginBottom: 8 }}>📰</div>
+              <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 4 }}>No Recent News</div>
+              <div style={{ fontSize: 12 }}>Company news and updates will appear here</div>
             </div>
+            <button style={{
+              width: '100%',
+              padding: '8px 16px',
+              fontSize: 12,
+              backgroundColor: '#fef3c7',
+              color: '#eab308',
+              border: '1px solid #f59e0b',
+              borderRadius: 4,
+              cursor: 'pointer',
+              marginTop: 8,
+              fontWeight: 500
+            }}
+            onClick={() => alert('Full News - Coming Soon!')}
+            >
+              View All News
+            </button>
           </div>
         </div>
 
@@ -264,10 +280,28 @@ export default function CustomerDashboard({ userId, config, features, api }: Cus
           <h4 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12, color: '#eab308', display: 'flex', alignItems: 'center', gap: 8 }}>
             📧 Mail
           </h4>
-          <div className="ui-card" style={{ padding: 16, minHeight: 120 }}>
+          <div className="ui-card" style={{ padding: 16 }}>
             <div style={{ color: '#6b7280', textAlign: 'center', padding: 20 }}>
-              No messages
+              <div style={{ fontSize: 32, marginBottom: 8 }}>📧</div>
+              <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 4 }}>No Messages</div>
+              <div style={{ fontSize: 12 }}>Internal messages and notifications will appear here</div>
             </div>
+            <button style={{
+              width: '100%',
+              padding: '8px 16px',
+              fontSize: 12,
+              backgroundColor: '#fef3c7',
+              color: '#eab308',
+              border: '1px solid #f59e0b',
+              borderRadius: 4,
+              cursor: 'pointer',
+              marginTop: 8,
+              fontWeight: 500
+            }}
+            onClick={() => alert('Full Mailbox - Coming Soon!')}
+            >
+              View Mailbox
+            </button>
           </div>
         </div>
       </div>

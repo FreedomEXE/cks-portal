@@ -9,7 +9,7 @@
  * Description: Shared API utilities for cross-role usage.
  * Function: Provide helpers for fetch, error handling, and headers.
  * Importance: Reduces duplication across role-specific API clients.
- * Connects to: hub/roles/*/api/*, shared/types/api.d.ts.
+ * Connects to: hub/roles/:role/api/*, shared/types/api.d.ts.
  */
 
 export async function getJSON<T>(url: string, init?: RequestInit): Promise<T> {

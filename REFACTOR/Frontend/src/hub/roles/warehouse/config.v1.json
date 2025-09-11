@@ -37,6 +37,20 @@
       "component": "Orders",
       "icon": "ShoppingCart",
       "requires": ["orders:process"]
+    },
+    {
+      "id": "shipments",
+      "label": "Shipments",
+      "component": "Shipments",
+      "icon": "Truck",
+      "requires": ["shipping:track"]
+    },
+    {
+      "id": "support",
+      "label": "Support",
+      "component": "Support",
+      "icon": "HelpCircle",
+      "requires": ["support:access"]
     }
   ],
   "features": {
@@ -53,6 +67,8 @@
       "dashboard": "/dashboard", 
       "inventory": "/inventory",
       "orders": "/orders",
+      "shipments": "/shipments",
+      "support": "/support",
       "shipping": "/shipping",
       "reports": "/reports"
     }
@@ -61,8 +77,9 @@
     "default": ["dashboard:view", "profile:view"],
     "required": {
       "inventory:manage": "Manage inventory levels",
-      "orders:process": "Process and fulfill orders", 
+      "orders:process": "Process and fulfill orders",
       "shipping:track": "Track shipments",
+      "support:access": "Access support resources", 
       "reports:generate": "Generate warehouse reports"
     }
   }

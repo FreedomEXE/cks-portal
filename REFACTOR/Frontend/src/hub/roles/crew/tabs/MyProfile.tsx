@@ -24,18 +24,19 @@ interface MyProfileProps {
 interface CrewProfile {
   crew_id: string;
   full_name: string;
-  role: string;
-  center_assignment: string;
+  reports_to: string;
+  primary_region: string;
   phone: string;
   email: string;
-  shift_schedule: string;
-  hire_date: string;
-  certifications: string;
-  supervisor: {
+  emergency_contact: string;
+  home_address: string;
+  start_date: string;
+  status: string;
+  account_manager: {
     name: string;
     email: string;
     phone: string;
-    supervisor_id: string;
+    manager_id: string;
   };
 }
 
@@ -54,18 +55,19 @@ export default function MyProfile({ userId, config, features, api }: MyProfilePr
       setCrewData({
         crew_id: 'CREW-001',
         full_name: 'John Crew Member',
-        role: 'Cleaning Specialist',
-        center_assignment: 'Downtown Service Center',
+        reports_to: 'Alex Johnson - Site Supervisor',
+        primary_region: 'Downtown Metro Area',
         phone: '(555) 345-6789',
         email: 'john@crew-member.com',
-        shift_schedule: 'Morning Shift (6AM-2PM)',
-        hire_date: '2024-03-15',
-        certifications: 'General Cleaning, Floor Care, Safety Training',
-        supervisor: {
-          name: 'Alex Johnson',
-          email: 'alex.johnson@center.com',
+        emergency_contact: 'Jane Doe - Spouse (555) 123-4567',
+        home_address: '123 Main St, Downtown City, ST 12345',
+        start_date: '2024-03-15',
+        status: 'Active',
+        account_manager: {
+          name: 'Sarah Wilson',
+          email: 'sarah.wilson@cks.com',
           phone: '(555) 567-8901',
-          supervisor_id: 'SUP-001'
+          manager_id: 'MGR-001'
         }
       });
     } catch (error) {
@@ -77,7 +79,7 @@ export default function MyProfile({ userId, config, features, api }: MyProfilePr
 
   if (loading) {
     return (
-      <div style={{ padding: 24, textAlign: 'center' }}>
+      <div style={{ textAlign: 'center' }}>
         <div style={{ color: '#6b7280' }}>Loading profile...</div>
       </div>
     );
@@ -85,21 +87,21 @@ export default function MyProfile({ userId, config, features, api }: MyProfilePr
 
   if (!crewData) {
     return (
-      <div style={{ padding: 24, textAlign: 'center' }}>
+      <div style={{ textAlign: 'center' }}>
         <div style={{ color: '#ef4444' }}>Error loading crew profile</div>
       </div>
     );
   }
 
   return (
-    <div style={{ padding: 24 }}>
+    <div>
       <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16, color: '#111827' }}>
         My Profile
       </h2>
 
       {/* Profile Tabs */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 24, flexWrap: 'wrap' }}>
-        {['Profile', 'Supervisor', 'Settings'].map((tab, i) => (
+        {['Profile', 'Account Manager', 'Settings'].map((tab, i) => (
           <button
             key={tab}
             onClick={() => setProfileTab(i)}
@@ -177,18 +179,18 @@ export default function MyProfile({ userId, config, features, api }: MyProfilePr
                   </tr>
                   <tr>
                     <td style={{ fontSize: 16, color: '#111827', fontWeight: 500, verticalAlign: 'top' }}>
-                      Role
+                      Reports To
                     </td>
                     <td style={{ fontSize: 16, color: '#111827' }}>
-                      {crewData.role}
+                      {crewData.reports_to}
                     </td>
                   </tr>
                   <tr>
                     <td style={{ fontSize: 16, color: '#111827', fontWeight: 500, verticalAlign: 'top' }}>
-                      Center Assignment
+                      Primary Region
                     </td>
                     <td style={{ fontSize: 16, color: '#111827' }}>
-                      {crewData.center_assignment}
+                      {crewData.primary_region}
                     </td>
                   </tr>
                   <tr>
@@ -209,18 +211,43 @@ export default function MyProfile({ userId, config, features, api }: MyProfilePr
                   </tr>
                   <tr>
                     <td style={{ fontSize: 16, color: '#111827', fontWeight: 500, verticalAlign: 'top' }}>
-                      Shift Schedule
+                      Emergency Contact
                     </td>
                     <td style={{ fontSize: 16, color: '#111827' }}>
-                      {crewData.shift_schedule}
+                      {crewData.emergency_contact}
                     </td>
                   </tr>
                   <tr>
                     <td style={{ fontSize: 16, color: '#111827', fontWeight: 500, verticalAlign: 'top' }}>
-                      Hire Date
+                      Home Address
                     </td>
                     <td style={{ fontSize: 16, color: '#111827' }}>
-                      {crewData.hire_date || '—'}
+                      {crewData.home_address}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style={{ fontSize: 16, color: '#111827', fontWeight: 500, verticalAlign: 'top' }}>
+                      Start Date
+                    </td>
+                    <td style={{ fontSize: 16, color: '#111827' }}>
+                      {crewData.start_date}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style={{ fontSize: 16, color: '#111827', fontWeight: 500, verticalAlign: 'top' }}>
+                      Status
+                    </td>
+                    <td style={{ fontSize: 16, color: '#111827' }}>
+                      <span style={{ 
+                        padding: '2px 8px',
+                        borderRadius: 4,
+                        background: '#dcfce7',
+                        color: '#166534',
+                        fontSize: 14,
+                        fontWeight: 600
+                      }}>
+                        {crewData.status}
+                      </span>
                     </td>
                   </tr>
                 </tbody>
@@ -231,10 +258,10 @@ export default function MyProfile({ userId, config, features, api }: MyProfilePr
 
         {profileTab === 1 && (
           <div>
-            <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 16, color: '#10b981' }}>Supervisor Contact</h3>
+            <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 16, color: '#10b981' }}>CKS Account Manager</h3>
             
             <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: 24 }}>
-              {/* Supervisor Photo */}
+              {/* Account Manager Photo */}
               <div style={{ textAlign: 'center' }}>
                 <div style={{
                   width: 120,
@@ -250,20 +277,20 @@ export default function MyProfile({ userId, config, features, api }: MyProfilePr
                   margin: '0 auto 12px',
                   border: '3px solid #10b981'
                 }}>
-                  {crewData.supervisor.name ? crewData.supervisor.name.split(' ').map((n: string) => n[0]).join('').toUpperCase() : 'SP'}
+                  {crewData.account_manager.name ? crewData.account_manager.name.split(' ').map((n: string) => n[0]).join('').toUpperCase() : 'AM'}
                 </div>
-                <div style={{ fontSize: 12, color: '#6b7280', fontWeight: 500 }}>Supervisor</div>
+                <div style={{ fontSize: 12, color: '#6b7280', fontWeight: 500 }}>Account Manager</div>
               </div>
 
-              {/* Supervisor Details */}
+              {/* Account Manager Details */}
               <div>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <tbody>
                     {[
-                      ['Supervisor Name', crewData.supervisor.name],
-                      ['Supervisor ID', crewData.supervisor.supervisor_id],
-                      ['Email', crewData.supervisor.email],
-                      ['Phone', crewData.supervisor.phone]
+                      ['Manager Name', crewData.account_manager.name],
+                      ['Manager ID', crewData.account_manager.manager_id],
+                      ['Email', crewData.account_manager.email],
+                      ['Phone', crewData.account_manager.phone]
                     ].map(([label, value]) => (
                       <tr key={label}>
                         <td style={{ 
@@ -298,7 +325,7 @@ export default function MyProfile({ userId, config, features, api }: MyProfilePr
                     fontWeight: 500,
                     cursor: 'pointer'
                   }}>
-                    Contact Supervisor
+                    Contact Manager
                   </button>
                   <button style={{
                     padding: '8px 16px',

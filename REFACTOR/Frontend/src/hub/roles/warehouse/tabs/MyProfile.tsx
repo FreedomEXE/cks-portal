@@ -32,11 +32,11 @@ interface WarehouseProfile {
   hire_date: string;
   certifications: string;
   clearance_level: string;
-  supervisor: {
+  account_manager: {
     name: string;
     email: string;
     phone: string;
-    supervisor_id: string;
+    manager_id: string;
   };
 }
 
@@ -63,11 +63,11 @@ export default function MyProfile({ userId, config, features, api }: MyProfilePr
         hire_date: '2024-02-10',
         certifications: 'Forklift Operation, Inventory Management, Safety Training',
         clearance_level: 'Level 2',
-        supervisor: {
+        account_manager: {
           name: 'Mike Warehouse Manager',
           email: 'mike.manager@warehouse.com',
           phone: '(555) 678-9012',
-          supervisor_id: 'WH-MGR-001'
+          manager_id: 'WH-MGR-001'
         }
       });
     } catch (error) {
@@ -79,7 +79,7 @@ export default function MyProfile({ userId, config, features, api }: MyProfilePr
 
   if (loading) {
     return (
-      <div style={{ padding: 24, textAlign: 'center' }}>
+      <div style={{ textAlign: 'center' }}>
         <div style={{ color: '#6b7280' }}>Loading profile...</div>
       </div>
     );
@@ -87,21 +87,21 @@ export default function MyProfile({ userId, config, features, api }: MyProfilePr
 
   if (!warehouseData) {
     return (
-      <div style={{ padding: 24, textAlign: 'center' }}>
+      <div style={{ textAlign: 'center' }}>
         <div style={{ color: '#ef4444' }}>Error loading warehouse profile</div>
       </div>
     );
   }
 
   return (
-    <div style={{ padding: 24 }}>
+    <div>
       <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16, color: '#111827' }}>
         My Profile
       </h2>
 
       {/* Profile Tabs */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 24, flexWrap: 'wrap' }}>
-        {['Profile', 'Supervisor', 'Settings'].map((tab, i) => (
+        {['Profile', 'Account Manager', 'Settings'].map((tab, i) => (
           <button
             key={tab}
             onClick={() => setProfileTab(i)}
@@ -233,10 +233,10 @@ export default function MyProfile({ userId, config, features, api }: MyProfilePr
 
         {profileTab === 1 && (
           <div>
-            <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 16, color: '#8b5cf6' }}>Supervisor Contact</h3>
+            <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 16, color: '#8b5cf6' }}>CKS Account Manager</h3>
             
             <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: 24 }}>
-              {/* Supervisor Photo */}
+              {/* Manager Photo */}
               <div style={{ textAlign: 'center' }}>
                 <div style={{
                   width: 120,
@@ -252,20 +252,20 @@ export default function MyProfile({ userId, config, features, api }: MyProfilePr
                   margin: '0 auto 12px',
                   border: '3px solid #8b5cf6'
                 }}>
-                  {warehouseData.supervisor.name ? warehouseData.supervisor.name.split(' ').map((n: string) => n[0]).join('').toUpperCase() : 'WM'}
+                  {warehouseData.account_manager.name ? warehouseData.account_manager.name.split(' ').map((n: string) => n[0]).join('').toUpperCase() : 'AM'}
                 </div>
-                <div style={{ fontSize: 12, color: '#6b7280', fontWeight: 500 }}>Warehouse Supervisor</div>
+                <div style={{ fontSize: 12, color: '#6b7280', fontWeight: 500 }}>CKS Account Manager</div>
               </div>
 
-              {/* Supervisor Details */}
+              {/* Manager Details */}
               <div>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <tbody>
                     {[
-                      ['Supervisor Name', warehouseData.supervisor.name],
-                      ['Supervisor ID', warehouseData.supervisor.supervisor_id],
-                      ['Email', warehouseData.supervisor.email],
-                      ['Phone', warehouseData.supervisor.phone]
+                      ['Manager Name', warehouseData.account_manager.name],
+                      ['Manager ID', warehouseData.account_manager.manager_id],
+                      ['Email', warehouseData.account_manager.email],
+                      ['Phone', warehouseData.account_manager.phone]
                     ].map(([label, value]) => (
                       <tr key={label}>
                         <td style={{ 
@@ -300,7 +300,7 @@ export default function MyProfile({ userId, config, features, api }: MyProfilePr
                     fontWeight: 500,
                     cursor: 'pointer'
                   }}>
-                    Contact Supervisor
+                    Contact Manager
                   </button>
                   <button style={{
                     padding: '8px 16px',

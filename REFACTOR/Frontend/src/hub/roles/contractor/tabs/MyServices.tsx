@@ -4,15 +4,12 @@
 ───────────────────────────────────────────────*/
 
 /**
- * MyServices.tsx
+ * MyServices.tsx - Contractor
  * 
- * Description: Contractor service selection and management with favorites system
- * Function: Manage selected services and designate up to 3 favorites for profile
- * Importance: Critical - Service selection defines contractor capabilities
- * Connects to: Contractor API services endpoints, CKS catalog integration
- * 
- * Notes: Production-ready implementation with complete service management.
- *        Includes service selection, favorites (max 3), and catalog browsing.
+ * Description: Contractor service management with offerings and service history
+ * Function: Manage services they offer, active services, and service history
+ * Importance: Critical - Service portfolio and engagement management
+ * Connects to: Services API, contractor offerings, CKS catalog
  */
 
 import React, { useState, useEffect } from 'react';
@@ -24,88 +21,113 @@ interface MyServicesProps {
   api: any;
 }
 
-interface ContractorService {
+interface Service {
   service_id: string;
   service_name: string;
+  status: 'active' | 'completed' | 'cancelled';
+  client?: string;
+  start_date: string;
+  end_date?: string;
   category: string;
-  status: 'active' | 'completed';
-  description?: string;
-  customers_served?: number;
-  last_provided?: string;
 }
 
 export default function MyServices({ userId, config, features, api }: MyServicesProps) {
-  const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'offerings' | 'history'>('offerings');
-  const [offeringsServices, setOfferingsServices] = useState<ContractorService[]>([]);
-  const [historyServices, setHistoryServices] = useState<ContractorService[]>([]);
-  const [message, setMessage] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'offered' | 'active' | 'history'>('offered');
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  const [offeredServices, setOfferedServices] = useState<Service[]>([]);
+  const [activeServices, setActiveServices] = useState<Service[]>([]);
+  const [serviceHistory, setServiceHistory] = useState<Service[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Load contractor services
   useEffect(() => {
     const loadServices = async () => {
       try {
         setLoading(true);
         
-        // Mock contractor offerings - Services they currently offer
-        const mockOfferings: ContractorService[] = [
+        // Mock services contractor currently offers through CKS (generic catalog services)
+        const mockOfferedServices: Service[] = [
           {
-            service_id: 'SVC-001',
-            service_name: 'Commercial Cleaning',
-            category: 'Cleaning Services',
+            service_id: 'SRV-001',
+            service_name: 'Commercial Deep Cleaning',
+            category: 'Cleaning',
             status: 'active',
-            description: 'Professional commercial cleaning services',
-            customers_served: 8,
-            last_provided: '2025-09-08'
+            start_date: '2024-01-15'
           },
           {
-            service_id: 'SVC-002',
-            service_name: 'Facility Maintenance',
+            service_id: 'SRV-002',
+            service_name: 'Floor Care & Maintenance',
             category: 'Maintenance',
             status: 'active',
-            description: 'Comprehensive facility maintenance solutions',
-            customers_served: 5,
-            last_provided: '2025-09-07'
+            start_date: '2024-03-01'
           },
           {
-            service_id: 'SVC-003',
-            service_name: 'Security Services',
-            category: 'Security',
+            service_id: 'SRV-003',
+            service_name: 'Window Cleaning Services',
+            category: 'Cleaning',
             status: 'active',
-            description: 'Professional security and monitoring services',
-            customers_served: 3,
-            last_provided: '2025-09-09'
+            start_date: '2024-02-10'
           }
         ];
 
-        // Mock service history - Services they used to offer
-        const mockHistory: ContractorService[] = [
+        // Mock active service engagements (specific instances contractor is working on)
+        const mockActiveServices: Service[] = [
           {
-            service_id: 'SVC-H001',
-            service_name: 'Landscaping',
-            category: 'Exterior Services',
-            status: 'completed',
-            description: 'Commercial landscaping and grounds maintenance',
-            customers_served: 12,
-            last_provided: '2025-06-30'
+            service_id: 'CEN001-SRV001',
+            service_name: 'Commercial Deep Cleaning',
+            status: 'active',
+            client: 'Downtown Business Center',
+            start_date: '2025-09-01',
+            category: 'Recurring'
           },
           {
-            service_id: 'SVC-H002',
-            service_name: 'IT Support',
-            category: 'Technology',
-            status: 'completed',
-            description: 'Basic IT support and troubleshooting',
-            customers_served: 4,
-            last_provided: '2025-05-15'
+            service_id: 'CEN002-SRV002',
+            service_name: 'Floor Care & Maintenance',
+            status: 'active',
+            client: 'Metro Construction LLC',
+            start_date: '2025-09-10',
+            end_date: '2025-09-15',
+            category: 'One-time'
           }
         ];
 
-        setOfferingsServices(mockOfferings);
-        setHistoryServices(mockHistory);
+        // Mock service history (completed/cancelled specific instances)
+        const mockServiceHistory: Service[] = [
+          {
+            service_id: 'CEN003-SRV001',
+            service_name: 'Commercial Deep Cleaning',
+            status: 'completed',
+            client: 'City Diner',
+            start_date: '2025-08-15',
+            end_date: '2025-08-20',
+            category: 'One-time'
+          },
+          {
+            service_id: 'CEN004-SRV003',
+            service_name: 'Window Cleaning Services',
+            status: 'cancelled',
+            client: 'Health Partners Clinic',
+            start_date: '2025-08-01',
+            end_date: '2025-08-02',
+            category: 'One-time'
+          },
+          {
+            service_id: 'CEN005-SRV002',
+            service_name: 'Floor Care & Maintenance',
+            status: 'completed',
+            client: 'Fashion Forward',
+            start_date: '2025-07-01',
+            end_date: '2025-07-31',
+            category: 'Monthly'
+          }
+        ];
 
+        setOfferedServices(mockOfferedServices);
+        setActiveServices(mockActiveServices);
+        setServiceHistory(mockServiceHistory);
+        
       } catch (error) {
         console.error('Error loading services:', error);
-        setMessage('Failed to load services');
       } finally {
         setLoading(false);
       }
@@ -114,12 +136,17 @@ export default function MyServices({ userId, config, features, api }: MyServices
     loadServices();
   }, [userId]);
 
-  const requestNewService = () => {
-    alert('Request New Service - Coming Soon!\n\nThis will allow you to request adding a new service to the CKS catalog for approval.');
+  const handleServiceClick = (serviceId: string, section: string) => {
+    // Mock detailed service view
+    alert(`Opening detailed view for ${serviceId} from ${section} section`);
   };
 
-  const browseCatalog = () => {
-    alert('CKS Service Catalog - Coming Soon!\n\nThis will open the full CKS service catalog where you can discover and add new services to your portfolio.');
+  const handleAddService = () => {
+    alert('Add Service - Coming Soon!');
+  };
+
+  const handleBrowseCatalog = () => {
+    alert('Browse CKS Catalog - Coming Soon!');
   };
 
   if (loading) {
@@ -131,21 +158,132 @@ export default function MyServices({ userId, config, features, api }: MyServices
     );
   }
 
-  const currentServices = activeTab === 'offerings' ? offeringsServices : historyServices;
+  // Get current data based on active tab
+  const getCurrentData = () => {
+    switch (activeTab) {
+      case 'offered': return offeredServices;
+      case 'active': return activeServices;
+      case 'history': return serviceHistory;
+      default: return [];
+    }
+  };
+
+  const getTableHeaders = () => {
+    switch (activeTab) {
+      case 'offered':
+        return ['Service ID', 'Service Name', 'Category', 'Status', 'Start Date'];
+      case 'active':
+        return ['Service ID', 'Service Name', 'Client', 'Category', 'Start Date', 'End Date'];
+      case 'history':
+        return ['Service ID', 'Service Name', 'Client', 'Status', 'Start Date', 'End Date'];
+      default:
+        return [];
+    }
+  };
+
+  const renderTableRow = (service: any) => {
+    switch (activeTab) {
+      case 'offered':
+        return (
+          <tr key={service.service_id}>
+            <td style={{ padding: 10, fontWeight: 600, color: '#10b981', cursor: 'pointer' }}
+                onClick={() => handleServiceClick(service.service_id, 'My Services')}>
+              {service.service_id}
+            </td>
+            <td style={{ padding: 10 }}>{service.service_name}</td>
+            <td style={{ padding: 10 }}>{service.category}</td>
+            <td style={{ padding: 10 }}>
+              <span style={{
+                padding: '2px 8px',
+                borderRadius: 4,
+                fontSize: 10,
+                fontWeight: 600,
+                background: '#dcfce7',
+                color: '#166534'
+              }}>
+                {service.status}
+              </span>
+            </td>
+            <td style={{ padding: 10 }}>{service.start_date}</td>
+          </tr>
+        );
+      case 'active':
+        return (
+          <tr key={service.service_id}>
+            <td style={{ padding: 10, fontWeight: 600, color: '#10b981', cursor: 'pointer' }}
+                onClick={() => handleServiceClick(service.service_id, 'Active Services')}>
+              {service.service_id}
+            </td>
+            <td style={{ padding: 10 }}>{service.service_name}</td>
+            <td style={{ padding: 10 }}>{service.client || '—'}</td>
+            <td style={{ padding: 10 }}>{service.category}</td>
+            <td style={{ padding: 10 }}>{service.start_date}</td>
+            <td style={{ padding: 10 }}>{service.end_date || '—'}</td>
+          </tr>
+        );
+      case 'history':
+        return (
+          <tr key={service.service_id}>
+            <td style={{ padding: 10, fontWeight: 600, color: '#10b981', cursor: 'pointer' }}
+                onClick={() => handleServiceClick(service.service_id, 'Service History')}>
+              {service.service_id}
+            </td>
+            <td style={{ padding: 10 }}>{service.service_name}</td>
+            <td style={{ padding: 10 }}>{service.client || '—'}</td>
+            <td style={{ padding: 10 }}>
+              <span style={{
+                padding: '2px 8px',
+                borderRadius: 4,
+                fontSize: 10,
+                fontWeight: 600,
+                background: service.status === 'completed' ? '#dcfce7' : '#fef2f2',
+                color: service.status === 'completed' ? '#166534' : '#991b1b'
+              }}>
+                {service.status}
+              </span>
+            </td>
+            <td style={{ padding: 10 }}>{service.start_date}</td>
+            <td style={{ padding: 10 }}>{service.end_date || '—'}</td>
+          </tr>
+        );
+      default:
+        return null;
+    }
+  };
+
+  const getTabLabel = (tab: string) => {
+    switch (tab) {
+      case 'offered': return `My Services (${offeredServices.length})`;
+      case 'active': return `Active Services (${activeServices.length})`;
+      case 'history': return `Service History (${serviceHistory.length})`;
+      default: return tab;
+    }
+  };
+
+  const getTabDescription = () => {
+    switch (activeTab) {
+      case 'offered': return 'Services you currently offer through CKS';
+      case 'active': return 'Currently active service engagements';
+      case 'history': return 'Completed/cancelled services archive';
+      default: return '';
+    }
+  };
 
   return (
     <div>
-      {/* Header */}
+      {/* Header with Action Buttons */}
       <div style={{ 
         display: 'flex', 
         justifyContent: 'space-between', 
         alignItems: 'center', 
         marginBottom: 16 
       }}>
-        <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>My Services</h2>
+        <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0, color: '#111827' }}>
+          My Services
+        </h2>
         <div style={{ display: 'flex', gap: 8 }}>
           <button
-            onClick={requestNewService}
+            onClick={handleAddService}
             style={{
               padding: '8px 16px',
               border: '1px solid #10b981',
@@ -157,10 +295,10 @@ export default function MyServices({ userId, config, features, api }: MyServices
               cursor: 'pointer'
             }}
           >
-            Request New Service
+            Add Service
           </button>
           <button
-            onClick={browseCatalog}
+            onClick={handleBrowseCatalog}
             style={{
               padding: '8px 16px',
               border: '1px solid #10b981',
@@ -179,7 +317,7 @@ export default function MyServices({ userId, config, features, api }: MyServices
 
       {/* Tab Navigation */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-        {(['offerings', 'history'] as const).map(tab => (
+        {(['offered', 'active', 'history'] as const).map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -191,111 +329,62 @@ export default function MyServices({ userId, config, features, api }: MyServices
               color: activeTab === tab ? 'white' : '#111827',
               fontSize: 14,
               fontWeight: 600,
-              cursor: 'pointer',
-              textTransform: 'capitalize'
+              cursor: 'pointer'
             }}
           >
-            {tab === 'offerings' ? `Current Offerings (${offeringsServices.length})` : `Service History (${historyServices.length})`}
+            {getTabLabel(tab)}
           </button>
         ))}
       </div>
 
-      {message && (
-        <div style={{
-          marginBottom: 16,
-          padding: '8px 12px',
-          background: message.includes('Failed') ? '#fef2f2' : '#ecfdf5',
-          color: message.includes('Failed') ? '#dc2626' : '#059669',
-          border: `1px solid ${message.includes('Failed') ? '#fecaca' : '#a7f3d0'}`,
-          borderRadius: 6,
-          fontSize: 13
-        }}>
-          {message}
+      {/* Single Content Panel */}
+      <div style={{ border: '1px solid #edf2f7', borderRadius: 10, background: '#fafafa', padding: 12 }}>
+        <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 12 }}>{getTabDescription()}</div>
+        
+        {/* Search */}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12 }}>
+          <input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search by Service ID or name"
+            style={{ flex: 1, padding: 8, border: '1px solid #e5e7eb', borderRadius: 8, background: 'white' }}
+          />
+          <span style={{ fontSize: 12, color: '#6b7280' }}>max 10</span>
         </div>
-      )}
-
-      {/* Services List */}
-      <div className="ui-card" style={{ padding: 0, overflow: 'hidden' }}>
-        {currentServices.length === 0 ? (
-          <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>
-            <div style={{ fontSize: 48, marginBottom: 8 }}>
-              {activeTab === 'offerings' ? '🛠️' : '📋'}
-            </div>
-            <div style={{ fontSize: 16, fontWeight: 500, marginBottom: 4 }}>
-              {activeTab === 'offerings' ? 'No Services Offered' : 'No Service History'}
-            </div>
-            <div style={{ fontSize: 12 }}>
-              {activeTab === 'offerings' 
-                ? 'Services you offer to customers will appear here' 
-                : 'Previously offered services will appear here'}
-            </div>
-          </div>
-        ) : (
-          <div style={{ padding: 16 }}>
-            <div style={{ display: 'grid', gap: 16 }}>
-              {currentServices.map(service => (
-                <div key={service.service_id} style={{
-                  padding: 16,
-                  border: '1px solid #e5e7eb',
-                  borderRadius: 8,
-                  background: activeTab === 'offerings' ? '#f9fafb' : '#f7f7f7'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                    <div>
-                      <h3 style={{ fontSize: 16, fontWeight: 600, margin: 0, color: '#111827' }}>
-                        {service.service_name}
-                      </h3>
-                      <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
-                        {service.category}
-                      </div>
-                    </div>
-                    <div style={{
-                      padding: '4px 8px',
-                      borderRadius: 4,
-                      fontSize: 11,
-                      fontWeight: 600,
-                      background: service.status === 'active' ? '#10b981' : '#6b7280',
-                      color: 'white'
-                    }}>
-                      {service.status}
-                    </div>
-                  </div>
-
-                  <p style={{ color: '#6b7280', fontSize: 13, marginBottom: 12, lineHeight: 1.4 }}>
-                    {service.description}
-                  </p>
-
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12 }}>
-                    <div style={{ display: 'flex', gap: 16 }}>
-                      <div>
-                        <span style={{ color: '#6b7280' }}>Customers Served: </span>
-                        <span style={{ fontWeight: 600, color: '#111827' }}>{service.customers_served}</span>
-                      </div>
-                      {service.last_provided && (
-                        <div>
-                          <span style={{ color: '#6b7280' }}>Last Provided: </span>
-                          <span style={{ fontWeight: 600, color: '#111827' }}>{service.last_provided}</span>
-                        </div>
-                      )}
-                    </div>
-                    <button style={{
-                      padding: '6px 12px',
-                      background: '#f3f4f6',
-                      color: '#111827',
-                      border: '1px solid #e5e7eb',
-                      borderRadius: 4,
-                      fontSize: 11,
-                      fontWeight: 600,
-                      cursor: 'pointer'
-                    }}>
-                      View Details
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        
+        {/* Table */}
+        <div style={{ overflowX: 'auto', background: 'white', border: '1px solid #e5e7eb', borderRadius: 8 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr>
+                {getTableHeaders().map(h => (
+                  <th key={h} style={{ 
+                    textAlign: 'left', 
+                    background: '#f9fafb', 
+                    borderBottom: '1px solid #e5e7eb', 
+                    padding: 10, 
+                    fontSize: 12, 
+                    color: '#6b7280' 
+                  }}>
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {getCurrentData()
+                .filter((s: any) => {
+                  const q = searchQuery.trim().toLowerCase();
+                  if (!q) return true;
+                  return String(s.service_id || '').toLowerCase().includes(q) || 
+                         String(s.service_name || '').toLowerCase().includes(q);
+                })
+                .slice(0, 10)
+                .map((service: any) => renderTableRow(service))
+              }
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

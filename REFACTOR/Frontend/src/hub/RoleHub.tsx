@@ -205,7 +205,7 @@ export default function RoleHub({ userId, role, userPermissions = [], className 
   }
 
   return (
-    <div className={className} style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#f9fafb' }}>
+    <div className={className} style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#f9fafb' }}>
       {/* Header Section - matches legacy layout with blue wrapper */}
       <div style={{ 
         padding: '16px 24px 24px 24px',

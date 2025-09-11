@@ -70,10 +70,10 @@ export default function CustomerProfile({ userId, config, features, api }: Custo
         status: 'Not Set',
         centers_managed: 0,
         account_manager: {
-          name: 'Not Assigned',
-          email: 'Not Assigned',
-          phone: 'Not Assigned',
-          manager_id: 'Not Assigned'
+          name: 'Sarah Wilson',
+          email: 'sarah.wilson@cks.com',
+          phone: '(555) 567-8901',
+          manager_id: 'MGR-001'
         }
       });
     } catch (error) {
@@ -85,7 +85,7 @@ export default function CustomerProfile({ userId, config, features, api }: Custo
 
   if (loading) {
     return (
-      <div style={{ padding: 24, textAlign: 'center' }}>
+      <div style={{ textAlign: 'center' }}>
         <div style={{ color: '#6b7280' }}>Loading profile...</div>
       </div>
     );
@@ -93,14 +93,14 @@ export default function CustomerProfile({ userId, config, features, api }: Custo
 
   if (!customerData) {
     return (
-      <div style={{ padding: 24, textAlign: 'center' }}>
+      <div style={{ textAlign: 'center' }}>
         <div style={{ color: '#ef4444' }}>Error loading customer profile</div>
       </div>
     );
   }
 
   return (
-    <div style={{ padding: 24 }}>
+    <div>
       <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16, color: '#111827' }}>
         Customer Profile
       </h2>
@@ -221,14 +221,6 @@ export default function CustomerProfile({ userId, config, features, api }: Custo
                     </td>
                     <td style={{ fontSize: 16, color: '#111827' }}>
                       {customerData.contract_start_date || '—'}
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style={{ fontSize: 16, color: '#111827', fontWeight: 500, verticalAlign: 'top' }}>
-                      Role
-                    </td>
-                    <td style={{ fontSize: 16, color: '#111827' }}>
-                      Customer Account
                     </td>
                   </tr>
                 </tbody>

@@ -73,7 +73,7 @@ export default function MyProfile({ userId, config, features, api }: MyProfilePr
 
   if (loading) {
     return (
-      <div style={{ padding: 24, textAlign: 'center' }}>
+      <div style={{ textAlign: 'center' }}>
         <div style={{ color: '#6b7280' }}>Loading profile...</div>
       </div>
     );
@@ -81,14 +81,14 @@ export default function MyProfile({ userId, config, features, api }: MyProfilePr
 
   if (!centerData) {
     return (
-      <div style={{ padding: 24, textAlign: 'center' }}>
+      <div style={{ textAlign: 'center' }}>
         <div style={{ color: '#ef4444' }}>Error loading center profile</div>
       </div>
     );
   }
 
   return (
-    <div style={{ padding: 24 }}>
+    <div>
       <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16, color: '#111827' }}>
         My Profile
       </h2>

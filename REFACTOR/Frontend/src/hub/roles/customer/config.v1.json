@@ -19,7 +19,7 @@
     },
     {
       "id": "profile",
-      "label": "Customer Profile",
+      "label": "My Profile",
       "component": "MyProfile",
       "icon": "Building",
       "requires": ["profile:view"]

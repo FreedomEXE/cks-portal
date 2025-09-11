@@ -37,6 +37,27 @@
       "component": "Ecosystem",
       "icon": "Network",
       "requires": ["ecosystem:view"]
+    },
+    {
+      "id": "orders",
+      "label": "Orders",
+      "component": "Orders",
+      "icon": "ShoppingCart",
+      "requires": ["orders:view"]
+    },
+    {
+      "id": "reports",
+      "label": "Reports",
+      "component": "Reports",
+      "icon": "BarChart3",
+      "requires": ["reports:view"]
+    },
+    {
+      "id": "support",
+      "label": "Support",
+      "component": "Support",
+      "icon": "HelpCircle",
+      "requires": ["support:access"]
     }
   ],
   "features": {
@@ -53,6 +74,9 @@
       "dashboard": "/dashboard", 
       "services": "/services",
       "ecosystem": "/ecosystem",
+      "orders": "/orders",
+      "reports": "/reports", 
+      "support": "/support",
       "tasks": "/tasks",
       "schedule": "/schedule",
       "equipment": "/equipment"
@@ -62,7 +86,10 @@
     "default": ["dashboard:view", "profile:view"],
     "required": {
       "services:view": "View assigned services",
-      "ecosystem:view": "View crew ecosystem", 
+      "ecosystem:view": "View crew ecosystem",
+      "orders:view": "View work orders",
+      "reports:view": "View reports and analytics",
+      "support:access": "Access support resources",
       "tasks:manage": "Manage assigned tasks",
       "schedule:view": "View work schedule",
       "equipment:use": "Access equipment resources"

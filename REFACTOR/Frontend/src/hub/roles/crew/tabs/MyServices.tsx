@@ -4,104 +4,144 @@
 ───────────────────────────────────────────────*/
 
 /**
- * MyServices.tsx
+ * MyServices.tsx - Crew
  * 
- * Description: Crew service training and history management
- * Function: View training certifications and service experience
- * Importance: Critical - Track skills and training for crew development
- * Connects to: Training API, certification tracking, skill management
+ * Description: Crew service management with training, active services, and service history
+ * Function: Track training progress, active service assignments, and service history
+ * Importance: Critical - Service training and engagement management for crew members
+ * Connects to: Training API, service assignments, CKS catalog
  */
 
 import React, { useState, useEffect } from 'react';
 
-interface ServicesProps {
+interface MyServicesProps {
   userId: string;
   config: any;
   features: Record<string, any>;
   api: any;
 }
 
-interface ServiceSkill {
-  id: string;
-  name: string;
+interface ServiceTraining {
+  service_id: string;
+  service_name: string;
+  certification_date: string;
+  certification_level: string;
   category: string;
-  status: 'certified' | 'training' | 'completed';
-  description: string;
-  certification_date?: string;
-  trainer?: string;
-  experience_hours?: number;
+  expires?: string;
 }
 
-export default function MyServices({ userId, config, features, api }: ServicesProps) {
-  const [activeTab, setActiveTab] = useState<'skills' | 'history'>('skills');
-  const [skillsServices, setSkillsServices] = useState<ServiceSkill[]>([]);
-  const [historyServices, setHistoryServices] = useState<ServiceSkill[]>([]);
-  const [loading, setLoading] = useState(false);
+interface Service {
+  service_id: string;
+  service_name: string;
+  status: 'active' | 'completed' | 'cancelled';
+  client?: string;
+  start_date: string;
+  end_date?: string;
+  category: string;
+  role?: string;
+}
+
+export default function MyServices({ userId, config, features, api }: MyServicesProps) {
+  const [activeTab, setActiveTab] = useState<'training' | 'active' | 'history'>('training');
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  const [trainingServices, setTrainingServices] = useState<ServiceTraining[]>([]);
+  const [activeServices, setActiveServices] = useState<Service[]>([]);
+  const [serviceHistory, setServiceHistory] = useState<Service[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const loadServices = async () => {
       try {
         setLoading(true);
         
-        // Mock current skills/certifications
-        const mockSkillsServices: ServiceSkill[] = [
+        // Mock training services (services crew member is trained in)
+        const mockTrainingServices: ServiceTraining[] = [
           {
-            id: 'SKILL-001',
-            name: 'General Cleaning Certification',
-            category: 'cleaning',
-            status: 'certified',
-            description: 'Basic commercial cleaning techniques and safety',
+            service_id: 'SRV-001',
+            service_name: 'Commercial Deep Cleaning',
             certification_date: '2024-06-15',
-            trainer: 'Alex Johnson',
-            experience_hours: 120
+            certification_level: 'Basic',
+            category: 'Cleaning',
+            expires: '2026-06-15'
           },
           {
-            id: 'SKILL-002',
-            name: 'Floor Care Specialist',
-            category: 'cleaning',
-            status: 'certified',
-            description: 'Advanced floor cleaning and maintenance',
+            service_id: 'SRV-002',
+            service_name: 'Floor Care & Maintenance',
             certification_date: '2024-08-20',
-            trainer: 'Maria Rodriguez',
-            experience_hours: 80
+            certification_level: 'Intermediate',
+            category: 'Maintenance',
+            expires: '2025-08-20'
           },
           {
-            id: 'SKILL-003',
-            name: 'Equipment Safety Training',
-            category: 'safety',
-            status: 'training',
-            description: 'Currently training on equipment safety protocols',
-            trainer: 'David Chen',
-            experience_hours: 15
+            service_id: 'SRV-003',
+            service_name: 'Window Cleaning Services',
+            certification_date: '2024-09-05',
+            certification_level: 'Basic',
+            category: 'Cleaning'
           }
         ];
 
-        // Mock training history
-        const mockHistoryServices: ServiceSkill[] = [
+        // Mock active services (specific service instances crew member is working on)
+        const mockActiveServices: Service[] = [
           {
-            id: 'HIST-001',
-            name: 'Basic Safety Orientation',
-            category: 'safety',
-            status: 'completed',
-            description: 'Initial safety training and orientation',
-            certification_date: '2024-05-01',
-            trainer: 'Safety Department',
-            experience_hours: 8
+            service_id: 'CEN001-SRV001',
+            service_name: 'Commercial Deep Cleaning',
+            status: 'active',
+            client: 'Downtown Business Center',
+            start_date: '2025-09-01',
+            category: 'Recurring',
+            role: 'Lead Cleaner'
           },
           {
-            id: 'HIST-002',
-            name: 'Customer Service Basics',
-            category: 'service',
-            status: 'completed',
-            description: 'Customer interaction and service standards',
-            certification_date: '2024-05-15',
-            trainer: 'HR Department',
-            experience_hours: 4
+            service_id: 'CEN002-SRV002',
+            service_name: 'Floor Care & Maintenance',
+            status: 'active',
+            client: 'Metro Construction LLC',
+            start_date: '2025-09-10',
+            end_date: '2025-09-15',
+            category: 'One-time',
+            role: 'Assistant'
           }
         ];
-        
-        setSkillsServices(mockSkillsServices);
-        setHistoryServices(mockHistoryServices);
+
+        // Mock service history (completed/cancelled specific service instances)
+        const mockServiceHistory: Service[] = [
+          {
+            service_id: 'CEN003-SRV001',
+            service_name: 'Commercial Deep Cleaning',
+            status: 'completed',
+            client: 'City Diner',
+            start_date: '2025-08-15',
+            end_date: '2025-08-20',
+            category: 'One-time',
+            role: 'Team Member'
+          },
+          {
+            service_id: 'CEN004-SRV003',
+            service_name: 'Window Cleaning Services',
+            status: 'cancelled',
+            client: 'Health Partners Clinic',
+            start_date: '2025-08-01',
+            end_date: '2025-08-02',
+            category: 'One-time',
+            role: 'Lead Cleaner'
+          },
+          {
+            service_id: 'CEN005-SRV002',
+            service_name: 'Floor Care & Maintenance',
+            status: 'completed',
+            client: 'Fashion Forward',
+            start_date: '2025-07-01',
+            end_date: '2025-07-31',
+            category: 'Monthly',
+            role: 'Assistant'
+          }
+        ];
+
+        setTrainingServices(mockTrainingServices);
+        setActiveServices(mockActiveServices);
+        setServiceHistory(mockServiceHistory);
         
       } catch (error) {
         console.error('Error loading services:', error);
@@ -113,13 +153,13 @@ export default function MyServices({ userId, config, features, api }: ServicesPr
     loadServices();
   }, [userId]);
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'certified': return '#10b981';
-      case 'training': return '#f59e0b';
-      case 'completed': return '#6b7280';
-      default: return '#6b7280';
-    }
+  const handleServiceClick = (serviceId: string, section: string) => {
+    // Mock detailed service view
+    alert(`Opening detailed view for ${serviceId} from ${section} section`);
+  };
+
+  const handleBrowseCatalog = () => {
+    alert('Browse CKS Catalog - Coming Soon!');
   };
 
   if (loading) {
@@ -131,19 +171,121 @@ export default function MyServices({ userId, config, features, api }: ServicesPr
     );
   }
 
-  const currentServices = activeTab === 'skills' ? skillsServices : historyServices;
+  // Get current data based on active tab
+  const getCurrentData = () => {
+    switch (activeTab) {
+      case 'training': return trainingServices;
+      case 'active': return activeServices;
+      case 'history': return serviceHistory;
+      default: return [];
+    }
+  };
+
+  const getTableHeaders = () => {
+    switch (activeTab) {
+      case 'training':
+        return ['Service ID', 'Service Name', 'Category', 'Certification Level', 'Certified Date', 'Expires'];
+      case 'active':
+        return ['Service ID', 'Service Name', 'Client', 'Category', 'Start Date', 'Role'];
+      case 'history':
+        return ['Service ID', 'Service Name', 'Client', 'Status', 'Start Date', 'End Date'];
+      default:
+        return [];
+    }
+  };
+
+  const renderTableRow = (service: any) => {
+    switch (activeTab) {
+      case 'training':
+        return (
+          <tr key={service.service_id}>
+            <td style={{ padding: 10, fontWeight: 600, color: '#10b981', cursor: 'pointer' }}
+                onClick={() => handleServiceClick(service.service_id, 'My Services')}>
+              {service.service_id}
+            </td>
+            <td style={{ padding: 10 }}>{service.service_name}</td>
+            <td style={{ padding: 10 }}>{service.category}</td>
+            <td style={{ padding: 10 }}>{service.certification_level}</td>
+            <td style={{ padding: 10 }}>{service.certification_date}</td>
+            <td style={{ padding: 10 }}>{service.expires || '—'}</td>
+          </tr>
+        );
+      case 'active':
+        return (
+          <tr key={service.service_id}>
+            <td style={{ padding: 10, fontWeight: 600, color: '#10b981', cursor: 'pointer' }}
+                onClick={() => handleServiceClick(service.service_id, 'Active Services')}>
+              {service.service_id}
+            </td>
+            <td style={{ padding: 10 }}>{service.service_name}</td>
+            <td style={{ padding: 10 }}>{service.client || '—'}</td>
+            <td style={{ padding: 10 }}>{service.category}</td>
+            <td style={{ padding: 10 }}>{service.start_date}</td>
+            <td style={{ padding: 10 }}>{service.role || '—'}</td>
+          </tr>
+        );
+      case 'history':
+        return (
+          <tr key={service.service_id}>
+            <td style={{ padding: 10, fontWeight: 600, color: '#10b981', cursor: 'pointer' }}
+                onClick={() => handleServiceClick(service.service_id, 'Service History')}>
+              {service.service_id}
+            </td>
+            <td style={{ padding: 10 }}>{service.service_name}</td>
+            <td style={{ padding: 10 }}>{service.client || '—'}</td>
+            <td style={{ padding: 10 }}>
+              <span style={{
+                padding: '2px 8px',
+                borderRadius: 4,
+                fontSize: 10,
+                fontWeight: 600,
+                background: service.status === 'completed' ? '#dcfce7' : '#fef2f2',
+                color: service.status === 'completed' ? '#166534' : '#991b1b'
+              }}>
+                {service.status}
+              </span>
+            </td>
+            <td style={{ padding: 10 }}>{service.start_date}</td>
+            <td style={{ padding: 10 }}>{service.end_date || '—'}</td>
+          </tr>
+        );
+      default:
+        return null;
+    }
+  };
+
+  const getTabLabel = (tab: string) => {
+    switch (tab) {
+      case 'training': return `My Services (${trainingServices.length})`;
+      case 'active': return `Active Services (${activeServices.length})`;
+      case 'history': return `Service History (${serviceHistory.length})`;
+      default: return tab;
+    }
+  };
+
+  const getTabDescription = () => {
+    switch (activeTab) {
+      case 'training': return 'Services you are trained and certified in';
+      case 'active': return 'Services you are currently working on';
+      case 'history': return 'Historical services you have completed';
+      default: return '';
+    }
+  };
 
   return (
     <div>
-      {/* Header */}
+      {/* Header with Browse CKS Catalog Button */}
       <div style={{ 
         display: 'flex', 
         justifyContent: 'space-between', 
         alignItems: 'center', 
         marginBottom: 16 
       }}>
-        <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>My Services</h2>
+        <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0, color: '#111827' }}>
+          My Services
+        </h2>
         <button
+          onClick={handleBrowseCatalog}
           style={{
             padding: '8px 16px',
             border: '1px solid #10b981',
@@ -155,13 +297,13 @@ export default function MyServices({ userId, config, features, api }: ServicesPr
             cursor: 'pointer'
           }}
         >
-          Request Training
+          Browse CKS Catalog
         </button>
       </div>
 
       {/* Tab Navigation */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-        {(['skills', 'history'] as const).map(tab => (
+        {(['training', 'active', 'history'] as const).map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -173,97 +315,62 @@ export default function MyServices({ userId, config, features, api }: ServicesPr
               color: activeTab === tab ? 'white' : '#111827',
               fontSize: 14,
               fontWeight: 600,
-              cursor: 'pointer',
-              textTransform: 'capitalize'
+              cursor: 'pointer'
             }}
           >
-            {tab === 'skills' ? `Current Skills (${skillsServices.length})` : `Training History (${historyServices.length})`}
+            {getTabLabel(tab)}
           </button>
         ))}
       </div>
 
-      {/* Services List */}
-      <div className="ui-card" style={{ padding: 0, overflow: 'hidden' }}>
-        {currentServices.length === 0 ? (
-          <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>
-            <div style={{ fontSize: 48, marginBottom: 8 }}>
-              {activeTab === 'skills' ? '🎓' : '📋'}
-            </div>
-            <div style={{ fontSize: 16, fontWeight: 500, marginBottom: 4 }}>
-              {activeTab === 'skills' ? 'No Skills Certified' : 'No Training History'}
-            </div>
-            <div style={{ fontSize: 12 }}>
-              {activeTab === 'skills' 
-                ? 'Your certifications and skills will appear here' 
-                : 'Completed training will appear here'}
-            </div>
-          </div>
-        ) : (
-          <div style={{ padding: 16 }}>
-            <div style={{ display: 'grid', gap: 16 }}>
-              {currentServices.map(service => (
-                <div key={service.id} style={{
-                  padding: 16,
-                  border: '1px solid #e5e7eb',
-                  borderRadius: 8,
-                  background: activeTab === 'skills' ? '#f9fafb' : '#f7f7f7'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                    <div>
-                      <h3 style={{ fontSize: 16, fontWeight: 600, margin: 0, color: '#111827' }}>
-                        {service.name}
-                      </h3>
-                      <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
-                        {service.category} • Trainer: {service.trainer}
-                      </div>
-                    </div>
-                    <div style={{
-                      padding: '4px 8px',
-                      borderRadius: 4,
-                      fontSize: 11,
-                      fontWeight: 600,
-                      background: getStatusColor(service.status),
-                      color: 'white'
-                    }}>
-                      {service.status}
-                    </div>
-                  </div>
-
-                  <p style={{ color: '#6b7280', fontSize: 13, marginBottom: 12, lineHeight: 1.4 }}>
-                    {service.description}
-                  </p>
-
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12 }}>
-                    <div style={{ display: 'flex', gap: 16 }}>
-                      <div>
-                        <span style={{ color: '#6b7280' }}>Experience: </span>
-                        <span style={{ fontWeight: 600, color: '#111827' }}>{service.experience_hours}h</span>
-                      </div>
-                      {service.certification_date && (
-                        <div>
-                          <span style={{ color: '#6b7280' }}>Certified: </span>
-                          <span style={{ fontWeight: 600, color: '#111827' }}>{service.certification_date}</span>
-                        </div>
-                      )}
-                    </div>
-                    <button style={{
-                      padding: '6px 12px',
-                      background: '#f3f4f6',
-                      color: '#111827',
-                      border: '1px solid #e5e7eb',
-                      borderRadius: 4,
-                      fontSize: 11,
-                      fontWeight: 600,
-                      cursor: 'pointer'
-                    }}>
-                      View Certificate
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+      {/* Single Content Panel */}
+      <div style={{ border: '1px solid #edf2f7', borderRadius: 10, background: '#fafafa', padding: 12 }}>
+        <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 12 }}>{getTabDescription()}</div>
+        
+        {/* Search */}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12 }}>
+          <input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search by Service ID or name"
+            style={{ flex: 1, padding: 8, border: '1px solid #e5e7eb', borderRadius: 8, background: 'white' }}
+          />
+          <span style={{ fontSize: 12, color: '#6b7280' }}>max 10</span>
+        </div>
+        
+        {/* Table */}
+        <div style={{ overflowX: 'auto', background: 'white', border: '1px solid #e5e7eb', borderRadius: 8 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr>
+                {getTableHeaders().map(h => (
+                  <th key={h} style={{ 
+                    textAlign: 'left', 
+                    background: '#f9fafb', 
+                    borderBottom: '1px solid #e5e7eb', 
+                    padding: 10, 
+                    fontSize: 12, 
+                    color: '#6b7280' 
+                  }}>
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {getCurrentData()
+                .filter((s: any) => {
+                  const q = searchQuery.trim().toLowerCase();
+                  if (!q) return true;
+                  return String(s.service_id || '').toLowerCase().includes(q) || 
+                         String(s.service_name || '').toLowerCase().includes(q);
+                })
+                .slice(0, 10)
+                .map((service: any) => renderTableRow(service))
+              }
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

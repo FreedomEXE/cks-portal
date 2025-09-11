@@ -90,7 +90,7 @@ export default function CustomerOrders({ userId, config, features, api }: Custom
   };
 
   return (
-    <div style={{ padding: 24 }}>
+    <div>
       <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16, color: '#111827' }}>
         Orders
       </h2>

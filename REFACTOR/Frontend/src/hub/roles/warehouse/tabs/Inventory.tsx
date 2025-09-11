@@ -22,115 +22,137 @@ interface InventoryProps {
 }
 
 interface InventoryItem {
-  id: string;
-  name: string;
-  category: string;
-  sku: string;
-  current_stock: number;
-  min_threshold: number;
-  max_capacity: number;
-  location: string;
-  unit: string;
-  cost_per_unit: number;
-  last_updated: string;
-  status: 'In Stock' | 'Low Stock' | 'Out of Stock' | 'Overstocked';
+  item_id: string;
+  item_name: string;
+  item_type: 'product' | 'supply';
+  quantity_on_hand: number;
+  quantity_available: number;
+  min_stock_level: number;
+  location_code: string;
+  is_low_stock: boolean;
+}
+
+interface HistoryItem {
+  activity_type: string;
+  item_name: string;
+  description: string;
+  quantity_change?: number;
+  activity_timestamp: string;
 }
 
 export default function Inventory({ userId, config, features, api }: InventoryProps) {
-  const [activeTab, setActiveTab] = useState<'current' | 'movements'>('current');
-  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
-  const [movements, setMovements] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [productQuery, setProductQuery] = useState('');
+  const [supplyQuery, setSupplyQuery] = useState('');
+  const [historyQuery, setHistoryQuery] = useState('');
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const loadInventory = async () => {
       try {
         setLoading(true);
         
-        // Mock inventory data
+        // Mock inventory data that matches legacy structure
         const mockInventory: InventoryItem[] = [
+          // Products
           {
-            id: 'INV-001',
-            name: 'Industrial Cleaning Solution',
-            category: 'Cleaning Chemicals',
-            sku: 'ICS-500',
-            current_stock: 45,
-            min_threshold: 25,
-            max_capacity: 100,
-            location: 'A-12-B',
-            unit: 'Gallons',
-            cost_per_unit: 24.99,
-            last_updated: '2025-09-10',
-            status: 'In Stock'
+            item_id: 'PROD-001',
+            item_name: 'Industrial Floor Cleaner',
+            item_type: 'product',
+            quantity_on_hand: 45,
+            quantity_available: 40,
+            min_stock_level: 25,
+            location_code: 'A-12-B',
+            is_low_stock: false
           },
           {
-            id: 'INV-002',
-            name: 'Microfiber Towels',
-            category: 'Cleaning Supplies',
-            sku: 'MFT-200',
-            current_stock: 8,
-            min_threshold: 50,
-            max_capacity: 200,
-            location: 'B-05-C',
-            unit: 'Packs',
-            cost_per_unit: 12.50,
-            last_updated: '2025-09-09',
-            status: 'Low Stock'
+            item_id: 'PROD-002',
+            item_name: 'Heavy Duty Degreaser',
+            item_type: 'product',
+            quantity_on_hand: 12,
+            quantity_available: 12,
+            min_stock_level: 20,
+            location_code: 'A-15-C',
+            is_low_stock: true
           },
           {
-            id: 'INV-003',
-            name: 'Safety Gloves',
-            category: 'Safety Equipment',
-            sku: 'SG-100',
-            current_stock: 0,
-            min_threshold: 30,
-            max_capacity: 150,
-            location: 'C-08-A',
-            unit: 'Boxes',
-            cost_per_unit: 8.75,
-            last_updated: '2025-09-08',
-            status: 'Out of Stock'
+            item_id: 'PROD-003',
+            item_name: 'Glass Cleaner Concentrate',
+            item_type: 'product',
+            quantity_on_hand: 0,
+            quantity_available: 0,
+            min_stock_level: 15,
+            location_code: 'A-08-A',
+            is_low_stock: true
+          },
+          // Supplies
+          {
+            item_id: 'SUP-001',
+            item_name: 'Microfiber Cleaning Cloths',
+            item_type: 'supply',
+            quantity_on_hand: 200,
+            quantity_available: 180,
+            min_stock_level: 50,
+            location_code: 'B-05-C',
+            is_low_stock: false
           },
           {
-            id: 'INV-004',
-            name: 'Floor Mop Heads',
-            category: 'Cleaning Equipment',
-            sku: 'FMH-75',
-            current_stock: 125,
-            min_threshold: 40,
-            max_capacity: 80,
-            location: 'D-03-B',
-            unit: 'Pieces',
-            cost_per_unit: 3.25,
-            last_updated: '2025-09-11',
-            status: 'Overstocked'
+            item_id: 'SUP-002',
+            item_name: 'Disposable Gloves (Box)',
+            item_type: 'supply',
+            quantity_on_hand: 8,
+            quantity_available: 5,
+            min_stock_level: 25,
+            location_code: 'B-02-A',
+            is_low_stock: true
+          },
+          {
+            item_id: 'SUP-003',
+            item_name: 'Mop Heads',
+            item_type: 'supply',
+            quantity_on_hand: 75,
+            quantity_available: 75,
+            min_stock_level: 30,
+            location_code: 'B-10-B',
+            is_low_stock: false
           }
         ];
 
-        // Mock movement history
-        const mockMovements = [
+        // Mock history data
+        const mockHistory: HistoryItem[] = [
           {
-            id: 'MOV-001',
-            item_name: 'Industrial Cleaning Solution',
-            type: 'Outbound',
-            quantity: -12,
-            destination: 'Downtown Service Center',
-            date: '2025-09-10',
-            operator: 'Warehouse Staff'
+            activity_type: 'OUTBOUND',
+            item_name: 'Industrial Floor Cleaner',
+            description: 'Order fulfillment to Downtown Service Center',
+            quantity_change: -5,
+            activity_timestamp: '2025-09-11T10:30:00'
           },
           {
-            id: 'MOV-002',
-            item_name: 'Safety Gloves',
-            type: 'Inbound',
-            quantity: +50,
-            destination: 'Supplier Delivery',
-            date: '2025-09-09',
-            operator: 'Receiving Team'
+            activity_type: 'INBOUND',
+            item_name: 'Disposable Gloves (Box)',
+            description: 'Stock replenishment from supplier',
+            quantity_change: 50,
+            activity_timestamp: '2025-09-10T14:15:00'
+          },
+          {
+            activity_type: 'ADJUSTMENT',
+            item_name: 'Microfiber Cleaning Cloths',
+            description: 'Inventory count adjustment',
+            quantity_change: -20,
+            activity_timestamp: '2025-09-09T16:45:00'
+          },
+          {
+            activity_type: 'OUTBOUND',
+            item_name: 'Heavy Duty Degreaser',
+            description: 'Emergency order to North Campus',
+            quantity_change: -8,
+            activity_timestamp: '2025-09-09T09:20:00'
           }
         ];
         
-        setInventoryItems(mockInventory);
-        setMovements(mockMovements);
+        setInventory(mockInventory);
+        setHistory(mockHistory);
         
       } catch (error) {
         console.error('Error loading inventory:', error);
@@ -142,16 +164,6 @@ export default function Inventory({ userId, config, features, api }: InventoryPr
     loadInventory();
   }, [userId]);
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'In Stock': return '#10b981';
-      case 'Low Stock': return '#f59e0b';
-      case 'Out of Stock': return '#ef4444';
-      case 'Overstocked': return '#6b7280';
-      default: return '#6b7280';
-    }
-  };
-
   if (loading) {
     return (
       <div style={{ textAlign: 'center', padding: 40, color: '#6b7280' }}>
@@ -161,176 +173,143 @@ export default function Inventory({ userId, config, features, api }: InventoryPr
     );
   }
 
-  const currentData = activeTab === 'current' ? inventoryItems : movements;
-
   return (
     <div>
-      {/* Header */}
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center', 
-        marginBottom: 16 
-      }}>
-        <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>Inventory Management</h2>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button style={{
-            padding: '8px 16px',
-            border: '1px solid #8b5cf6',
-            borderRadius: 6,
-            background: 'white',
-            color: '#8b5cf6',
-            fontSize: 14,
-            fontWeight: 600,
-            cursor: 'pointer'
-          }}>
-            Add Item
-          </button>
-          <button style={{
-            padding: '8px 16px',
-            border: '1px solid #8b5cf6',
-            borderRadius: 6,
-            background: '#8b5cf6',
-            color: 'white',
-            fontSize: 14,
-            fontWeight: 600,
-            cursor: 'pointer'
-          }}>
-            Adjust Stock
-          </button>
+      {/* Two-column layout within a single outer card */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        {/* Products Panel */}
+        <div style={{ border: '1px solid #edf2f7', borderRadius: 10, background: '#fafafa', padding: 12 }}>
+          <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 10, color: '#111827' }}>Products</div>
+          {/* Search */}
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+            <input
+              value={productQuery}
+              onChange={(e) => setProductQuery(e.target.value)}
+              placeholder="Search by Product ID or name"
+              style={{ flex: 1, padding: 8, border: '1px solid #e5e7eb', borderRadius: 8, background: 'white' }}
+            />
+            <span style={{ fontSize: 12, color: '#6b7280' }}>max 10</span>
+          </div>
+          <div style={{ overflowX: 'auto', background: 'white', border: '1px solid #e5e7eb', borderRadius: 8 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr>
+                  {['Product ID', 'Name', 'On Hand', 'Available', 'Min', 'Location', 'Low?'].map(h => (
+                    <th key={h} style={{ textAlign: 'left', background: '#f9fafb', borderBottom: '1px solid #e5e7eb', padding: 10, fontSize: 12, color: '#6b7280' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {inventory
+                  .filter((it: any) => it.item_type === 'product')
+                  .filter((it: any) => {
+                    const q = productQuery.trim().toLowerCase();
+                    if (!q) return true;
+                    return String(it.item_id || '').toLowerCase().includes(q) || String(it.item_name || '').toLowerCase().includes(q);
+                  })
+                  .slice(0, 10)
+                  .map((it: any) => (
+                    <tr key={`${it.item_id}`}>
+                      <td style={{ padding: 10, fontWeight: 600 }}>{it.item_id}</td>
+                      <td style={{ padding: 10 }}>{it.item_name}</td>
+                      <td style={{ padding: 10 }}>{it.quantity_on_hand}</td>
+                      <td style={{ padding: 10 }}>{it.quantity_available}</td>
+                      <td style={{ padding: 10 }}>{it.min_stock_level ?? 0}</td>
+                      <td style={{ padding: 10 }}>{it.location_code || '—'}</td>
+                      <td style={{ padding: 10 }}>{it.is_low_stock ? 'Yes' : 'No'}</td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        
+        {/* Supplies Panel */}
+        <div style={{ border: '1px solid #edf2f7', borderRadius: 10, background: '#fafafa', padding: 12 }}>
+          <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 10, color: '#111827' }}>Supplies</div>
+          {/* Search */}
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+            <input
+              value={supplyQuery}
+              onChange={(e) => setSupplyQuery(e.target.value)}
+              placeholder="Search by Supply ID or name"
+              style={{ flex: 1, padding: 8, border: '1px solid #e5e7eb', borderRadius: 8, background: 'white' }}
+            />
+            <span style={{ fontSize: 12, color: '#6b7280' }}>max 10</span>
+          </div>
+          <div style={{ overflowX: 'auto', background: 'white', border: '1px solid #e5e7eb', borderRadius: 8 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr>
+                  {['Supply ID', 'Name', 'On Hand', 'Available', 'Min', 'Location', 'Low?'].map(h => (
+                    <th key={h} style={{ textAlign: 'left', background: '#f9fafb', borderBottom: '1px solid #e5e7eb', padding: 10, fontSize: 12, color: '#6b7280' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {inventory
+                  .filter((it: any) => it.item_type === 'supply')
+                  .filter((it: any) => {
+                    const q = supplyQuery.trim().toLowerCase();
+                    if (!q) return true;
+                    return String(it.item_id || '').toLowerCase().includes(q) || String(it.item_name || '').toLowerCase().includes(q);
+                  })
+                  .slice(0, 10)
+                  .map((it: any) => (
+                    <tr key={`${it.item_id}`}>
+                      <td style={{ padding: 10, fontWeight: 600 }}>{it.item_id}</td>
+                      <td style={{ padding: 10 }}>{it.item_name}</td>
+                      <td style={{ padding: 10 }}>{it.quantity_on_hand}</td>
+                      <td style={{ padding: 10 }}>{it.quantity_available}</td>
+                      <td style={{ padding: 10 }}>{it.min_stock_level ?? 0}</td>
+                      <td style={{ padding: 10 }}>{it.location_code || '—'}</td>
+                      <td style={{ padding: 10 }}>{it.is_low_stock ? 'Yes' : 'No'}</td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
-
-      {/* Tab Navigation */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-        {(['current', 'movements'] as const).map(tab => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            style={{
-              padding: '8px 16px',
-              borderRadius: 6,
-              border: '1px solid #e5e7eb',
-              background: activeTab === tab ? '#8b5cf6' : 'white',
-              color: activeTab === tab ? 'white' : '#111827',
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: 'pointer',
-              textTransform: 'capitalize'
-            }}
-          >
-            {tab === 'current' ? `Current Stock (${inventoryItems.length})` : `Stock Movements (${movements.length})`}
-          </button>
-        ))}
-      </div>
-
-      {/* Inventory List */}
-      <div className="ui-card" style={{ padding: 0, overflow: 'hidden' }}>
-        {activeTab === 'current' ? (
-          <div style={{ padding: 16 }}>
-            <div style={{ display: 'grid', gap: 16 }}>
-              {inventoryItems.map(item => (
-                <div key={item.id} style={{
-                  padding: 16,
-                  border: '1px solid #e5e7eb',
-                  borderRadius: 8,
-                  background: '#f9fafb'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                    <div>
-                      <h3 style={{ fontSize: 16, fontWeight: 600, margin: 0, color: '#111827' }}>
-                        {item.name}
-                      </h3>
-                      <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
-                        SKU: {item.sku} • Location: {item.location} • Category: {item.category}
-                      </div>
-                    </div>
-                    <div style={{
-                      padding: '4px 8px',
-                      borderRadius: 4,
-                      fontSize: 11,
-                      fontWeight: 600,
-                      background: getStatusColor(item.status),
-                      color: 'white'
-                    }}>
-                      {item.status}
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, fontSize: 12 }}>
-                    <div>
-                      <span style={{ color: '#6b7280' }}>Current Stock: </span>
-                      <span style={{ fontWeight: 600, color: '#111827' }}>{item.current_stock} {item.unit}</span>
-                    </div>
-                    <div>
-                      <span style={{ color: '#6b7280' }}>Min Threshold: </span>
-                      <span style={{ fontWeight: 600, color: '#111827' }}>{item.min_threshold} {item.unit}</span>
-                    </div>
-                    <div>
-                      <span style={{ color: '#6b7280' }}>Max Capacity: </span>
-                      <span style={{ fontWeight: 600, color: '#111827' }}>{item.max_capacity} {item.unit}</span>
-                    </div>
-                    <div>
-                      <span style={{ color: '#6b7280' }}>Cost Per Unit: </span>
-                      <span style={{ fontWeight: 600, color: '#111827' }}>${item.cost_per_unit}</span>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, fontSize: 12 }}>
-                    <div style={{ color: '#6b7280' }}>
-                      Last Updated: {item.last_updated}
-                    </div>
-                    <button style={{
-                      padding: '6px 12px',
-                      background: '#8b5cf6',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: 4,
-                      fontSize: 11,
-                      fontWeight: 600,
-                      cursor: 'pointer'
-                    }}>
-                      Adjust Stock
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
+      
+      {/* Archive & History Section */}
+      <div style={{ marginTop: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 8 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#111827' }}>Archive & History</div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <input
+              value={historyQuery}
+              onChange={(e) => setHistoryQuery(e.target.value)}
+              placeholder="Search history"
+              style={{ padding: 8, border: '1px solid #e5e7eb', borderRadius: 8 }}
+            />
+            <span style={{ fontSize: 12, color: '#6b7280' }}>max 10</span>
           </div>
-        ) : (
-          <div style={{ padding: 16 }}>
-            <div style={{ display: 'grid', gap: 12 }}>
-              {movements.map(movement => (
-                <div key={movement.id} style={{
-                  padding: 16,
-                  border: '1px solid #e5e7eb',
-                  borderRadius: 8,
-                  background: movement.type === 'Inbound' ? '#f0f9ff' : '#fef2f2'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div>
-                      <h4 style={{ fontSize: 16, fontWeight: 600, margin: 0, color: '#111827' }}>
-                        {movement.item_name}
-                      </h4>
-                      <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
-                        {movement.destination} • {movement.date} • By: {movement.operator}
-                      </div>
-                    </div>
-                    <div style={{
-                      padding: '4px 8px',
-                      borderRadius: 4,
-                      fontSize: 12,
-                      fontWeight: 600,
-                      color: movement.quantity > 0 ? '#059669' : '#dc2626'
-                    }}>
-                      {movement.quantity > 0 ? '+' : ''}{movement.quantity}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        </div>
+        <div style={{ display: 'grid', gap: 8 }}>
+          {(history || [])
+            .filter((h: any) => {
+              const q = historyQuery.trim().toLowerCase();
+              if (!q) return true;
+              return String(h.item_name || '').toLowerCase().includes(q) || String(h.description || '').toLowerCase().includes(q) || String(h.activity_type || '').toLowerCase().includes(q);
+            })
+            .slice(0, 10)
+            .map((h: any, idx: number) => (
+              <div key={idx} style={{ padding: 10, border: '1px solid #e5e7eb', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 999, background: '#ede9fe', color: '#6d28d9', fontWeight: 600 }}>{String(h.activity_type || '').toUpperCase()}</span>
+                <span style={{ fontSize: 13, fontWeight: 600 }}>{h.item_name || h.description || 'Inventory event'}</span>
+                {typeof h.quantity_change === 'number' && (
+                  <span style={{ fontSize: 12, color: h.quantity_change > 0 ? '#166534' : '#991b1b' }}>
+                    {h.quantity_change > 0 ? `+${h.quantity_change}` : h.quantity_change}
+                  </span>
+                )}
+                <span style={{ marginLeft: 'auto', fontSize: 11, color: '#6b7280' }}>{h.activity_timestamp ? String(h.activity_timestamp).slice(0, 19).replace('T', ' ') : ''}</span>
+              </div>
+            ))}
+          {(!history || history.length === 0) && (
+            <div style={{ fontSize: 13, color: '#6b7280' }}>No archive entries yet.</div>
+          )}
+        </div>
       </div>
     </div>
   );

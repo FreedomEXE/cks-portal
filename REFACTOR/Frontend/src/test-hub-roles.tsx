@@ -109,6 +109,9 @@ const testUsers: Record<TestRole, TestUserData> = {
       'profile:view',
       'services:view',
       'ecosystem:view',
+      'orders:view',
+      'reports:view',
+      'support:access',
       'tasks:manage',
       'schedule:view',
       'equipment:use'
@@ -125,6 +128,7 @@ const testUsers: Record<TestRole, TestUserData> = {
       'inventory:manage',
       'orders:process',
       'shipping:track',
+      'support:access',
       'reports:generate'
     ]
   }

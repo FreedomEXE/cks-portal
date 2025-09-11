@@ -58,6 +58,8 @@ export default function CrewHome() {
   const [profileTab, setProfileTab] = useState(0);
   const [clockedIn, setClockedIn] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [activities, setActivities] = useState<any[]>([]);
+  const [activityLoading, setActivityLoading] = useState(false);
   
   // Get crew code and name from profile data
   const session = getCrewSession();
