@@ -139,7 +139,7 @@ export default function CrewDashboard({ userId, config, features, api }: CrewDas
 
   if (loading) {
     return (
-      <div style={{ padding: 24, textAlign: 'center' }}>
+      <div style={{ textAlign: 'center' }}>
         <div style={{ color: '#6b7280' }}>Loading dashboard...</div>
       </div>
     );
@@ -148,223 +148,163 @@ export default function CrewDashboard({ userId, config, features, api }: CrewDas
   const taskStats = getTaskStats();
 
   return (
-    <div style={{ padding: 24 }}>
+    <div>
       <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16, color: '#111827' }}>
-        My Shift
+        Overview
       </h2>
 
-      {/* Shift Status Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
-        <div className="ui-card" style={{ padding: 16, textAlign: 'center' }}>
-          <div style={{ fontSize: 24, fontWeight: 700, color: getStatusColor(shiftInfo?.status || ''), marginBottom: 4 }}>
-            {shiftInfo?.status || 'Loading'}
-          </div>
-          <div style={{ fontSize: 14, color: '#6b7280' }}>Shift Status</div>
-        </div>
-
+      {/* Dashboard Metric Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 16, marginBottom: 24 }}>
         <div className="ui-card" style={{ padding: 16, textAlign: 'center' }}>
           <div style={{ fontSize: 24, fontWeight: 700, color: '#10b981', marginBottom: 4 }}>
-            {taskStats.completed}/{taskStats.total}
+            3
           </div>
-          <div style={{ fontSize: 14, color: '#6b7280' }}>Tasks Complete</div>
+          <div style={{ fontSize: 14, color: '#6b7280' }}>Active Services</div>
         </div>
 
         <div className="ui-card" style={{ padding: 16, textAlign: 'center' }}>
           <div style={{ fontSize: 24, fontWeight: 700, color: '#3b82f6', marginBottom: 4 }}>
-            {taskStats.inProgress}
+            {taskStats.total}
           </div>
-          <div style={{ fontSize: 14, color: '#6b7280' }}>In Progress</div>
+          <div style={{ fontSize: 14, color: '#6b7280' }}>My Tasks</div>
         </div>
 
         <div className="ui-card" style={{ padding: 16, textAlign: 'center' }}>
           <div style={{ fontSize: 24, fontWeight: 700, color: '#f59e0b', marginBottom: 4 }}>
-            {taskStats.pending}
+            6.5
           </div>
-          <div style={{ fontSize: 14, color: '#6b7280' }}>Pending Tasks</div>
+          <div style={{ fontSize: 14, color: '#6b7280' }}>My Hours</div>
+        </div>
+
+        <div className="ui-card" style={{ padding: 16, textAlign: 'center' }}>
+          <div style={{ fontSize: 24, fontWeight: 700, color: '#8b5cf6', marginBottom: 4 }}>
+            2
+          </div>
+          <div style={{ fontSize: 14, color: '#6b7280' }}>Pending Orders</div>
+        </div>
+
+        <div className="ui-card" style={{ padding: 16, textAlign: 'center' }}>
+          <div style={{ fontSize: 24, fontWeight: 700, color: '#10b981', marginBottom: 4 }}>
+            Active
+          </div>
+          <div style={{ fontSize: 14, color: '#6b7280' }}>Account Status</div>
         </div>
       </div>
 
-      {/* Quick Actions */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 24 }}>
-        <button style={{
-          padding: '24px 16px',
-          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-          color: 'white',
-          border: 'none',
-          borderRadius: 12,
-          fontSize: 14,
-          fontWeight: 700,
-          cursor: 'pointer',
-          textAlign: 'center',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: 8
-        }}>
-          <div style={{ fontSize: 20 }}>⏰</div>
-          <div>CLOCK IN/OUT</div>
-        </button>
-
-        <button style={{
-          padding: '24px 16px',
-          background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
-          color: 'white',
-          border: 'none',
-          borderRadius: 12,
-          fontSize: 14,
-          fontWeight: 700,
-          cursor: 'pointer',
-          textAlign: 'center',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: 8
-        }}>
-          <div style={{ fontSize: 20 }}>📋</div>
-          <div>REPORT ISSUE</div>
-        </button>
-
-        <button style={{
-          padding: '24px 16px',
-          background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-          color: 'white',
-          border: 'none',
-          borderRadius: 12,
-          fontSize: 14,
-          fontWeight: 700,
-          cursor: 'pointer',
-          textAlign: 'center',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: 8
-        }}>
-          <div style={{ fontSize: 20 }}>📦</div>
-          <div>REQUEST SUPPLIES</div>
-        </button>
-      </div>
-
-      {/* Shift Information */}
-      {shiftInfo && (
-        <div style={{ marginBottom: 24 }}>
-          <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12, color: '#111827' }}>
-            Today's Shift Information
-          </h3>
-          <div className="ui-card" style={{ padding: 16 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
-              <div><strong>Date:</strong> {shiftInfo.date}</div>
-              <div><strong>Time:</strong> {shiftInfo.start_time} - {shiftInfo.end_time}</div>
-              <div><strong>Center:</strong> {shiftInfo.center}</div>
-              <div><strong>Supervisor:</strong> {shiftInfo.supervisor}</div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Today's Tasks */}
+      {/* Quick Time Clock */}
       <div style={{ marginBottom: 24 }}>
-        <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12, color: '#111827' }}>
-          Today's Tasks
-        </h3>
-        <div className="ui-card" style={{ padding: 0, overflow: 'hidden' }}>
-          {tasks.length === 0 ? (
-            <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>
-              <div style={{ fontSize: 48, marginBottom: 12 }}>📋</div>
-              <div style={{ marginBottom: 8 }}>No tasks assigned</div>
-              <div style={{ fontSize: 14, color: '#9ca3af' }}>Tasks will appear here when assigned</div>
-            </div>
-          ) : (
-            <div style={{ padding: 16 }}>
-              <div style={{ display: 'grid', gap: 12 }}>
-                {tasks.map(task => (
-                  <div key={task.id} style={{
-                    padding: 16,
-                    border: '1px solid #e5e7eb',
-                    borderRadius: 8,
-                    background: task.status === 'Completed' ? '#f0f9ff' : '#f9fafb'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                      <div>
-                        <h4 style={{ fontSize: 16, fontWeight: 600, margin: 0, color: '#111827' }}>
-                          {task.title}
-                        </h4>
-                        <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
-                          {task.location} • Assigned: {task.assigned_time}
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                        <div style={{
-                          padding: '2px 6px',
-                          borderRadius: 4,
-                          fontSize: 10,
-                          fontWeight: 600,
-                          background: getStatusColor(task.priority),
-                          color: 'white'
-                        }}>
-                          {task.priority}
-                        </div>
-                        <div style={{
-                          padding: '4px 8px',
-                          borderRadius: 4,
-                          fontSize: 11,
-                          fontWeight: 600,
-                          background: getStatusColor(task.status),
-                          color: 'white'
-                        }}>
-                          {task.status}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12 }}>
-                      <div style={{ color: '#6b7280' }}>
-                        Estimated time: {task.estimated_time}
-                      </div>
-                      {task.status !== 'Completed' && (
-                        <button style={{
-                          padding: '6px 12px',
-                          background: task.status === 'Pending' ? '#3b82f6' : '#10b981',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: 4,
-                          fontSize: 11,
-                          fontWeight: 600,
-                          cursor: 'pointer'
-                        }}>
-                          {task.status === 'Pending' ? 'Start Task' : 'Mark Complete'}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+        <div className="ui-card" style={{ padding: 24, textAlign: 'center' }}>
+          <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 16, color: '#111827' }}>Quick Time Clock</h3>
+          <div style={{ fontSize: 32, fontWeight: 700, color: '#10b981', marginBottom: 8 }}>
+            {new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+          </div>
+          <div style={{ fontSize: 14, color: '#6b7280', marginBottom: 20 }}>
+            {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+          </div>
+          <div style={{ display: 'flex', gap: 16, justifyContent: 'center' }}>
+            <button style={{
+              padding: '12px 24px',
+              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+              color: 'white',
+              border: 'none',
+              borderRadius: 8,
+              fontSize: 14,
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8
+            }}>
+              <div style={{ fontSize: 16 }}>⏰</div>
+              <div>Clock In</div>
+            </button>
+            <button style={{
+              padding: '12px 24px',
+              background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+              color: 'white',
+              border: 'none',
+              borderRadius: 8,
+              fontSize: 14,
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8
+            }}>
+              <div style={{ fontSize: 16 }}>🕐</div>
+              <div>Clock Out</div>
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Quick Info */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-        <div>
-          <h4 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12, color: '#10b981', display: 'flex', alignItems: 'center', gap: 8 }}>
-            👥 Team Members
-          </h4>
-          <div className="ui-card" style={{ padding: 16, minHeight: 120 }}>
-            <div style={{ color: '#6b7280', textAlign: 'center', padding: 20 }}>
-              View team members in Ecosystem
-            </div>
-          </div>
-        </div>
 
-        <div>
-          <h4 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12, color: '#10b981', display: 'flex', alignItems: 'center', gap: 8 }}>
-            📢 Announcements
-          </h4>
-          <div className="ui-card" style={{ padding: 16, minHeight: 120 }}>
-            <div style={{ color: '#6b7280', textAlign: 'center', padding: 20 }}>
-              No new announcements
-            </div>
+      {/* Recent Activity */}
+      <div className="ui-card" style={{ padding: 16, marginBottom: 24 }}>
+        <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 12, color: '#10b981' }}>Recent Activity</div>
+        <div style={{ textAlign: 'center', padding: 20, color: '#6b7280' }}>
+          <div style={{ fontSize: 32, marginBottom: 8 }}>📋</div>
+          <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 4 }}>No recent activity</div>
+          <div style={{ fontSize: 12 }}>Work activities will appear here</div>
+        </div>
+      </div>
+
+      {/* Communication Hub */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        {/* News & Updates */}
+        <div className="ui-card" style={{ padding: 16 }}>
+          <div style={{ marginBottom: 16, color: '#10b981', display: 'flex', alignItems: 'center', gap: 8, fontSize: 16, fontWeight: 600 }}>
+            📰 News & Updates
           </div>
+          <div style={{ textAlign: 'center', padding: 20, color: '#6b7280' }}>
+            <div style={{ fontSize: 32, marginBottom: 8 }}>📰</div>
+            <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 4 }}>No Recent News</div>
+            <div style={{ fontSize: 12 }}>Company news and updates will appear here</div>
+          </div>
+          <button style={{
+            width: '100%',
+            padding: '8px 16px',
+            fontSize: 12,
+            backgroundColor: '#dcfce7',
+            color: '#10b981',
+            border: '1px solid #22c55e',
+            borderRadius: 4,
+            cursor: 'pointer',
+            marginTop: 8,
+            fontWeight: 500
+          }}
+          onClick={() => alert('Full News - Coming Soon!')}
+          >
+            View All News
+          </button>
+        </div>
+        
+        {/* Mail & Messages */}
+        <div className="ui-card" style={{ padding: 16 }}>
+          <div style={{ marginBottom: 16, color: '#10b981', display: 'flex', alignItems: 'center', gap: 8, fontSize: 16, fontWeight: 600 }}>
+            📬 Mail
+          </div>
+          <div style={{ textAlign: 'center', padding: 20, color: '#6b7280' }}>
+            <div style={{ fontSize: 32, marginBottom: 8 }}>📧</div>
+            <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 4 }}>No Messages</div>
+            <div style={{ fontSize: 12 }}>Internal messages and notifications will appear here</div>
+          </div>
+          <button style={{
+            width: '100%',
+            padding: '8px 16px',
+            fontSize: 12,
+            backgroundColor: '#dcfce7',
+            color: '#10b981',
+            border: '1px solid #22c55e',
+            borderRadius: 4,
+            cursor: 'pointer',
+            marginTop: 8,
+            fontWeight: 500
+          }}
+          onClick={() => alert('Full Mailbox - Coming Soon!')}
+          >
+            View Mailbox
+          </button>
         </div>
       </div>
     </div>

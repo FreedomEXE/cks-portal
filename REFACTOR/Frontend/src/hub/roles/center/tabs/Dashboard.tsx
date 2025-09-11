@@ -110,14 +110,14 @@ export default function CenterDashboard({ userId, config, features, api }: Cente
 
   if (loading) {
     return (
-      <div style={{ padding: 24, textAlign: 'center' }}>
+      <div style={{ textAlign: 'center' }}>
         <div style={{ color: '#6b7280' }}>Loading dashboard...</div>
       </div>
     );
   }
 
   return (
-    <div style={{ padding: 24 }}>
+    <div>
       <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16, color: '#111827' }}>
         Overview
       </h2>
@@ -200,57 +200,13 @@ export default function CenterDashboard({ userId, config, features, api }: Cente
         </button>
       </div>
 
-      {/* Recent Activity Section */}
-      <div style={{ marginBottom: 24 }}>
-        <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12, color: '#111827' }}>
-          Recent Activity
-        </h3>
-        <div className="ui-card" style={{ padding: 0, overflow: 'hidden' }}>
-          {schedules.length === 0 ? (
-            <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>
-              <div style={{ fontSize: 48, marginBottom: 12 }}>📅</div>
-              <div style={{ marginBottom: 8 }}>No services scheduled</div>
-              <div style={{ fontSize: 14, color: '#9ca3af' }}>Today's schedule is clear</div>
-            </div>
-          ) : (
-            <div style={{ padding: 16 }}>
-              <div style={{ display: 'grid', gap: 12 }}>
-                {schedules.map(schedule => (
-                  <div key={schedule.id} style={{
-                    padding: 16,
-                    border: '1px solid #e5e7eb',
-                    borderRadius: 8,
-                    background: '#f9fafb'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                      <div>
-                        <h4 style={{ fontSize: 16, fontWeight: 600, margin: 0, color: '#111827' }}>
-                          {schedule.service_type}
-                        </h4>
-                        <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
-                          {schedule.contractor}
-                        </div>
-                      </div>
-                      <div style={{
-                        padding: '4px 8px',
-                        borderRadius: 4,
-                        fontSize: 11,
-                        fontWeight: 600,
-                        background: getStatusColor(schedule.status),
-                        color: 'white'
-                      }}>
-                        {schedule.status}
-                      </div>
-                    </div>
-
-                    <div style={{ fontSize: 12, color: '#6b7280' }}>
-                      Scheduled: {schedule.scheduled_time}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+      {/* Recent Activity */}
+      <div className="ui-card" style={{ padding: 16, marginBottom: 24 }}>
+        <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 12, color: '#3b82f6' }}>Recent Activity</div>
+        <div style={{ textAlign: 'center', padding: 20, color: '#6b7280' }}>
+          <div style={{ fontSize: 32, marginBottom: 8 }}>📅</div>
+          <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 4 }}>No recent activity</div>
+          <div style={{ fontSize: 12 }}>Center activities will appear here</div>
         </div>
       </div>
 
@@ -260,10 +216,28 @@ export default function CenterDashboard({ userId, config, features, api }: Cente
           <h4 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12, color: '#3b82f6', display: 'flex', alignItems: 'center', gap: 8 }}>
             📰 News & Updates
           </h4>
-          <div className="ui-card" style={{ padding: 16, minHeight: 200 }}>
+          <div className="ui-card" style={{ padding: 16 }}>
             <div style={{ color: '#6b7280', textAlign: 'center', padding: 20 }}>
-              No new updates available
+              <div style={{ fontSize: 32, marginBottom: 8 }}>📰</div>
+              <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 4 }}>No Recent News</div>
+              <div style={{ fontSize: 12 }}>Company news and updates will appear here</div>
             </div>
+            <button style={{
+              width: '100%',
+              padding: '8px 16px',
+              fontSize: 12,
+              backgroundColor: '#dbeafe',
+              color: '#3b82f6',
+              border: '1px solid #3b82f6',
+              borderRadius: 4,
+              cursor: 'pointer',
+              marginTop: 8,
+              fontWeight: 500
+            }}
+            onClick={() => alert('Full News - Coming Soon!')}
+            >
+              View All News
+            </button>
           </div>
         </div>
 
@@ -271,10 +245,28 @@ export default function CenterDashboard({ userId, config, features, api }: Cente
           <h4 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12, color: '#3b82f6', display: 'flex', alignItems: 'center', gap: 8 }}>
             ✉️ Mail
           </h4>
-          <div className="ui-card" style={{ padding: 16, minHeight: 200 }}>
+          <div className="ui-card" style={{ padding: 16 }}>
             <div style={{ color: '#6b7280', textAlign: 'center', padding: 20 }}>
-              No new messages
+              <div style={{ fontSize: 32, marginBottom: 8 }}>📧</div>
+              <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 4 }}>No Messages</div>
+              <div style={{ fontSize: 12 }}>Internal messages and notifications will appear here</div>
             </div>
+            <button style={{
+              width: '100%',
+              padding: '8px 16px',
+              fontSize: 12,
+              backgroundColor: '#dbeafe',
+              color: '#3b82f6',
+              border: '1px solid #3b82f6',
+              borderRadius: 4,
+              cursor: 'pointer',
+              marginTop: 8,
+              fontWeight: 500
+            }}
+            onClick={() => alert('Full Mailbox - Coming Soon!')}
+            >
+              View Mailbox
+            </button>
           </div>
         </div>
       </div>

@@ -79,15 +79,17 @@ export default function Dashboard({ userId, config, features, api }: DashboardPr
 
   return (
     <div>
-      <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Manager Dashboard</h2>
+      <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Overview</h2>
       
       {/* Simple Entity Count Metrics */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', gap: 16, marginBottom: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 16, marginBottom: 24 }}>
         {[
           { title: 'My Contractors', value: dashboardLoading ? '—' : String(dashboardMetrics.contractors), subtitle: 'Total contractors managed', color: '#3b7af7' },
           { title: 'My Customers', value: dashboardLoading ? '—' : String(dashboardMetrics.customers), subtitle: 'Total customers served', color: '#10b981' },
           { title: 'My Centers', value: dashboardLoading ? '—' : String(dashboardMetrics.centers), subtitle: 'Service centers managed', color: '#8b5cf6' },
           { title: 'My Crew', value: dashboardLoading ? '—' : String(dashboardMetrics.crew), subtitle: 'Total crew members', color: '#f59e0b' },
+          { title: 'Pending Orders', value: dashboardLoading ? '—' : '7', subtitle: 'Orders requiring attention', color: '#ef4444' },
+          { title: 'Account Status', value: dashboardLoading ? '—' : 'Active', subtitle: 'Current account status', color: '#10b981' },
         ].map(metric => (
           <div key={metric.title} className="ui-card" style={{ padding: 16, textAlign: 'center' }}>
             <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>{metric.title}</div>
@@ -107,11 +109,27 @@ export default function Dashboard({ userId, config, features, api }: DashboardPr
           <div className="title" style={{ marginBottom: 16, color: '#3b7af7', display: 'flex', alignItems: 'center', gap: 8 }}>
             📰 News & Updates
           </div>
-          <div style={{ textAlign: 'center', padding: 32, color: '#6b7280', background: '#f9fafb', borderRadius: 8 }}>
-            <div style={{ fontSize: 48, marginBottom: 8 }}>📰</div>
-            <div style={{ fontSize: 14, fontWeight: 500 }}>No recent news</div>
-            <div style={{ fontSize: 12, marginTop: 4 }}>Company news and updates will appear here</div>
+          <div style={{ textAlign: 'center', padding: 20, color: '#6b7280' }}>
+            <div style={{ fontSize: 32, marginBottom: 8 }}>📰</div>
+            <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 4 }}>No Recent News</div>
+            <div style={{ fontSize: 12 }}>Company news and updates will appear here</div>
           </div>
+          <button style={{
+            width: '100%',
+            padding: '8px 16px',
+            fontSize: 12,
+            backgroundColor: '#dbeafe',
+            color: '#3b7af7',
+            border: '1px solid #3b82f6',
+            borderRadius: 4,
+            cursor: 'pointer',
+            marginTop: 8,
+            fontWeight: 500
+          }}
+          onClick={() => alert('Full News - Coming Soon!')}
+          >
+            View All News
+          </button>
         </div>
         
         {/* Mail & Messages */}
@@ -119,11 +137,27 @@ export default function Dashboard({ userId, config, features, api }: DashboardPr
           <div className="title" style={{ marginBottom: 16, color: '#3b7af7', display: 'flex', alignItems: 'center', gap: 8 }}>
             📬 Mail
           </div>
-          <div style={{ textAlign: 'center', padding: 32, color: '#6b7280', background: '#f9fafb', borderRadius: 8 }}>
-            <div style={{ fontSize: 48, marginBottom: 8 }}>📬</div>
-            <div style={{ fontSize: 14, fontWeight: 500 }}>No messages</div>
-            <div style={{ fontSize: 12, marginTop: 4 }}>Internal messages and notifications will appear here</div>
+          <div style={{ textAlign: 'center', padding: 20, color: '#6b7280' }}>
+            <div style={{ fontSize: 32, marginBottom: 8 }}>📧</div>
+            <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 4 }}>No Messages</div>
+            <div style={{ fontSize: 12 }}>Internal messages and notifications will appear here</div>
           </div>
+          <button style={{
+            width: '100%',
+            padding: '8px 16px',
+            fontSize: 12,
+            backgroundColor: '#dbeafe',
+            color: '#3b7af7',
+            border: '1px solid #3b82f6',
+            borderRadius: 4,
+            cursor: 'pointer',
+            marginTop: 8,
+            fontWeight: 500
+          }}
+          onClick={() => alert('Full Mailbox - Coming Soon!')}
+          >
+            View Mailbox
+          </button>
         </div>
       </div>
     </div>
