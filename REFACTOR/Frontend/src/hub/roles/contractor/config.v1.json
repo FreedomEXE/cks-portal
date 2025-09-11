@@ -25,18 +25,18 @@
       "requires": ["profile:view"]
     },
     {
+      "id": "ecosystem",
+      "label": "My Ecosystem",
+      "component": "Ecosystem",
+      "icon": "Network",
+      "requires": ["ecosystem:view"]
+    },
+    {
       "id": "services",
       "label": "My Services",
       "component": "MyServices",
       "icon": "Settings",
       "requires": ["services:manage"]
-    },
-    {
-      "id": "ecosystem",
-      "label": "Ecosystem",
-      "component": "Ecosystem",
-      "icon": "Network",
-      "requires": ["ecosystem:view"]
     },
     {
       "id": "orders",

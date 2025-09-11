@@ -272,7 +272,7 @@ export default function Ecosystem({ userId, config, features, api }: EcosystemPr
         border: '1px solid #fecaca', 
         background: '#fef2f2' 
       }}>
-        <div style={{ fontWeight: 600, marginBottom: 4 }}>Error Loading Ecosystem</div>
+        <div style={{ fontWeight: 600, marginBottom: 4 }}>Error Loading My Ecosystem</div>
         <div style={{ fontSize: 14 }}>{error}</div>
       </div>
     );
@@ -281,7 +281,7 @@ export default function Ecosystem({ userId, config, features, api }: EcosystemPr
   if (!ecosystem.length) {
     return (
       <div>
-        <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Ecosystem</h2>
+        <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>My Ecosystem</h2>
         <div className="ui-card" style={{ padding: 32, textAlign: 'center' }}>
           <div style={{ fontSize: 48, marginBottom: 12 }}>🌐</div>
           <div style={{ fontSize: 16, fontWeight: 500, marginBottom: 4 }}>
@@ -315,7 +315,7 @@ export default function Ecosystem({ userId, config, features, api }: EcosystemPr
           </div>
         </div>
         
-        {/* Ecosystem Tree */}
+        {/* My Ecosystem Tree */}
         <div style={{ padding: 12 }}>
           {ecosystem.map((node) => renderNode(node))}
         </div>

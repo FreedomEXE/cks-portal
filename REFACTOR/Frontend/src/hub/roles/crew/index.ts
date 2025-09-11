@@ -21,13 +21,15 @@ import Dashboard from './tabs/Dashboard';
 import MyProfile from './tabs/MyProfile';
 import MyServices from './tabs/MyServices';
 import Ecosystem from './tabs/Ecosystem';
+import Support from './tabs/Support';
 
 // Export all components for dynamic resolution
 export const components = {
   Dashboard,
   MyProfile,
   MyServices,
-  Ecosystem
+  Ecosystem,
+  Support
 } as const;
 
 // Export utility components (to be added as needed)

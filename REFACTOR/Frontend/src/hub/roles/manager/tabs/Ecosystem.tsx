@@ -136,7 +136,7 @@ export default function Ecosystem({ userId, config, features, api }: EcosystemPr
   if (loading) {
     return (
       <div>
-        <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Ecosystem</h2>
+        <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>My Ecosystem</h2>
         <div className="ui-card" style={{ padding: 16 }}>
           <div style={{ textAlign: 'center', padding: 40, color: '#6b7280' }}>
             Loading ecosystem...
@@ -149,11 +149,11 @@ export default function Ecosystem({ userId, config, features, api }: EcosystemPr
   if (error) {
     return (
       <div>
-        <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Ecosystem</h2>
+        <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>My Ecosystem</h2>
         <div className="ui-card" style={{ padding: 16 }}>
           <div style={{ textAlign: 'center', padding: 40, color: '#dc2626', background: '#fef2f2', borderRadius: 8 }}>
             <div style={{ fontSize: 48, marginBottom: 8 }}>⚠️</div>
-            <div style={{ fontSize: 16, fontWeight: 500 }}>Failed to Load Ecosystem</div>
+            <div style={{ fontSize: 16, fontWeight: 500 }}>Failed to Load My Ecosystem</div>
             <div style={{ fontSize: 12, marginTop: 4 }}>{error}</div>
           </div>
         </div>
@@ -169,7 +169,7 @@ export default function Ecosystem({ userId, config, features, api }: EcosystemPr
         {ecosystem.length === 0 ? (
           <div style={{ textAlign: 'center', padding: 40, color: '#6b7280', background: '#f9fafb', borderRadius: 8 }}>
             <div style={{ fontSize: 48, marginBottom: 8 }}>🌐</div>
-            <div style={{ fontSize: 16, fontWeight: 500, marginBottom: 4 }}>No Ecosystem Data</div>
+            <div style={{ fontSize: 16, fontWeight: 500, marginBottom: 4 }}>No My Ecosystem Data</div>
             <div style={{ fontSize: 12, marginTop: 4, lineHeight: 1.5 }}>
               Your ecosystem relationships will appear here once configured.<br />
               This includes contractors, customers, centers, and crew assignments.
