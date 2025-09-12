@@ -125,9 +125,10 @@ const testUsers: Record<TestRole, TestUserData> = {
     permissions: [
       'dashboard:view',
       'profile:view',
+      'services:manage',
       'inventory:manage',
       'orders:process',
-      'shipping:track',
+      'delivery:track',
       'support:access',
       'reports:generate'
     ]

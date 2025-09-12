@@ -6,13 +6,13 @@
 /**
  * Reports.tsx
  * 
- * Description: Contractor reports and feedback management system
- * Function: View and manage business reports and customer feedback
- * Importance: Critical - Business intelligence and customer relationship management
- * Connects to: Contractor API reports endpoints, feedback system
+ * Description: Contractor reports and feedback submission system with ecosystem hierarchy
+ * Function: Create reports for managers and view ecosystem communications
+ * Importance: Critical - Contractor communication with management and ecosystem visibility
+ * Connects to: Contractor API reports endpoints, ecosystem visibility system
  * 
- * Notes: Production-ready implementation with complete reporting functionality.
- *        Includes reports management, feedback tracking, and archive search.
+ * Notes: Contractors create reports primarily for managers to view
+ *        Also view reports/feedback from others involving contractor
  */
 
 import React, { useState, useEffect } from 'react';
@@ -34,6 +34,8 @@ interface Report {
   created_by_id: string;
   created_at: string;
   description?: string;
+  about_type?: string;
+  about_id?: string;
 }
 
 interface Feedback {
@@ -44,112 +46,177 @@ interface Feedback {
   created_by_id: string;
   created_at: string;
   message?: string;
-  center_id?: string;
-  customer_id?: string;
-}
-
-interface ReportDetail {
-  report: Report;
-  comments: Array<{
-    comment_id: string;
-    commenter_role: string;
-    commenter_id: string;
-    content: string;
-    created_at: string;
-  }>;
+  about_type?: string;
+  about_id?: string;
 }
 
 export default function Reports({ userId, config, features, api }: ReportsProps) {
-  const [activeTab, setActiveTab] = useState<'reports' | 'feedback'>('reports');
+  const [activeTab, setActiveTab] = useState<'create' | 'my-items' | 'view-all'>('create');
+  const [activeSubTab, setActiveSubTab] = useState<'report' | 'feedback'>('report');
   const [reports, setReports] = useState<Report[]>([]);
   const [feedback, setFeedback] = useState<Feedback[]>([]);
+  const [allReports, setAllReports] = useState<Report[]>([]);
+  const [allFeedback, setAllFeedback] = useState<Feedback[]>([]);
   const [reportsTotals, setReportsTotals] = useState<Record<string, number>>({});
   const [feedbackTotals, setFeedbackTotals] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(false);
   
-  // Archive search
-  const [archiveReportId, setArchiveReportId] = useState('');
-  const [archiveFeedbackId, setArchiveFeedbackId] = useState('');
+  // Form states
+  const [reportForm, setReportForm] = useState({
+    title: '',
+    about_type: '', // 'center', 'customer', 'order', 'service' - contractor reports upward
+    about_id: '',
+    type: '',
+    severity: '',
+    description: ''
+  });
   
-  // Detail modals
-  const [reportDetailOpen, setReportDetailOpen] = useState(false);
-  const [reportDetail, setReportDetail] = useState<ReportDetail | null>(null);
-  const [feedbackDetailOpen, setFeedbackDetailOpen] = useState(false);
-  const [feedbackDetail, setFeedbackDetail] = useState<Feedback | null>(null);
+  const [feedbackForm, setFeedbackForm] = useState({
+    title: '',
+    about_type: '', // 'center', 'customer', 'order', 'service' - contractor feedback upward  
+    about_id: '',
+    kind: '',
+    message: ''
+  });
 
-  // Load reports or feedback based on active tab
+  // Load data based on active tab
   useEffect(() => {
     const loadData = async () => {
       try {
         setLoading(true);
         
-        if (activeTab === 'reports') {
-          // Mock reports data
+        if (activeTab === 'my-items' && activeSubTab === 'report') {
+          // Contractor submitted reports
           const mockReports: Report[] = [
             {
-              report_id: 'RPT-001',
-              title: 'Equipment Maintenance Issue',
-              type: 'equipment',
+              report_id: 'RPT-201',
+              title: 'Resource Allocation Issue',
+              type: 'resource',
               severity: 'medium',
               status: 'open',
-              created_by_role: 'crew',
-              created_by_id: 'CRW-001',
-              created_at: '2025-01-09T10:30:00Z',
-              description: 'Cleaning equipment needs maintenance at downtown location'
+              created_by_role: 'contractor',
+              created_by_id: userId,
+              created_at: '2025-01-10T11:20:00Z',
+              description: 'Need additional crew resources for upcoming large contracts',
+              about_type: 'center',
+              about_id: 'CTR-001'
             },
             {
-              report_id: 'RPT-002',
-              title: 'Service Quality Concern',
-              type: 'quality',
+              report_id: 'RPT-202',
+              title: 'Customer Service Escalation',
+              type: 'customer',
               severity: 'high',
               status: 'in_progress',
-              created_by_role: 'customer',
-              created_by_id: 'CUS-001',
-              created_at: '2025-01-08T14:15:00Z',
-              description: 'Customer reported quality issues with recent service'
+              created_by_role: 'contractor',
+              created_by_id: userId,
+              created_at: '2025-01-08T16:45:00Z',
+              description: 'Major customer complaint requiring management attention',
+              about_type: 'customer',
+              about_id: 'CUS-003'
             }
           ];
-          
           setReports(mockReports);
-          setReportsTotals({
-            open: 1,
-            in_progress: 1,
-            resolved: 0,
-            closed: 0
-          });
           
-        } else {
-          // Mock feedback data
+        } else if (activeTab === 'my-items' && activeSubTab === 'feedback') {
+          // Contractor submitted feedback
           const mockFeedback: Feedback[] = [
             {
-              feedback_id: 'FDB-001',
-              title: 'Excellent Service Quality',
-              kind: 'praise',
-              created_by_role: 'customer',
-              created_by_id: 'CUS-001',
-              created_at: '2025-01-08T16:45:00Z',
-              message: 'Outstanding cleaning service. Very professional team.',
-              center_id: 'CTR-001'
+              feedback_id: 'FDB-201',
+              title: 'Service Quality Recognition',
+              kind: 'compliment',
+              created_by_role: 'contractor',
+              created_by_id: userId,
+              created_at: '2025-01-09T14:30:00Z',
+              message: 'Center team provided exceptional support during project execution',
+              about_type: 'center',
+              about_id: 'CTR-002'
             },
             {
-              feedback_id: 'FDB-002',
-              title: 'Schedule Change Request',
-              kind: 'request',
-              created_by_role: 'customer',
-              created_by_id: 'CUS-002',
-              created_at: '2025-01-07T11:20:00Z',
-              message: 'Would like to adjust our weekly cleaning schedule.',
-              center_id: 'CTR-003'
+              feedback_id: 'FDB-202',
+              title: 'Process Improvement Suggestion',
+              kind: 'suggestion',
+              created_by_role: 'contractor',
+              created_by_id: userId,
+              created_at: '2025-01-07T10:15:00Z',
+              message: 'Could streamline order processing workflow for better efficiency',
+              about_type: 'order',
+              about_id: 'ORD-789'
             }
           ];
-          
           setFeedback(mockFeedback);
-          setFeedbackTotals({
-            praise: 1,
-            request: 1,
-            issue: 0
-          });
+          
+        } else if (activeTab === 'view-all' && activeSubTab === 'report') {
+          // Reports from others involving this contractor
+          const mockAllReports: Report[] = [
+            {
+              report_id: 'RPT-301',
+              title: 'Contractor Performance Review',
+              type: 'performance',
+              severity: 'medium',
+              status: 'in_progress',
+              created_by_role: 'center',
+              created_by_id: 'CTR-001',
+              created_at: '2025-01-09T13:20:00Z',
+              description: 'Quarterly review of contractor service delivery and quality metrics',
+              about_type: 'contractor',
+              about_id: userId
+            },
+            {
+              report_id: 'RPT-302',
+              title: 'Project Timeline Concern',
+              type: 'operational',
+              severity: 'low',
+              status: 'open',
+              created_by_role: 'customer',
+              created_by_id: 'CUS-005',
+              created_at: '2025-01-08T09:45:00Z',
+              description: 'Minor delays in project completion but overall satisfaction maintained',
+              about_type: 'contractor',
+              about_id: userId
+            }
+          ];
+          setAllReports(mockAllReports);
+          
+        } else if (activeTab === 'view-all' && activeSubTab === 'feedback') {
+          // Feedback from others involving this contractor
+          const mockAllFeedback: Feedback[] = [
+            {
+              feedback_id: 'FDB-301',
+              title: 'Outstanding Service Quality',
+              kind: 'compliment',
+              created_by_role: 'customer',
+              created_by_id: 'CUS-006',
+              created_at: '2025-01-09T17:20:00Z',
+              message: 'Contractor exceeded expectations with professional service and attention to detail',
+              about_type: 'contractor',
+              about_id: userId
+            },
+            {
+              feedback_id: 'FDB-302',
+              title: 'Communication Excellence',
+              kind: 'compliment',
+              created_by_role: 'center',
+              created_by_id: 'CTR-003',
+              created_at: '2025-01-07T11:30:00Z',
+              message: 'Contractor maintains excellent communication throughout project lifecycle',
+              about_type: 'contractor',
+              about_id: userId
+            }
+          ];
+          setAllFeedback(mockAllFeedback);
         }
+        
+        setReportsTotals({
+          open: 1,
+          in_progress: 1,
+          resolved: 0,
+          closed: 0
+        });
+        setFeedbackTotals({
+          compliment: 2,
+          suggestion: 1,
+          issue: 0
+        });
         
       } catch (error) {
         console.error('Error loading data:', error);
@@ -159,108 +226,127 @@ export default function Reports({ userId, config, features, api }: ReportsProps)
     };
 
     loadData();
-  }, [activeTab, userId]);
+  }, [activeTab, activeSubTab, userId]);
 
-  const openReportDetail = async (reportId: string) => {
+  const handleReportSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     try {
-      setReportDetailOpen(true);
-      setReportDetail(null);
-      
-      // Mock report detail
-      const report = reports.find(r => r.report_id === reportId);
-      if (!report) return;
-      
-      const mockDetail: ReportDetail = {
-        report,
-        comments: [
-          {
-            comment_id: 'COM-001',
-            commenter_role: 'manager',
-            commenter_id: 'MGR-001',
-            content: 'Looking into this issue. Will follow up with the team.',
-            created_at: '2025-01-09T11:00:00Z'
-          }
-        ]
-      };
-      
-      setReportDetail(mockDetail);
-      
+      console.log('Submitting report:', reportForm);
+      // Here would be API call to submit report
+      alert('Report submitted successfully! Managers will be notified and can view this report.');
+      setReportForm({
+        title: '',
+        about_type: '',
+        about_id: '',
+        type: '',
+        severity: '',
+        description: ''
+      });
     } catch (error) {
-      console.error('Error loading report detail:', error);
-      setReportDetail(null);
+      console.error('Error submitting report:', error);
+      alert('Error submitting report. Please try again.');
     }
   };
 
-  const closeReportDetail = () => {
-    setReportDetailOpen(false);
-    setReportDetail(null);
-  };
-
-  const openFeedbackDetail = async (feedbackId: string) => {
+  const handleFeedbackSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     try {
-      setFeedbackDetailOpen(true);
-      setFeedbackDetail(null);
-      
-      const feedbackItem = feedback.find(f => f.feedback_id === feedbackId);
-      setFeedbackDetail(feedbackItem || null);
-      
+      console.log('Submitting feedback:', feedbackForm);
+      // Here would be API call to submit feedback
+      alert('Feedback submitted successfully! Relevant team members will be able to view this.');
+      setFeedbackForm({
+        title: '',
+        about_type: '',
+        about_id: '',
+        kind: '',
+        message: ''
+      });
     } catch (error) {
-      console.error('Error loading feedback detail:', error);
-      setFeedbackDetail(null);
-    }
-  };
-
-  const closeFeedbackDetail = () => {
-    setFeedbackDetailOpen(false);
-    setFeedbackDetail(null);
-  };
-
-  const searchArchive = async (id: string, type: 'report' | 'feedback') => {
-    if (!id.trim()) return;
-    
-    if (type === 'report') {
-      await openReportDetail(id);
-    } else {
-      await openFeedbackDetail(id);
+      console.error('Error submitting feedback:', error);
+      alert('Error submitting feedback. Please try again.');
     }
   };
 
   return (
     <div>
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center', 
-        marginBottom: 16 
-      }}>
-        <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>Reports & Feedback</h2>
-        
-        {/* Reports/Feedback Tabs */}
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button
-            onClick={() => setActiveTab('reports')}
-            style={{
-              padding: '8px 16px',
-              borderRadius: 6,
-              border: '1px solid #e5e7eb',
-              background: activeTab === 'reports' ? '#10b981' : 'white',
-              color: activeTab === 'reports' ? 'white' : '#111827',
-              fontSize: 14,
+      <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 12 }}>Reports & Feedback</h2>
+      
+      {/* Main Navigation Tabs */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+        <button 
+          onClick={() => setActiveTab('create')} 
+          style={{ 
+            padding: '8px 16px', 
+            borderRadius: 8, 
+            border: '1px solid #e5e7eb', 
+            background: activeTab === 'create' ? '#3b82f6' : 'white', 
+            color: activeTab === 'create' ? 'white' : '#111827', 
+            fontSize: 13, 
+            fontWeight: 600,
+            cursor: 'pointer'
+          }}
+        >
+          Create
+        </button>
+        <button 
+          onClick={() => setActiveTab('my-items')} 
+          style={{ 
+            padding: '8px 16px', 
+            borderRadius: 8, 
+            border: '1px solid #e5e7eb', 
+            background: activeTab === 'my-items' ? '#3b82f6' : 'white', 
+            color: activeTab === 'my-items' ? 'white' : '#111827', 
+            fontSize: 13, 
+            fontWeight: 600,
+            cursor: 'pointer'
+          }}
+        >
+          My Items
+        </button>
+        <button 
+          onClick={() => setActiveTab('view-all')} 
+          style={{ 
+            padding: '8px 16px', 
+            borderRadius: 8, 
+            border: '1px solid #e5e7eb', 
+            background: activeTab === 'view-all' ? '#3b82f6' : 'white', 
+            color: activeTab === 'view-all' ? 'white' : '#111827', 
+            fontSize: 13, 
+            fontWeight: 600,
+            cursor: 'pointer'
+          }}
+        >
+          View All
+        </button>
+      </div>
+
+      {/* Sub-navigation for Create and My Items */}
+      {(activeTab === 'create' || activeTab === 'my-items' || activeTab === 'view-all') && (
+        <div style={{ display: 'flex', gap: 8, marginBottom: 16, paddingLeft: 8 }}>
+          <button 
+            onClick={() => setActiveSubTab('report')} 
+            style={{ 
+              padding: '6px 12px', 
+              borderRadius: 6, 
+              border: '1px solid #e5e7eb', 
+              background: activeSubTab === 'report' ? '#dc2626' : 'white', 
+              color: activeSubTab === 'report' ? 'white' : '#111827', 
+              fontSize: 12, 
               fontWeight: 600,
               cursor: 'pointer'
             }}
           >
             Reports
           </button>
-          <button
-            onClick={() => setActiveTab('feedback')}
-            style={{
-              padding: '8px 16px',
-              borderRadius: 6,
-              border: '1px solid #e5e7eb',
-              background: activeTab === 'feedback' ? '#10b981' : 'white',
-              color: activeTab === 'feedback' ? 'white' : '#111827',
-              fontSize: 14,
+          <button 
+            onClick={() => setActiveSubTab('feedback')} 
+            style={{ 
+              padding: '6px 12px', 
+              borderRadius: 6, 
+              border: '1px solid #e5e7eb', 
+              background: activeSubTab === 'feedback' ? '#16a34a' : 'white', 
+              color: activeSubTab === 'feedback' ? 'white' : '#111827', 
+              fontSize: 12, 
               fontWeight: 600,
               cursor: 'pointer'
             }}
@@ -268,391 +354,370 @@ export default function Reports({ userId, config, features, api }: ReportsProps)
             Feedback
           </button>
         </div>
-      </div>
-
-      {activeTab === 'reports' ? (
-        <div>
-          {/* Reports Status Summary */}
-          <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
-            {[
-              { key: 'open', label: 'Open', value: reportsTotals.open, color: '#ef4444' },
-              { key: 'in_progress', label: 'In Progress', value: reportsTotals.in_progress, color: '#f59e0b' },
-              { key: 'resolved', label: 'Resolved', value: reportsTotals.resolved, color: '#10b981' },
-              { key: 'closed', label: 'Closed', value: reportsTotals.closed, color: '#6b7280' }
-            ].map(({ key, label, value, color }) => (
-              <span key={key} style={{
-                background: '#f9fafb',
-                border: '1px solid #e5e7eb',
-                borderRadius: 16,
-                padding: '6px 12px',
-                fontSize: 12,
-                fontWeight: 600,
-                color: color
-              }}>
-                {label}: {value || 0}
-              </span>
-            ))}
-          </div>
-
-          <div className="ui-card" style={{ padding: 0, overflow: 'hidden' }}>
-            {loading ? (
-              <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>
-                <div style={{ fontSize: 24, marginBottom: 8 }}>⏳</div>
-                <div>Loading reports...</div>
-              </div>
-            ) : reports.length === 0 ? (
-              <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>
-                <div style={{ fontSize: 48, marginBottom: 8 }}>📊</div>
-                <div style={{ fontSize: 16, fontWeight: 500, marginBottom: 4 }}>No Reports</div>
-                <div style={{ fontSize: 12 }}>Business reports and issues will appear here</div>
-              </div>
-            ) : (
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ background: '#f9fafb' }}>
-                    <th style={{ padding: 12, textAlign: 'left', fontSize: 12, fontWeight: 600 }}>Title</th>
-                    <th style={{ padding: 12, textAlign: 'left', fontSize: 12, fontWeight: 600 }}>Type</th>
-                    <th style={{ padding: 12, textAlign: 'left', fontSize: 12, fontWeight: 600 }}>Severity</th>
-                    <th style={{ padding: 12, textAlign: 'left', fontSize: 12, fontWeight: 600 }}>Status</th>
-                    <th style={{ padding: 12, textAlign: 'left', fontSize: 12, fontWeight: 600 }}>Reported By</th>
-                    <th style={{ padding: 12, textAlign: 'left', fontSize: 12, fontWeight: 600 }}>Created</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {reports.map((report, index) => (
-                    <tr key={report.report_id} onClick={() => openReportDetail(report.report_id)} style={{
-                      cursor: 'pointer',
-                      borderBottom: index < reports.length - 1 ? '1px solid #e5e7eb' : 'none',
-                      ':hover': { background: '#f9fafb' }
-                    }}>
-                      <td style={{ padding: 12, fontWeight: 600 }}>{report.title}</td>
-                      <td style={{ padding: 12, textTransform: 'capitalize' }}>{report.type}</td>
-                      <td style={{ padding: 12 }}>
-                        {report.severity ? (
-                          <span style={{
-                            padding: '2px 8px',
-                            borderRadius: 12,
-                            fontSize: 11,
-                            fontWeight: 600,
-                            background: report.severity === 'high' ? '#fef2f2' : 
-                                       report.severity === 'medium' ? '#fef3c7' : '#f0fdf4',
-                            color: report.severity === 'high' ? '#dc2626' : 
-                                   report.severity === 'medium' ? '#d97706' : '#059669'
-                          }}>
-                            {report.severity}
-                          </span>
-                        ) : '—'}
-                      </td>
-                      <td style={{ padding: 12, textTransform: 'capitalize' }}>{report.status.replace('_', ' ')}</td>
-                      <td style={{ padding: 12, fontSize: 12, color: '#6b7280' }}>
-                        {report.created_by_role}:{report.created_by_id}
-                      </td>
-                      <td style={{ padding: 12, fontSize: 12 }}>
-                        {new Date(report.created_at).toLocaleDateString()}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </div>
-      ) : (
-        <div>
-          {/* Feedback Summary */}
-          <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
-            {[
-              { key: 'praise', label: 'Praise', value: feedbackTotals.praise, color: '#10b981' },
-              { key: 'request', label: 'Requests', value: feedbackTotals.request, color: '#3b7af7' },
-              { key: 'issue', label: 'Issues', value: feedbackTotals.issue, color: '#ef4444' }
-            ].map(({ key, label, value, color }) => (
-              <span key={key} style={{
-                background: '#f9fafb',
-                border: '1px solid #e5e7eb',
-                borderRadius: 16,
-                padding: '6px 12px',
-                fontSize: 12,
-                fontWeight: 600,
-                color: color
-              }}>
-                {label}: {value || 0}
-              </span>
-            ))}
-          </div>
-
-          <div className="ui-card" style={{ padding: 0, overflow: 'hidden' }}>
-            {loading ? (
-              <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>
-                <div style={{ fontSize: 24, marginBottom: 8 }}>⏳</div>
-                <div>Loading feedback...</div>
-              </div>
-            ) : feedback.length === 0 ? (
-              <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>
-                <div style={{ fontSize: 48, marginBottom: 8 }}>💬</div>
-                <div style={{ fontSize: 16, fontWeight: 500, marginBottom: 4 }}>No Feedback</div>
-                <div style={{ fontSize: 12 }}>Customer feedback will appear here</div>
-              </div>
-            ) : (
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ background: '#f9fafb' }}>
-                    <th style={{ padding: 12, textAlign: 'left', fontSize: 12, fontWeight: 600 }}>Title</th>
-                    <th style={{ padding: 12, textAlign: 'left', fontSize: 12, fontWeight: 600 }}>Type</th>
-                    <th style={{ padding: 12, textAlign: 'left', fontSize: 12, fontWeight: 600 }}>From</th>
-                    <th style={{ padding: 12, textAlign: 'left', fontSize: 12, fontWeight: 600 }}>Center</th>
-                    <th style={{ padding: 12, textAlign: 'left', fontSize: 12, fontWeight: 600 }}>Created</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {feedback.map((feedbackItem, index) => (
-                    <tr key={feedbackItem.feedback_id} onClick={() => openFeedbackDetail(feedbackItem.feedback_id)} style={{
-                      cursor: 'pointer',
-                      borderBottom: index < feedback.length - 1 ? '1px solid #e5e7eb' : 'none',
-                      ':hover': { background: '#f9fafb' }
-                    }}>
-                      <td style={{ padding: 12, fontWeight: 600 }}>{feedbackItem.title}</td>
-                      <td style={{ padding: 12 }}>
-                        <span style={{
-                          padding: '2px 8px',
-                          borderRadius: 12,
-                          fontSize: 11,
-                          fontWeight: 600,
-                          background: feedbackItem.kind === 'praise' ? '#dcfce7' : 
-                                     feedbackItem.kind === 'request' ? '#dbeafe' : '#fef2f2',
-                          color: feedbackItem.kind === 'praise' ? '#059669' : 
-                                 feedbackItem.kind === 'request' ? '#2563eb' : '#dc2626'
-                        }}>
-                          {feedbackItem.kind}
-                        </span>
-                      </td>
-                      <td style={{ padding: 12, fontSize: 12, color: '#6b7280' }}>
-                        {feedbackItem.created_by_role}:{feedbackItem.created_by_id}
-                      </td>
-                      <td style={{ padding: 12 }}>{feedbackItem.center_id || '—'}</td>
-                      <td style={{ padding: 12, fontSize: 12 }}>
-                        {new Date(feedbackItem.created_at).toLocaleDateString()}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </div>
       )}
 
-      {/* Archive Search */}
-      <div className="ui-card" style={{ padding: 16, marginTop: 16 }}>
-        <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>Archive Search</h3>
-        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-          <input
-            placeholder="Report ID (e.g., RPT-1001)"
-            value={archiveReportId}
-            onChange={(e) => setArchiveReportId(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                searchArchive(archiveReportId, 'report');
-              }
-            }}
-            style={{
-              padding: '8px 12px',
-              border: '1px solid #e5e7eb',
-              borderRadius: 6,
-              minWidth: 200,
-              fontSize: 13
-            }}
-          />
-          <button
-            onClick={() => searchArchive(archiveReportId, 'report')}
-            style={{
-              padding: '8px 12px',
-              border: '1px solid #e5e7eb',
-              borderRadius: 6,
-              background: 'white',
-              cursor: 'pointer',
-              fontSize: 13
-            }}
-          >
-            Open Report
-          </button>
-          
-          <input
-            placeholder="Feedback ID (e.g., FDB-1001)"
-            value={archiveFeedbackId}
-            onChange={(e) => setArchiveFeedbackId(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                searchArchive(archiveFeedbackId, 'feedback');
-              }
-            }}
-            style={{
-              padding: '8px 12px',
-              border: '1px solid #e5e7eb',
-              borderRadius: 6,
-              minWidth: 200,
-              fontSize: 13
-            }}
-          />
-          <button
-            onClick={() => searchArchive(archiveFeedbackId, 'feedback')}
-            style={{
-              padding: '8px 12px',
-              border: '1px solid #e5e7eb',
-              borderRadius: 6,
-              background: 'white',
-              cursor: 'pointer',
-              fontSize: 13
-            }}
-          >
-            Open Feedback
-          </button>
-        </div>
-      </div>
 
-      {/* Report Detail Modal */}
-      {reportDetailOpen && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(0,0,0,0.4)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 50
-        }} onClick={closeReportDetail}>
-          <div className="ui-card" style={{
-            width: 720,
-            maxWidth: '90%',
-            padding: 24
-          }} onClick={e => e.stopPropagation()}>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              marginBottom: 16
-            }}>
-              <h3 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>Report Detail</h3>
-              <button
-                onClick={closeReportDetail}
-                style={{
-                  padding: '6px 8px',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: 4,
-                  background: 'white',
-                  cursor: 'pointer'
-                }}
-              >
-                ✕
-              </button>
+      {/* Content based on active tab */}
+      <div className="ui-card" style={{ padding: activeTab === 'create' ? 20 : 0 }}>
+        {/* CREATE TAB */}
+        {activeTab === 'create' && activeSubTab === 'report' && (
+          <form onSubmit={handleReportSubmit}>
+            <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16, color: '#dc2626' }}>Create Report</h3>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4 }}>Title:</label>
+                <input
+                  type="text"
+                  value={reportForm.title}
+                  onChange={(e) => setReportForm({...reportForm, title: e.target.value})}
+                  style={{ width: '100%', padding: 8, border: '1px solid #d1d5db', borderRadius: 4, fontSize: 14 }}
+                  required
+                />
+              </div>
+              
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4 }}>About:</label>
+                <select
+                  value={reportForm.about_type}
+                  onChange={(e) => setReportForm({...reportForm, about_type: e.target.value, about_id: ''})}
+                  style={{ width: '100%', padding: 8, border: '1px solid #d1d5db', borderRadius: 4, fontSize: 14 }}
+                  required
+                >
+                  <option value="">Select type...</option>
+                  <option value="center">Center</option>
+                  <option value="customer">Customer</option>
+                  <option value="order">Order</option>
+                  <option value="service">Service</option>
+                </select>
+              </div>
             </div>
             
-            {!reportDetail ? (
-              <div style={{ color: '#6b7280', textAlign: 'center', padding: 20 }}>Loading...</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 16 }}>
+              {reportForm.about_type && (
+                <div>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4 }}>ID:</label>
+                  <input
+                    type="text"
+                    value={reportForm.about_id}
+                    onChange={(e) => setReportForm({...reportForm, about_id: e.target.value})}
+                    placeholder={`${reportForm.about_type.toUpperCase()}-001`}
+                    style={{ width: '100%', padding: 8, border: '1px solid #d1d5db', borderRadius: 4, fontSize: 14 }}
+                    required
+                  />
+                </div>
+              )}
+              
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4 }}>Type:</label>
+                <select
+                  value={reportForm.type}
+                  onChange={(e) => setReportForm({...reportForm, type: e.target.value})}
+                  style={{ width: '100%', padding: 8, border: '1px solid #d1d5db', borderRadius: 4, fontSize: 14 }}
+                  required
+                >
+                  <option value="">Select type...</option>
+                  <option value="resource">Resource</option>
+                  <option value="customer">Customer</option>
+                  <option value="operational">Operational</option>
+                  <option value="quality">Quality</option>
+                  <option value="financial">Financial</option>
+                </select>
+              </div>
+              
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4 }}>Severity:</label>
+                <select
+                  value={reportForm.severity}
+                  onChange={(e) => setReportForm({...reportForm, severity: e.target.value})}
+                  style={{ width: '100%', padding: 8, border: '1px solid #d1d5db', borderRadius: 4, fontSize: 14 }}
+                  required
+                >
+                  <option value="">Select severity...</option>
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                </select>
+              </div>
+            </div>
+            
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4 }}>Description:</label>
+              <textarea
+                value={reportForm.description}
+                onChange={(e) => setReportForm({...reportForm, description: e.target.value})}
+                rows={4}
+                style={{ width: '100%', padding: 8, border: '1px solid #d1d5db', borderRadius: 4, fontSize: 14, resize: 'vertical' }}
+                required
+              />
+            </div>
+            
+            <button 
+              type="submit" 
+              style={{ 
+                background: '#dc2626', 
+                color: 'white', 
+                padding: '10px 20px', 
+                border: 'none', 
+                borderRadius: 6, 
+                fontSize: 14, 
+                fontWeight: 600, 
+                cursor: 'pointer' 
+              }}
+            >
+              Submit Report
+            </button>
+          </form>
+        )}
+        
+        {activeTab === 'create' && activeSubTab === 'feedback' && (
+          <form onSubmit={handleFeedbackSubmit}>
+            <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16, color: '#16a34a' }}>Create Feedback</h3>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4 }}>Title:</label>
+                <input
+                  type="text"
+                  value={feedbackForm.title}
+                  onChange={(e) => setFeedbackForm({...feedbackForm, title: e.target.value})}
+                  style={{ width: '100%', padding: 8, border: '1px solid #d1d5db', borderRadius: 4, fontSize: 14 }}
+                  required
+                />
+              </div>
+              
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4 }}>About:</label>
+                <select
+                  value={feedbackForm.about_type}
+                  onChange={(e) => setFeedbackForm({...feedbackForm, about_type: e.target.value, about_id: ''})}
+                  style={{ width: '100%', padding: 8, border: '1px solid #d1d5db', borderRadius: 4, fontSize: 14 }}
+                  required
+                >
+                  <option value="">Select type...</option>
+                  <option value="center">Center</option>
+                  <option value="customer">Customer</option>
+                  <option value="order">Order</option>
+                  <option value="service">Service</option>
+                </select>
+              </div>
+            </div>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+              {feedbackForm.about_type && (
+                <div>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4 }}>ID:</label>
+                  <input
+                    type="text"
+                    value={feedbackForm.about_id}
+                    onChange={(e) => setFeedbackForm({...feedbackForm, about_id: e.target.value})}
+                    placeholder={`${feedbackForm.about_type.toUpperCase()}-001`}
+                    style={{ width: '100%', padding: 8, border: '1px solid #d1d5db', borderRadius: 4, fontSize: 14 }}
+                    required
+                  />
+                </div>
+              )}
+              
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4 }}>Kind:</label>
+                <select
+                  value={feedbackForm.kind}
+                  onChange={(e) => setFeedbackForm({...feedbackForm, kind: e.target.value})}
+                  style={{ width: '100%', padding: 8, border: '1px solid #d1d5db', borderRadius: 4, fontSize: 14 }}
+                  required
+                >
+                  <option value="">Select kind...</option>
+                  <option value="compliment">Compliment</option>
+                  <option value="suggestion">Suggestion</option>
+                  <option value="concern">Concern</option>
+                  <option value="general">General</option>
+                </select>
+              </div>
+            </div>
+            
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4 }}>Message:</label>
+              <textarea
+                value={feedbackForm.message}
+                onChange={(e) => setFeedbackForm({...feedbackForm, message: e.target.value})}
+                rows={4}
+                style={{ width: '100%', padding: 8, border: '1px solid #d1d5db', borderRadius: 4, fontSize: 14, resize: 'vertical' }}
+                required
+              />
+            </div>
+            
+            <button 
+              type="submit" 
+              style={{ 
+                background: '#16a34a', 
+                color: 'white', 
+                padding: '10px 20px', 
+                border: 'none', 
+                borderRadius: 6, 
+                fontSize: 14, 
+                fontWeight: 600, 
+                cursor: 'pointer' 
+              }}
+            >
+              Submit Feedback
+            </button>
+          </form>
+        )}
+        
+        {/* MY ITEMS TAB */}
+        {activeTab === 'my-items' && (
+          <div>
+            {loading ? (
+              <div style={{ textAlign: 'center', padding: 40, color: '#6b7280' }}>
+                <div style={{ fontSize: 14 }}>Loading {activeSubTab}...</div>
+              </div>
             ) : (
               <div>
-                <div style={{ marginBottom: 16 }}>
-                  <h4 style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>
-                    {reportDetail.report.title}
-                  </h4>
-                  <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 8 }}>
-                    {reportDetail.report.type} • {reportDetail.report.severity} • {reportDetail.report.status}
+                {activeSubTab === 'report' && reports.length === 0 && (
+                  <div style={{ textAlign: 'center', padding: 40, color: '#6b7280' }}>
+                    <div style={{ fontSize: 48, marginBottom: 8 }}>📊</div>
+                    <div style={{ fontSize: 16, fontWeight: 500 }}>No Reports Found</div>
+                    <div style={{ fontSize: 12, marginTop: 4 }}>Reports you create will appear here</div>
                   </div>
-                  <div style={{ fontSize: 14, whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
-                    {reportDetail.report.description || 'No description provided.'}
-                  </div>
-                </div>
+                )}
                 
-                <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 16 }}>
-                  <h5 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>Comments:</h5>
-                  <div style={{
-                    maxHeight: 200,
-                    overflowY: 'auto',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: 6,
-                    padding: 12
+                {activeSubTab === 'feedback' && feedback.length === 0 && (
+                  <div style={{ textAlign: 'center', padding: 40, color: '#6b7280' }}>
+                    <div style={{ fontSize: 48, marginBottom: 8 }}>💬</div>
+                    <div style={{ fontSize: 16, fontWeight: 500 }}>No Feedback Found</div>
+                    <div style={{ fontSize: 12, marginTop: 4 }}>Feedback you submit will appear here</div>
+                  </div>
+                )}
+                
+                {activeSubTab === 'report' && reports.map((report, index) => (
+                  <div key={report.report_id} style={{ 
+                    padding: 16, 
+                    borderBottom: index < reports.length - 1 ? '1px solid #e5e7eb' : 'none',
+                    background: '#fef2f2'
                   }}>
-                    {reportDetail.comments.length === 0 ? (
-                      <div style={{ color: '#6b7280', fontSize: 13 }}>No comments yet.</div>
-                    ) : (
-                      reportDetail.comments.map(comment => (
-                        <div key={comment.comment_id} style={{
-                          marginBottom: 12,
-                          paddingBottom: 12,
-                          borderBottom: '1px solid #f3f4f6'
-                        }}>
-                          <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>
-                            {comment.commenter_role}:{comment.commenter_id} • {new Date(comment.created_at).toLocaleString()}
-                          </div>
-                          <div style={{ fontSize: 13 }}>{comment.content}</div>
-                        </div>
-                      ))
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: '#dc2626' }}>{report.report_id}</span>
+                      <span style={{ 
+                        padding: '2px 6px', 
+                        borderRadius: 4, 
+                        fontSize: 10, 
+                        fontWeight: 600,
+                        background: report.severity === 'high' ? '#fecaca' : 
+                                  report.severity === 'medium' ? '#fed7aa' : '#fef3c7',
+                        color: report.severity === 'high' ? '#991b1b' : 
+                              report.severity === 'medium' ? '#9a3412' : '#92400e'
+                      }}>
+                        {report.severity?.toUpperCase()}
+                      </span>
+                      <span style={{ 
+                        padding: '2px 6px', 
+                        borderRadius: 4, 
+                        fontSize: 10, 
+                        fontWeight: 600,
+                        background: report.status === 'resolved' ? '#dcfce7' : 
+                                  report.status === 'in_progress' ? '#fef3c7' : '#fee2e2',
+                        color: report.status === 'resolved' ? '#166534' : 
+                              report.status === 'in_progress' ? '#92400e' : '#991b1b'
+                      }}>
+                        {report.status.replace('_', ' ').toUpperCase()}
+                      </span>
+                    </div>
+                    <h4 style={{ fontSize: 14, fontWeight: 600, color: '#111827', marginBottom: 4 }}>{report.title}</h4>
+                    <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 8 }}>
+                      About: {report.about_type} • Created: {new Date(report.created_at).toLocaleDateString()}
+                    </div>
+                    {report.description && (
+                      <p style={{ fontSize: 12, color: '#374151', lineHeight: 1.4, margin: 0 }}>{report.description}</p>
                     )}
                   </div>
-                </div>
+                ))}
+                
+                {activeSubTab === 'feedback' && feedback.map((fb, index) => (
+                  <div key={fb.feedback_id} style={{ 
+                    padding: 16, 
+                    borderBottom: index < feedback.length - 1 ? '1px solid #e5e7eb' : 'none',
+                    background: '#f0fdf4'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: '#16a34a' }}>{fb.feedback_id}</span>
+                      <span style={{ 
+                        padding: '2px 6px', 
+                        borderRadius: 4, 
+                        fontSize: 10, 
+                        fontWeight: 600,
+                        background: '#dcfce7',
+                        color: '#166534'
+                      }}>
+                        {fb.kind.toUpperCase()}
+                      </span>
+                    </div>
+                    <h4 style={{ fontSize: 14, fontWeight: 600, color: '#111827', marginBottom: 4 }}>{fb.title}</h4>
+                    <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 8 }}>
+                      About: {fb.about_type} • Created: {new Date(fb.created_at).toLocaleDateString()}
+                    </div>
+                    {fb.message && (
+                      <p style={{ fontSize: 12, color: '#374151', lineHeight: 1.4, margin: 0 }}>{fb.message}</p>
+                    )}
+                  </div>
+                ))}
               </div>
             )}
           </div>
-        </div>
-      )}
-
-      {/* Feedback Detail Modal */}
-      {feedbackDetailOpen && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(0,0,0,0.4)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 50
-        }} onClick={closeFeedbackDetail}>
-          <div className="ui-card" style={{
-            width: 600,
-            maxWidth: '90%',
-            padding: 24
-          }} onClick={e => e.stopPropagation()}>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              marginBottom: 16
-            }}>
-              <h3 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>Feedback Detail</h3>
-              <button
-                onClick={closeFeedbackDetail}
-                style={{
-                  padding: '6px 8px',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: 4,
-                  background: 'white',
-                  cursor: 'pointer'
-                }}
-              >
-                ✕
-              </button>
-            </div>
-            
-            {!feedbackDetail ? (
-              <div style={{ color: '#6b7280', textAlign: 'center', padding: 20 }}>Loading...</div>
+        )}
+        
+        {/* VIEW ALL TAB */}
+        {activeTab === 'view-all' && (
+          <div>
+            {loading ? (
+              <div style={{ textAlign: 'center', padding: 40, color: '#6b7280' }}>
+                <div style={{ fontSize: 14 }}>Loading {activeSubTab}...</div>
+              </div>
             ) : (
               <div>
-                <h4 style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>
-                  {feedbackDetail.title}
-                </h4>
-                <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 12 }}>
-                  {feedbackDetail.kind} • {feedbackDetail.center_id || feedbackDetail.customer_id} • {new Date(feedbackDetail.created_at).toLocaleDateString()}
-                </div>
-                <div style={{ fontSize: 14, whiteSpace: 'pre-wrap', lineHeight: 1.5, marginBottom: 12 }}>
-                  {feedbackDetail.message || 'No message provided.'}
-                </div>
-                <div style={{ fontSize: 12, color: '#6b7280' }}>
-                  From: {feedbackDetail.created_by_role}:{feedbackDetail.created_by_id}
-                </div>
+                {activeSubTab === 'report' && allReports.length === 0 && (
+                  <div style={{ textAlign: 'center', padding: 40, color: '#6b7280' }}>
+                    <div style={{ fontSize: 16, fontWeight: 500 }}>No Reports Found</div>
+                  </div>
+                )}
+                
+                {activeSubTab === 'feedback' && allFeedback.length === 0 && (
+                  <div style={{ textAlign: 'center', padding: 40, color: '#6b7280' }}>
+                    <div style={{ fontSize: 16, fontWeight: 500 }}>No Feedback Found</div>
+                  </div>
+                )}
+                
+                {activeSubTab === 'report' && allReports.map((report, index) => (
+                  <div key={report.report_id} style={{ 
+                    padding: 12, 
+                    borderBottom: index < allReports.length - 1 ? '1px solid #e5e7eb' : 'none'
+                  }}>
+                    <div style={{ fontSize: 14 }}>
+                      <strong>{report.report_id}</strong> - {report.title}
+                    </div>
+                    <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
+                      Created by: {report.created_by_role} | Status: {report.status === 'resolved' ? 'Resolved' : 'Open'}
+                    </div>
+                  </div>
+                ))}
+                
+                {activeSubTab === 'feedback' && allFeedback.map((fb, index) => (
+                  <div key={fb.feedback_id} style={{ 
+                    padding: 12, 
+                    borderBottom: index < allFeedback.length - 1 ? '1px solid #e5e7eb' : 'none'
+                  }}>
+                    <div style={{ fontSize: 14 }}>
+                      <strong>{fb.feedback_id}</strong> - {fb.title}
+                    </div>
+                    <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
+                      Created by: {fb.created_by_role} | Status: {fb.status || 'Open'}
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

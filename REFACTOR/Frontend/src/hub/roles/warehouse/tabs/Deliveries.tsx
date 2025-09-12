@@ -4,27 +4,27 @@
 ───────────────────────────────────────────────*/
 
 /**
- * Shipments.tsx
+ * Deliveries.tsx
  * 
- * Description: Warehouse shipment management and tracking
- * Function: View and manage shipments for warehouse operations
- * Importance: Critical - Shipment tracking and logistics coordination
- * Connects to: Shipment API, delivery systems, order fulfillment
+ * Description: Warehouse delivery management and tracking
+ * Function: View and manage deliveries for warehouse operations
+ * Importance: Critical - Delivery tracking and logistics coordination
+ * Connects to: Delivery API, delivery systems, order fulfillment
  */
 
 import React, { useState, useEffect } from 'react';
 
-interface ShipmentsProps {
+interface DeliveriesProps {
   userId: string;
   config: any;
   features: Record<string, any>;
   api: any;
 }
 
-interface Shipment {
-  shipment_id: string;
+interface Delivery {
+  delivery_id: string;
   order_id: string;
-  shipment_date?: string;
+  delivery_date?: string;
   order_date?: string;
   total_qty?: number;
   item_count?: number;
@@ -35,11 +35,11 @@ interface Shipment {
   actual_delivery_date?: string;
 }
 
-export default function Shipments({ userId, config, features, api }: ShipmentsProps) {
-  const [shipments, setShipments] = useState<Shipment[]>([]);
-  const [shipPendingOneQuery, setShipPendingOneQuery] = useState('');
-  const [shipPendingRecQuery, setShipPendingRecQuery] = useState('');
-  const [shipArchiveQuery, setShipArchiveQuery] = useState('');
+export default function Deliveries({ userId, config, features, api }: DeliveriesProps) {
+  const [deliveries, setDeliveries] = useState<Delivery[]>([]);
+  const [deliveryPendingOneQuery, setDeliveryPendingOneQuery] = useState('');
+  const [deliveryPendingRecQuery, setDeliveryPendingRecQuery] = useState('');
+  const [deliveryArchiveQuery, setDeliveryArchiveQuery] = useState('');
   const [loading, setLoading] = useState(true);
 
   // Helper function to format date
@@ -69,17 +69,17 @@ export default function Shipments({ userId, config, features, api }: ShipmentsPr
   };
 
   useEffect(() => {
-    const loadShipments = async () => {
+    const loadDeliveries = async () => {
       try {
         setLoading(true);
         
-        // Mock shipments data
-        const mockShipments: Shipment[] = [
-          // One-time pending shipments
+        // Mock deliveries data
+        const mockDeliveries: Delivery[] = [
+          // One-time pending deliveries
           {
-            shipment_id: 'SHIP-001',
-            order_id: 'WH-2025-001',
-            shipment_date: '2025-09-11',
+            delivery_id: 'DEL-001',
+            order_id: 'CRW001-ORD-SUP001',
+            delivery_date: '2025-09-11',
             total_qty: 15,
             item_count: 15,
             center_id: 'CTR-001',
@@ -87,21 +87,21 @@ export default function Shipments({ userId, config, features, api }: ShipmentsPr
             order_kind: 'one-time'
           },
           {
-            shipment_id: 'SHIP-002',
-            order_id: 'WH-2025-002',
-            shipment_date: '2025-09-10',
+            delivery_id: 'DEL-002',
+            order_id: 'CTR002-ORD-SUP003',
+            delivery_date: '2025-09-10',
             total_qty: 8,
             item_count: 8,
             center_id: 'CTR-002',
             status: 'pending',
             order_kind: 'one-time'
           },
-          // Recurring pending shipments
+          // Recurring pending deliveries
           {
-            shipment_id: 'SHIP-003',
-            order_id: 'WH-REC-001',
+            delivery_id: 'DEL-003',
+            order_id: 'CRW003-ORD-SUP005',
             order_date: '2025-09-01',
-            shipment_date: '2025-09-11',
+            delivery_date: '2025-09-11',
             total_qty: 25,
             item_count: 25,
             center_id: 'CTR-003',
@@ -110,10 +110,10 @@ export default function Shipments({ userId, config, features, api }: ShipmentsPr
             recurrence_interval: 'Weekly'
           },
           {
-            shipment_id: 'SHIP-004',
-            order_id: 'WH-REC-002',
+            delivery_id: 'DEL-004',
+            order_id: 'CTR001-ORD-SUP002',
             order_date: '2025-08-15',
-            shipment_date: '2025-09-15',
+            delivery_date: '2025-09-15',
             total_qty: 12,
             item_count: 12,
             center_id: 'CTR-004',
@@ -121,11 +121,11 @@ export default function Shipments({ userId, config, features, api }: ShipmentsPr
             order_kind: 'recurring',
             recurrence_interval: 'Monthly'
           },
-          // Delivered shipments (archive)
+          // Delivered deliveries (archive)
           {
-            shipment_id: 'SHIP-005',
-            order_id: 'WH-2025-005',
-            shipment_date: '2025-09-08',
+            delivery_id: 'DEL-005',
+            order_id: 'CRW002-ORD-SUP006',
+            delivery_date: '2025-09-08',
             total_qty: 20,
             item_count: 20,
             center_id: 'CTR-005',
@@ -134,9 +134,9 @@ export default function Shipments({ userId, config, features, api }: ShipmentsPr
             actual_delivery_date: '2025-09-09'
           },
           {
-            shipment_id: 'SHIP-006',
-            order_id: 'WH-2025-006',
-            shipment_date: '2025-09-07',
+            delivery_id: 'DEL-006',
+            order_id: 'CTR003-ORD-SUP004',
+            delivery_date: '2025-09-07',
             total_qty: 30,
             item_count: 30,
             center_id: 'CTR-006',
@@ -146,25 +146,25 @@ export default function Shipments({ userId, config, features, api }: ShipmentsPr
           }
         ];
         
-        setShipments(mockShipments);
+        setDeliveries(mockDeliveries);
         
       } catch (error) {
-        console.error('Error loading shipments:', error);
+        console.error('Error loading deliveries:', error);
       } finally {
         setLoading(false);
       }
     };
 
-    loadShipments();
+    loadDeliveries();
   }, [userId]);
 
-  const handleDeliverShipment = async (shipmentId: string) => {
+  const handleCompleteDelivery = async (deliveryId: string) => {
     try {
-      // Mock deliver shipment functionality
-      console.log('Delivering shipment:', shipmentId);
-      // In real implementation, would call API to mark shipment as delivered
-      setShipments(prev => prev.map(s => 
-        s.shipment_id === shipmentId 
+      // Mock complete delivery functionality
+      console.log('Completing delivery:', deliveryId);
+      // In real implementation, would call API to mark delivery as delivered
+      setDeliveries(prev => prev.map(s => 
+        s.delivery_id === deliveryId 
           ? { ...s, status: 'delivered' as const, actual_delivery_date: new Date().toISOString().slice(0, 10) }
           : s
       ));
@@ -173,18 +173,18 @@ export default function Shipments({ userId, config, features, api }: ShipmentsPr
     }
   };
 
-  const handleCancelShipment = async (shipmentId: string) => {
+  const handleCancelDelivery = async (deliveryId: string) => {
     try {
-      // Mock cancel shipment functionality
-      console.log('Cancelling shipment:', shipmentId);
-      // In real implementation, would call API to cancel shipment
-      setShipments(prev => prev.map(s => 
-        s.shipment_id === shipmentId 
+      // Mock cancel delivery functionality
+      console.log('Cancelling delivery:', deliveryId);
+      // In real implementation, would call API to cancel delivery
+      setDeliveries(prev => prev.map(s => 
+        s.delivery_id === deliveryId 
           ? { ...s, status: 'cancelled' as const }
           : s
       ));
     } catch (error) {
-      console.error('Error cancelling shipment:', error);
+      console.error('Error cancelling delivery:', error);
     }
   };
 
@@ -192,22 +192,22 @@ export default function Shipments({ userId, config, features, api }: ShipmentsPr
     return (
       <div style={{ textAlign: 'center', padding: 40, color: '#6b7280' }}>
         <div style={{ fontSize: 24, marginBottom: 8 }}>⏳</div>
-        <div>Loading shipments...</div>
+        <div>Loading deliveries...</div>
       </div>
     );
   }
 
   return (
     <div>
-      {/* Top: Shipments split into One-time and Recurring (like Inventory split) */}
+      {/* Top: Deliveries split into One-time and Recurring (like Inventory split) */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16, alignItems: 'stretch' }}>
         {/* One-time */}
         <div style={{ border: '1px solid #edf2f7', borderRadius: 10, background: '#fafafa', padding: 12, display: 'flex', flexDirection: 'column', height: '100%' }}>
           <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 10, color: '#111827' }}>One-time</div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
             <input
-              value={shipPendingOneQuery}
-              onChange={(e) => setShipPendingOneQuery(e.target.value)}
+              value={deliveryPendingOneQuery}
+              onChange={(e) => setDeliveryPendingOneQuery(e.target.value)}
               placeholder="Search by order/center"
               style={{ flex: 1, padding: 8, border: '1px solid #e5e7eb', borderRadius: 8, background: 'white' }}
             />
@@ -223,11 +223,11 @@ export default function Shipments({ userId, config, features, api }: ShipmentsPr
                 </tr>
               </thead>
               <tbody>
-                {shipments
+                {deliveries
                   .filter((s: any) => String(s.status || 'pending') === 'pending')
                   .filter((s: any) => (s.order_kind !== 'recurring'))
                   .filter((s: any) => {
-                    const q = shipPendingOneQuery.trim().toLowerCase();
+                    const q = deliveryPendingOneQuery.trim().toLowerCase();
                     if (!q) return true;
                     return (
                       String(s.order_id || '').toLowerCase().includes(q) ||
@@ -236,22 +236,22 @@ export default function Shipments({ userId, config, features, api }: ShipmentsPr
                   })
                   .slice(0, 10)
                   .map((s: any) => (
-                    <tr key={s.shipment_id}>
+                    <tr key={s.delivery_id}>
                       <td style={{ padding: 10, fontWeight: 600 }}>{s.order_id}</td>
-                      <td style={{ padding: 10 }}>{fmtDate(s.shipment_date)}</td>
+                      <td style={{ padding: 10 }}>{fmtDate(s.delivery_date)}</td>
                       <td style={{ padding: 10 }}>{s.total_qty ?? s.item_count ?? 0}</td>
                       <td style={{ padding: 10 }}>{s.center_id || '—'}</td>
                       <td style={{ padding: 10 }}>pending</td>
                       <td style={{ padding: 10 }}>{'—'}</td>
                       <td style={{ padding: 10, display: 'flex', gap: 6 }}>
                         <button
-                          onClick={() => handleDeliverShipment(s.shipment_id)}
+                          onClick={() => handleCompleteDelivery(s.delivery_id)}
                           style={{ padding: '6px 10px', background: '#8b5cf6', color: 'white', border: 'none', borderRadius: 8, fontSize: 11, cursor: 'pointer' }}
                         >
                           Delivered
                         </button>
                         <button
-                          onClick={() => handleCancelShipment(s.shipment_id)}
+                          onClick={() => handleCancelDelivery(s.delivery_id)}
                           style={{ padding: '6px 10px', background: '#e5e7eb', color: '#111827', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 11, cursor: 'pointer' }}
                         >
                           Cancel
@@ -269,8 +269,8 @@ export default function Shipments({ userId, config, features, api }: ShipmentsPr
           <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 10, color: '#111827' }}>Recurring</div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
             <input
-              value={shipPendingRecQuery}
-              onChange={(e) => setShipPendingRecQuery(e.target.value)}
+              value={deliveryPendingRecQuery}
+              onChange={(e) => setDeliveryPendingRecQuery(e.target.value)}
               placeholder="Search by order/center"
               style={{ flex: 1, padding: 8, border: '1px solid #e5e7eb', borderRadius: 8, background: 'white' }}
             />
@@ -286,11 +286,11 @@ export default function Shipments({ userId, config, features, api }: ShipmentsPr
                 </tr>
               </thead>
               <tbody>
-                {shipments
+                {deliveries
                   .filter((s: any) => String(s.status || 'pending') === 'pending')
                   .filter((s: any) => (s.order_kind === 'recurring'))
                   .filter((s: any) => {
-                    const q = shipPendingRecQuery.trim().toLowerCase();
+                    const q = deliveryPendingRecQuery.trim().toLowerCase();
                     if (!q) return true;
                     return (
                       String(s.order_id || '').toLowerCase().includes(q) ||
@@ -299,23 +299,23 @@ export default function Shipments({ userId, config, features, api }: ShipmentsPr
                   })
                   .slice(0, 10)
                   .map((s: any) => (
-                    <tr key={s.shipment_id}>
+                    <tr key={s.delivery_id}>
                       <td style={{ padding: 10, fontWeight: 600 }}>{s.order_id}</td>
                       <td style={{ padding: 10 }}>{fmtDate(s.order_date)}</td>
                       <td style={{ padding: 10 }}>{s.total_qty ?? s.item_count ?? 0}</td>
                       <td style={{ padding: 10 }}>{s.center_id || '—'}</td>
                       <td style={{ padding: 10 }}>{s.recurrence_interval || '—'}</td>
-                      <td style={{ padding: 10 }}>{nextScheduled(s.shipment_date || s.order_date, s.recurrence_interval)}</td>
+                      <td style={{ padding: 10 }}>{nextScheduled(s.delivery_date || s.order_date, s.recurrence_interval)}</td>
                       <td style={{ padding: 10 }}>pending</td>
                       <td style={{ padding: 10, display: 'flex', gap: 6 }}>
                         <button
-                          onClick={() => handleDeliverShipment(s.shipment_id)}
+                          onClick={() => handleCompleteDelivery(s.delivery_id)}
                           style={{ padding: '6px 10px', background: '#8b5cf6', color: 'white', border: 'none', borderRadius: 8, fontSize: 11, cursor: 'pointer' }}
                         >
                           Delivered
                         </button>
                         <button
-                          onClick={() => handleCancelShipment(s.shipment_id)}
+                          onClick={() => handleCancelDelivery(s.delivery_id)}
                           style={{ padding: '6px 10px', background: '#e5e7eb', color: '#111827', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 11, cursor: 'pointer' }}
                         >
                           Cancel
@@ -334,9 +334,9 @@ export default function Shipments({ userId, config, features, api }: ShipmentsPr
         <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 10, color: '#111827' }}>Archive</div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
           <input
-            value={shipArchiveQuery}
-            onChange={(e) => setShipArchiveQuery(e.target.value)}
-            placeholder="Search delivered shipments"
+            value={deliveryArchiveQuery}
+            onChange={(e) => setDeliveryArchiveQuery(e.target.value)}
+            placeholder="Search delivered deliveries"
             style={{ flex: 1, padding: 8, border: '1px solid #e5e7eb', borderRadius: 8, background: 'white' }}
           />
           <span style={{ fontSize: 12, color: '#6b7280' }}>max 10</span>
@@ -351,10 +351,10 @@ export default function Shipments({ userId, config, features, api }: ShipmentsPr
               </tr>
             </thead>
             <tbody>
-              {shipments
+              {deliveries
                 .filter((s: any) => String(s.status || '') === 'delivered')
                 .filter((s: any) => {
-                  const q = shipArchiveQuery.trim().toLowerCase();
+                  const q = deliveryArchiveQuery.trim().toLowerCase();
                   if (!q) return true;
                   return (
                     String(s.order_id || '').toLowerCase().includes(q) ||
@@ -363,9 +363,9 @@ export default function Shipments({ userId, config, features, api }: ShipmentsPr
                 })
                 .slice(0, 10)
                 .map((s: any) => (
-                  <tr key={s.shipment_id}>
+                  <tr key={s.delivery_id}>
                     <td style={{ padding: 10, fontWeight: 600 }}>{s.order_id}</td>
-                    <td style={{ padding: 10 }}>{fmtDate(s.shipment_date)}</td>
+                    <td style={{ padding: 10 }}>{fmtDate(s.delivery_date)}</td>
                     <td style={{ padding: 10 }}>{s.total_qty ?? s.item_count ?? 0}</td>
                     <td style={{ padding: 10 }}>{s.center_id || '—'}</td>
                     <td style={{ padding: 10 }}>{String(s.status || '').toLowerCase()}</td>

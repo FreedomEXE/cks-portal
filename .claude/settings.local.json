@@ -26,7 +26,9 @@
       "Bash(git push:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(dir /B \"C:\\Users\\rizz5\\OneDrive\\Desktop\\CKS\\cks-portal\\REFACTOR\\Frontend\\src\\hub\\roles\\warehouse\\tabs\")"
+      "Bash(dir /B \"C:\\Users\\rizz5\\OneDrive\\Desktop\\CKS\\cks-portal\\REFACTOR\\Frontend\\src\\hub\\roles\\warehouse\\tabs\")",
+      "Bash(dir /B \"C:\\Users\\rizz5\\OneDrive\\Desktop\\CKS\\cks-portal\\REFACTOR\\Frontend\\src\\hub\\roles\\crew\\tabs\")",
+      "Bash(npx vite build:*)"
     ],
     "deny": [],
     "ask": []

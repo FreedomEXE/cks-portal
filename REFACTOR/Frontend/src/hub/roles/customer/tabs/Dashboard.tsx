@@ -228,7 +228,7 @@ export default function CustomerDashboard({ userId, config, features, api }: Cus
           gap: 8
         }}>
           <div style={{ fontSize: 24 }}>📦</div>
-          <div>REQUEST PRODUCTS</div>
+          <div>REQUEST SUPPLIES</div>
           <div style={{ fontSize: 12, fontWeight: 400, opacity: 0.9 }}>
             Supplies • Equipment • Materials • More
           </div>

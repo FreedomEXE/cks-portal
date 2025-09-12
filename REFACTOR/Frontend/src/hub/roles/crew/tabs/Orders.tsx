@@ -6,132 +6,160 @@
 /**
  * Orders.tsx
  * 
- * Description: Center order management with service and supply order tracking
- * Function: View and manage both service orders and supply orders for the center
- * Importance: Critical - Dual order lifecycle management for centers
- * Connects to: Order API, service management, supply management, contractor coordination
+ * Description: Crew supply order management and assignment tracking
+ * Function: Order supplies directly and view assignment requests from managers
+ * Importance: Critical - Supply order management and assignment acceptance for crew
+ * Connects to: Order API, supply management, assignment system, crew coordination
+ * 
+ * Notes: Crew can order supplies but cannot request services.
+ *        Shows assignment requests for service orders from managers.
  */
 
 import React, { useState } from 'react';
 
-interface CenterOrdersProps {
+interface CrewOrdersProps {
   userId: string;
   config: any;
   features: any;
   api: any;
 }
 
-// Mock data for service orders (current flow: Center → Customer → Contractor → Manager)
-const mockServiceOrders = {
+// Mock data for service assignment requests (crew doesn't create these, just accepts/rejects)
+const mockServiceAssignments = {
   status: [
     {
-      orderId: 'CEN001-ORD-SRV001',
+      orderId: 'CEN001-ORD-SRV004',
       orderType: 'service',
-      serviceName: 'Window Cleaning',
+      serviceName: 'Security System Check',
       centerName: 'Downtown Office Complex',
       centerId: 'CEN001',
-      contractor: 'Premium Cleaning Solutions',
-      createdBy: 'center',
-      customerStatus: 'pending',
-      contractorStatus: 'pending',
-      managerStatus: 'pending',
-      priority: 'high',
-      requestDate: '2025-09-10',
-      expectedStartDate: '2025-09-15',
-      location: 'All Floors - Exterior Windows'
-    }
-  ],
-  progress: [
-    {
-      orderId: 'CEN001-ORD-SRV005',
-      orderType: 'service',
-      serviceName: 'Elevator Maintenance',
-      centerName: 'Downtown Office Complex',
-      centerId: 'CEN001',
-      contractor: 'Vertical Transport Inc',
+      contractor: 'SecureTech Services',
       createdBy: 'center',
       customerStatus: 'approved',
       contractorStatus: 'approved',
       managerStatus: 'approved',
-      priority: 'medium',
-      requestDate: '2025-09-06',
-      expectedStartDate: '2025-09-14',
-      location: 'Elevators A & B'
-    }
-  ],
-  archive: [
-    {
-      orderId: 'CEN001-ORD-SRV002',
-      orderType: 'service',
-      serviceName: 'HVAC Maintenance',
-      centerName: 'Downtown Office Complex',
-      centerId: 'CEN001',
-      contractor: 'TechCorp Services',
-      approvedDate: '2025-09-02',
-      becameServiceId: 'CEN001-SRV002',
+      assignmentStatus: 'pending', // pending, accepted, rejected
       priority: 'high',
-      location: 'Rooftop HVAC Units'
-    }
-  ]
-};
-
-// Mock data for supply orders (simplified flow: Center → Contractor → Warehouse)
-const mockSupplyOrders = {
-  status: [
+      requestedDate: '2025-09-11',
+      scheduledDate: '2025-09-16',
+      location: 'Main Lobby & All Entrances',
+      assignedCrew: 'CREW-001'
+    },
     {
-      orderId: 'CEN001-ORD-SUP001',
-      orderType: 'supply',
-      itemName: 'Cleaning Supplies Refill',
-      centerName: 'Downtown Office Complex',
-      centerId: 'CEN001',
-      contractor: 'Supply Chain Pro',
+      orderId: 'CEN003-ORD-SRV007',
+      orderType: 'service',
+      serviceName: 'Window Cleaning',
+      centerName: 'Tech Innovation Hub',
+      centerId: 'CEN003',
+      contractor: 'Premium Cleaning Solutions',
       createdBy: 'center',
-      contractorStatus: 'pending',
-      warehouseStatus: 'pending',
+      customerStatus: 'approved',
+      contractorStatus: 'approved',
+      managerStatus: 'approved',
+      assignmentStatus: 'pending',
       priority: 'medium',
-      requestDate: '2025-09-11',
-      expectedDeliveryDate: '2025-09-13',
-      quantity: '50 units',
-      location: 'Storage Room B'
+      requestedDate: '2025-09-11',
+      scheduledDate: '2025-09-18',
+      location: 'Floors 1-5, Exterior Windows',
+      assignedCrew: 'CREW-001'
     }
   ],
   progress: [
     {
-      orderId: 'CEN001-ORD-SUP003',
-      orderType: 'supply',
-      itemName: 'Office Paper & Supplies',
-      centerName: 'Downtown Office Complex',
-      centerId: 'CEN001',
-      contractor: 'Supply Chain Pro',
-      createdBy: 'center',
+      orderId: 'CEN002-ORD-SRV006',
+      orderType: 'service',
+      serviceName: 'HVAC Maintenance',
+      centerName: 'Westside Business Park',
+      centerId: 'CEN002',
+      contractor: 'TechCorp Services',
+      createdBy: 'customer',
+      customerStatus: 'approved',
       contractorStatus: 'approved',
-      warehouseStatus: 'preparing',
-      priority: 'low',
-      requestDate: '2025-09-09',
-      expectedDeliveryDate: '2025-09-12',
-      quantity: '25 boxes',
-      location: 'Reception Desk'
+      managerStatus: 'approved',
+      assignmentStatus: 'accepted',
+      priority: 'high',
+      requestedDate: '2025-09-09',
+      scheduledDate: '2025-09-15',
+      location: 'Rooftop HVAC System',
+      assignedCrew: 'CREW-001'
     }
   ],
   archive: [
     {
-      orderId: 'CEN001-ORD-SUP002',
-      orderType: 'supply',
-      itemName: 'Security Equipment',
-      centerName: 'Downtown Office Complex',
-      centerId: 'CEN001',
-      contractor: 'Supply Chain Pro',
-      approvedDate: '2025-09-05',
-      deliveredDate: '2025-09-07',
-      priority: 'high',
-      quantity: '10 units',
-      location: 'Security Office'
+      orderId: 'CEN004-ORD-SRV001',
+      orderType: 'service',
+      serviceName: 'Window Cleaning',
+      centerName: 'Industrial Complex East',
+      centerId: 'CEN004',
+      contractor: 'Premium Cleaning Solutions',
+      assignmentStatus: 'accepted',
+      priority: 'medium',
+      requestedDate: '2025-09-05',
+      scheduledDate: '2025-09-12',
+      completedDate: '2025-09-12',
+      location: 'All Buildings, Exterior Windows',
+      assignedCrew: 'CREW-001'
     }
   ]
 };
 
-export default function CenterOrders({ userId, config, features, api }: CenterOrdersProps) {
-  // Service orders state
+// Mock data for supply orders (crew can create these)
+const mockSupplyOrders = {
+  status: [
+    {
+      orderId: 'CRW001-ORD-SUP001',
+      orderType: 'supply',
+      itemName: 'Safety Equipment Refill',
+      centerName: 'Downtown Office Complex',
+      centerId: 'CEN001',
+      contractor: 'Supply Chain Pro',
+      createdBy: 'crew',
+      contractorStatus: 'pending',
+      warehouseStatus: 'pending',
+      priority: 'high',
+      requestDate: '2025-09-11',
+      expectedDeliveryDate: '2025-09-14',
+      quantity: '20 units',
+      location: 'Equipment Storage'
+    }
+  ],
+  progress: [
+    {
+      orderId: 'CRW001-ORD-SUP002',
+      orderType: 'supply',
+      itemName: 'Cleaning Tools Replacement',
+      centerName: 'Tech Innovation Hub',
+      centerId: 'CEN003',
+      contractor: 'Supply Chain Pro',
+      createdBy: 'crew',
+      contractorStatus: 'approved',
+      warehouseStatus: 'preparing',
+      priority: 'medium',
+      requestDate: '2025-09-09',
+      expectedDeliveryDate: '2025-09-12',
+      quantity: '15 units',
+      location: 'Maintenance Room'
+    }
+  ],
+  archive: [
+    {
+      orderId: 'CRW001-ORD-SUP003',
+      orderType: 'supply',
+      itemName: 'Work Gloves & Masks',
+      centerName: 'Westside Business Park',
+      centerId: 'CEN002',
+      contractor: 'Supply Chain Pro',
+      approvedDate: '2025-09-05',
+      deliveredDate: '2025-09-08',
+      priority: 'low',
+      quantity: '50 units',
+      location: 'Break Room Storage'
+    }
+  ]
+};
+
+export default function CrewOrders({ userId, config, features, api }: CrewOrdersProps) {
+  // Service assignment state
   const [serviceActiveTab, setServiceActiveTab] = useState<'in_progress' | 'archive'>('in_progress');
   const [serviceSearchTerm, setServiceSearchTerm] = useState('');
   
@@ -143,7 +171,22 @@ export default function CenterOrders({ userId, config, features, api }: CenterOr
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  const handleOrderAction = (orderId: string, action: string) => {
+  const handleAssignmentResponse = (orderId: string, action: string) => {
+    setActionLoading(orderId);
+    
+    // Mock action
+    setTimeout(() => {
+      if (action === 'Accept') {
+        setNotice(`Assignment ${orderId} accepted successfully`);
+      } else {
+        setNotice(`Assignment ${orderId} rejected - removed from your list`);
+      }
+      setTimeout(() => setNotice(null), 3000);
+      setActionLoading(null);
+    }, 1000);
+  };
+
+  const handleSupplyOrderAction = (orderId: string, action: string) => {
     setActionLoading(orderId);
     
     // Mock action
@@ -154,31 +197,30 @@ export default function CenterOrders({ userId, config, features, api }: CenterOr
     }, 1000);
   };
 
-  // Service orders filtering
-  const serviceOrders = serviceActiveTab === 'in_progress' ? [...mockServiceOrders.status, ...mockServiceOrders.progress] : mockServiceOrders[serviceActiveTab];
-  const filteredServiceOrders = serviceOrders.filter(order => 
+  // Service assignment filtering
+  const serviceAssignments = serviceActiveTab === 'in_progress' ? [...mockServiceAssignments.status, ...mockServiceAssignments.progress] : mockServiceAssignments[serviceActiveTab];
+  const filteredServiceAssignments = serviceAssignments.filter(order => 
     order.orderId.toLowerCase().includes(serviceSearchTerm.toLowerCase()) ||
     order.serviceName.toLowerCase().includes(serviceSearchTerm.toLowerCase()) ||
-    (order.contractor && order.contractor.toLowerCase().includes(serviceSearchTerm.toLowerCase()))
+    order.centerName.toLowerCase().includes(serviceSearchTerm.toLowerCase())
   );
 
   // Supply orders filtering  
   const supplyOrders = supplyActiveTab === 'in_progress' ? [...mockSupplyOrders.status, ...mockSupplyOrders.progress] : mockSupplyOrders[supplyActiveTab];
   const filteredSupplyOrders = supplyOrders.filter(order => 
     order.orderId.toLowerCase().includes(supplySearchTerm.toLowerCase()) ||
-    order.itemName.toLowerCase().includes(supplySearchTerm.toLowerCase()) ||
-    (order.contractor && order.contractor.toLowerCase().includes(supplySearchTerm.toLowerCase()))
+    order.itemName.toLowerCase().includes(supplySearchTerm.toLowerCase())
   );
 
-  // Render function for service orders
-  const renderServiceOrders = (orders: any[], activeTab: string) => (
+  // Render function for service assignments (accept/reject workflow)
+  const renderServiceAssignments = (orders: any[], activeTab: string) => (
     <div>
       {orders.map((order: any) => (
         <div key={order.orderId} className="ui-card" style={{ padding: 12, marginBottom: 8, border: '1px solid #e5e7eb' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-                <span style={{ fontWeight: 600, color: '#eab308', cursor: 'pointer', fontSize: 14 }}>
+                <span style={{ fontWeight: 600, color: '#10b981', cursor: 'pointer', fontSize: 14 }}>
                   {order.orderId}
                 </span>
                 <span style={{
@@ -199,34 +241,31 @@ export default function CenterOrders({ userId, config, features, api }: CenterOr
                 {order.createdBy.charAt(0).toUpperCase() + order.createdBy.slice(1)} Created
               </span>
             )}
-            {order.customerStatus && (
+            {order.assignmentStatus && (
               <span style={{
                 padding: '1px 6px', borderRadius: 8, fontSize: 10, fontWeight: 600,
-                background: order.customerStatus === 'approved' ? '#dcfce7' : '#fef2f2',
-                color: order.customerStatus === 'approved' ? '#16a34a' : '#dc2626'
+                background: order.assignmentStatus === 'accepted' ? '#dcfce7' : order.assignmentStatus === 'pending' ? '#fef3c7' : '#fef2f2',
+                color: order.assignmentStatus === 'accepted' ? '#16a34a' : order.assignmentStatus === 'pending' ? '#92400e' : '#dc2626'
               }}>
-                Customer: {order.customerStatus}
-              </span>
-            )}
-            {order.contractorStatus && (
-              <span style={{
-                padding: '1px 6px', borderRadius: 8, fontSize: 10, fontWeight: 600,
-                background: order.contractorStatus === 'approved' ? '#dcfce7' : '#fef2f2',
-                color: order.contractorStatus === 'approved' ? '#16a34a' : '#dc2626'
-              }}>
-                Contractor: {order.contractorStatus}
+                Assignment: {order.assignmentStatus}
               </span>
             )}
           </div>
 
           <div style={{ display: 'flex', gap: 6 }}>
-            {order.customerStatus === 'pending' ? (
-              <button disabled={actionLoading === order.orderId} onClick={() => handleOrderAction(order.orderId, 'Cancel')}
-                style={{ padding: '4px 8px', borderRadius: 4, border: 'none', background: '#dc2626', color: 'white', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
-                {actionLoading === order.orderId ? 'Cancelling...' : 'Cancel'}
-              </button>
+            {order.assignmentStatus === 'pending' ? (
+              <>
+                <button disabled={actionLoading === order.orderId} onClick={() => handleAssignmentResponse(order.orderId, 'Accept')}
+                  style={{ padding: '4px 8px', borderRadius: 4, border: 'none', background: '#10b981', color: 'white', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+                  {actionLoading === order.orderId ? 'Accepting...' : 'Accept'}
+                </button>
+                <button disabled={actionLoading === order.orderId} onClick={() => handleAssignmentResponse(order.orderId, 'Reject')}
+                  style={{ padding: '4px 8px', borderRadius: 4, border: '1px solid #ef4444', background: 'white', color: '#ef4444', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+                  {actionLoading === order.orderId ? 'Rejecting...' : 'Reject'}
+                </button>
+              </>
             ) : (
-              <button onClick={() => alert(`Order details for ${order.orderId}`)}
+              <button onClick={() => alert(`Assignment details for ${order.orderId}`)}
                 style={{ padding: '4px 8px', borderRadius: 4, border: '1px solid #d1d5db', background: 'white', color: '#374151', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
                 View Details
               </button>
@@ -236,7 +275,7 @@ export default function CenterOrders({ userId, config, features, api }: CenterOr
       ))}
       {orders.length === 0 && (
         <div style={{ textAlign: 'center', padding: 20, color: '#6b7280', background: '#f9fafb', borderRadius: 6, fontSize: 12 }}>
-          No service orders in {activeTab === 'in_progress' ? 'progress' : 'archive'}
+          No assignment requests in {activeTab === 'in_progress' ? 'progress' : 'archive'}
         </div>
       )}
     </div>
@@ -250,7 +289,7 @@ export default function CenterOrders({ userId, config, features, api }: CenterOr
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-                <span style={{ fontWeight: 600, color: '#eab308', cursor: 'pointer', fontSize: 14 }}>
+                <span style={{ fontWeight: 600, color: '#10b981', cursor: 'pointer', fontSize: 14 }}>
                   {order.orderId}
                 </span>
                 <span style={{
@@ -293,7 +332,7 @@ export default function CenterOrders({ userId, config, features, api }: CenterOr
 
           <div style={{ display: 'flex', gap: 6 }}>
             {order.contractorStatus === 'pending' ? (
-              <button disabled={actionLoading === order.orderId} onClick={() => handleOrderAction(order.orderId, 'Cancel')}
+              <button disabled={actionLoading === order.orderId} onClick={() => handleSupplyOrderAction(order.orderId, 'Cancel')}
                 style={{ padding: '4px 8px', borderRadius: 4, border: 'none', background: '#dc2626', color: 'white', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
                 {actionLoading === order.orderId ? 'Cancelling...' : 'Cancel'}
               </button>
@@ -330,25 +369,13 @@ export default function CenterOrders({ userId, config, features, api }: CenterOr
         </div>
       )}
       
-      {/* Header with dual action buttons */}
+      {/* Header with only Order Supplies button (crew can't request services) */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>Orders</h2>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <button style={{
             padding: '8px 16px',
-            background: '#059669',
-            color: 'white',
-            border: 'none',
-            borderRadius: 6,
-            fontSize: 14,
-            fontWeight: 600,
-            cursor: 'pointer'
-          }}>
-            Request Service
-          </button>
-          <button style={{
-            padding: '8px 16px',
-            background: '#eab308',
+            background: '#10b981',
             color: 'white',
             border: 'none',
             borderRadius: 6,
@@ -367,10 +394,10 @@ export default function CenterOrders({ userId, config, features, api }: CenterOr
         {/* Service Orders Section */}
         <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <h3 style={{ fontSize: 16, fontWeight: 600, margin: 0, color: '#059669' }}>Service Orders</h3>
+            <h3 style={{ fontSize: 16, fontWeight: 600, margin: 0, color: '#10b981' }}>Service Orders</h3>
             <input
               type="text"
-              placeholder="Search services..."
+              placeholder="Search assignments..."
               value={serviceSearchTerm}
               onChange={(e) => setServiceSearchTerm(e.target.value)}
               style={{
@@ -392,7 +419,7 @@ export default function CenterOrders({ userId, config, features, api }: CenterOr
                   padding: '4px 12px',
                   borderRadius: 4,
                   border: '1px solid #e5e7eb',
-                  background: serviceActiveTab === bucket ? '#059669' : 'white',
+                  background: serviceActiveTab === bucket ? '#10b981' : 'white',
                   color: serviceActiveTab === bucket ? 'white' : '#111827',
                   fontSize: 11,
                   fontWeight: 600,
@@ -404,13 +431,13 @@ export default function CenterOrders({ userId, config, features, api }: CenterOr
             ))}
           </div>
 
-          {renderServiceOrders(filteredServiceOrders, serviceActiveTab)}
+          {renderServiceAssignments(filteredServiceAssignments, serviceActiveTab)}
         </div>
         
         {/* Supply Orders Section */}
         <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <h3 style={{ fontSize: 16, fontWeight: 600, margin: 0, color: '#eab308' }}>Supply Orders</h3>
+            <h3 style={{ fontSize: 16, fontWeight: 600, margin: 0, color: '#10b981' }}>Supply Orders</h3>
             <input
               type="text"
               placeholder="Search supplies..."
@@ -435,7 +462,7 @@ export default function CenterOrders({ userId, config, features, api }: CenterOr
                   padding: '4px 12px',
                   borderRadius: 4,
                   border: '1px solid #e5e7eb',
-                  background: supplyActiveTab === bucket ? '#eab308' : 'white',
+                  background: supplyActiveTab === bucket ? '#10b981' : 'white',
                   color: supplyActiveTab === bucket ? 'white' : '#111827',
                   fontSize: 11,
                   fontWeight: 600,
@@ -452,7 +479,7 @@ export default function CenterOrders({ userId, config, features, api }: CenterOr
       </div>
       
       <div style={{ fontSize: 11, color: '#6b7280', textAlign: 'center' }}>
-        Service Orders: {filteredServiceOrders.length} | Supply Orders: {filteredSupplyOrders.length}
+        Service Orders: {filteredServiceAssignments.length} | Supply Orders: {filteredSupplyOrders.length}
       </div>
     </div>
   );

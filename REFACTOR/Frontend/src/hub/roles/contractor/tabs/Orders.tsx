@@ -6,16 +6,13 @@
 /**
  * Orders.tsx
  * 
- * Description: Contractor order management with approval workflow
- * Function: Manage pending approvals, approved orders, and order archive
- * Importance: Critical - Core business workflow for contractor order processing
- * Connects to: Contractor API orders endpoints, approval system
- * 
- * Notes: Production-ready implementation with complete order management.
- *        Includes approval workflow, order details, and status tracking.
+ * Description: Contractor order management with service and supply approval workflow
+ * Function: Handle approvals for both service orders and supply orders, plus create orders on behalf of customers
+ * Importance: Critical - Dual order approval workflow for contractors
+ * Connects to: Order API, service management, supply management, approval system
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
 interface OrdersProps {
   userId: string;
@@ -24,225 +21,342 @@ interface OrdersProps {
   api: any;
 }
 
-interface Order {
-  order_id: string;
-  customer_id: string;
-  center_id: string;
-  status: string;
-  item_count: number;
-  service_count: number;
-  product_count: number;
-  order_date: string;
-  total_amount?: number;
-}
+// Mock data for service orders that need contractor approval
+const mockServiceOrders = {
+  status: [
+    {
+      orderId: 'CEN001-ORD-SRV001',
+      orderType: 'service',
+      serviceName: 'Window Cleaning',
+      centerName: 'Downtown Office Complex',
+      centerId: 'CEN001',
+      customerId: 'CUST-001',
+      requestedBy: 'Center Manager',
+      createdBy: 'center',
+      requestDate: '2025-09-10',
+      expectedStartDate: '2025-09-15',
+      contractorStatus: 'pending',
+      customerStatus: 'approved',
+      managerStatus: 'pending',
+      priority: 'high',
+      description: 'Weekly window cleaning for all floors'
+    },
+    {
+      orderId: 'CUS001-ORD-SRV002',
+      orderType: 'service',
+      serviceName: 'Lawn Maintenance',
+      centerName: 'Westside Business Park',
+      centerId: 'CEN002',
+      customerId: 'CUST-002',
+      requestedBy: 'Facility Coordinator',
+      createdBy: 'customer',
+      requestDate: '2025-09-09',
+      expectedStartDate: '2025-09-20',
+      contractorStatus: 'pending',
+      customerStatus: 'approved',
+      managerStatus: 'pending',
+      priority: 'medium',
+      description: 'Bi-weekly lawn care and landscaping'
+    }
+  ],
+  progress: [
+    {
+      orderId: 'CEN003-ORD-SRV003',
+      orderType: 'service',
+      serviceName: 'HVAC Maintenance',
+      centerName: 'Tech Innovation Hub',
+      centerId: 'CEN003',
+      customerId: 'CUST-001',
+      requestedBy: 'Operations Manager',
+      createdBy: 'center',
+      requestDate: '2025-09-08',
+      expectedStartDate: '2025-09-18',
+      contractorStatus: 'approved',
+      customerStatus: 'approved',
+      managerStatus: 'pending',
+      priority: 'high',
+      description: 'Monthly HVAC system inspection'
+    }
+  ],
+  archive: [
+    {
+      orderId: 'CEN004-ORD-SRV004',
+      orderType: 'service',
+      serviceName: 'Security System Check',
+      centerName: 'Industrial Complex East',
+      centerId: 'CEN004',
+      approvedDate: '2025-09-05',
+      becameServiceId: 'CEN004-SRV004',
+      priority: 'high',
+      description: 'Weekly security system testing'
+    }
+  ]
+};
 
-interface OrderDetail {
-  order: Order;
-  items: Array<{
-    order_item_id: string;
-    item_id: string;
-    item_type: 'service' | 'product';
-    quantity: number;
-    description?: string;
-  }>;
-  approvals: Array<{
-    approval_id: string;
-    approver_type: string;
-    status: string;
-    decided_at?: string;
-  }>;
-}
+// Mock data for supply orders that need contractor approval
+const mockSupplyOrders = {
+  status: [
+    {
+      orderId: 'CEN001-ORD-SUP001',
+      orderType: 'supply',
+      itemName: 'Cleaning Equipment Refill',
+      centerName: 'Downtown Office Complex',
+      centerId: 'CEN001',
+      requestedBy: 'Facility Manager',
+      createdBy: 'center',
+      requestDate: '2025-09-11',
+      expectedDeliveryDate: '2025-09-14',
+      contractorStatus: 'pending',
+      warehouseStatus: 'pending',
+      priority: 'medium',
+      quantity: '40 units',
+      location: 'Storage Room A'
+    },
+    {
+      orderId: 'CRW001-ORD-SUP001',
+      orderType: 'supply',
+      itemName: 'Maintenance Tools',
+      centerName: 'Tech Innovation Hub',
+      centerId: 'CEN003',
+      requestedBy: 'Crew Lead',
+      createdBy: 'crew',
+      requestDate: '2025-09-10',
+      expectedDeliveryDate: '2025-09-13',
+      contractorStatus: 'pending',
+      warehouseStatus: 'pending',
+      priority: 'high',
+      quantity: '15 units',
+      location: 'Maintenance Room'
+    }
+  ],
+  progress: [
+    {
+      orderId: 'CUS001-ORD-SUP002',
+      orderType: 'supply',
+      itemName: 'Office Equipment',
+      centerName: 'Westside Business Park',
+      centerId: 'CEN002',
+      requestedBy: 'Office Manager',
+      createdBy: 'customer',
+      requestDate: '2025-09-09',
+      expectedDeliveryDate: '2025-09-12',
+      contractorStatus: 'approved',
+      warehouseStatus: 'preparing',
+      priority: 'low',
+      quantity: '25 boxes',
+      location: 'Reception Area'
+    }
+  ],
+  archive: [
+    {
+      orderId: 'CEN002-ORD-SUP003',
+      orderType: 'supply',
+      itemName: 'Safety Equipment',
+      centerName: 'Downtown Office Complex',
+      centerId: 'CEN001',
+      approvedDate: '2025-09-05',
+      deliveredDate: '2025-09-08',
+      priority: 'high',
+      quantity: '20 units',
+      location: 'Safety Station'
+    }
+  ]
+};
 
 export default function Orders({ userId, config, features, api }: OrdersProps) {
-  const [activeTab, setActiveTab] = useState<'pending' | 'approved' | 'archive'>('pending');
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState(false);
+  // Service orders state
+  const [serviceActiveTab, setServiceActiveTab] = useState<'in_progress' | 'archive'>('in_progress');
+  const [serviceSearchTerm, setServiceSearchTerm] = useState('');
+  
+  // Supply orders state  
+  const [supplyActiveTab, setSupplyActiveTab] = useState<'in_progress' | 'archive'>('in_progress');
+  const [supplySearchTerm, setSupplySearchTerm] = useState('');
+  
+  // Shared state
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  
-  // Order detail modal
-  const [detailOpen, setDetailOpen] = useState(false);
-  const [detailLoading, setDetailLoading] = useState(false);
-  const [orderDetail, setOrderDetail] = useState<OrderDetail | null>(null);
 
-  // Load orders based on active tab
-  useEffect(() => {
-    const loadOrders = async () => {
-      try {
-        setLoading(true);
-        
-        // Mock orders data based on tab
-        let mockOrders: Order[] = [];
-        
-        if (activeTab === 'pending') {
-          mockOrders = [
-            {
-              order_id: 'ORD-001',
-              customer_id: 'CUS-001',
-              center_id: 'CTR-001',
-              status: 'Pending Approval',
-              item_count: 3,
-              service_count: 2,
-              product_count: 1,
-              order_date: '2025-01-09',
-              total_amount: 1250.00
-            },
-            {
-              order_id: 'ORD-002',
-              customer_id: 'CUS-002',
-              center_id: 'CTR-003',
-              status: 'Pending Approval',
-              item_count: 2,
-              service_count: 1,
-              product_count: 1,
-              order_date: '2025-01-08',
-              total_amount: 875.00
-            }
-          ];
-        } else if (activeTab === 'approved') {
-          mockOrders = [
-            {
-              order_id: 'ORD-003',
-              customer_id: 'CUS-001',
-              center_id: 'CTR-002',
-              status: 'Approved',
-              item_count: 4,
-              service_count: 3,
-              product_count: 1,
-              order_date: '2025-01-07',
-              total_amount: 2100.00
-            }
-          ];
-        } else {
-          mockOrders = [
-            {
-              order_id: 'ORD-004',
-              customer_id: 'CUS-003',
-              center_id: 'CTR-005',
-              status: 'Completed',
-              item_count: 1,
-              service_count: 1,
-              product_count: 0,
-              order_date: '2024-12-15',
-              total_amount: 500.00
-            }
-          ];
-        }
-        
-        setOrders(mockOrders);
-        
-      } catch (error) {
-        console.error('Error loading orders:', error);
-        setOrders([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadOrders();
-  }, [activeTab, userId]);
-
-  const approveOrder = async (orderId: string) => {
-    try {
-      setActionLoading(orderId);
-      
-      // Mock approval operation
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Remove from current list
-      setOrders(prev => prev.filter(order => order.order_id !== orderId));
-      
-      setNotice(`Order ${orderId} approved successfully`);
+  const handleOrderAction = (orderId: string, action: string) => {
+    setActionLoading(orderId);
+    
+    setTimeout(() => {
+      setNotice(`${action} action for ${orderId} completed successfully`);
       setTimeout(() => setNotice(null), 3000);
-      
-    } catch (error) {
-      console.error('Error approving order:', error);
-      alert('Failed to approve order. Please try again.');
-    } finally {
       setActionLoading(null);
-    }
+    }, 1000);
   };
 
-  const denyOrder = async (orderId: string) => {
-    try {
-      setActionLoading(orderId);
-      
-      // Mock denial operation
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Remove from current list
-      setOrders(prev => prev.filter(order => order.order_id !== orderId));
-      
-      setNotice(`Order ${orderId} denied`);
-      setTimeout(() => setNotice(null), 3000);
-      
-    } catch (error) {
-      console.error('Error denying order:', error);
-      alert('Failed to deny order. Please try again.');
-    } finally {
-      setActionLoading(null);
-    }
-  };
+  // Service orders filtering
+  const serviceOrders = serviceActiveTab === 'in_progress' ? [...mockServiceOrders.status, ...mockServiceOrders.progress] : mockServiceOrders[serviceActiveTab];
+  const filteredServiceOrders = serviceOrders.filter(order => 
+    order.orderId.toLowerCase().includes(serviceSearchTerm.toLowerCase()) ||
+    order.serviceName.toLowerCase().includes(serviceSearchTerm.toLowerCase()) ||
+    (order.centerName && order.centerName.toLowerCase().includes(serviceSearchTerm.toLowerCase()))
+  );
 
-  const openOrderDetail = async (orderId: string) => {
-    try {
-      setDetailOpen(true);
-      setDetailLoading(true);
-      
-      // Mock order detail data
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      const order = orders.find(o => o.order_id === orderId);
-      if (!order) return;
-      
-      const mockDetail: OrderDetail = {
-        order,
-        items: [
-          {
-            order_item_id: 'OI-001',
-            item_id: 'SVC-001',
-            item_type: 'service',
-            quantity: 1,
-            description: 'Commercial Cleaning - Full Building'
-          },
-          {
-            order_item_id: 'OI-002',
-            item_id: 'SVC-002',
-            item_type: 'service',
-            quantity: 1,
-            description: 'Facility Maintenance - Monthly'
-          },
-          {
-            order_item_id: 'OI-003',
-            item_id: 'PRD-001',
-            item_type: 'product',
-            quantity: 5,
-            description: 'Commercial Grade Cleaning Supplies'
-          }
-        ],
-        approvals: [
-          {
-            approval_id: 'APP-001',
-            approver_type: 'contractor',
-            status: 'pending'
-          }
-        ]
-      };
-      
-      setOrderDetail(mockDetail);
-      
-    } catch (error) {
-      console.error('Error loading order detail:', error);
-      setOrderDetail(null);
-    } finally {
-      setDetailLoading(false);
-    }
-  };
+  // Supply orders filtering  
+  const supplyOrders = supplyActiveTab === 'in_progress' ? [...mockSupplyOrders.status, ...mockSupplyOrders.progress] : mockSupplyOrders[supplyActiveTab];
+  const filteredSupplyOrders = supplyOrders.filter(order => 
+    order.orderId.toLowerCase().includes(supplySearchTerm.toLowerCase()) ||
+    order.itemName.toLowerCase().includes(supplySearchTerm.toLowerCase()) ||
+    (order.centerName && order.centerName.toLowerCase().includes(supplySearchTerm.toLowerCase()))
+  );
 
-  const closeOrderDetail = () => {
-    setDetailOpen(false);
-    setOrderDetail(null);
-  };
+  // Render function for service orders (contractor approval workflow)
+  const renderServiceOrders = (orders: any[], activeTab: string) => (
+    <div>
+      {orders.map((order: any) => (
+        <div key={order.orderId} className="ui-card" style={{ padding: 12, marginBottom: 8, border: '1px solid #e5e7eb' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                <span style={{ fontWeight: 600, color: '#10b981', cursor: 'pointer', fontSize: 14 }}>
+                  {order.orderId}
+                </span>
+                <span style={{
+                  padding: '1px 6px', borderRadius: 8, fontSize: 10, fontWeight: 600,
+                  background: order.priority === 'high' ? '#fef2f2' : order.priority === 'medium' ? '#e0f2fe' : '#f0fdf4',
+                  color: order.priority === 'high' ? '#dc2626' : order.priority === 'medium' ? '#0369a1' : '#16a34a'
+                }}>
+                  {order.priority.toUpperCase()}
+                </span>
+              </div>
+              <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 2 }}>{order.serviceName}</div>
+            </div>
+          </div>
+          
+          <div style={{ display: 'flex', gap: 4, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
+            {order.createdBy && (
+              <span style={{ padding: '1px 6px', borderRadius: 8, fontSize: 10, fontWeight: 600, background: '#e0f2fe', color: '#0369a1' }}>
+                {order.createdBy.charAt(0).toUpperCase() + order.createdBy.slice(1)} Created
+              </span>
+            )}
+            {order.customerStatus && (
+              <span style={{
+                padding: '1px 6px', borderRadius: 8, fontSize: 10, fontWeight: 600,
+                background: order.customerStatus === 'approved' ? '#dcfce7' : '#fef2f2',
+                color: order.customerStatus === 'approved' ? '#16a34a' : '#dc2626'
+              }}>
+                Customer: {order.customerStatus}
+              </span>
+            )}
+            {order.contractorStatus && (
+              <span style={{
+                padding: '1px 6px', borderRadius: 8, fontSize: 10, fontWeight: 600,
+                background: order.contractorStatus === 'approved' ? '#dcfce7' : '#fef2f2',
+                color: order.contractorStatus === 'approved' ? '#16a34a' : '#dc2626'
+              }}>
+                Contractor: {order.contractorStatus}
+              </span>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', gap: 6 }}>
+            {order.contractorStatus === 'pending' ? (
+              <>
+                <button disabled={actionLoading === order.orderId} onClick={() => handleOrderAction(order.orderId, 'Approve')}
+                  style={{ padding: '4px 8px', borderRadius: 4, border: 'none', background: '#10b981', color: 'white', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+                  {actionLoading === order.orderId ? 'Approving...' : 'Approve'}
+                </button>
+                <button disabled={actionLoading === order.orderId} onClick={() => handleOrderAction(order.orderId, 'Deny')}
+                  style={{ padding: '4px 8px', borderRadius: 4, border: '1px solid #ef4444', background: 'white', color: '#ef4444', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+                  {actionLoading === order.orderId ? 'Denying...' : 'Deny'}
+                </button>
+              </>
+            ) : (
+              <button onClick={() => alert(`Order details for ${order.orderId}`)}
+                style={{ padding: '4px 8px', borderRadius: 4, border: '1px solid #d1d5db', background: 'white', color: '#374151', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+                View Details
+              </button>
+            )}
+          </div>
+        </div>
+      ))}
+      {orders.length === 0 && (
+        <div style={{ textAlign: 'center', padding: 20, color: '#6b7280', background: '#f9fafb', borderRadius: 6, fontSize: 12 }}>
+          No service orders in {activeTab === 'in_progress' ? 'progress' : 'archive'}
+        </div>
+      )}
+    </div>
+  );
+
+  // Render function for supply orders (contractor approval workflow)
+  const renderSupplyOrders = (orders: any[], activeTab: string) => (
+    <div>
+      {orders.map((order: any) => (
+        <div key={order.orderId} className="ui-card" style={{ padding: 12, marginBottom: 8, border: '1px solid #e5e7eb' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                <span style={{ fontWeight: 600, color: '#10b981', cursor: 'pointer', fontSize: 14 }}>
+                  {order.orderId}
+                </span>
+                <span style={{
+                  padding: '1px 6px', borderRadius: 8, fontSize: 10, fontWeight: 600,
+                  background: order.priority === 'high' ? '#fef2f2' : order.priority === 'medium' ? '#e0f2fe' : '#f0fdf4',
+                  color: order.priority === 'high' ? '#dc2626' : order.priority === 'medium' ? '#0369a1' : '#16a34a'
+                }}>
+                  {order.priority.toUpperCase()}
+                </span>
+              </div>
+              <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 2 }}>{order.itemName}</div>
+            </div>
+          </div>
+          
+          <div style={{ display: 'flex', gap: 4, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
+            {order.createdBy && (
+              <span style={{ padding: '1px 6px', borderRadius: 8, fontSize: 10, fontWeight: 600, background: '#e0f2fe', color: '#0369a1' }}>
+                {order.createdBy.charAt(0).toUpperCase() + order.createdBy.slice(1)} Created
+              </span>
+            )}
+            {order.contractorStatus && (
+              <span style={{
+                padding: '1px 6px', borderRadius: 8, fontSize: 10, fontWeight: 600,
+                background: order.contractorStatus === 'approved' ? '#dcfce7' : '#fef2f2',
+                color: order.contractorStatus === 'approved' ? '#16a34a' : '#dc2626'
+              }}>
+                Contractor: {order.contractorStatus}
+              </span>
+            )}
+            {order.warehouseStatus && (
+              <span style={{
+                padding: '1px 6px', borderRadius: 8, fontSize: 10, fontWeight: 600,
+                background: order.warehouseStatus === 'delivered' ? '#dcfce7' : '#fef3c7',
+                color: order.warehouseStatus === 'delivered' ? '#16a34a' : '#92400e'
+              }}>
+                Warehouse: {order.warehouseStatus}
+              </span>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', gap: 6 }}>
+            {order.contractorStatus === 'pending' ? (
+              <>
+                <button disabled={actionLoading === order.orderId} onClick={() => handleOrderAction(order.orderId, 'Approve')}
+                  style={{ padding: '4px 8px', borderRadius: 4, border: 'none', background: '#10b981', color: 'white', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+                  {actionLoading === order.orderId ? 'Approving...' : 'Approve'}
+                </button>
+                <button disabled={actionLoading === order.orderId} onClick={() => handleOrderAction(order.orderId, 'Deny')}
+                  style={{ padding: '4px 8px', borderRadius: 4, border: '1px solid #ef4444', background: 'white', color: '#ef4444', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+                  {actionLoading === order.orderId ? 'Denying...' : 'Deny'}
+                </button>
+              </>
+            ) : (
+              <button onClick={() => alert(`Order details for ${order.orderId}`)}
+                style={{ padding: '4px 8px', borderRadius: 4, border: '1px solid #d1d5db', background: 'white', color: '#374151', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+                View Details
+              </button>
+            )}
+          </div>
+        </div>
+      ))}
+      {orders.length === 0 && (
+        <div style={{ textAlign: 'center', padding: 20, color: '#6b7280', background: '#f9fafb', borderRadius: 6, fontSize: 12 }}>
+          No supply orders in {activeTab === 'in_progress' ? 'progress' : 'archive'}
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <div>
@@ -260,314 +374,130 @@ export default function Orders({ userId, config, features, api }: OrdersProps) {
         </div>
       )}
       
-      <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Order Management</h2>
-      
-      {/* Order Status Tabs */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-        {[
-          { key: 'pending' as const, label: 'Pending Approvals' },
-          { key: 'approved' as const, label: 'Approved' },
-          { key: 'archive' as const, label: 'Archive' }
-        ].map(tab => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
-            style={{
-              padding: '8px 16px',
-              borderRadius: 6,
-              border: '1px solid #e5e7eb',
-              background: activeTab === tab.key ? '#10b981' : 'white',
-              color: activeTab === tab.key ? 'white' : '#111827',
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: 'pointer',
-              transition: 'all 0.2s ease'
-            }}
-          >
-            {tab.label}
+      {/* Header with dual action buttons */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>Orders</h2>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <button style={{
+            padding: '8px 16px',
+            background: '#10b981',
+            color: 'white',
+            border: 'none',
+            borderRadius: 6,
+            fontSize: 14,
+            fontWeight: 600,
+            cursor: 'pointer'
+          }}>
+            Request Service
           </button>
-        ))}
+          <button style={{
+            padding: '8px 16px',
+            background: '#10b981',
+            color: 'white',
+            border: 'none',
+            borderRadius: 6,
+            fontSize: 14,
+            fontWeight: 600,
+            cursor: 'pointer'
+          }}>
+            Order Supplies
+          </button>
+        </div>
       </div>
-
-      <div className="ui-card" style={{ padding: 0, overflow: 'hidden' }}>
-        {loading ? (
-          <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>
-            <div style={{ fontSize: 24, marginBottom: 8 }}>⏳</div>
-            <div>Loading orders...</div>
+      
+      {/* Split layout: Service Orders | Supply Orders */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+        
+        {/* Service Orders Section */}
+        <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <h3 style={{ fontSize: 16, fontWeight: 600, margin: 0, color: '#10b981' }}>Service Orders</h3>
+            <input
+              type="text"
+              placeholder="Search services..."
+              value={serviceSearchTerm}
+              onChange={(e) => setServiceSearchTerm(e.target.value)}
+              style={{
+                padding: '4px 8px',
+                border: '1px solid #d1d5db',
+                borderRadius: 4,
+                fontSize: 12,
+                width: 140
+              }}
+            />
           </div>
-        ) : orders.length === 0 ? (
-          <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>
-            <div style={{ fontSize: 48, marginBottom: 8 }}>📋</div>
-            <div style={{ fontSize: 16, fontWeight: 500, marginBottom: 4 }}>
-              No Orders in {activeTab.replace('_', ' ')}
-            </div>
-            <div style={{ fontSize: 12, lineHeight: 1.5 }}>
-              {activeTab === 'pending' && 'New orders requiring your approval will appear here.'}
-              {activeTab === 'approved' && 'Orders you have approved will be listed here.'}
-              {activeTab === 'archive' && 'Completed and historical orders can be found here.'}
-            </div>
-          </div>
-        ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ background: '#f9fafb' }}>
-                <th style={{ padding: 12, textAlign: 'left', fontSize: 12, fontWeight: 600 }}>Order ID</th>
-                <th style={{ padding: 12, textAlign: 'left', fontSize: 12, fontWeight: 600 }}>Customer</th>
-                <th style={{ padding: 12, textAlign: 'left', fontSize: 12, fontWeight: 600 }}>Center</th>
-                <th style={{ padding: 12, textAlign: 'left', fontSize: 12, fontWeight: 600 }}>Items</th>
-                <th style={{ padding: 12, textAlign: 'left', fontSize: 12, fontWeight: 600 }}>Services</th>
-                <th style={{ padding: 12, textAlign: 'left', fontSize: 12, fontWeight: 600 }}>Products</th>
-                <th style={{ padding: 12, textAlign: 'left', fontSize: 12, fontWeight: 600 }}>Status</th>
-                <th style={{ padding: 12, textAlign: 'left', fontSize: 12, fontWeight: 600 }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {orders.map((order, index) => (
-                <tr key={order.order_id} style={{
-                  borderBottom: index < orders.length - 1 ? '1px solid #e5e7eb' : 'none',
-                  ':hover': { background: '#f9fafb' }
-                }}>
-                  <td style={{
-                    padding: 12,
-                    fontFamily: 'ui-monospace',
-                    color: '#2563eb',
-                    cursor: 'pointer',
-                    fontWeight: 600
-                  }} onClick={() => openOrderDetail(order.order_id)}>
-                    {order.order_id}
-                  </td>
-                  <td style={{ padding: 12 }}>{order.customer_id}</td>
-                  <td style={{ padding: 12 }}>{order.center_id}</td>
-                  <td style={{ padding: 12, textAlign: 'center' }}>{order.item_count}</td>
-                  <td style={{ padding: 12, textAlign: 'center' }}>{order.service_count}</td>
-                  <td style={{ padding: 12, textAlign: 'center' }}>{order.product_count}</td>
-                  <td style={{ padding: 12 }}>
-                    <span style={{
-                      padding: '2px 8px',
-                      borderRadius: 12,
-                      fontSize: 11,
-                      fontWeight: 600,
-                      background: order.status === 'Pending Approval' ? '#fef3c7' : 
-                                 order.status === 'Approved' ? '#dcfce7' : '#f3f4f6',
-                      color: order.status === 'Pending Approval' ? '#d97706' : 
-                             order.status === 'Approved' ? '#059669' : '#374151'
-                    }}>
-                      {order.status}
-                    </span>
-                  </td>
-                  <td style={{ padding: 12 }}>
-                    {activeTab === 'pending' ? (
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        <button
-                          disabled={actionLoading === order.order_id}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            approveOrder(order.order_id);
-                          }}
-                          style={{
-                            padding: '4px 8px',
-                            borderRadius: 4,
-                            border: 'none',
-                            background: '#10b981',
-                            color: 'white',
-                            fontSize: 11,
-                            fontWeight: 600,
-                            cursor: actionLoading === order.order_id ? 'not-allowed' : 'pointer',
-                            opacity: actionLoading === order.order_id ? 0.5 : 1
-                          }}
-                        >
-                          {actionLoading === order.order_id ? '...' : 'Approve'}
-                        </button>
-                        <button
-                          disabled={actionLoading === order.order_id}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            denyOrder(order.order_id);
-                          }}
-                          style={{
-                            padding: '4px 8px',
-                            borderRadius: 4,
-                            border: 'none',
-                            background: '#ef4444',
-                            color: 'white',
-                            fontSize: 11,
-                            fontWeight: 600,
-                            cursor: actionLoading === order.order_id ? 'not-allowed' : 'pointer',
-                            opacity: actionLoading === order.order_id ? 0.5 : 1
-                          }}
-                        >
-                          {actionLoading === order.order_id ? '...' : 'Deny'}
-                        </button>
-                      </div>
-                    ) : (
-                      <span style={{ fontSize: 12, color: '#6b7280' }}>—</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-
-      {/* Order Detail Modal */}
-      {detailOpen && (
-        <div
-          onClick={closeOrderDetail}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.4)',
-            zIndex: 50,
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            padding: 16
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="ui-card"
-            style={{
-              width: 'min(800px, 95vw)',
-              maxHeight: '85vh',
-              overflowY: 'auto',
-              background: 'white',
-              borderRadius: 12,
-              padding: 24
-            }}
-          >
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: 16
-            }}>
-              <h3 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>Order Details</h3>
+          
+          <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
+            {['in_progress', 'archive'].map(bucket => (
               <button
-                onClick={closeOrderDetail}
+                key={bucket}
+                onClick={() => setServiceActiveTab(bucket as 'in_progress' | 'archive')}
                 style={{
+                  padding: '4px 12px',
+                  borderRadius: 4,
                   border: '1px solid #e5e7eb',
-                  borderRadius: 8,
-                  padding: '6px 10px',
-                  background: 'white',
-                  cursor: 'pointer',
-                  fontSize: 14
+                  background: serviceActiveTab === bucket ? '#10b981' : 'white',
+                  color: serviceActiveTab === bucket ? 'white' : '#111827',
+                  fontSize: 11,
+                  fontWeight: 600,
+                  cursor: 'pointer'
                 }}
               >
-                Close
+                {bucket === 'in_progress' ? 'In Progress' : 'Archive'}
               </button>
-            </div>
-
-            {detailLoading ? (
-              <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>
-                <div style={{ fontSize: 24, marginBottom: 8 }}>⏳</div>
-                <div>Loading order details...</div>
-              </div>
-            ) : orderDetail ? (
-              <div>
-                {/* Order Summary */}
-                <div style={{
-                  marginBottom: 24,
-                  padding: 16,
-                  background: '#f9fafb',
-                  borderRadius: 8,
-                  border: '1px solid #e5e7eb'
-                }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
-                    <div>
-                      <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 2 }}>Order ID</div>
-                      <div style={{ fontWeight: 600 }}>{orderDetail.order.order_id}</div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 2 }}>Customer</div>
-                      <div style={{ fontWeight: 600 }}>{orderDetail.order.customer_id}</div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 2 }}>Center</div>
-                      <div style={{ fontWeight: 600 }}>{orderDetail.order.center_id}</div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 2 }}>Date</div>
-                      <div style={{ fontWeight: 600 }}>{orderDetail.order.order_date}</div>
-                    </div>
-                  </div>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 24 }}>
-                  {/* Order Items */}
-                  <div>
-                    <h4 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>Order Items</h4>
-                    <div style={{ display: 'grid', gap: 8 }}>
-                      {orderDetail.items.map((item, idx) => (
-                        <div key={item.order_item_id || idx} style={{
-                          display: 'flex',
-                          gap: 12,
-                          alignItems: 'center',
-                          border: '1px solid #e5e7eb',
-                          borderRadius: 8,
-                          padding: 12
-                        }}>
-                          <span style={{
-                            fontSize: 10,
-                            padding: '2px 6px',
-                            borderRadius: 12,
-                            background: item.item_type === 'service' ? '#ecfdf5' : '#eff6ff',
-                            color: item.item_type === 'service' ? '#065f46' : '#1e40af',
-                            fontWeight: 600,
-                            textTransform: 'uppercase'
-                          }}>
-                            {item.item_type}
-                          </span>
-                          <div style={{ flex: 1 }}>
-                            <div style={{ fontWeight: 600, fontSize: 14 }}>{item.item_id}</div>
-                            {item.description && (
-                              <div style={{ fontSize: 12, color: '#6b7280' }}>{item.description}</div>
-                            )}
-                          </div>
-                          <div style={{ fontSize: 12, color: '#6b7280' }}>
-                            Qty: {item.quantity}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Approvals */}
-                  <div>
-                    <h4 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>Approvals</h4>
-                    <div style={{ display: 'grid', gap: 8 }}>
-                      {orderDetail.approvals.map((approval, idx) => (
-                        <div key={approval.approval_id || idx} style={{
-                          padding: 12,
-                          border: '1px solid #e5e7eb',
-                          borderRadius: 8
-                        }}>
-                          <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>
-                            {approval.approver_type.toUpperCase()}
-                          </div>
-                          <div style={{ fontWeight: 600, marginBottom: 4 }}>
-                            {approval.status}
-                          </div>
-                          {approval.decided_at && (
-                            <div style={{ fontSize: 11, color: '#6b7280' }}>
-                              {new Date(approval.decided_at).toLocaleDateString()}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div style={{ padding: 20, textAlign: 'center', color: '#6b7280' }}>
-                Failed to load order details
-              </div>
-            )}
+            ))}
           </div>
+
+          {renderServiceOrders(filteredServiceOrders, serviceActiveTab)}
         </div>
-      )}
+        
+        {/* Supply Orders Section */}
+        <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <h3 style={{ fontSize: 16, fontWeight: 600, margin: 0, color: '#10b981' }}>Supply Orders</h3>
+            <input
+              type="text"
+              placeholder="Search supplies..."
+              value={supplySearchTerm}
+              onChange={(e) => setSupplySearchTerm(e.target.value)}
+              style={{
+                padding: '4px 8px',
+                border: '1px solid #d1d5db',
+                borderRadius: 4,
+                fontSize: 12,
+                width: 140
+              }}
+            />
+          </div>
+          
+          <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
+            {['in_progress', 'archive'].map(bucket => (
+              <button
+                key={bucket}
+                onClick={() => setSupplyActiveTab(bucket as 'in_progress' | 'archive')}
+                style={{
+                  padding: '4px 12px',
+                  borderRadius: 4,
+                  border: '1px solid #e5e7eb',
+                  background: supplyActiveTab === bucket ? '#10b981' : 'white',
+                  color: supplyActiveTab === bucket ? 'white' : '#111827',
+                  fontSize: 11,
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                {bucket === 'in_progress' ? 'In Progress' : 'Archive'}
+              </button>
+            ))}
+          </div>
+
+          {renderSupplyOrders(filteredSupplyOrders, supplyActiveTab)}
+        </div>
+      </div>
+      
+      <div style={{ fontSize: 11, color: '#6b7280', textAlign: 'center' }}>
+        Service Orders: {filteredServiceOrders.length} | Supply Orders: {filteredSupplyOrders.length}
+      </div>
     </div>
   );
 }
