@@ -19,17 +19,23 @@
 // Import all warehouse tab components
 import Dashboard from './tabs/Dashboard';
 import MyProfile from './tabs/MyProfile';
+import Services from './tabs/Services';
 import Inventory from './tabs/Inventory';
 import Orders from './tabs/Orders';
-import Shipments from './tabs/Shipments';
+import Deliveries from './tabs/Deliveries';
+import Reports from './tabs/Reports';
+import Support from './tabs/Support';
 
 // Export all components for dynamic resolution
 export const components = {
   Dashboard,
   MyProfile,
+  Services,
   Inventory,
   Orders,
-  Shipments
+  Deliveries,
+  Reports,
+  Support
 } as const;
 
 // Export utility components (to be added as needed)

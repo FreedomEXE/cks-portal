@@ -25,6 +25,13 @@
       "requires": ["profile:view"]
     },
     {
+      "id": "services",
+      "label": "My Services",
+      "component": "Services",
+      "icon": "Settings",
+      "requires": ["services:manage"]
+    },
+    {
       "id": "inventory",
       "label": "Inventory",
       "component": "Inventory", 
@@ -39,11 +46,18 @@
       "requires": ["orders:process"]
     },
     {
-      "id": "shipments",
-      "label": "Shipments",
-      "component": "Shipments",
+      "id": "deliveries",
+      "label": "Deliveries",
+      "component": "Deliveries",
       "icon": "Truck",
-      "requires": ["shipping:track"]
+      "requires": ["delivery:track"]
+    },
+    {
+      "id": "reports",
+      "label": "Reports",
+      "component": "Reports",
+      "icon": "FileText",
+      "requires": ["reports:generate"]
     },
     {
       "id": "support",
@@ -57,28 +71,30 @@
     "showInventoryMetrics": true,
     "showOrderTracking": true,
     "allowStockAdjustments": true,
-    "shippingIntegration": true,
+    "deliveryIntegration": true,
     "viewHierarchy": ["manager"]
   },
   "api": {
     "baseUrl": "/api/warehouse",
     "endpoints": {
       "profile": "/profile",
-      "dashboard": "/dashboard", 
+      "dashboard": "/dashboard",
+      "services": "/services", 
       "inventory": "/inventory",
       "orders": "/orders",
-      "shipments": "/shipments",
+      "deliveries": "/deliveries",
       "support": "/support",
-      "shipping": "/shipping",
+      "delivery": "/delivery",
       "reports": "/reports"
     }
   },
   "permissions": {
-    "default": ["dashboard:view", "profile:view"],
+    "default": ["dashboard:view", "profile:view", "services:manage", "reports:generate"],
     "required": {
+      "services:manage": "Manage warehouse services (delivery, equipment rental, repair)",
       "inventory:manage": "Manage inventory levels",
       "orders:process": "Process and fulfill orders",
-      "shipping:track": "Track shipments",
+      "delivery:track": "Track deliveries",
       "support:access": "Access support resources", 
       "reports:generate": "Generate warehouse reports"
     }

@@ -21,6 +21,8 @@ import Dashboard from './tabs/Dashboard';
 import MyProfile from './tabs/MyProfile';
 import MyServices from './tabs/MyServices';
 import Ecosystem from './tabs/Ecosystem';
+import Orders from './tabs/Orders';
+import Reports from './tabs/Reports';
 import Support from './tabs/Support';
 
 // Export all components for dynamic resolution
@@ -29,6 +31,8 @@ export const components = {
   MyProfile,
   MyServices,
   Ecosystem,
+  Orders,
+  Reports,
   Support
 } as const;
 
