@@ -58,6 +58,8 @@ export default function RoleHub({ userId, role, userPermissions = [], className 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [testLoggedOut, setTestLoggedOut] = useState<boolean>(false);
+  const [testLoginUser, setTestLoginUser] = useState<string>('');
+  const [testLoginPass, setTestLoginPass] = useState<string>('');
 
   const getRoleDisplayName = (role: string) => {
     switch (role) {
@@ -170,21 +172,50 @@ export default function RoleHub({ userId, role, userPermissions = [], className 
     );
   }
 
-  // Test-only logout view for the refactor harness (stays on localhost:3004)
+  // Test-only login view for the refactor harness (stays on localhost:3004)
   if (testLoggedOut) {
     return (
-      <div className={className} style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f9fafb' }}>
-        <div style={{ background: '#ffffff', border: '1px solid #e5e7eb', borderRadius: 12, padding: 24, width: 420, textAlign: 'center', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}>
-          <div style={{ fontSize: 18, fontWeight: 700, color: '#111827', marginBottom: 8 }}>Logged out (test)</div>
-          <div style={{ fontSize: 14, color: '#6b7280', marginBottom: 16 }}>
-            You are still in the CKS Hub Testing Interface.
+      <div className={className} style={{ position: 'absolute', inset: 0, background: '#1f1f1f', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ width: 420, transform: 'translateY(-24px)' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+            <img src="/cks-logo.png" alt="CKS" style={{ width: '100%', height: 'auto', marginBottom: 6, filter: 'invert(1)', paddingInline: 24 }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
+            <div style={{ color: '#9ca3af', marginBottom: 12 }}>Test Login (does not hit backend)</div>
           </div>
-          <button
-            onClick={() => setTestLoggedOut(false)}
-            style={{ padding: '8px 16px', background: '#374151', color: 'white', border: 'none', borderRadius: 6, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}
-          >
-            Return to Hub Demo
-          </button>
+
+          <form onSubmit={(e) => { e.preventDefault(); setTestLoggedOut(false); }} style={{ paddingInline: 24 }}>
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: 'block', marginBottom: 6, color: 'white' }}>Username</label>
+              <input
+                value={testLoginUser}
+                onChange={(e) => setTestLoginUser(e.target.value)}
+                autoComplete="username"
+                style={{ width: '100%', borderRadius: 12, border: '1px solid #374151', background: '#111111', color: 'white', padding: '10px 12px' }}
+              />
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: 'block', marginBottom: 6, color: 'white' }}>Password</label>
+              <input
+                type="password"
+                value={testLoginPass}
+                onChange={(e) => setTestLoginPass(e.target.value)}
+                autoComplete="current-password"
+                style={{ width: '100%', borderRadius: 12, border: '1px solid #374151', background: '#111111', color: 'white', padding: '10px 12px' }}
+              />
+            </div>
+            <button type="submit" style={{ width: '100%', border: 'none', borderRadius: 10, padding: '12px 16px', background: '#3b82f6', color: 'white', fontWeight: 600, cursor: 'pointer' }}>
+              Sign in
+            </button>
+            <div style={{ textAlign: 'center', color: '#9ca3af', marginTop: 8, fontSize: 12 }}>
+              <a href="#" onClick={(e) => e.preventDefault()} style={{ color: '#9ca3af', textDecoration: 'underline' }}>Forgot password?</a>
+            </div>
+          </form>
+
+          <div style={{ marginTop: 10, paddingInline: 24 }}>
+            <button onClick={() => setTestLoggedOut(false)} style={{ width: '100%', border: '1px solid #e5e7eb', background: 'white', color: 'black', borderRadius: 10, padding: '10px 16px', cursor: 'pointer' }}>
+              Continue with Google
+            </button>
+            <div style={{ textAlign: 'center', color: '#9ca3af', marginTop: 8 }}>Secured by Clerk (test)</div>
+          </div>
         </div>
       </div>
     );
