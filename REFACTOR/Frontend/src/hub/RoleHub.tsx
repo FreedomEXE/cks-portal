@@ -57,6 +57,7 @@ export default function RoleHub({ userId, role, userPermissions = [], className 
   const [activeTab, setActiveTab] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [testLoggedOut, setTestLoggedOut] = useState<boolean>(false);
 
   const getRoleDisplayName = (role: string) => {
     switch (role) {
@@ -169,6 +170,26 @@ export default function RoleHub({ userId, role, userPermissions = [], className 
     );
   }
 
+  // Test-only logout view for the refactor harness (stays on localhost:3004)
+  if (testLoggedOut) {
+    return (
+      <div className={className} style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f9fafb' }}>
+        <div style={{ background: '#ffffff', border: '1px solid #e5e7eb', borderRadius: 12, padding: 24, width: 420, textAlign: 'center', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}>
+          <div style={{ fontSize: 18, fontWeight: 700, color: '#111827', marginBottom: 8 }}>Logged out (test)</div>
+          <div style={{ fontSize: 14, color: '#6b7280', marginBottom: 16 }}>
+            You are still in the CKS Hub Testing Interface.
+          </div>
+          <button
+            onClick={() => setTestLoggedOut(false)}
+            style={{ padding: '8px 16px', background: '#374151', color: 'white', border: 'none', borderRadius: 6, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}
+          >
+            Return to Hub Demo
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={className} style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#f9fafb' }}>
       {/* Header */}
@@ -180,7 +201,7 @@ export default function RoleHub({ userId, role, userPermissions = [], className 
               onClick={() => {
                 try { localStorage.setItem('userLoggedOut', 'true'); } catch {}
                 try { sessionStorage.removeItem('role'); sessionStorage.removeItem('code'); } catch {}
-                window.location.href = 'http://localhost:5183/login';
+                setTestLoggedOut(true);
               }}
               style={{ padding: '8px 16px', background: config.theme.primaryColor, color: 'white', border: 'none', borderRadius: 6, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}
             >
