@@ -1,11 +1,11 @@
-REFACTOR PLAN - CHECK - BACKEND + DATABASE (Domain-First)
+REFACTOR PLAN - CHECK - BACKEND + DATABASE (Hybrid: Role-Scoped Composition)
 
-Purpose: Consolidate per-role Backend/DB into domain-first modules guarded by capabilities and RLS. Preserve existing API surface (`/api/:role/...`) while routing through shared domain handlers.
+Purpose: Keep a modular, per‑role repo experience while eliminating drift. Roles compose shared domain logic (backend) and apply shared RLS policies (database). API remains `/api/:role/...` so the Frontend stays unchanged.
 
 Legend: [EXISTS] present now, [TO CREATE] new, [TO REFACTOR] move/rename, [TO RETIRE] remove after parity
 
 --------------------------------------------------------------------------------
-BACKEND (Domain-First)
+BACKEND (Hybrid: Roles compose Domains)
 
 REFACTOR/Backend/
   README.md                                     [EXISTS]
@@ -28,36 +28,43 @@ REFACTOR/Backend/
         zod.ts                                  [TO CREATE]
       logging/
         audit.ts                                [TO CREATE]
-    domains/
+    domains/                                    (Shared business logic only)
       dashboard/
-        routes.ts                               [TO CREATE]
-        service.ts                              [TO CREATE]
-        repository.ts                           [TO CREATE]
-        validators.ts                           [TO CREATE]
+        routes.factory.ts                        [TO CREATE]
+        service.ts                               [TO CREATE]
+        repository.ts                            [TO CREATE]
+        validators.ts                            [TO CREATE]
+        docs/README.md                           [TO CREATE]
+      profile/                                  [TO CREATE all]
+      directory/                                [TO CREATE all]
+      services/                                 [TO CREATE all]
+      orders/                                   [TO CREATE all]
+      reports/                                  [TO CREATE all]
+      support/                                  [TO CREATE all]
+      assignments/                              [TO CREATE all]
+      archive/                                  [TO CREATE all]
+      inventory/ (warehouse)                    [TO CREATE all]
+      deliveries/ (warehouse)                   [TO CREATE all]
+    roles/                                      (Per‑role composition only; no business logic)
+      admin/
+        config.ts                               [TO CREATE] feature toggles, required caps
+        router.ts                               [TO CREATE] compose domain routers for admin
         docs/README.md                          [TO CREATE]
-      profile/
-        routes.ts | service.ts | repository.ts | validators.ts   [TO CREATE]
-      directory/
-        routes.ts | service.ts | repository.ts | validators.ts   [TO CREATE]
-      services/
-        routes.ts | service.ts | repository.ts | validators.ts   [TO CREATE]
-      orders/
-        routes.ts | service.ts | repository.ts | validators.ts   [TO CREATE]
-      reports/
-        routes.ts | service.ts | repository.ts | validators.ts   [TO CREATE]
-      support/
-        routes.ts | service.ts | repository.ts | validators.ts   [TO CREATE]
-      assignments/
-        routes.ts | service.ts | repository.ts | validators.ts   [TO CREATE]
-      archive/
-        routes.ts | service.ts | repository.ts | validators.ts   [TO CREATE]
-      inventory/        (warehouse)
-        routes.ts | service.ts | repository.ts | validators.ts   [TO CREATE]
-      deliveries/       (warehouse)
-        routes.ts | service.ts | repository.ts | validators.ts   [TO CREATE]
+      manager/
+        config.ts | router.ts | docs/README.md  [TO CREATE]
+      contractor/
+        config.ts | router.ts | docs/README.md  [TO CREATE]
+      customer/
+        config.ts | router.ts | docs/README.md  [TO CREATE]
+      center/
+        config.ts | router.ts | docs/README.md  [TO CREATE]
+      crew/
+        config.ts | router.ts | docs/README.md  [TO CREATE]
+      warehouse/
+        config.ts | router.ts | docs/README.md  [TO CREATE]
     routes/
-      index.ts                                   [TO CREATE] compose domain routers
-      mount.ts                                   [TO CREATE] use roleContext, authenticate, requireCaps
+      roleRegistry.ts                           [TO CREATE] map role→router
+      mount.ts                                   [TO CREATE] app.use('/api/:role', roleContext, authenticate, select router)
     docs/
       API_Surface.md                             [TO CREATE]
       ServicesDesign.md                          [TO CREATE]
@@ -70,14 +77,14 @@ REFACTOR/Backend/
       domains/*.spec.ts                          [TO CREATE]
       e2e/*.spec.ts                              [TO CREATE]
 
-TO RETIRE AFTER PARITY: server/roles/* (admin, manager, contractor, customer, center, crew, warehouse)
+TO RETIRE AFTER PARITY: server/roles/* where they duplicate domain logic (current per‑role routes/services/repos/validators)
 
 --------------------------------------------------------------------------------
-DATABASE (Domain-First)
+DATABASE (Hybrid: Shared Schema + Role Overlays)
 
 REFACTOR/Database/
   README.md                                     [EXISTS]
-  migrations/
+  migrations/                                   (Shared tables by domain)
     000_extensions.sql                           [TO CREATE]
     001_users.sql                                [TO CREATE] users, profiles, sessions
     002_rbac.sql                                 [TO CREATE] roles, permissions, role_permissions, user_overrides
@@ -92,7 +99,7 @@ REFACTOR/Database/
   functions/
     log_activity.sql                             [TO CREATE]
     compute_caps.sql                             [TO CREATE]
-  rls/
+  rls/                                          (Shared policy templates per domain)
     users.rls.sql                                 [TO CREATE]
     directory.rls.sql                             [TO CREATE]
     services.rls.sql                              [TO CREATE]
@@ -100,20 +107,31 @@ REFACTOR/Database/
     reports.rls.sql                               [TO CREATE]
     support.rls.sql                               [TO CREATE]
     inventory.rls.sql                             [TO CREATE]
+  roles/                                        (Per‑role overlays; no tables)
+    admin/
+      policies.sql                               [TO CREATE] apply templates/grants for admin
+      views/                                     [TO CREATE] optional role views (e.g., v_directory_admin.sql)
+      seeds/capabilities.sql                      [TO CREATE] role→perm mappings (overrides)
+      docs/README.md                              [TO CREATE]
+    manager/                                     [TO CREATE same structure]
+    contractor/                                  [TO CREATE]
+    customer/                                    [TO CREATE]
+    center/                                      [TO CREATE]
+    crew/                                        [TO CREATE]
+    warehouse/                                   [TO CREATE]
   seeds/
     001_roles.sql                                 [TO CREATE]
     002_permissions.sql                           [TO CREATE]
     003_role_permissions.sql                      [TO CREATE]
     010_demo_data.sql                             [TO CREATE]
   docs/
-    README.md                                     [EXISTS]
     DataModel.md                                  [EXISTS]
     Migrations.md                                 [EXISTS]
     RLS_Policies.md                               [EXISTS]
     Seeds.md                                      [EXISTS]
     Changelog.md                                  [EXISTS]
 
-TO RETIRE AFTER PARITY: roles/*/migrations/* (admin, manager, contractor, customer, center, crew, warehouse)
+TO RETIRE AFTER PARITY: Database/roles/*/migrations/* (per‑role schemas)
 
 --------------------------------------------------------------------------------
 ROUTING SURFACE (Compatible)
@@ -140,17 +158,18 @@ Guards:
 - RLS → DB-level data isolation by role/capability
 
 --------------------------------------------------------------------------------
-MIGRATION MAP (Old → New)
+MIGRATION MAP (Old → Hybrid)
 
 Backend
-- server/roles/*/routes/dashboard.ts      → server/domains/dashboard/routes.ts
-- server/roles/*/routes/profile.ts        → server/domains/profile/routes.ts
-- server/roles/*/routes/directory.ts      → server/domains/directory/routes.ts (filter by type)
-- server/roles/*/services/*.ts            → server/domains/<domain>/*.ts
-- server/roles/warehouse/*                → server/domains/inventory|deliveries/*
+- server/roles/*/routes/dashboard.ts      → server/domains/dashboard/routes.factory.ts + roles/<role>/router.ts
+- server/roles/*/routes/profile.ts        → server/domains/profile/routes.factory.ts + roles/<role>/router.ts
+- server/roles/*/routes/directory.ts      → server/domains/directory/routes.factory.ts + roles/<role>/router.ts
+- server/roles/*/services/*.ts            → server/domains/<domain>/*.ts (shared)
+- server/roles/warehouse/*                → server/domains/inventory|deliveries/* (shared)
 
 Database
-- roles/*/migrations/*.sql                → consolidated migrations/<by-domain>.sql + rls/*.sql
+- roles/*/migrations/*.sql                → consolidated migrations/<by-domain>.sql + rls/*.sql (shared)
+- role-specific views/policies            → roles/<role>/{policies.sql,views/*,seeds/capabilities.sql}
 
 --------------------------------------------------------------------------------
 EXECUTION CHECKLIST
@@ -158,24 +177,25 @@ EXECUTION CHECKLIST
 Phase 1 – Scaffolding
 - Create server/core/{auth,http,validation,logging}                          [TO CREATE]
 - Create server/domains for {dashboard,profile,directory,services,orders}    [TO CREATE]
-- Add server/routes/{index.ts,mount.ts}                                      [TO CREATE]
+- Add server/roles/* with {config.ts,router.ts} for admin/manager            [TO CREATE]
+- Add server/routes/{roleRegistry.ts,mount.ts}                               [TO CREATE]
 
 Phase 2 – Minimum Parity (Manager/Admin first)
-- Port dashboard/profile/directory endpoints to domain routes                [TO CREATE]
+- Port dashboard/profile/directory into domain factories                     [TO CREATE]
+- In roles/admin|manager/router.ts compose domain routers with caps          [TO CREATE]
 - Wire authenticate + roleContext + requireCaps                              [TO REFACTOR/CREATE]
 - Keep existing /api/:role paths working                                     [COMPAT]
 
 Phase 3 – Database Consolidation
-- Add consolidated migrations (users, rbac, activity, directory, services…)  [TO CREATE]
-- Implement RLS policies per domain                                          [TO CREATE]
-- Seed roles, permissions, mappings                                          [TO CREATE]
+- Add shared migrations (users, rbac, activity, directory, services…)        [TO CREATE]
+- Implement shared RLS templates per domain                                  [TO CREATE]
+- Add roles/<role> overlays (policies.sql, views/, seeds/capabilities.sql)   [TO CREATE]
 
-Phase 4 – Expand Domains & Retire Old
+Phase 4 – Expand + Retire Old
 - Port remaining domains (orders, reports, support, assignments, archive)    [TO CREATE]
 - Add warehouse domains (inventory, deliveries)                              [TO CREATE]
-- Retire server/roles/* and roles/*/migrations after parity                  [TO RETIRE]
+- Retire duplicated server/roles/* logic and per-role migrations             [TO RETIRE]
 
 Notes
-- FE remains compatible (same base paths), can begin consuming consolidated endpoints incrementally.
-- Capability names remain unchanged; enforcement shifts to shared middlewares and RLS.
-
+- Frontend remains modular and unchanged; API paths remain `/api/:role/...`.
+- Variation lives in role config/overlays; business logic lives once in domains.
