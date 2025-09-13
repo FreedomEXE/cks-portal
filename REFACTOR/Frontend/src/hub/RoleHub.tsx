@@ -4,6 +4,12 @@
  */
 
 import React, { useEffect, useMemo, useState } from 'react';
+// Import OG logo from repo docs so the test login can display it
+// Vite dev server is configured to allow fs access above project root
+// Path: repo/docs/images/cks-logo.png
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore - asset module resolution
+import cksLogo from '../../../../docs/images/cks-logo.png';
 
 interface RoleHubProps {
   userId: string;
@@ -178,7 +184,7 @@ export default function RoleHub({ userId, role, userPermissions = [], className 
       <div className={className} style={{ position: 'absolute', inset: 0, background: '#1f1f1f', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ width: 420, transform: 'translateY(-24px)' }}>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-            <img src="/cks-logo.png" alt="CKS" style={{ width: '100%', height: 'auto', marginBottom: 6, filter: 'invert(1)', paddingInline: 24 }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
+            <img src={cksLogo as string} alt="CKS" style={{ width: '100%', height: 'auto', marginBottom: 6, filter: 'invert(1)', paddingInline: 24 }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
             <div style={{ color: '#9ca3af', marginBottom: 12 }}>Test Login (does not hit backend)</div>
           </div>
 
