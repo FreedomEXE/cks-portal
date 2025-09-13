@@ -29,6 +29,8 @@ import { metricsMiddleware, metricsHandler } from './src/core/metrics';
 import pool from '../../Database/db/pool';  
 import meRouter from './routes/me';
 import hubsRouter from './routes/hubs';
+import createRoleMountRouter from './routes/mount';
+import { roleContext } from './src/auth/roleContext';
 import adminRouter from './hubs/admin/routes';
 import crewRouter from './hubs/crew/routes';
 import managerRouter from './hubs/manager/routes';
@@ -36,7 +38,7 @@ import customerRouter from './hubs/customer/routes';
 import contractorRouter from './hubs/contractor/routes';
 import centerRouter from './hubs/center/routes';
 import warehouseRouter from './hubs/warehouse/routes';
-import catalogRouter from './resources/catalog';
+import { createCatalogRouter } from './domains/catalog';
 import ordersRouter from './resources/orders';
 import reportsRouter from './resources/reports';
 import feedbackRouter from './resources/feedback';
@@ -78,6 +80,8 @@ app.get('/test-db', async (_req, res) => {
 // Mount modular routes - ALL under /api for consistency
 app.use('/api', meRouter);
 app.use('/api/hub', hubsRouter);
+// Hybrid mount: shared /api/:role router that dispatches by URL param
+app.use('/api/:role', roleContext, createRoleMountRouter());
 app.use('/api/admin', adminRouter);
 app.use('/api/crew', crewRouter);
 app.use('/api/manager', managerRouter);
@@ -85,7 +89,18 @@ app.use('/api/customer', customerRouter);
 app.use('/api/contractor', contractorRouter);
 app.use('/api/center', centerRouter);
 app.use('/api/warehouse', warehouseRouter);
-app.use('/api/catalog', catalogRouter);
+// Global catalog (accessible to all authenticated users)
+app.use('/api/catalog', createCatalogRouter({
+  role: 'global',
+  capabilities: ['catalog:view'],
+  features: {
+    browse: true,
+    search: true,
+    categories: true,
+    myServices: false,
+    admin: false
+  }
+}));
 app.use('/api/orders', ordersRouter);
 app.use('/api/reports', reportsRouter);
 app.use('/api/feedback', feedbackRouter);
