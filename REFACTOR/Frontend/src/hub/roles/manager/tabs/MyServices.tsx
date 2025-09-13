@@ -13,6 +13,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { useCatalog } from '../../../../shared/catalog/CatalogContext';
 
 interface MyServicesProps {
   userId: string;
@@ -42,6 +43,7 @@ interface ServiceTraining {
 }
 
 export default function MyServices({ userId, config, features, api }: MyServicesProps) {
+  const { open: openCatalog } = useCatalog();
   const [activeTab, setActiveTab] = useState<'personal' | 'active' | 'history'>('personal');
   const [searchQuery, setSearchQuery] = useState('');
   
@@ -159,7 +161,7 @@ export default function MyServices({ userId, config, features, api }: MyServices
   };
 
   const handleBrowseCatalog = () => {
-    alert('Browse CKS Catalog - Coming Soon!');
+    openCatalog({ type: 'service' });
   };
 
   if (loading) {
@@ -375,4 +377,3 @@ export default function MyServices({ userId, config, features, api }: MyServices
     </div>
   );
 }
-
