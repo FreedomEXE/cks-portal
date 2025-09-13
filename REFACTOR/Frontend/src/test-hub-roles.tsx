@@ -19,7 +19,7 @@ import React, { useState } from 'react';
 import RoleHub from './hub/RoleHub';
 
 // Available test roles
-type TestRole = 'manager' | 'contractor' | 'customer' | 'center' | 'crew' | 'warehouse';
+type TestRole = 'manager' | 'contractor' | 'customer' | 'center' | 'crew' | 'warehouse' | 'admin';
 
 interface TestUserData {
   id: string;
@@ -131,6 +131,54 @@ const testUsers: Record<TestRole, TestUserData> = {
       'delivery:track',
       'support:access',
       'reports:generate'
+    ]
+  },
+  admin: {
+    id: 'ADM-TEST-001',
+    role: 'admin',
+    displayName: 'Admin Hub Test',
+    description: 'Test the admin role with full system administration access',
+    permissions: [
+      // Core System
+      'system:admin',
+      'system:config',
+      'system:monitor',
+      'system:backup',
+      // User Management
+      'users:create',
+      'users:view',
+      'users:edit',
+      'users:delete',
+      'users:assign',
+      'users:activate',
+      'users:deactivate',
+      // Organization Management
+      'organizations:create',
+      'organizations:view',
+      'organizations:edit',
+      'organizations:delete',
+      // Role Management
+      'roles:create',
+      'roles:view',
+      'roles:edit',
+      'roles:assign',
+      'roles:permissions',
+      // Directory/Intelligence
+      'directory:view',
+      'directory:export',
+      'directory:search',
+      'directory:analytics',
+      // Audit & Support
+      'audit:view',
+      'audit:export',
+      'audit:manage',
+      'support:admin',
+      'support:escalate',
+      'support:manage',
+      // Reports
+      'reports:system',
+      'reports:users',
+      'reports:security'
     ]
   }
 };

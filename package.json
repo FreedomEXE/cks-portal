@@ -28,11 +28,20 @@
     "type": "git",
     "url": "git+https://github.com/FreedomEXE/cks-portal.git"
   },
-  "keywords": ["business-management", "hub-architecture", "react", "nodejs", "postgresql"],
+  "keywords": [
+    "business-management",
+    "hub-architecture",
+    "react",
+    "nodejs",
+    "postgresql"
+  ],
   "author": "",
   "license": "ISC",
   "bugs": {
     "url": "https://github.com/FreedomEXE/cks-portal/issues"
   },
-  "homepage": "https://github.com/FreedomEXE/cks-portal#readme"
+  "homepage": "https://github.com/FreedomEXE/cks-portal#readme",
+  "dependencies": {
+    "playwright": "^1.55.0"
+  }
 }

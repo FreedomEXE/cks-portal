@@ -1,0 +1,114 @@
+{
+  "role": "manager",
+  "displayName": "Manager Hub",
+  "code": "MGR",
+  "title": "CKS Portal - Manager Hub Test",
+  "url": "http://localhost:3012/hub/manager",
+  "tabs": [],
+  "navigation": [
+    {
+      "text": "Manager Hub Test",
+      "href": null,
+      "className": "",
+      "id": ""
+    },
+    {
+      "text": "Contractor Hub Test",
+      "href": null,
+      "className": "",
+      "id": ""
+    },
+    {
+      "text": "Customer Hub Test",
+      "href": null,
+      "className": "",
+      "id": ""
+    },
+    {
+      "text": "Center Hub Test",
+      "href": null,
+      "className": "",
+      "id": ""
+    },
+    {
+      "text": "Crew Hub Test",
+      "href": null,
+      "className": "",
+      "id": ""
+    },
+    {
+      "text": "Warehouse Hub Test",
+      "href": null,
+      "className": "",
+      "id": ""
+    },
+    {
+      "text": "Log out",
+      "href": null,
+      "className": "",
+      "id": ""
+    },
+    {
+      "text": "Dashboard",
+      "href": null,
+      "className": "",
+      "id": ""
+    },
+    {
+      "text": "My Profile",
+      "href": null,
+      "className": "",
+      "id": ""
+    },
+    {
+      "text": "My Ecosystem",
+      "href": null,
+      "className": "",
+      "id": ""
+    },
+    {
+      "text": "My Services",
+      "href": null,
+      "className": "",
+      "id": ""
+    },
+    {
+      "text": "Orders",
+      "href": null,
+      "className": "",
+      "id": ""
+    },
+    {
+      "text": "Reports",
+      "href": null,
+      "className": "",
+      "id": ""
+    },
+    {
+      "text": "Support",
+      "href": null,
+      "className": "",
+      "id": ""
+    },
+    {
+      "text": "Clear",
+      "href": null,
+      "className": "",
+      "id": ""
+    },
+    {
+      "text": "View All News",
+      "href": null,
+      "className": "",
+      "id": ""
+    },
+    {
+      "text": "View Mailbox",
+      "href": null,
+      "className": "",
+      "id": ""
+    }
+  ],
+  "contentAreas": [],
+  "timestamp": "2025-09-12T19:59:41.597Z"
+}
