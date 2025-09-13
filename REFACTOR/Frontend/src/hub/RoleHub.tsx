@@ -176,7 +176,16 @@ export default function RoleHub({ userId, role, userPermissions = [], className 
         <div style={{ background: '#ffffff', borderRadius: 12, border: `3px solid ${config.theme.primaryColor}`, padding: '20px 24px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <h1 style={{ margin: 0, fontSize: 32, fontWeight: 700, color: '#111827' }}>{config.displayName}</h1>
-            <button style={{ padding: '8px 16px', background: config.theme.primaryColor, color: 'white', border: 'none', borderRadius: 6, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>Log out</button>
+            <button
+              onClick={() => {
+                try { localStorage.setItem('userLoggedOut', 'true'); } catch {}
+                try { sessionStorage.removeItem('role'); sessionStorage.removeItem('code'); } catch {}
+                window.location.href = 'http://localhost:5183/login';
+              }}
+              style={{ padding: '8px 16px', background: config.theme.primaryColor, color: 'white', border: 'none', borderRadius: 6, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}
+            >
+              Log out
+            </button>
           </div>
           <div style={{ fontSize: 14, color: '#6b7280', marginBottom: 16 }}>Welcome to {config.displayName}</div>
 
@@ -217,4 +226,3 @@ export default function RoleHub({ userId, role, userPermissions = [], className 
     </div>
   );
 }
-
