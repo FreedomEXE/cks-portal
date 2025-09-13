@@ -23,7 +23,7 @@ import ReactDOM from 'react-dom/client';
 import { Routes, Route, Navigate, BrowserRouter, useNavigate } from 'react-router-dom';
 import { ClerkProvider, useUser } from '@clerk/clerk-react';
 import HubRoleRouter from './pages/HubRoleRouter';
-import Login from './pages/Login';
+import Login from 'cks-auth/pages/Login';
 import { UserProfile, SignedIn } from '@clerk/clerk-react';
 import ForgotPassword from './pages/ForgotPassword';
 import CatalogPage from './pages/Catalog';

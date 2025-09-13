@@ -16,6 +16,9 @@
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "baseUrl": ".",
+    "paths": {
+      "cks-auth/*": ["../Auth/frontend/*"]
+    },
   "types": ["vite/client", "vitest", "@testing-library/jest-dom/vitest"]
   },
   "include": ["src", "vite.config.*", "env.d.ts", "vitest.setup.ts", "vitest.setup.d.ts"],
