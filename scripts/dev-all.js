@@ -45,8 +45,8 @@ function runTarget(label, cwd) {
   return child;
 }
 
-const backendCwd = path.join(process.cwd(), 'backend', 'server');
-const frontendCwd = path.join(process.cwd(), 'frontend');
+const backendCwd = path.join(process.cwd(), 'Backend');
+const frontendCwd = path.join(process.cwd(), 'Frontend');
 
 const backend = runTarget('backend', backendCwd);
 const frontend = runTarget('frontend', frontendCwd);
@@ -65,3 +65,6 @@ if (timeoutMs && Number.isFinite(timeoutMs)) {
     shutdown();
   }, timeoutMs);
 }
+
+
+

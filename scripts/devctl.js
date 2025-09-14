@@ -2,9 +2,9 @@
 /*
  Cross-platform dev process controller for CKS Portal
  Commands:
-   node scripts/devctl.js start [backend|frontend|all]
-   node scripts/devctl.js stop  [backend|frontend|all]
-   node scripts/devctl.js restart [backend|frontend|all]
+   node scripts/devctl.js start [backend|Frontend|all]
+   node scripts/devctl.js stop  [backend|Frontend|all]
+   node scripts/devctl.js restart [backend|Frontend|all]
    node scripts/devctl.js status
 */
 
@@ -17,14 +17,14 @@ const root = process.cwd();
 const PROC = {
   backend: {
     name: 'backend',
-    cwd: path.join(root, 'backend', 'server'),
-    log: path.join(root, 'backend', 'server', 'backend-dev.log'),
+    cwd: path.join(root, 'Backend'),
+    log: path.join(root, 'Backend', 'backend-dev.log'),
     pid: path.join(root, '.backend_dev_pid'),
   },
   frontend: {
     name: 'frontend',
-    cwd: path.join(root, 'frontend'),
-    log: path.join(root, 'frontend', 'frontend-dev.log'),
+    cwd: path.join(root, 'Frontend'),
+    log: path.join(root, 'Frontend', 'frontend-dev.log'),
     pid: path.join(root, '.frontend_dev_pid'),
   },
 };
@@ -156,7 +156,7 @@ function usage() {
 }
 
 const [,, cmd, targetArg] = process.argv;
-const target = targetArg || 'all';
+const target = (targetArg || 'all');
 
 if (!cmd || !['start','stop','restart','status'].includes(cmd)) {
   usage();
@@ -182,4 +182,5 @@ switch (cmd) {
     status();
     break;
 }
+
 

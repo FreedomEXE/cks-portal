@@ -4,7 +4,8 @@ const fs = require('fs');
 const { spawn } = require('child_process');
 
 const target = process.argv[2];
-if (!['backend', 'frontend'].includes(target)) {
+const tLower = (target || '').toLowerCase();
+if (!['backend', 'frontend'].includes(tLower)) {
   console.error('Usage: node scripts/run-dev.js <backend|frontend>');
   process.exit(1);
 }
@@ -13,13 +14,9 @@ const root = path.resolve(__dirname, '..');
 const isWin = process.platform === 'win32';
 const npmCmd = isWin ? 'npm.cmd' : 'npm';
 
-const cfg = target === 'backend' ? {
-  cwd: path.join(root, 'backend', 'server'),
-  log: path.join(root, 'backend', 'server', 'backend-dev.log'),
-} : {
-  cwd: path.join(root, 'frontend'),
-  log: path.join(root, 'frontend', 'frontend-dev.log'),
-};
+const cfg = tLower === 'backend'
+  ? { cwd: path.join(root, 'Backend'), log: path.join(root, 'Backend', 'backend-dev.log') }
+  : { cwd: path.join(root, 'Frontend'), log: path.join(root, 'Frontend', 'frontend-dev.log') };
 
 // Ensure log directory exists
 fs.mkdirSync(path.dirname(cfg.log), { recursive: true });
@@ -60,4 +57,5 @@ child.on('exit', (code, signal) => {
   out.write(`\n===== STOP ${target.toUpperCase()} code=${code} signal=${signal} ${new Date().toISOString()} =====\n`);
   out.end(() => process.exit(code ?? 0));
 });
+
 

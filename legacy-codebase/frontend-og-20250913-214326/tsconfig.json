@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+
+    "strict": false,
+    "skipLibCheck": true,
+
+    "allowJs": true,          // keep your JS files
+    "checkJs": false,         // don’t type-check JS unless you add // @ts-check
+    "noEmit": true,           // <- prevents “would overwrite input file”
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "baseUrl": ".",
+    "paths": {
+      "cks-auth/*": ["../Auth/frontend/*"]
+    },
+  "types": ["vite/client", "vitest", "@testing-library/jest-dom/vitest"]
+  },
+  "include": ["src", "vite.config.*", "env.d.ts", "vitest.setup.ts", "vitest.setup.d.ts"],
+  "exclude": ["node_modules", "dist"]
+}
