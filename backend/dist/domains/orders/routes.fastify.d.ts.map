@@ -1,0 +1,1 @@
+{"version":3,"file":"routes.fastify.d.ts","sourceRoot":"","sources":["../../../server/domains/orders/routes.fastify.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,qBAAqB,EAAyB,MAAM,SAAS,CAAC;AAGvE,OAAO,EAAE,iBAAiB,EAAE,MAAM,SAAS,CAAC;AAM5C,eAAO,MAAM,yBAAyB,GAAI,UAAU,iBAAiB,KAAG,qBAqEvE,CAAC"}

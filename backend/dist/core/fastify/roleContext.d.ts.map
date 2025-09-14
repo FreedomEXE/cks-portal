@@ -1,0 +1,1 @@
+{"version":3,"file":"roleContext.d.ts","sourceRoot":"","sources":["../../../server/core/fastify/roleContext.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,YAAY,EAAE,cAAc,EAAE,MAAM,SAAS,CAAC;AAEvD,wBAAsB,kBAAkB,CAAC,GAAG,EAAE,cAAc,EAAE,KAAK,EAAE,YAAY,sBAqBhF"}

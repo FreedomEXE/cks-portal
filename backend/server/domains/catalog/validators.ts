@@ -13,7 +13,15 @@
  */
 
 import { z } from 'zod';
-import { CommonSchemas, Transforms } from '../../core/validation/zod';
+
+// Simple schema transforms and common schemas for Fastify build
+const Transforms = {
+  normalizeString: z.string().trim().transform(s => s || undefined)
+};
+
+const CommonSchemas = {
+  metadata: z.record(z.any()).default({})
+};
 
 /**
  * Catalog-specific schemas
@@ -35,7 +43,7 @@ export const CatalogSchemas = {
    * Search query parameters
    */
   searchQuery: z.object({
-    q: Transforms.normalizeString.min(1, 'Search term is required'),
+    q: z.string().min(1, 'Search term is required'),
     type: z.enum(['service', 'product']).optional(),
     category: Transforms.normalizeString.optional(),
     limit: z.coerce.number().int().min(1).max(200).default(50),

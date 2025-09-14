@@ -54,7 +54,7 @@ export async function updateService(
   ];
 
   for (const [k, col] of map) {
-    if (updates[k] !== undefined) {
+    if (updates[k as keyof typeof updates] !== undefined) {
       vals.push((updates as any)[k]);
       sets.push(`${col} = $${vals.length}`);
     }

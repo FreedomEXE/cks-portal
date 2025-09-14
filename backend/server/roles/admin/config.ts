@@ -12,8 +12,24 @@
  * Connects to: All domain route factories, global capability definitions
  */
 
-import { DashboardRouteConfig } from '../../domains/dashboard/routes.factory';
 import { CatalogRouteConfig } from '../../domains/catalog/types';
+
+// Define dashboard config interface locally since routes.factory is legacy Express
+interface DashboardRouteConfig {
+  capabilities: {
+    view: string;
+    manage: string;
+  };
+  features: {
+    kpis: boolean;
+    orders: boolean;
+    activity: boolean;
+    analytics: boolean;
+    clearActivity: boolean;
+  };
+  scope: string;
+  roleCode: string;
+}
 
 /**
  * Admin role configuration

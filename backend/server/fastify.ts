@@ -67,7 +67,7 @@ export function buildServer() {
     // Dev mock auth (optional)
     try { (await import('./core/fastify/mockAuth')).mockAuthPlugin(instance as any, {}, ()=>{}); } catch {}
     instance.addHook('preHandler', authenticateFastify);
-    instance.register(createCatalogFastifyPlugin({}), { prefix: '/catalog' });
+    instance.register(createCatalogFastifyPlugin(), { prefix: '/catalog' });
   }, { prefix: '/api' });
 
   // Dynamic role mount (shim) — forwards /api/:role/* to internal /api/_{role}/*
@@ -78,17 +78,17 @@ export function buildServer() {
     instance.addHook('preHandler', authenticateFastify);
 
     // Register role-agnostic domain plugins; per-role access enforced inside
-    instance.register(createDashboardFastifyPlugin({}), { prefix: '/dashboard' });
-    instance.register(createServicesFastifyPlugin({}), { prefix: '/services' });
-    instance.register(createOrdersFastifyPlugin({}), { prefix: '/orders' });
-    instance.register(createAssignmentsFastifyPlugin({}), { prefix: '/assignments' });
-    instance.register(createArchiveFastifyPlugin({}), { prefix: '/archive' });
-    instance.register(createSupportFastifyPlugin({}), { prefix: '/support' });
-    instance.register(createDirectoryFastifyPlugin({}), { prefix: '/directory' });
-    instance.register(createProfileFastifyPlugin({}), { prefix: '/profile' });
-    instance.register(createReportsFastifyPlugin({}), { prefix: '/reports' });
-    instance.register(createInventoryFastifyPlugin({}), { prefix: '/inventory' });
-    instance.register(createDeliveriesFastifyPlugin({}), { prefix: '/deliveries' });
+    instance.register(createDashboardFastifyPlugin(), { prefix: '/dashboard' });
+    instance.register(createServicesFastifyPlugin(), { prefix: '/services' });
+    instance.register(createOrdersFastifyPlugin(), { prefix: '/orders' });
+    instance.register(createAssignmentsFastifyPlugin(), { prefix: '/assignments' });
+    instance.register(createArchiveFastifyPlugin(), { prefix: '/archive' });
+    instance.register(createSupportFastifyPlugin(), { prefix: '/support' });
+    instance.register(createDirectoryFastifyPlugin(), { prefix: '/directory' });
+    instance.register(createProfileFastifyPlugin(), { prefix: '/profile' });
+    instance.register(createReportsFastifyPlugin(), { prefix: '/reports' });
+    instance.register(createInventoryFastifyPlugin(), { prefix: '/inventory' });
+    instance.register(createDeliveriesFastifyPlugin(), { prefix: '/deliveries' });
   }, { prefix: '/api/:role' });
 
   
