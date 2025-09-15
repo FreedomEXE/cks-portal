@@ -1,7 +1,0 @@
-.env
-node_modules
-dist/
-build/
-*.js
-!jest.config.cjs
-!.*.cjs

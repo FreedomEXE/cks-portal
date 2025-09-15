@@ -1,93 +1,56 @@
 "use strict";
 /*───────────────────────────────────────────────
   Property of CKS  © 2025
-  Manifested by Freedom
 ───────────────────────────────────────────────*/
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.query = query;
-exports.queryOne = queryOne;
-exports.transaction = transaction;
-exports.testConnection = testConnection;
 /**
- * File: connection.ts
+ * File: server/db/connection.ts
  *
- * Description: Database connection utility using node-postgres
- * Function: Provide database connection pool and query helpers
- * Importance: Central database access for all repositories
- * Connects to: All repository files, PostgreSQL database
+ * Description:
+ * Postgres Pool (single) with Render SSL handling
  *
- * Notes: Simple connection pool setup for Manager role implementation
+ * Function:
+ * Provide shared Pool, query helper, and testConnection()
+ *
+ * Importance:
+ * Central DB connection for repositories
+ *
+ * Role in system:
+ * Used by repositories and services to perform queries
+ *
+ * Notes:
+ * Respects DATABASE_URL with ?sslmode=require
+ * and Render domains (TLS enabled).
  */
-const pg_1 = require("pg");
-// Database connection configuration
-const poolConfig = {
-    host: process.env.DB_HOST || 'localhost',
-    port: parseInt(process.env.DB_PORT || '5432'),
-    database: process.env.DB_NAME || 'cks_portal_v2',
-    user: process.env.DB_USER || 'postgres',
-    password: process.env.DB_PASSWORD || 'postgres',
-    max: 20, // Maximum connections in pool
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 2000,
-    // Enable SSL for Render or production environments
-    ssl: (process.env.NODE_ENV === 'production' || (process.env.DB_HOST || '').includes('render.com'))
-        ? { rejectUnauthorized: false }
-        : false,
+/*───────────────────────────────────────────────
+  Manifested by Freedom_EXE
+───────────────────────────────────────────────*/
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
 };
-// Create connection pool
-const pool = new pg_1.Pool(poolConfig);
-// Handle pool errors
-pool.on('error', (err) => {
-    console.error('PostgreSQL pool error:', err);
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.query = exports.pool = void 0;
+exports.testConnection = testConnection;
+const dotenv_1 = __importDefault(require("dotenv"));
+dotenv_1.default.config({ override: true });
+require("dotenv/config");
+const pg_1 = require("pg");
+const url = process.env.DATABASE_URL;
+if (!url || url.trim() === '') {
+    throw new Error('Missing DATABASE_URL in .env');
+}
+exports.pool = new pg_1.Pool({
+    connectionString: url,
+    // Render requires TLS; rejectUnauthorized:false plays nice locally/behind proxies.
+    ssl: { rejectUnauthorized: false },
+    keepAlive: true,
+    connectionTimeoutMillis: 8_000,
+    idleTimeoutMillis: 10_000,
+    max: Number(process.env.DB_POOL_MAX ?? 5),
 });
-// Query helper with error handling
-async function query(text, params) {
-    const client = await pool.connect();
-    try {
-        const result = await client.query(text, params);
-        return result.rows;
-    }
-    catch (error) {
-        console.error('Database query error:', error);
-        throw error;
-    }
-    finally {
-        client.release();
-    }
-}
-// Query helper that returns single row
-async function queryOne(text, params) {
-    const rows = await query(text, params);
-    return rows.length > 0 ? rows[0] : null;
-}
-// Transaction helper
-async function transaction(callback) {
-    const client = await pool.connect();
-    try {
-        await client.query('BEGIN');
-        const result = await callback(client);
-        await client.query('COMMIT');
-        return result;
-    }
-    catch (error) {
-        await client.query('ROLLBACK');
-        throw error;
-    }
-    finally {
-        client.release();
-    }
-}
-// Connection test
+const query = (text, params) => exports.pool.query(text, params);
+exports.query = query;
 async function testConnection() {
-    try {
-        await query('SELECT 1 as test');
-        console.log('Database connection successful');
-        return true;
-    }
-    catch (error) {
-        console.error('Database connection failed:', error);
-        return false;
-    }
+    await exports.pool.query('select 1');
 }
-exports.default = pool;
+exports.default = exports.pool;
 //# sourceMappingURL=connection.js.map

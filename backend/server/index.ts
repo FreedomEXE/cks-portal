@@ -1,67 +1,38 @@
-/*───────────────────────────────────────────────
+﻿/*───────────────────────────────────────────────
   Property of CKS  © 2025
   Manifested by Freedom
 ───────────────────────────────────────────────*/
 
 /**
- * File: index.ts
- * 
- * Description: Server entry point for CKS Manager backend
- * Function: Start the Express server and initialize database connection
- * Importance: Main entry point for backend services
- * Connects to: app.ts, database connection
- * 
- * Notes: Development server for Manager role testing
+ * server/index.ts
+ *
+ * Description: Entry point. Loads env, tests DB, and starts Fastify.
+ * Function: Bootstrap server with environment and DB preflight
+ * Importance: Ensures DB available on boot and exposes HTTP server
+ * Connects to: db/connection, fastify builder
  */
 
-import 'dotenv/config';
-import { buildServer } from './fastify';
-import { testConnection } from './db/connection';
+import "dotenv/config";
+import { testConnection } from "./db/connection";
+import { buildServer } from "./fastify";
 
-const PORT = process.env.PORT || 5000;
-const HOST = process.env.HOST || '0.0.0.0';
-
-// Test database connection on startup
-async function startServer() {
-  console.log('🚀 Starting CKS Portal Backend Server (Fastify)...');
+async function start() {
+  console.log("🚀 Starting CKS Portal Backend Server (Fastify)...");
 
   try {
-    // Test database connection
-    const dbConnected = await testConnection();
+    await testConnection();
+    console.log("✅ DB connection ok — starting HTTP server...");
 
-    if (dbConnected) {
-      console.log('✅ Database connection established');
-    } else {
-      console.log('⚠️  Database connection failed - server will start but queries may fail');
-    }
+    const app = await buildServer();
+    const port = Number(process.env.PORT || 5000);
+    const host = process.env.HOST || "0.0.0.0";
 
-    // Build and start the Fastify server
-    const app = buildServer();
-
-    await app.listen({ port: Number(PORT), host: HOST });
-
-    console.log(`🟢 Server running on http://localhost:${PORT}`);
-    console.log(`📖 API Documentation: http://localhost:${PORT}/api/docs`);
-    console.log(`🏥 Health Check: http://localhost:${PORT}/health`);
-    console.log(`📦 Global Catalog: http://localhost:${PORT}/api/catalog`);
-    console.log(`📊 Manager Dashboard: http://localhost:${PORT}/api/manager/dashboard/health`);
-    console.log(`👤 Admin Dashboard: http://localhost:${PORT}/api/admin/dashboard/health`);
-  } catch (error) {
-    console.error('❌ Failed to start server:', error);
+    await app.listen({ port, host });
+    console.log(`🎯 Server listening at http://${host}:${port}`);
+  } catch (err) {
+    console.error("❌ Startup failed — aborting:", err);
     process.exit(1);
   }
 }
 
-// Handle graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('🛑 SIGTERM received, shutting down gracefully');
-  process.exit(0);
-});
-
-process.on('SIGINT', () => {
-  console.log('🛑 SIGINT received, shutting down gracefully');
-  process.exit(0);
-});
-
-// Start the server
-startServer();
+start();

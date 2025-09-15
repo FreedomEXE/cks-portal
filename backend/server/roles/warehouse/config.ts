@@ -1,31 +1,15 @@
-export const WarehouseConfig = {
-  role: {
-    code: 'warehouse',
-    name: 'Warehouse',
-    description: 'Warehouse operations: inventory and deliveries',
-    scope: 'entity' as const,
-  },
-  capabilities: {
-    inventory: {
-      view: 'inventory:view',
-      adjust: 'inventory:adjust',
-    },
-    deliveries: {
-      view: 'delivery:track',
-      update: 'delivery:update',
-    },
-  },
-  domains: {
-    inventory: {
-      capabilities: { view: 'inventory:view', adjust: 'inventory:adjust' },
-      scope: 'entity',
-      roleCode: 'warehouse' as const,
-    },
-    deliveries: {
-      capabilities: { view: 'delivery:track', update: 'delivery:update' },
-      scope: 'entity',
-      roleCode: 'warehouse' as const,
-    },
-  },
-};
+﻿/*───────────────────────────────────────────────
+  Property of CKS  © 2025
+  Manifested by Freedom
+───────────────────────────────────────────────*/
 
+/**
+ * server/roles/warehouse/config.ts
+ *
+ * Description: Role route prefix configuration
+ * Function: Declare REST prefix for warehouse role
+ * Importance: Keeps backend/fe prefixes consistent
+ */
+
+export const prefix = "/api/warehouse" as const;
+export default { prefix };

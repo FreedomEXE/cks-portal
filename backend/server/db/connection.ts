@@ -1,91 +1,53 @@
-/*───────────────────────────────────────────────
+﻿/*───────────────────────────────────────────────
   Property of CKS  © 2025
-  Manifested by Freedom
+───────────────────────────────────────────────*/
+/**
+ * File: server/db/connection.ts
+ *
+ * Description:
+ * Postgres Pool (single) with Render SSL handling
+ *
+ * Function:
+ * Provide shared Pool, query helper, and testConnection()
+ *
+ * Importance:
+ * Central DB connection for repositories
+ *
+ * Role in system:
+ * Used by repositories and services to perform queries
+ *
+ * Notes:
+ * Respects DATABASE_URL with ?sslmode=require
+ * and Render domains (TLS enabled).
+ */
+/*───────────────────────────────────────────────
+  Manifested by Freedom_EXE
 ───────────────────────────────────────────────*/
 
-/**
- * File: connection.ts
- * 
- * Description: Database connection utility using node-postgres
- * Function: Provide database connection pool and query helpers
- * Importance: Central database access for all repositories
- * Connects to: All repository files, PostgreSQL database
- * 
- * Notes: Simple connection pool setup for Manager role implementation
- */
+import dotenv from 'dotenv';
+dotenv.config({ override: true });
+import 'dotenv/config';
+import { Pool } from 'pg';
 
-import { Pool, PoolConfig } from 'pg';
+const url = process.env.DATABASE_URL;
+if (!url || url.trim() === '') {
+  throw new Error('Missing DATABASE_URL in .env');
+}
 
-// Database connection configuration
-const poolConfig: PoolConfig = {
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '5432'),
-  database: process.env.DB_NAME || 'cks_portal_v2',
-  user: process.env.DB_USER || 'postgres',
-  password: process.env.DB_PASSWORD || 'postgres',
-  max: 20, // Maximum connections in pool
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
-  // Enable SSL for Render or production environments
-  ssl: (process.env.NODE_ENV === 'production' || (process.env.DB_HOST || '').includes('render.com'))
-    ? { rejectUnauthorized: false }
-    : false,
-};
-
-// Create connection pool
-const pool = new Pool(poolConfig);
-
-// Handle pool errors
-pool.on('error', (err) => {
-  console.error('PostgreSQL pool error:', err);
+export const pool = new Pool({
+  connectionString: url,
+  // Render requires TLS; rejectUnauthorized:false plays nice locally/behind proxies.
+  ssl: { rejectUnauthorized: false },
+  keepAlive: true,
+  connectionTimeoutMillis: 8_000,
+  idleTimeoutMillis: 10_000,
+  max: Number(process.env.DB_POOL_MAX ?? 5),
 });
 
-// Query helper with error handling
-export async function query(text: string, params?: any[]): Promise<any[]> {
-  const client = await pool.connect();
-  try {
-    const result = await client.query(text, params);
-    return result.rows;
-  } catch (error) {
-    console.error('Database query error:', error);
-    throw error;
-  } finally {
-    client.release();
-  }
-}
+export const query = (text: string, params?: any[]) => pool.query(text, params);
 
-// Query helper that returns single row
-export async function queryOne(text: string, params?: any[]): Promise<any | null> {
-  const rows = await query(text, params);
-  return rows.length > 0 ? rows[0] : null;
-}
-
-// Transaction helper
-export async function transaction<T>(callback: (client: any) => Promise<T>): Promise<T> {
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-    const result = await callback(client);
-    await client.query('COMMIT');
-    return result;
-  } catch (error) {
-    await client.query('ROLLBACK');
-    throw error;
-  } finally {
-    client.release();
-  }
-}
-
-// Connection test
-export async function testConnection(): Promise<boolean> {
-  try {
-    await query('SELECT 1 as test');
-    console.log('Database connection successful');
-    return true;
-  } catch (error) {
-    console.error('Database connection failed:', error);
-    return false;
-  }
+export async function testConnection() {
+  await pool.query('select 1');
 }
 
 export default pool;

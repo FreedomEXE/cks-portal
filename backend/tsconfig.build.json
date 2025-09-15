@@ -3,33 +3,22 @@
   "include": [
     "server/index.ts",
     "server/fastify.ts",
-    "server/core/fastify/**/*",
-    "server/core/config/**/*",
+    "server/registerDomains.ts",
     "server/db/**/*",
+    "server/core/fastify/**/*",
+    "server/core/http/**/*",
+    "server/core/validation/**/*",
+    "server/core/logging/**/*",
+    "server/core/config/**/*",
     "server/domains/**/routes.fastify.ts",
-    "server/domains/**/service.ts",
-    "server/domains/**/repository.ts",
-    "server/domains/**/types.ts",
-    "server/domains/**/validators.ts",
     "server/roles/**/config.ts"
   ],
   "exclude": [
     "node_modules",
     "dist",
-    "**/*.test.ts",
-    "**/*.spec.ts",
     "server/_legacy/**/*",
-    "server/app.ts",
-    "server/routes/**/*",
-    "server/middleware/**/*",
-    "server/roles/**/routes/**/*",
-    "server/roles/**/services/**/*",
-    "server/roles/**/repositories/**/*",
-    "server/roles/**/validators/**/*",
-    "server/core/auth/**/*",
-    "server/core/http/**/*",
-    "server/core/validation/**/*",
-    "server/domains/**/routes.factory.ts",
-    "server/domains/**/index.ts"
+    "**/*.test.ts",
+    "**/*.spec.ts"
   ]
 }
+

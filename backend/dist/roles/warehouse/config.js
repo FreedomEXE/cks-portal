@@ -1,34 +1,17 @@
 "use strict";
+/*───────────────────────────────────────────────
+  Property of CKS  © 2025
+  Manifested by Freedom
+───────────────────────────────────────────────*/
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.WarehouseConfig = void 0;
-exports.WarehouseConfig = {
-    role: {
-        code: 'warehouse',
-        name: 'Warehouse',
-        description: 'Warehouse operations: inventory and deliveries',
-        scope: 'entity',
-    },
-    capabilities: {
-        inventory: {
-            view: 'inventory:view',
-            adjust: 'inventory:adjust',
-        },
-        deliveries: {
-            view: 'delivery:track',
-            update: 'delivery:update',
-        },
-    },
-    domains: {
-        inventory: {
-            capabilities: { view: 'inventory:view', adjust: 'inventory:adjust' },
-            scope: 'entity',
-            roleCode: 'warehouse',
-        },
-        deliveries: {
-            capabilities: { view: 'delivery:track', update: 'delivery:update' },
-            scope: 'entity',
-            roleCode: 'warehouse',
-        },
-    },
-};
+exports.prefix = void 0;
+/**
+ * server/roles/warehouse/config.ts
+ *
+ * Description: Role route prefix configuration
+ * Function: Declare REST prefix for warehouse role
+ * Importance: Keeps backend/fe prefixes consistent
+ */
+exports.prefix = "/api/warehouse";
+exports.default = { prefix: exports.prefix };
 //# sourceMappingURL=config.js.map

@@ -9,7 +9,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 // Path: repo/docs/images/cks-logo.png
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore - asset module resolution
-import cksLogo from '../../../../docs/images/cks-logo.png';
+import cksLogo from '../../../docs/images/cks-logo.png';
 
 interface RoleHubProps {
   userId: string;

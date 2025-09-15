@@ -6,6 +6,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CatalogRepository = void 0;
 class CatalogRepository {
+    db;
     constructor(db) {
         this.db = db;
     }
