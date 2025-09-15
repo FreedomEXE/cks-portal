@@ -1,0 +1,10 @@
+{
+  "name": "@cks/backend",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "tsx watch server/index.ts",
+    "build": "tsc",
+    "test": "vitest"
+  }
+}

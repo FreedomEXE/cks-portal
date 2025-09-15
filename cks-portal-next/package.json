@@ -1,0 +1,20 @@
+{
+  "name": "@cks/portal",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "node scripts/run-dev.js",
+    "build": "pnpm run -r build",
+    "test": "pnpm run -r test",
+    "codegen": "node scripts/prebuild-codegen.mjs",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "lint": "pnpm -r --if-present lint",
+    "prebuild": "pnpm run codegen",
+    "prepare": "husky install"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "husky": "9",
+    "typescript": "^5.0.0"
+  }
+}

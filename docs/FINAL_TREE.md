@@ -50,6 +50,8 @@ CKS-Portal/                                 # Monorepo root (pnpm workspaces, pr
     devctl.js                                # Dev orchestration helper
     run-dev.js                               # One-command local dev runner
     prebuild-codegen.mjs                     # Runs contracts/roles codegen pre-build
+    create-cks-skeleton.sh                   # Bootstrap skeleton (bash)
+    create-cks-skeleton.ps1                  # Bootstrap skeleton (PowerShell)
 
   docs/                                      # Living documentation (ops + dev)
     README.md                                # Overview and quickstart

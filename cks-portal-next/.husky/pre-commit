@@ -1,0 +1,6 @@
+﻿#!/usr/bin/env sh
+if [ -f \"/_/husky.sh\" ]; then . \"/_/husky.sh\"; fi
+echo 'pre-commit: codegen + typecheck + lint'
+pnpm codegen || exit 1
+pnpm run typecheck || true
+pnpm run lint || true

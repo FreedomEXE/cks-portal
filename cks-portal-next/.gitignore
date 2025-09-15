@@ -1,0 +1,50 @@
+﻿#-----------------------------------------------
+#  Property of CKS  (c) 2025
+#-----------------------------------------------
+# File: .gitignore
+#
+# Description:
+# Short what/why
+#
+# Responsibilities:
+# - Key responsibility
+# - Another responsibility
+#
+# Role in system:
+# - Who imports/uses this; high-level
+#
+# Notes:
+# Special behaviors, flags, envs
+#-----------------------------------------------
+#  Manifested by Freedom_EXE
+#-----------------------------------------------
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/settings.local.json
+.idea/
+
+# Logs
+logs/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test coverage
+coverage/
+.nyc_output/
