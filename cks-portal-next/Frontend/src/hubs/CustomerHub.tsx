@@ -30,8 +30,8 @@ export default function CustomerHub() {
     const tabs = [
     { id: 'dashboard', label: 'Dashboard', path: '/customer/dashboard' },
     { id: 'profile', label: 'My Profile', path: '/customer/profile' },
-    { id: 'centers', label: 'My Centers', path: '/customer/centers' },
-    { id: 'services', label: 'Services', path: '/customer/services' },
+    { id: 'ecosystem', label: 'My Ecosystem', path: '/customer/ecosystem' },
+    { id: 'services', label: 'My Services', path: '/customer/services' },
     { id: 'orders', label: 'Orders', path: '/customer/orders' },
     { id: 'reports', label: 'Reports', path: '/customer/reports' },
     { id: 'support', label: 'Support', path: '/customer/support' }

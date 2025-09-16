@@ -31,7 +31,7 @@ export default function ManagerHub() {
     { id: 'dashboard', label: 'Dashboard', path: '/manager/dashboard' },
     { id: 'profile', label: 'My Profile', path: '/manager/profile' },
     { id: 'ecosystem', label: 'My Ecosystem', path: '/manager/ecosystem' },
-    { id: 'services', label: 'Services', path: '/manager/services' },
+    { id: 'services', label: 'My Services', path: '/manager/services' },
     { id: 'orders', label: 'Orders', path: '/manager/orders' },
     { id: 'reports', label: 'Reports', path: '/manager/reports' },
     { id: 'support', label: 'Support', path: '/manager/support' }

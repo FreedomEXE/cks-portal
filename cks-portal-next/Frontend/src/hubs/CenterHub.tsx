@@ -29,10 +29,10 @@ export default function CenterHub() {
 
     const tabs = [
     { id: 'dashboard', label: 'Dashboard', path: '/center/dashboard' },
-    { id: 'facility', label: 'Facility', path: '/center/facility' },
-    { id: 'maintenance', label: 'Maintenance', path: '/center/maintenance' },
-    { id: 'visitors', label: 'Visitors', path: '/center/visitors' },
-    { id: 'services', label: 'Services', path: '/center/services' },
+    { id: 'profile', label: 'My Profile', path: '/center/profile' },
+    { id: 'ecosystem', label: 'My Ecosystem', path: '/center/ecosystem' },
+    { id: 'services', label: 'My Services', path: '/center/services' },
+    { id: 'orders', label: 'Orders', path: '/center/orders' },
     { id: 'reports', label: 'Reports', path: '/center/reports' },
     { id: 'support', label: 'Support', path: '/center/support' }
   ];

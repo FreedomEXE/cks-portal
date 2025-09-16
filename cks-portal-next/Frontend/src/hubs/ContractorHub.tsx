@@ -29,11 +29,11 @@ export default function ContractorHub() {
 
     const tabs = [
     { id: 'dashboard', label: 'Dashboard', path: '/contractor/dashboard' },
-    { id: 'profile', label: 'Company Profile', path: '/contractor/profile' },
-    { id: 'services', label: 'Services', path: '/contractor/services' },
-    { id: 'orders', label: 'Work Orders', path: '/contractor/orders' },
+    { id: 'profile', label: 'My Profile', path: '/contractor/profile' },
+    { id: 'ecosystem', label: 'My Ecosystem', path: '/contractor/ecosystem' },
+    { id: 'services', label: 'My Services', path: '/contractor/services' },
+    { id: 'orders', label: 'Orders', path: '/contractor/orders' },
     { id: 'reports', label: 'Reports', path: '/contractor/reports' },
-    { id: 'account', label: 'Account Manager', path: '/contractor/account' },
     { id: 'support', label: 'Support', path: '/contractor/support' }
   ];
 

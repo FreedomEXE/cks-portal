@@ -29,10 +29,10 @@ export default function CrewHub() {
 
     const tabs = [
     { id: 'dashboard', label: 'Dashboard', path: '/crew/dashboard' },
-    { id: 'timeclock', label: 'Time Clock', path: '/crew/timeclock' },
-    { id: 'tasks', label: 'My Tasks', path: '/crew/tasks' },
-    { id: 'schedule', label: 'Schedule', path: '/crew/schedule' },
-    { id: 'equipment', label: 'Equipment', path: '/crew/equipment' },
+    { id: 'profile', label: 'My Profile', path: '/crew/profile' },
+    { id: 'ecosystem', label: 'My Ecosystem', path: '/crew/ecosystem' },
+    { id: 'services', label: 'My Services', path: '/crew/services' },
+    { id: 'orders', label: 'Orders', path: '/crew/orders' },
     { id: 'reports', label: 'Reports', path: '/crew/reports' },
     { id: 'support', label: 'Support', path: '/crew/support' }
   ];
