@@ -1,0 +1,86 @@
+#-----------------------------------------------
+#  Property of CKS  © 2025
+#-----------------------------------------------
+# File: Dockerfile.backend
+#
+# Description:
+# Backend container (Fastify API) with multi-stage build
+#
+# Responsibilities:
+# - Build optimized Backend production image
+# - Include only necessary dependencies and artifacts
+#
+# Role in system:
+# - Used to containerize the Backend API service
+#
+# Notes:
+# Multi-stage build for smaller production image
+#-----------------------------------------------
+#  Manifested by Freedom_EXE
+#-----------------------------------------------
+
+# Build stage
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# Install pnpm
+RUN npm install -g pnpm@8
+
+# Copy workspace configuration
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
+
+# Copy package files for dependency resolution
+COPY Backend/package.json ./Backend/
+COPY Shared/package.json ./Shared/
+COPY packages/*/package.json ./packages/
+
+# Install all dependencies
+RUN pnpm install --frozen-lockfile
+
+# Copy source code
+COPY Backend/ ./Backend/
+COPY Shared/ ./Shared/
+COPY Database/ ./Database/
+
+# Build the backend
+RUN pnpm run build:backend
+
+# Production stage
+FROM node:20-alpine AS production
+
+WORKDIR /app
+
+# Install pnpm
+RUN npm install -g pnpm@8
+
+# Copy workspace configuration
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
+
+# Copy package files
+COPY Backend/package.json ./Backend/
+
+# Install only production dependencies
+RUN pnpm install --prod --frozen-lockfile
+
+# Copy built application
+COPY --from=builder /app/Backend/dist ./Backend/dist
+COPY --from=builder /app/Shared/dist ./Shared/dist
+
+# Create non-root user
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S backend -u 1001
+
+# Change ownership and switch to non-root user
+RUN chown -R backend:nodejs /app
+USER backend
+
+# Expose port
+EXPOSE 3001
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:3001/healthz', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"
+
+# Start the application
+CMD ["node", "Backend/dist/server/index.js"]

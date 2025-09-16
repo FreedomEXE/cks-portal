@@ -1,0 +1,8 @@
+# dast.yml
+# Dynamic application security testing
+
+name: dast
+
+jobs:
+  todo:
+    runs-on: ubuntu-latest

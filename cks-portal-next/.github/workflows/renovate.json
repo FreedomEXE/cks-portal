@@ -1,0 +1,31 @@
+/*───────────────────────────────────────────────
+  Property of CKS  © 2025
+───────────────────────────────────────────────*/
+/**
+ * File: renovate.json
+ *
+ * Description:
+ * renovate.json implementation
+ *
+ * Responsibilities:
+ * - Provide renovate.json functionality
+ *
+ * Role in system:
+ * - Used by CKS Portal system
+ *
+ * Notes:
+ * To be implemented
+ */
+/*───────────────────────────────────────────────
+  Manifested by Freedom_EXE
+───────────────────────────────────────────────*/
+
+{
+  "extends": ["config:base"],
+  "packageRules": [
+    {
+      "matchPackagePatterns": ["*"],
+      "automerge": false
+    }
+  ]
+}

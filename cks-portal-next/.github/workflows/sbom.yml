@@ -1,0 +1,8 @@
+# sbom.yml
+# SBOM generation workflow
+
+name: sbom
+
+jobs:
+  todo:
+    runs-on: ubuntu-latest

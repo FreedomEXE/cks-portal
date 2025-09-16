@@ -1,0 +1,232 @@
+#-----------------------------------------------
+#  Property of CKS  © 2025
+#-----------------------------------------------
+# File: alert-rules.yaml
+#
+# Description:
+# Alert definitions for CKS Portal infrastructure and applications
+#
+# Responsibilities:
+# - Define alerting rules for critical system metrics
+# - Set appropriate thresholds and escalation policies
+#
+# Role in system:
+# - Used by monitoring system to trigger alerts
+#
+# Notes:
+# Follows SRE best practices for alerting
+#-----------------------------------------------
+#  Manifested by Freedom_EXE
+#-----------------------------------------------
+
+groups:
+  - name: cks-portal-infrastructure
+    interval: 30s
+    rules:
+      # ECS Service Health
+      - alert: ECSServiceDown
+        expr: aws_ecs_service_running_count{service_name=~"cks-portal-.*"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: "{{ $labels.service_name }}"
+        annotations:
+          summary: "ECS Service {{ $labels.service_name }} is down"
+          description: "ECS service {{ $labels.service_name }} has no running tasks for more than 2 minutes."
+          runbook: "https://runbooks.cks-portal.com/ecs-service-down"
+
+      - alert: ECSServiceHighCPU
+        expr: aws_ecs_service_cpu_utilization{service_name=~"cks-portal-.*"} > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: "{{ $labels.service_name }}"
+        annotations:
+          summary: "High CPU usage on ECS service {{ $labels.service_name }}"
+          description: "ECS service {{ $labels.service_name }} CPU utilization is above 80% for more than 5 minutes."
+          runbook: "https://runbooks.cks-portal.com/high-cpu"
+
+      - alert: ECSServiceHighMemory
+        expr: aws_ecs_service_memory_utilization{service_name=~"cks-portal-.*"} > 85
+        for: 5m
+        labels:
+          severity: warning
+          service: "{{ $labels.service_name }}"
+        annotations:
+          summary: "High memory usage on ECS service {{ $labels.service_name }}"
+          description: "ECS service {{ $labels.service_name }} memory utilization is above 85% for more than 5 minutes."
+          runbook: "https://runbooks.cks-portal.com/high-memory"
+
+      # Database Health
+      - alert: RDSHighCPU
+        expr: aws_rds_cpu_utilization{db_instance_identifier="cks-portal-postgres"} > 80
+        for: 10m
+        labels:
+          severity: warning
+          service: database
+        annotations:
+          summary: "High CPU usage on RDS instance"
+          description: "RDS instance cks-portal-postgres CPU utilization is above 80% for more than 10 minutes."
+          runbook: "https://runbooks.cks-portal.com/rds-high-cpu"
+
+      - alert: RDSHighConnections
+        expr: aws_rds_database_connections{db_instance_identifier="cks-portal-postgres"} > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: database
+        annotations:
+          summary: "High connection count on RDS instance"
+          description: "RDS instance cks-portal-postgres has more than 80 connections for more than 5 minutes."
+          runbook: "https://runbooks.cks-portal.com/rds-high-connections"
+
+      - alert: RDSDown
+        expr: aws_rds_database_connections{db_instance_identifier="cks-portal-postgres"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: database
+        annotations:
+          summary: "RDS instance is down"
+          description: "RDS instance cks-portal-postgres appears to be down (no connections possible)."
+          runbook: "https://runbooks.cks-portal.com/rds-down"
+
+      # Load Balancer Health
+      - alert: ALBHighResponseTime
+        expr: aws_alb_target_response_time_average{load_balancer=~"cks-portal-.*"} > 2
+        for: 5m
+        labels:
+          severity: warning
+          service: load-balancer
+        annotations:
+          summary: "High response time on Application Load Balancer"
+          description: "ALB {{ $labels.load_balancer }} response time is above 2 seconds for more than 5 minutes."
+          runbook: "https://runbooks.cks-portal.com/alb-high-response-time"
+
+      - alert: ALBHighErrorRate
+        expr: (aws_alb_httpcode_target_5xx_count / aws_alb_request_count) * 100 > 5
+        for: 3m
+        labels:
+          severity: critical
+          service: load-balancer
+        annotations:
+          summary: "High error rate on Application Load Balancer"
+          description: "ALB error rate is above 5% for more than 3 minutes."
+          runbook: "https://runbooks.cks-portal.com/alb-high-error-rate"
+
+      # Application Health
+      - alert: HighErrorRate
+        expr: (rate(http_requests_total{status=~"5.*"}[5m]) / rate(http_requests_total[5m])) * 100 > 5
+        for: 3m
+        labels:
+          severity: critical
+          service: "{{ $labels.service }}"
+        annotations:
+          summary: "High error rate in {{ $labels.service }}"
+          description: "{{ $labels.service }} error rate is above 5% for more than 3 minutes."
+          runbook: "https://runbooks.cks-portal.com/high-error-rate"
+
+      - alert: SlowResponseTime
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+          service: "{{ $labels.service }}"
+        annotations:
+          summary: "Slow response time in {{ $labels.service }}"
+          description: "{{ $labels.service }} 95th percentile response time is above 2 seconds for more than 5 minutes."
+          runbook: "https://runbooks.cks-portal.com/slow-response-time"
+
+  - name: cks-portal-business-metrics
+    interval: 60s
+    rules:
+      # Business Critical Alerts
+      - alert: OrderProcessingBacklog
+        expr: orders_pending_count > 100
+        for: 10m
+        labels:
+          severity: warning
+          team: operations
+        annotations:
+          summary: "High number of pending orders"
+          description: "There are {{ $value }} pending orders for more than 10 minutes."
+          runbook: "https://runbooks.cks-portal.com/order-backlog"
+
+      - alert: AuthenticationFailureSpike
+        expr: increase(auth_failures_total[5m]) > 50
+        for: 2m
+        labels:
+          severity: warning
+          team: security
+        annotations:
+          summary: "Authentication failure spike detected"
+          description: "{{ $value }} authentication failures in the last 5 minutes."
+          runbook: "https://runbooks.cks-portal.com/auth-failures"
+
+      - alert: DatabaseConnectionPoolExhaustion
+        expr: db_connection_pool_active / db_connection_pool_max > 0.9
+        for: 2m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "Database connection pool near exhaustion"
+          description: "Database connection pool is {{ $value | humanizePercentage }} full."
+          runbook: "https://runbooks.cks-portal.com/db-pool-exhaustion"
+
+  - name: cks-portal-slos
+    interval: 30s
+    rules:
+      # SLO Error Budget Alerts
+      - alert: SLOErrorBudgetBurn
+        expr: (
+          1 - (
+            sum(rate(http_requests_total{status!~"5.*"}[5m])) /
+            sum(rate(http_requests_total[5m]))
+          )
+        ) > 0.01  # 1% error rate
+        for: 5m
+        labels:
+          severity: warning
+          team: sre
+        annotations:
+          summary: "SLO error budget burning fast"
+          description: "Error rate is {{ $value | humanizePercentage }}, burning through error budget."
+          runbook: "https://runbooks.cks-portal.com/slo-error-budget"
+
+      - alert: SLOLatencyBudgetBurn
+        expr: histogram_quantile(0.99, rate(http_request_duration_seconds_bucket[5m])) > 5
+        for: 5m
+        labels:
+          severity: warning
+          team: sre
+        annotations:
+          summary: "SLO latency budget burning"
+          description: "99th percentile latency is {{ $value }}s, exceeding SLO."
+          runbook: "https://runbooks.cks-portal.com/slo-latency-budget"
+
+  - name: cks-portal-security
+    interval: 60s
+    rules:
+      # Security Alerts
+      - alert: SuspiciousLoginActivity
+        expr: increase(login_attempts_total{result="failed"}[10m]) > 10
+        for: 1m
+        labels:
+          severity: warning
+          team: security
+        annotations:
+          summary: "Suspicious login activity detected"
+          description: "{{ $value }} failed login attempts in the last 10 minutes from {{ $labels.source_ip }}."
+          runbook: "https://runbooks.cks-portal.com/suspicious-login"
+
+      - alert: UnauthorizedAPIAccess
+        expr: increase(http_requests_total{status="401"}[5m]) > 20
+        for: 2m
+        labels:
+          severity: warning
+          team: security
+        annotations:
+          summary: "High number of unauthorized API requests"
+          description: "{{ $value }} unauthorized API requests in the last 5 minutes."
+          runbook: "https://runbooks.cks-portal.com/unauthorized-access"

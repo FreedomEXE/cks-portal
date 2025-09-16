@@ -1,0 +1,64 @@
+{
+  "project": {
+    "name": "CKS Portal Next",
+    "description": "CKS Portal monorepo with modern architecture",
+    "type": "monorepo"
+  },
+  "workspace": {
+    "packages": [
+      "Frontend",
+      "Backend",
+      "Auth",
+      "Gateway",
+      "packages/ui",
+      "packages/domain-widgets",
+      "Shared",
+      "Database"
+    ],
+    "entryPoints": {
+      "frontend": "Frontend/src/main.tsx",
+      "backend": "Backend/server/index.ts",
+      "gateway": "Gateway/src/index.ts",
+      "worker": "Backend/core/workers/index.ts"
+    }
+  },
+  "architecture": {
+    "patterns": ["Domain-Driven Design", "CQRS", "Event Sourcing", "RBAC"],
+    "boundaries": {
+      "Frontend": ["Auth", "packages/*", "Shared"],
+      "Backend": ["Shared", "Database"],
+      "Gateway": ["Shared"],
+      "Auth": ["Shared"]
+    }
+  },
+  "development": {
+    "preferredCommands": {
+      "dev": "pnpm run dev",
+      "build": "pnpm run build",
+      "test": "pnpm run test",
+      "typecheck": "pnpm run typecheck",
+      "lint": "pnpm run lint"
+    },
+    "importantFiles": [
+      "docs/Architecture.md",
+      "docs/DomainDesign.md",
+      "docs/Authentication.md",
+      "Shared/roles/schema.ts",
+      "Backend/core/auth/authenticate.ts",
+      "Frontend/src/hubs/",
+      "Database/migrations/",
+      "Shared/contracts/"
+    ]
+  },
+  "prompts": {
+    "codeReview": "Review this code for CKS Portal standards: security, performance, maintainability, and architecture compliance",
+    "domainAnalysis": "Analyze this domain implementation against DDD principles and CKS business requirements",
+    "roleSystem": "Evaluate this role/permission implementation for correctness and security"
+  },
+  "conventions": {
+    "fileHeaders": "Use CKS standard headers with Property of CKS © 2025",
+    "naming": "Use PascalCase for components, camelCase for functions, kebab-case for files",
+    "imports": "Absolute imports preferred, respect package boundaries",
+    "testing": "Unit tests for business logic, integration tests for APIs, e2e for critical flows"
+  }
+}

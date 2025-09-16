@@ -1,0 +1,59 @@
+#-----------------------------------------------
+#  Property of CKS  © 2025
+#-----------------------------------------------
+# File: .gitattributes
+#
+# Description:
+# Normalize line endings (LF) and text handling
+#
+# Responsibilities:
+# - Ensure consistent line endings across platforms
+# - Handle binary files properly
+#
+# Role in system:
+# - Used by Git to normalize file handling
+#
+# Notes:
+# Prevents CRLF/LF issues in cross-platform development
+#-----------------------------------------------
+#  Manifested by Freedom_EXE
+#-----------------------------------------------
+
+# Set default behavior for text files
+* text=auto
+
+# Explicitly declare text files
+*.ts text
+*.tsx text
+*.js text
+*.jsx text
+*.json text
+*.md text
+*.yml text
+*.yaml text
+*.sql text
+*.html text
+*.css text
+*.scss text
+*.toml text
+
+# Ensure line endings are LF
+*.ts eol=lf
+*.tsx eol=lf
+*.js eol=lf
+*.jsx eol=lf
+*.json eol=lf
+
+# Declare files that should always have LF line endings on checkout
+*.sh eol=lf
+
+# Denote binary files
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary

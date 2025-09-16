@@ -1,0 +1,62 @@
+#-----------------------------------------------
+#  Property of CKS  © 2025
+#-----------------------------------------------
+# File: .prettierignore
+#
+# Description:
+# Files and directories excluded from Prettier formatting
+#
+# Responsibilities:
+# - Exclude build outputs and dependencies from formatting
+# - Preserve manually formatted files
+#
+# Role in system:
+# - Used by Prettier to skip certain files/directories
+#
+# Notes:
+# Keep in sync with .gitignore for consistency
+#-----------------------------------------------
+#  Manifested by Freedom_EXE
+#-----------------------------------------------
+
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build outputs
+dist/
+build/
+coverage/
+.nyc_output/
+
+# Generated files
+*.tsbuildinfo
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+
+# Database files
+*.sql
+Database/migrations/*.sql
+Database/rls/*.sql
+
+# Generated contracts and types
+Shared/contracts/openapi.json
+**/roles/**/config.ts
+Frontend/src/roles/
+
+# Logs
+*.log
+logs/
+
+# Environment files
+.env*
+
+# IDE files
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db

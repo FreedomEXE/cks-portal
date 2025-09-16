@@ -21,6 +21,66 @@ CKS-Portal/                                 # Monorepo root (pnpm workspaces, pr
   Dockerfile.frontend                        # Frontend container (Vite app)
   Dockerfile.worker                          # Worker container
 
+  packages/                                  # Shared packages (NEW LOCATION)
+    ui/                                      # Pure UI components - role agnostic
+      package.json                           # UI package deps/scripts
+      tsconfig.json                          # TS config for UI package
+      src/
+        navigation/
+          MyHubSection/                      # Shared hub navigation component
+            MyHubSection.tsx                 # Main nav bar with tabs and logout
+            MyHubSection.stories.tsx         # Storybook stories
+            MyHubSection.test.tsx            # Component tests
+            index.ts                         # Barrel export
+        buttons/
+          Button/                            # Generic button component
+          LogoutButton/                      # Logout button used across hubs
+        cards/
+          InfoCard/                          # Dashboard metric display cards
+          Card/                              # Base card component
+        tables/
+          DataTable/                         # Generic data table
+          DataListBox/                       # List view for services/orders
+        forms/
+          Input/                             # Form input component
+          Select/                            # Dropdown select
+          Form/                              # Form wrapper with validation
+        feedback/
+          Toast/                             # Toast notifications
+          Modal/                             # Modal dialogs
+          EmptyState/                        # Empty state displays
+        layout/
+          PageHeader/                        # Page title sections
+          TabContainer/                      # Tab layout wrapper
+    domain-widgets/                          # Business logic components - role aware but agnostic
+      package.json                           # Domain widgets deps/scripts
+      tsconfig.json                          # TS config for domain widgets
+      src/
+        orders/
+          OrderList/                         # Order listing component
+            OrderList.tsx                    # Main component
+            OrderList.test.tsx               # Tests
+            index.ts                         # Export
+          OrderApprovalTree/                 # Approval workflow display
+          OrderDetail/                       # Order detail view
+        reports/
+          ReportsCard/                       # Reports listing card
+          ReportCreator/                     # Report creation form
+        activity/
+          ActivityFeed/                      # Recent activity display
+          ActivityItem/                      # Individual activity entry
+        ecosystem/
+          EcosystemTreeView/                 # Hierarchical org display
+        inventory/
+          InventoryTable/                    # Inventory management table
+          StockIndicator/                    # Stock level badges
+        services/
+          ServiceList/                       # Service listing
+          ServiceCard/                       # Service display card
+        support/
+          SupportTicket/                     # Support ticket display
+          FAQSection/                        # FAQ accordion
+
   infra/                                     # IaC (Terraform/Pulumi)
     main.tf                                  # Core infra resources
     variables.tf                             # Terraform variables
@@ -77,6 +137,7 @@ CKS-Portal/                                 # Monorepo root (pnpm workspaces, pr
     Codegen.md                               # Contracts/roles generation and drift checks
     FASTIFY-CUTOVER-CHECKLIST.md             # Stepwise Express→Fastify cutover plan
     GatewayCutoverPlan.md                    # Staged gateway rollout and toggles
+    ComponentArchitecture.md                 # Shared vs role-specific component guidelines
 
   Auth/                                      # Auth package (Clerk provider + hooks/UI)
     package.json                             # Auth package scripts/deps
@@ -260,16 +321,40 @@ CKS-Portal/                                 # Monorepo root (pnpm workspaces, pr
       auth/
         AuthWrapper.tsx                        # Wrap app with Auth provider
         useCustomId.ts                         # Read external ID from context
-      hub/
-        RoleHub.tsx                            # Role-based hub renderer
-        roleConfigLoader.ts                    # Loader for role configs
-      shared/
-        api/base.ts                            # API client base (fetch/axios)
-        components/{Dashboard.tsx,Directory.tsx,Profile.tsx,Orders.tsx,Reports.tsx,Support.tsx,Assign.tsx,Archive.tsx} # Shared UI
-        catalog/{CatalogContext.tsx,CatalogViewer.tsx} # Catalog overlay
-        schemas/roleConfig.ts                  # Zod schema for role configs
-        types/api.d.ts                         # Frontend API types
-        utils/customIdParser.ts                # Parse external ID on FE
+      hubs/                                    # Hub orchestration layer (NEW)
+        AdminHub.tsx                           # Admin hub orchestrator combining config + components
+        ManagerHub.tsx                         # Manager hub orchestrator
+        ContractorHub.tsx                      # Contractor hub orchestrator
+        CustomerHub.tsx                        # Customer hub orchestrator
+        CenterHub.tsx                          # Center hub orchestrator
+        CrewHub.tsx                            # Crew hub orchestrator
+        WarehouseHub.tsx                       # Warehouse hub orchestrator
+      features/                                # Feature-specific components (NEW)
+        admin/                                 # Admin-only features
+          CreateUsers.tsx                      # User creation form with role-specific fields
+          AssignRoles.tsx                      # Role assignment interface
+          SystemMetrics.tsx                    # System-wide metrics dashboard
+          AuditLogs.tsx                        # Audit log viewer
+        manager/                               # Manager-only features
+          MyEcosystem.tsx                      # Manager's territory hierarchy view
+          ServiceCertification.tsx             # Manager training/certification tracker
+          TeamPerformance.tsx                  # Team performance metrics
+        contractor/                            # Contractor-only features
+          CompanyProfile.tsx                   # Contractor company profile management
+          AccountManager.tsx                   # CKS account manager display
+        warehouse/                             # Warehouse-only features
+          InventoryManager.tsx                  # Inventory management interface
+          DeliveryScheduler.tsx                # Delivery scheduling system
+          StockAlerts.tsx                      # Low stock alert management
+        crew/                                  # Crew-only features
+          TimeClockWidget.tsx                  # Clock in/out interface
+          TaskList.tsx                         # Crew task assignments
+        shared/                                # Features used by multiple roles
+          OrderManager.tsx                      # Order management (used by multiple)
+          ReportsViewer.tsx                     # Reports viewing (used by multiple)
+          ServicesCatalog.tsx                   # Service catalog browser
+          SupportCenter.tsx                     # Support ticket interface
+          ProfileManager.tsx                    # User profile management
       roles/                                   # GENERATED from Shared/roles (do not edit)
         admin/{index.ts,config.v1.json}
         manager/{index.ts,config.v1.json}

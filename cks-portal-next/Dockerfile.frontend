@@ -1,0 +1,122 @@
+#-----------------------------------------------
+#  Property of CKS  © 2025
+#-----------------------------------------------
+# File: Dockerfile.frontend
+#
+# Description:
+# Frontend container (Vite app) with multi-stage build and nginx
+#
+# Responsibilities:
+# - Build optimized Frontend production bundle
+# - Serve static assets with nginx
+#
+# Role in system:
+# - Used to containerize the Frontend application
+#
+# Notes:
+# Uses nginx for production serving with gzip and caching
+#-----------------------------------------------
+#  Manifested by Freedom_EXE
+#-----------------------------------------------
+
+# Build stage
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# Install pnpm
+RUN npm install -g pnpm@8
+
+# Copy workspace configuration
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
+
+# Copy package files for dependency resolution
+COPY Frontend/package.json ./Frontend/
+COPY Auth/package.json ./Auth/
+COPY packages/*/package.json ./packages/
+COPY Shared/package.json ./Shared/
+
+# Install all dependencies
+RUN pnpm install --frozen-lockfile
+
+# Copy source code
+COPY Frontend/ ./Frontend/
+COPY Auth/ ./Auth/
+COPY packages/ ./packages/
+COPY Shared/ ./Shared/
+
+# Build the frontend
+RUN pnpm run build:frontend
+
+# Production stage with nginx
+FROM nginx:alpine AS production
+
+# Copy nginx configuration
+COPY <<EOF /etc/nginx/conf.d/default.conf
+server {
+    listen 80;
+    server_name localhost;
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # Gzip compression
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 1024;
+    gzip_types
+        text/plain
+        text/css
+        text/xml
+        text/javascript
+        application/javascript
+        application/xml+rss
+        application/json;
+
+    # Cache static assets
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+
+    # Handle client-side routing
+    location / {
+        try_files \$uri \$uri/ /index.html;
+        add_header X-Frame-Options "SAMEORIGIN" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-XSS-Protection "1; mode=block" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    }
+
+    # Health check endpoint
+    location /healthz {
+        access_log off;
+        return 200 "OK\n";
+        add_header Content-Type text/plain;
+    }
+}
+EOF
+
+# Copy built application
+COPY --from=builder /app/Frontend/dist /usr/share/nginx/html
+
+# Create non-root user
+RUN addgroup -g 1001 -S nginx_group && \
+    adduser -S nginx_user -u 1001 -G nginx_group
+
+# Adjust nginx to run as non-root
+RUN sed -i 's/user  nginx;/user  nginx_user;/' /etc/nginx/nginx.conf && \
+    touch /var/run/nginx.pid && \
+    chown -R nginx_user:nginx_group /var/cache/nginx /var/run/nginx.pid /usr/share/nginx/html
+
+# Switch to non-root user
+USER nginx_user
+
+# Expose port
+EXPOSE 80
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost/healthz || exit 1
+
+# Start nginx
+CMD ["nginx", "-g", "daemon off;"]

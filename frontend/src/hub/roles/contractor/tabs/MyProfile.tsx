@@ -16,6 +16,8 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import ProfileSection from '../../../../shared/components/ProfileSection';
+import SubNavigationTabs from '../../../../shared/components/SubNavigationTabs';
 
 interface MyProfileProps {
   userId: string;
@@ -25,7 +27,8 @@ interface MyProfileProps {
 }
 
 export default function MyProfile({ userId, config, features, api }: MyProfileProps) {
-  const [activeTab, setActiveTab] = useState(0);
+  // Sub-tabs: 'profile' | 'account' | 'settings'
+  const [activeTab, setActiveTab] = useState<'profile' | 'account' | 'settings'>('profile');
   const [profileData, setProfileData] = useState<any>(null);
   const [managerProfile, setManagerProfile] = useState<any>(null);
   const [managerLoading, setManagerLoading] = useState(false);
@@ -51,7 +54,7 @@ export default function MyProfile({ userId, config, features, api }: MyProfilePr
 
   // Load manager profile when Account Manager tab is active
   useEffect(() => {
-    if (activeTab !== 1 || !profileData?.cks_manager) return;
+    if (activeTab !== 'account' || !profileData?.cks_manager) return;
     
     const loadManagerProfile = async () => {
       try {
@@ -108,123 +111,75 @@ export default function MyProfile({ userId, config, features, api }: MyProfilePr
     <div>
       <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Company Profile</h2>
       
-      {/* Profile Tabs */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
-        {['Profile', 'Account Manager', 'Settings'].map((tab, i) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(i)}
-            style={{
-              padding: '8px 16px',
-              borderRadius: 6,
-              border: '1px solid #e5e7eb',
-              background: activeTab === i ? '#10b981' : 'white',
-              color: activeTab === i ? 'white' : '#111827',
-              fontSize: 14,
-              fontWeight: 500,
-              cursor: 'pointer',
-              transition: 'all 0.2s ease'
-            }}
-          >
-            {tab}
-          </button>
-        ))}
-      </div>
+      {/* Sub-tabs (Profile / Account Manager / Settings) */}
+      <SubNavigationTabs
+        tabs={[
+          { key: 'profile', label: 'Profile' },
+          { key: 'account', label: 'Account Manager' },
+          { key: 'settings', label: 'Settings' },
+        ]}
+        active={activeTab}
+        onTabChange={(k) => setActiveTab(k as any)}
+      />
 
       {/* Profile Content */}
       <div className="ui-card" style={{ padding: 24 }}>
-        {activeTab === 0 && (
+        {activeTab === 'profile' && (
           <div style={{ display: 'flex', gap: 32 }}>
-            {/* Profile Photo - Left Side */}
+            {/* Profile Photo - Left Side (contractor-specific control remains) */}
             <div style={{ textAlign: 'center' }}>
-              <div style={{
-                width: 150,
-                height: 150,
-                borderRadius: '50%',
-                background: '#f3f4f6',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: 48,
-                color: '#6b7280',
-                fontWeight: 'bold',
-                marginBottom: 16
-              }}>
-                {companyName.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2) || 'PC'}
+              <div
+                style={{
+                  width: 150,
+                  height: 150,
+                  borderRadius: '50%',
+                  background: '#f3f4f6',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 48,
+                  color: '#6b7280',
+                  fontWeight: 'bold',
+                  marginBottom: 16,
+                }}
+              >
+                {companyName.split(' ').map((n) => n[0]).join('').toUpperCase().substring(0, 2) || 'PC'}
               </div>
-              <button style={{
-                padding: '8px 16px',
-                background: 'white',
-                color: '#6b7280',
-                border: '1px solid #e5e7eb',
-                borderRadius: 6,
-                fontSize: 14,
-                fontWeight: 500,
-                cursor: 'pointer'
-              }}>
+              <button
+                style={{
+                  padding: '8px 16px',
+                  background: 'white',
+                  color: '#6b7280',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: 6,
+                  fontSize: 14,
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                }}
+              >
                 Update Photo
               </button>
             </div>
 
-            {/* Profile Info Grid - Right Side */}
+            {/* Generic profile section (shared) */}
             <div style={{ flex: 1 }}>
-              <table style={{ width: '100%', borderSpacing: '0 16px' }}>
-                <tbody>
-                  <tr>
-                    <td style={{ fontSize: 16, color: '#111827', fontWeight: 500, width: '200px', verticalAlign: 'top' }}>
-                      Company Name
-                    </td>
-                    <td style={{ fontSize: 16, color: '#111827' }}>
-                      {profileData.company_name}
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style={{ fontSize: 16, color: '#111827', fontWeight: 500, verticalAlign: 'top' }}>
-                      Contractor ID
-                    </td>
-                    <td style={{ fontSize: 16, color: '#111827' }}>
-                      {profileData.contractor_id}
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style={{ fontSize: 16, color: '#111827', fontWeight: 500, verticalAlign: 'top' }}>
-                      Main Contact
-                    </td>
-                    <td style={{ fontSize: 16, color: '#111827' }}>
-                      {profileData.main_contact}
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style={{ fontSize: 16, color: '#111827', fontWeight: 500, verticalAlign: 'top' }}>
-                      Email
-                    </td>
-                    <td style={{ fontSize: 16, color: '#111827' }}>
-                      {profileData.email}
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style={{ fontSize: 16, color: '#111827', fontWeight: 500, verticalAlign: 'top' }}>
-                      Phone
-                    </td>
-                    <td style={{ fontSize: 16, color: '#111827' }}>
-                      {profileData.phone}
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style={{ fontSize: 16, color: '#111827', fontWeight: 500, verticalAlign: 'top' }}>
-                      Start Date
-                    </td>
-                    <td style={{ fontSize: 16, color: '#111827' }}>
-                      {formatDate(profileData.contract_start_date)}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+              <ProfileSection
+                user={{
+                  name: profileData.main_contact,
+                  companyName: profileData.company_name,
+                  email: profileData.email,
+                  phone: profileData.phone,
+                  website: profileData.website,
+                }}
+                customId={profileData.contractor_id}
+                role={'contractor'}
+                config={config}
+              />
             </div>
           </div>
         )}
 
-        {activeTab === 1 && (
+        {activeTab === 'account' && (
           <div>
             <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 16, color: '#10b981' }}>CKS Account Manager</h3>
             
@@ -323,6 +278,14 @@ export default function MyProfile({ userId, config, features, api }: MyProfilePr
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {activeTab === 'settings' && (
+          <div>
+            <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 16, color: '#10b981' }}>Settings</h3>
+            {/* Contractor-specific settings UI remains unchanged; placeholder below */}
+            <div style={{ color: '#6b7280' }}>Settings content will be rendered here.</div>
           </div>
         )}
 

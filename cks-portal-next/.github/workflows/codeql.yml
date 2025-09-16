@@ -1,0 +1,37 @@
+/*───────────────────────────────────────────────
+  Property of CKS  © 2025
+───────────────────────────────────────────────*/
+/**
+ * File: codeql.yml
+ *
+ * Description:
+ * codeql.yml implementation
+ *
+ * Responsibilities:
+ * - Provide codeql.yml functionality
+ *
+ * Role in system:
+ * - Used by CKS Portal system
+ *
+ * Notes:
+ * To be implemented
+ */
+/*───────────────────────────────────────────────
+  Manifested by Freedom_EXE
+───────────────────────────────────────────────*/
+
+name: CodeQL Security Analysis
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '0 0 * * 0'
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: github/codeql-action/init@v2
+      - uses: github/codeql-action/analyze@v2

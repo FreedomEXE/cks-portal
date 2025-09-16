@@ -1,0 +1,8 @@
+# provenance.yml
+# SLSA build provenance
+
+name: provenance
+
+jobs:
+  todo:
+    runs-on: ubuntu-latest

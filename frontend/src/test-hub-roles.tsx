@@ -17,6 +17,7 @@
 
 import React, { useState } from 'react';
 import RoleHub from './hub/RoleHub';
+import ProfileComparison from './test-interface/components/ProfileComparison';
 
 // Available test roles
 type TestRole = 'manager' | 'contractor' | 'customer' | 'center' | 'crew' | 'warehouse' | 'admin';
@@ -185,6 +186,7 @@ const testUsers: Record<TestRole, TestUserData> = {
 
 export default function TestHubRoles() {
   const [selectedRole, setSelectedRole] = useState<TestRole>('manager');
+  const [showProfileComparison, setShowProfileComparison] = useState<boolean>(false);
   const currentUser = testUsers[selectedRole];
 
   return (
@@ -234,6 +236,24 @@ export default function TestHubRoles() {
             </button>
           ))}
         </div>
+
+        {/* Quick link to profile comparison */}
+        <button
+          onClick={() => setShowProfileComparison((v) => !v)}
+          style={{
+            marginLeft: '1rem',
+            padding: '0.5rem 1rem',
+            border: '1px solid #9ca3af',
+            borderRadius: '0.375rem',
+            backgroundColor: showProfileComparison ? '#10b981' : '#111827',
+            color: 'white',
+            cursor: 'pointer',
+            fontSize: '0.875rem',
+            fontWeight: 500,
+          }}
+        >
+          {showProfileComparison ? 'Hide' : 'Show'} Profile Comparison
+        </button>
         
         <div style={{ 
           color: '#9ca3af', 
@@ -246,14 +266,20 @@ export default function TestHubRoles() {
         </div>
       </div>
 
-      {/* Role Hub Container */}
-      <div style={{ flex: 1, overflow: 'hidden' }}>
-        <RoleHub 
-          userId={currentUser.id}
-          role={currentUser.role}
-          userPermissions={currentUser.permissions}
-          className={`${currentUser.role}-hub-test`}
-        />
+      {/* Role Hub Container / Comparison */}
+      <div style={{ flex: 1, overflow: 'auto' }}>
+        {showProfileComparison ? (
+          <div style={{ padding: 16 }}>
+            <ProfileComparison />
+          </div>
+        ) : (
+          <RoleHub
+            userId={currentUser.id}
+            role={currentUser.role}
+            userPermissions={currentUser.permissions}
+            className={`${currentUser.role}-hub-test`}
+          />
+        )}
       </div>
 
       {/* Debug Info Footer */}

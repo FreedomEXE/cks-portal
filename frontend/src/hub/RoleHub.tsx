@@ -4,6 +4,7 @@
  */
 
 import React, { useEffect, useMemo, useState } from 'react';
+import NavigationTabs, { Tab as NavTab } from '../shared/components/NavigationTabs';
 // Import OG logo from repo docs so the test login can display it
 // Vite dev server is configured to allow fs access above project root
 // Path: repo/docs/images/cks-logo.png
@@ -248,30 +249,12 @@ export default function RoleHub({ userId, role, userPermissions = [], className 
           <div style={{ fontSize: 14, color: '#6b7280', marginBottom: 16 }}>Welcome to {config.displayName}</div>
 
           {/* Tabs */}
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {availableTabs.map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                style={{
-                  padding: '8px 16px',
-                  border: 'none',
-                  borderRadius: 6,
-                  background: activeTab === tab.id ? (config.theme?.accentColor || config.theme.primaryColor) : '#f3f4f6',
-                  color: activeTab === tab.id ? 'white' : '#374151',
-                  fontSize: 14,
-                  fontWeight: 500,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease',
-                  boxShadow: activeTab === tab.id
-                    ? `inset 0 -2px 0 0 ${config.theme?.accentColor || config.theme.primaryColor}`
-                    : 'inset 0 -2px 0 0 transparent'
-                }}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
+          <NavigationTabs
+            tabs={availableTabs.map<NavTab>((t) => ({ key: t.id, label: t.label, icon: t.icon, requires: t.requires }))}
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            accentColor={config.theme?.accentColor || config.theme.primaryColor}
+          />
         </div>
       </div>
 

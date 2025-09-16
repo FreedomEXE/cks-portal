@@ -28,13 +28,14 @@ jobs:
       - name: Install
         run: |
           cd Backend
-          npm ci
+          npm install
       - name: Build
         run: |
           cd Backend
           npm run build
 
   frontend:
+    if: ${{ hashFiles('Frontend/package.json') != '' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -44,12 +45,11 @@ jobs:
       - name: Install
         run: |
           cd Frontend
-          npm ci
+          npm install
       - name: Build
         run: |
           cd Frontend
           npm run build
-
 
 
 
