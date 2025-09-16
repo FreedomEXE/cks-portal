@@ -21,12 +21,77 @@
   Manifested by Freedom_EXE
 ───────────────────────────────────────────────*/
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import MyHubSection from '../../../packages/ui/src/navigation/MyHubSection';
 import OverviewSection from '../../../packages/domain-widgets/src/overview';
+import { RecentActivity, type Activity } from '../../../packages/domain-widgets/src/activity';
 
 export default function WarehouseHub() {
   const [activeTab, setActiveTab] = useState('dashboard');
+
+  // Add scrollbar styles
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.textContent = `
+      .hub-content-scroll::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+      .hub-content-scroll::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .hub-content-scroll::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 3px;
+      }
+      .hub-content-scroll::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
+      }
+    `;
+    document.head.appendChild(style);
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
+
+  // Mock activities for warehouse
+  const [activities, setActivities] = useState<Activity[]>([
+    {
+      id: 'act-1',
+      message: 'New shipment received: 500 units of product SKU-123',
+      timestamp: new Date(Date.now() - 15 * 60 * 1000), // 15 minutes ago
+      type: 'success',
+      metadata: { role: 'warehouse', userId: 'WHS-001', title: 'Shipment Received' }
+    },
+    {
+      id: 'act-2',
+      message: 'Low stock alert: Product SKU-456 below threshold',
+      timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
+      type: 'warning',
+      metadata: { role: 'warehouse', userId: 'WHS-001', title: 'Stock Alert' }
+    },
+    {
+      id: 'act-3',
+      message: 'Order WO-2024-089 prepared for delivery',
+      timestamp: new Date(Date.now() - 5 * 60 * 60 * 1000), // 5 hours ago
+      type: 'info',
+      metadata: { role: 'warehouse', userId: 'WHS-001', title: 'Order Prepared' }
+    },
+    {
+      id: 'act-4',
+      message: 'Inventory audit completed for Section A',
+      timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000), // 1 day ago
+      type: 'success',
+      metadata: { role: 'warehouse', userId: 'WHS-001', title: 'Audit Complete' }
+    },
+    {
+      id: 'act-5',
+      message: 'Restocking order placed for 10 items',
+      timestamp: new Date(Date.now() - 48 * 60 * 60 * 1000), // 2 days ago
+      type: 'action',
+      metadata: { role: 'warehouse', userId: 'WHS-001', title: 'Restock Ordered' }
+    }
+  ]);
 
     const tabs = [
     { id: 'dashboard', label: 'Dashboard', path: '/warehouse/dashboard' },
@@ -75,14 +140,28 @@ export default function WarehouseHub() {
       />
 
       {/* Content Area */}
-      <div style={{ flex: 1, overflow: 'auto', padding: '24px' }}>
+      <div style={{
+        flex: 1,
+        overflow: 'auto',
+        padding: '24px',
+        scrollbarWidth: 'thin',
+        scrollbarColor: '#94a3b8 transparent'
+      }} className="hub-content-scroll">
         <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
           {activeTab === 'dashboard' ? (
-            <OverviewSection
-              cards={overviewCards}
-              data={overviewData}
-              title="Warehouse Overview"
-            />
+            <>
+              <OverviewSection
+                cards={overviewCards}
+                data={overviewData}
+                title="Overview"
+              />
+              <RecentActivity
+                activities={activities}
+                onClear={() => setActivities([])}
+                title="Recent Activity"
+                emptyMessage="No recent warehouse activity"
+              />
+            </>
           ) : (
             <>
               <h2>Warehouse Hub - {activeTab}</h2>

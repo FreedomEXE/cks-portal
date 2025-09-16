@@ -5,10 +5,10 @@
  * File: OverviewSection.tsx
  *
  * Description:
- * Renders a grid of InfoCards for overview dashboards
+ * Renders a grid of OverviewCards for overview dashboards
  *
  * Responsibilities:
- * - Map card configurations to InfoCard components
+ * - Map card configurations to OverviewCard components
  * - Handle responsive grid layout
  * - Pass data values to individual cards
  * - Support loading states for all cards
@@ -24,7 +24,7 @@
 ───────────────────────────────────────────────*/
 
 import React from 'react';
-import InfoCard from '../../../ui/src/cards/InfoCard';
+import OverviewCard from '../../../ui/src/cards/OverviewCard';
 
 export interface CardConfig {
   id: string;
@@ -70,7 +70,7 @@ export default function OverviewSection({
           const displayValue = value !== undefined ? value : '-';
 
           return (
-            <InfoCard
+            <OverviewCard
               key={card.id}
               title={card.title}
               value={displayValue}

@@ -24,8 +24,8 @@
 // Overview
 export * from './overview';
 
-// Orders
-export * from './orders/OrderList';
+// Orders (placeholder exports)
+// export * from './orders/OrderList';
 // export * from './orders/OrderApprovalTree';
 // export * from './orders/OrderDetail';
 
@@ -33,9 +33,8 @@ export * from './orders/OrderList';
 // export * from './reports/ReportsCard';
 // export * from './reports/ReportCreator';
 
-// Activity (placeholder exports)
-// export * from './activity/ActivityFeed';
-// export * from './activity/ActivityItem';
+// Activity
+export * from './activity';
 
 // Ecosystem (placeholder exports)
 // export * from './ecosystem/EcosystemTreeView';

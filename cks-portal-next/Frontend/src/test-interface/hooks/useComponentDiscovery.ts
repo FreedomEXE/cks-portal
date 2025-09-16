@@ -39,125 +39,164 @@ export function useComponentDiscovery(selectedRole: string) {
   useEffect(() => {
     const discovered: ComponentInfo[] = [];
 
+    // Track already discovered component names to avoid duplicates
+    const discoveredNames = new Set<string>();
+
     // Always add the current hub
+    const hubName = `${selectedRole.charAt(0).toUpperCase() + selectedRole.slice(1)}Hub`;
     discovered.push({
-      name: `${selectedRole.charAt(0).toUpperCase() + selectedRole.slice(1)}Hub`,
-      location: `Frontend/src/hubs/${selectedRole.charAt(0).toUpperCase() + selectedRole.slice(1)}Hub.tsx`,
+      name: hubName,
+      location: `Frontend/src/hubs/${hubName}.tsx`,
       type: 'hub',
       status: 'loaded'
     });
+    discoveredNames.add(hubName);
 
-    // Known components (fallback if glob doesn't work)
-    const knownComponents = [
-      { name: 'MyHubSection', location: 'packages/ui/src/navigation/MyHubSection', type: 'ui' as const },
-      { name: 'InfoCard', location: 'packages/ui/src/cards/InfoCard', type: 'ui' as const },
-      { name: 'OverviewSection', location: 'packages/domain-widgets/src/overview', type: 'domain' as const },
-    ];
-
-    // Add known components
-    knownComponents.forEach(comp => {
-      discovered.push({
-        ...comp,
-        status: 'loaded'
-      });
-    });
-
-    // Try to discover more UI components dynamically
+    // Discover UI components dynamically
     try {
       const uiModules = import.meta.glob('../../../../packages/ui/src/**/*.tsx', { eager: false });
       Object.keys(uiModules).forEach(path => {
-        // Extract component name from path
-        const parts = path.split('/');
-        const componentFolder = parts[parts.length - 2];
-        const fileName = parts[parts.length - 1];
-
         // Skip test files, stories, and index files
-        if (!fileName.includes('.test.') &&
-            !fileName.includes('.stories.') &&
-            !fileName.includes('index.') &&
-            fileName.endsWith('.tsx')) {
+        if (path.includes('.test.') || path.includes('.stories.') || path.includes('/index.')) {
+          return;
+        }
 
-          const componentName = fileName.replace('.tsx', '');
-          // Only add if it's a main component file and not already in known components
-          if ((componentName === componentFolder || fileName === `${componentFolder}.tsx`) &&
-              !knownComponents.some(kc => kc.name === componentFolder)) {
-            discovered.push({
-              name: componentFolder,
-              location: `packages/ui/src${path.split('packages/ui/src')[1] || ''}`,
-              type: 'ui',
-              status: 'loaded'
-            });
+        // Extract meaningful component name from the path
+        const cleanPath = path.replace('../../../../packages/ui/src/', '');
+        const parts = cleanPath.split('/');
+
+        // Look for main component files (e.g., InfoCard/InfoCard.tsx or MyComponent.tsx)
+        const fileName = parts[parts.length - 1].replace('.tsx', '');
+
+        // Determine component name based on path structure
+        let componentName = '';
+        let componentPath = '';
+
+        if (parts.length >= 2) {
+          // Nested component (e.g., cards/InfoCard/InfoCard.tsx)
+          const folderName = parts[parts.length - 2];
+          if (fileName === folderName || fileName === 'index') {
+            componentName = folderName;
+            componentPath = cleanPath.substring(0, cleanPath.lastIndexOf('/'));
+          } else if (parts.length === 2 && fileName !== 'index') {
+            // Direct file in category folder (e.g., navigation/MyHubSection.tsx)
+            componentName = fileName;
+            componentPath = cleanPath.replace('.tsx', '');
           }
+        } else if (parts.length === 1 && fileName !== 'index') {
+          // Root level component
+          componentName = fileName;
+          componentPath = cleanPath.replace('.tsx', '');
+        }
+
+        // Add if we found a valid component and haven't seen it before
+        if (componentName && !discoveredNames.has(componentName)) {
+          discovered.push({
+            name: componentName,
+            location: `packages/ui/src/${componentPath}`,
+            type: 'ui',
+            status: 'loaded'
+          });
+          discoveredNames.add(componentName);
         }
       });
     } catch (e) {
-      console.log('Dynamic UI discovery not available, using known components');
+      console.log('Dynamic UI discovery error:', e);
     }
 
-    // Try to discover Domain Widget components dynamically
+    // Discover Domain Widget components dynamically
     try {
       const domainModules = import.meta.glob('../../../../packages/domain-widgets/src/**/*.tsx', { eager: false });
+      console.log('[Component Discovery] Found domain module paths:', Object.keys(domainModules));
       Object.keys(domainModules).forEach(path => {
-        const parts = path.split('/');
-        const componentFolder = parts[parts.length - 2];
-        const fileName = parts[parts.length - 1];
+        // Skip test files, stories, and index files
+        if (path.includes('.test.') || path.includes('.stories.') || path.includes('/index.')) {
+          return;
+        }
 
-        if (!fileName.includes('.test.') &&
-            !fileName.includes('.stories.') &&
-            !fileName.includes('index.') &&
-            fileName.endsWith('.tsx')) {
+        // Extract meaningful component name from the path
+        const cleanPath = path.replace('../../../../packages/domain-widgets/src/', '');
+        const parts = cleanPath.split('/');
 
-          const componentName = fileName.replace('.tsx', '');
-          if ((componentName === componentFolder || fileName === `${componentFolder}.tsx`) &&
-              !knownComponents.some(kc => kc.name === componentFolder)) {
-            discovered.push({
-              name: componentFolder,
-              location: `packages/domain-widgets/src${path.split('packages/domain-widgets/src')[1] || ''}`,
-              type: 'domain',
-              status: 'loaded'
-            });
+        // Look for main component files
+        const fileName = parts[parts.length - 1].replace('.tsx', '');
+
+        // Determine component name based on path structure
+        let componentName = '';
+        let componentPath = '';
+
+        if (parts.length >= 2) {
+          // Could be nested like activity/RecentActivity/RecentActivity.tsx
+          const folderName = parts[parts.length - 2];
+          if (fileName === folderName) {
+            // This is the main component file
+            componentName = folderName;
+            componentPath = cleanPath.substring(0, cleanPath.lastIndexOf('/'));
+          } else if (parts.length === 3 && parts[1] === folderName && fileName === folderName) {
+            // Deep nesting like activity/RecentActivity/RecentActivity.tsx
+            componentName = folderName;
+            componentPath = cleanPath.substring(0, cleanPath.lastIndexOf('/'));
+          } else if (parts.length === 1 || (parts.length === 2 && fileName !== 'index')) {
+            // Simple structure like overview/OverviewSection.tsx or OverviewSection.tsx
+            componentName = fileName;
+            componentPath = cleanPath.replace('.tsx', '');
           }
+        } else if (fileName !== 'index') {
+          // Root level component
+          componentName = fileName;
+          componentPath = cleanPath.replace('.tsx', '');
+        }
+
+        // Add if we found a valid component and haven't seen it before
+        if (componentName && !discoveredNames.has(componentName)) {
+          console.log('[Component Discovery] Adding domain component:', componentName, 'at', componentPath);
+          discovered.push({
+            name: componentName,
+            location: `packages/domain-widgets/src/${componentPath}`,
+            type: 'domain',
+            status: 'loaded'
+          });
+          discoveredNames.add(componentName);
         }
       });
     } catch (e) {
-      console.log('Dynamic domain discovery not available, using known components');
+      console.log('Dynamic domain discovery error:', e);
     }
 
-    // Try to discover Feature components for current role
+    // Discover Feature components for current role
     try {
       const featureModules = import.meta.glob('../../features/**/*.tsx', { eager: false });
       Object.keys(featureModules).forEach(path => {
         // Check if it's for the current role or shared
         if (path.includes(`/${selectedRole}/`) || path.includes('/shared/')) {
-          const parts = path.split('/');
-          const fileName = parts[parts.length - 1];
+          if (path.includes('.test.') || path.includes('.stories.') || path.includes('/index.')) {
+            return;
+          }
 
-          if (!fileName.includes('.test.') &&
-              !fileName.includes('.stories.') &&
-              !fileName.includes('index.') &&
-              fileName.endsWith('.tsx')) {
+          const cleanPath = path.replace('../../features/', '');
+          const parts = cleanPath.split('/');
+          const fileName = parts[parts.length - 1].replace('.tsx', '');
 
-            const componentName = fileName.replace('.tsx', '');
+          if (fileName && !discoveredNames.has(fileName)) {
             discovered.push({
-              name: componentName,
-              location: `Frontend/src/features${path.split('../features')[1] || ''}`,
+              name: fileName,
+              location: `Frontend/src/features/${cleanPath}`,
               type: 'feature',
               status: 'loaded'
             });
+            discoveredNames.add(fileName);
           }
         }
       });
     } catch (e) {
-      console.log('Dynamic feature discovery not available');
+      console.log('Dynamic feature discovery error:', e);
     }
 
-    // Remove duplicates based on name
-    const uniqueComponents = discovered.filter((component, index, self) =>
-      index === self.findIndex((c) => c.name === component.name)
-    );
+    console.log('[Component Discovery] Total discovered:', discovered.length, 'components');
+    console.log('[Component Discovery] Components:', discovered.map(c => `${c.name} (${c.type})`).join(', '));
 
-    setComponents(uniqueComponents);
-    setComponentCount(uniqueComponents.length);
+    setComponents(discovered);
+    setComponentCount(discovered.length);
   }, [selectedRole]);
 
   return { components, componentCount };

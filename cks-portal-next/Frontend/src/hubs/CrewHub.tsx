@@ -21,12 +21,77 @@
   Manifested by Freedom_EXE
 ───────────────────────────────────────────────*/
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import MyHubSection from '../../../packages/ui/src/navigation/MyHubSection';
 import OverviewSection from '../../../packages/domain-widgets/src/overview';
+import { RecentActivity, type Activity } from '../../../packages/domain-widgets/src/activity';
 
 export default function CrewHub() {
   const [activeTab, setActiveTab] = useState('dashboard');
+
+  // Add scrollbar styles
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.textContent = `
+      .hub-content-scroll::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+      .hub-content-scroll::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .hub-content-scroll::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 3px;
+      }
+      .hub-content-scroll::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
+      }
+    `;
+    document.head.appendChild(style);
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
+
+  // Mock activities for crew
+  const [activities, setActivities] = useState<Activity[]>([
+    {
+      id: 'act-1',
+      message: 'Assigned to new task: Service at CTR-002',
+      timestamp: new Date(Date.now() - 20 * 60 * 1000), // 20 minutes ago
+      type: 'action',
+      metadata: { role: 'crew', userId: 'CRW-001', title: 'Task Assignment' }
+    },
+    {
+      id: 'act-2',
+      message: 'Completed task: Equipment setup',
+      timestamp: new Date(Date.now() - 3 * 60 * 60 * 1000), // 3 hours ago
+      type: 'success',
+      metadata: { role: 'crew', userId: 'CRW-001', title: 'Task Completed' }
+    },
+    {
+      id: 'act-3',
+      message: 'Clocked in at 8:00 AM',
+      timestamp: new Date(Date.now() - 7 * 60 * 60 * 1000), // 7 hours ago
+      type: 'info',
+      metadata: { role: 'crew', userId: 'CRW-001', title: 'Time Entry' }
+    },
+    {
+      id: 'act-4',
+      message: 'Training module completed: Safety Procedures',
+      timestamp: new Date(Date.now() - 48 * 60 * 60 * 1000), // 2 days ago
+      type: 'success',
+      metadata: { role: 'crew', userId: 'CRW-001', title: 'Training Update' }
+    },
+    {
+      id: 'act-5',
+      message: 'Schedule updated for next week',
+      timestamp: new Date(Date.now() - 72 * 60 * 60 * 1000), // 3 days ago
+      type: 'info',
+      metadata: { role: 'crew', userId: 'CRW-001', title: 'Schedule Change' }
+    }
+  ]);
 
     const tabs = [
     { id: 'dashboard', label: 'Dashboard', path: '/crew/dashboard' },
@@ -74,14 +139,28 @@ export default function CrewHub() {
       />
 
       {/* Content Area */}
-      <div style={{ flex: 1, overflow: 'auto', padding: '24px' }}>
+      <div style={{
+        flex: 1,
+        overflow: 'auto',
+        padding: '24px',
+        scrollbarWidth: 'thin',
+        scrollbarColor: '#94a3b8 transparent'
+      }} className="hub-content-scroll">
         <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
           {activeTab === 'dashboard' ? (
-            <OverviewSection
-              cards={overviewCards}
-              data={overviewData}
-              title="Overview"
-            />
+            <>
+              <OverviewSection
+                cards={overviewCards}
+                data={overviewData}
+                title="Overview"
+              />
+              <RecentActivity
+                activities={activities}
+                onClear={() => setActivities([])}
+                title="Recent Activity"
+                emptyMessage="No recent activity"
+              />
+            </>
           ) : (
             <>
               <h2>Crew Hub - {activeTab}</h2>

@@ -24,6 +24,7 @@
 ───────────────────────────────────────────────*/
 
 import React from 'react';
+import Button from '../../buttons/Button';
 
 export interface Tab {
   id: string;
@@ -89,28 +90,13 @@ export default function MyHubSection({
             {hubName}
           </h1>
 
-          <button
+          <Button
+            variant="primary"
             onClick={onLogout}
-            style={{
-              padding: '8px 16px',
-              background: colors.primary,
-              color: 'white',
-              border: 'none',
-              borderRadius: 6,
-              fontSize: 14,
-              fontWeight: 500,
-              cursor: 'pointer',
-              transition: 'opacity 0.2s'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.opacity = '0.9';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.opacity = '1';
-            }}
+            roleColor={colors.primary}
           >
             Log out
-          </button>
+          </Button>
         </div>
 
         {/* Welcome Message */}

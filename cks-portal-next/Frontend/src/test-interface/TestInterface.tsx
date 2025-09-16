@@ -350,11 +350,11 @@ export default function TestInterface() {
       )}
 
       {/* Main Content Area */}
-      <div style={{ flex: 1, overflow: 'auto', background: '#0f172a' }}>
+      <div style={{ flex: 1, overflow: 'hidden', background: '#0f172a' }}>
         {viewMode === 'catalog' ? (
-          renderComponentCatalog()
+          <div style={{ height: '100%', overflow: 'auto' }}>{renderComponentCatalog()}</div>
         ) : viewMode === 'config' ? (
-          renderConfigDetails()
+          <div style={{ height: '100%', overflow: 'auto' }}>{renderConfigDetails()}</div>
         ) : (
           <div style={{ height: '100%', background: '#f9fafb' }}>
             <Suspense fallback={

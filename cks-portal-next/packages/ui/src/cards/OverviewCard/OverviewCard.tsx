@@ -2,10 +2,10 @@
   Property of CKS  © 2025
 ───────────────────────────────────────────────*/
 /**
- * File: InfoCard.tsx
+ * File: OverviewCard.tsx
  *
  * Description:
- * Reusable metric/information card component
+ * Reusable metric/overview card component
  *
  * Responsibilities:
  * - Display title, value, and subtitle in card format
@@ -25,7 +25,7 @@
 
 import React from 'react';
 
-export interface InfoCardProps {
+export interface OverviewCardProps {
   title: string;
   value: string | number;
   subtitle?: string;
@@ -45,14 +45,14 @@ const colorMap: Record<string, string> = {
   black: '#111827'
 };
 
-export default function InfoCard({
+export default function OverviewCard({
   title,
   value,
   subtitle,
   color = 'blue',
   onClick,
   loading = false
-}: InfoCardProps) {
+}: OverviewCardProps) {
   const displayColor = colorMap[color] || color;
 
   if (loading) {

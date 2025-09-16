@@ -1,0 +1,130 @@
+import React from 'react';
+import { ActivityItem } from './ActivityItem';
+import Button from '../../../../ui/src/buttons/Button';
+
+export interface Activity {
+  id: string;
+  message: string;
+  timestamp: Date;
+  type?: 'info' | 'success' | 'warning' | 'action';
+  metadata?: {
+    role?: string;
+    userId?: string;
+    [key: string]: any;
+  };
+}
+
+interface RecentActivityProps {
+  activities: Activity[];
+  onClear: () => void;
+  title?: string;
+  maxHeight?: string;
+  emptyMessage?: string;
+}
+
+export function RecentActivity({
+  activities,
+  onClear,
+  title = 'Recent Activity',
+  maxHeight = '400px',
+  emptyMessage = 'No recent activity',
+}: RecentActivityProps) {
+  return (
+    <div style={{ marginBottom: 32 }}>
+      <h2
+        style={{
+          margin: 0,
+          fontSize: 20,
+          fontWeight: 700,
+          color: '#111827',
+          marginBottom: 16,
+        }}
+      >
+        {title}
+      </h2>
+
+      <div
+        className="ui-card"
+        style={{
+          padding: 16,
+          position: 'relative',
+        }}
+      >
+        {activities.length > 0 && (
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'flex-end',
+              marginBottom: 12,
+            }}
+          >
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={onClear}
+            >
+              Clear
+            </Button>
+          </div>
+        )}
+
+        <div
+          style={{
+            maxHeight,
+            overflowY: 'auto',
+            overflowX: 'hidden',
+          }}
+        >
+        {activities.length > 0 ? (
+          activities.map((activity) => (
+            <ActivityItem
+              key={activity.id}
+              message={activity.message}
+              timestamp={activity.timestamp}
+              type={activity.type}
+              role={activity.metadata?.role}
+              title={activity.metadata?.title}
+            />
+          ))
+        ) : (
+          <div
+            style={{
+              padding: '48px 16px',
+              textAlign: 'center',
+              color: '#9ca3af',
+            }}
+          >
+            <div
+              style={{
+                fontSize: 48,
+                marginBottom: 12,
+                opacity: 0.5,
+              }}
+            >
+              📋
+            </div>
+            <div
+              style={{
+                fontSize: 14,
+                fontWeight: 500,
+                color: '#6b7280',
+              }}
+            >
+              {emptyMessage}
+            </div>
+            <div
+              style={{
+                fontSize: 12,
+                color: '#9ca3af',
+                marginTop: 4,
+              }}
+            >
+              Activities will appear here as they occur
+            </div>
+          </div>
+        )}
+        </div>
+      </div>
+    </div>
+  );
+}
