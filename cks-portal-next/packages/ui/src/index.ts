@@ -24,13 +24,12 @@
 // Navigation
 export * from './navigation/MyHubSection';
 
+// Cards
+export * from './cards/InfoCard';
+
 // Buttons (placeholder exports)
 // export * from './buttons/Button';
 // export * from './buttons/LogoutButton';
-
-// Cards (placeholder exports)
-// export * from './cards/Card';
-// export * from './cards/InfoCard';
 
 // Tables (placeholder exports)
 // export * from './tables/DataTable';

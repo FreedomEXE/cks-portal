@@ -25,6 +25,7 @@
 ───────────────────────────────────────────────*/
 
 import React, { useState, Suspense, lazy, useEffect } from 'react';
+import { useComponentDiscovery } from './hooks/useComponentDiscovery';
 
 // Dynamically import hub components
 const hubs = {
@@ -40,21 +41,16 @@ const hubs = {
 type RoleType = keyof typeof hubs;
 type ViewMode = 'hub' | 'catalog' | 'config';
 
-interface ComponentInfo {
-  name: string;
-  location: string;
-  type: 'hub' | 'ui' | 'domain' | 'feature';
-  status: 'loaded' | 'pending' | 'error';
-}
-
 export default function TestInterface() {
   const [selectedRole, setSelectedRole] = useState<RoleType>('manager');
   const [viewMode, setViewMode] = useState<ViewMode>('hub');
   const [showDebug, setShowDebug] = useState(false);
   const [showConfig, setShowConfig] = useState(false);
-  const [componentCount, setComponentCount] = useState(0);
 
   const HubComponent = hubs[selectedRole];
+
+  // Use dynamic component discovery
+  const { components: loadedComponents, componentCount } = useComponentDiscovery(selectedRole);
 
   const roleInfo = {
     admin: {
@@ -115,75 +111,63 @@ export default function TestInterface() {
     },
   };
 
-  // Track loaded components
-  const loadedComponents: ComponentInfo[] = [
-    {
-      name: 'MyHubSection',
-      location: 'packages/ui/src/navigation/MyHubSection',
-      type: 'ui',
-      status: 'loaded'
-    },
-    {
-      name: `${selectedRole.charAt(0).toUpperCase() + selectedRole.slice(1)}Hub`,
-      location: `Frontend/src/hubs/${selectedRole.charAt(0).toUpperCase() + selectedRole.slice(1)}Hub.tsx`,
-      type: 'hub',
-      status: 'loaded'
-    }
-  ];
+  const renderComponentCatalog = () => {
+    // Group components by type
+    const uiComponents = loadedComponents.filter(c => c.type === 'ui');
+    const domainComponents = loadedComponents.filter(c => c.type === 'domain');
+    const featureComponents = loadedComponents.filter(c => c.type === 'feature');
+    const hubComponents = loadedComponents.filter(c => c.type === 'hub');
 
-  useEffect(() => {
-    // Simulate component counting
-    setComponentCount(loadedComponents.length);
-  }, [selectedRole]);
+    return (
+      <div style={{ padding: '2rem', background: '#1e293b', minHeight: '100%' }}>
+        <h2 style={{ color: '#f8fafc', marginBottom: '1.5rem' }}>📦 Component Catalog</h2>
 
-  const renderComponentCatalog = () => (
-    <div style={{ padding: '2rem', background: '#1e293b', minHeight: '100%' }}>
-      <h2 style={{ color: '#f8fafc', marginBottom: '1.5rem' }}>📦 Component Catalog</h2>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }}>
-        <div style={{ background: '#0f172a', padding: '1rem', borderRadius: '0.5rem', border: '1px solid #334155' }}>
-          <h3 style={{ color: '#60a5fa', margin: '0 0 0.5rem 0' }}>packages/ui/</h3>
-          <div style={{ color: '#94a3b8', fontSize: '0.875rem' }}>
-            <div>✅ MyHubSection</div>
-            <div>⏳ Button (pending)</div>
-            <div>⏳ DataTable (pending)</div>
-            <div>⏳ InfoCard (pending)</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }}>
+          <div style={{ background: '#0f172a', padding: '1rem', borderRadius: '0.5rem', border: '1px solid #334155' }}>
+            <h3 style={{ color: '#60a5fa', margin: '0 0 0.5rem 0' }}>packages/ui/ ({uiComponents.length})</h3>
+            <div style={{ color: '#94a3b8', fontSize: '0.875rem' }}>
+              {uiComponents.map(comp => (
+                <div key={comp.name}>✅ {comp.name}</div>
+              ))}
+            </div>
           </div>
-        </div>
 
-        <div style={{ background: '#0f172a', padding: '1rem', borderRadius: '0.5rem', border: '1px solid #334155' }}>
-          <h3 style={{ color: '#10b981', margin: '0 0 0.5rem 0' }}>packages/domain-widgets/</h3>
-          <div style={{ color: '#94a3b8', fontSize: '0.875rem' }}>
-            <div>⏳ OrderList (pending)</div>
-            <div>⏳ ReportsCard (pending)</div>
-            <div>⏳ ActivityFeed (pending)</div>
-            <div>⏳ InventoryTable (pending)</div>
+          <div style={{ background: '#0f172a', padding: '1rem', borderRadius: '0.5rem', border: '1px solid #334155' }}>
+            <h3 style={{ color: '#10b981', margin: '0 0 0.5rem 0' }}>packages/domain-widgets/ ({domainComponents.length})</h3>
+            <div style={{ color: '#94a3b8', fontSize: '0.875rem' }}>
+              {domainComponents.map(comp => (
+                <div key={comp.name}>✅ {comp.name}</div>
+              ))}
+            </div>
           </div>
-        </div>
 
-        <div style={{ background: '#0f172a', padding: '1rem', borderRadius: '0.5rem', border: '1px solid #334155' }}>
-          <h3 style={{ color: '#f97316', margin: '0 0 0.5rem 0' }}>src/features/</h3>
-          <div style={{ color: '#94a3b8', fontSize: '0.875rem' }}>
-            <div>⏳ CreateUsers (admin)</div>
-            <div>⏳ MyEcosystem (manager)</div>
-            <div>⏳ OrderManager (shared)</div>
-            <div>⏳ ProfileManager (shared)</div>
+          <div style={{ background: '#0f172a', padding: '1rem', borderRadius: '0.5rem', border: '1px solid #334155' }}>
+            <h3 style={{ color: '#f97316', margin: '0 0 0.5rem 0' }}>src/features/ ({featureComponents.length})</h3>
+            <div style={{ color: '#94a3b8', fontSize: '0.875rem' }}>
+              {featureComponents.length > 0 ? (
+                featureComponents.map(comp => (
+                  <div key={comp.name}>✅ {comp.name}</div>
+                ))
+              ) : (
+                <div>⏳ No features loaded</div>
+              )}
+            </div>
           </div>
-        </div>
 
-        <div style={{ background: '#0f172a', padding: '1rem', borderRadius: '0.5rem', border: '1px solid #334155' }}>
-          <h3 style={{ color: '#8b5cf6', margin: '0 0 0.5rem 0' }}>src/hubs/</h3>
-          <div style={{ color: '#94a3b8', fontSize: '0.875rem' }}>
-            {Object.keys(hubs).map(hub => (
-              <div key={hub}>
-                {selectedRole === hub ? '✅' : '○'} {hub.charAt(0).toUpperCase() + hub.slice(1)}Hub
-              </div>
-            ))}
+          <div style={{ background: '#0f172a', padding: '1rem', borderRadius: '0.5rem', border: '1px solid #334155' }}>
+            <h3 style={{ color: '#8b5cf6', margin: '0 0 0.5rem 0' }}>src/hubs/</h3>
+            <div style={{ color: '#94a3b8', fontSize: '0.875rem' }}>
+              {Object.keys(hubs).map(hub => (
+                <div key={hub}>
+                  {selectedRole === hub ? '✅' : '○'} {hub.charAt(0).toUpperCase() + hub.slice(1)}Hub
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   const renderConfigDetails = () => (
     <div style={{ padding: '2rem', background: '#1e293b', minHeight: '100%' }}>
@@ -204,12 +188,15 @@ export default function TestInterface() {
         </div>
 
         <div style={{ background: '#0f172a', padding: '1rem', borderRadius: '0.5rem' }}>
-          <h3 style={{ color: roleInfo[selectedRole].color, margin: '0 0 1rem 0' }}>File Locations</h3>
-          <div style={{ color: '#94a3b8', fontSize: '0.875rem', lineHeight: 1.6, fontFamily: 'monospace' }}>
-            <div><strong>Hub:</strong> src/hubs/{selectedRole.charAt(0).toUpperCase() + selectedRole.slice(1)}Hub.tsx</div>
-            <div><strong>Features:</strong> src/features/{selectedRole}/</div>
-            <div><strong>Config:</strong> src/roles/{selectedRole}/config.v1.json</div>
-            <div><strong>Navigation:</strong> packages/ui/src/navigation/MyHubSection/</div>
+          <h3 style={{ color: roleInfo[selectedRole].color, margin: '0 0 1rem 0' }}>Component Locations ({loadedComponents.length})</h3>
+          <div style={{ color: '#94a3b8', fontSize: '0.875rem', lineHeight: 1.6, fontFamily: 'monospace', maxHeight: '300px', overflowY: 'auto' }}>
+            {loadedComponents.map(comp => (
+              <div key={comp.name} style={{ marginBottom: '0.25rem' }}>
+                <strong style={{ color: comp.type === 'ui' ? '#60a5fa' : comp.type === 'domain' ? '#10b981' : comp.type === 'hub' ? '#8b5cf6' : '#f97316' }}>
+                  {comp.name}:
+                </strong> {comp.location}
+              </div>
+            ))}
           </div>
         </div>
       </div>

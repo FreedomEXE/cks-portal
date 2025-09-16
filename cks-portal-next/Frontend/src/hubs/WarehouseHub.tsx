@@ -23,6 +23,7 @@
 
 import React, { useState } from 'react';
 import MyHubSection from '../../../packages/ui/src/navigation/MyHubSection';
+import OverviewSection from '../../../packages/domain-widgets/src/overview';
 
 export default function WarehouseHub() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -43,6 +44,24 @@ export default function WarehouseHub() {
     // Implement logout logic
   };
 
+  // Warehouse-specific overview cards (5 cards)
+  const overviewCards = [
+    { id: 'products', title: 'Product Count', dataKey: 'productCount', color: 'purple', subtitle: 'Total products' },
+    { id: 'lowstock', title: 'Low Stock', dataKey: 'lowStockCount', color: 'red', subtitle: 'Items to reorder' },
+    { id: 'orders', title: 'Pending Orders', dataKey: 'pendingOrders', color: 'orange', subtitle: 'Orders to fulfill' },
+    { id: 'deliveries', title: 'Pending Deliveries', dataKey: 'pendingDeliveries', color: 'blue', subtitle: 'Awaiting delivery' },
+    { id: 'status', title: 'Account Status', dataKey: 'accountStatus', color: 'green', subtitle: 'Current status' }
+  ];
+
+  // Mock data - replace with actual API data
+  const overviewData = {
+    productCount: '2,456',
+    lowStockCount: 23,
+    pendingOrders: 34,
+    pendingDeliveries: 12,
+    accountStatus: 'Active'
+  };
+
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#f9fafb' }}>
       <MyHubSection
@@ -58,8 +77,18 @@ export default function WarehouseHub() {
       {/* Content Area */}
       <div style={{ flex: 1, overflow: 'auto', padding: '24px' }}>
         <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
-          <h2>Warehouse Hub - {activeTab}</h2>
-          <p>Content for {activeTab} will be implemented here.</p>
+          {activeTab === 'dashboard' ? (
+            <OverviewSection
+              cards={overviewCards}
+              data={overviewData}
+              title="Warehouse Overview"
+            />
+          ) : (
+            <>
+              <h2>Warehouse Hub - {activeTab}</h2>
+              <p>Content for {activeTab} will be implemented here.</p>
+            </>
+          )}
         </div>
       </div>
     </div>

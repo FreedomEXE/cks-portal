@@ -1,0 +1,146 @@
+/*───────────────────────────────────────────────
+  Property of CKS  © 2025
+───────────────────────────────────────────────*/
+/**
+ * File: InfoCard.tsx
+ *
+ * Description:
+ * Reusable metric/information card component
+ *
+ * Responsibilities:
+ * - Display title, value, and subtitle in card format
+ * - Support different color themes for values
+ * - Handle click interactions with hover states
+ * - Show loading skeleton when data is fetching
+ *
+ * Role in system:
+ * - Used in overview sections across all role hubs
+ *
+ * Notes:
+ * Matches the design from manager overview example
+ */
+/*───────────────────────────────────────────────
+  Manifested by Freedom_EXE
+───────────────────────────────────────────────*/
+
+import React from 'react';
+
+export interface InfoCardProps {
+  title: string;
+  value: string | number;
+  subtitle?: string;
+  color?: string;
+  onClick?: () => void;
+  loading?: boolean;
+}
+
+const colorMap: Record<string, string> = {
+  blue: '#3b82f6',
+  green: '#10b981',
+  purple: '#8b5cf6',
+  orange: '#f97316',
+  red: '#ef4444',
+  yellow: '#eab308',
+  gray: '#6b7280',
+  black: '#111827'
+};
+
+export default function InfoCard({
+  title,
+  value,
+  subtitle,
+  color = 'blue',
+  onClick,
+  loading = false
+}: InfoCardProps) {
+  const displayColor = colorMap[color] || color;
+
+  if (loading) {
+    return (
+      <div className="ui-card" style={{
+        padding: 16,
+        textAlign: 'center',
+        minHeight: 100
+      }}>
+        <div style={{
+          background: '#f3f4f6',
+          height: 12,
+          width: '60%',
+          borderRadius: 4,
+          marginBottom: 8,
+          margin: '0 auto 8px',
+          animation: 'pulse 2s infinite'
+        }} />
+        <div style={{
+          background: '#f3f4f6',
+          height: 32,
+          width: '40%',
+          borderRadius: 4,
+          marginBottom: 4,
+          margin: '0 auto 4px',
+          animation: 'pulse 2s infinite'
+        }} />
+        <div style={{
+          background: '#f3f4f6',
+          height: 12,
+          width: '80%',
+          borderRadius: 4,
+          margin: '0 auto',
+          animation: 'pulse 2s infinite'
+        }} />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="ui-card"
+      onClick={onClick}
+      style={{
+        padding: 16,
+        textAlign: 'center',
+        cursor: onClick ? 'pointer' : 'default',
+        transition: 'all 0.2s',
+        minHeight: 100
+      }}
+      onMouseEnter={(e) => {
+        if (onClick) {
+          e.currentTarget.style.transform = 'translateY(-2px)';
+          e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06)';
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (onClick) {
+          e.currentTarget.style.transform = 'translateY(0)';
+          e.currentTarget.style.boxShadow = '';
+        }
+      }}
+    >
+      <div style={{
+        fontSize: 12,
+        color: '#6b7280',
+        marginBottom: 4
+      }}>
+        {title}
+      </div>
+
+      <div style={{
+        fontSize: 32,
+        fontWeight: 700,
+        color: displayColor,
+        marginBottom: 2
+      }}>
+        {value}
+      </div>
+
+      {subtitle && (
+        <div style={{
+          fontSize: 12,
+          color: '#6b7280'
+        }}>
+          {subtitle}
+        </div>
+      )}
+    </div>
+  );
+}

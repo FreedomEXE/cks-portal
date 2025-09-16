@@ -23,6 +23,7 @@
 
 import React, { useState } from 'react';
 import MyHubSection from '../../../packages/ui/src/navigation/MyHubSection';
+import OverviewSection from '../../../packages/domain-widgets/src/overview';
 
 export default function ManagerHub() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -42,6 +43,26 @@ export default function ManagerHub() {
     // Implement logout logic
   };
 
+  // Manager-specific overview cards (6 cards)
+  const overviewCards = [
+    { id: 'contractors', title: 'My Contractors', dataKey: 'contractorCount', color: 'blue', subtitle: 'Total contractors managed' },
+    { id: 'customers', title: 'My Customers', dataKey: 'customerCount', color: 'green', subtitle: 'Total customers served' },
+    { id: 'centers', title: 'My Centers', dataKey: 'centerCount', color: 'purple', subtitle: 'Service centers managed' },
+    { id: 'crew', title: 'My Crew', dataKey: 'crewCount', color: 'orange', subtitle: 'Total crew members' },
+    { id: 'orders', title: 'Pending Orders', dataKey: 'pendingOrders', color: 'red', subtitle: 'Orders requiring attention' },
+    { id: 'status', title: 'Account Status', dataKey: 'accountStatus', color: 'green', subtitle: 'Current account status' }
+  ];
+
+  // Mock data - replace with actual API data
+  const overviewData = {
+    contractorCount: 3,
+    customerCount: 12,
+    centerCount: 4,
+    crewCount: 8,
+    pendingOrders: 7,
+    accountStatus: 'Active'
+  };
+
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#f9fafb' }}>
       <MyHubSection
@@ -57,8 +78,18 @@ export default function ManagerHub() {
       {/* Content Area */}
       <div style={{ flex: 1, overflow: 'auto', padding: '24px' }}>
         <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
-          <h2>Manager Hub - {activeTab}</h2>
-          <p>Content for {activeTab} will be implemented here.</p>
+          {activeTab === 'dashboard' ? (
+            <OverviewSection
+              cards={overviewCards}
+              data={overviewData}
+              title="Overview"
+            />
+          ) : (
+            <>
+              <h2>Manager Hub - {activeTab}</h2>
+              <p>Content for {activeTab} will be implemented here.</p>
+            </>
+          )}
         </div>
       </div>
     </div>
