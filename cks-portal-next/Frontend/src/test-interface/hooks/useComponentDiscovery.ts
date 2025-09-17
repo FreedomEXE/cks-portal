@@ -104,16 +104,30 @@ export function useComponentDiscovery(selectedRole: string) {
 
     // Discover Domain Widget components dynamically
     try {
-      const domainModules = import.meta.glob('../../../../packages/domain-widgets/src/**/*.tsx', { eager: false });
-      console.log('[Component Discovery] Found domain module paths:', Object.keys(domainModules));
-      Object.keys(domainModules).forEach(path => {
+      // Include both src/ and root level components in domain-widgets
+      const domainModulesSrc = import.meta.glob('../../../../packages/domain-widgets/src/**/*.tsx', { eager: false });
+      const domainModulesRoot = import.meta.glob('../../../../packages/domain-widgets/*.tsx', { eager: false });
+      const domainModulesNested = import.meta.glob('../../../../packages/domain-widgets/**/*.tsx', { eager: false });
+
+      // Combine both paths, filtering out src/ from root to avoid duplicates
+      const allDomainModules = {
+        ...domainModulesSrc,
+        ...domainModulesRoot,
+        ...Object.fromEntries(
+          Object.entries(domainModulesNested).filter(([path]) => !path.includes('/src/') && !path.includes('node_modules') && !Object.keys(domainModulesRoot).includes(path))
+        )
+      };
+
+      console.log('[Component Discovery] Found domain module paths:', Object.keys(allDomainModules));
+      Object.keys(allDomainModules).forEach(path => {
         // Skip only test and story files
         if (path.includes('.test.') || path.includes('.stories.')) {
           return;
         }
 
         // Extract meaningful component name from the path
-        const cleanPath = path.replace('../../../../packages/domain-widgets/src/', '');
+        const cleanPath = path.replace('../../../../packages/domain-widgets/', '')
+                              .replace('src/', ''); // Remove src/ if present
         const parts = cleanPath.split('/');
         const fileName = parts[parts.length - 1].replace('.tsx', '');
 
@@ -140,10 +154,14 @@ export function useComponentDiscovery(selectedRole: string) {
 
         // Add if we found a valid component and haven't seen it before
         if (componentName && componentName !== 'index' && !discoveredNames.has(componentName)) {
-          console.log('[Component Discovery] Adding domain component:', componentName, 'at', componentPath);
+          console.log('[Component Discovery] Adding domain component:', componentName, 'at', componentPath, 'from path:', path);
+          // Determine if it's in src/ or root
+          const locationPath = path.includes('/src/')
+            ? `packages/domain-widgets/src/${componentPath}`
+            : `packages/domain-widgets/${componentPath}`;
           discovered.push({
             name: componentName,
-            location: `packages/domain-widgets/src/${componentPath}`,
+            location: locationPath,
             type: 'domain',
             status: 'loaded'
           });

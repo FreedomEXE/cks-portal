@@ -29,6 +29,7 @@ import { RecentActivity, type Activity } from '../../../packages/domain-widgets/
 import { NewsPreview } from '../../../packages/domain-widgets/src/news';
 import { MemosPreview } from '../../../packages/domain-widgets/src/memos';
 import { ProfileInfoCard } from '../../../packages/domain-widgets/src/profile';
+import EcosystemTree, { type TreeNode } from '../../../packages/domain-widgets/EcosystemTree';
 
 export default function CrewHub() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -57,6 +58,18 @@ export default function CrewHub() {
       document.head.removeChild(style);
     };
   }, []);
+
+  // Mock ecosystem data for crew (shows center and team members)
+  const ecosystemData: TreeNode = {
+    user: { id: 'CTR-001', role: 'Center', name: 'Acme Downtown Office' },
+    children: [
+      { user: { id: 'CRW-001', role: 'Crew', name: 'John Smith (Lead)' } },
+      { user: { id: 'CRW-002', role: 'Crew', name: 'Jane Doe (Specialist)' } },
+      { user: { id: 'CRW-003', role: 'Crew', name: 'Mike Johnson' } },
+      { user: { id: 'CRW-004', role: 'Crew', name: 'Sarah Wilson' } },
+      { user: { id: 'CRW-005', role: 'Crew', name: 'Bob Brown' } }
+    ]
+  };
 
   // Mock activities for crew
   const [activities, setActivities] = useState<Activity[]>([
@@ -191,6 +204,21 @@ export default function CrewHub() {
               onUpdatePhoto={() => console.log('Update photo')}
               onContactManager={() => console.log('Contact manager')}
               onScheduleMeeting={() => console.log('Schedule meeting')}
+            />
+          ) : activeTab === 'ecosystem' ? (
+            <EcosystemTree
+              rootUser={{ id: 'CTR-001', role: 'Center', name: 'Acme Downtown Office' }}
+              treeData={ecosystemData}
+              onNodeClick={(userId) => console.log('View details for:', userId)}
+              expandedNodes={['CTR-001']}
+              currentUserId="CRW-001"
+              title="Ecosystem"
+              subtitle="Your Work Network Overview"
+              description="Click any row with an arrow to expand and explore your network connections"
+              roleColorMap={{
+                center: '#ffedd5',
+                crew: '#fee2e2'
+              }}
             />
           ) : (
             <>

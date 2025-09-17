@@ -29,6 +29,7 @@ import { RecentActivity, type Activity } from '../../../packages/domain-widgets/
 import { NewsPreview } from '../../../packages/domain-widgets/src/news';
 import { MemosPreview } from '../../../packages/domain-widgets/src/memos';
 import { ProfileInfoCard } from '../../../packages/domain-widgets/src/profile';
+import EcosystemTree, { type TreeNode } from '../../../packages/domain-widgets/EcosystemTree';
 
 export default function ManagerHub() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -57,6 +58,70 @@ export default function ManagerHub() {
       document.head.removeChild(style);
     };
   }, []);
+
+  // Mock ecosystem data for manager (shows full hierarchy)
+  const ecosystemData: TreeNode = {
+    user: { id: 'MGR-001', role: 'Manager', name: 'John Smith' },
+    children: [
+      {
+        user: { id: 'CON-001', role: 'Contractor', name: 'Premium Contractor LLC' },
+        count: 3,
+        type: 'customers',
+        children: [
+          {
+            user: { id: 'CUS-001', role: 'Customer', name: 'Acme Corporation' },
+            count: 3,
+            type: 'centers',
+            children: [
+              {
+                user: { id: 'CTR-001', role: 'Center', name: 'Acme Downtown Office' },
+                count: 2,
+                type: 'crew',
+                children: [
+                  { user: { id: 'CRW-001', role: 'Crew', name: 'John Smith (Lead)' } },
+                  { user: { id: 'CRW-002', role: 'Crew', name: 'Jane Doe (Specialist)' } }
+                ]
+              },
+              {
+                user: { id: 'CTR-002', role: 'Center', name: 'Acme Warehouse' },
+                count: 3,
+                type: 'crew',
+                children: [
+                  { user: { id: 'CRW-003', role: 'Crew', name: 'Mike Johnson (Lead)' } },
+                  { user: { id: 'CRW-004', role: 'Crew', name: 'Sarah Wilson' } },
+                  { user: { id: 'CRW-005', role: 'Crew', name: 'Bob Brown' } }
+                ]
+              }
+            ]
+          },
+          {
+            user: { id: 'CUS-002', role: 'Customer', name: 'Global Tech Solutions' },
+            count: 2,
+            type: 'centers',
+            children: [
+              {
+                user: { id: 'CTR-003', role: 'Center', name: 'Global Tech HQ' },
+                count: 2,
+                type: 'crew'
+              }
+            ]
+          }
+        ]
+      },
+      {
+        user: { id: 'CON-002', role: 'Contractor', name: 'Elite Services Inc' },
+        count: 2,
+        type: 'customers',
+        children: [
+          {
+            user: { id: 'CUS-003', role: 'Customer', name: 'Local Business Center' },
+            count: 1,
+            type: 'centers'
+          }
+        ]
+      }
+    ]
+  };
 
   // Mock activities for manager - showing activities from various roles
   const [activities, setActivities] = useState<Activity[]>([
@@ -209,6 +274,24 @@ export default function ManagerHub() {
               accountManager={null}
               primaryColor="#3b82f6"
               onUpdatePhoto={() => console.log('Update photo')}
+            />
+          ) : activeTab === 'ecosystem' ? (
+            <EcosystemTree
+              rootUser={{ id: 'MGR-001', role: 'Manager', name: 'John Smith' }}
+              treeData={ecosystemData}
+              onNodeClick={(userId) => console.log('View details for:', userId)}
+              expandedNodes={['MGR-001']}
+              currentUserId="MGR-001"
+              title="Ecosystem"
+              subtitle="Your Territory Overview"
+              description="Click any row with an arrow to expand and explore your territory ecosystem"
+              roleColorMap={{
+                manager: '#e0f2fe',
+                contractor: '#dcfce7',
+                customer: '#fef9c3',
+                center: '#ffedd5',
+                crew: '#fee2e2'
+              }}
             />
           ) : (
             <>

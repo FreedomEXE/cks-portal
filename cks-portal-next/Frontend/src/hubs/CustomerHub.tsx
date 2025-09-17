@@ -29,6 +29,7 @@ import { RecentActivity, type Activity } from '../../../packages/domain-widgets/
 import { NewsPreview } from '../../../packages/domain-widgets/src/news';
 import { MemosPreview } from '../../../packages/domain-widgets/src/memos';
 import { ProfileInfoCard } from '../../../packages/domain-widgets/src/profile';
+import EcosystemTree, { type TreeNode } from '../../../packages/domain-widgets/EcosystemTree';
 
 export default function CustomerHub() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -57,6 +58,41 @@ export default function CustomerHub() {
       document.head.removeChild(style);
     };
   }, []);
+
+  // Mock ecosystem data for customer (shows centers and crew)
+  const ecosystemData: TreeNode = {
+    user: { id: 'CUS-001', role: 'Customer', name: 'Acme Corporation' },
+    children: [
+      {
+        user: { id: 'CTR-001', role: 'Center', name: 'Acme Downtown Office' },
+        count: 2,
+        type: 'crew',
+        children: [
+          { user: { id: 'CRW-001', role: 'Crew', name: 'John Smith (Lead)' } },
+          { user: { id: 'CRW-002', role: 'Crew', name: 'Jane Doe (Specialist)' } }
+        ]
+      },
+      {
+        user: { id: 'CTR-002', role: 'Center', name: 'Acme Warehouse' },
+        count: 3,
+        type: 'crew',
+        children: [
+          { user: { id: 'CRW-003', role: 'Crew', name: 'Mike Johnson (Lead)' } },
+          { user: { id: 'CRW-004', role: 'Crew', name: 'Sarah Wilson' } },
+          { user: { id: 'CRW-005', role: 'Crew', name: 'Bob Brown' } }
+        ]
+      },
+      {
+        user: { id: 'CTR-006', role: 'Center', name: 'Acme Research Lab' },
+        count: 2,
+        type: 'crew',
+        children: [
+          { user: { id: 'CRW-012', role: 'Crew', name: 'Alice Martinez' } },
+          { user: { id: 'CRW-013', role: 'Crew', name: 'Robert Chen' } }
+        ]
+      }
+    ]
+  };
 
   // Mock activities for customer
   const [activities, setActivities] = useState<Activity[]>([
@@ -184,6 +220,22 @@ export default function CustomerHub() {
               onUpdatePhoto={() => console.log('Update photo')}
               onContactManager={() => console.log('Contact manager')}
               onScheduleMeeting={() => console.log('Schedule meeting')}
+            />
+          ) : activeTab === 'ecosystem' ? (
+            <EcosystemTree
+              rootUser={{ id: 'CUS-001', role: 'Customer', name: 'Acme Corporation' }}
+              treeData={ecosystemData}
+              onNodeClick={(userId) => console.log('View details for:', userId)}
+              expandedNodes={['CUS-001']}
+              currentUserId="CUS-001"
+              title="Ecosystem"
+              subtitle="Your Business Network Overview"
+              description="Click any row with an arrow to expand and explore your network connections"
+              roleColorMap={{
+                customer: '#fef9c3',
+                center: '#ffedd5',
+                crew: '#fee2e2'
+              }}
             />
           ) : (
             <>

@@ -29,6 +29,7 @@ import { RecentActivity, type Activity } from '../../../packages/domain-widgets/
 import { NewsPreview } from '../../../packages/domain-widgets/src/news';
 import { MemosPreview } from '../../../packages/domain-widgets/src/memos';
 import { ProfileInfoCard } from '../../../packages/domain-widgets/src/profile';
+import EcosystemTree, { type TreeNode } from '../../../packages/domain-widgets/EcosystemTree';
 
 export default function ContractorHub() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -57,6 +58,89 @@ export default function ContractorHub() {
       document.head.removeChild(style);
     };
   }, []);
+
+  // Mock ecosystem data for contractor
+  const ecosystemData: TreeNode = {
+    user: { id: 'CON-001', role: 'Contractor', name: 'Premium Contractor LLC' },
+    children: [
+      {
+        user: { id: 'CUS-001', role: 'Customer', name: 'Acme Corporation' },
+        count: 3,
+        type: 'center',
+        children: [
+          {
+            user: { id: 'CTR-001', role: 'Center', name: 'Acme Downtown Office' },
+            count: 2,
+            type: 'crew',
+            children: [
+              { user: { id: 'CRW-001', role: 'Crew', name: 'John Smith (Lead)' } },
+              { user: { id: 'CRW-002', role: 'Crew', name: 'Jane Doe (Specialist)' } }
+            ]
+          },
+          {
+            user: { id: 'CTR-002', role: 'Center', name: 'Acme Warehouse' },
+            count: 3,
+            type: 'crew',
+            children: [
+              { user: { id: 'CRW-003', role: 'Crew', name: 'Mike Johnson (Lead)' } },
+              { user: { id: 'CRW-004', role: 'Crew', name: 'Sarah Wilson' } },
+              { user: { id: 'CRW-005', role: 'Crew', name: 'Bob Brown' } }
+            ]
+          },
+          {
+            user: { id: 'CTR-006', role: 'Center', name: 'Acme Research Lab' },
+            count: 2,
+            type: 'crew',
+            children: [
+              { user: { id: 'CRW-012', role: 'Crew', name: 'Alice Martinez' } },
+              { user: { id: 'CRW-013', role: 'Crew', name: 'Robert Chen' } }
+            ]
+          }
+        ]
+      },
+      {
+        user: { id: 'CUS-002', role: 'Customer', name: 'Global Tech Solutions' },
+        count: 2,
+        type: 'center',
+        children: [
+          {
+            user: { id: 'CTR-003', role: 'Center', name: 'Global Tech HQ' },
+            count: 2,
+            type: 'crew',
+            children: [
+              { user: { id: 'CRW-006', role: 'Crew', name: 'Alice Green (Lead)' } },
+              { user: { id: 'CRW-007', role: 'Crew', name: 'Tom Clark' } }
+            ]
+          },
+          {
+            user: { id: 'CTR-004', role: 'Center', name: 'Global Tech Branch' },
+            count: 2,
+            type: 'crew',
+            children: [
+              { user: { id: 'CRW-008', role: 'Crew', name: 'Lisa White (Lead)' } },
+              { user: { id: 'CRW-009', role: 'Crew', name: 'David Lee' } }
+            ]
+          }
+        ]
+      },
+      {
+        user: { id: 'CUS-003', role: 'Customer', name: 'Local Business Center' },
+        count: 1,
+        type: 'center',
+        children: [
+          {
+            user: { id: 'CTR-005', role: 'Center', name: 'Local Business Main' },
+            count: 2,
+            type: 'crew',
+            children: [
+              { user: { id: 'CRW-010', role: 'Crew', name: 'Chris Taylor (Lead)' } },
+              { user: { id: 'CRW-011', role: 'Crew', name: 'Emma Davis' } }
+            ]
+          }
+        ]
+      }
+    ]
+  };
 
   // Mock activities for contractor
   const [activities, setActivities] = useState<Activity[]>([
@@ -193,6 +277,23 @@ export default function ContractorHub() {
               onUpdatePhoto={() => console.log('Update photo')}
               onContactManager={() => console.log('Contact manager')}
               onScheduleMeeting={() => console.log('Schedule meeting')}
+            />
+          ) : activeTab === 'ecosystem' ? (
+            <EcosystemTree
+              rootUser={{ id: 'CON-001', role: 'Contractor', name: 'Premium Contractor LLC' }}
+              treeData={ecosystemData}
+              onNodeClick={(userId) => console.log('View details for:', userId)}
+              expandedNodes={['CON-001']}
+              currentUserId="CON-001"
+              title="Ecosystem"
+              subtitle="Your Business Network Overview"
+              description="Click any row with an arrow to expand and explore your network connections"
+              roleColorMap={{
+                contractor: '#dcfce7',
+                customer: '#fef9c3',
+                center: '#ffedd5',
+                crew: '#fee2e2'
+              }}
             />
           ) : (
             <>

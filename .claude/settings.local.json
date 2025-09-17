@@ -29,7 +29,11 @@
       "Bash(dir /B \"C:\\Users\\rizz5\\OneDrive\\Desktop\\CKS\\cks-portal\\REFACTOR\\Frontend\\src\\hub\\roles\\warehouse\\tabs\")",
       "Bash(dir /B \"C:\\Users\\rizz5\\OneDrive\\Desktop\\CKS\\cks-portal\\REFACTOR\\Frontend\\src\\hub\\roles\\crew\\tabs\")",
       "Bash(npx vite build:*)",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "Bash(for role in manager contractor customer center crew)",
+      "Bash(do echo \"=== $role ===\")",
+      "Bash(ls:*)",
+      "Bash(done)"
     ],
     "deny": [],
     "ask": []
