@@ -21,9 +21,12 @@
 ───────────────────────────────────────────────*/
 
 import React, { useState, useEffect } from 'react';
+import { Scrollbar } from '../../../packages/ui/src/Scrollbar';
 import MyHubSection from '../../../packages/ui/src/navigation/MyHubSection';
 import OverviewSection from '../../../packages/domain-widgets/src/overview';
 import { RecentActivity, type Activity } from '../../../packages/domain-widgets/src/activity';
+import { NewsPreview } from '../../../packages/domain-widgets/src/news';
+import { MemosPreview } from '../../../packages/domain-widgets/src/memos';
 
 export default function AdminHub() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -108,10 +111,10 @@ export default function AdminHub() {
 
   // Admin-specific overview cards (4 cards)
   const overviewCards = [
-    { id: 'users', title: 'Total Users', dataKey: 'userCount', color: 'black', subtitle: 'System users' },
-    { id: 'tickets', title: 'Open Support Tickets', dataKey: 'ticketCount', color: 'blue', subtitle: 'Awaiting resolution' },
-    { id: 'priority', title: 'High Priority', dataKey: 'highPriorityCount', color: 'red', subtitle: 'Critical issues' },
-    { id: 'uptime', title: 'Days Online', dataKey: 'daysOnline', color: 'green', subtitle: 'System uptime' }
+    { id: 'users', title: 'Total Users', dataKey: 'userCount', color: 'black' },
+    { id: 'tickets', title: 'Open Support Tickets', dataKey: 'ticketCount', color: 'blue' },
+    { id: 'priority', title: 'High Priority', dataKey: 'highPriorityCount', color: 'red' },
+    { id: 'uptime', title: 'Days Online', dataKey: 'daysOnline', color: 'green' }
   ];
 
   // Mock data - replace with actual API data
@@ -123,7 +126,7 @@ export default function AdminHub() {
   };
 
   return (
-    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#f9fafb' }}>
+    <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: '#f9fafb' }}>
       <MyHubSection
         hubName="Administrator Hub"
         tabs={tabs}
@@ -135,13 +138,10 @@ export default function AdminHub() {
       />
 
       {/* Content Area */}
-      <div style={{
+      <Scrollbar style={{
         flex: 1,
-        overflow: 'auto',
-        padding: '24px',
-        scrollbarWidth: 'thin',
-        scrollbarColor: '#94a3b8 transparent'
-      }} className="hub-content-scroll">
+        padding: '24px'
+      }}>
         <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
           {activeTab === 'dashboard' ? (
             <>
@@ -156,6 +156,12 @@ export default function AdminHub() {
                 title="Recent Activity"
                 emptyMessage="No recent system activity"
               />
+
+              {/* Communication Hub */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 24 }}>
+                <NewsPreview color="#111827" onViewAll={() => console.log('View all news')} />
+                <MemosPreview color="#111827" onViewAll={() => console.log('View memos')} />
+              </div>
             </>
           ) : (
             <>
@@ -164,7 +170,7 @@ export default function AdminHub() {
             </>
           )}
         </div>
-      </div>
+      </Scrollbar>
     </div>
   );
 }

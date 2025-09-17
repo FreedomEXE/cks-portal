@@ -59,8 +59,7 @@ export default function OverviewCard({
     return (
       <div className="ui-card" style={{
         padding: 16,
-        textAlign: 'center',
-        minHeight: 100
+        textAlign: 'center'
       }}>
         <div style={{
           background: '#f3f4f6',
@@ -99,21 +98,26 @@ export default function OverviewCard({
       style={{
         padding: 16,
         textAlign: 'center',
-        cursor: onClick ? 'pointer' : 'default',
+        cursor: 'pointer',
         transition: 'all 0.2s',
-        minHeight: 100
+        userSelect: 'none',
+        WebkitUserSelect: 'none'
       }}
       onMouseEnter={(e) => {
-        if (onClick) {
-          e.currentTarget.style.transform = 'translateY(-2px)';
-          e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06)';
-        }
+        e.currentTarget.style.transform = 'translateY(-2px)';
+        e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06)';
+        e.currentTarget.style.background = '#fafafa';
       }}
       onMouseLeave={(e) => {
-        if (onClick) {
-          e.currentTarget.style.transform = 'translateY(0)';
-          e.currentTarget.style.boxShadow = '';
-        }
+        e.currentTarget.style.transform = 'translateY(0)';
+        e.currentTarget.style.boxShadow = '';
+        e.currentTarget.style.background = '';
+      }}
+      onMouseDown={(e) => {
+        e.currentTarget.style.transform = 'translateY(0) scale(0.98)';
+      }}
+      onMouseUp={(e) => {
+        e.currentTarget.style.transform = 'translateY(-2px) scale(1)';
       }}
     >
       <div style={{
@@ -127,20 +131,10 @@ export default function OverviewCard({
       <div style={{
         fontSize: 32,
         fontWeight: 700,
-        color: displayColor,
-        marginBottom: 2
+        color: displayColor
       }}>
         {value}
       </div>
-
-      {subtitle && (
-        <div style={{
-          fontSize: 12,
-          color: '#6b7280'
-        }}>
-          {subtitle}
-        </div>
-      )}
     </div>
   );
 }

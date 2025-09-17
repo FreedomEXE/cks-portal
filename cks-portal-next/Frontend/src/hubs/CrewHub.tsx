@@ -22,9 +22,13 @@
 ───────────────────────────────────────────────*/
 
 import React, { useState, useEffect } from 'react';
+import { Scrollbar } from '../../../packages/ui/src/Scrollbar';
 import MyHubSection from '../../../packages/ui/src/navigation/MyHubSection';
 import OverviewSection from '../../../packages/domain-widgets/src/overview';
 import { RecentActivity, type Activity } from '../../../packages/domain-widgets/src/activity';
+import { NewsPreview } from '../../../packages/domain-widgets/src/news';
+import { MemosPreview } from '../../../packages/domain-widgets/src/memos';
+import { ProfileInfoCard } from '../../../packages/domain-widgets/src/profile';
 
 export default function CrewHub() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -110,11 +114,11 @@ export default function CrewHub() {
 
   // Crew-specific overview cards (5 cards)
   const overviewCards = [
-    { id: 'services', title: 'Active Services', dataKey: 'serviceCount', color: 'blue', subtitle: 'Services assigned' },
-    { id: 'tasks', title: 'My Tasks', dataKey: 'taskCount', color: 'red', subtitle: 'Tasks to complete' },
-    { id: 'hours', title: 'My Hours', dataKey: 'hoursWorked', color: 'purple', subtitle: 'Hours this week' },
-    { id: 'orders', title: 'Pending Orders', dataKey: 'pendingOrders', color: 'orange', subtitle: 'Orders assigned' },
-    { id: 'status', title: 'Account Status', dataKey: 'accountStatus', color: 'green', subtitle: 'Current status' }
+    { id: 'services', title: 'Active Services', dataKey: 'serviceCount', color: 'blue' },
+    { id: 'tasks', title: 'My Tasks', dataKey: 'taskCount', color: 'red' },
+    { id: 'hours', title: 'My Hours', dataKey: 'hoursWorked', color: 'purple' },
+    { id: 'orders', title: 'Pending Orders', dataKey: 'pendingOrders', color: 'orange' },
+    { id: 'status', title: 'Account Status', dataKey: 'accountStatus', color: 'green' }
   ];
 
   // Mock data - replace with actual API data
@@ -127,7 +131,7 @@ export default function CrewHub() {
   };
 
   return (
-    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#f9fafb' }}>
+    <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: '#f9fafb' }}>
       <MyHubSection
         hubName="Crew Hub"
         tabs={tabs}
@@ -139,13 +143,10 @@ export default function CrewHub() {
       />
 
       {/* Content Area */}
-      <div style={{
+      <Scrollbar style={{
         flex: 1,
-        overflow: 'auto',
-        padding: '24px',
-        scrollbarWidth: 'thin',
-        scrollbarColor: '#94a3b8 transparent'
-      }} className="hub-content-scroll">
+        padding: '24px'
+      }}>
         <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
           {activeTab === 'dashboard' ? (
             <>
@@ -160,7 +161,37 @@ export default function CrewHub() {
                 title="Recent Activity"
                 emptyMessage="No recent activity"
               />
+
+              {/* Communication Hub */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 24 }}>
+                <NewsPreview color="#ef4444" onViewAll={() => console.log('View all news')} />
+                <MemosPreview color="#ef4444" onViewAll={() => console.log('View memos')} />
+              </div>
             </>
+          ) : activeTab === 'profile' ? (
+            <ProfileInfoCard
+              role="crew"
+              profileData={{
+                name: 'David Martinez',
+                crewId: 'CRW-001',
+                address: '567 Worker Lane, Houston, TX 77001',
+                phone: '(555) 890-1234',
+                email: 'david.martinez@cks-crew.com',
+                territory: 'Southwest District',
+                emergencyContact: 'Maria Martinez (555) 890-5678',
+                startDate: '2022-02-28'
+              }}
+              accountManager={{
+                name: 'Tom Bradley',
+                id: 'MGR-005',
+                email: 'tom.bradley@cks.com',
+                phone: '(555) 901-2345'
+              }}
+              primaryColor="#ef4444"
+              onUpdatePhoto={() => console.log('Update photo')}
+              onContactManager={() => console.log('Contact manager')}
+              onScheduleMeeting={() => console.log('Schedule meeting')}
+            />
           ) : (
             <>
               <h2>Crew Hub - {activeTab}</h2>
@@ -168,7 +199,7 @@ export default function CrewHub() {
             </>
           )}
         </div>
-      </div>
+      </Scrollbar>
     </div>
   );
 }

@@ -22,9 +22,13 @@
 ───────────────────────────────────────────────*/
 
 import React, { useState, useEffect } from 'react';
+import { Scrollbar } from '../../../packages/ui/src/Scrollbar';
 import MyHubSection from '../../../packages/ui/src/navigation/MyHubSection';
 import OverviewSection from '../../../packages/domain-widgets/src/overview';
 import { RecentActivity, type Activity } from '../../../packages/domain-widgets/src/activity';
+import { NewsPreview } from '../../../packages/domain-widgets/src/news';
+import { MemosPreview } from '../../../packages/domain-widgets/src/memos';
+import { ProfileInfoCard } from '../../../packages/domain-widgets/src/profile';
 
 export default function ContractorHub() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -110,12 +114,12 @@ export default function ContractorHub() {
 
   // Contractor-specific overview cards (6 cards)
   const overviewCards = [
-    { id: 'services', title: 'Active Services', dataKey: 'serviceCount', color: 'blue', subtitle: 'Services in progress' },
-    { id: 'customers', title: 'Active Customers', dataKey: 'customerCount', color: 'green', subtitle: 'Customers served' },
-    { id: 'centers', title: 'Active Centers', dataKey: 'centerCount', color: 'purple', subtitle: 'Centers serviced' },
-    { id: 'crew', title: 'Active Crew', dataKey: 'crewCount', color: 'orange', subtitle: 'Team members' },
-    { id: 'orders', title: 'Pending Orders', dataKey: 'pendingOrders', color: 'red', subtitle: 'Orders to complete' },
-    { id: 'status', title: 'Account Status', dataKey: 'accountStatus', color: 'green', subtitle: 'Current status' }
+    { id: 'services', title: 'Active Services', dataKey: 'serviceCount', color: 'blue' },
+    { id: 'customers', title: 'Active Customers', dataKey: 'customerCount', color: 'green' },
+    { id: 'centers', title: 'Active Centers', dataKey: 'centerCount', color: 'purple' },
+    { id: 'crew', title: 'Active Crew', dataKey: 'crewCount', color: 'orange' },
+    { id: 'orders', title: 'Pending Orders', dataKey: 'pendingOrders', color: 'red' },
+    { id: 'status', title: 'Account Status', dataKey: 'accountStatus', color: 'green' }
   ];
 
   // Mock data - replace with actual API data
@@ -129,7 +133,7 @@ export default function ContractorHub() {
   };
 
   return (
-    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#f9fafb' }}>
+    <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: '#f9fafb' }}>
       <MyHubSection
         hubName="Contractor Hub"
         tabs={tabs}
@@ -141,13 +145,10 @@ export default function ContractorHub() {
       />
 
       {/* Content Area */}
-      <div style={{
+      <Scrollbar style={{
         flex: 1,
-        overflow: 'auto',
-        padding: '24px',
-        scrollbarWidth: 'thin',
-        scrollbarColor: '#94a3b8 transparent'
-      }} className="hub-content-scroll">
+        padding: '24px'
+      }}>
         <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
           {activeTab === 'dashboard' ? (
             <>
@@ -162,7 +163,37 @@ export default function ContractorHub() {
                 title="Recent Activity"
                 emptyMessage="No recent contractor activity"
               />
+
+              {/* Communication Hub */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 24 }}>
+                <NewsPreview color="#10b981" onViewAll={() => console.log('View all news')} />
+                <MemosPreview color="#10b981" onViewAll={() => console.log('View memos')} />
+              </div>
             </>
+          ) : activeTab === 'profile' ? (
+            <ProfileInfoCard
+              role="contractor"
+              profileData={{
+                name: 'ABC Contracting Services',
+                contractorId: 'CON-001',
+                address: '456 Industrial Blvd, Denver, CO 80202',
+                phone: '(555) 234-5678',
+                email: 'contact@abccontracting.com',
+                website: 'www.abccontracting.com',
+                mainContact: 'Michael Johnson',
+                startDate: '2020-03-20'
+              }}
+              accountManager={{
+                name: 'Sarah Williams',
+                id: 'MGR-002',
+                email: 'sarah.williams@cks.com',
+                phone: '(555) 345-6789'
+              }}
+              primaryColor="#10b981"
+              onUpdatePhoto={() => console.log('Update photo')}
+              onContactManager={() => console.log('Contact manager')}
+              onScheduleMeeting={() => console.log('Schedule meeting')}
+            />
           ) : (
             <>
               <h2>Contractor Hub - {activeTab}</h2>
@@ -170,7 +201,7 @@ export default function ContractorHub() {
             </>
           )}
         </div>
-      </div>
+      </Scrollbar>
     </div>
   );
 }

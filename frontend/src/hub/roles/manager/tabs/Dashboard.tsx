@@ -88,17 +88,16 @@ export default function Dashboard({ userId, config, features, api }: DashboardPr
       {/* Simple Entity Count Metrics */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 16, marginBottom: 24 }}>
         {[
-          { title: 'My Contractors', value: dashboardLoading ? '—' : String(dashboardMetrics.contractors), subtitle: 'Total contractors managed', color: '#3b7af7' },
-          { title: 'My Customers', value: dashboardLoading ? '—' : String(dashboardMetrics.customers), subtitle: 'Total customers served', color: '#10b981' },
-          { title: 'My Centers', value: dashboardLoading ? '—' : String(dashboardMetrics.centers), subtitle: 'Service centers managed', color: '#8b5cf6' },
-          { title: 'My Crew', value: dashboardLoading ? '—' : String(dashboardMetrics.crew), subtitle: 'Total crew members', color: '#f59e0b' },
-          { title: 'Pending Orders', value: dashboardLoading ? '—' : '7', subtitle: 'Orders requiring attention', color: '#ef4444' },
-          { title: 'Account Status', value: dashboardLoading ? '—' : 'Active', subtitle: 'Current account status', color: '#10b981' },
+          { title: 'My Contractors', value: dashboardLoading ? '—' : String(dashboardMetrics.contractors), color: '#3b7af7' },
+          { title: 'My Customers', value: dashboardLoading ? '—' : String(dashboardMetrics.customers), color: '#10b981' },
+          { title: 'My Centers', value: dashboardLoading ? '—' : String(dashboardMetrics.centers), color: '#8b5cf6' },
+          { title: 'My Crew', value: dashboardLoading ? '—' : String(dashboardMetrics.crew), color: '#f59e0b' },
+          { title: 'Pending Orders', value: dashboardLoading ? '—' : '7', color: '#ef4444' },
+          { title: 'Account Status', value: dashboardLoading ? '—' : 'Active', color: '#10b981' },
         ].map(metric => (
           <div key={metric.title} className="ui-card" style={{ padding: 16, textAlign: 'center' }}>
             <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>{metric.title}</div>
-            <div style={{ fontSize: 32, fontWeight: 700, color: metric.color, marginBottom: 2 }}>{metric.value}</div>
-            <div style={{ fontSize: 12, color: '#6b7280' }}>{metric.subtitle}</div>
+            <div style={{ fontSize: 32, fontWeight: 700, color: metric.color }}>{metric.value}</div>
           </div>
         ))}
       </div>

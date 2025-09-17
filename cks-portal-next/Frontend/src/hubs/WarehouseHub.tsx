@@ -22,9 +22,13 @@
 ───────────────────────────────────────────────*/
 
 import React, { useState, useEffect } from 'react';
+import { Scrollbar } from '../../../packages/ui/src/Scrollbar';
 import MyHubSection from '../../../packages/ui/src/navigation/MyHubSection';
 import OverviewSection from '../../../packages/domain-widgets/src/overview';
 import { RecentActivity, type Activity } from '../../../packages/domain-widgets/src/activity';
+import { NewsPreview } from '../../../packages/domain-widgets/src/news';
+import { MemosPreview } from '../../../packages/domain-widgets/src/memos';
+import { ProfileInfoCard } from '../../../packages/domain-widgets/src/profile';
 
 export default function WarehouseHub() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -111,11 +115,11 @@ export default function WarehouseHub() {
 
   // Warehouse-specific overview cards (5 cards)
   const overviewCards = [
-    { id: 'products', title: 'Product Count', dataKey: 'productCount', color: 'purple', subtitle: 'Total products' },
-    { id: 'lowstock', title: 'Low Stock', dataKey: 'lowStockCount', color: 'red', subtitle: 'Items to reorder' },
-    { id: 'orders', title: 'Pending Orders', dataKey: 'pendingOrders', color: 'orange', subtitle: 'Orders to fulfill' },
-    { id: 'deliveries', title: 'Pending Deliveries', dataKey: 'pendingDeliveries', color: 'blue', subtitle: 'Awaiting delivery' },
-    { id: 'status', title: 'Account Status', dataKey: 'accountStatus', color: 'green', subtitle: 'Current status' }
+    { id: 'products', title: 'Product Count', dataKey: 'productCount', color: 'purple' },
+    { id: 'lowstock', title: 'Low Stock', dataKey: 'lowStockCount', color: 'red' },
+    { id: 'orders', title: 'Pending Orders', dataKey: 'pendingOrders', color: 'orange' },
+    { id: 'deliveries', title: 'Pending Deliveries', dataKey: 'pendingDeliveries', color: 'blue' },
+    { id: 'status', title: 'Account Status', dataKey: 'accountStatus', color: 'green' }
   ];
 
   // Mock data - replace with actual API data
@@ -128,7 +132,7 @@ export default function WarehouseHub() {
   };
 
   return (
-    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#f9fafb' }}>
+    <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: '#f9fafb' }}>
       <MyHubSection
         hubName="Warehouse Hub"
         tabs={tabs}
@@ -140,13 +144,10 @@ export default function WarehouseHub() {
       />
 
       {/* Content Area */}
-      <div style={{
+      <Scrollbar style={{
         flex: 1,
-        overflow: 'auto',
-        padding: '24px',
-        scrollbarWidth: 'thin',
-        scrollbarColor: '#94a3b8 transparent'
-      }} className="hub-content-scroll">
+        padding: '24px'
+      }}>
         <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
           {activeTab === 'dashboard' ? (
             <>
@@ -161,7 +162,37 @@ export default function WarehouseHub() {
                 title="Recent Activity"
                 emptyMessage="No recent warehouse activity"
               />
+
+              {/* Communication Hub */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 24 }}>
+                <NewsPreview onViewAll={() => console.log('View all news')} />
+                <MemosPreview onViewAll={() => console.log('View memos')} />
+              </div>
             </>
+          ) : activeTab === 'profile' ? (
+            <ProfileInfoCard
+              role="warehouse"
+              profileData={{
+                name: 'Central Distribution Warehouse',
+                warehouseId: 'WHS-001',
+                address: '999 Logistics Parkway, Dallas, TX 75201',
+                phone: '(555) 012-3456',
+                email: 'central@cks-warehouse.com',
+                territory: 'Central Region',
+                mainContact: 'Kevin Thompson',
+                startDate: '2017-09-12'
+              }}
+              accountManager={{
+                name: 'Jennifer Brown',
+                id: 'MGR-006',
+                email: 'jennifer.brown@cks.com',
+                phone: '(555) 123-4567'
+              }}
+              primaryColor="#8b5cf6"
+              onUpdatePhoto={() => console.log('Update photo')}
+              onContactManager={() => console.log('Contact manager')}
+              onScheduleMeeting={() => console.log('Schedule meeting')}
+            />
           ) : (
             <>
               <h2>Warehouse Hub - {activeTab}</h2>
@@ -169,7 +200,7 @@ export default function WarehouseHub() {
             </>
           )}
         </div>
-      </div>
+      </Scrollbar>
     </div>
   );
 }

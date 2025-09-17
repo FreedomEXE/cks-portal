@@ -22,9 +22,13 @@
 ───────────────────────────────────────────────*/
 
 import React, { useState, useEffect } from 'react';
+import { Scrollbar } from '../../../packages/ui/src/Scrollbar';
 import MyHubSection from '../../../packages/ui/src/navigation/MyHubSection';
 import OverviewSection from '../../../packages/domain-widgets/src/overview';
 import { RecentActivity, type Activity } from '../../../packages/domain-widgets/src/activity';
+import { NewsPreview } from '../../../packages/domain-widgets/src/news';
+import { MemosPreview } from '../../../packages/domain-widgets/src/memos';
+import { ProfileInfoCard } from '../../../packages/domain-widgets/src/profile';
 
 export default function CustomerHub() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -103,11 +107,11 @@ export default function CustomerHub() {
 
   // Customer-specific overview cards (5 cards)
   const overviewCards = [
-    { id: 'services', title: 'Active Services', dataKey: 'serviceCount', color: 'blue', subtitle: 'Services in progress' },
-    { id: 'centers', title: 'Active Centers', dataKey: 'centerCount', color: 'yellow', subtitle: 'Centers managed' },
-    { id: 'crew', title: 'Active Crew', dataKey: 'crewCount', color: 'orange', subtitle: 'Crew assigned' },
-    { id: 'requests', title: 'Pending Requests', dataKey: 'pendingRequests', color: 'red', subtitle: 'Awaiting response' },
-    { id: 'status', title: 'Account Status', dataKey: 'accountStatus', color: 'green', subtitle: 'Current status' }
+    { id: 'services', title: 'Active Services', dataKey: 'serviceCount', color: 'blue' },
+    { id: 'centers', title: 'Active Centers', dataKey: 'centerCount', color: 'yellow' },
+    { id: 'crew', title: 'Active Crew', dataKey: 'crewCount', color: 'orange' },
+    { id: 'requests', title: 'Pending Requests', dataKey: 'pendingRequests', color: 'red' },
+    { id: 'status', title: 'Account Status', dataKey: 'accountStatus', color: 'green' }
   ];
 
   // Mock data - replace with actual API data
@@ -120,7 +124,7 @@ export default function CustomerHub() {
   };
 
   return (
-    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#f9fafb' }}>
+    <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: '#f9fafb' }}>
       <MyHubSection
         hubName="Customer Hub"
         tabs={tabs}
@@ -132,13 +136,10 @@ export default function CustomerHub() {
       />
 
       {/* Content Area */}
-      <div style={{
+      <Scrollbar style={{
         flex: 1,
-        overflow: 'auto',
-        padding: '24px',
-        scrollbarWidth: 'thin',
-        scrollbarColor: '#94a3b8 transparent'
-      }} className="hub-content-scroll">
+        padding: '24px'
+      }}>
         <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
           {activeTab === 'dashboard' ? (
             <>
@@ -153,7 +154,37 @@ export default function CustomerHub() {
                 title="Recent Activity"
                 emptyMessage="No recent customer activity"
               />
+
+              {/* Communication Hub */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 24 }}>
+                <NewsPreview color="#eab308" onViewAll={() => console.log('View all news')} />
+                <MemosPreview color="#eab308" onViewAll={() => console.log('View memos')} />
+              </div>
             </>
+          ) : activeTab === 'profile' ? (
+            <ProfileInfoCard
+              role="customer"
+              profileData={{
+                name: 'TechCorp Industries',
+                customerId: 'CUS-001',
+                address: '789 Technology Way, San Francisco, CA 94105',
+                phone: '(555) 456-7890',
+                email: 'services@techcorp.com',
+                website: 'www.techcorp.com',
+                mainContact: 'Emily Davis',
+                startDate: '2019-06-10'
+              }}
+              accountManager={{
+                name: 'Robert Chen',
+                id: 'MGR-003',
+                email: 'robert.chen@cks.com',
+                phone: '(555) 567-8901'
+              }}
+              primaryColor="#eab308"
+              onUpdatePhoto={() => console.log('Update photo')}
+              onContactManager={() => console.log('Contact manager')}
+              onScheduleMeeting={() => console.log('Schedule meeting')}
+            />
           ) : (
             <>
               <h2>Customer Hub - {activeTab}</h2>
@@ -161,7 +192,7 @@ export default function CustomerHub() {
             </>
           )}
         </div>
-      </div>
+      </Scrollbar>
     </div>
   );
 }

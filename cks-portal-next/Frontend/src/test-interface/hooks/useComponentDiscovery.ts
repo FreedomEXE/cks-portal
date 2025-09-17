@@ -56,41 +56,39 @@ export function useComponentDiscovery(selectedRole: string) {
     try {
       const uiModules = import.meta.glob('../../../../packages/ui/src/**/*.tsx', { eager: false });
       Object.keys(uiModules).forEach(path => {
-        // Skip test files, stories, and index files
-        if (path.includes('.test.') || path.includes('.stories.') || path.includes('/index.')) {
+        // Skip only test and story files
+        if (path.includes('.test.') || path.includes('.stories.')) {
           return;
         }
 
         // Extract meaningful component name from the path
         const cleanPath = path.replace('../../../../packages/ui/src/', '');
         const parts = cleanPath.split('/');
-
-        // Look for main component files (e.g., InfoCard/InfoCard.tsx or MyComponent.tsx)
         const fileName = parts[parts.length - 1].replace('.tsx', '');
 
         // Determine component name based on path structure
         let componentName = '';
-        let componentPath = '';
+        let componentPath = cleanPath;
 
         if (parts.length >= 2) {
-          // Nested component (e.g., cards/InfoCard/InfoCard.tsx)
           const folderName = parts[parts.length - 2];
+          // If it's a main component file (ComponentName/ComponentName.tsx or ComponentName/index.tsx)
           if (fileName === folderName || fileName === 'index') {
             componentName = folderName;
-            componentPath = cleanPath.substring(0, cleanPath.lastIndexOf('/'));
-          } else if (parts.length === 2 && fileName !== 'index') {
-            // Direct file in category folder (e.g., navigation/MyHubSection.tsx)
+            componentPath = parts.slice(0, -1).join('/');
+          } else {
+            // It's a standalone file
             componentName = fileName;
             componentPath = cleanPath.replace('.tsx', '');
           }
-        } else if (parts.length === 1 && fileName !== 'index') {
-          // Root level component
-          componentName = fileName;
+        } else {
+          // Root level file
+          componentName = fileName === 'index' ? 'Root' : fileName;
           componentPath = cleanPath.replace('.tsx', '');
         }
 
         // Add if we found a valid component and haven't seen it before
-        if (componentName && !discoveredNames.has(componentName)) {
+        if (componentName && componentName !== 'index' && !discoveredNames.has(componentName)) {
           discovered.push({
             name: componentName,
             location: `packages/ui/src/${componentPath}`,
@@ -109,46 +107,39 @@ export function useComponentDiscovery(selectedRole: string) {
       const domainModules = import.meta.glob('../../../../packages/domain-widgets/src/**/*.tsx', { eager: false });
       console.log('[Component Discovery] Found domain module paths:', Object.keys(domainModules));
       Object.keys(domainModules).forEach(path => {
-        // Skip test files, stories, and index files
-        if (path.includes('.test.') || path.includes('.stories.') || path.includes('/index.')) {
+        // Skip only test and story files
+        if (path.includes('.test.') || path.includes('.stories.')) {
           return;
         }
 
         // Extract meaningful component name from the path
         const cleanPath = path.replace('../../../../packages/domain-widgets/src/', '');
         const parts = cleanPath.split('/');
-
-        // Look for main component files
         const fileName = parts[parts.length - 1].replace('.tsx', '');
 
         // Determine component name based on path structure
         let componentName = '';
-        let componentPath = '';
+        let componentPath = cleanPath;
 
         if (parts.length >= 2) {
-          // Could be nested like activity/RecentActivity/RecentActivity.tsx
           const folderName = parts[parts.length - 2];
-          if (fileName === folderName) {
-            // This is the main component file
+          // If it's a main component file (ComponentName/ComponentName.tsx or ComponentName/index.tsx)
+          if (fileName === folderName || fileName === 'index') {
             componentName = folderName;
-            componentPath = cleanPath.substring(0, cleanPath.lastIndexOf('/'));
-          } else if (parts.length === 3 && parts[1] === folderName && fileName === folderName) {
-            // Deep nesting like activity/RecentActivity/RecentActivity.tsx
-            componentName = folderName;
-            componentPath = cleanPath.substring(0, cleanPath.lastIndexOf('/'));
-          } else if (parts.length === 1 || (parts.length === 2 && fileName !== 'index')) {
-            // Simple structure like overview/OverviewSection.tsx or OverviewSection.tsx
+            componentPath = parts.slice(0, -1).join('/');
+          } else {
+            // It's a standalone file or sub-component
             componentName = fileName;
             componentPath = cleanPath.replace('.tsx', '');
           }
-        } else if (fileName !== 'index') {
-          // Root level component
-          componentName = fileName;
+        } else {
+          // Root level file
+          componentName = fileName === 'index' ? 'Root' : fileName;
           componentPath = cleanPath.replace('.tsx', '');
         }
 
         // Add if we found a valid component and haven't seen it before
-        if (componentName && !discoveredNames.has(componentName)) {
+        if (componentName && componentName !== 'index' && !discoveredNames.has(componentName)) {
           console.log('[Component Discovery] Adding domain component:', componentName, 'at', componentPath);
           discovered.push({
             name: componentName,

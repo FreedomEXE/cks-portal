@@ -22,9 +22,13 @@
 ───────────────────────────────────────────────*/
 
 import React, { useState, useEffect } from 'react';
+import { Scrollbar } from '../../../packages/ui/src/Scrollbar';
 import MyHubSection from '../../../packages/ui/src/navigation/MyHubSection';
 import OverviewSection from '../../../packages/domain-widgets/src/overview';
 import { RecentActivity, type Activity } from '../../../packages/domain-widgets/src/activity';
+import { NewsPreview } from '../../../packages/domain-widgets/src/news';
+import { MemosPreview } from '../../../packages/domain-widgets/src/memos';
+import { ProfileInfoCard } from '../../../packages/domain-widgets/src/profile';
 
 export default function ManagerHub() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -131,12 +135,12 @@ export default function ManagerHub() {
 
   // Manager-specific overview cards (6 cards)
   const overviewCards = [
-    { id: 'contractors', title: 'My Contractors', dataKey: 'contractorCount', color: 'blue', subtitle: 'Total contractors managed' },
-    { id: 'customers', title: 'My Customers', dataKey: 'customerCount', color: 'green', subtitle: 'Total customers served' },
-    { id: 'centers', title: 'My Centers', dataKey: 'centerCount', color: 'purple', subtitle: 'Service centers managed' },
-    { id: 'crew', title: 'My Crew', dataKey: 'crewCount', color: 'orange', subtitle: 'Total crew members' },
-    { id: 'orders', title: 'Pending Orders', dataKey: 'pendingOrders', color: 'red', subtitle: 'Orders requiring attention' },
-    { id: 'status', title: 'Account Status', dataKey: 'accountStatus', color: 'green', subtitle: 'Current account status' }
+    { id: 'contractors', title: 'My Contractors', dataKey: 'contractorCount', color: 'blue' },
+    { id: 'customers', title: 'My Customers', dataKey: 'customerCount', color: 'green' },
+    { id: 'centers', title: 'My Centers', dataKey: 'centerCount', color: 'purple' },
+    { id: 'crew', title: 'My Crew', dataKey: 'crewCount', color: 'orange' },
+    { id: 'orders', title: 'Pending Orders', dataKey: 'pendingOrders', color: 'red' },
+    { id: 'status', title: 'Account Status', dataKey: 'accountStatus', color: 'green' }
   ];
 
   // Mock data - replace with actual API data
@@ -151,7 +155,7 @@ export default function ManagerHub() {
 
 
   return (
-    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#f9fafb' }}>
+    <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: '#f9fafb' }}>
       <MyHubSection
         hubName="Manager Hub"
         tabs={tabs}
@@ -163,13 +167,10 @@ export default function ManagerHub() {
       />
 
       {/* Content Area */}
-      <div style={{
+      <Scrollbar style={{
         flex: 1,
-        overflow: 'auto',
-        padding: '24px',
-        scrollbarWidth: 'thin',
-        scrollbarColor: '#94a3b8 transparent'
-      }} className="hub-content-scroll">
+        padding: '24px'
+      }}>
         <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
           {activeTab === 'dashboard' ? (
             <>
@@ -184,7 +185,31 @@ export default function ManagerHub() {
                 title="Recent Activity"
                 emptyMessage="No recent manager activity"
               />
+
+              {/* Communication Hub */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 24 }}>
+                <NewsPreview color="#3b82f6" onViewAll={() => console.log('View all news')} />
+                <MemosPreview color="#3b82f6" onViewAll={() => console.log('View memos')} />
+              </div>
             </>
+          ) : activeTab === 'profile' ? (
+            <ProfileInfoCard
+              role="manager"
+              profileData={{
+                fullName: 'John Smith',
+                managerId: 'MGR-001',
+                address: '123 Business Ave, Suite 100, New York, NY 10001',
+                phone: '(555) 123-4567',
+                email: 'john.smith@cks.com',
+                territory: 'Northeast Region',
+                role: 'Senior Manager',
+                reportsTo: 'Regional Director',
+                startDate: '2021-01-15'
+              }}
+              accountManager={null}
+              primaryColor="#3b82f6"
+              onUpdatePhoto={() => console.log('Update photo')}
+            />
           ) : (
             <>
               <h2>Manager Hub - {activeTab}</h2>
@@ -192,7 +217,7 @@ export default function ManagerHub() {
             </>
           )}
         </div>
-      </div>
+      </Scrollbar>
     </div>
   );
 }
