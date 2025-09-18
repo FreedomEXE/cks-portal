@@ -1,0 +1,891 @@
+{
+  "admin": {
+    "tabs": {
+      "dashboard": {
+        "OverviewSection": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/overview"
+        },
+        "RecentActivity": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/activity"
+        },
+        "NewsPreview": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/news"
+        },
+        "MemosPreview": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/memos"
+        },
+        "OverviewCard": {
+          "count": 4,
+          "type": "ui",
+          "path": "packages/ui/src/cards/OverviewCard"
+        },
+        "Button": {
+          "count": 2,
+          "type": "ui",
+          "path": "packages/ui/src/Button"
+        },
+        "MyHubSection": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/MyHubSection"
+        },
+        "Scrollbar": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/Scrollbar"
+        }
+      },
+      "directory": {
+        "MyHubSection": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/MyHubSection"
+        },
+        "Scrollbar": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/Scrollbar"
+        }
+      },
+      "create": {
+        "MyHubSection": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/MyHubSection"
+        },
+        "Scrollbar": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/Scrollbar"
+        }
+      },
+      "assign": {
+        "MyHubSection": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/MyHubSection"
+        },
+        "Scrollbar": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/Scrollbar"
+        }
+      },
+      "archive": {
+        "MyHubSection": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/MyHubSection"
+        },
+        "Scrollbar": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/Scrollbar"
+        }
+      },
+      "support": {
+        "MyHubSection": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/MyHubSection"
+        },
+        "Scrollbar": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/Scrollbar"
+        }
+      }
+    },
+    "tabDefinitions": [
+      "dashboard",
+      "directory",
+      "create",
+      "assign",
+      "archive",
+      "support"
+    ]
+  },
+  "manager": {
+    "tabs": {
+      "dashboard": {
+        "OverviewSection": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/overview"
+        },
+        "RecentActivity": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/activity"
+        },
+        "NewsPreview": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/news"
+        },
+        "MemosPreview": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/memos"
+        },
+        "OverviewCard": {
+          "count": 6,
+          "type": "ui",
+          "path": "packages/ui/src/cards/OverviewCard"
+        },
+        "Button": {
+          "count": 2,
+          "type": "ui",
+          "path": "packages/ui/src/Button"
+        },
+        "MyHubSection": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/MyHubSection"
+        },
+        "Scrollbar": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/Scrollbar"
+        }
+      },
+      "profile": {
+        "MyHubSection": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/MyHubSection"
+        },
+        "Scrollbar": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/Scrollbar"
+        }
+      },
+      "ecosystem": {
+        "MyHubSection": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/MyHubSection"
+        },
+        "Scrollbar": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/Scrollbar"
+        }
+      },
+      "services": {
+        "MyHubSection": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/MyHubSection"
+        },
+        "Scrollbar": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/Scrollbar"
+        }
+      },
+      "orders": {
+        "MyHubSection": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/MyHubSection"
+        },
+        "Scrollbar": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/Scrollbar"
+        }
+      },
+      "reports": {
+        "MyHubSection": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/MyHubSection"
+        },
+        "Scrollbar": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/Scrollbar"
+        }
+      },
+      "support": {
+        "MyHubSection": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/MyHubSection"
+        },
+        "Scrollbar": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/Scrollbar"
+        }
+      }
+    },
+    "tabDefinitions": [
+      "dashboard",
+      "profile",
+      "ecosystem",
+      "services",
+      "orders",
+      "reports",
+      "support"
+    ]
+  },
+  "contractor": {
+    "tabs": {
+      "dashboard": {
+        "OverviewSection": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/overview"
+        },
+        "RecentActivity": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/activity"
+        },
+        "NewsPreview": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/news"
+        },
+        "MemosPreview": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/memos"
+        },
+        "OverviewCard": {
+          "count": 6,
+          "type": "ui",
+          "path": "packages/ui/src/cards/OverviewCard"
+        },
+        "Button": {
+          "count": 2,
+          "type": "ui",
+          "path": "packages/ui/src/Button"
+        },
+        "MyHubSection": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/MyHubSection"
+        },
+        "Scrollbar": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/Scrollbar"
+        }
+      },
+      "profile": {
+        "MyHubSection": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/MyHubSection"
+        },
+        "Scrollbar": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/Scrollbar"
+        }
+      },
+      "ecosystem": {
+        "MyHubSection": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/MyHubSection"
+        },
+        "Scrollbar": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/Scrollbar"
+        }
+      },
+      "services": {
+        "MyHubSection": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/MyHubSection"
+        },
+        "Scrollbar": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/Scrollbar"
+        }
+      },
+      "orders": {
+        "MyHubSection": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/MyHubSection"
+        },
+        "Scrollbar": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/Scrollbar"
+        }
+      },
+      "reports": {
+        "MyHubSection": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/MyHubSection"
+        },
+        "Scrollbar": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/Scrollbar"
+        }
+      },
+      "support": {
+        "MyHubSection": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/MyHubSection"
+        },
+        "Scrollbar": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/Scrollbar"
+        }
+      }
+    },
+    "tabDefinitions": [
+      "dashboard",
+      "profile",
+      "ecosystem",
+      "services",
+      "orders",
+      "reports",
+      "support"
+    ]
+  },
+  "customer": {
+    "tabs": {
+      "dashboard": {
+        "OverviewSection": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/overview"
+        },
+        "RecentActivity": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/activity"
+        },
+        "NewsPreview": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/news"
+        },
+        "MemosPreview": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/memos"
+        },
+        "OverviewCard": {
+          "count": 5,
+          "type": "ui",
+          "path": "packages/ui/src/cards/OverviewCard"
+        },
+        "Button": {
+          "count": 2,
+          "type": "ui",
+          "path": "packages/ui/src/Button"
+        },
+        "MyHubSection": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/MyHubSection"
+        },
+        "Scrollbar": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/Scrollbar"
+        }
+      },
+      "profile": {
+        "MyHubSection": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/MyHubSection"
+        },
+        "Scrollbar": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/Scrollbar"
+        }
+      },
+      "ecosystem": {
+        "MyHubSection": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/MyHubSection"
+        },
+        "Scrollbar": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/Scrollbar"
+        }
+      },
+      "services": {
+        "MyHubSection": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/MyHubSection"
+        },
+        "Scrollbar": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/Scrollbar"
+        }
+      },
+      "orders": {
+        "MyHubSection": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/MyHubSection"
+        },
+        "Scrollbar": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/Scrollbar"
+        }
+      },
+      "reports": {
+        "MyHubSection": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/MyHubSection"
+        },
+        "Scrollbar": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/Scrollbar"
+        }
+      },
+      "support": {
+        "MyHubSection": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/MyHubSection"
+        },
+        "Scrollbar": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/Scrollbar"
+        }
+      }
+    },
+    "tabDefinitions": [
+      "dashboard",
+      "profile",
+      "ecosystem",
+      "services",
+      "orders",
+      "reports",
+      "support"
+    ]
+  },
+  "center": {
+    "tabs": {
+      "dashboard": {
+        "OverviewSection": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/overview"
+        },
+        "RecentActivity": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/activity"
+        },
+        "NewsPreview": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/news"
+        },
+        "MemosPreview": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/memos"
+        },
+        "OverviewCard": {
+          "count": 4,
+          "type": "ui",
+          "path": "packages/ui/src/cards/OverviewCard"
+        },
+        "Button": {
+          "count": 2,
+          "type": "ui",
+          "path": "packages/ui/src/Button"
+        },
+        "MyHubSection": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/MyHubSection"
+        },
+        "Scrollbar": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/Scrollbar"
+        }
+      },
+      "profile": {
+        "MyHubSection": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/MyHubSection"
+        },
+        "Scrollbar": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/Scrollbar"
+        }
+      },
+      "ecosystem": {
+        "MyHubSection": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/MyHubSection"
+        },
+        "Scrollbar": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/Scrollbar"
+        }
+      },
+      "services": {
+        "MyHubSection": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/MyHubSection"
+        },
+        "Scrollbar": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/Scrollbar"
+        }
+      },
+      "orders": {
+        "MyHubSection": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/MyHubSection"
+        },
+        "Scrollbar": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/Scrollbar"
+        }
+      },
+      "reports": {
+        "MyHubSection": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/MyHubSection"
+        },
+        "Scrollbar": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/Scrollbar"
+        }
+      },
+      "support": {
+        "MyHubSection": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/MyHubSection"
+        },
+        "Scrollbar": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/Scrollbar"
+        }
+      }
+    },
+    "tabDefinitions": [
+      "dashboard",
+      "profile",
+      "ecosystem",
+      "services",
+      "orders",
+      "reports",
+      "support"
+    ]
+  },
+  "crew": {
+    "tabs": {
+      "dashboard": {
+        "OverviewSection": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/overview"
+        },
+        "RecentActivity": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/activity"
+        },
+        "NewsPreview": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/news"
+        },
+        "MemosPreview": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/memos"
+        },
+        "OverviewCard": {
+          "count": 5,
+          "type": "ui",
+          "path": "packages/ui/src/cards/OverviewCard"
+        },
+        "Button": {
+          "count": 2,
+          "type": "ui",
+          "path": "packages/ui/src/Button"
+        },
+        "MyHubSection": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/MyHubSection"
+        },
+        "Scrollbar": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/Scrollbar"
+        }
+      },
+      "profile": {
+        "MyHubSection": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/MyHubSection"
+        },
+        "Scrollbar": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/Scrollbar"
+        }
+      },
+      "ecosystem": {
+        "MyHubSection": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/MyHubSection"
+        },
+        "Scrollbar": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/Scrollbar"
+        }
+      },
+      "services": {
+        "MyHubSection": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/MyHubSection"
+        },
+        "Scrollbar": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/Scrollbar"
+        }
+      },
+      "orders": {
+        "MyHubSection": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/MyHubSection"
+        },
+        "Scrollbar": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/Scrollbar"
+        }
+      },
+      "reports": {
+        "MyHubSection": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/MyHubSection"
+        },
+        "Scrollbar": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/Scrollbar"
+        }
+      },
+      "support": {
+        "MyHubSection": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/MyHubSection"
+        },
+        "Scrollbar": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/Scrollbar"
+        }
+      }
+    },
+    "tabDefinitions": [
+      "dashboard",
+      "profile",
+      "ecosystem",
+      "services",
+      "orders",
+      "reports",
+      "support"
+    ]
+  },
+  "warehouse": {
+    "tabs": {
+      "dashboard": {
+        "OverviewSection": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/overview"
+        },
+        "RecentActivity": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/activity"
+        },
+        "NewsPreview": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/news"
+        },
+        "MemosPreview": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/memos"
+        },
+        "OverviewCard": {
+          "count": 5,
+          "type": "ui",
+          "path": "packages/ui/src/cards/OverviewCard"
+        },
+        "Button": {
+          "count": 2,
+          "type": "ui",
+          "path": "packages/ui/src/Button"
+        },
+        "MyHubSection": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/MyHubSection"
+        },
+        "Scrollbar": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/Scrollbar"
+        }
+      },
+      "profile": {
+        "MyHubSection": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/MyHubSection"
+        },
+        "Scrollbar": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/Scrollbar"
+        }
+      },
+      "services": {
+        "MyHubSection": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/MyHubSection"
+        },
+        "Scrollbar": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/Scrollbar"
+        }
+      },
+      "inventory": {
+        "MyHubSection": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/MyHubSection"
+        },
+        "Scrollbar": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/Scrollbar"
+        }
+      },
+      "orders": {
+        "MyHubSection": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/MyHubSection"
+        },
+        "Scrollbar": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/Scrollbar"
+        }
+      },
+      "deliveries": {
+        "MyHubSection": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/MyHubSection"
+        },
+        "Scrollbar": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/Scrollbar"
+        }
+      },
+      "reports": {
+        "MyHubSection": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/MyHubSection"
+        },
+        "Scrollbar": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/Scrollbar"
+        }
+      },
+      "support": {
+        "MyHubSection": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/MyHubSection"
+        },
+        "Scrollbar": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/Scrollbar"
+        }
+      }
+    },
+    "tabDefinitions": [
+      "dashboard",
+      "profile",
+      "services",
+      "inventory",
+      "orders",
+      "deliveries",
+      "reports",
+      "support"
+    ]
+  }
+}

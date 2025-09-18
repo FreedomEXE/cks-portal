@@ -31,8 +31,12 @@ import { MemosPreview } from '../../../packages/domain-widgets/src/memos';
 import { ProfileInfoCard } from '../../../packages/domain-widgets/src/profile';
 import EcosystemTree, { type TreeNode } from '../../../packages/domain-widgets/EcosystemTree';
 
-export default function CenterHub() {
-  const [activeTab, setActiveTab] = useState('dashboard');
+interface CenterHubProps {
+  initialTab?: string;
+}
+
+export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) {
+  const [activeTab, setActiveTab] = useState(initialTab);
 
   // Add scrollbar styles
   useEffect(() => {

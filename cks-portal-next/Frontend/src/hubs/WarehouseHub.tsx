@@ -30,8 +30,12 @@ import { NewsPreview } from '../../../packages/domain-widgets/src/news';
 import { MemosPreview } from '../../../packages/domain-widgets/src/memos';
 import { ProfileInfoCard } from '../../../packages/domain-widgets/src/profile';
 
-export default function WarehouseHub() {
-  const [activeTab, setActiveTab] = useState('dashboard');
+interface WarehouseHubProps {
+  initialTab?: string;
+}
+
+export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubProps) {
+  const [activeTab, setActiveTab] = useState(initialTab);
 
   // Add scrollbar styles
   useEffect(() => {

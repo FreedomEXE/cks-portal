@@ -28,8 +28,12 @@ import { RecentActivity, type Activity } from '../../../packages/domain-widgets/
 import { NewsPreview } from '../../../packages/domain-widgets/src/news';
 import { MemosPreview } from '../../../packages/domain-widgets/src/memos';
 
-export default function AdminHub() {
-  const [activeTab, setActiveTab] = useState('dashboard');
+interface AdminHubProps {
+  initialTab?: string;
+}
+
+export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
+  const [activeTab, setActiveTab] = useState(initialTab);
 
   // Add scrollbar styles
   useEffect(() => {
