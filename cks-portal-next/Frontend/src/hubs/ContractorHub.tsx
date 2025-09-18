@@ -30,6 +30,10 @@ import { NewsPreview } from '../../../packages/domain-widgets/src/news';
 import { MemosPreview } from '../../../packages/domain-widgets/src/memos';
 import { ProfileInfoCard } from '../../../packages/domain-widgets/src/profile';
 import EcosystemTree, { type TreeNode } from '../../../packages/domain-widgets/EcosystemTree';
+import DataTable from '../../../packages/ui/src/tables/DataTable';
+import NavigationTab from '../../../packages/ui/src/navigation/NavigationTab';
+import TabContainer from '../../../packages/ui/src/navigation/TabContainer';
+import Button from '../../../packages/ui/src/buttons/Button';
 
 interface ContractorHubProps {
   initialTab?: string;
@@ -37,6 +41,7 @@ interface ContractorHubProps {
 
 export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHubProps) {
   const [activeTab, setActiveTab] = useState(initialTab);
+  const [servicesTab, setServicesTab] = useState('my');
 
   // Add scrollbar styles
   useEffect(() => {
@@ -220,6 +225,27 @@ export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHu
     accountStatus: 'Active'
   };
 
+  // Mock services data for contractor
+  const myServicesData = [
+    { serviceId: 'SRV-001', serviceName: 'Industrial Cleaning', type: 'Recurring', status: 'Active', startDate: '2023-01-15' },
+    { serviceId: 'SRV-004', serviceName: 'HVAC Maintenance', type: 'One-time', status: 'Active', startDate: '2023-06-20' },
+    { serviceId: 'SRV-007', serviceName: 'Equipment Installation', type: 'Recurring', status: 'Suspended', startDate: '2022-11-10' },
+    { serviceId: 'SRV-009', serviceName: 'Safety Inspections', type: 'One-time', status: 'Active', startDate: '2024-03-05' },
+  ];
+
+  const activeServicesData = [
+    { serviceId: 'CTR001-SRV001', serviceName: 'Industrial Cleaning', centerId: 'CTR001', type: 'Recurring', startDate: '2025-09-15' },
+    { serviceId: 'CTR002-SRV004', serviceName: 'HVAC Maintenance', centerId: 'CTR002', type: 'One-time', startDate: '2025-09-20' },
+    { serviceId: 'CTR003-SRV007', serviceName: 'Equipment Installation', centerId: 'CTR003', type: 'Recurring', startDate: '2025-09-22' },
+  ];
+
+  const serviceHistoryData = [
+    { serviceId: 'CTR004-SRV001', serviceName: 'Industrial Cleaning', centerId: 'CTR004', type: 'Recurring', status: 'Completed', startDate: '2025-06-28', endDate: '2025-08-28' },
+    { serviceId: 'CTR005-SRV009', serviceName: 'Safety Inspections', centerId: 'CTR005', type: 'One-time', status: 'Completed', startDate: '2025-08-10', endDate: '2025-08-15' },
+    { serviceId: 'CTR002-SRV004', serviceName: 'HVAC Maintenance', centerId: 'CTR002', type: 'Recurring', status: 'Completed', startDate: '2025-06-02', endDate: '2025-08-02' },
+    { serviceId: 'CTR001-SRV007', serviceName: 'Equipment Installation', centerId: 'CTR001', type: 'One-time', status: 'Cancelled', startDate: '2025-07-15', endDate: '2025-07-20' },
+  ];
+
   return (
     <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: '#f9fafb' }}>
       <MyHubSection
@@ -299,6 +325,134 @@ export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHu
                 crew: '#fee2e2'
               }}
             />
+          ) : activeTab === 'services' ? (
+            <>
+              <div style={{ marginBottom: 24 }}>
+                <h1 style={{ fontSize: 24, fontWeight: 'bold', color: '#111827', marginBottom: 0 }}>
+                  My Services
+                </h1>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+                <TabContainer variant="pills" spacing="compact">
+                  <NavigationTab
+                    label="My Services"
+                    count={4}
+                    isActive={servicesTab === 'my'}
+                    onClick={() => setServicesTab('my')}
+                    activeColor="#10b981"
+                  />
+                  <NavigationTab
+                    label="Active Services"
+                    count={3}
+                    isActive={servicesTab === 'active'}
+                    onClick={() => setServicesTab('active')}
+                    activeColor="#10b981"
+                  />
+                  <NavigationTab
+                    label="Service History"
+                    count={4}
+                    isActive={servicesTab === 'history'}
+                    onClick={() => setServicesTab('history')}
+                    activeColor="#10b981"
+                  />
+                </TabContainer>
+
+                <Button
+                  variant="primary"
+                  roleColor="#10b981"
+                  onClick={() => console.log('Browse catalog')}
+                >
+                  Browse CKS Catalog
+                </Button>
+              </div>
+
+              <div style={{ color: '#6b7280', fontSize: '14px', marginBottom: 16 }}>
+                {servicesTab === 'my' ? 'Services you currently offer through CKS' :
+                 servicesTab === 'active' ? 'Active service agreements' :
+                 'Services archive'}
+              </div>
+
+              {servicesTab === 'my' && (
+                <DataTable
+                  columns={[
+                    { key: 'serviceId', label: 'SERVICE ID', clickable: true },
+                    { key: 'serviceName', label: 'SERVICE NAME' },
+                    { key: 'type', label: 'TYPE' },
+                    {
+                      key: 'status',
+                      label: 'STATUS',
+                      render: (value: string) => (
+                        <span style={{
+                          padding: '4px 12px',
+                          borderRadius: '4px',
+                          fontSize: '12px',
+                          fontWeight: 500,
+                          backgroundColor: value === 'Active' ? '#dcfce7' : value === 'Suspended' ? '#fef3c7' : '#fee2e2',
+                          color: value === 'Active' ? '#16a34a' : value === 'Suspended' ? '#d97706' : '#dc2626'
+                        }}>
+                          {value}
+                        </span>
+                      )
+                    },
+                    { key: 'startDate', label: 'START DATE' }
+                  ]}
+                  data={myServicesData}
+                  searchPlaceholder="Search by Service ID or name"
+                  maxItems={10}
+                  onRowClick={(row) => console.log('View service:', row)}
+                />
+              )}
+
+              {servicesTab === 'active' && (
+                <DataTable
+                  columns={[
+                    { key: 'serviceId', label: 'SERVICE ID', clickable: true },
+                    { key: 'serviceName', label: 'SERVICE NAME' },
+                    { key: 'centerId', label: 'CENTER ID' },
+                    { key: 'type', label: 'TYPE' },
+                    { key: 'startDate', label: 'START DATE' }
+                  ]}
+                  data={activeServicesData}
+                  searchPlaceholder="Search active services"
+                  maxItems={10}
+                  onRowClick={(row) => console.log('View order:', row)}
+                />
+              )}
+
+              {servicesTab === 'history' && (
+                <DataTable
+                  columns={[
+                    { key: 'serviceId', label: 'SERVICE ID', clickable: true },
+                    { key: 'serviceName', label: 'SERVICE NAME' },
+                    { key: 'centerId', label: 'CENTER ID' },
+                    { key: 'type', label: 'TYPE' },
+                    {
+                      key: 'status',
+                      label: 'STATUS',
+                      render: (value: string) => (
+                        <span style={{
+                          padding: '4px 12px',
+                          borderRadius: '4px',
+                          fontSize: '12px',
+                          fontWeight: 500,
+                          backgroundColor: value === 'Completed' ? '#dcfce7' : '#fee2e2',
+                          color: value === 'Completed' ? '#16a34a' : '#dc2626'
+                        }}>
+                          {value}
+                        </span>
+                      )
+                    },
+                    { key: 'startDate', label: 'START DATE' },
+                    { key: 'endDate', label: 'END DATE' }
+                  ]}
+                  data={serviceHistoryData}
+                  searchPlaceholder="Search service history"
+                  maxItems={10}
+                  onRowClick={(row) => console.log('View history:', row)}
+                />
+              )}
+            </>
           ) : (
             <>
               <h2>Contractor Hub - {activeTab}</h2>

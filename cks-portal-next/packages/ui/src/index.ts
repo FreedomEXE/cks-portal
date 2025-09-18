@@ -30,9 +30,8 @@ export * from './cards/OverviewCard';
 // Buttons
 export * from './buttons/Button';
 
-// Tables (placeholder exports)
-// export * from './tables/DataTable';
-// export * from './tables/DataListBox';
+// Tables
+export * from './tables/DataTable';
 
 // Forms (placeholder exports)
 // export * from './forms/Input';

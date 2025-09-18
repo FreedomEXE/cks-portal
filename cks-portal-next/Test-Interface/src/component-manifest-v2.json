@@ -1,0 +1,537 @@
+{
+  "admin": {
+    "tabDefinitions": [
+      "dashboard",
+      "directory",
+      "create",
+      "assign",
+      "archive",
+      "support"
+    ],
+    "tabs": {
+      "dashboard": {
+        "OverviewSection": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/overview"
+        },
+        "RecentActivity": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/activity"
+        },
+        "NewsPreview": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/news"
+        },
+        "MemosPreview": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/memos"
+        },
+        "MyHubSection": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/MyHubSection"
+        },
+        "Scrollbar": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/Scrollbar"
+        }
+      },
+      "directory": {
+        "DataTable": {
+          "count": 4,
+          "type": "ui",
+          "path": "../../../packages/ui/src/tables/DataTable"
+        },
+        "NavigationTab": {
+          "count": 11,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/NavigationTab"
+        },
+        "TabContainer": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/TabContainer"
+        }
+      },
+      "create": {},
+      "assign": {},
+      "archive": {},
+      "support": {}
+    }
+  },
+  "manager": {
+    "tabDefinitions": [
+      "dashboard",
+      "profile",
+      "ecosystem",
+      "services",
+      "orders",
+      "reports",
+      "support"
+    ],
+    "tabs": {
+      "dashboard": {
+        "OverviewSection": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/overview"
+        },
+        "RecentActivity": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/activity"
+        },
+        "NewsPreview": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/news"
+        },
+        "MemosPreview": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/memos"
+        },
+        "MyHubSection": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/MyHubSection"
+        },
+        "Scrollbar": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/Scrollbar"
+        }
+      },
+      "profile": {
+        "ProfileInfoCard": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/profile"
+        }
+      },
+      "ecosystem": {},
+      "services": {
+        "DataTable": {
+          "count": 3,
+          "type": "ui",
+          "path": "../../../packages/ui/src/tables/DataTable"
+        },
+        "NavigationTab": {
+          "count": 3,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/NavigationTab"
+        },
+        "TabContainer": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/TabContainer"
+        },
+        "Button": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/buttons/Button"
+        }
+      },
+      "orders": {},
+      "reports": {},
+      "support": {}
+    }
+  },
+  "contractor": {
+    "tabDefinitions": [
+      "dashboard",
+      "profile",
+      "ecosystem",
+      "services",
+      "orders",
+      "reports",
+      "support"
+    ],
+    "tabs": {
+      "dashboard": {
+        "OverviewSection": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/overview"
+        },
+        "RecentActivity": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/activity"
+        },
+        "NewsPreview": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/news"
+        },
+        "MemosPreview": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/memos"
+        },
+        "MyHubSection": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/MyHubSection"
+        },
+        "Scrollbar": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/Scrollbar"
+        }
+      },
+      "profile": {
+        "ProfileInfoCard": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/profile"
+        }
+      },
+      "ecosystem": {},
+      "services": {
+        "DataTable": {
+          "count": 3,
+          "type": "ui",
+          "path": "../../../packages/ui/src/tables/DataTable"
+        },
+        "NavigationTab": {
+          "count": 3,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/NavigationTab"
+        },
+        "TabContainer": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/TabContainer"
+        },
+        "Button": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/buttons/Button"
+        }
+      },
+      "orders": {},
+      "reports": {},
+      "support": {}
+    }
+  },
+  "customer": {
+    "tabDefinitions": [
+      "dashboard",
+      "profile",
+      "ecosystem",
+      "services",
+      "orders",
+      "reports",
+      "support"
+    ],
+    "tabs": {
+      "dashboard": {
+        "OverviewSection": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/overview"
+        },
+        "RecentActivity": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/activity"
+        },
+        "NewsPreview": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/news"
+        },
+        "MemosPreview": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/memos"
+        },
+        "MyHubSection": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/MyHubSection"
+        },
+        "Scrollbar": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/Scrollbar"
+        }
+      },
+      "profile": {
+        "ProfileInfoCard": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/profile"
+        }
+      },
+      "ecosystem": {},
+      "services": {
+        "DataTable": {
+          "count": 2,
+          "type": "ui",
+          "path": "../../../packages/ui/src/tables/DataTable"
+        },
+        "NavigationTab": {
+          "count": 2,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/NavigationTab"
+        },
+        "TabContainer": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/TabContainer"
+        },
+        "Button": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/buttons/Button"
+        }
+      },
+      "orders": {},
+      "reports": {},
+      "support": {}
+    }
+  },
+  "center": {
+    "tabDefinitions": [
+      "dashboard",
+      "profile",
+      "ecosystem",
+      "services",
+      "orders",
+      "reports",
+      "support"
+    ],
+    "tabs": {
+      "dashboard": {
+        "OverviewSection": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/overview"
+        },
+        "RecentActivity": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/activity"
+        },
+        "NewsPreview": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/news"
+        },
+        "MemosPreview": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/memos"
+        },
+        "MyHubSection": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/MyHubSection"
+        },
+        "Scrollbar": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/Scrollbar"
+        }
+      },
+      "profile": {
+        "ProfileInfoCard": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/profile"
+        }
+      },
+      "ecosystem": {},
+      "services": {
+        "DataTable": {
+          "count": 2,
+          "type": "ui",
+          "path": "../../../packages/ui/src/tables/DataTable"
+        },
+        "NavigationTab": {
+          "count": 2,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/NavigationTab"
+        },
+        "TabContainer": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/TabContainer"
+        },
+        "Button": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/buttons/Button"
+        }
+      },
+      "orders": {},
+      "reports": {},
+      "support": {}
+    }
+  },
+  "crew": {
+    "tabDefinitions": [
+      "dashboard",
+      "profile",
+      "ecosystem",
+      "services",
+      "orders",
+      "reports",
+      "support"
+    ],
+    "tabs": {
+      "dashboard": {
+        "OverviewSection": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/overview"
+        },
+        "RecentActivity": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/activity"
+        },
+        "NewsPreview": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/news"
+        },
+        "MemosPreview": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/memos"
+        },
+        "MyHubSection": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/MyHubSection"
+        },
+        "Scrollbar": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/Scrollbar"
+        }
+      },
+      "profile": {
+        "ProfileInfoCard": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/profile"
+        }
+      },
+      "ecosystem": {},
+      "services": {
+        "DataTable": {
+          "count": 3,
+          "type": "ui",
+          "path": "../../../packages/ui/src/tables/DataTable"
+        },
+        "NavigationTab": {
+          "count": 3,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/NavigationTab"
+        },
+        "TabContainer": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/TabContainer"
+        },
+        "Button": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/buttons/Button"
+        }
+      },
+      "orders": {},
+      "reports": {},
+      "support": {}
+    }
+  },
+  "warehouse": {
+    "tabDefinitions": [
+      "dashboard",
+      "profile",
+      "services",
+      "inventory",
+      "orders",
+      "deliveries",
+      "reports",
+      "support"
+    ],
+    "tabs": {
+      "dashboard": {
+        "OverviewSection": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/overview"
+        },
+        "RecentActivity": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/activity"
+        },
+        "NewsPreview": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/news"
+        },
+        "MemosPreview": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/memos"
+        },
+        "MyHubSection": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/MyHubSection"
+        },
+        "Scrollbar": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/Scrollbar"
+        }
+      },
+      "profile": {
+        "ProfileInfoCard": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/profile"
+        }
+      },
+      "services": {
+        "DataTable": {
+          "count": 3,
+          "type": "ui",
+          "path": "../../../packages/ui/src/tables/DataTable"
+        },
+        "NavigationTab": {
+          "count": 3,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/NavigationTab"
+        },
+        "TabContainer": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/navigation/TabContainer"
+        },
+        "Button": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/buttons/Button"
+        }
+      },
+      "inventory": {},
+      "orders": {},
+      "deliveries": {},
+      "reports": {},
+      "support": {}
+    }
+  }
+}

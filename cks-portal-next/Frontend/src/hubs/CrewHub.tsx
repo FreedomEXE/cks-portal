@@ -30,6 +30,10 @@ import { NewsPreview } from '../../../packages/domain-widgets/src/news';
 import { MemosPreview } from '../../../packages/domain-widgets/src/memos';
 import { ProfileInfoCard } from '../../../packages/domain-widgets/src/profile';
 import EcosystemTree, { type TreeNode } from '../../../packages/domain-widgets/EcosystemTree';
+import DataTable from '../../../packages/ui/src/tables/DataTable';
+import NavigationTab from '../../../packages/ui/src/navigation/NavigationTab';
+import TabContainer from '../../../packages/ui/src/navigation/TabContainer';
+import Button from '../../../packages/ui/src/buttons/Button';
 
 interface CrewHubProps {
   initialTab?: string;
@@ -37,6 +41,7 @@ interface CrewHubProps {
 
 export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
   const [activeTab, setActiveTab] = useState(initialTab);
+  const [servicesTab, setServicesTab] = useState('my');
 
   // Add scrollbar styles
   useEffect(() => {
@@ -147,6 +152,27 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
     accountStatus: 'Active'
   };
 
+  // Mock services data for crew
+  const myServicesData = [
+    { serviceId: 'SRV-031', serviceName: 'Floor Care & Maintenance', type: 'Recurring', certified: 'Yes', certificationDate: '2023-03-15', expires: '2026-03-15' },
+    { serviceId: 'SRV-032', serviceName: 'Window Cleaning', type: 'One-time', certified: 'Yes', certificationDate: '2023-08-20', expires: '2025-08-20' },
+    { serviceId: 'SRV-033', serviceName: 'Equipment Operation', type: 'Recurring', certified: 'No', certificationDate: '—', expires: '—' },
+    { serviceId: 'SRV-034', serviceName: 'Safety Protocols', type: 'One-time', certified: 'Yes', certificationDate: '2022-12-05', expires: '—' },
+  ];
+
+  const activeServicesData = [
+    { serviceId: 'CTR001-SRV031', serviceName: 'Floor Care & Maintenance', centerId: 'CTR001', type: 'Recurring', startDate: '2025-09-15' },
+    { serviceId: 'CTR002-SRV032', serviceName: 'Window Cleaning', centerId: 'CTR002', type: 'One-time', startDate: '2025-09-18' },
+    { serviceId: 'CTR003-SRV034', serviceName: 'Safety Protocols', centerId: 'CTR003', type: 'Recurring', startDate: '2025-09-20' },
+  ];
+
+  const serviceHistoryData = [
+    { serviceId: 'CTR001-SRV035', serviceName: 'Floor Care & Maintenance', centerId: 'CTR001', type: 'Recurring', status: 'Completed', startDate: '2025-09-10', endDate: '2025-09-16' },
+    { serviceId: 'CTR002-SRV036', serviceName: 'Safety Protocols', centerId: 'CTR002', type: 'One-time', status: 'Completed', startDate: '2025-09-12', endDate: '2025-09-14' },
+    { serviceId: 'CTR003-SRV037', serviceName: 'Window Cleaning', centerId: 'CTR003', type: 'Recurring', status: 'Completed', startDate: '2025-09-08', endDate: '2025-09-12' },
+    { serviceId: 'CTR001-SRV038', serviceName: 'Equipment Operation', centerId: 'CTR001', type: 'One-time', status: 'Cancelled', startDate: '2025-09-05', endDate: '2025-09-08' },
+  ];
+
   return (
     <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: '#f9fafb' }}>
       <MyHubSection
@@ -224,6 +250,120 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
                 crew: '#fee2e2'
               }}
             />
+          ) : activeTab === 'services' ? (
+            <>
+              <div style={{ marginBottom: 24 }}>
+                <h1 style={{ fontSize: 24, fontWeight: 'bold', color: '#111827', marginBottom: 0 }}>
+                  My Services
+                </h1>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+                <TabContainer variant="pills" spacing="compact">
+                  <NavigationTab
+                    label="My Services"
+                    count={4}
+                    isActive={servicesTab === 'my'}
+                    onClick={() => setServicesTab('my')}
+                    activeColor="#ef4444"
+                  />
+                  <NavigationTab
+                    label="Active Services"
+                    count={3}
+                    isActive={servicesTab === 'active'}
+                    onClick={() => setServicesTab('active')}
+                    activeColor="#ef4444"
+                  />
+                  <NavigationTab
+                    label="Service History"
+                    count={4}
+                    isActive={servicesTab === 'history'}
+                    onClick={() => setServicesTab('history')}
+                    activeColor="#ef4444"
+                  />
+                </TabContainer>
+
+                <Button
+                  variant="primary"
+                  roleColor="#ef4444"
+                  onClick={() => console.log('View training')}
+                >
+                  View Training
+                </Button>
+              </div>
+
+              <div style={{ color: '#6b7280', fontSize: '14px', marginBottom: 16 }}>
+                {servicesTab === 'my' ? 'Services you are trained and certified in' :
+                 servicesTab === 'active' ? 'Services you are currently assigned to' :
+                 'Services you no longer are assigned to'}
+              </div>
+
+              {servicesTab === 'my' && (
+                <DataTable
+                  columns={[
+                    { key: 'serviceId', label: 'SERVICE ID', clickable: true },
+                    { key: 'serviceName', label: 'SERVICE NAME' },
+                    { key: 'type', label: 'TYPE' },
+                    { key: 'certified', label: 'CERTIFIED' },
+                    { key: 'certificationDate', label: 'CERTIFICATION DATE' },
+                    { key: 'expires', label: 'EXPIRES' }
+                  ]}
+                  data={myServicesData}
+                  searchPlaceholder="Search by Service ID or name"
+                  maxItems={10}
+                  onRowClick={(row) => console.log('View service:', row)}
+                />
+              )}
+
+              {servicesTab === 'active' && (
+                <DataTable
+                  columns={[
+                    { key: 'serviceId', label: 'SERVICE ID', clickable: true },
+                    { key: 'serviceName', label: 'SERVICE NAME' },
+                    { key: 'centerId', label: 'CENTER ID' },
+                    { key: 'type', label: 'TYPE' },
+                    { key: 'startDate', label: 'START DATE' }
+                  ]}
+                  data={activeServicesData}
+                  searchPlaceholder="Search active services"
+                  maxItems={10}
+                  onRowClick={(row) => console.log('View task:', row)}
+                />
+              )}
+
+              {servicesTab === 'history' && (
+                <DataTable
+                  columns={[
+                    { key: 'serviceId', label: 'SERVICE ID', clickable: true },
+                    { key: 'serviceName', label: 'SERVICE NAME' },
+                    { key: 'centerId', label: 'CENTER ID' },
+                    { key: 'type', label: 'TYPE' },
+                    {
+                      key: 'status',
+                      label: 'STATUS',
+                      render: (value: string) => (
+                        <span style={{
+                          padding: '4px 12px',
+                          borderRadius: '4px',
+                          fontSize: '12px',
+                          fontWeight: 500,
+                          backgroundColor: value === 'Completed' ? '#dcfce7' : '#fee2e2',
+                          color: value === 'Completed' ? '#16a34a' : '#dc2626'
+                        }}>
+                          {value}
+                        </span>
+                      )
+                    },
+                    { key: 'startDate', label: 'START DATE' },
+                    { key: 'endDate', label: 'END DATE' }
+                  ]}
+                  data={serviceHistoryData}
+                  searchPlaceholder="Search service history"
+                  maxItems={10}
+                  onRowClick={(row) => console.log('View history:', row)}
+                />
+              )}
+            </>
           ) : (
             <>
               <h2>Crew Hub - {activeTab}</h2>

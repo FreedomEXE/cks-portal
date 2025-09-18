@@ -7,7 +7,10 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "analyze": "node scripts/analyze-components.js"
+    "analyze": "node scripts/analyze-components-v2.js",
+    "analyze-old": "node scripts/analyze-components.js",
+    "discover": "node scripts/discover-components.js",
+    "update": "npm run discover && npm run analyze"
   },
   "dependencies": {
     "react": "^18.2.0",

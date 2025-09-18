@@ -30,6 +30,10 @@ import { NewsPreview } from '../../../packages/domain-widgets/src/news';
 import { MemosPreview } from '../../../packages/domain-widgets/src/memos';
 import { ProfileInfoCard } from '../../../packages/domain-widgets/src/profile';
 import EcosystemTree, { type TreeNode } from '../../../packages/domain-widgets/EcosystemTree';
+import DataTable from '../../../packages/ui/src/tables/DataTable';
+import NavigationTab from '../../../packages/ui/src/navigation/NavigationTab';
+import TabContainer from '../../../packages/ui/src/navigation/TabContainer';
+import Button from '../../../packages/ui/src/buttons/Button';
 
 interface ManagerHubProps {
   initialTab?: string;
@@ -37,6 +41,7 @@ interface ManagerHubProps {
 
 export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps) {
   const [activeTab, setActiveTab] = useState(initialTab);
+  const [servicesTab, setServicesTab] = useState('my');
 
   // Add scrollbar styles
   useEffect(() => {
@@ -222,6 +227,27 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
     accountStatus: 'Active'
   };
 
+  // Mock services data
+  const myServicesData = [
+    { serviceId: 'SRV-001', serviceName: 'Commercial Deep Cleaning', certified: 'Yes', certificationDate: '2024-03-15', expires: '2026-03-15' },
+    { serviceId: 'SRV-002', serviceName: 'Floor Care & Maintenance', certified: 'Yes', certificationDate: '2024-01-10', expires: '—' },
+    { serviceId: 'SRV-003', serviceName: 'Window Cleaning Services', certified: 'No', certificationDate: '—', expires: '—' },
+    { serviceId: 'SRV-004', serviceName: 'HVAC Maintenance', certified: 'Yes', certificationDate: '2024-02-20', expires: '2025-02-20' },
+  ];
+
+  const activeServicesData = [
+    { serviceId: 'CTR001-SRV001', serviceName: 'Commercial Deep Cleaning', centerId: 'CTR001', type: 'Recurring', startDate: '2025-09-01' },
+    { serviceId: 'CTR002-SRV002', serviceName: 'Floor Care & Maintenance', centerId: 'CTR002', type: 'One-time', startDate: '2025-09-10' },
+    { serviceId: 'CTR001-SRV003', serviceName: 'Window Cleaning Services', centerId: 'CTR001', type: 'Recurring', startDate: '2025-08-15' },
+  ];
+
+  const serviceHistoryData = [
+    { serviceId: 'CTR003-SRV001', serviceName: 'Commercial Deep Cleaning', centerId: 'CTR003', type: 'Recurring', status: 'Completed', startDate: '2025-06-01', endDate: '2025-08-20' },
+    { serviceId: 'CTR002-SRV003', serviceName: 'Window Cleaning Services', centerId: 'CTR002', type: 'One-time', status: 'Cancelled', startDate: '2025-07-15', endDate: '2025-08-02' },
+    { serviceId: 'CTR001-SRV002', serviceName: 'Floor Care & Maintenance', centerId: 'CTR001', type: 'Recurring', status: 'Completed', startDate: '2025-05-31', endDate: '2025-07-31' },
+    { serviceId: 'CTR004-SRV004', serviceName: 'HVAC Maintenance', centerId: 'CTR004', type: 'One-time', status: 'Completed', startDate: '2025-07-01', endDate: '2025-07-15' },
+  ];
+
 
   return (
     <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: '#f9fafb' }}>
@@ -297,6 +323,119 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
                 crew: '#fee2e2'
               }}
             />
+          ) : activeTab === 'services' ? (
+            <>
+              <div style={{ marginBottom: 24 }}>
+                <h1 style={{ fontSize: 24, fontWeight: 'bold', color: '#111827', marginBottom: 0 }}>
+                  My Services
+                </h1>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+                <TabContainer variant="pills" spacing="compact">
+                  <NavigationTab
+                    label="My Services"
+                    count={4}
+                    isActive={servicesTab === 'my'}
+                    onClick={() => setServicesTab('my')}
+                    activeColor="#3b82f6"
+                  />
+                  <NavigationTab
+                    label="Active Services"
+                    count={3}
+                    isActive={servicesTab === 'active'}
+                    onClick={() => setServicesTab('active')}
+                    activeColor="#3b82f6"
+                  />
+                  <NavigationTab
+                    label="Service History"
+                    count={4}
+                    isActive={servicesTab === 'history'}
+                    onClick={() => setServicesTab('history')}
+                    activeColor="#3b82f6"
+                  />
+                </TabContainer>
+
+                <Button
+                  variant="primary"
+                  roleColor="#3b82f6"
+                  onClick={() => console.log('Browse catalog')}
+                >
+                  Browse CKS Catalog
+                </Button>
+              </div>
+
+              <div style={{ color: '#6b7280', fontSize: '14px', marginBottom: 16 }}>
+                {servicesTab === 'my' ? 'Services you are certified in and qualified to train' :
+                 servicesTab === 'active' ? 'Services you currently manage' :
+                 'Services you no longer manage'}
+              </div>
+
+              {servicesTab === 'my' && (
+                <DataTable
+                  columns={[
+                    { key: 'serviceId', label: 'SERVICE ID', clickable: true },
+                    { key: 'serviceName', label: 'SERVICE NAME' },
+                    { key: 'certified', label: 'CERTIFIED' },
+                    { key: 'certificationDate', label: 'CERTIFICATION DATE' },
+                    { key: 'expires', label: 'EXPIRES' }
+                  ]}
+                  data={myServicesData}
+                  searchPlaceholder="Search by Service ID or name"
+                  maxItems={10}
+                  onRowClick={(row) => console.log('View service:', row)}
+                />
+              )}
+
+              {servicesTab === 'active' && (
+                <DataTable
+                  columns={[
+                    { key: 'serviceId', label: 'SERVICE ID', clickable: true },
+                    { key: 'serviceName', label: 'SERVICE NAME' },
+                    { key: 'centerId', label: 'CENTER ID' },
+                    { key: 'type', label: 'TYPE' },
+                    { key: 'startDate', label: 'START DATE' }
+                  ]}
+                  data={activeServicesData}
+                  searchPlaceholder="Search active services"
+                  maxItems={10}
+                  onRowClick={(row) => console.log('View order:', row)}
+                />
+              )}
+
+              {servicesTab === 'history' && (
+                <DataTable
+                  columns={[
+                    { key: 'serviceId', label: 'SERVICE ID', clickable: true },
+                    { key: 'serviceName', label: 'SERVICE NAME' },
+                    { key: 'centerId', label: 'CENTER ID' },
+                    { key: 'type', label: 'TYPE' },
+                    {
+                      key: 'status',
+                      label: 'STATUS',
+                      render: (value: string) => (
+                        <span style={{
+                          padding: '4px 12px',
+                          borderRadius: '4px',
+                          fontSize: '12px',
+                          fontWeight: 500,
+                          backgroundColor: value === 'Completed' ? '#dcfce7' : '#fee2e2',
+                          color: value === 'Completed' ? '#16a34a' : '#dc2626'
+                        }}>
+                          {value}
+                        </span>
+                      )
+                    },
+                    { key: 'startDate', label: 'START DATE' },
+                    { key: 'endDate', label: 'END DATE' }
+                  ]}
+                  data={serviceHistoryData}
+                  searchPlaceholder="Search service history"
+                  maxItems={10}
+                  onRowClick={(row) => console.log('View history:', row)}
+                />
+              )}
+            </>
           ) : (
             <>
               <h2>Manager Hub - {activeTab}</h2>

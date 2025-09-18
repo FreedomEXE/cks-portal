@@ -30,6 +30,10 @@ import { NewsPreview } from '../../../packages/domain-widgets/src/news';
 import { MemosPreview } from '../../../packages/domain-widgets/src/memos';
 import { ProfileInfoCard } from '../../../packages/domain-widgets/src/profile';
 import EcosystemTree, { type TreeNode } from '../../../packages/domain-widgets/EcosystemTree';
+import DataTable from '../../../packages/ui/src/tables/DataTable';
+import NavigationTab from '../../../packages/ui/src/navigation/NavigationTab';
+import TabContainer from '../../../packages/ui/src/navigation/TabContainer';
+import Button from '../../../packages/ui/src/buttons/Button';
 
 interface CustomerHubProps {
   initialTab?: string;
@@ -37,6 +41,7 @@ interface CustomerHubProps {
 
 export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubProps) {
   const [activeTab, setActiveTab] = useState(initialTab);
+  const [servicesTab, setServicesTab] = useState('my');
 
   // Add scrollbar styles
   useEffect(() => {
@@ -163,6 +168,27 @@ export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubPro
     accountStatus: 'Active'
   };
 
+  // Mock services data for customer
+  const myServicesData = [
+    { serviceId: 'CTR001-SRV011', serviceName: 'Office Cleaning', type: 'Recurring', status: 'Active', startDate: '2024-01-15' },
+    { serviceId: 'CTR002-SRV012', serviceName: 'IT Support & Maintenance', type: 'One-time', status: 'Active', startDate: '2024-03-10' },
+    { serviceId: 'CTR001-SRV013', serviceName: 'Security Services', type: 'Recurring', status: 'Active', startDate: '2024-02-20' },
+    { serviceId: 'CTR003-SRV014', serviceName: 'Landscaping Services', type: 'One-time', status: 'Scheduled', startDate: '2024-04-01' },
+  ];
+
+  const activeServicesData = [
+    { orderId: 'ORD-201', serviceName: 'Office Cleaning', provider: 'Premium Contractors LLC', nextService: '2025-09-19', frequency: 'Daily', cost: '$2,500/month' },
+    { orderId: 'ORD-202', serviceName: 'IT Support & Maintenance', provider: 'Tech Solutions Inc', nextService: '2025-09-25', frequency: 'Weekly', cost: '$1,800/month' },
+    { orderId: 'ORD-203', serviceName: 'Security Services', provider: 'Elite Security Corp', nextService: '2025-09-18', frequency: '24/7', cost: '$4,200/month' },
+  ];
+
+  const serviceHistoryData = [
+    { serviceId: 'CTR001-SRV015', serviceName: 'Office Cleaning', centerId: 'CTR001', type: 'Recurring', status: 'Completed', startDate: '2025-06-30', endDate: '2025-08-30' },
+    { serviceId: 'CTR002-SRV016', serviceName: 'HVAC Maintenance', centerId: 'CTR002', type: 'One-time', status: 'Completed', startDate: '2025-08-15', endDate: '2025-08-20' },
+    { serviceId: 'CTR003-SRV017', serviceName: 'Window Cleaning', centerId: 'CTR003', type: 'Recurring', status: 'Completed', startDate: '2025-08-05', endDate: '2025-08-10' },
+    { serviceId: 'CTR001-SRV018', serviceName: 'Carpet Cleaning', centerId: 'CTR001', type: 'One-time', status: 'Cancelled', startDate: '2025-07-20', endDate: '2025-07-25' },
+  ];
+
   return (
     <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: '#f9fafb' }}>
       <MyHubSection
@@ -241,6 +267,109 @@ export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubPro
                 crew: '#fee2e2'
               }}
             />
+          ) : activeTab === 'services' ? (
+            <>
+              <div style={{ marginBottom: 24 }}>
+                <h1 style={{ fontSize: 24, fontWeight: 'bold', color: '#111827', marginBottom: 0 }}>
+                  My Services
+                </h1>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+                <TabContainer variant="pills" spacing="compact">
+                  <NavigationTab
+                    label="My Services"
+                    count={4}
+                    isActive={servicesTab === 'my'}
+                    onClick={() => setServicesTab('my')}
+                    activeColor="#eab308"
+                  />
+                  <NavigationTab
+                    label="Service History"
+                    count={4}
+                    isActive={servicesTab === 'history'}
+                    onClick={() => setServicesTab('history')}
+                    activeColor="#eab308"
+                  />
+                </TabContainer>
+
+                <Button
+                  variant="primary"
+                  roleColor="#eab308"
+                  onClick={() => console.log('Browse catalog')}
+                >
+                  Browse CKS Catalog
+                </Button>
+              </div>
+
+              <div style={{ color: '#6b7280', fontSize: '14px', marginBottom: 16 }}>
+                {servicesTab === 'my' ? 'CKS services currently provided at your centers' : 'Services Archive'}
+              </div>
+
+              {servicesTab === 'my' && (
+                <DataTable
+                  columns={[
+                    { key: 'serviceId', label: 'SERVICE ID', clickable: true },
+                    { key: 'serviceName', label: 'SERVICE NAME' },
+                    { key: 'type', label: 'TYPE' },
+                    {
+                      key: 'status',
+                      label: 'STATUS',
+                      render: (value: string) => (
+                        <span style={{
+                          padding: '4px 12px',
+                          borderRadius: '4px',
+                          fontSize: '12px',
+                          fontWeight: 500,
+                          backgroundColor: value === 'Active' ? '#dcfce7' : value === 'Scheduled' ? '#dbeafe' : '#fef3c7',
+                          color: value === 'Active' ? '#16a34a' : value === 'Scheduled' ? '#2563eb' : '#d97706'
+                        }}>
+                          {value}
+                        </span>
+                      )
+                    },
+                    { key: 'startDate', label: 'START DATE' }
+                  ]}
+                  data={myServicesData}
+                  searchPlaceholder="Search by Service ID or name"
+                  maxItems={10}
+                  onRowClick={(row) => console.log('View service:', row)}
+                />
+              )}
+
+              {servicesTab === 'history' && (
+                <DataTable
+                  columns={[
+                    { key: 'serviceId', label: 'SERVICE ID', clickable: true },
+                    { key: 'serviceName', label: 'SERVICE NAME' },
+                    { key: 'centerId', label: 'CENTER ID' },
+                    { key: 'type', label: 'TYPE' },
+                    {
+                      key: 'status',
+                      label: 'STATUS',
+                      render: (value: string) => (
+                        <span style={{
+                          padding: '4px 12px',
+                          borderRadius: '4px',
+                          fontSize: '12px',
+                          fontWeight: 500,
+                          backgroundColor: value === 'Completed' ? '#dcfce7' : '#fee2e2',
+                          color: value === 'Completed' ? '#16a34a' : '#dc2626'
+                        }}>
+                          {value}
+                        </span>
+                      )
+                    },
+                    { key: 'startDate', label: 'START DATE' },
+                    { key: 'endDate', label: 'END DATE' }
+                  ]}
+                  data={serviceHistoryData}
+                  searchPlaceholder="Search service history"
+                  maxItems={10}
+                  onRowClick={(row) => console.log('View history:', row)}
+                />
+              )}
+            </>
           ) : (
             <>
               <h2>Customer Hub - {activeTab}</h2>
