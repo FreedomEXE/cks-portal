@@ -80,6 +80,13 @@
       }
     },
     {
+      "name": "OrderCard",
+      "path": "packages/ui/src/cards/OrderCard/OrderCard.tsx",
+      "type": "ui",
+      "file": "OrderCard.tsx",
+      "usage": {}
+    },
+    {
       "name": "OverviewCard",
       "path": "packages/ui/src/cards/OverviewCard/OverviewCard.tsx",
       "type": "ui",
@@ -175,6 +182,24 @@
             "support"
           ],
           "count": 0
+        }
+      }
+    },
+    {
+      "name": "PageHeader",
+      "path": "packages/ui/src/layout/PageHeader/PageHeader.tsx",
+      "type": "ui",
+      "file": "PageHeader.tsx",
+      "usage": {
+        "manager": {
+          "used": true,
+          "tabs": [
+            "dashboard",
+            "profile",
+            "ecosystem",
+            "services"
+          ],
+          "count": 3
         }
       }
     },
@@ -872,6 +897,79 @@
       }
     },
     {
+      "name": "OrdersSection",
+      "path": "packages/domain-widgets/src/OrdersSection/OrdersSection.tsx",
+      "type": "domain",
+      "file": "OrdersSection.tsx",
+      "usage": {
+        "manager": {
+          "used": true,
+          "tabs": [
+            "dashboard",
+            "profile",
+            "ecosystem",
+            "services",
+            "orders"
+          ],
+          "count": 1
+        },
+        "contractor": {
+          "used": true,
+          "tabs": [
+            "dashboard",
+            "profile",
+            "ecosystem",
+            "services",
+            "orders"
+          ],
+          "count": 1
+        },
+        "customer": {
+          "used": true,
+          "tabs": [
+            "dashboard",
+            "profile",
+            "ecosystem",
+            "services",
+            "orders"
+          ],
+          "count": 1
+        },
+        "center": {
+          "used": true,
+          "tabs": [
+            "dashboard",
+            "profile",
+            "ecosystem",
+            "services",
+            "orders"
+          ],
+          "count": 1
+        },
+        "crew": {
+          "used": true,
+          "tabs": [
+            "dashboard",
+            "profile",
+            "ecosystem",
+            "services",
+            "orders"
+          ],
+          "count": 1
+        },
+        "warehouse": {
+          "used": true,
+          "tabs": [
+            "dashboard",
+            "profile",
+            "services",
+            "orders"
+          ],
+          "count": 1
+        }
+      }
+    },
+    {
       "name": "OverviewSection",
       "path": "packages/domain-widgets/src/overview/OverviewSection.tsx",
       "type": "domain",
@@ -1458,6 +1556,16 @@
           ],
           "count": 0
         },
+        "PageHeader": {
+          "used": true,
+          "tabs": [
+            "dashboard",
+            "profile",
+            "ecosystem",
+            "services"
+          ],
+          "count": 3
+        },
         "MyHubSection": {
           "used": true,
           "tabs": [
@@ -1545,6 +1653,17 @@
           "used": true,
           "tabs": [
             "dashboard"
+          ],
+          "count": 1
+        },
+        "OrdersSection": {
+          "used": true,
+          "tabs": [
+            "dashboard",
+            "profile",
+            "ecosystem",
+            "services",
+            "orders"
           ],
           "count": 1
         },
@@ -1737,6 +1856,17 @@
           ],
           "count": 1
         },
+        "OrdersSection": {
+          "used": true,
+          "tabs": [
+            "dashboard",
+            "profile",
+            "ecosystem",
+            "services",
+            "orders"
+          ],
+          "count": 1
+        },
         "OverviewSection": {
           "used": true,
           "tabs": [
@@ -1923,6 +2053,17 @@
           "used": true,
           "tabs": [
             "dashboard"
+          ],
+          "count": 1
+        },
+        "OrdersSection": {
+          "used": true,
+          "tabs": [
+            "dashboard",
+            "profile",
+            "ecosystem",
+            "services",
+            "orders"
           ],
           "count": 1
         },
@@ -2115,6 +2256,17 @@
           ],
           "count": 1
         },
+        "OrdersSection": {
+          "used": true,
+          "tabs": [
+            "dashboard",
+            "profile",
+            "ecosystem",
+            "services",
+            "orders"
+          ],
+          "count": 1
+        },
         "OverviewSection": {
           "used": true,
           "tabs": [
@@ -2301,6 +2453,17 @@
           "used": true,
           "tabs": [
             "dashboard"
+          ],
+          "count": 1
+        },
+        "OrdersSection": {
+          "used": true,
+          "tabs": [
+            "dashboard",
+            "profile",
+            "ecosystem",
+            "services",
+            "orders"
           ],
           "count": 1
         },
@@ -2494,6 +2657,16 @@
           ],
           "count": 1
         },
+        "OrdersSection": {
+          "used": true,
+          "tabs": [
+            "dashboard",
+            "profile",
+            "services",
+            "orders"
+          ],
+          "count": 1
+        },
         "OverviewSection": {
           "used": true,
           "tabs": [
@@ -2554,5 +2727,5 @@
       }
     }
   },
-  "generated": "2025-09-18T18:31:41.124Z"
+  "generated": "2025-09-18T20:40:20.561Z"
 }

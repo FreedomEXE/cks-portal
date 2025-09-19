@@ -21,7 +21,7 @@
   Manifested by Freedom_EXE
 ───────────────────────────────────────────────*/
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Scrollbar } from '../../../packages/ui/src/Scrollbar';
 import MyHubSection from '../../../packages/ui/src/navigation/MyHubSection';
 import OverviewSection from '../../../packages/domain-widgets/src/overview';
@@ -31,9 +31,11 @@ import { MemosPreview } from '../../../packages/domain-widgets/src/memos';
 import { ProfileInfoCard } from '../../../packages/domain-widgets/src/profile';
 import EcosystemTree, { type TreeNode } from '../../../packages/domain-widgets/EcosystemTree';
 import DataTable from '../../../packages/ui/src/tables/DataTable';
-import NavigationTab from '../../../packages/ui/src/navigation/NavigationTab';
-import TabContainer from '../../../packages/ui/src/navigation/TabContainer';
 import Button from '../../../packages/ui/src/buttons/Button';
+import { OrdersSection } from '../../../packages/domain-widgets/src/OrdersSection';
+import PageHeader from '../../../packages/ui/src/layout/PageHeader';
+import PageWrapper from '../../../packages/ui/src/layout/PageWrapper';
+import TabSection from '../../../packages/ui/src/layout/TabSection';
 
 interface ManagerHubProps {
   initialTab?: string;
@@ -42,6 +44,7 @@ interface ManagerHubProps {
 export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps) {
   const [activeTab, setActiveTab] = useState(initialTab);
   const [servicesTab, setServicesTab] = useState('my');
+  const [servicesSearchQuery, setServicesSearchQuery] = useState('');
 
   // Add scrollbar styles
   useEffect(() => {
@@ -192,6 +195,130 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
     }
   ]);
 
+  // Mock orders data
+  const serviceOrders = [
+    {
+      orderId: 'CEN001-ORD-SRV001',
+      orderType: 'service' as const,
+      title: 'Window Cleaning',
+      requestedBy: 'Center Created',
+      requestedDate: '2025-09-10',
+      expectedDate: '2025-09-15',
+      status: 'pending' as const,
+      approvalStages: [
+        { role: 'Center Created', status: 'approved' as const, user: 'Acme Downtown' },
+        { role: 'Customer', status: 'approved' as const, user: 'Acme Corp' },
+        { role: 'Contractor', status: 'approved' as const, user: 'Premium LLC' },
+        { role: 'Manager', status: 'pending' as const }
+      ]
+    },
+    {
+      orderId: 'CUS001-ORD-SRV002',
+      orderType: 'service' as const,
+      title: 'Lawn Maintenance',
+      requestedBy: 'Customer Created',
+      requestedDate: '2025-09-12',
+      expectedDate: '2025-09-20',
+      status: 'pending' as const,
+      approvalStages: [
+        { role: 'Customer Created', status: 'approved' as const, user: 'TechStart Inc' },
+        { role: 'Contractor', status: 'approved' as const, user: 'Premium LLC' },
+        { role: 'Manager', status: 'pending' as const }
+      ]
+    },
+    {
+      orderId: 'CEN003-ORD-SRV003',
+      orderType: 'service' as const,
+      title: 'HVAC Maintenance',
+      requestedBy: 'Center Created',
+      requestedDate: '2025-09-08',
+      expectedDate: '2025-09-12',
+      status: 'in-progress' as const,
+      approvalStages: [
+        { role: 'Center Created', status: 'approved' as const, user: 'Tech Campus' },
+        { role: 'Customer', status: 'approved' as const, user: 'TechStart Inc' },
+        { role: 'Contractor', status: 'approved' as const, user: 'Elite Services' },
+        { role: 'Manager', status: 'approved' as const, user: 'John Smith' }
+      ]
+    },
+    // Archive orders - completed/cancelled
+    {
+      orderId: 'CEN002-ORD-SRV001',
+      orderType: 'service' as const,
+      title: 'Deep Cleaning Service',
+      requestedBy: 'Center Created',
+      requestedDate: '2025-08-15',
+      expectedDate: '2025-08-20',
+      status: 'approved' as const,
+      transformedId: 'CEN002-SRV001',
+      approvalStages: [
+        { role: 'Center Created', status: 'approved' as const, user: 'Tech Campus' },
+        { role: 'Customer', status: 'approved' as const, user: 'TechStart Inc' },
+        { role: 'Contractor', status: 'approved' as const, user: 'Elite Services' },
+        { role: 'Manager', status: 'approved' as const, user: 'John Smith' }
+      ]
+    },
+    {
+      orderId: 'CUS002-ORD-SRV005',
+      orderType: 'service' as const,
+      title: 'Emergency Plumbing',
+      requestedBy: 'Customer Created',
+      requestedDate: '2025-08-10',
+      expectedDate: '2025-08-11',
+      status: 'cancelled' as const,
+      approvalStages: [
+        { role: 'Customer', status: 'approved' as const, user: 'GlobalTech Inc' },
+        { role: 'Contractor', status: 'rejected' as const, user: 'Premium LLC' }
+      ]
+    }
+  ];
+
+  const productOrders = [
+    {
+      orderId: 'CEN001-ORD-PRD001',
+      orderType: 'product' as const,
+      title: 'Cleaning Equipment Refill',
+      requestedBy: 'Center Created',
+      requestedDate: '2025-09-10',
+      expectedDate: '2025-09-15',
+      status: 'approved' as const,
+      approvalStages: [
+        { role: 'Center Created', status: 'approved' as const, user: 'Acme Downtown' },
+        { role: 'Contractor', status: 'approved' as const, user: 'Premium LLC' },
+        { role: 'Warehouse', status: 'pending' as const }
+      ]
+    },
+    {
+      orderId: 'CRW001-ORD-PRD001',
+      orderType: 'product' as const,
+      title: 'Safety Equipment Request',
+      requestedBy: 'Crew Created',
+      requestedDate: '2025-09-11',
+      expectedDate: '2025-09-13',
+      status: 'pending' as const,
+      approvalStages: [
+        { role: 'Crew Created', status: 'approved' as const, user: 'John Smith' },
+        { role: 'Contractor', status: 'pending' as const },
+        { role: 'Warehouse', status: 'waiting' as const }
+      ]
+    },
+    {
+      orderId: 'MGR001-ORD-PRD001',
+      orderType: 'product' as const,
+      title: 'Office Supplies',
+      requestedBy: 'Manager Created',
+      requestedDate: '2025-09-09',
+      expectedDate: '2025-09-20',
+      status: 'approved' as const,
+      transformedId: 'MGR001-SUP001',
+      approvalStages: [
+        { role: 'Manager Created', status: 'approved' as const, user: 'John Smith' },
+        { role: 'Contractor', status: 'approved' as const, user: 'Premium LLC' },
+        { role: 'Warehouse', status: 'approved' as const, user: 'Main Warehouse' }
+      ]
+    }
+  ];
+
     const tabs = [
     { id: 'dashboard', label: 'Dashboard', path: '/manager/dashboard' },
     { id: 'profile', label: 'My Profile', path: '/manager/profile' },
@@ -264,20 +391,21 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
       {/* Content Area */}
       <Scrollbar style={{
         flex: 1,
-        padding: '24px'
+        padding: '0 24px'
       }}>
         <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
           {activeTab === 'dashboard' ? (
-            <>
+            <PageWrapper title="Dashboard" showHeader={false}>
+              {/* Section headers remain for dashboard */}
+              <PageHeader title="Overview" />
               <OverviewSection
                 cards={overviewCards}
                 data={overviewData}
-                title="Overview"
               />
+              <PageHeader title="Recent Activity" />
               <RecentActivity
                 activities={activities}
                 onClear={() => setActivities([])}
-                title="Recent Activity"
                 emptyMessage="No recent manager activity"
               />
 
@@ -286,9 +414,10 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
                 <NewsPreview color="#3b82f6" onViewAll={() => console.log('View all news')} />
                 <MemosPreview color="#3b82f6" onViewAll={() => console.log('View memos')} />
               </div>
-            </>
+            </PageWrapper>
           ) : activeTab === 'profile' ? (
-            <ProfileInfoCard
+            <PageWrapper title="My Profile" showHeader={true} headerSrOnly>
+              <ProfileInfoCard
               role="manager"
               profileData={{
                 fullName: 'John Smith',
@@ -305,142 +434,148 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
               primaryColor="#3b82f6"
               onUpdatePhoto={() => console.log('Update photo')}
             />
+            </PageWrapper>
           ) : activeTab === 'ecosystem' ? (
-            <EcosystemTree
-              rootUser={{ id: 'MGR-001', role: 'Manager', name: 'John Smith' }}
-              treeData={ecosystemData}
-              onNodeClick={(userId) => console.log('View details for:', userId)}
-              expandedNodes={['MGR-001']}
-              currentUserId="MGR-001"
-              title="Ecosystem"
-              subtitle="Your Territory Overview"
-              description="Click any row with an arrow to expand and explore your territory ecosystem"
-              roleColorMap={{
-                manager: '#e0f2fe',
-                contractor: '#dcfce7',
-                customer: '#fef9c3',
-                center: '#ffedd5',
-                crew: '#fee2e2'
-              }}
-            />
+            <PageWrapper title="My Ecosystem" showHeader={true} headerSrOnly>
+              <EcosystemTree
+                rootUser={{ id: 'MGR-001', role: 'Manager', name: 'John Smith' }}
+                treeData={ecosystemData}
+                onNodeClick={(userId: string) => console.log('View details for:', userId)}
+                expandedNodes={['MGR-001']}
+                currentUserId="MGR-001"
+                title="My Ecosystem"
+                subtitle="Your Territory Overview"
+                description="Click any row with an arrow to expand and explore your territory ecosystem"
+                roleColorMap={{
+                  manager: '#e0f2fe',
+                  contractor: '#dcfce7',
+                  customer: '#fef9c3',
+                  center: '#ffedd5',
+                  crew: '#fee2e2'
+                }}
+              />
+            </PageWrapper>
           ) : activeTab === 'services' ? (
-            <>
-              <div style={{ marginBottom: 24 }}>
-                <h1 style={{ fontSize: 24, fontWeight: 'bold', color: '#111827', marginBottom: 0 }}>
-                  My Services
-                </h1>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-                <TabContainer variant="pills" spacing="compact">
-                  <NavigationTab
-                    label="My Services"
-                    count={4}
-                    isActive={servicesTab === 'my'}
-                    onClick={() => setServicesTab('my')}
-                    activeColor="#3b82f6"
+            <PageWrapper title="My Services" showHeader={true} headerSrOnly>
+              <TabSection
+                tabs={[
+                  { id: 'my', label: 'My Services', count: 4 },
+                  { id: 'active', label: 'Active Services', count: 3 },
+                  { id: 'history', label: 'Service History', count: 4 }
+                ]}
+                activeTab={servicesTab}
+                onTabChange={setServicesTab}
+                description={
+                  servicesTab === 'my' ? 'Services you are certified in and qualified to train' :
+                  servicesTab === 'active' ? 'Services you currently manage' :
+                  'Services you no longer manage'
+                }
+                searchPlaceholder={
+                  servicesTab === 'my' ? 'Search by Service ID or name' :
+                  servicesTab === 'active' ? 'Search active services' :
+                  'Search service history'
+                }
+                onSearch={setServicesSearchQuery}
+                actionButton={
+                  <Button
+                    variant="primary"
+                    roleColor="#000000"
+                    onClick={() => console.log('Browse catalog')}
+                  >
+                    Browse CKS Catalog
+                  </Button>
+                }
+                primaryColor="#3b82f6"
+              >
+                {servicesTab === 'my' && (
+                  <DataTable
+                    columns={[
+                      { key: 'serviceId', label: 'SERVICE ID', clickable: true },
+                      { key: 'serviceName', label: 'SERVICE NAME' },
+                      { key: 'certified', label: 'CERTIFIED' },
+                      { key: 'certificationDate', label: 'CERTIFICATION DATE' },
+                      { key: 'expires', label: 'EXPIRES' }
+                    ]}
+                    data={myServicesData}
+                    showSearch={false}
+                    externalSearchQuery={servicesSearchQuery}
+                    maxItems={10}
+                    onRowClick={(row: unknown) => console.log('View service:', row)}
                   />
-                  <NavigationTab
-                    label="Active Services"
-                    count={3}
-                    isActive={servicesTab === 'active'}
-                    onClick={() => setServicesTab('active')}
-                    activeColor="#3b82f6"
+                )}
+
+                {servicesTab === 'active' && (
+                  <DataTable
+                    columns={[
+                      { key: 'serviceId', label: 'SERVICE ID', clickable: true },
+                      { key: 'serviceName', label: 'SERVICE NAME' },
+                      { key: 'centerId', label: 'CENTER ID' },
+                      { key: 'type', label: 'TYPE' },
+                      { key: 'startDate', label: 'START DATE' }
+                    ]}
+                    data={activeServicesData}
+                    showSearch={false}
+                    externalSearchQuery={servicesSearchQuery}
+                    maxItems={10}
+                    onRowClick={(row: unknown) => console.log('View order:', row)}
                   />
-                  <NavigationTab
-                    label="Service History"
-                    count={4}
-                    isActive={servicesTab === 'history'}
-                    onClick={() => setServicesTab('history')}
-                    activeColor="#3b82f6"
+                )}
+
+                {servicesTab === 'history' && (
+                  <DataTable
+                    columns={[
+                      { key: 'serviceId', label: 'SERVICE ID', clickable: true },
+                      { key: 'serviceName', label: 'SERVICE NAME' },
+                      { key: 'centerId', label: 'CENTER ID' },
+                      { key: 'type', label: 'TYPE' },
+                      {
+                        key: 'status',
+                        label: 'STATUS',
+                        render: (value: string) => (
+                          <span style={{
+                            padding: '4px 12px',
+                            borderRadius: '4px',
+                            fontSize: '12px',
+                            fontWeight: 500,
+                            backgroundColor: value === 'Completed' ? '#dcfce7' : '#fee2e2',
+                            color: value === 'Completed' ? '#16a34a' : '#dc2626'
+                          }}>
+                            {value}
+                          </span>
+                        )
+                      },
+                      { key: 'startDate', label: 'START DATE' },
+                      { key: 'endDate', label: 'END DATE' }
+                    ]}
+                    data={serviceHistoryData}
+                    showSearch={false}
+                    externalSearchQuery={servicesSearchQuery}
+                    maxItems={10}
+                    onRowClick={(row: unknown) => console.log('View history:', row)}
                   />
-                </TabContainer>
-
-                <Button
-                  variant="primary"
-                  roleColor="#3b82f6"
-                  onClick={() => console.log('Browse catalog')}
-                >
-                  Browse CKS Catalog
-                </Button>
-              </div>
-
-              <div style={{ color: '#6b7280', fontSize: '14px', marginBottom: 16 }}>
-                {servicesTab === 'my' ? 'Services you are certified in and qualified to train' :
-                 servicesTab === 'active' ? 'Services you currently manage' :
-                 'Services you no longer manage'}
-              </div>
-
-              {servicesTab === 'my' && (
-                <DataTable
-                  columns={[
-                    { key: 'serviceId', label: 'SERVICE ID', clickable: true },
-                    { key: 'serviceName', label: 'SERVICE NAME' },
-                    { key: 'certified', label: 'CERTIFIED' },
-                    { key: 'certificationDate', label: 'CERTIFICATION DATE' },
-                    { key: 'expires', label: 'EXPIRES' }
-                  ]}
-                  data={myServicesData}
-                  searchPlaceholder="Search by Service ID or name"
-                  maxItems={10}
-                  onRowClick={(row) => console.log('View service:', row)}
-                />
-              )}
-
-              {servicesTab === 'active' && (
-                <DataTable
-                  columns={[
-                    { key: 'serviceId', label: 'SERVICE ID', clickable: true },
-                    { key: 'serviceName', label: 'SERVICE NAME' },
-                    { key: 'centerId', label: 'CENTER ID' },
-                    { key: 'type', label: 'TYPE' },
-                    { key: 'startDate', label: 'START DATE' }
-                  ]}
-                  data={activeServicesData}
-                  searchPlaceholder="Search active services"
-                  maxItems={10}
-                  onRowClick={(row) => console.log('View order:', row)}
-                />
-              )}
-
-              {servicesTab === 'history' && (
-                <DataTable
-                  columns={[
-                    { key: 'serviceId', label: 'SERVICE ID', clickable: true },
-                    { key: 'serviceName', label: 'SERVICE NAME' },
-                    { key: 'centerId', label: 'CENTER ID' },
-                    { key: 'type', label: 'TYPE' },
-                    {
-                      key: 'status',
-                      label: 'STATUS',
-                      render: (value: string) => (
-                        <span style={{
-                          padding: '4px 12px',
-                          borderRadius: '4px',
-                          fontSize: '12px',
-                          fontWeight: 500,
-                          backgroundColor: value === 'Completed' ? '#dcfce7' : '#fee2e2',
-                          color: value === 'Completed' ? '#16a34a' : '#dc2626'
-                        }}>
-                          {value}
-                        </span>
-                      )
-                    },
-                    { key: 'startDate', label: 'START DATE' },
-                    { key: 'endDate', label: 'END DATE' }
-                  ]}
-                  data={serviceHistoryData}
-                  searchPlaceholder="Search service history"
-                  maxItems={10}
-                  onRowClick={(row) => console.log('View history:', row)}
-                />
-              )}
-            </>
+                )}
+              </TabSection>
+            </PageWrapper>
+          ) : activeTab === 'orders' ? (
+            <PageWrapper title="Orders" showHeader={true} headerSrOnly>
+              <OrdersSection
+                userRole="manager"
+                serviceOrders={serviceOrders}
+                productOrders={productOrders}
+                onCreateProductOrder={() => console.log('Request Products')}
+                onOrderAction={(orderId: string, action: string) => {
+                  console.log(`Order ${orderId}: ${action}`);
+                }}
+                showServiceOrders={true}
+                showProductOrders={true}
+                primaryColor="#3b82f6"
+              />
+            </PageWrapper>
           ) : (
-            <>
+            <PageWrapper title={activeTab} showHeader={true} headerSrOnly>
               <h2>Manager Hub - {activeTab}</h2>
               <p>Content for {activeTab} will be implemented here.</p>
-            </>
+            </PageWrapper>
           )}
         </div>
       </Scrollbar>

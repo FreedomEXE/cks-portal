@@ -34,6 +34,10 @@ import DataTable from '../../../packages/ui/src/tables/DataTable';
 import NavigationTab from '../../../packages/ui/src/navigation/NavigationTab';
 import TabContainer from '../../../packages/ui/src/navigation/TabContainer';
 import Button from '../../../packages/ui/src/buttons/Button';
+import { OrdersSection } from '../../../packages/domain-widgets/src/OrdersSection';
+import PageHeader from '../../../packages/ui/src/layout/PageHeader';
+import PageWrapper from '../../../packages/ui/src/layout/PageWrapper';
+import TabSection from '../../../packages/ui/src/layout/TabSection';
 
 interface CrewHubProps {
   initialTab?: string;
@@ -42,6 +46,7 @@ interface CrewHubProps {
 export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
   const [activeTab, setActiveTab] = useState(initialTab);
   const [servicesTab, setServicesTab] = useState('my');
+  const [servicesSearchQuery, setServicesSearchQuery] = useState('');
 
   // Add scrollbar styles
   useEffect(() => {
@@ -119,6 +124,84 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
     }
   ]);
 
+  // Mock orders data for Crew
+  const serviceOrders = [
+    {
+      orderId: 'CEN001-ORD-SRV004',
+      orderType: 'service' as const,
+      title: 'Security System Check',
+      priority: 'high' as const,
+      requestedBy: 'Center Created',
+      requestedDate: '2025-09-10',
+      expectedDate: '2025-09-12',
+      status: 'pending' as const,
+      approvalStages: [
+        { role: 'Center', status: 'approved' as const, user: 'Acme Downtown' },
+        { role: 'Assignment', status: 'pending' as const }
+      ]
+    },
+    {
+      orderId: 'CEN003-ORD-SRV007',
+      orderType: 'service' as const,
+      title: 'Window Cleaning',
+      priority: 'medium' as const,
+      requestedBy: 'Center Created',
+      requestedDate: '2025-09-11',
+      expectedDate: '2025-09-16',
+      status: 'in-progress' as const,
+      approvalStages: [
+        { role: 'Center', status: 'approved' as const, user: 'Tech Campus' },
+        { role: 'Assignment', status: 'approved' as const, user: 'Accepted' }
+      ]
+    },
+    {
+      orderId: 'CEN002-ORD-SRV006',
+      orderType: 'service' as const,
+      title: 'HVAC Maintenance',
+      priority: 'high' as const,
+      requestedBy: 'Center Created',
+      requestedDate: '2025-09-08',
+      expectedDate: '2025-09-10',
+      status: 'completed' as const,
+      approvalStages: [
+        { role: 'Center', status: 'approved' as const, user: 'Acme Warehouse' },
+        { role: 'Assignment', status: 'approved' as const, user: 'Completed' }
+      ]
+    }
+  ];
+
+  const productOrders = [
+    {
+      orderId: 'CRW001-ORD-PRD001',
+      orderType: 'product' as const,
+      title: 'Safety Equipment Refill',
+      priority: 'high' as const,
+      requestedBy: 'Crew Created',
+      requestedDate: '2025-09-10',
+      expectedDate: '2025-09-12',
+      status: 'pending' as const,
+      approvalStages: [
+        { role: 'Crew', status: 'approved' as const, user: 'John Smith' },
+        { role: 'Contractor', status: 'pending' as const }
+      ]
+    },
+    {
+      orderId: 'CRW001-ORD-PRD002',
+      orderType: 'product' as const,
+      title: 'Cleaning Tools Replacement',
+      priority: 'medium' as const,
+      requestedBy: 'Crew Created',
+      requestedDate: '2025-09-09',
+      expectedDate: '2025-09-15',
+      status: 'approved' as const,
+      approvalStages: [
+        { role: 'Crew', status: 'approved' as const, user: 'John Smith' },
+        { role: 'Contractor', status: 'approved' as const, user: 'Premium LLC' },
+        { role: 'Warehouse', status: 'pending' as const }
+      ]
+    }
+  ];
+
     const tabs = [
     { id: 'dashboard', label: 'Dashboard', path: '/crew/dashboard' },
     { id: 'profile', label: 'My Profile', path: '/crew/profile' },
@@ -188,20 +271,20 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
       {/* Content Area */}
       <Scrollbar style={{
         flex: 1,
-        padding: '24px'
+        padding: '0 24px'
       }}>
         <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
           {activeTab === 'dashboard' ? (
-            <>
+            <PageWrapper title="Dashboard" showHeader={false}>
+              <PageHeader title="Overview" />
               <OverviewSection
                 cards={overviewCards}
                 data={overviewData}
-                title="Overview"
               />
+              <PageHeader title="Recent Activity" />
               <RecentActivity
                 activities={activities}
                 onClear={() => setActivities([])}
-                title="Recent Activity"
                 emptyMessage="No recent activity"
               />
 
@@ -210,9 +293,10 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
                 <NewsPreview color="#ef4444" onViewAll={() => console.log('View all news')} />
                 <MemosPreview color="#ef4444" onViewAll={() => console.log('View memos')} />
               </div>
-            </>
+            </PageWrapper>
           ) : activeTab === 'profile' ? (
-            <ProfileInfoCard
+            <PageWrapper title="My Profile" showHeader={true} headerSrOnly>
+              <ProfileInfoCard
               role="crew"
               profileData={{
                 name: 'David Martinez',
@@ -235,8 +319,10 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
               onContactManager={() => console.log('Contact manager')}
               onScheduleMeeting={() => console.log('Schedule meeting')}
             />
+            </PageWrapper>
           ) : activeTab === 'ecosystem' ? (
-            <EcosystemTree
+            <PageWrapper title="My Ecosystem" showHeader={true} headerSrOnly>
+              <EcosystemTree
               rootUser={{ id: 'CTR-001', role: 'Center', name: 'Acme Downtown Office' }}
               treeData={ecosystemData}
               onNodeClick={(userId) => console.log('View details for:', userId)}
@@ -250,53 +336,39 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
                 crew: '#fee2e2'
               }}
             />
+            </PageWrapper>
           ) : activeTab === 'services' ? (
-            <>
-              <div style={{ marginBottom: 24 }}>
-                <h1 style={{ fontSize: 24, fontWeight: 'bold', color: '#111827', marginBottom: 0 }}>
-                  My Services
-                </h1>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-                <TabContainer variant="pills" spacing="compact">
-                  <NavigationTab
-                    label="My Services"
-                    count={4}
-                    isActive={servicesTab === 'my'}
-                    onClick={() => setServicesTab('my')}
-                    activeColor="#ef4444"
-                  />
-                  <NavigationTab
-                    label="Active Services"
-                    count={3}
-                    isActive={servicesTab === 'active'}
-                    onClick={() => setServicesTab('active')}
-                    activeColor="#ef4444"
-                  />
-                  <NavigationTab
-                    label="Service History"
-                    count={4}
-                    isActive={servicesTab === 'history'}
-                    onClick={() => setServicesTab('history')}
-                    activeColor="#ef4444"
-                  />
-                </TabContainer>
-
-                <Button
-                  variant="primary"
-                  roleColor="#ef4444"
-                  onClick={() => console.log('View training')}
-                >
-                  View Training
-                </Button>
-              </div>
-
-              <div style={{ color: '#6b7280', fontSize: '14px', marginBottom: 16 }}>
-                {servicesTab === 'my' ? 'Services you are trained and certified in' :
-                 servicesTab === 'active' ? 'Services you are currently assigned to' :
-                 'Services you no longer are assigned to'}
-              </div>
+            <PageWrapper title="My Services" showHeader={true} headerSrOnly>
+              <TabSection
+                tabs={[
+                  { id: 'my', label: 'My Services', count: 4 },
+                  { id: 'active', label: 'Active Services', count: 3 },
+                  { id: 'history', label: 'Service History', count: 4 }
+                ]}
+                activeTab={servicesTab}
+                onTabChange={setServicesTab}
+                description={
+                  servicesTab === 'my' ? 'Services you are trained and certified in' :
+                  servicesTab === 'active' ? 'Services you are currently assigned to' :
+                  'Services you no longer are assigned to'
+                }
+                searchPlaceholder={
+                  servicesTab === 'my' ? 'Search by Service ID or name' :
+                  servicesTab === 'active' ? 'Search active services' :
+                  'Search service history'
+                }
+                onSearch={setServicesSearchQuery}
+                actionButton={
+                  <Button
+                    variant="primary"
+                    roleColor="#000000"
+                    onClick={() => console.log('Browse catalog')}
+                  >
+                    Browse CKS Catalog
+                  </Button>
+                }
+                primaryColor="#ef4444"
+              >
 
               {servicesTab === 'my' && (
                 <DataTable
@@ -309,7 +381,8 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
                     { key: 'expires', label: 'EXPIRES' }
                   ]}
                   data={myServicesData}
-                  searchPlaceholder="Search by Service ID or name"
+                  showSearch={false}
+                  externalSearchQuery={servicesSearchQuery}
                   maxItems={10}
                   onRowClick={(row) => console.log('View service:', row)}
                 />
@@ -325,7 +398,8 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
                     { key: 'startDate', label: 'START DATE' }
                   ]}
                   data={activeServicesData}
-                  searchPlaceholder="Search active services"
+                  showSearch={false}
+                  externalSearchQuery={servicesSearchQuery}
                   maxItems={10}
                   onRowClick={(row) => console.log('View task:', row)}
                 />
@@ -358,17 +432,34 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
                     { key: 'endDate', label: 'END DATE' }
                   ]}
                   data={serviceHistoryData}
-                  searchPlaceholder="Search service history"
+                  showSearch={false}
+                  externalSearchQuery={servicesSearchQuery}
                   maxItems={10}
                   onRowClick={(row) => console.log('View history:', row)}
                 />
               )}
-            </>
+              </TabSection>
+            </PageWrapper>
+          ) : activeTab === 'orders' ? (
+            <PageWrapper title="Orders" showHeader={true} headerSrOnly>
+              <OrdersSection
+              userRole="crew"
+              serviceOrders={serviceOrders}
+              productOrders={productOrders}
+              onCreateProductOrder={() => console.log('Request Products')}
+              onOrderAction={(orderId, action) => {
+                console.log(`Order ${orderId}: ${action}`);
+              }}
+              showServiceOrders={true}
+              showProductOrders={true}
+              primaryColor="#ef4444"
+            />
+            </PageWrapper>
           ) : (
-            <>
+            <PageWrapper title={activeTab} showHeader={true} headerSrOnly>
               <h2>Crew Hub - {activeTab}</h2>
               <p>Content for {activeTab} will be implemented here.</p>
-            </>
+            </PageWrapper>
           )}
         </div>
       </Scrollbar>

@@ -112,9 +112,20 @@
           "count": 1,
           "type": "domain",
           "path": "../../../packages/domain-widgets/src/profile"
+        },
+        "PageHeader": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/layout/PageHeader"
         }
       },
-      "ecosystem": {},
+      "ecosystem": {
+        "PageHeader": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/layout/PageHeader"
+        }
+      },
       "services": {
         "DataTable": {
           "count": 3,
@@ -135,9 +146,20 @@
           "count": 1,
           "type": "ui",
           "path": "../../../packages/ui/src/buttons/Button"
+        },
+        "PageHeader": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/layout/PageHeader"
         }
       },
-      "orders": {},
+      "orders": {
+        "OrdersSection": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/OrdersSection"
+        }
+      },
       "reports": {},
       "support": {}
     }
@@ -215,7 +237,13 @@
           "path": "../../../packages/ui/src/buttons/Button"
         }
       },
-      "orders": {},
+      "orders": {
+        "OrdersSection": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/OrdersSection"
+        }
+      },
       "reports": {},
       "support": {}
     }
@@ -293,7 +321,13 @@
           "path": "../../../packages/ui/src/buttons/Button"
         }
       },
-      "orders": {},
+      "orders": {
+        "OrdersSection": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/OrdersSection"
+        }
+      },
       "reports": {},
       "support": {}
     }
@@ -371,7 +405,13 @@
           "path": "../../../packages/ui/src/buttons/Button"
         }
       },
-      "orders": {},
+      "orders": {
+        "OrdersSection": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/OrdersSection"
+        }
+      },
       "reports": {},
       "support": {}
     }
@@ -449,7 +489,13 @@
           "path": "../../../packages/ui/src/buttons/Button"
         }
       },
-      "orders": {},
+      "orders": {
+        "OrdersSection": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/OrdersSection"
+        }
+      },
       "reports": {},
       "support": {}
     }
@@ -528,7 +574,13 @@
         }
       },
       "inventory": {},
-      "orders": {},
+      "orders": {
+        "OrdersSection": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/OrdersSection"
+        }
+      },
       "deliveries": {},
       "reports": {},
       "support": {}

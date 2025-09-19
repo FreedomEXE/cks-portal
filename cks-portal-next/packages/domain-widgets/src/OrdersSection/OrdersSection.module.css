@@ -1,0 +1,75 @@
+.ordersSection {
+  width: 100%;
+}
+
+.searchInput {
+  width: 100%;
+  max-width: 500px;
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.searchInput:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.searchInput::placeholder {
+  color: #9ca3af;
+}
+
+.tabContent {
+  /* Let content define height; keep small breathing room */
+  min-height: 120px;
+  padding: 4px 0;
+}
+
+.orderCardsContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  /* Remove large fixed min-height that created empty space */
+  min-height: 0;
+}
+
+.noOrders {
+  text-align: center;
+  padding: 60px 20px;
+  color: #6b7280;
+  font-size: 14px;
+  background-color: #f9fafb;
+  border-radius: 8px;
+  border: 1px dashed #d1d5db;
+  min-height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.transformedId {
+  margin-top: 8px;
+  padding: 8px;
+  background-color: #f0f9ff;
+  border-left: 3px solid #3b82f6;
+  border-radius: 4px;
+  font-size: 13px;
+  color: #4b5563;
+}
+
+.newId {
+  font-weight: 600;
+  color: #3b82f6;
+  margin-left: 4px;
+}
+
+@media (max-width: 768px) {
+  .searchInput {
+    width: 100%;
+    max-width: none;
+  }
+}

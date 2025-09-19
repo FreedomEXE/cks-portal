@@ -31,6 +31,9 @@ import DataTable from '../../../packages/ui/src/tables/DataTable';
 import NavigationTab from '../../../packages/ui/src/navigation/NavigationTab';
 import TabContainer from '../../../packages/ui/src/navigation/TabContainer';
 import Button from '../../../packages/ui/src/buttons/Button';
+import PageHeader from '../../../packages/ui/src/layout/PageHeader';
+import PageWrapper from '../../../packages/ui/src/layout/PageWrapper';
+import TabSection from '../../../packages/ui/src/layout/TabSection';
 
 interface AdminHubProps {
   initialTab?: string;
@@ -675,20 +678,20 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
       {/* Content Area */}
       <Scrollbar style={{
         flex: 1,
-        padding: '24px'
+        padding: '0 24px'
       }}>
         <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
           {activeTab === 'dashboard' ? (
-            <>
+            <PageWrapper title="Dashboard" showHeader={false}>
+              <PageHeader title="Overview" />
               <OverviewSection
                 cards={overviewCards}
                 data={overviewData}
-                title="Overview"
               />
+              <PageHeader title="Recent Activity" />
               <RecentActivity
                 activities={activities}
                 onClear={() => setActivities([])}
-                title="Recent Activity"
                 emptyMessage="No recent system activity"
               />
 
@@ -697,18 +700,9 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
                 <NewsPreview color="#111827" onViewAll={() => console.log('View all news')} />
                 <MemosPreview color="#111827" onViewAll={() => console.log('View memos')} />
               </div>
-            </>
+            </PageWrapper>
           ) : activeTab === 'directory' ? (
-            <>
-              <div style={{ marginBottom: 24 }}>
-                <h1 style={{ fontSize: 24, fontWeight: 'bold', color: '#111827', marginBottom: 6 }}>
-                  CKS Directory - Complete Business Intelligence
-                </h1>
-                <p style={{ color: '#6b7280', margin: 0 }}>
-                  At-a-glance directory showing essential fields. Click on ID to view detailed profile with complete information.
-                </p>
-              </div>
-
+            <PageWrapper title="Directory" showHeader={true} headerSrOnly>
               <TabContainer variant="pills" spacing="compact">
                 <NavigationTab
                   label="Contractors"
@@ -843,12 +837,12 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
                   />
                 )}
               </div>
-            </>
+            </PageWrapper>
           ) : (
-            <>
+            <PageWrapper title={activeTab} showHeader={true} headerSrOnly>
               <h2>Admin {activeTab} content</h2>
               <p>Content for {activeTab} will be implemented here.</p>
-            </>
+            </PageWrapper>
           )}
         </div>
       </Scrollbar>

@@ -1,0 +1,121 @@
+.container {
+  width: 100%;
+}
+
+/* Description text below tabs */
+.description {
+  color: #6b7280;
+  font-size: 14px;
+  line-height: 1.5;
+  margin-bottom: 16px;
+}
+
+/* Search section inside card */
+.searchSection {
+  padding: 20px 24px;
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.searchContainer {
+  /* Constrain search to roughly half width like in My Services */
+  flex: 0 1 50%;
+  max-width: 560px;
+  min-width: 320px;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 16px;
+  color: #9ca3af;
+  pointer-events: none;
+}
+
+.searchInput {
+  width: 100%;
+  padding: 10px 16px 10px 48px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 14px;
+  background: white;
+  transition: all 0.2s ease;
+  outline: none;
+}
+
+.searchInput:hover {
+  border-color: #d1d5db;
+}
+
+.searchInput:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.searchInput::placeholder {
+  color: #9ca3af;
+}
+
+.actionButton {
+  flex-shrink: 0;
+}
+
+/* Main content area */
+.content {
+  padding: 24px;
+}
+
+/* Flush content (no padding) for full-width lists/cards like Recent Activity */
+.contentFlush {
+  padding: 0;
+}
+
+/* Remove default margins from children */
+.content > div:first-child {
+  margin-top: 0;
+}
+
+/* Remove border/background from DataTable when inside TabSection */
+.content > div > div {
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .searchSection {
+    padding: 16px;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .searchContainer {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    flex: 1 1 auto;
+  }
+
+  .actionButton {
+    width: 100%;
+  }
+
+  .actionButton button {
+    width: 100%;
+  }
+
+  .content {
+    padding: 16px;
+  }
+
+  .description {
+    margin-bottom: 12px;
+    font-size: 13px;
+  }
+}

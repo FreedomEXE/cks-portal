@@ -50,15 +50,6 @@ export default function OverviewSection({
 }: OverviewSectionProps) {
   return (
     <div style={{ marginBottom: 32 }}>
-      <h2 style={{
-        fontSize: 20,
-        fontWeight: 700,
-        color: '#111827',
-        marginBottom: 16
-      }}>
-        {title}
-      </h2>
-
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',

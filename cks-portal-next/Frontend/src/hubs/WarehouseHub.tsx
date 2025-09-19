@@ -33,6 +33,10 @@ import DataTable from '../../../packages/ui/src/tables/DataTable';
 import NavigationTab from '../../../packages/ui/src/navigation/NavigationTab';
 import TabContainer from '../../../packages/ui/src/navigation/TabContainer';
 import Button from '../../../packages/ui/src/buttons/Button';
+import { OrdersSection } from '../../../packages/domain-widgets/src/OrdersSection';
+import PageHeader from '../../../packages/ui/src/layout/PageHeader';
+import PageWrapper from '../../../packages/ui/src/layout/PageWrapper';
+import TabSection from '../../../packages/ui/src/layout/TabSection';
 
 interface WarehouseHubProps {
   initialTab?: string;
@@ -41,6 +45,7 @@ interface WarehouseHubProps {
 export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubProps) {
   const [activeTab, setActiveTab] = useState(initialTab);
   const [servicesTab, setServicesTab] = useState('my');
+  const [servicesSearchQuery, setServicesSearchQuery] = useState('');
 
   // Add scrollbar styles
   useEffect(() => {
@@ -105,6 +110,58 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
       metadata: { role: 'warehouse', userId: 'WHS-001', title: 'Restock Ordered' }
     }
   ]);
+
+  // Mock product orders data for Warehouse (only product orders)
+  const productOrders = [
+    {
+      orderId: 'CRW001-ORD-PRD001',
+      orderType: 'product' as const,
+      title: 'Safety Equipment Request',
+      priority: 'high' as const,
+      requestedBy: 'Crew Created',
+      requestedDate: '2025-09-10',
+      expectedDate: '2025-09-12',
+      expectedStart: '2025-09-15',
+      status: 'pending' as const,
+      approvalStages: [
+        { role: 'Crew', status: 'approved' as const, user: 'John Smith' },
+        { role: 'Contractor', status: 'approved' as const, user: 'Premium LLC' },
+        { role: 'Warehouse', status: 'pending' as const }
+      ]
+    },
+    {
+      orderId: 'CEN001-ORD-PRD002',
+      orderType: 'product' as const,
+      title: 'Office Supplies',
+      priority: 'medium' as const,
+      requestedBy: 'Center Created',
+      requestedDate: '2025-09-10',
+      expectedDate: '2025-09-15',
+      expectedStart: '2025-09-15',
+      status: 'pending' as const,
+      approvalStages: [
+        { role: 'Center', status: 'approved' as const, user: 'Acme Downtown' },
+        { role: 'Contractor', status: 'approved' as const, user: 'Premium LLC' },
+        { role: 'Warehouse', status: 'pending' as const }
+      ]
+    },
+    {
+      orderId: 'CUST001-ORD-PRD001',
+      orderType: 'product' as const,
+      title: 'Cleaning Supplies',
+      priority: 'low' as const,
+      requestedBy: 'Customer Created',
+      requestedDate: '2025-09-09',
+      expectedDate: '2025-09-20',
+      expectedStart: '2025-09-15',
+      status: 'in-progress' as const,
+      approvalStages: [
+        { role: 'Customer', status: 'approved' as const, user: 'Acme Corp' },
+        { role: 'Contractor', status: 'approved' as const, user: 'Premium LLC' },
+        { role: 'Warehouse', status: 'approved' as const, user: 'Main Warehouse' }
+      ]
+    }
+  ];
 
     const tabs = [
     { id: 'dashboard', label: 'Dashboard', path: '/warehouse/dashboard' },
@@ -176,20 +233,20 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
       {/* Content Area */}
       <Scrollbar style={{
         flex: 1,
-        padding: '24px'
+        padding: '0 24px'
       }}>
         <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
           {activeTab === 'dashboard' ? (
-            <>
+            <PageWrapper title="Dashboard" showHeader={false}>
+              <PageHeader title="Overview" />
               <OverviewSection
                 cards={overviewCards}
                 data={overviewData}
-                title="Overview"
               />
+              <PageHeader title="Recent Activity" />
               <RecentActivity
                 activities={activities}
                 onClear={() => setActivities([])}
-                title="Recent Activity"
                 emptyMessage="No recent warehouse activity"
               />
 
@@ -198,9 +255,10 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
                 <NewsPreview onViewAll={() => console.log('View all news')} />
                 <MemosPreview onViewAll={() => console.log('View memos')} />
               </div>
-            </>
+            </PageWrapper>
           ) : activeTab === 'profile' ? (
-            <ProfileInfoCard
+            <PageWrapper title="My Profile" showHeader={true} headerSrOnly>
+              <ProfileInfoCard
               role="warehouse"
               profileData={{
                 name: 'Central Distribution Warehouse',
@@ -223,53 +281,39 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
               onContactManager={() => console.log('Contact manager')}
               onScheduleMeeting={() => console.log('Schedule meeting')}
             />
+            </PageWrapper>
           ) : activeTab === 'services' ? (
-            <>
-              <div style={{ marginBottom: 24 }}>
-                <h1 style={{ fontSize: 24, fontWeight: 'bold', color: '#111827', marginBottom: 0 }}>
-                  My Services
-                </h1>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-                <TabContainer variant="pills" spacing="compact">
-                  <NavigationTab
-                    label="My Services"
-                    count={4}
-                    isActive={servicesTab === 'my'}
-                    onClick={() => setServicesTab('my')}
-                    activeColor="#8b5cf6"
-                  />
-                  <NavigationTab
-                    label="Active Services"
-                    count={3}
-                    isActive={servicesTab === 'active'}
-                    onClick={() => setServicesTab('active')}
-                    activeColor="#8b5cf6"
-                  />
-                  <NavigationTab
-                    label="Service History"
-                    count={4}
-                    isActive={servicesTab === 'history'}
-                    onClick={() => setServicesTab('history')}
-                    activeColor="#8b5cf6"
-                  />
-                </TabContainer>
-
-                <Button
-                  variant="primary"
-                  roleColor="#8b5cf6"
-                  onClick={() => console.log('Create order')}
-                >
-                  Create Order
-                </Button>
-              </div>
-
-              <div style={{ color: '#6b7280', fontSize: '14px', marginBottom: 16 }}>
-                {servicesTab === 'my' ? 'Services you are trained and certified in' :
-                 servicesTab === 'active' ? 'Services you are currently assigned to' :
-                 'Services Archive'}
-              </div>
+            <PageWrapper title="My Services" showHeader={true} headerSrOnly>
+              <TabSection
+                tabs={[
+                  { id: 'my', label: 'My Services', count: 4 },
+                  { id: 'active', label: 'Active Services', count: 3 },
+                  { id: 'history', label: 'Service History', count: 4 }
+                ]}
+                activeTab={servicesTab}
+                onTabChange={setServicesTab}
+                description={
+                  servicesTab === 'my' ? 'Services you are trained and certified in' :
+                  servicesTab === 'active' ? 'Services you are currently assigned to' :
+                  'Services Archive'
+                }
+                searchPlaceholder={
+                  servicesTab === 'my' ? 'Search by Service ID or name' :
+                  servicesTab === 'active' ? 'Search active services' :
+                  'Search service history'
+                }
+                onSearch={setServicesSearchQuery}
+                actionButton={
+                  <Button
+                    variant="primary"
+                    roleColor="#000000"
+                    onClick={() => console.log('Browse catalog')}
+                  >
+                    Browse CKS Catalog
+                  </Button>
+                }
+                primaryColor="#8b5cf6"
+              >
 
               {servicesTab === 'my' && (
                 <DataTable
@@ -282,7 +326,8 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
                     { key: 'expires', label: 'EXPIRES' }
                   ]}
                   data={myServicesData}
-                  searchPlaceholder="Search by Service ID or name"
+                  showSearch={false}
+                  externalSearchQuery={servicesSearchQuery}
                   maxItems={10}
                   onRowClick={(row) => console.log('View service:', row)}
                 />
@@ -298,7 +343,8 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
                     { key: 'startDate', label: 'START DATE' }
                   ]}
                   data={activeServicesData}
-                  searchPlaceholder="Search active services"
+                  showSearch={false}
+                  externalSearchQuery={servicesSearchQuery}
                   maxItems={10}
                   onRowClick={(row) => console.log('View order:', row)}
                 />
@@ -331,17 +377,33 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
                     { key: 'endDate', label: 'END DATE' }
                   ]}
                   data={serviceHistoryData}
-                  searchPlaceholder="Search service history"
+                  showSearch={false}
+                  externalSearchQuery={servicesSearchQuery}
                   maxItems={10}
                   onRowClick={(row) => console.log('View history:', row)}
                 />
               )}
-            </>
+              </TabSection>
+            </PageWrapper>
+          ) : activeTab === 'orders' ? (
+            <PageWrapper title="Orders" showHeader={true} headerSrOnly>
+              <OrdersSection
+              userRole="warehouse"
+              serviceOrders={[]}
+              productOrders={productOrders}
+              onOrderAction={(orderId, action) => {
+                console.log(`Order ${orderId}: ${action}`);
+              }}
+              showServiceOrders={false}
+              showProductOrders={true}
+              primaryColor="#8b5cf6"
+            />
+            </PageWrapper>
           ) : (
-            <>
+            <PageWrapper title={activeTab} showHeader={true} headerSrOnly>
               <h2>Warehouse Hub - {activeTab}</h2>
               <p>Content for {activeTab} will be implemented here.</p>
-            </>
+            </PageWrapper>
           )}
         </div>
       </Scrollbar>

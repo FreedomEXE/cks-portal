@@ -18,6 +18,7 @@ export interface DataTableProps {
   showSearch?: boolean;
   onRowClick?: (row: any) => void;
   searchFields?: string[]; // Which fields to search in
+  externalSearchQuery?: string; // Allow external search control from TabSection
 }
 
 const DataTable: React.FC<DataTableProps> = ({
@@ -29,10 +30,14 @@ const DataTable: React.FC<DataTableProps> = ({
   emptyMessage = "No data available",
   showSearch = true,
   onRowClick,
-  searchFields
+  searchFields,
+  externalSearchQuery
 }) => {
-  const [searchQuery, setSearchQuery] = useState('');
+  const [internalSearchQuery, setInternalSearchQuery] = useState('');
   const [isExpanded, setIsExpanded] = useState(false);
+
+  // Use external search if provided, otherwise use internal
+  const searchQuery = externalSearchQuery !== undefined ? externalSearchQuery : internalSearchQuery;
 
   // Filter data based on search query
   const filteredData = useMemo(() => {
@@ -62,7 +67,7 @@ const DataTable: React.FC<DataTableProps> = ({
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    setSearchQuery(value);
+    setInternalSearchQuery(value);
     onSearch?.(value);
   };
 

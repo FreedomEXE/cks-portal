@@ -15,7 +15,10 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
       '@cks-hubs': path.resolve(__dirname, '../Frontend/src/hubs'),
       '@cks-packages': path.resolve(__dirname, '../../packages'),
-      '@cks-frontend': path.resolve(__dirname, '../Frontend/src')
+      '@cks-frontend': path.resolve(__dirname, '../Frontend/src'),
+      // Scoped package-style aliases used inside packages
+      '@cks-portal/ui': path.resolve(__dirname, '../../packages/ui/src'),
+      '@cks-portal/domain-widgets': path.resolve(__dirname, '../../packages/domain-widgets/src')
     }
   },
   build: {

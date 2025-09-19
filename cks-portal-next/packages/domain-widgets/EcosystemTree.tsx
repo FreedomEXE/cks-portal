@@ -255,8 +255,6 @@ const EcosystemTree: React.FC<EcosystemTreeProps> = ({
 
   return (
     <div>
-      <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16, color: '#111827' }}>{title}</h2>
-
       <div style={{
         borderRadius: 8,
         border: '1px solid #e5e7eb',

@@ -34,6 +34,10 @@ import DataTable from '../../../packages/ui/src/tables/DataTable';
 import NavigationTab from '../../../packages/ui/src/navigation/NavigationTab';
 import TabContainer from '../../../packages/ui/src/navigation/TabContainer';
 import Button from '../../../packages/ui/src/buttons/Button';
+import { OrdersSection } from '../../../packages/domain-widgets/src/OrdersSection';
+import PageWrapper from '../../../packages/ui/src/layout/PageWrapper';
+import PageHeader from '../../../packages/ui/src/layout/PageHeader';
+import TabSection from '../../../packages/ui/src/layout/TabSection';
 
 interface CenterHubProps {
   initialTab?: string;
@@ -41,6 +45,7 @@ interface CenterHubProps {
 
 export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) {
   const [activeTab, setActiveTab] = useState(initialTab);
+  const [servicesSearchQuery, setServicesSearchQuery] = useState('');
   const [servicesTab, setServicesTab] = useState('my');
 
   // Add scrollbar styles
@@ -112,6 +117,69 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
     }
   ]);
 
+  // Mock orders data for Center
+  const serviceOrders = [
+    {
+      orderId: 'CEN001-ORD-SRV001',
+      orderType: 'service' as const,
+      title: 'Window Cleaning',
+      requestedBy: 'Center Created',
+      requestedDate: '2025-09-10',
+      expectedDate: '2025-09-15',
+      status: 'pending' as const,
+      approvalStages: [
+        { role: 'Center', status: 'approved' as const, user: 'Acme Downtown' },
+        { role: 'Customer', status: 'pending' as const },
+        { role: 'Contractor', status: 'waiting' as const }
+      ]
+    },
+    {
+      orderId: 'CEN001-ORD-SRV002',
+      orderType: 'service' as const,
+      title: 'Elevator Maintenance',
+      requestedBy: 'Center Created',
+      requestedDate: '2025-09-12',
+      expectedDate: '2025-09-18',
+      status: 'approved' as const,
+      approvalStages: [
+        { role: 'Center', status: 'approved' as const, user: 'Acme Downtown' },
+        { role: 'Customer', status: 'approved' as const, user: 'Acme Corp' },
+        { role: 'Contractor', status: 'approved' as const, user: 'Premium LLC' },
+        { role: 'Manager', status: 'pending' as const }
+      ]
+    }
+  ];
+
+  const productOrders = [
+    {
+      orderId: 'CEN001-ORD-PRD001',
+      orderType: 'product' as const,
+      title: 'Cleaning Supplies Refill',
+      requestedBy: 'Center Created',
+      requestedDate: '2025-09-10',
+      expectedDate: '2025-09-15',
+      status: 'pending' as const,
+      approvalStages: [
+        { role: 'Center', status: 'approved' as const, user: 'Acme Downtown' },
+        { role: 'Contractor', status: 'pending' as const }
+      ]
+    },
+    {
+      orderId: 'CEN001-ORD-PRD003',
+      orderType: 'product' as const,
+      title: 'Office Paper & Supplies',
+      requestedBy: 'Center Created',
+      requestedDate: '2025-09-09',
+      expectedDate: '2025-09-20',
+      status: 'approved' as const,
+      approvalStages: [
+        { role: 'Center', status: 'approved' as const, user: 'Acme Downtown' },
+        { role: 'Contractor', status: 'approved' as const, user: 'Premium LLC' },
+        { role: 'Warehouse', status: 'pending' as const }
+      ]
+    }
+  ];
+
     const tabs = [
     { id: 'dashboard', label: 'Dashboard', path: '/center/dashboard' },
     { id: 'profile', label: 'My Profile', path: '/center/profile' },
@@ -179,20 +247,20 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
       {/* Content Area */}
       <Scrollbar style={{
         flex: 1,
-        padding: '24px'
+        padding: '0 24px'
       }}>
         <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
           {activeTab === 'dashboard' ? (
-            <>
+            <PageWrapper title="Dashboard" showHeader={false}>
+              <PageHeader title="Overview" />
               <OverviewSection
                 cards={overviewCards}
                 data={overviewData}
-                title="Overview"
               />
+              <PageHeader title="Recent Activity" />
               <RecentActivity
                 activities={activities}
                 onClear={() => setActivities([])}
-                title="Recent Activity"
                 emptyMessage="No recent center activity"
               />
 
@@ -201,9 +269,10 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
                 <NewsPreview color="#f97316" onViewAll={() => console.log('View all news')} />
                 <MemosPreview color="#f97316" onViewAll={() => console.log('View memos')} />
               </div>
-            </>
+            </PageWrapper>
           ) : activeTab === 'profile' ? (
-            <ProfileInfoCard
+            <PageWrapper headerSrOnly>
+              <ProfileInfoCard
               role="center"
               profileData={{
                 name: 'Downtown Service Center',
@@ -226,8 +295,10 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
               onContactManager={() => console.log('Contact manager')}
               onScheduleMeeting={() => console.log('Schedule meeting')}
             />
+            </PageWrapper>
           ) : activeTab === 'ecosystem' ? (
-            <EcosystemTree
+            <PageWrapper headerSrOnly>
+              <EcosystemTree
               rootUser={{ id: 'CTR-001', role: 'Center', name: 'Acme Downtown Office' }}
               treeData={ecosystemData}
               onNodeClick={(userId) => console.log('View details for:', userId)}
@@ -241,44 +312,33 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
                 crew: '#fee2e2'
               }}
             />
+            </PageWrapper>
           ) : activeTab === 'services' ? (
-            <>
-              <div style={{ marginBottom: 24 }}>
-                <h1 style={{ fontSize: 24, fontWeight: 'bold', color: '#111827', marginBottom: 0 }}>
-                  My Services
-                </h1>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-                <TabContainer variant="pills" spacing="compact">
-                  <NavigationTab
-                    label="My Services"
-                    count={4}
-                    isActive={servicesTab === 'my'}
-                    onClick={() => setServicesTab('my')}
-                    activeColor="#f97316"
-                  />
-                  <NavigationTab
-                    label="Service History"
-                    count={4}
-                    isActive={servicesTab === 'history'}
-                    onClick={() => setServicesTab('history')}
-                    activeColor="#f97316"
-                  />
-                </TabContainer>
-
-                <Button
-                  variant="primary"
-                  roleColor="#f97316"
-                  onClick={() => console.log('Request service')}
-                >
-                  Request Service
-                </Button>
-              </div>
-
-              <div style={{ color: '#6b7280', fontSize: '14px', marginBottom: 16 }}>
-                {servicesTab === 'my' ? 'CKS services currently provided at your center' : 'Services Archive'}
-              </div>
+            <PageWrapper headerSrOnly>
+              <TabSection
+                tabs={[
+                  { id: 'my', label: 'My Services', count: 4 },
+                  { id: 'history', label: 'Service History', count: 4 }
+                ]}
+                activeTab={servicesTab}
+                onTabChange={setServicesTab}
+                description={servicesTab === 'my' ? 'CKS services currently provided at your center' : 'Services Archive'}
+                searchPlaceholder={
+                  servicesTab === 'my' ? 'Search by Service ID or name' :
+                  'Search service history'
+                }
+                onSearch={setServicesSearchQuery}
+                actionButton={
+                  <Button
+                    variant="primary"
+                    roleColor="#000000"
+                    onClick={() => console.log('Browse catalog')}
+                  >
+                    Browse CKS Catalog
+                  </Button>
+                }
+                primaryColor="#f97316"
+              >
 
               {servicesTab === 'my' && (
                 <DataTable
@@ -305,7 +365,8 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
                     { key: 'startDate', label: 'START DATE' }
                   ]}
                   data={myServicesData}
-                  searchPlaceholder="Search by Service ID or name"
+                  showSearch={false}
+                  externalSearchQuery={servicesSearchQuery}
                   maxItems={10}
                   onRowClick={(row) => console.log('View service:', row)}
                 />
@@ -338,17 +399,35 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
                     { key: 'endDate', label: 'END DATE' }
                   ]}
                   data={serviceHistoryData}
-                  searchPlaceholder="Search service history"
+                  showSearch={false}
+                  externalSearchQuery={servicesSearchQuery}
                   maxItems={10}
                   onRowClick={(row) => console.log('View history:', row)}
                 />
               )}
-            </>
+              </TabSection>
+            </PageWrapper>
+          ) : activeTab === 'orders' ? (
+            <PageWrapper headerSrOnly>
+              <OrdersSection
+              userRole="center"
+              serviceOrders={serviceOrders}
+              productOrders={productOrders}
+              onCreateServiceOrder={() => console.log('Request Service')}
+              onCreateProductOrder={() => console.log('Request Products')}
+              onOrderAction={(orderId, action) => {
+                console.log(`Order ${orderId}: ${action}`);
+              }}
+              showServiceOrders={true}
+              showProductOrders={true}
+              primaryColor="#f97316"
+            />
+            </PageWrapper>
           ) : (
-            <>
+            <PageWrapper title={activeTab} showHeader={true} headerSrOnly>
               <h2>Center Hub - {activeTab}</h2>
               <p>Content for {activeTab} will be implemented here.</p>
-            </>
+            </PageWrapper>
           )}
         </div>
       </Scrollbar>

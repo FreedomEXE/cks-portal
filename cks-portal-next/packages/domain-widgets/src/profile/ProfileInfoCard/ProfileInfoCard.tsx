@@ -101,10 +101,6 @@ export function ProfileInfoCard({
 
   return (
     <div>
-      {/* Header */}
-      <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16, color: '#111827' }}>
-        My Profile
-      </h2>
 
       {/* Tabs - Outside the card */}
       <div style={{ marginBottom: 24 }}>

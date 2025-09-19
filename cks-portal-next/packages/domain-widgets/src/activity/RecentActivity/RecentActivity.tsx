@@ -31,18 +31,6 @@ export function RecentActivity({
 }: RecentActivityProps) {
   return (
     <div style={{ marginBottom: 32 }}>
-      <h2
-        style={{
-          margin: 0,
-          fontSize: 20,
-          fontWeight: 700,
-          color: '#111827',
-          marginBottom: 16,
-        }}
-      >
-        {title}
-      </h2>
-
       <div
         className="ui-card"
         style={{
