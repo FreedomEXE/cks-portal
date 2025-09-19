@@ -3,19 +3,22 @@ import styles from './OrderCard.module.css';
 
 interface ApprovalStage {
   role: string;
-  status: 'pending' | 'approved' | 'rejected' | 'waiting';
+  status: 'pending' | 'approved' | 'rejected' | 'waiting' | 'accepted' | 'requested' | 'delivered';
   user?: string;
   timestamp?: string;
 }
 
 interface OrderCardProps {
   orderId: string;
-  orderType: 'service' | 'supply';
+  orderType: 'service' | 'product';
   title: string;
   requestedBy: string;
+  destination?: string;  // Destination for the order
   requestedDate: string;
-  expectedDate?: string;
-  status: 'pending' | 'in-progress' | 'approved' | 'rejected' | 'cancelled';
+  expectedDate?: string;  // Requested date
+  serviceStartDate?: string;  // Actual service start (for service-created)
+  deliveryDate?: string;  // Actual delivery date (for delivered)
+  status: 'pending' | 'in-progress' | 'approved' | 'rejected' | 'cancelled' | 'delivered' | 'service-created';
   approvalStages?: ApprovalStage[];
   onAction?: (action: string) => void;
   actions?: string[];
@@ -31,8 +34,11 @@ const OrderCard: React.FC<OrderCardProps> = ({
   orderType,
   title,
   requestedBy,
+  destination,
   requestedDate,
   expectedDate,
+  serviceStartDate,
+  deliveryDate,
   status,
   approvalStages = [],
   onAction,
@@ -44,32 +50,46 @@ const OrderCard: React.FC<OrderCardProps> = ({
   transformedId
 }) => {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: string, isPulsing: boolean = false, isLastStage: boolean = false) => {
+    let baseClass = '';
     switch (status) {
       case 'approved':
-        return styles.statusGreen;
+      case 'delivered':
+      case 'service-created':
+      case 'requested':  // Crew requested shows as green (completed action)
+        baseClass = styles.statusGreen;
+        break;
       case 'pending':
       case 'waiting':
-        return styles.statusYellow;  // Back to yellow for pending
+      case 'accepted':  // Accepted but not delivered - shows as yellow
+        baseClass = styles.statusYellow;
+        break;
       case 'rejected':
       case 'cancelled':
-        return styles.statusRed;  // Red for both rejected and cancelled
+        baseClass = styles.statusRed;  // Red for both rejected and cancelled
+        break;
       case 'in-progress':
-        return styles.statusBlue;
+        baseClass = styles.statusBlue;
+        break;
       default:
-        return styles.statusGray;
+        baseClass = styles.statusGray;
     }
+    // Add pulsing class for pending/waiting/accepted states
+    if (isPulsing && (status === 'pending' || status === 'waiting' || status === 'accepted')) {
+      return `${baseClass} ${styles.pulsingStage}`;
+    }
+    return baseClass;
   };
 
   const getActionButtonClass = (action: string) => {
     const actionLower = action.toLowerCase();
-    if (actionLower.includes('approve') || actionLower.includes('accept')) {
+    if (actionLower.includes('approve') || actionLower.includes('accept') || actionLower.includes('create service')) {
       return styles.actionApprove;
     }
     if (actionLower.includes('reject') || actionLower.includes('deny') || actionLower.includes('cancel')) {
       return styles.actionReject;
     }
-    if (actionLower.includes('assign') || actionLower.includes('add')) {
+    if (actionLower.includes('assign') || actionLower.includes('add') || actionLower.includes('deliver')) {
       return styles.actionAssign;
     }
     return styles.actionDefault;
@@ -83,6 +103,8 @@ const OrderCard: React.FC<OrderCardProps> = ({
         case 'pending': return '#fef3c7'; // Light yellow - back to original
         case 'in-progress': return '#dbeafe'; // Light blue
         case 'approved': return '#dcfce7'; // Light green
+        case 'delivered': return '#dcfce7'; // Light green - same as approved
+        case 'service-created': return '#dcfce7'; // Light green - service created
         case 'rejected': return '#fee2e2'; // Light red
         case 'cancelled': return '#fee2e2'; // Light red - same as rejected
         default: return '#f9fafb';
@@ -214,18 +236,32 @@ const OrderCard: React.FC<OrderCardProps> = ({
                   <span className={styles.detailLabel}>Requested By</span>
                   <span className={styles.detailValue}>{requestedBy}</span>
                 </div>
-                <div className={styles.detailItem}>
-                  <span className={styles.detailLabel}>Center ID</span>
-                  <span className={styles.detailValue}>{orderId.split('-')[0]}</span>
-                </div>
+                {destination && (
+                  <div className={styles.detailItem}>
+                    <span className={styles.detailLabel}>Destination</span>
+                    <span className={styles.detailValue}>{destination}</span>
+                  </div>
+                )}
                 <div className={styles.detailItem}>
                   <span className={styles.detailLabel}>Date Requested</span>
                   <span className={styles.detailValue}>{requestedDate}</span>
                 </div>
                 {expectedDate && (
                   <div className={styles.detailItem}>
-                    <span className={styles.detailLabel}>Expected By</span>
+                    <span className={styles.detailLabel}>Requested By</span>
                     <span className={styles.detailValue}>{expectedDate}</span>
+                  </div>
+                )}
+                {serviceStartDate && status === 'service-created' && (
+                  <div className={styles.detailItem}>
+                    <span className={styles.detailLabel}>Service Started</span>
+                    <span className={styles.detailValue}>{serviceStartDate}</span>
+                  </div>
+                )}
+                {deliveryDate && status === 'delivered' && (
+                  <div className={styles.detailItem}>
+                    <span className={styles.detailLabel}>Delivered On</span>
+                    <span className={styles.detailValue}>{deliveryDate}</span>
                   </div>
                 )}
               </div>
@@ -238,7 +274,7 @@ const OrderCard: React.FC<OrderCardProps> = ({
                 <div className={styles.workflowStages}>
                   {approvalStages.map((stage, index) => (
                     <div key={index} className={styles.stageContainer}>
-                      <div className={`${styles.stage} ${getStatusColor(stage.status)}`}>
+                      <div className={`${styles.stage} ${getStatusColor(stage.status, true, index === approvalStages.length - 1)}`}>
                         <div className={styles.stageRole}>{stage.role}</div>
                         <div className={styles.stageStatus}>
                           {stage.status.replace('-', ' ')}
@@ -316,8 +352,20 @@ const OrderCard: React.FC<OrderCardProps> = ({
           </div>
           {expectedDate && (
             <div className={styles.metaItem}>
-              <span className={styles.metaLabel}>Expected:</span>
+              <span className={styles.metaLabel}>Requested:</span>
               <span className={styles.metaValue}>{expectedDate}</span>
+            </div>
+          )}
+          {serviceStartDate && status === 'service-created' && (
+            <div className={styles.metaItem}>
+              <span className={styles.metaLabel}>Service Start:</span>
+              <span className={styles.metaValue}>{serviceStartDate}</span>
+            </div>
+          )}
+          {deliveryDate && status === 'delivered' && (
+            <div className={styles.metaItem}>
+              <span className={styles.metaLabel}>Delivered:</span>
+              <span className={styles.metaValue}>{deliveryDate}</span>
             </div>
           )}
         </div>
@@ -328,7 +376,7 @@ const OrderCard: React.FC<OrderCardProps> = ({
             <div className={styles.workflowStages}>
               {approvalStages.map((stage, index) => (
                 <div key={index} className={styles.stageContainer}>
-                  <div className={`${styles.stage} ${getStatusColor(stage.status)}`}>
+                  <div className={`${styles.stage} ${getStatusColor(stage.status, true, index === approvalStages.length - 1)}`}>
                     <div className={styles.stageRole}>{stage.role}</div>
                     <div className={styles.stageStatus}>
                       {stage.status.replace('-', ' ')}

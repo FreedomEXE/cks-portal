@@ -117,68 +117,10 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
     }
   ]);
 
-  // Mock orders data for Center
-  const serviceOrders = [
-    {
-      orderId: 'CEN001-ORD-SRV001',
-      orderType: 'service' as const,
-      title: 'Window Cleaning',
-      requestedBy: 'Center Created',
-      requestedDate: '2025-09-10',
-      expectedDate: '2025-09-15',
-      status: 'pending' as const,
-      approvalStages: [
-        { role: 'Center', status: 'approved' as const, user: 'Acme Downtown' },
-        { role: 'Customer', status: 'pending' as const },
-        { role: 'Contractor', status: 'waiting' as const }
-      ]
-    },
-    {
-      orderId: 'CEN001-ORD-SRV002',
-      orderType: 'service' as const,
-      title: 'Elevator Maintenance',
-      requestedBy: 'Center Created',
-      requestedDate: '2025-09-12',
-      expectedDate: '2025-09-18',
-      status: 'approved' as const,
-      approvalStages: [
-        { role: 'Center', status: 'approved' as const, user: 'Acme Downtown' },
-        { role: 'Customer', status: 'approved' as const, user: 'Acme Corp' },
-        { role: 'Contractor', status: 'approved' as const, user: 'Premium LLC' },
-        { role: 'Manager', status: 'pending' as const }
-      ]
-    }
-  ];
+  // Mock orders data for Center - CLEARED FOR FRESH START
+  const serviceOrders: any[] = [];
 
-  const productOrders = [
-    {
-      orderId: 'CEN001-ORD-PRD001',
-      orderType: 'product' as const,
-      title: 'Cleaning Supplies Refill',
-      requestedBy: 'Center Created',
-      requestedDate: '2025-09-10',
-      expectedDate: '2025-09-15',
-      status: 'pending' as const,
-      approvalStages: [
-        { role: 'Center', status: 'approved' as const, user: 'Acme Downtown' },
-        { role: 'Contractor', status: 'pending' as const }
-      ]
-    },
-    {
-      orderId: 'CEN001-ORD-PRD003',
-      orderType: 'product' as const,
-      title: 'Office Paper & Supplies',
-      requestedBy: 'Center Created',
-      requestedDate: '2025-09-09',
-      expectedDate: '2025-09-20',
-      status: 'approved' as const,
-      approvalStages: [
-        { role: 'Center', status: 'approved' as const, user: 'Acme Downtown' },
-        { role: 'Contractor', status: 'approved' as const, user: 'Premium LLC' },
-        { role: 'Warehouse', status: 'pending' as const }
-      ]
-    }
-  ];
+  const productOrders: any[] = [];
 
     const tabs = [
     { id: 'dashboard', label: 'Dashboard', path: '/center/dashboard' },

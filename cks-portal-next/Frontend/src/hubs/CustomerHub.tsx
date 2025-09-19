@@ -140,66 +140,10 @@ export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubPro
     }
   ]);
 
-  // Mock orders data for Customer
-  const serviceOrders = [
-    {
-      orderId: 'CUS001-ORD-SRV001',
-      orderType: 'service' as const,
-      title: 'Window Cleaning',
-      requestedBy: 'Customer Created',
-      requestedDate: '2025-09-10',
-      expectedDate: '2025-09-15',
-      status: 'pending' as const,
-      approvalStages: [
-        { role: 'Customer', status: 'approved' as const, user: 'Acme Corp' },
-        { role: 'Contractor', status: 'pending' as const }
-      ]
-    },
-    {
-      orderId: 'CUS001-ORD-SRV002',
-      orderType: 'service' as const,
-      title: 'HVAC Maintenance',
-      requestedBy: 'Customer Created',
-      requestedDate: '2025-09-12',
-      expectedDate: '2025-09-18',
-      status: 'approved' as const,
-      approvalStages: [
-        { role: 'Customer', status: 'approved' as const, user: 'Acme Corp' },
-        { role: 'Contractor', status: 'approved' as const, user: 'Premium LLC' },
-        { role: 'Manager', status: 'pending' as const }
-      ]
-    }
-  ];
+  // Mock orders data for Customer - CLEARED FOR FRESH START
+  const serviceOrders: any[] = [];
 
-  const productOrders = [
-    {
-      orderId: 'CUS001-ORD-PRD001',
-      orderType: 'product' as const,
-      title: 'Office Equipment Supplies',
-      requestedBy: 'Customer Created',
-      requestedDate: '2025-09-10',
-      expectedDate: '2025-09-15',
-      status: 'pending' as const,
-      approvalStages: [
-        { role: 'Customer', status: 'approved' as const, user: 'Acme Corp' },
-        { role: 'Contractor', status: 'pending' as const }
-      ]
-    },
-    {
-      orderId: 'CUS001-ORD-PRD002',
-      orderType: 'product' as const,
-      title: 'Break Room Supplies',
-      requestedBy: 'Customer Created',
-      requestedDate: '2025-09-09',
-      expectedDate: '2025-09-20',
-      status: 'approved' as const,
-      approvalStages: [
-        { role: 'Customer', status: 'approved' as const, user: 'Acme Corp' },
-        { role: 'Contractor', status: 'approved' as const, user: 'Premium LLC' },
-        { role: 'Warehouse', status: 'pending' as const }
-      ]
-    }
-  ];
+  const productOrders: any[] = [];
 
     const tabs = [
     { id: 'dashboard', label: 'Dashboard', path: '/customer/dashboard' },

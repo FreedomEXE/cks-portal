@@ -195,127 +195,125 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
     }
   ]);
 
-  // Mock orders data
-  const serviceOrders = [
-    {
-      orderId: 'CEN001-ORD-SRV001',
-      orderType: 'service' as const,
-      title: 'Window Cleaning',
-      requestedBy: 'Center Created',
-      requestedDate: '2025-09-10',
-      expectedDate: '2025-09-15',
-      status: 'pending' as const,
-      approvalStages: [
-        { role: 'Center Created', status: 'approved' as const, user: 'Acme Downtown' },
-        { role: 'Customer', status: 'approved' as const, user: 'Acme Corp' },
-        { role: 'Contractor', status: 'approved' as const, user: 'Premium LLC' },
-        { role: 'Manager', status: 'pending' as const }
-      ]
-    },
-    {
-      orderId: 'CUS001-ORD-SRV002',
-      orderType: 'service' as const,
-      title: 'Lawn Maintenance',
-      requestedBy: 'Customer Created',
-      requestedDate: '2025-09-12',
-      expectedDate: '2025-09-20',
-      status: 'pending' as const,
-      approvalStages: [
-        { role: 'Customer Created', status: 'approved' as const, user: 'TechStart Inc' },
-        { role: 'Contractor', status: 'approved' as const, user: 'Premium LLC' },
-        { role: 'Manager', status: 'pending' as const }
-      ]
-    },
-    {
-      orderId: 'CEN003-ORD-SRV003',
-      orderType: 'service' as const,
-      title: 'HVAC Maintenance',
-      requestedBy: 'Center Created',
-      requestedDate: '2025-09-08',
-      expectedDate: '2025-09-12',
-      status: 'in-progress' as const,
-      approvalStages: [
-        { role: 'Center Created', status: 'approved' as const, user: 'Tech Campus' },
-        { role: 'Customer', status: 'approved' as const, user: 'TechStart Inc' },
-        { role: 'Contractor', status: 'approved' as const, user: 'Elite Services' },
-        { role: 'Manager', status: 'approved' as const, user: 'John Smith' }
-      ]
-    },
-    // Archive orders - completed/cancelled
-    {
-      orderId: 'CEN002-ORD-SRV001',
-      orderType: 'service' as const,
-      title: 'Deep Cleaning Service',
-      requestedBy: 'Center Created',
-      requestedDate: '2025-08-15',
-      expectedDate: '2025-08-20',
-      status: 'approved' as const,
-      transformedId: 'CEN002-SRV001',
-      approvalStages: [
-        { role: 'Center Created', status: 'approved' as const, user: 'Tech Campus' },
-        { role: 'Customer', status: 'approved' as const, user: 'TechStart Inc' },
-        { role: 'Contractor', status: 'approved' as const, user: 'Elite Services' },
-        { role: 'Manager', status: 'approved' as const, user: 'John Smith' }
-      ]
-    },
-    {
-      orderId: 'CUS002-ORD-SRV005',
-      orderType: 'service' as const,
-      title: 'Emergency Plumbing',
-      requestedBy: 'Customer Created',
-      requestedDate: '2025-08-10',
-      expectedDate: '2025-08-11',
-      status: 'cancelled' as const,
-      approvalStages: [
-        { role: 'Customer', status: 'approved' as const, user: 'GlobalTech Inc' },
-        { role: 'Contractor', status: 'rejected' as const, user: 'Premium LLC' }
-      ]
-    }
-  ];
-
-  const productOrders = [
-    {
-      orderId: 'CEN001-ORD-PRD001',
-      orderType: 'product' as const,
-      title: 'Cleaning Equipment Refill',
-      requestedBy: 'Center Created',
-      requestedDate: '2025-09-10',
-      expectedDate: '2025-09-15',
-      status: 'approved' as const,
-      approvalStages: [
-        { role: 'Center Created', status: 'approved' as const, user: 'Acme Downtown' },
-        { role: 'Contractor', status: 'approved' as const, user: 'Premium LLC' },
-        { role: 'Warehouse', status: 'pending' as const }
-      ]
-    },
+  // Mock orders data - Manager can see all crew product orders
+  const serviceOrders: any[] = [];
+  const productOrders: any[] = [
+    // Same orders as CrewHub - Manager can monitor crew orders
+    // State 1: Pending warehouse acceptance
     {
       orderId: 'CRW001-ORD-PRD001',
-      orderType: 'product' as const,
-      title: 'Safety Equipment Request',
-      requestedBy: 'Crew Created',
-      requestedDate: '2025-09-11',
-      expectedDate: '2025-09-13',
-      status: 'pending' as const,
+      orderType: 'product',
+      title: 'Cleaning Supplies - Standard Package',
+      requestedBy: 'CRW-001',
+      destination: 'CTR-001',
+      requestedDate: '2025-09-19',
+      expectedDate: '2025-09-22',
+      status: 'in-progress',
       approvalStages: [
-        { role: 'Crew Created', status: 'approved' as const, user: 'John Smith' },
-        { role: 'Contractor', status: 'pending' as const },
-        { role: 'Warehouse', status: 'waiting' as const }
-      ]
+        { role: 'Crew', status: 'requested', user: 'CRW-001', timestamp: '2025-09-19 09:00' },
+        { role: 'Warehouse', status: 'pending' }
+      ],
+      approvalStage: {
+        currentStage: 'warehouse',
+        warehouseApproval: 'pending',
+        warehouseNotes: null
+      },
+      items: [
+        { name: 'All-Purpose Cleaner', quantity: 10, unit: 'bottles' },
+        { name: 'Microfiber Cloths', quantity: 50, unit: 'pieces' },
+        { name: 'Disinfectant Spray', quantity: 15, unit: 'cans' }
+      ],
+      notes: 'Urgent - running low on supplies for upcoming service'
     },
+    // State 2: Accepted by warehouse (pending delivery)
     {
-      orderId: 'MGR001-ORD-PRD001',
-      orderType: 'product' as const,
-      title: 'Office Supplies',
-      requestedBy: 'Manager Created',
-      requestedDate: '2025-09-09',
+      orderId: 'CRW001-ORD-PRD002',
+      orderType: 'product',
+      title: 'Safety Equipment Restock',
+      requestedBy: 'CRW-001',
+      destination: 'CTR-002',
+      requestedDate: '2025-09-17',
       expectedDate: '2025-09-20',
-      status: 'approved' as const,
-      transformedId: 'MGR001-SUP001',
+      status: 'in-progress',
       approvalStages: [
-        { role: 'Manager Created', status: 'approved' as const, user: 'John Smith' },
-        { role: 'Contractor', status: 'approved' as const, user: 'Premium LLC' },
-        { role: 'Warehouse', status: 'approved' as const, user: 'Main Warehouse' }
-      ]
+        { role: 'Crew', status: 'requested', user: 'CRW-001', timestamp: '2025-09-17 14:30' },
+        { role: 'Warehouse', status: 'accepted' }
+      ],
+      approvalStage: {
+        currentStage: 'delivery',
+        warehouseApproval: 'approved',
+        warehouseApprovedBy: 'WHS-001',
+        warehouseApprovedDate: '2025-09-18',
+        warehouseNotes: 'Stock available - preparing for shipment',
+        deliveryStatus: 'pending'
+      },
+      items: [
+        { name: 'Safety Gloves', quantity: 100, unit: 'pairs' },
+        { name: 'Face Masks', quantity: 200, unit: 'pieces' },
+        { name: 'Safety Goggles', quantity: 20, unit: 'pieces' }
+      ],
+      notes: 'Monthly safety equipment restock'
+    },
+    // State 3: Delivered (archived)
+    {
+      orderId: 'CRW001-ORD-PRD003',
+      orderType: 'product',
+      title: 'Floor Care Products',
+      requestedBy: 'CRW-001',
+      destination: 'CTR-003',
+      requestedDate: '2025-09-14',
+      expectedDate: '2025-09-16',
+      deliveryDate: '2025-09-16',
+      status: 'delivered',
+      approvalStages: [
+        { role: 'Crew', status: 'requested', user: 'CRW-001', timestamp: '2025-09-14 08:00' },
+        { role: 'Warehouse', status: 'accepted', user: 'WHS-001', timestamp: '2025-09-14 11:30' },
+        { role: 'Warehouse', status: 'delivered', user: 'WHS-001', timestamp: '2025-09-16 15:45' }
+      ],
+      approvalStage: {
+        currentStage: 'completed',
+        warehouseApproval: 'approved',
+        warehouseApprovedBy: 'WHS-001',
+        warehouseApprovedDate: '2025-09-14',
+        deliveryStatus: 'delivered',
+        deliveredBy: 'WHS-001',
+        deliveredDate: '2025-09-16',
+        deliveryNotes: 'Delivered to loading dock - signed by J. Smith'
+      },
+      items: [
+        { name: 'Floor Wax', quantity: 5, unit: 'gallons' },
+        { name: 'Floor Stripper', quantity: 3, unit: 'gallons' },
+        { name: 'Mop Heads', quantity: 24, unit: 'pieces' }
+      ],
+      notes: 'For scheduled floor maintenance at CTR-003'
+    },
+    // State 4: Rejected (archived)
+    {
+      orderId: 'CRW001-ORD-PRD004',
+      orderType: 'product',
+      title: 'Specialized Equipment Request',
+      requestedBy: 'CRW-001',
+      destination: 'CTR-001',
+      requestedDate: '2025-09-12',
+      expectedDate: '2025-09-15',
+      status: 'rejected',
+      approvalStages: [
+        { role: 'Crew', status: 'requested', user: 'CRW-001', timestamp: '2025-09-12 10:00' },
+        { role: 'Warehouse', status: 'rejected', user: 'WHS-001', timestamp: '2025-09-13 09:30' }
+      ],
+      approvalStage: {
+        currentStage: 'rejected',
+        warehouseApproval: 'rejected',
+        warehouseRejectedBy: 'WHS-001',
+        warehouseRejectedDate: '2025-09-13',
+        warehouseNotes: 'Items not in current inventory - please contact procurement for special order',
+        rejectionReason: 'Out of stock - requires special order'
+      },
+      items: [
+        { name: 'Industrial Steam Cleaner', quantity: 2, unit: 'units' },
+        { name: 'High-Pressure Washer', quantity: 1, unit: 'unit' }
+      ],
+      notes: 'Need for deep cleaning project'
     }
   ];
 
@@ -564,7 +562,23 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
                 productOrders={productOrders}
                 onCreateProductOrder={() => console.log('Request Products')}
                 onOrderAction={(orderId: string, action: string) => {
-                  console.log(`Order ${orderId}: ${action}`);
+                  if (action === 'View Details') {
+                    // Find the order to determine its status
+                    const allOrders = [...serviceOrders, ...productOrders];
+                    const order = allOrders.find(o => o.orderId === orderId);
+
+                    if (order) {
+                      if (order.status === 'delivered') {
+                        alert('Delivery and order details will show here later. We will be able to add a POD or waybill here.');
+                      } else if (order.status === 'rejected') {
+                        alert('Rejection details will show here later. It will also show a waybill and a rejection reason.');
+                      } else if (order.status === 'pending' || order.status === 'in-progress') {
+                        alert('List of products ordered will show here and some other info.');
+                      }
+                    }
+                  } else {
+                    console.log(`Order ${orderId}: ${action}`);
+                  }
                 }}
                 showServiceOrders={true}
                 showProductOrders={true}

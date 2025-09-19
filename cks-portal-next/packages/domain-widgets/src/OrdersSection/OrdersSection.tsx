@@ -9,12 +9,15 @@ interface Order {
   orderType: 'service' | 'product';
   title: string;
   requestedBy: string;
+  destination?: string;  // Destination for the order
   requestedDate: string;
-  expectedDate?: string;
-  status: 'pending' | 'in-progress' | 'approved' | 'rejected' | 'cancelled';
+  expectedDate?: string;  // Date requested by customer/center
+  serviceStartDate?: string;  // Actual date set by Manager when creating service
+  deliveryDate?: string;  // Actual date when product was delivered
+  status: 'pending' | 'in-progress' | 'approved' | 'rejected' | 'cancelled' | 'delivered' | 'service-created';
   approvalStages?: Array<{
     role: string;
-    status: 'pending' | 'approved' | 'rejected' | 'waiting';
+    status: 'pending' | 'approved' | 'rejected' | 'waiting' | 'accepted' | 'requested' | 'delivered';
     user?: string;
     timestamp?: string;
   }>;
@@ -65,15 +68,15 @@ const OrdersSection: React.FC<OrdersSectionProps> = ({
 
   // Count orders by type and status
   const serviceOrdersCount = serviceOrders.filter(o =>
-    ['pending', 'in-progress'].includes(o.status)  // Removed approved from active
+    ['pending', 'in-progress', 'approved'].includes(o.status)  // Active orders
   ).length;
 
   const productOrdersCount = productOrders.filter(o =>
-    ['pending', 'in-progress'].includes(o.status)  // Removed approved from active
+    ['pending', 'in-progress', 'approved'].includes(o.status)  // Active orders
   ).length;
 
   const archiveCount = allOrders.filter(o =>
-    ['approved', 'cancelled', 'rejected'].includes(o.status)  // Approved goes to archive
+    ['cancelled', 'rejected', 'delivered', 'service-created'].includes(o.status)  // Only truly completed/terminated orders
   ).length;
 
   // Get tab description based on user role and active tab
@@ -125,10 +128,10 @@ const OrdersSection: React.FC<OrdersSectionProps> = ({
 
     // Filter by tab status
     if (tabType === 'archive') {
-      return filtered.filter(o => ['approved', 'cancelled', 'rejected'].includes(o.status));  // Approved in archive
+      return filtered.filter(o => ['cancelled', 'rejected', 'delivered', 'service-created'].includes(o.status));  // Only truly completed
     } else {
-      // Non-archive tabs show only active orders (not approved)
-      return filtered.filter(o => ['pending', 'in-progress'].includes(o.status));
+      // Non-archive tabs show active orders
+      return filtered.filter(o => ['pending', 'in-progress', 'approved'].includes(o.status));
     }
   };
 
@@ -146,7 +149,7 @@ const OrdersSection: React.FC<OrdersSectionProps> = ({
   const getOrderActions = (order: Order): string[] => {
     const actions: string[] = [];
 
-    if (order.status === 'cancelled' || order.status === 'approved' || order.status === 'rejected') {
+    if (order.status === 'cancelled' || order.status === 'rejected' || order.status === 'delivered' || order.status === 'service-created') {
       return ['View Details'];
     }
 
@@ -154,10 +157,13 @@ const OrdersSection: React.FC<OrdersSectionProps> = ({
       case 'manager':
         if (order.orderType === 'service') {
           if (order.status === 'pending') {
-            actions.push('Assign Crew', 'Add Training', 'Approve Order');
-          } else if (order.status === 'in-progress') {
+            actions.push('Assign Crew', 'Add Training', 'Create Service');
+          } else {
             actions.push('View Details');
           }
+        } else if (order.orderType === 'product') {
+          // Manager can create product orders
+          actions.push('View Details');
         } else {
           actions.push('View Details');
         }
@@ -191,8 +197,15 @@ const OrdersSection: React.FC<OrdersSectionProps> = ({
         break;
 
       case 'warehouse':
-        if (order.orderType === 'product' && order.status === 'pending') {
-          actions.push('Approve', 'Deny');
+        if (order.orderType === 'product') {
+          if (order.status === 'pending') {
+            actions.push('Accept', 'Deny');
+          } else {
+            actions.push('View Details');
+          }
+        } else if (order.orderType === 'service' && order.status === 'pending') {
+          // Warehouse can create services
+          actions.push('Create Service');
         } else {
           actions.push('View Details');
         }
@@ -247,6 +260,7 @@ const OrdersSection: React.FC<OrdersSectionProps> = ({
             orderType={order.orderType}
             title={order.title}
             requestedBy={order.requestedBy}
+            destination={order.destination}
             requestedDate={order.requestedDate}
             expectedDate={order.expectedDate}
             status={order.status}
@@ -277,8 +291,8 @@ const OrdersSection: React.FC<OrdersSectionProps> = ({
   const getActionButtons = () => {
     const buttons = [];
 
-    // Request Service button - for contractor, customer, center
-    if (onCreateServiceOrder && (userRole === 'contractor' || userRole === 'customer' || userRole === 'center')) {
+    // Request Service button - for contractor, customer, center, warehouse
+    if (onCreateServiceOrder && (userRole === 'contractor' || userRole === 'customer' || userRole === 'center' || userRole === 'warehouse')) {
       buttons.push(
         <Button
           key="service"

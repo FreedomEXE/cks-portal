@@ -195,93 +195,16 @@ export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHu
     }
   ]);
 
-  // Mock orders data for Contractor
-  const serviceOrders = [
-    {
-      orderId: 'CUS001-ORD-SRV001',
-      orderType: 'service' as const,
-      title: 'Window Cleaning',
-      requestedBy: 'Customer Created',
-      requestedDate: '2025-09-10',
-      expectedDate: '2025-09-15',
-      status: 'pending' as const,
-      approvalStages: [
-        { role: 'Customer', status: 'approved' as const, user: 'Acme Corp' },
-        { role: 'Contractor', status: 'pending' as const }
-      ]
-    },
-    {
-      orderId: 'CEN002-ORD-SRV002',
-      orderType: 'service' as const,
-      title: 'HVAC Maintenance',
-      requestedBy: 'Center Created',
-      requestedDate: '2025-09-12',
-      expectedDate: '2025-09-18',
-      status: 'pending' as const,
-      approvalStages: [
-        { role: 'Center', status: 'approved' as const, user: 'Acme Downtown' },
-        { role: 'Customer', status: 'approved' as const, user: 'Acme Corp' },
-        { role: 'Contractor', status: 'pending' as const }
-      ]
-    },
-    {
-      orderId: 'CUS002-ORD-SRV003',
-      orderType: 'service' as const,
-      title: 'Lawn Maintenance',
-      requestedBy: 'Customer Created',
-      requestedDate: '2025-09-08',
-      expectedDate: '2025-09-20',
-      status: 'approved' as const,
-      approvalStages: [
-        { role: 'Customer', status: 'approved' as const, user: 'TechStart Inc' },
-        { role: 'Contractor', status: 'approved' as const, user: 'Premium LLC' },
-        { role: 'Manager', status: 'pending' as const }
-      ]
-    }
+  // Mock orders data for Contractor - CLEARED FOR FRESH START
+  const serviceOrders: any[] = [
+    // Orders cleared - will add one flow at a time
   ];
 
-  const productOrders = [
-    {
-      orderId: 'CEN001-ORD-PRD001',
-      orderType: 'product' as const,
-      title: 'Cleaning Equipment Refill',
-      requestedBy: 'Center Created',
-      requestedDate: '2025-09-11',
-      expectedDate: '2025-09-14',
-      status: 'pending' as const,
-      approvalStages: [
-        { role: 'Center', status: 'approved' as const, user: 'Acme Downtown' },
-        { role: 'Contractor', status: 'pending' as const }
-      ]
-    },
-    {
-      orderId: 'CRW001-ORD-PRD002',
-      orderType: 'product' as const,
-      title: 'Safety Equipment',
-      requestedBy: 'Crew Created',
-      requestedDate: '2025-09-10',
-      expectedDate: '2025-09-13',
-      status: 'pending' as const,
-      approvalStages: [
-        { role: 'Crew', status: 'approved' as const, user: 'John Smith' },
-        { role: 'Contractor', status: 'pending' as const }
-      ]
-    },
-    {
-      orderId: 'CUS001-ORD-PRD003',
-      orderType: 'product' as const,
-      title: 'Break Room Supplies',
-      requestedBy: 'Customer Created',
-      requestedDate: '2025-09-09',
-      expectedDate: '2025-09-20',
-      status: 'approved' as const,
-      approvalStages: [
-        { role: 'Customer', status: 'approved' as const, user: 'Acme Corp' },
-        { role: 'Contractor', status: 'approved' as const, user: 'Premium LLC' },
-        { role: 'Warehouse', status: 'pending' as const }
-      ]
-    }
+  const productOrders: any[] = [
+    // Orders cleared - will add one flow at a time
   ];
+
+  // All orders removed - starting fresh with proper flows
 
     const tabs = [
     { id: 'dashboard', label: 'Dashboard', path: '/contractor/dashboard' },
