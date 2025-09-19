@@ -22,6 +22,11 @@ interface TabSectionProps {
   className?: string;
   /** Controls internal content padding. default: padded; flush: no padding for full-bleed content */
   contentPadding?: 'default' | 'flush';
+  filterOptions?: {
+    options: string[];
+    placeholder: string;
+    onFilter?: (value: string) => void;
+  };
 }
 
 /**
@@ -39,14 +44,22 @@ const TabSection: React.FC<TabSectionProps> = ({
   children,
   primaryColor = '#3b82f6',
   className = '',
-  contentPadding = 'default'
+  contentPadding = 'default',
+  filterOptions
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
+  const [filterValue, setFilterValue] = useState('');
 
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
     const query = e.target.value;
     setSearchQuery(query);
     onSearch?.(query);
+  };
+
+  const handleFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = e.target.value;
+    setFilterValue(value);
+    filterOptions?.onFilter?.(value);
   };
 
   return (
@@ -87,7 +100,7 @@ const TabSection: React.FC<TabSectionProps> = ({
         }}
       >
         {/* Search bar section */}
-        {(searchPlaceholder || actionButton) && (
+        {(searchPlaceholder || actionButton || filterOptions) && (
           <div className={styles.searchSection}>
             {searchPlaceholder && (
               <div className={styles.searchContainer}>
@@ -110,6 +123,32 @@ const TabSection: React.FC<TabSectionProps> = ({
                   onChange={handleSearch}
                   className={styles.searchInput}
                 />
+              </div>
+            )}
+            {filterOptions && (
+              <div style={{ marginLeft: '12px' }}>
+                <select
+                  value={filterValue}
+                  onChange={handleFilterChange}
+                  style={{
+                    padding: '8px 12px',
+                    backgroundColor: '#ffffff',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '6px',
+                    color: '#111827',
+                    fontSize: '14px',
+                    outline: 'none',
+                    cursor: 'pointer',
+                    minWidth: '120px'
+                  }}
+                >
+                  <option value="">{filterOptions.placeholder}</option>
+                  {filterOptions.options.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
               </div>
             )}
             {actionButton && (

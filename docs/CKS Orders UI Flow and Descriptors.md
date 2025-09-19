@@ -133,11 +133,19 @@ The CKS order system consists of two distinct workflow types:
 **Views**:
 - All product orders requiring warehouse action
 - Both crew direct orders and complex chain orders
+- Deliveries tab: One-Time, Recurring, and Archive deliveries
 
 **Actions Available**:
 - Accept/Deny product orders
-- Mark as Delivered when fulfillment complete
-- View order history
+- **Delivered**: Mark orders as delivered (moves to archive with "delivered" status)
+- **Cancel**: Cancel orders (moves to archive with "cancelled" status)
+- View order history and delivery tracking
+
+**Delivery Workflow Completion**:
+- Orders accepted by warehouse appear in Deliveries tab
+- Warehouse marks orders as "Delivered" or "Cancel" to complete the workflow
+- Both actions immediately archive the order for all users in the chain
+- Delivered orders show "delivered" status, cancelled orders show "cancelled" status
 
 ---
 

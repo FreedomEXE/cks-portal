@@ -35,6 +35,8 @@ import NavigationTab from '../../../packages/ui/src/navigation/NavigationTab';
 import TabContainer from '../../../packages/ui/src/navigation/TabContainer';
 import Button from '../../../packages/ui/src/buttons/Button';
 import { OrdersSection } from '../../../packages/domain-widgets/src/OrdersSection';
+import { SupportSection } from '../../../packages/domain-widgets/src/support';
+import { ReportsSection } from '../../../packages/domain-widgets/src/reports';
 import PageHeader from '../../../packages/ui/src/layout/PageHeader';
 import PageWrapper from '../../../packages/ui/src/layout/PageWrapper';
 import TabSection from '../../../packages/ui/src/layout/TabSection';
@@ -667,6 +669,21 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
               showProductOrders={true}
               primaryColor="#ef4444"
             />
+            </PageWrapper>
+          ) : activeTab === 'reports' ? (
+            <PageWrapper headerSrOnly>
+              <ReportsSection
+                role="crew"
+                userId="CRW-001"
+                primaryColor="#ef4444"
+              />
+            </PageWrapper>
+          ) : activeTab === 'support' ? (
+            <PageWrapper headerSrOnly>
+              <SupportSection
+                role="crew"
+                primaryColor="#ef4444"
+              />
             </PageWrapper>
           ) : (
             <PageWrapper title={activeTab} showHeader={true} headerSrOnly>

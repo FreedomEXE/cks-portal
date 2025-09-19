@@ -21,7 +21,7 @@
   Manifested by Freedom_EXE
 ───────────────────────────────────────────────*/
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Scrollbar } from '../../../packages/ui/src/Scrollbar';
 import MyHubSection from '../../../packages/ui/src/navigation/MyHubSection';
 import OverviewSection from '../../../packages/domain-widgets/src/overview';
@@ -34,6 +34,8 @@ import NavigationTab from '../../../packages/ui/src/navigation/NavigationTab';
 import TabContainer from '../../../packages/ui/src/navigation/TabContainer';
 import Button from '../../../packages/ui/src/buttons/Button';
 import { OrdersSection } from '../../../packages/domain-widgets/src/OrdersSection';
+import { SupportSection } from '../../../packages/domain-widgets/src/support';
+import { ReportsSection } from '../../../packages/domain-widgets/src/reports';
 import PageHeader from '../../../packages/ui/src/layout/PageHeader';
 import PageWrapper from '../../../packages/ui/src/layout/PageWrapper';
 import TabSection from '../../../packages/ui/src/layout/TabSection';
@@ -48,6 +50,9 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
   const [servicesSearchQuery, setServicesSearchQuery] = useState('');
   const [inventoryTab, setInventoryTab] = useState('active');
   const [inventorySearchQuery, setInventorySearchQuery] = useState('');
+  const [inventoryFilter, setInventoryFilter] = useState('');
+  const [deliveriesTab, setDeliveriesTab] = useState('onetime');
+  const [deliveriesSearchQuery, setDeliveriesSearchQuery] = useState('');
 
   // Add scrollbar styles
   useEffect(() => {
@@ -450,7 +455,6 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
       name: 'Industrial Floor Scrubber',
       type: 'Equipment',
       onHand: 3,
-      available: 2,
       min: 2,
       location: 'A-12-B',
       isLow: false
@@ -460,7 +464,6 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
       name: 'Commercial Vacuum Cleaner',
       type: 'Equipment',
       onHand: 1,
-      available: 1,
       min: 2,
       location: 'A-15-C',
       isLow: true
@@ -470,7 +473,6 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
       name: 'Industrial Floor Cleaner',
       type: 'Products',
       onHand: 45,
-      available: 40,
       min: 25,
       location: 'B-01-A',
       isLow: false
@@ -480,7 +482,6 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
       name: 'Heavy Duty Degreaser',
       type: 'Products',
       onHand: 12,
-      available: 12,
       min: 20,
       location: 'B-02-C',
       isLow: true
@@ -490,7 +491,6 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
       name: 'Glass Cleaner Concentrate',
       type: 'Products',
       onHand: 0,
-      available: 0,
       min: 15,
       location: 'B-03-A',
       isLow: true
@@ -500,7 +500,6 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
       name: 'Microfiber Cleaning Cloths',
       type: 'Materials',
       onHand: 200,
-      available: 180,
       min: 50,
       location: 'C-05-C',
       isLow: false
@@ -510,7 +509,6 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
       name: 'Disposable Gloves (Box)',
       type: 'Materials',
       onHand: 8,
-      available: 5,
       min: 25,
       location: 'C-02-A',
       isLow: true
@@ -520,7 +518,6 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
       name: 'Mop Heads',
       type: 'Materials',
       onHand: 75,
-      available: 75,
       min: 30,
       location: 'C-10-B',
       isLow: false
@@ -555,6 +552,83 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
       type: 'Equipment',
       archivedDate: '2025-05-25',
       reason: 'Damaged beyond repair'
+    }
+  ];
+
+  // Filter inventory data based on type filter
+  const filteredActiveInventoryData = useMemo(() => {
+    if (!inventoryFilter || inventoryFilter === 'All Types') {
+      return activeInventoryData;
+    }
+    return activeInventoryData.filter(item => item.type === inventoryFilter);
+  }, [inventoryFilter]);
+
+  const filteredArchivedInventoryData = useMemo(() => {
+    if (!inventoryFilter || inventoryFilter === 'All Types') {
+      return archivedInventoryData;
+    }
+    return archivedInventoryData.filter(item => item.type === inventoryFilter);
+  }, [inventoryFilter]);
+
+  // Mock deliveries data for warehouse
+  const onetimeDeliveriesData = [
+    {
+      orderId: 'CRW001-ORD-PRD001',
+      orderDate: '2025-09-11',
+      quantity: 15,
+      destination: 'CTR-001',
+      status: 'pending',
+      deliveryDate: '—'
+    },
+    {
+      orderId: 'CTR002-ORD-PRD003',
+      orderDate: '2025-09-10',
+      quantity: 8,
+      destination: 'CTR-002',
+      status: 'pending',
+      deliveryDate: '—'
+    }
+  ];
+
+  const recurringDeliveriesData = [
+    {
+      orderId: 'CRW003-ORD-PRD005',
+      creationDate: '2025-09-01',
+      quantity: 25,
+      destination: 'CTR-003',
+      deliveryFrequency: 'Weekly',
+      nextDelivery: '2025-09-18',
+      status: 'pending'
+    },
+    {
+      orderId: 'CTR001-ORD-PRD002',
+      creationDate: '2025-08-15',
+      quantity: 12,
+      destination: 'CTR-004',
+      deliveryFrequency: 'Monthly',
+      nextDelivery: '2025-10-15',
+      status: 'pending'
+    }
+  ];
+
+  const archivedDeliveriesData = [
+    {
+      orderId: 'CRW002-ORD-PRD006',
+      orderDate: '2025-09-08',
+      quantity: 20,
+      destination: 'CTR-005',
+      status: 'delivered',
+      deliveryDate: '2025-09-09',
+      type: 'One-time'
+    },
+    {
+      orderId: 'CTR003-ORD-PRD004',
+      orderDate: '2025-09-07',
+      quantity: 30,
+      destination: 'CTR-006',
+      status: 'delivered',
+      deliveryDate: '2025-09-08',
+      type: 'One-time'
     }
   ];
 
@@ -815,8 +889,8 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
             <PageWrapper headerSrOnly>
               <TabSection
                 tabs={[
-                  { id: 'active', label: 'Product Inventory', count: activeInventoryData.length },
-                  { id: 'archive', label: 'Archive', count: archivedInventoryData.length }
+                  { id: 'active', label: 'Product Inventory', count: filteredActiveInventoryData.length },
+                  { id: 'archive', label: 'Archive', count: filteredArchivedInventoryData.length }
                 ]}
                 activeTab={inventoryTab}
                 onTabChange={setInventoryTab}
@@ -826,6 +900,11 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
                   'Search archived products'
                 }
                 onSearch={setInventorySearchQuery}
+                filterOptions={{
+                  options: ['Equipment', 'Products', 'Materials'],
+                  placeholder: 'All Types',
+                  onFilter: setInventoryFilter
+                }}
                 primaryColor="#8b5cf6"
               >
 
@@ -836,7 +915,6 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
                     { key: 'name', label: 'NAME' },
                     { key: 'type', label: 'TYPE' },
                     { key: 'onHand', label: 'ON HAND' },
-                    { key: 'available', label: 'AVAILABLE' },
                     { key: 'min', label: 'MIN' },
                     { key: 'location', label: 'LOCATION' },
                     {
@@ -856,7 +934,7 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
                       )
                     }
                   ]}
-                  data={activeInventoryData}
+                  data={filteredActiveInventoryData}
                   showSearch={false}
                   externalSearchQuery={inventorySearchQuery}
                   maxItems={10}
@@ -873,7 +951,7 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
                     { key: 'archivedDate', label: 'ARCHIVED DATE' },
                     { key: 'reason', label: 'REASON' }
                   ]}
-                  data={archivedInventoryData}
+                  data={filteredArchivedInventoryData}
                   showSearch={false}
                   externalSearchQuery={inventorySearchQuery}
                   maxItems={10}
@@ -881,6 +959,194 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
                 />
               )}
               </TabSection>
+            </PageWrapper>
+          ) : activeTab === 'deliveries' ? (
+            <PageWrapper headerSrOnly>
+              <TabSection
+                tabs={[
+                  { id: 'onetime', label: 'One-Time', count: onetimeDeliveriesData.length },
+                  { id: 'recurring', label: 'Recurring', count: recurringDeliveriesData.length },
+                  { id: 'archive', label: 'Archive', count: archivedDeliveriesData.length }
+                ]}
+                activeTab={deliveriesTab}
+                onTabChange={setDeliveriesTab}
+                description={
+                  deliveriesTab === 'onetime' ? 'One-time product deliveries pending completion' :
+                  deliveriesTab === 'recurring' ? 'Recurring delivery schedules and frequencies' :
+                  'Completed delivery records archive'
+                }
+                searchPlaceholder={
+                  deliveriesTab === 'onetime' ? 'Search by Order ID or destination' :
+                  deliveriesTab === 'recurring' ? 'Search recurring deliveries' :
+                  'Search archived deliveries'
+                }
+                onSearch={setDeliveriesSearchQuery}
+                primaryColor="#8b5cf6"
+              >
+
+              {deliveriesTab === 'onetime' && (
+                <DataTable
+                  columns={[
+                    { key: 'orderId', label: 'ORDER ID', clickable: true },
+                    { key: 'orderDate', label: 'ORDER DATE' },
+                    { key: 'quantity', label: 'QUANTITY' },
+                    { key: 'destination', label: 'DESTINATION' },
+                    { key: 'status', label: 'STATUS' },
+                    { key: 'deliveryDate', label: 'DELIVERY DATE' },
+                    {
+                      key: 'actions',
+                      label: 'ACTIONS',
+                      render: (value, row) => (
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              console.log(`Marking ${row.orderId} as delivered`);
+                              // This would archive the order with status 'delivered'
+                            }}
+                            style={{
+                              padding: '6px 12px',
+                              fontSize: '12px',
+                              fontWeight: 500,
+                              backgroundColor: '#8b5cf6',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Delivered
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              console.log(`Cancelling ${row.orderId}`);
+                              // This would archive the order with status 'cancelled'
+                            }}
+                            style={{
+                              padding: '6px 12px',
+                              fontSize: '12px',
+                              fontWeight: 500,
+                              backgroundColor: '#dc2626',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      )
+                    }
+                  ]}
+                  data={onetimeDeliveriesData}
+                  showSearch={false}
+                  externalSearchQuery={deliveriesSearchQuery}
+                  maxItems={10}
+                  onRowClick={(row) => console.log('View delivery details:', row)}
+                />
+              )}
+
+              {deliveriesTab === 'recurring' && (
+                <DataTable
+                  columns={[
+                    { key: 'orderId', label: 'ORDER ID', clickable: true },
+                    { key: 'creationDate', label: 'CREATION DATE' },
+                    { key: 'quantity', label: 'QUANTITY' },
+                    { key: 'destination', label: 'DESTINATION' },
+                    { key: 'deliveryFrequency', label: 'DELIVERY FREQUENCY' },
+                    { key: 'nextDelivery', label: 'NEXT DELIVERY' },
+                    { key: 'status', label: 'STATUS' },
+                    {
+                      key: 'actions',
+                      label: 'ACTIONS',
+                      render: (value, row) => (
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              console.log(`Marking ${row.orderId} as delivered`);
+                              // This would archive the order with status 'delivered'
+                            }}
+                            style={{
+                              padding: '6px 12px',
+                              fontSize: '12px',
+                              fontWeight: 500,
+                              backgroundColor: '#8b5cf6',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Delivered
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              console.log(`Cancelling ${row.orderId}`);
+                              // This would archive the order with status 'cancelled'
+                            }}
+                            style={{
+                              padding: '6px 12px',
+                              fontSize: '12px',
+                              fontWeight: 500,
+                              backgroundColor: '#dc2626',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      )
+                    }
+                  ]}
+                  data={recurringDeliveriesData}
+                  showSearch={false}
+                  externalSearchQuery={deliveriesSearchQuery}
+                  maxItems={10}
+                  onRowClick={(row) => console.log('View recurring delivery:', row)}
+                />
+              )}
+
+              {deliveriesTab === 'archive' && (
+                <DataTable
+                  columns={[
+                    { key: 'orderId', label: 'ORDER ID', clickable: true },
+                    { key: 'orderDate', label: 'ORDER DATE' },
+                    { key: 'quantity', label: 'QUANTITY' },
+                    { key: 'destination', label: 'DESTINATION' },
+                    { key: 'status', label: 'STATUS' },
+                    { key: 'deliveryDate', label: 'DELIVERY DATE' },
+                    { key: 'type', label: 'TYPE' }
+                  ]}
+                  data={archivedDeliveriesData}
+                  showSearch={false}
+                  externalSearchQuery={deliveriesSearchQuery}
+                  maxItems={10}
+                  onRowClick={(row) => console.log('View archived delivery:', row)}
+                />
+              )}
+              </TabSection>
+            </PageWrapper>
+          ) : activeTab === 'reports' ? (
+            <PageWrapper headerSrOnly>
+              <ReportsSection
+                role="warehouse"
+                userId="WHS-001"
+                primaryColor="#8b5cf6"
+              />
+            </PageWrapper>
+          ) : activeTab === 'support' ? (
+            <PageWrapper headerSrOnly>
+              <SupportSection
+                role="warehouse"
+                primaryColor="#8b5cf6"
+              />
             </PageWrapper>
           ) : (
             <PageWrapper title={activeTab} showHeader={true} headerSrOnly>

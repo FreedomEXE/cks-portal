@@ -35,6 +35,8 @@ import NavigationTab from '../../../packages/ui/src/navigation/NavigationTab';
 import TabContainer from '../../../packages/ui/src/navigation/TabContainer';
 import Button from '../../../packages/ui/src/buttons/Button';
 import { OrdersSection } from '../../../packages/domain-widgets/src/OrdersSection';
+import { SupportSection } from '../../../packages/domain-widgets/src/support';
+import { ReportsSection } from '../../../packages/domain-widgets/src/reports';
 import PageWrapper from '../../../packages/ui/src/layout/PageWrapper';
 import PageHeader from '../../../packages/ui/src/layout/PageHeader';
 import TabSection from '../../../packages/ui/src/layout/TabSection';
@@ -721,6 +723,21 @@ export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHu
               showProductOrders={true}
               primaryColor="#10b981"
             />
+            </PageWrapper>
+          ) : activeTab === 'reports' ? (
+            <PageWrapper headerSrOnly>
+              <ReportsSection
+                role="contractor"
+                userId="CTR-001"
+                primaryColor="#10b981"
+              />
+            </PageWrapper>
+          ) : activeTab === 'support' ? (
+            <PageWrapper headerSrOnly>
+              <SupportSection
+                role="contractor"
+                primaryColor="#10b981"
+              />
             </PageWrapper>
           ) : (
             <PageWrapper title={activeTab} showHeader={true} headerSrOnly>

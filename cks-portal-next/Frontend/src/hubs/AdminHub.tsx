@@ -31,6 +31,7 @@ import DataTable from '../../../packages/ui/src/tables/DataTable';
 import NavigationTab from '../../../packages/ui/src/navigation/NavigationTab';
 import TabContainer from '../../../packages/ui/src/navigation/TabContainer';
 import Button from '../../../packages/ui/src/buttons/Button';
+import { AdminSupportSection } from '../../../packages/domain-widgets/src/support';
 import PageHeader from '../../../packages/ui/src/layout/PageHeader';
 import PageWrapper from '../../../packages/ui/src/layout/PageWrapper';
 import TabSection from '../../../packages/ui/src/layout/TabSection';
@@ -837,6 +838,12 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
                   />
                 )}
               </div>
+            </PageWrapper>
+          ) : activeTab === 'support' ? (
+            <PageWrapper headerSrOnly>
+              <AdminSupportSection
+                primaryColor="#6366f1"
+              />
             </PageWrapper>
           ) : (
             <PageWrapper title={activeTab} showHeader={true} headerSrOnly>

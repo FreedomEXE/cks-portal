@@ -33,6 +33,8 @@ import EcosystemTree, { type TreeNode } from '../../../packages/domain-widgets/E
 import DataTable from '../../../packages/ui/src/tables/DataTable';
 import Button from '../../../packages/ui/src/buttons/Button';
 import { OrdersSection } from '../../../packages/domain-widgets/src/OrdersSection';
+import { SupportSection } from '../../../packages/domain-widgets/src/support';
+import { ReportsSection } from '../../../packages/domain-widgets/src/reports';
 import PageHeader from '../../../packages/ui/src/layout/PageHeader';
 import PageWrapper from '../../../packages/ui/src/layout/PageWrapper';
 import TabSection from '../../../packages/ui/src/layout/TabSection';
@@ -768,6 +770,21 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
                 }}
                 showServiceOrders={true}
                 showProductOrders={true}
+                primaryColor="#3b82f6"
+              />
+            </PageWrapper>
+          ) : activeTab === 'support' ? (
+            <PageWrapper headerSrOnly>
+              <SupportSection
+                role="manager"
+                primaryColor="#3b82f6"
+              />
+            </PageWrapper>
+          ) : activeTab === 'reports' ? (
+            <PageWrapper headerSrOnly>
+              <ReportsSection
+                role="manager"
+                userId="MNG-001"
                 primaryColor="#3b82f6"
               />
             </PageWrapper>

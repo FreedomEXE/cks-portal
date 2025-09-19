@@ -19,6 +19,12 @@ export interface DataTableProps {
   onRowClick?: (row: any) => void;
   searchFields?: string[]; // Which fields to search in
   externalSearchQuery?: string; // Allow external search control from TabSection
+  filterOptions?: {
+    field: string;
+    options: string[];
+    placeholder: string;
+    onFilter?: (value: string) => void;
+  };
 }
 
 const DataTable: React.FC<DataTableProps> = ({
@@ -31,34 +37,49 @@ const DataTable: React.FC<DataTableProps> = ({
   showSearch = true,
   onRowClick,
   searchFields,
-  externalSearchQuery
+  externalSearchQuery,
+  filterOptions
 }) => {
   const [internalSearchQuery, setInternalSearchQuery] = useState('');
   const [isExpanded, setIsExpanded] = useState(false);
+  const [filterValue, setFilterValue] = useState('');
 
   // Use external search if provided, otherwise use internal
   const searchQuery = externalSearchQuery !== undefined ? externalSearchQuery : internalSearchQuery;
 
-  // Filter data based on search query
+  // Filter data based on search query and filter dropdown
   const filteredData = useMemo(() => {
-    if (!searchQuery) return data;
+    let result = data;
 
-    const query = searchQuery.toLowerCase();
-    return data.filter(row => {
-      // If searchFields specified, only search those
-      if (searchFields && searchFields.length > 0) {
-        return searchFields.some(field => {
-          const value = row[field];
+    // Apply filter dropdown first
+    if (filterOptions && filterValue && filterValue !== 'All Types') {
+      result = result.filter(row => {
+        const value = row[filterOptions.field];
+        return value && String(value).toLowerCase() === filterValue.toLowerCase();
+      });
+    }
+
+    // Then apply search query
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter(row => {
+        // If searchFields specified, only search those
+        if (searchFields && searchFields.length > 0) {
+          return searchFields.some(field => {
+            const value = row[field];
+            return value && String(value).toLowerCase().includes(query);
+          });
+        }
+        // Otherwise search all columns
+        return columns.some(col => {
+          const value = row[col.key];
           return value && String(value).toLowerCase().includes(query);
         });
-      }
-      // Otherwise search all columns
-      return columns.some(col => {
-        const value = row[col.key];
-        return value && String(value).toLowerCase().includes(query);
       });
-    });
-  }, [data, searchQuery, columns, searchFields]);
+    }
+
+    return result;
+  }, [data, searchQuery, columns, searchFields, filterOptions, filterValue]);
 
   // Limit displayed items based on expansion state
   const displayedData = isExpanded ? filteredData : filteredData.slice(0, maxItems);
@@ -71,13 +92,24 @@ const DataTable: React.FC<DataTableProps> = ({
     onSearch?.(value);
   };
 
+  const handleFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = e.target.value;
+    setFilterValue(value);
+    filterOptions?.onFilter?.(value);
+  };
+
   // Add max indicator to placeholder
   const fullPlaceholder = `${searchPlaceholder} (first ${Math.min(maxItems, totalCount)} rows shown)`;
 
   return (
     <div style={{ width: '100%' }}>
       {showSearch && (
-        <div style={{ marginBottom: 16 }}>
+        <div style={{
+          marginBottom: 16,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px'
+        }}>
           <input
             type="text"
             placeholder={fullPlaceholder}
@@ -94,6 +126,30 @@ const DataTable: React.FC<DataTableProps> = ({
               outline: 'none'
             }}
           />
+          {filterOptions && (
+            <select
+              value={filterValue}
+              onChange={handleFilterChange}
+              style={{
+                padding: '12px',
+                backgroundColor: '#ffffff',
+                border: '1px solid #e5e7eb',
+                borderRadius: '8px',
+                color: '#111827',
+                fontSize: '14px',
+                outline: 'none',
+                cursor: 'pointer',
+                minWidth: '150px'
+              }}
+            >
+              <option value="">{filterOptions.placeholder}</option>
+              {filterOptions.options.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
       )}
 

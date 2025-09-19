@@ -117,6 +117,11 @@ Crew (✓ Approved) → Warehouse (⏳ Accepted)
 
 *Note: Warehouse "Accepted" still shows as pulsing yellow to indicate delivery is pending*
 
+**Delivery Completion Process**:
+- Accepted orders appear in Warehouse Deliveries tab
+- Warehouse clicks "Delivered" or "Cancel" button
+- Order immediately moves to Archive for all users with appropriate status
+
 ### Example 3: Delivered (Archived)
 **Order ID**: `CRW001-ORD-PRD003`
 **Created by**: CRW-001
@@ -145,6 +150,21 @@ Crew (✓ Approved) → Warehouse (✗ Rejected)
 **Order Badge**: REJECTED (red)
 **Available Actions**: View Details (shows rejection reason)
 **Rejection Reason**: "Out of stock - requires special order"
+
+### Example 5: Cancelled by Warehouse (During Delivery)
+**Order ID**: `CRW001-ORD-PRD005`
+**Created by**: CRW-001
+**Destination**: CTR-004
+**Status**: cancelled (all users)
+
+**Workflow Tree**:
+```
+Crew (✓ Approved) → Warehouse (✗ Cancelled)
+```
+
+**Order Badge**: CANCELLED (red)
+**Available Actions**: View Details (shows cancellation reason)
+**Cancellation Reason**: "Unable to fulfill due to shipping issues"
 
 ## Service Order Workflow Examples
 
@@ -186,7 +206,10 @@ Center (✓ Approved) → Manager (✓ Service Created)
 ### Warehouse View
 - Sees product orders requiring warehouse action
 - Pending orders show Accept/Deny buttons
-- Accepted orders show View Details only
+- Accepted orders appear in Deliveries tab for completion
+- **Deliveries Tab**: Three sub-tabs (One-Time, Recurring, Archive)
+  - **Delivered Button**: Marks order as delivered (moves to archive, status: "delivered")
+  - **Cancel Button**: Cancels order (moves to archive, status: "cancelled")
 - Cannot see service orders unless warehouse created them
 
 ### Crew View
