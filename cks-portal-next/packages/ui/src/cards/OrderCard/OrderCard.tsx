@@ -74,8 +74,8 @@ const OrderCard: React.FC<OrderCardProps> = ({
       default:
         baseClass = styles.statusGray;
     }
-    // Add pulsing class for pending/waiting/accepted states
-    if (isPulsing && (status === 'pending' || status === 'waiting' || status === 'accepted')) {
+    // Add pulsing class only for pending/accepted states (not waiting)
+    if (isPulsing && (status === 'pending' || status === 'accepted')) {
       return `${baseClass} ${styles.pulsingStage}`;
     }
     return baseClass;
@@ -374,22 +374,30 @@ const OrderCard: React.FC<OrderCardProps> = ({
           <div className={styles.approvalWorkflow}>
             <h4 className={styles.workflowTitle}>Approval Workflow</h4>
             <div className={styles.workflowStages}>
-              {approvalStages.map((stage, index) => (
-                <div key={index} className={styles.stageContainer}>
-                  <div className={`${styles.stage} ${getStatusColor(stage.status, true, index === approvalStages.length - 1)}`}>
-                    <div className={styles.stageRole}>{stage.role}</div>
-                    <div className={styles.stageStatus}>
-                      {stage.status.replace('-', ' ')}
+              {approvalStages.map((stage, index) => {
+                // Find the first pending/accepted stage to apply pulsing (not waiting)
+                const firstPendingIndex = approvalStages.findIndex(s =>
+                  s.status === 'pending' || s.status === 'accepted'
+                );
+                const shouldPulse = index === firstPendingIndex;
+
+                return (
+                  <div key={index} className={styles.stageContainer}>
+                    <div className={`${styles.stage} ${getStatusColor(stage.status, shouldPulse, index === approvalStages.length - 1)}`}>
+                      <div className={styles.stageRole}>{stage.role}</div>
+                      <div className={styles.stageStatus}>
+                        {stage.status.replace('-', ' ')}
+                      </div>
+                      {stage.user && (
+                        <div className={styles.stageUser}>{stage.user}</div>
+                      )}
                     </div>
-                    {stage.user && (
-                      <div className={styles.stageUser}>{stage.user}</div>
+                    {index < approvalStages.length - 1 && (
+                      <div className={styles.stageArrow}>→</div>
                     )}
                   </div>
-                  {index < approvalStages.length - 1 && (
-                    <div className={styles.stageArrow}>→</div>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}

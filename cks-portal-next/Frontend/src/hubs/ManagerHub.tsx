@@ -195,8 +195,101 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
     }
   ]);
 
-  // Mock orders data - Manager can see all crew product orders
-  const serviceOrders: any[] = [];
+  // Mock orders data - Manager sees service requests that need their approval and crew assignment
+  const serviceOrders: any[] = [
+    // State 1: All approved, pending manager to create service (ACTION REQUIRED)
+    {
+      orderId: 'CTR001-ORD-SRV003',
+      orderType: 'service',
+      title: 'Security System Installation',
+      requestedBy: 'CTR-001',
+      destination: 'CTR-001',
+      requestedDate: '2025-09-17',
+      expectedDate: '2025-09-30',
+      status: 'pending',  // Manager sees as pending (needs to create service)
+      approvalStages: [
+        { role: 'Center', status: 'requested', user: 'CTR-001', timestamp: '2025-09-17 08:00' },
+        { role: 'Customer', status: 'approved', user: 'CUS-001', timestamp: '2025-09-17 11:00' },
+        { role: 'Contractor', status: 'approved', user: 'CON-001', timestamp: '2025-09-17 15:00' },
+        { role: 'Manager', status: 'pending' }  // Their action needed - only this should pulse
+      ],
+      description: 'Installation of new security camera system',
+      serviceType: 'Installation',
+      frequency: 'One-time',
+      estimatedDuration: '12 hours',
+      notes: 'Requires specialized security clearance'
+    },
+    // State 2: Manager created service and assigned crew (SERVICE ACTIVE)
+    {
+      orderId: 'CTR001-ORD-SRV004',
+      orderType: 'service',
+      title: 'Landscaping Maintenance Service',
+      requestedBy: 'CTR-001',
+      destination: 'CTR-001',
+      requestedDate: '2025-09-15',
+      expectedDate: '2025-09-20',
+      serviceStartDate: '2025-09-20',
+      status: 'service-created',  // Service has been created and assigned
+      approvalStages: [
+        { role: 'Center', status: 'requested', user: 'CTR-001', timestamp: '2025-09-15 09:00' },
+        { role: 'Customer', status: 'approved', user: 'CUS-001', timestamp: '2025-09-15 12:00' },
+        { role: 'Contractor', status: 'approved', user: 'CON-001', timestamp: '2025-09-15 16:00' },
+        { role: 'Manager', status: 'service-created', user: 'MGR-001', timestamp: '2025-09-16 10:00' }
+      ],
+      description: 'Weekly landscaping and grounds maintenance',
+      serviceType: 'Landscaping',
+      frequency: 'Weekly',
+      estimatedDuration: '6 hours',
+      assignedCrew: 'CRW-003',
+      notes: 'Includes lawn care and shrub trimming'
+    },
+    // State 3: Another pending service creation
+    {
+      orderId: 'CTR001-ORD-SRV007',
+      orderType: 'service',
+      title: 'Plumbing Repair Service',
+      requestedBy: 'CTR-001',
+      destination: 'CTR-001',
+      requestedDate: '2025-09-19',
+      expectedDate: '2025-09-22',
+      status: 'pending',
+      approvalStages: [
+        { role: 'Center', status: 'requested', user: 'CTR-001', timestamp: '2025-09-19 08:00' },
+        { role: 'Customer', status: 'approved', user: 'CUS-001', timestamp: '2025-09-19 10:00' },
+        { role: 'Contractor', status: 'approved', user: 'CON-001', timestamp: '2025-09-19 13:00' },
+        { role: 'Manager', status: 'pending' }  // Action needed
+      ],
+      description: 'Emergency plumbing repairs in main office',
+      serviceType: 'Plumbing',
+      frequency: 'One-time',
+      estimatedDuration: '4 hours',
+      notes: 'Pipe leak in conference room - urgent'
+    },
+    // State 4: Another completed service
+    {
+      orderId: 'CTR001-ORD-SRV008',
+      orderType: 'service',
+      title: 'HVAC System Maintenance',
+      requestedBy: 'CTR-001',
+      destination: 'CTR-001',
+      requestedDate: '2025-09-12',
+      expectedDate: '2025-09-15',
+      serviceStartDate: '2025-09-15',
+      status: 'service-created',
+      approvalStages: [
+        { role: 'Center', status: 'requested', user: 'CTR-001', timestamp: '2025-09-12 09:00' },
+        { role: 'Customer', status: 'approved', user: 'CUS-001', timestamp: '2025-09-12 11:00' },
+        { role: 'Contractor', status: 'approved', user: 'CON-001', timestamp: '2025-09-12 14:00' },
+        { role: 'Manager', status: 'service-created', user: 'MGR-001', timestamp: '2025-09-13 09:00' }
+      ],
+      description: 'Routine HVAC system maintenance and filter replacement',
+      serviceType: 'Maintenance',
+      frequency: 'Quarterly',
+      estimatedDuration: '3 hours',
+      assignedCrew: 'CRW-005',
+      notes: 'Standard quarterly maintenance'
+    }
+  ];
   const productOrders: any[] = [
     // Same orders as CrewHub - Manager can monitor crew orders
     // State 1: Pending warehouse acceptance
@@ -267,7 +360,6 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
       status: 'delivered',
       approvalStages: [
         { role: 'Crew', status: 'requested', user: 'CRW-001', timestamp: '2025-09-14 08:00' },
-        { role: 'Warehouse', status: 'accepted', user: 'WHS-001', timestamp: '2025-09-14 11:30' },
         { role: 'Warehouse', status: 'delivered', user: 'WHS-001', timestamp: '2025-09-16 15:45' }
       ],
       approvalStage: {
@@ -314,6 +406,54 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
         { name: 'High-Pressure Washer', quantity: 1, unit: 'unit' }
       ],
       notes: 'Need for deep cleaning project'
+    },
+    // Manager monitors all Center->Customer->Contractor->Warehouse flows
+    // Example 1: Pending customer approval
+    {
+      orderId: 'CTR001-ORD-PRD001',
+      orderType: 'product',
+      title: 'Office Supplies - Monthly Restock',
+      requestedBy: 'CTR-001',
+      destination: 'CTR-001',
+      requestedDate: '2025-09-19',
+      expectedDate: '2025-09-25',
+      status: 'in-progress',  // Manager sees all as in-progress (monitoring)
+      approvalStages: [
+        { role: 'Center', status: 'requested', user: 'CTR-001', timestamp: '2025-09-19 10:00' },
+        { role: 'Customer', status: 'pending' },
+        { role: 'Contractor', status: 'waiting' },
+        { role: 'Warehouse', status: 'waiting' }
+      ],
+      items: [
+        { name: 'Paper Towels', quantity: 100, unit: 'rolls' },
+        { name: 'Hand Soap', quantity: 50, unit: 'bottles' },
+        { name: 'Trash Bags', quantity: 200, unit: 'bags' }
+      ],
+      notes: 'Monthly restocking for all bathrooms and break rooms'
+    },
+    // Example 2: Full approval chain completed, delivered
+    {
+      orderId: 'CTR001-ORD-PRD005',
+      orderType: 'product',
+      title: 'HVAC Filters Bulk Order',
+      requestedBy: 'CTR-001',
+      destination: 'CTR-001',
+      requestedDate: '2025-09-10',
+      expectedDate: '2025-09-15',
+      deliveryDate: '2025-09-15',
+      status: 'delivered',
+      approvalStages: [
+        { role: 'Center', status: 'requested', user: 'CTR-001', timestamp: '2025-09-10 09:00' },
+        { role: 'Customer', status: 'approved', user: 'CUS-001', timestamp: '2025-09-10 11:00' },
+        { role: 'Contractor', status: 'approved', user: 'CON-001', timestamp: '2025-09-11 10:00' },
+        { role: 'Warehouse', status: 'accepted', user: 'WHS-001', timestamp: '2025-09-12 08:00' },
+        { role: 'Warehouse', status: 'delivered', user: 'WHS-001', timestamp: '2025-09-15 14:00' }
+      ],
+      items: [
+        { name: 'HVAC Filters 20x25x1', quantity: 50, unit: 'filters' },
+        { name: 'HVAC Filters 16x20x1', quantity: 30, unit: 'filters' }
+      ],
+      notes: 'Quarterly filter replacement stock'
     }
   ];
 

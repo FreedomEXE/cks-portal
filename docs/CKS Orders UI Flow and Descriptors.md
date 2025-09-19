@@ -1,558 +1,487 @@
-# CKS Orders UI Flow and Descriptors
+# CKS Orders System - Complete Implementation Guide
 
-**Document Version:** 1.0  
-**Last Updated:** September 11, 2025  
-**Purpose:** Comprehensive specification for CKS order system architecture, UI flows, and business logic
+**Document Version:** 2.0
+**Last Updated:** September 19, 2025
+**Purpose:** Comprehensive specification for the CKS order system with actual implementation details
 
 ---
 
 ## Table of Contents
 1. [System Overview](#system-overview)
-2. [Order Types & Structure](#order-types--structure)
-3. [User Roles & Permissions](#user-roles--permissions)
-4. [Order Lifecycle](#order-lifecycle)
-5. [UI Layout & Functionality](#ui-layout--functionality)
-6. [Order ID Structure](#order-id-structure)
-7. [Cross-Role Interactions](#cross-role-interactions)
-8. [Order-to-Service Transformation](#order-to-service-transformation)
-9. [Technical Implementation](#technical-implementation)
-10. [Business Rules](#business-rules)
+2. [Order Types](#order-types)
+3. [User Roles & Workflows](#user-roles--workflows)
+4. [Product Order Workflows](#product-order-workflows)
+5. [Service Order Workflows](#service-order-workflows)
+6. [Order Status System](#order-status-system)
+7. [UI Components & Behavior](#ui-components--behavior)
+8. [Technical Implementation](#technical-implementation)
+9. [Business Rules](#business-rules)
 
 ---
 
 ## System Overview
 
-The CKS order system facilitates procurement and service requests across six primary user types:
-- **Managers** - Oversight, reporting, and system administration
-- **Contractors** - Provide services, request supplies and services
-- **Customers** - Request services from contractors, limited supply access
-- **Centers** - Request supplies and services, approve contractor/crew requests
-- **Crews** - Request supplies and services (similar to contractors but center-managed)
-- **Warehouses** - Fulfill supply orders, provide logistics services
+The CKS order system consists of two distinct workflow types:
 
-*Note: Admin role will be added in future iterations for system-wide administration*
+### **Product Orders**
+- **Purpose**: Request physical supplies/equipment
+- **ID Format**: `[USER-ID]-ORD-PRD[NUMBER]`
+- **Workflow**: Center/Crew → Warehouse (simple) OR Center → Customer → Contractor → Warehouse (complex)
 
-### Core Principles
-1. **Dual Order System**: Supply Orders (SUP) and Service Orders (SRV)
-2. **Permission-Based Workflows**: Different approval chains based on user roles
-3. **Traceability**: Every order maintains complete audit trail
-4. **Status-Driven UI**: Interface adapts based on order status and user permissions
+### **Service Orders**
+- **Purpose**: Request services to be performed
+- **ID Format**: `[USER-ID]-ORD-SRV[NUMBER]`
+- **Workflow**: Center → Customer → Contractor → Manager → Crew
 
----
-
-## Order Types & Structure
-
-### 1. Supply Orders (SUP)
-**Purpose:** Request physical supplies/equipment from warehouses  
-**ID Format:** `[REQUESTER]-ORD-SUP[XXX]`  
-**Examples:** `CRW001-ORD-SUP001`, `CTR002-ORD-SUP003`
-
-**Key Fields:**
-- `order_id`: Unique identifier
-- `requester_id`: Who initiated the order
-- `supply_id`: What supply is being ordered
-- `quantity`: Amount requested
-- `priority`: Low/Medium/High/Urgent
-- `delivery_location`: Where to deliver
-- `requested_date`: When needed
-- `approval_status`: Pending/Approved/Denied
-- `fulfillment_status`: Pending/Processing/Shipped/Delivered
-
-### 2. Service Orders (SRV)
-**Purpose:** Request services from contractors/warehouses  
-**ID Format:** `[REQUESTER]-ORD-SRV[XXX]`  
-**Examples:** `CTR001-ORD-SRV001`, `CRW003-ORD-SRV002`
-
-**Key Fields:**
-- `order_id`: Unique identifier
-- `requester_id`: Who initiated the order
-- `service_id`: What service is being ordered
-- `service_provider`: Who will provide the service
-- `location`: Where service is needed
-- `scheduled_date`: When service is needed
-- `approval_status`: Pending/Approved/Denied
-- `service_status`: Pending/Scheduled/In Progress/Completed
+### **Core Principles**
+1. **Visual Workflow Trees**: Every order shows complete approval chain
+2. **Selective Pulsing**: Only the immediate next approver's stage pulses
+3. **Role-Based Perspectives**: Same order appears differently to each role
+4. **Chain Preservation**: Crew rejections don't break service chains
 
 ---
 
-## User Roles & Permissions
+## Order Types
 
-### Contractor Permissions
-**Can Create:**
-- Supply Orders: ✅ (requires center approval)
-- Service Orders: ✅ (requires center approval)
+### Product Orders (PRD)
 
-**Can View:**
-- Own orders: ✅ (all statuses)
-- Center orders: ❌
-- Other contractor orders: ❌
+**Simple Flow**: Direct requests to warehouse
+- Crew → Warehouse (immediate approval)
 
-**Can Approve:**
-- Supply Orders: ❌
-- Service Orders: ❌
+**Complex Flow**: Customer approval chain
+- Center → Customer → Contractor → Warehouse
 
-**Special Actions:**
-- Cancel own pending orders: ✅
-- Modify pending orders: ✅ (before approval)
+**Key Features**:
+- Three-stage warehouse progression: pending → accepted → delivered
+- Archive shows delivered orders without duplicate "accepted" stage
+- Status perspective varies by role (pending for you, in-progress for others)
 
-### Center Permissions
-**Can Create:**
-- Supply Orders: ✅ (direct to warehouse)
-- Service Orders: ✅ (direct to provider)
+### Service Orders (SRV)
 
-**Can View:**
-- Own orders: ✅ (all statuses)
-- Contractor orders from their contractors: ✅
-- Other center orders: ❌
+**Single Flow**: Center-initiated services
+- Center → Customer → Contractor → Manager → Crew
 
-**Can Approve:**
-- Contractor supply orders: ✅
-- Contractor service orders: ✅
-- Own orders: Auto-approved
-
-**Special Actions:**
-- Bulk approve contractor orders: ✅
-- Modify contractor orders: ✅ (before forwarding to warehouse)
-- Cancel orders: ✅ (before fulfillment starts)
-
-### Warehouse Permissions
-**Can Create:**
-- Service Orders: ❌ (warehouses provide services, don't order them)
-- Supply Orders: ❌ (warehouses fulfill, don't create)
-
-**Can View:**
-- All supply orders assigned to them: ✅
-- Service orders for their services: ✅
-- Other warehouse orders: ❌
-
-**Can Approve:**
-- Supply Orders: ✅ (for fulfillment)
-- Service Orders: ✅ (for scheduling)
-
-**Special Actions:**
-- Mark orders as "In Progress": ✅
-- Complete/deliver orders: ✅
-- Reject orders (insufficient inventory): ✅
-
-### Manager Permissions
-**Can Create:**
-- Any type of order: ✅
-- Emergency/priority orders: ✅
-
-**Can View:**
-- All orders system-wide: ✅
-- Order analytics and reports: ✅
-
-**Can Approve:**
-- Any order: ✅ (override capability)
-- Bulk operations: ✅
-
-**Special Actions:**
-- Emergency order prioritization: ✅
-- System-wide order cancellation: ✅
-- Order reassignment: ✅
+**Key Features**:
+- Manager creates service and assigns crew
+- Crew can accept/deny assignments (doesn't break chain)
+- Status becomes "service-created" when complete
+- Crew rejections require manager reassignment
 
 ---
 
-## Order Lifecycle
+## User Roles & Workflows
 
-### Supply Order Lifecycle
-```
-1. CREATED (by contractor/center)
-   ↓
-2. PENDING_APPROVAL (if contractor → center approval)
-   ↓
-3. APPROVED (by center/auto if center-created)
-   ↓
-4. FORWARDED_TO_WAREHOUSE
-   ↓
-5. WAREHOUSE_PENDING (warehouse review)
-   ↓
-6. WAREHOUSE_APPROVED (warehouse accepts)
-   ↓
-7. IN_PROGRESS (warehouse processing)
-   ↓
-8. READY_FOR_DELIVERY
-   ↓
-9. OUT_FOR_DELIVERY
-   ↓
-10. DELIVERED (completed)
+### Center Hub
+**Product Orders Can Create**:
+- Simple: Direct to warehouse
+- Complex: Through customer approval chain
 
-Alternative paths:
-- DENIED (at any approval stage)
-- CANCELLED (by requester before processing)
-- REJECTED (by warehouse - insufficient inventory)
-```
+**Service Orders Can Create**:
+- Service requests requiring customer/contractor/manager approval
 
-### Service Order Lifecycle
-```
-1. CREATED (by contractor/center)
-   ↓
-2. PENDING_APPROVAL (if contractor → center approval)
-   ↓
-3. APPROVED (by center/auto if center-created)
-   ↓
-4. FORWARDED_TO_PROVIDER
-   ↓
-5. PROVIDER_PENDING (service provider review)
-   ↓
-6. PROVIDER_APPROVED (service provider accepts)
-   ↓
-7. SCHEDULED (date/time confirmed)
-   ↓
-8. IN_PROGRESS (service being performed)
-   ↓
-9. COMPLETED (service finished)
+**Actions Available**:
+- Create Product Order
+- Create Service Order
+- View order status and workflow trees
 
-Alternative paths:
-- DENIED (at any approval stage)
-- CANCELLED (by requester before service starts)
-- REJECTED (by provider - unavailable/conflict)
-```
+### Customer Hub
+**Views**:
+- Product orders from their centers requiring approval
+- Service orders from their centers requiring approval
+
+**Actions Available**:
+- Approve/Reject product orders from centers
+- Approve/Reject service orders from centers
+- View Details on all orders
+
+### Contractor Hub
+**Views**:
+- Product orders approved by customers, pending contractor approval
+- Service orders approved by customers, pending contractor approval
+
+**Actions Available**:
+- Approve/Reject product orders after customer approval
+- Approve/Reject service orders after customer approval
+- View Details on completed orders
+
+### Manager Hub
+**Views**:
+- Service orders fully approved by center/customer/contractor, pending manager action
+- Product orders (monitoring crew orders)
+
+**Actions Available**:
+- Create Service (for approved service orders)
+- Assign Crew (internal process)
+- View all orders system-wide
+
+### Crew Hub
+**Product Orders**:
+- Can create direct product orders to warehouse
+- View own product order status
+
+**Service Orders**:
+- Receive service assignments from manager
+- Accept/Deny service assignments
+- View active and completed services
+
+**Actions Available**:
+- Request Products (to warehouse)
+- Accept/Deny service assignments
+- View Details on orders and services
+
+### Warehouse Hub
+**Views**:
+- All product orders requiring warehouse action
+- Both crew direct orders and complex chain orders
+
+**Actions Available**:
+- Accept/Deny product orders
+- Mark as Delivered when fulfillment complete
+- View order history
 
 ---
 
-## UI Layout & Functionality
+## Product Order Workflows
 
-### Orders Tab Structure (All Roles)
-The Orders tab uses a consistent three-section layout:
+### Crew Direct Product Orders
+```
+Crew → Warehouse
+CRW001-ORD-PRD001
 
-#### 1. In Progress Section
-**Purpose:** Active orders requiring attention  
-**Filters:** Status = Pending, Approved, In Progress  
-**Display:** Table format with action buttons
+States:
+1. Crew creates order (status: pending)
+   - Crew sees: pending (can cancel)
+   - Warehouse sees: pending (can accept/deny)
 
-**Columns (Supply Orders):**
-- Order ID (clickable for details)
-- Supply Name
-- Quantity
-- Requester
-- Priority (color-coded badge)
-- Status (color-coded badge)
-- Actions (Approve/Deny/View buttons)
+2. Warehouse accepts (status: approved)
+   - Crew sees: in-progress (waiting for delivery)
+   - Warehouse sees: accepted (ready for delivery)
 
-**Columns (Service Orders):**
-- Order ID (clickable for details)
-- Service Name  
-- Provider
-- Requester
-- Scheduled Date
-- Status (color-coded badge)
-- Actions (Approve/Deny/Schedule buttons)
+3. Warehouse delivers (status: delivered)
+   - Both see: delivered (archived)
+```
 
-#### 2. Pending Approval Section
-**Purpose:** Orders awaiting user's approval  
-**Visibility:** Only for users with approval permissions  
-**Features:**
-- Bulk approval checkbox
-- "Approve All" button
-- Individual approve/deny actions
-- Priority sorting
+### Center Complex Product Orders
+```
+Center → Customer → Contractor → Warehouse
+CTR001-ORD-PRD001
 
-#### 3. Order History Section
-**Purpose:** Completed, cancelled, or denied orders  
-**Filters:** Status = Delivered, Completed, Cancelled, Denied  
-**Features:**
-- Read-only view
-- Search/filter functionality
-- Export capability (CSV/PDF)
+States:
+1. Center creates order
+   - Center sees: in-progress (waiting for customer)
+   - Customer sees: pending (needs their approval) ← PULSES
+
+2. Customer approves
+   - Customer sees: in-progress (waiting for contractor)
+   - Contractor sees: pending (needs their approval) ← PULSES
+
+3. Contractor approves
+   - Contractor sees: in-progress (waiting for warehouse)
+   - Warehouse sees: pending (needs their approval) ← PULSES
+
+4. Warehouse accepts
+   - All see: in-progress (warehouse processing)
+
+5. Warehouse delivers
+   - All see: delivered (archived)
+```
+
+### Approval Chain Display Rules
+- **Show full chain**: All roles see complete workflow
+- **Pulse current approver**: Only immediate next stage pulses
+- **Archive simplification**: Remove "warehouse accepted" from delivered orders
+
+---
+
+## Service Order Workflows
+
+### Center Service Orders
+```
+Center → Customer → Contractor → Manager → Crew
+CTR001-ORD-SRV001
+
+States:
+1. Center creates service request
+   - Center sees: in-progress (waiting for customer)
+   - Customer sees: pending (needs approval) ← PULSES
+
+2. Customer approves
+   - Customer sees: in-progress (waiting for contractor)
+   - Contractor sees: pending (needs approval) ← PULSES
+
+3. Contractor approves
+   - Contractor sees: in-progress (waiting for manager)
+   - Manager sees: pending (needs to create service) ← PULSES
+
+4. Manager creates service and assigns crew
+   - All see: service-created (service active)
+   - Crew sees: pending (needs to accept assignment) ← SPECIAL CASE
+
+5. Crew accepts assignment
+   - Service remains service-created
+   - Crew assignment handled internally by manager
+
+6. If crew denies assignment
+   - Service remains pending at manager level
+   - Manager reassigns different crew
+   - Original order chain unaffected
+```
+
+### Crew Service Assignment Process
+**Manager assigns crew to service**:
+- Crew receives assignment notification
+- Options: Accept or Deny
+- If denied: Manager must reassign (service stays active)
+- If accepted: Service proceeds normally
+
+**Special Rules**:
+- Crew denial does NOT archive the service order
+- Manager handles crew assignment through separate interface
+- Service workflow continues regardless of individual crew responses
+
+---
+
+## Order Status System
+
+### Order Status Values
+- **pending**: User needs to take action
+- **in-progress**: Waiting for others in the chain
+- **approved**: Fully approved, proceeding to fulfillment
+- **delivered**: Product orders completed
+- **service-created**: Service orders completed and active
+- **rejected**: Denied at any approval stage
+
+### Status Perspective Rules
+- **For the actor**: Shows "pending" when action needed
+- **For observers**: Shows "in-progress" when waiting
+- **For completed**: Shows final status (delivered/service-created/rejected)
+
+### Visual Indicators
+- **Green**: Completed stages (requested, approved, delivered, service-created)
+- **Yellow**: Active stages (pending, waiting, accepted)
+- **Red**: Failed stages (rejected, denied)
+- **Blue**: In-progress stages
+- **Pulsing**: Only applied to immediate next approver
+
+---
+
+## UI Components & Behavior
+
+### OrdersSection Component
+**Tab Structure**:
+1. **Service Orders**: All service-related orders
+2. **Product Orders**: All product-related orders
+3. **Archive**: Completed/rejected orders (delivered, service-created, rejected)
+
+**Key Features**:
+- Role-based action buttons
+- Search functionality
+- Collapsible order cards
+- Real-time status updates
+
+### OrderCard Component
+**Visual Elements**:
+- Order ID and type badge
+- Title and description
+- Approval workflow tree with arrows
+- Action buttons based on user role and order status
+- Expandable details section
+
+**Workflow Tree Display**:
+- Shows all approval stages
+- Arrows connect stages
+- Only immediate next approver pulses
+- Color-coded by status
+- Timestamps for completed stages
 
 ### Action Buttons by Role
 
-#### Contractor Actions
-- **"Request Supplies"** - Opens supply order form
-- **"Request Service"** - Opens service order form
-- **"Cancel"** - Cancel pending orders (own orders only)
-- **"View Details"** - View order details and status
+#### Center
+- **Request Service**: Creates service orders
+- **Request Products**: Creates product orders
+- **View Details**: For all orders
 
-#### Center Actions
-- **"Request Supplies"** - Create direct supply order
-- **"Request Service"** - Create direct service order
-- **"Approve"** - Approve contractor orders
-- **"Deny"** - Deny contractor orders with reason
-- **"Modify"** - Edit contractor orders before approval
-- **"Bulk Approve"** - Approve multiple contractor orders
+#### Customer
+- **Approve**: For pending orders requiring approval
+- **Reject**: For pending orders requiring approval
+- **View Details**: For all other orders
 
-#### Warehouse Actions
-- **"Accept"** - Accept supply/service orders for fulfillment
-- **"Reject"** - Reject orders with reason
-- **"Start Processing"** - Mark order as in progress
-- **"Ready for Delivery"** - Mark supplies ready
-- **"Complete"** - Mark order as fulfilled/delivered
+#### Contractor
+- **Approve**: For orders pending contractor approval
+- **Reject**: For orders pending contractor approval
+- **View Details**: For all other orders
 
-#### Manager Actions
-- **"Override Approve"** - Force approve any order
-- **"Prioritize"** - Change order priority
-- **"Reassign"** - Change order assignment
-- **"Generate Report"** - Export order data
+#### Manager
+- **Create Service**: For approved service orders
+- **View Details**: For all orders
 
----
+#### Crew
+- **Request Products**: For product orders to warehouse
+- **Accept**: For service assignments
+- **Deny**: For service assignments
+- **View Details**: For all other orders
 
-## Order ID Structure
-
-### Format: `[REQUESTER]-ORD-[TYPE][NUMBER]`
-
-#### Components Breakdown:
-
-**REQUESTER (3-6 chars):**
-- `CRW###` = Contractor ID (e.g., CRW001, CRW045)
-- `CTR###` = Center ID (e.g., CTR001, CTR012)
-- `WHS###` = Warehouse ID (e.g., WHS001)
-- `MGR###` = Manager ID (e.g., MGR001)
-
-**ORD (3 chars):**
-- Fixed literal "ORD" indicating this is an order
-- Distinguishes from direct service IDs (SRV-001) or supply IDs (SUP-001)
-
-**TYPE+NUMBER (6 chars):**
-- `SUP###` = Supply order (e.g., SUP001, SUP045)
-- `SRV###` = Service order (e.g., SRV001, SRV023)
-
-#### Examples with Context:
-- `CRW001-ORD-SUP001` = Contractor 001 ordered Supply 001
-- `CTR002-ORD-SRV003` = Center 002 ordered Service 003
-- `MGR001-ORD-SUP012` = Manager 001 emergency ordered Supply 012
-
-### ID Evolution Through Lifecycle:
-
-**Original Order:** `CRW001-ORD-SUP001`
-1. Order created by contractor
-2. Approved by center → same ID
-3. Forwarded to warehouse → same ID
-4. Becomes delivery → `DEL-001` (references original order ID)
-
-**Service Transformation:** `CTR001-ORD-SRV002`
-1. Order created by center
-2. Accepted by contractor → becomes `SRV002-CTR001` (service instance)
-
----
-
-## Cross-Role Interactions
-
-### Contractor → Center → Warehouse Flow
-
-#### Supply Order Example:
-1. **Contractor Creates:** `CRW001-ORD-SUP001`
-   - Contractor UI: Order appears in "In Progress" (Pending Approval)
-   - Center UI: Order appears in "Pending Approval" section
-
-2. **Center Approves:**
-   - Center UI: Approve button → Order moves to "In Progress" 
-   - System: Order forwarded to warehouse automatically
-   - Warehouse UI: Order appears in "Pending Approval"
-
-3. **Warehouse Accepts:**
-   - Warehouse UI: Accept → Order moves to "In Progress"
-   - System: Creates delivery record `DEL-001`
-   - Contractor/Center UI: Status updates to "Being Processed"
-
-4. **Warehouse Delivers:**
-   - Warehouse UI: Complete delivery
-   - All UIs: Order moves to "Order History" with "Delivered" status
-
-### Direct Center → Warehouse Flow
-
-#### Supply Order Example:
-1. **Center Creates:** `CTR002-ORD-SUP003`
-   - Auto-approved (no center approval needed)
-   - Immediately forwarded to warehouse
-   - Warehouse UI: Appears in "Pending Approval"
-
-2. **Warehouse Processing:** Same as above from step 3
-
-### Service Order Flows
-
-#### Center → Contractor Service:
-1. **Center Creates:** `CTR001-ORD-SRV002`
-2. **Contractor Accepts:** Creates service instance `SRV002-CTR001`
-3. **Service Completion:** Both order and service marked complete
-
----
-
-## Order-to-Service Transformation
-
-### When Orders Become Services
-
-**Supply Orders:**
-- Never become services
-- Remain as orders through entire lifecycle
-- Generate delivery records for tracking
-
-**Service Orders:**
-- Transform when accepted by service provider
-- Original order ID preserved for traceability
-- New service instance created with provider-specific ID
-
-### Transformation Examples:
-
-#### Service Order Transformation:
-```
-Original: CTR001-ORD-SRV002 (Center orders HVAC repair)
-↓ (Contractor accepts)
-Service Instance: SRV002-CTR001 (HVAC repair for Center 001)
-Provider View: Active service in their "My Services" tab
-Client View: Order completed in "Order History"
-```
-
-#### Supply Order Flow (No Transformation):
-```
-Original: CRW001-ORD-SUP001 (Contractor orders supplies)
-↓ (Approved and processed)
-Delivery: DEL-001 (References CRW001-ORD-SUP001)
-Final Status: Order remains as order, delivery completed
-```
+#### Warehouse
+- **Accept**: For pending product orders
+- **Deny**: For pending product orders
+- **Deliver**: For accepted orders ready for delivery
+- **View Details**: For completed orders
 
 ---
 
 ## Technical Implementation
 
-### Database Schema Considerations
+### Data Structure
+```typescript
+interface Order {
+  orderId: string;  // Format: UserID-ORD-TYPE###
+  orderType: 'service' | 'product';
+  title: string;
+  requestedBy: string;
+  destination: string;
+  requestedDate: string;
+  expectedDate?: string;
+  serviceStartDate?: string;  // For service orders
+  deliveryDate?: string;      // For product orders
+  status: 'pending' | 'in-progress' | 'approved' | 'rejected' | 'delivered' | 'service-created';
+  approvalStages: ApprovalStage[];
+  // Additional fields...
+}
 
-#### Orders Table:
-```sql
-orders {
-  order_id VARCHAR(20) PRIMARY KEY -- CRW001-ORD-SUP001
-  order_type ENUM('supply', 'service')
-  requester_id VARCHAR(10) -- CRW001, CTR002, etc.
-  target_id VARCHAR(10) -- SUP001, SRV002, etc.
-  target_type ENUM('supply', 'service')
-  approval_status ENUM('pending', 'approved', 'denied')
-  fulfillment_status VARCHAR(20) -- varies by order type
-  created_at TIMESTAMP
-  approved_at TIMESTAMP
-  completed_at TIMESTAMP
-  -- Additional fields...
+interface ApprovalStage {
+  role: string;
+  status: 'pending' | 'approved' | 'rejected' | 'waiting' | 'accepted' | 'requested' | 'delivered' | 'service-created';
+  user?: string;
+  timestamp?: string;
 }
 ```
 
-#### Order Status Tracking:
-```sql
-order_status_history {
-  id INT PRIMARY KEY AUTO_INCREMENT
-  order_id VARCHAR(20) FOREIGN KEY
-  status VARCHAR(20)
-  changed_by VARCHAR(10) -- user who made change
-  changed_at TIMESTAMP
-  notes TEXT
-}
+### Component Architecture
+```
+OrdersSection
+├── TabSection (Service/Product/Archive tabs)
+├── OrderCard[] (Collapsible order display)
+│   ├── Workflow Tree (Approval stages)
+│   ├── Order Details (Expandable)
+│   └── Action Buttons (Role-based)
+└── Search/Filter Controls
 ```
 
-### API Endpoints Structure:
-
-#### Order Management:
-```
-GET /api/orders -- Get orders for current user
-POST /api/orders -- Create new order
-PUT /api/orders/{id}/approve -- Approve order
-PUT /api/orders/{id}/deny -- Deny order
-PUT /api/orders/{id}/status -- Update order status
-DELETE /api/orders/{id} -- Cancel order
+### Pulsing Logic
+```typescript
+// Find first pending/accepted stage to pulse
+const firstPendingIndex = approvalStages.findIndex(s =>
+  s.status === 'pending' || s.status === 'accepted'
+);
+const shouldPulse = index === firstPendingIndex;
 ```
 
-#### Role-Specific Endpoints:
-```
-GET /api/contractor/orders -- Contractor's orders
-GET /api/center/pending-approvals -- Center's approval queue
-GET /api/warehouse/fulfillment-queue -- Warehouse's work queue
-GET /api/manager/all-orders -- System-wide order view
-```
+### Status Calculation
+- Order status reflects current stage of workflow
+- Role-specific perspective (pending vs in-progress)
+- Archive filtering by final states
 
 ---
 
 ## Business Rules
 
-### Order Creation Rules
-1. **Contractors must have center approval** for all orders
-2. **Centers can create direct orders** without additional approval
-3. **Emergency orders** can bypass normal approval chains (manager override)
-4. **Order value limits** may apply based on user role and approval level
+### Product Order Rules
+1. **Crew can create direct orders** to warehouse (no approval chain)
+2. **Center orders through customer** require customer → contractor → warehouse approval
+3. **Warehouse has final authority** on product fulfillment
+4. **Delivered status is final** - no further actions possible
 
-### Approval Rules
-1. **Single approver required** for contractor→center orders
-2. **Automatic approval** for center-created orders
-3. **Warehouse acceptance** required for all supply orders
-4. **Service provider acceptance** required for service orders
+### Service Order Rules
+1. **All service orders require customer approval** before contractor review
+2. **Manager must create service** after contractor approval
+3. **Crew assignment is separate** from main approval chain
+4. **Crew rejection doesn't break chain** - manager reassigns
+5. **Service-created status indicates active service**
 
-### Cancellation Rules
-1. **Creators can cancel** pending orders before approval
-2. **Centers can cancel** contractor orders before warehouse processing
-3. **Warehouses cannot cancel** orders once processing starts
-4. **Managers can cancel** any order with system-wide override
+### Approval Chain Rules
+1. **Sequential approval required** - cannot skip stages
+2. **Rejection at any stage** moves order to archive
+3. **Only immediate next approver** can take action
+4. **Previous approvers cannot revoke** decisions
 
-### Priority Rules
-1. **Priority affects queue ordering** in all interfaces
-2. **Urgent orders** bypass normal processing delays
-3. **Emergency orders** can interrupt current workflows
-4. **Priority changes** require manager approval after order creation
+### UI Display Rules
+1. **Full workflow visibility** for all participants
+2. **Pulsing only on actionable stages** for current user
+3. **Archive simplification** - remove redundant intermediate stages
+4. **Role-appropriate action buttons** based on order status and user permissions
 
-### Inventory Rules (Supply Orders)
-1. **Stock availability** checked at warehouse acceptance
-2. **Partial fulfillment** allowed with requester notification
-3. **Substitute items** require approval from requester
-4. **Back-order processing** for out-of-stock items
-
-### Scheduling Rules (Service Orders)
-1. **Provider availability** must be confirmed
-2. **Service location** must be accessible and valid
-3. **Recurring services** generate multiple order instances
-4. **Service conflicts** prevent double-booking
+### Crew Assignment Rules (Service Orders Only)
+1. **Manager controls crew assignment** through separate interface
+2. **Crew can accept or deny** assignments without affecting main workflow
+3. **Service remains active** regardless of individual crew responses
+4. **Manager must reassign** if crew denies assignment
+5. **Assignment status tracked separately** from main order status
 
 ---
 
-## Status Color Coding
+## Example Order Flows
 
-### Supply Orders:
-- 🔵 **Pending** - Blue
-- 🟡 **Approved** - Yellow  
-- 🟠 **In Progress** - Orange
-- 🟢 **Delivered** - Green
-- 🔴 **Denied** - Red
-- ⚪ **Cancelled** - Gray
+### Product Order: CRW001-ORD-PRD001
+**Crew Direct to Warehouse**
+```
+Initial: Crew creates order
+├── Crew sees: pending (can cancel)
+└── Warehouse sees: pending (can accept/deny)
 
-### Service Orders:
-- 🔵 **Pending** - Blue
-- 🟡 **Scheduled** - Yellow
-- 🟠 **In Progress** - Orange  
-- 🟢 **Completed** - Green
-- 🔴 **Denied** - Red
-- ⚪ **Cancelled** - Gray
+Accepted: Warehouse accepts
+├── Crew sees: in-progress (waiting delivery)
+└── Warehouse sees: accepted (ready to deliver)
 
----
+Delivered: Warehouse delivers
+├── Crew sees: delivered (archived)
+└── Warehouse sees: delivered (archived)
+```
 
-## Error Handling
+### Service Order: CTR001-ORD-SRV001
+**Center Service Request**
+```
+Initial: Center creates service request
+├── Center sees: in-progress
+├── Customer sees: pending ← PULSES
+├── Contractor sees: waiting
+└── Manager sees: waiting
 
-### Common Error Scenarios:
-1. **Insufficient inventory** → Warehouse rejection with alternative suggestions
-2. **Service provider unavailable** → Automatic reassignment to available provider
-3. **Invalid delivery location** → Order returned to requester for correction
-4. **Approval timeout** → Automatic escalation to manager
-5. **System errors** → Order placed in error queue for manual review
+Customer Approved: Customer approves
+├── Center sees: in-progress
+├── Customer sees: in-progress
+├── Contractor sees: pending ← PULSES
+└── Manager sees: waiting
 
-### User Notifications:
-- **Real-time status updates** via websocket connections
-- **Email notifications** for status changes requiring action
-- **Mobile push notifications** for urgent orders
-- **Dashboard alerts** for overdue approvals
+Contractor Approved: Contractor approves
+├── Center sees: in-progress
+├── Customer sees: in-progress
+├── Contractor sees: in-progress
+└── Manager sees: pending ← PULSES
+
+Service Created: Manager creates service
+├── All see: service-created
+└── Crew sees: pending assignment (separate process)
+```
 
 ---
 
 ## Future Considerations
 
-### Planned Enhancements:
-1. **AI-powered order suggestions** based on historical patterns
-2. **Automated approval chains** for routine orders
-3. **Integration with external suppliers** for expanded inventory
-4. **Mobile app** for field-based order management
-5. **Advanced analytics** for order pattern analysis
+### Planned Enhancements
+1. **Bulk operations** for managers
+2. **Mobile notifications** for urgent orders
+3. **Analytics dashboard** for order patterns
+4. **Automated escalation** for overdue approvals
+5. **Integration with external systems** for real-time tracking
 
-### Scalability Considerations:
-1. **Database partitioning** by date ranges for historical orders
-2. **Caching strategies** for frequently accessed order data  
-3. **API rate limiting** for high-volume order processing
-4. **Load balancing** for approval workflow endpoints
+### Scalability Notes
+1. **Component architecture is production-ready** - only mock data needs replacement
+2. **Order filtering by status** enables efficient archive management
+3. **Role-based permissions** built into component logic
+4. **Workflow trees adapt** to any number of approval stages
 
 ---
 
 **Document End**
 
-*This document serves as the authoritative reference for CKS order system implementation. All UI components, API endpoints, and business logic should align with the specifications outlined above.*
+*This document reflects the actual implementation of the CKS order system as built. All UI components, workflows, and business logic are documented based on the current codebase.*

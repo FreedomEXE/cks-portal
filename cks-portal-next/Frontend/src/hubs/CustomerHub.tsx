@@ -140,10 +140,256 @@ export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubPro
     }
   ]);
 
-  // Mock orders data for Customer - CLEARED FOR FRESH START
-  const serviceOrders: any[] = [];
+  // Mock orders data for Customer - Service requests from centers
+  const serviceOrders: any[] = [
+    // State 1: Pending customer approval (ACTION REQUIRED)
+    {
+      orderId: 'CTR001-ORD-SRV001',
+      orderType: 'service',
+      title: 'HVAC System Maintenance Contract',
+      requestedBy: 'CTR-001',
+      destination: 'CTR-001',
+      requestedDate: '2025-09-19',
+      expectedDate: '2025-10-01',
+      status: 'pending',  // Customer sees as pending (needs their approval)
+      approvalStages: [
+        { role: 'Center', status: 'requested', user: 'CTR-001', timestamp: '2025-09-19 09:00' },
+        { role: 'Customer', status: 'pending' },  // Their action needed - only this should pulse
+        { role: 'Contractor', status: 'waiting' },
+        { role: 'Manager', status: 'waiting' }
+      ],
+      description: 'Quarterly HVAC maintenance and inspection service',
+      serviceType: 'Maintenance',
+      frequency: 'Quarterly',
+      estimatedDuration: '4 hours',
+      notes: 'Include filter replacement and system diagnostics'
+    },
+    // State 2: Customer approved, monitoring contractor approval
+    {
+      orderId: 'CTR001-ORD-SRV002',
+      orderType: 'service',
+      title: 'Office Deep Cleaning Service',
+      requestedBy: 'CTR-001',
+      destination: 'CTR-001',
+      requestedDate: '2025-09-18',
+      expectedDate: '2025-09-25',
+      status: 'in-progress',  // Customer sees as in-progress after approving
+      approvalStages: [
+        { role: 'Center', status: 'requested', user: 'CTR-001', timestamp: '2025-09-18 10:00' },
+        { role: 'Customer', status: 'approved', user: 'CUS-001', timestamp: '2025-09-18 14:00' },
+        { role: 'Contractor', status: 'pending' },  // Only this should pulse
+        { role: 'Manager', status: 'waiting' }
+      ],
+      description: 'Comprehensive deep cleaning of all office areas',
+      serviceType: 'Cleaning',
+      frequency: 'One-time',
+      estimatedDuration: '8 hours',
+      notes: 'Include carpet cleaning and window washing'
+    },
+    // State 3: All approved, monitoring manager service creation
+    {
+      orderId: 'CTR001-ORD-SRV003',
+      orderType: 'service',
+      title: 'Security System Installation',
+      requestedBy: 'CTR-001',
+      destination: 'CTR-001',
+      requestedDate: '2025-09-17',
+      expectedDate: '2025-09-30',
+      status: 'in-progress',
+      approvalStages: [
+        { role: 'Center', status: 'requested', user: 'CTR-001', timestamp: '2025-09-17 08:00' },
+        { role: 'Customer', status: 'approved', user: 'CUS-001', timestamp: '2025-09-17 11:00' },
+        { role: 'Contractor', status: 'approved', user: 'CON-001', timestamp: '2025-09-17 15:00' },
+        { role: 'Manager', status: 'pending' }  // Only this should pulse
+      ],
+      description: 'Installation of new security camera system',
+      serviceType: 'Installation',
+      frequency: 'One-time',
+      estimatedDuration: '12 hours',
+      notes: 'Requires specialized security clearance'
+    },
+    // State 4: Service created and active
+    {
+      orderId: 'CTR001-ORD-SRV004',
+      orderType: 'service',
+      title: 'Landscaping Maintenance Service',
+      requestedBy: 'CTR-001',
+      destination: 'CTR-001',
+      requestedDate: '2025-09-15',
+      expectedDate: '2025-09-20',
+      serviceStartDate: '2025-09-20',
+      status: 'service-created',
+      approvalStages: [
+        { role: 'Center', status: 'requested', user: 'CTR-001', timestamp: '2025-09-15 09:00' },
+        { role: 'Customer', status: 'approved', user: 'CUS-001', timestamp: '2025-09-15 12:00' },
+        { role: 'Contractor', status: 'approved', user: 'CON-001', timestamp: '2025-09-15 16:00' },
+        { role: 'Manager', status: 'service-created', user: 'MGR-001', timestamp: '2025-09-16 10:00' }
+      ],
+      description: 'Weekly landscaping and grounds maintenance',
+      serviceType: 'Landscaping',
+      frequency: 'Weekly',
+      estimatedDuration: '6 hours',
+      assignedCrew: 'CRW-003',
+      notes: 'Includes lawn care and shrub trimming'
+    },
+    // State 5: Rejected by Customer
+    {
+      orderId: 'CTR001-ORD-SRV005',
+      orderType: 'service',
+      title: 'Premium Office Renovation',
+      requestedBy: 'CTR-001',
+      destination: 'CTR-001',
+      requestedDate: '2025-09-12',
+      expectedDate: '2025-10-15',
+      status: 'rejected',
+      approvalStages: [
+        { role: 'Center', status: 'requested', user: 'CTR-001', timestamp: '2025-09-12 10:00' },
+        { role: 'Customer', status: 'rejected', user: 'CUS-001', timestamp: '2025-09-12 16:00' }
+      ],
+      description: 'Complete office renovation and modernization',
+      serviceType: 'Renovation',
+      frequency: 'One-time',
+      estimatedDuration: '200 hours',
+      rejectionReason: 'Budget exceeds approved limits for this quarter',
+      notes: 'High-end finishes and custom furniture'
+    }
+  ];
 
-  const productOrders: any[] = [];
+  // Customer sees orders from their centers that need approval or monitoring
+  const productOrders: any[] = [
+    // State 1: Pending customer approval (ACTION REQUIRED)
+    {
+      orderId: 'CTR001-ORD-PRD001',
+      orderType: 'product',
+      title: 'Office Supplies - Monthly Restock',
+      requestedBy: 'CTR-001',
+      destination: 'CTR-001',
+      requestedDate: '2025-09-19',
+      expectedDate: '2025-09-25',
+      status: 'pending',  // Customer sees as pending (needs their approval)
+      approvalStages: [
+        { role: 'Center', status: 'requested', user: 'CTR-001', timestamp: '2025-09-19 10:00' },
+        { role: 'Customer', status: 'pending' },  // Their action needed
+        { role: 'Contractor', status: 'waiting' },
+        { role: 'Warehouse', status: 'waiting' }
+      ],
+      items: [
+        { name: 'Paper Towels', quantity: 100, unit: 'rolls' },
+        { name: 'Hand Soap', quantity: 50, unit: 'bottles' },
+        { name: 'Trash Bags', quantity: 200, unit: 'bags' }
+      ],
+      notes: 'Monthly restocking for all bathrooms and break rooms'
+    },
+    // State 2: Customer approved, monitoring contractor approval
+    {
+      orderId: 'CTR001-ORD-PRD002',
+      orderType: 'product',
+      title: 'Cleaning Equipment Replacement',
+      requestedBy: 'CTR-001',
+      destination: 'CTR-001',
+      requestedDate: '2025-09-17',
+      expectedDate: '2025-09-24',
+      status: 'in-progress',  // Customer sees as in-progress after approving
+      approvalStages: [
+        { role: 'Center', status: 'requested', user: 'CTR-001', timestamp: '2025-09-17 14:00' },
+        { role: 'Customer', status: 'approved', user: 'CUS-001', timestamp: '2025-09-17 16:30' },
+        { role: 'Contractor', status: 'pending' },
+        { role: 'Warehouse', status: 'waiting' }
+      ],
+      items: [
+        { name: 'Industrial Vacuum', quantity: 2, unit: 'units' },
+        { name: 'Floor Buffer', quantity: 1, unit: 'unit' },
+        { name: 'Mop Buckets', quantity: 5, unit: 'units' }
+      ],
+      notes: 'Replacing damaged equipment'
+    },
+    // Continuing with other states for Customer visibility
+    {
+      orderId: 'CTR001-ORD-PRD003',
+      orderType: 'product',
+      title: 'Emergency Supplies Request',
+      requestedBy: 'CTR-001',
+      destination: 'CTR-001',
+      requestedDate: '2025-09-16',
+      expectedDate: '2025-09-20',
+      status: 'in-progress',
+      approvalStages: [
+        { role: 'Center', status: 'requested', user: 'CTR-001', timestamp: '2025-09-16 08:00' },
+        { role: 'Customer', status: 'approved', user: 'CUS-001', timestamp: '2025-09-16 09:15' },
+        { role: 'Contractor', status: 'approved', user: 'CON-001', timestamp: '2025-09-16 11:00' },
+        { role: 'Warehouse', status: 'pending' }
+      ],
+      items: [
+        { name: 'Spill Kit', quantity: 3, unit: 'kits' },
+        { name: 'Safety Cones', quantity: 10, unit: 'units' },
+        { name: 'Wet Floor Signs', quantity: 6, unit: 'signs' }
+      ],
+      notes: 'Urgent safety equipment needed'
+    },
+    {
+      orderId: 'CTR001-ORD-PRD004',
+      orderType: 'product',
+      title: 'Seasonal Decoration Supplies',
+      requestedBy: 'CTR-001',
+      destination: 'CTR-001',
+      requestedDate: '2025-09-14',
+      expectedDate: '2025-09-18',
+      status: 'in-progress',
+      approvalStages: [
+        { role: 'Center', status: 'requested', user: 'CTR-001', timestamp: '2025-09-14 10:00' },
+        { role: 'Customer', status: 'approved', user: 'CUS-001', timestamp: '2025-09-14 14:00' },
+        { role: 'Contractor', status: 'approved', user: 'CON-001', timestamp: '2025-09-15 09:00' },
+        { role: 'Warehouse', status: 'accepted' }
+      ],
+      items: [
+        { name: 'Holiday Decorations', quantity: 1, unit: 'set' },
+        { name: 'String Lights', quantity: 20, unit: 'strands' }
+      ],
+      notes: 'For upcoming holiday season'
+    },
+    {
+      orderId: 'CTR001-ORD-PRD005',
+      orderType: 'product',
+      title: 'HVAC Filters Bulk Order',
+      requestedBy: 'CTR-001',
+      destination: 'CTR-001',
+      requestedDate: '2025-09-10',
+      expectedDate: '2025-09-15',
+      deliveryDate: '2025-09-15',
+      status: 'delivered',
+      approvalStages: [
+        { role: 'Center', status: 'requested', user: 'CTR-001', timestamp: '2025-09-10 09:00' },
+        { role: 'Customer', status: 'approved', user: 'CUS-001', timestamp: '2025-09-10 11:00' },
+        { role: 'Contractor', status: 'approved', user: 'CON-001', timestamp: '2025-09-11 10:00' },
+        { role: 'Warehouse', status: 'delivered', user: 'WHS-001', timestamp: '2025-09-15 14:00' }
+      ],
+      items: [
+        { name: 'HVAC Filters 20x25x1', quantity: 50, unit: 'filters' },
+        { name: 'HVAC Filters 16x20x1', quantity: 30, unit: 'filters' }
+      ],
+      notes: 'Quarterly filter replacement stock'
+    },
+    {
+      orderId: 'CTR001-ORD-PRD006',
+      orderType: 'product',
+      title: 'Premium Coffee Machine Request',
+      requestedBy: 'CTR-001',
+      destination: 'CTR-001',
+      requestedDate: '2025-09-08',
+      expectedDate: '2025-09-12',
+      status: 'rejected',
+      approvalStages: [
+        { role: 'Center', status: 'requested', user: 'CTR-001', timestamp: '2025-09-08 11:00' },
+        { role: 'Customer', status: 'rejected', user: 'CUS-001', timestamp: '2025-09-08 15:00' }
+      ],
+      rejectionReason: 'Budget constraints - not approved for luxury items',
+      items: [
+        { name: 'Espresso Machine', quantity: 1, unit: 'unit' },
+        { name: 'Coffee Grinder', quantity: 1, unit: 'unit' }
+      ],
+      notes: 'For employee break room upgrade'
+    }
+  ];
 
     const tabs = [
     { id: 'dashboard', label: 'Dashboard', path: '/customer/dashboard' },

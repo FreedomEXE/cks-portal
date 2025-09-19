@@ -231,6 +231,97 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
         { name: 'High-Pressure Washer', quantity: 1, unit: 'unit' }
       ],
       notes: 'Need for deep cleaning project'
+    },
+    // Center-initiated orders that have gone through full approval chain
+    // State: Fully approved by Center->Customer->Contractor, pending warehouse
+    {
+      orderId: 'CTR001-ORD-PRD003',
+      orderType: 'product',
+      title: 'Emergency Supplies Request',
+      requestedBy: 'CTR-001',
+      destination: 'CTR-001',
+      requestedDate: '2025-09-16',
+      expectedDate: '2025-09-20',
+      status: 'pending',  // Warehouse sees as pending (ACTION REQUIRED)
+      approvalStages: [
+        { role: 'Center', status: 'requested', user: 'CTR-001', timestamp: '2025-09-16 08:00' },
+        { role: 'Customer', status: 'approved', user: 'CUS-001', timestamp: '2025-09-16 09:15' },
+        { role: 'Contractor', status: 'approved', user: 'CON-001', timestamp: '2025-09-16 11:00' },
+        { role: 'Warehouse', status: 'pending' }  // Their action needed
+      ],
+      items: [
+        { name: 'Spill Kit', quantity: 3, unit: 'kits' },
+        { name: 'Safety Cones', quantity: 10, unit: 'units' },
+        { name: 'Wet Floor Signs', quantity: 6, unit: 'signs' }
+      ],
+      notes: 'Urgent safety equipment needed'
+    },
+    // State: Warehouse accepted, pending delivery
+    {
+      orderId: 'CTR001-ORD-PRD004',
+      orderType: 'product',
+      title: 'Seasonal Decoration Supplies',
+      requestedBy: 'CTR-001',
+      destination: 'CTR-001',
+      requestedDate: '2025-09-14',
+      expectedDate: '2025-09-18',
+      status: 'approved',  // Warehouse accepted, pending delivery
+      approvalStages: [
+        { role: 'Center', status: 'requested', user: 'CTR-001', timestamp: '2025-09-14 10:00' },
+        { role: 'Customer', status: 'approved', user: 'CUS-001', timestamp: '2025-09-14 14:00' },
+        { role: 'Contractor', status: 'approved', user: 'CON-001', timestamp: '2025-09-15 09:00' },
+        { role: 'Warehouse', status: 'accepted' }
+      ],
+      items: [
+        { name: 'Holiday Decorations', quantity: 1, unit: 'set' },
+        { name: 'String Lights', quantity: 20, unit: 'strands' }
+      ],
+      notes: 'For upcoming holiday season'
+    },
+    // State: Delivered
+    {
+      orderId: 'CTR001-ORD-PRD005',
+      orderType: 'product',
+      title: 'HVAC Filters Bulk Order',
+      requestedBy: 'CTR-001',
+      destination: 'CTR-001',
+      requestedDate: '2025-09-10',
+      expectedDate: '2025-09-15',
+      deliveryDate: '2025-09-15',
+      status: 'delivered',
+      approvalStages: [
+        { role: 'Center', status: 'requested', user: 'CTR-001', timestamp: '2025-09-10 09:00' },
+        { role: 'Customer', status: 'approved', user: 'CUS-001', timestamp: '2025-09-10 11:00' },
+        { role: 'Contractor', status: 'approved', user: 'CON-001', timestamp: '2025-09-11 10:00' },
+        { role: 'Warehouse', status: 'delivered', user: 'WHS-001', timestamp: '2025-09-15 14:00' }
+      ],
+      items: [
+        { name: 'HVAC Filters 20x25x1', quantity: 50, unit: 'filters' },
+        { name: 'HVAC Filters 16x20x1', quantity: 30, unit: 'filters' }
+      ],
+      notes: 'Quarterly filter replacement stock'
+    },
+    // State: Rejected by warehouse
+    {
+      orderId: 'CTR001-ORD-PRD008',
+      orderType: 'product',
+      title: 'Specialty Tools Request',
+      requestedBy: 'CTR-001',
+      destination: 'CTR-001',
+      requestedDate: '2025-09-03',
+      expectedDate: '2025-09-08',
+      status: 'rejected',
+      approvalStages: [
+        { role: 'Center', status: 'requested', user: 'CTR-001', timestamp: '2025-09-03 10:00' },
+        { role: 'Customer', status: 'approved', user: 'CUS-001', timestamp: '2025-09-03 14:00' },
+        { role: 'Contractor', status: 'approved', user: 'CON-001', timestamp: '2025-09-04 09:00' },
+        { role: 'Warehouse', status: 'rejected', user: 'WHS-001', timestamp: '2025-09-04 15:00' }
+      ],
+      rejectionReason: 'Items discontinued - suggest alternative products',
+      items: [
+        { name: 'Specialty Floor Stripper Tool', quantity: 2, unit: 'units' }
+      ],
+      notes: 'For tile renovation project'
     }
   ];
 

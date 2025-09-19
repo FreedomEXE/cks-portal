@@ -124,8 +124,162 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
     }
   ]);
 
-  // Mock orders data for Crew - showing all possible states in product order flow
-  const serviceOrders: any[] = [];
+  // Mock orders data for Crew - Services assigned to this crew member
+  const serviceOrders: any[] = [
+    // State 1: NEW SERVICE ASSIGNMENT - Crew needs to accept/deny (ACTION REQUIRED)
+    {
+      orderId: 'CTR001-ORD-SRV010',
+      orderType: 'service',
+      title: 'Electrical System Inspection',
+      requestedBy: 'CTR-001',
+      destination: 'CTR-001',
+      requestedDate: '2025-09-19',
+      expectedDate: '2025-09-25',
+      serviceStartDate: '2025-09-25',
+      status: 'pending',  // Crew sees as pending (needs to accept/deny assignment)
+      approvalStages: [
+        { role: 'Center', status: 'requested', user: 'CTR-001', timestamp: '2025-09-19 08:00' },
+        { role: 'Customer', status: 'approved', user: 'CUS-001', timestamp: '2025-09-19 10:00' },
+        { role: 'Contractor', status: 'approved', user: 'CON-001', timestamp: '2025-09-19 13:00' },
+        { role: 'Manager', status: 'pending' }  // Manager waiting for crew response
+      ],
+      description: 'Annual electrical system safety inspection',
+      serviceType: 'Inspection',
+      frequency: 'Yearly',
+      estimatedDuration: '4 hours',
+      assignedCrew: 'CRW-001',  // This crew member
+      notes: 'Requires electrical certification - check safety protocols',
+      crewAssignmentStatus: 'pending'  // NEW: Shows crew hasn't responded yet
+    },
+    // State 2: ANOTHER NEW ASSIGNMENT - Different service type
+    {
+      orderId: 'CTR001-ORD-SRV011',
+      orderType: 'service',
+      title: 'Emergency Water Damage Cleanup',
+      requestedBy: 'CTR-001',
+      destination: 'CTR-001',
+      requestedDate: '2025-09-19',
+      expectedDate: '2025-09-20',
+      serviceStartDate: '2025-09-20',
+      status: 'pending',  // Crew needs to respond
+      approvalStages: [
+        { role: 'Center', status: 'requested', user: 'CTR-001', timestamp: '2025-09-19 14:00' },
+        { role: 'Customer', status: 'approved', user: 'CUS-001', timestamp: '2025-09-19 15:00' },
+        { role: 'Contractor', status: 'approved', user: 'CON-001', timestamp: '2025-09-19 16:00' },
+        { role: 'Manager', status: 'pending' }  // Manager waiting for crew response
+      ],
+      description: 'Urgent water damage restoration and cleanup',
+      serviceType: 'Emergency',
+      frequency: 'One-time',
+      estimatedDuration: '12 hours',
+      assignedCrew: 'CRW-001',  // This crew member
+      notes: 'URGENT: Pipe burst in basement - immediate response needed',
+      crewAssignmentStatus: 'pending',
+      priority: 'high'
+    },
+    // State 3: ACCEPTED SERVICE - Currently active
+    {
+      orderId: 'CTR001-ORD-SRV004',
+      orderType: 'service',
+      title: 'Landscaping Maintenance Service',
+      requestedBy: 'CTR-001',
+      destination: 'CTR-001',
+      requestedDate: '2025-09-15',
+      expectedDate: '2025-09-20',
+      serviceStartDate: '2025-09-20',
+      status: 'service-created',  // Service is active and assigned to them
+      approvalStages: [
+        { role: 'Center', status: 'requested', user: 'CTR-001', timestamp: '2025-09-15 09:00' },
+        { role: 'Customer', status: 'approved', user: 'CUS-001', timestamp: '2025-09-15 12:00' },
+        { role: 'Contractor', status: 'approved', user: 'CON-001', timestamp: '2025-09-15 16:00' },
+        { role: 'Manager', status: 'service-created', user: 'MGR-001', timestamp: '2025-09-16 10:00' }
+      ],
+      description: 'Weekly landscaping and grounds maintenance',
+      serviceType: 'Landscaping',
+      frequency: 'Weekly',
+      estimatedDuration: '6 hours',
+      assignedCrew: 'CRW-001',  // This crew member
+      notes: 'Includes lawn care and shrub trimming',
+      crewAssignmentStatus: 'accepted'  // Crew accepted this assignment
+    },
+    // State 4: ANOTHER ACCEPTED SERVICE - Currently active
+    {
+      orderId: 'CTR001-ORD-SRV008',
+      orderType: 'service',
+      title: 'HVAC System Maintenance',
+      requestedBy: 'CTR-001',
+      destination: 'CTR-001',
+      requestedDate: '2025-09-12',
+      expectedDate: '2025-09-15',
+      serviceStartDate: '2025-09-15',
+      status: 'service-created',
+      approvalStages: [
+        { role: 'Center', status: 'requested', user: 'CTR-001', timestamp: '2025-09-12 09:00' },
+        { role: 'Customer', status: 'approved', user: 'CUS-001', timestamp: '2025-09-12 11:00' },
+        { role: 'Contractor', status: 'approved', user: 'CON-001', timestamp: '2025-09-12 14:00' },
+        { role: 'Manager', status: 'service-created', user: 'MGR-001', timestamp: '2025-09-13 09:00' }
+      ],
+      description: 'Routine HVAC system maintenance and filter replacement',
+      serviceType: 'Maintenance',
+      frequency: 'Quarterly',
+      estimatedDuration: '3 hours',
+      assignedCrew: 'CRW-001',  // This crew member
+      notes: 'Standard quarterly maintenance',
+      crewAssignmentStatus: 'accepted'
+    },
+    // State 5: DENIED SERVICE - Crew rejected this assignment (Manager can reassign)
+    {
+      orderId: 'CTR001-ORD-SRV012',
+      orderType: 'service',
+      title: 'Rooftop Equipment Installation',
+      requestedBy: 'CTR-001',
+      destination: 'CTR-001',
+      requestedDate: '2025-09-18',
+      expectedDate: '2025-09-24',
+      serviceStartDate: '2025-09-24',
+      status: 'pending',  // Still shows as pending - Manager needs to reassign
+      approvalStages: [
+        { role: 'Center', status: 'requested', user: 'CTR-001', timestamp: '2025-09-18 09:00' },
+        { role: 'Customer', status: 'approved', user: 'CUS-001', timestamp: '2025-09-18 12:00' },
+        { role: 'Contractor', status: 'approved', user: 'CON-001', timestamp: '2025-09-18 15:00' },
+        { role: 'Manager', status: 'pending' }  // Manager still pending (needs to reassign)
+      ],
+      description: 'Installation of new rooftop HVAC equipment',
+      serviceType: 'Installation',
+      frequency: 'One-time',
+      estimatedDuration: '16 hours',
+      assignedCrew: 'CRW-001',  // This crew member (but they denied)
+      notes: 'Heavy equipment work - requires safety harness certification',
+      crewAssignmentStatus: 'denied',  // Crew denied this assignment
+      denialReason: 'Not certified for rooftop work - safety concern'
+    },
+    // State 3: Completed service (in archive)
+    {
+      orderId: 'CTR001-ORD-SRV009',
+      orderType: 'service',
+      title: 'Office Window Cleaning',
+      requestedBy: 'CTR-001',
+      destination: 'CTR-001',
+      requestedDate: '2025-09-05',
+      expectedDate: '2025-09-08',
+      serviceStartDate: '2025-09-08',
+      status: 'service-created',  // Completed service
+      approvalStages: [
+        { role: 'Center', status: 'requested', user: 'CTR-001', timestamp: '2025-09-05 10:00' },
+        { role: 'Customer', status: 'approved', user: 'CUS-001', timestamp: '2025-09-05 14:00' },
+        { role: 'Contractor', status: 'approved', user: 'CON-001', timestamp: '2025-09-05 16:00' },
+        { role: 'Manager', status: 'service-created', user: 'MGR-001', timestamp: '2025-09-06 09:00' }
+      ],
+      description: 'Professional window cleaning for all office floors',
+      serviceType: 'Cleaning',
+      frequency: 'Monthly',
+      estimatedDuration: '4 hours',
+      assignedCrew: 'CRW-001',  // This crew member
+      notes: 'All exterior and interior windows',
+      serviceCompleted: true,
+      completedDate: '2025-09-08'
+    }
+  ];
 
   const productOrders: any[] = [
     // State 1: Pending warehouse acceptance
@@ -196,7 +350,6 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
       status: 'delivered',
       approvalStages: [
         { role: 'Crew', status: 'requested', user: 'CRW-001', timestamp: '2025-09-14 08:00' },
-        { role: 'Warehouse', status: 'accepted', user: 'WHS-001', timestamp: '2025-09-14 11:30' },
         { role: 'Warehouse', status: 'delivered', user: 'WHS-001', timestamp: '2025-09-16 15:45' }
       ],
       approvalStage: {

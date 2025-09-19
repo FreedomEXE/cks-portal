@@ -195,13 +195,211 @@ export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHu
     }
   ]);
 
-  // Mock orders data for Contractor - CLEARED FOR FRESH START
+  // Mock orders data for Contractor - Service requests that need contractor approval
   const serviceOrders: any[] = [
-    // Orders cleared - will add one flow at a time
+    // State 1: Customer approved, pending contractor (ACTION REQUIRED)
+    {
+      orderId: 'CTR001-ORD-SRV002',
+      orderType: 'service',
+      title: 'Office Deep Cleaning Service',
+      requestedBy: 'CTR-001',
+      destination: 'CTR-001',
+      requestedDate: '2025-09-18',
+      expectedDate: '2025-09-25',
+      status: 'pending',  // Contractor sees as pending (needs their approval)
+      approvalStages: [
+        { role: 'Center', status: 'requested', user: 'CTR-001', timestamp: '2025-09-18 10:00' },
+        { role: 'Customer', status: 'approved', user: 'CUS-001', timestamp: '2025-09-18 14:00' },
+        { role: 'Contractor', status: 'pending' },  // Their action needed - only this should pulse
+        { role: 'Manager', status: 'waiting' }
+      ],
+      description: 'Comprehensive deep cleaning of all office areas',
+      serviceType: 'Cleaning',
+      frequency: 'One-time',
+      estimatedDuration: '8 hours',
+      notes: 'Include carpet cleaning and window washing'
+    },
+    // State 2: Contractor approved, monitoring manager
+    {
+      orderId: 'CTR001-ORD-SRV003',
+      orderType: 'service',
+      title: 'Security System Installation',
+      requestedBy: 'CTR-001',
+      destination: 'CTR-001',
+      requestedDate: '2025-09-17',
+      expectedDate: '2025-09-30',
+      status: 'in-progress',  // Contractor sees as in-progress after approving
+      approvalStages: [
+        { role: 'Center', status: 'requested', user: 'CTR-001', timestamp: '2025-09-17 08:00' },
+        { role: 'Customer', status: 'approved', user: 'CUS-001', timestamp: '2025-09-17 11:00' },
+        { role: 'Contractor', status: 'approved', user: 'CON-001', timestamp: '2025-09-17 15:00' },
+        { role: 'Manager', status: 'pending' }  // Only this should pulse
+      ],
+      description: 'Installation of new security camera system',
+      serviceType: 'Installation',
+      frequency: 'One-time',
+      estimatedDuration: '12 hours',
+      notes: 'Requires specialized security clearance'
+    },
+    // State 3: Service created and active
+    {
+      orderId: 'CTR001-ORD-SRV004',
+      orderType: 'service',
+      title: 'Landscaping Maintenance Service',
+      requestedBy: 'CTR-001',
+      destination: 'CTR-001',
+      requestedDate: '2025-09-15',
+      expectedDate: '2025-09-20',
+      serviceStartDate: '2025-09-20',
+      status: 'service-created',
+      approvalStages: [
+        { role: 'Center', status: 'requested', user: 'CTR-001', timestamp: '2025-09-15 09:00' },
+        { role: 'Customer', status: 'approved', user: 'CUS-001', timestamp: '2025-09-15 12:00' },
+        { role: 'Contractor', status: 'approved', user: 'CON-001', timestamp: '2025-09-15 16:00' },
+        { role: 'Manager', status: 'service-created', user: 'MGR-001', timestamp: '2025-09-16 10:00' }
+      ],
+      description: 'Weekly landscaping and grounds maintenance',
+      serviceType: 'Landscaping',
+      frequency: 'Weekly',
+      estimatedDuration: '6 hours',
+      assignedCrew: 'CRW-003',
+      notes: 'Includes lawn care and shrub trimming'
+    },
+    // State 4: Rejected by Contractor
+    {
+      orderId: 'CTR001-ORD-SRV006',
+      orderType: 'service',
+      title: 'Hazardous Material Cleanup',
+      requestedBy: 'CTR-001',
+      destination: 'CTR-001',
+      requestedDate: '2025-09-10',
+      expectedDate: '2025-09-15',
+      status: 'rejected',
+      approvalStages: [
+        { role: 'Center', status: 'requested', user: 'CTR-001', timestamp: '2025-09-10 09:00' },
+        { role: 'Customer', status: 'approved', user: 'CUS-001', timestamp: '2025-09-10 12:00' },
+        { role: 'Contractor', status: 'rejected', user: 'CON-001', timestamp: '2025-09-10 16:00' }
+      ],
+      description: 'Specialized hazardous material disposal service',
+      serviceType: 'Cleanup',
+      frequency: 'One-time',
+      estimatedDuration: '16 hours',
+      rejectionReason: 'Requires specialized certification not currently held',
+      notes: 'Chemical spill cleanup and disposal'
+    }
   ];
 
+  // Contractor sees orders that need their approval after customer has approved
   const productOrders: any[] = [
-    // Orders cleared - will add one flow at a time
+    // State 1: Customer approved, pending contractor (ACTION REQUIRED)
+    {
+      orderId: 'CTR001-ORD-PRD002',
+      orderType: 'product',
+      title: 'Cleaning Equipment Replacement',
+      requestedBy: 'CTR-001',
+      destination: 'CTR-001',
+      requestedDate: '2025-09-17',
+      expectedDate: '2025-09-24',
+      status: 'pending',  // Contractor sees as pending (needs their approval)
+      approvalStages: [
+        { role: 'Center', status: 'requested', user: 'CTR-001', timestamp: '2025-09-17 14:00' },
+        { role: 'Customer', status: 'approved', user: 'CUS-001', timestamp: '2025-09-17 16:30' },
+        { role: 'Contractor', status: 'pending' },  // Their action needed - only this should pulse
+        { role: 'Warehouse', status: 'waiting' }
+      ],
+      items: [
+        { name: 'Industrial Vacuum', quantity: 2, unit: 'units' },
+        { name: 'Floor Buffer', quantity: 1, unit: 'unit' },
+        { name: 'Mop Buckets', quantity: 5, unit: 'units' }
+      ],
+      notes: 'Replacing damaged equipment'
+    },
+    // State 2: Contractor approved, monitoring warehouse
+    {
+      orderId: 'CTR001-ORD-PRD003',
+      orderType: 'product',
+      title: 'Emergency Supplies Request',
+      requestedBy: 'CTR-001',
+      destination: 'CTR-001',
+      requestedDate: '2025-09-16',
+      expectedDate: '2025-09-20',
+      status: 'in-progress',  // Contractor sees as in-progress after approving
+      approvalStages: [
+        { role: 'Center', status: 'requested', user: 'CTR-001', timestamp: '2025-09-16 08:00' },
+        { role: 'Customer', status: 'approved', user: 'CUS-001', timestamp: '2025-09-16 09:15' },
+        { role: 'Contractor', status: 'approved', user: 'CON-001', timestamp: '2025-09-16 11:00' },
+        { role: 'Warehouse', status: 'pending' }  // Only this should pulse
+      ],
+      items: [
+        { name: 'Spill Kit', quantity: 3, unit: 'kits' },
+        { name: 'Safety Cones', quantity: 10, unit: 'units' },
+        { name: 'Wet Floor Signs', quantity: 6, unit: 'signs' }
+      ],
+      notes: 'Urgent safety equipment needed'
+    },
+    {
+      orderId: 'CTR001-ORD-PRD004',
+      orderType: 'product',
+      title: 'Seasonal Decoration Supplies',
+      requestedBy: 'CTR-001',
+      destination: 'CTR-001',
+      requestedDate: '2025-09-14',
+      expectedDate: '2025-09-18',
+      status: 'in-progress',
+      approvalStages: [
+        { role: 'Center', status: 'requested', user: 'CTR-001', timestamp: '2025-09-14 10:00' },
+        { role: 'Customer', status: 'approved', user: 'CUS-001', timestamp: '2025-09-14 14:00' },
+        { role: 'Contractor', status: 'approved', user: 'CON-001', timestamp: '2025-09-15 09:00' },
+        { role: 'Warehouse', status: 'accepted' }
+      ],
+      items: [
+        { name: 'Holiday Decorations', quantity: 1, unit: 'set' },
+        { name: 'String Lights', quantity: 20, unit: 'strands' }
+      ],
+      notes: 'For upcoming holiday season'
+    },
+    {
+      orderId: 'CTR001-ORD-PRD005',
+      orderType: 'product',
+      title: 'HVAC Filters Bulk Order',
+      requestedBy: 'CTR-001',
+      destination: 'CTR-001',
+      requestedDate: '2025-09-10',
+      expectedDate: '2025-09-15',
+      deliveryDate: '2025-09-15',
+      status: 'delivered',
+      approvalStages: [
+        { role: 'Center', status: 'requested', user: 'CTR-001', timestamp: '2025-09-10 09:00' },
+        { role: 'Customer', status: 'approved', user: 'CUS-001', timestamp: '2025-09-10 11:00' },
+        { role: 'Contractor', status: 'approved', user: 'CON-001', timestamp: '2025-09-11 10:00' },
+        { role: 'Warehouse', status: 'delivered', user: 'WHS-001', timestamp: '2025-09-15 14:00' }
+      ],
+      items: [
+        { name: 'HVAC Filters 20x25x1', quantity: 50, unit: 'filters' },
+        { name: 'HVAC Filters 16x20x1', quantity: 30, unit: 'filters' }
+      ],
+      notes: 'Quarterly filter replacement stock'
+    },
+    {
+      orderId: 'CTR001-ORD-PRD007',
+      orderType: 'product',
+      title: 'Non-Standard Cleaning Chemicals',
+      requestedBy: 'CTR-001',
+      destination: 'CTR-001',
+      requestedDate: '2025-09-05',
+      expectedDate: '2025-09-10',
+      status: 'rejected',
+      approvalStages: [
+        { role: 'Center', status: 'requested', user: 'CTR-001', timestamp: '2025-09-05 13:00' },
+        { role: 'Customer', status: 'approved', user: 'CUS-001', timestamp: '2025-09-05 15:00' },
+        { role: 'Contractor', status: 'rejected', user: 'CON-001', timestamp: '2025-09-06 09:00' }
+      ],
+      rejectionReason: 'Not on approved vendor list - safety compliance required',
+      items: [
+        { name: 'Industrial Solvent X', quantity: 10, unit: 'gallons' }
+      ],
+      notes: 'Special cleaning project request'
+    }
   ];
 
   // All orders removed - starting fresh with proper flows

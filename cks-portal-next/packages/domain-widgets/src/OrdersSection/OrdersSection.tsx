@@ -187,8 +187,9 @@ const OrdersSection: React.FC<OrdersSectionProps> = ({
         break;
 
       case 'crew':
-        if (order.orderType === 'service' && order.status === 'pending') {
-          actions.push('Accept', 'Reject');
+        if (order.orderType === 'service' && (order as any).crewAssignmentStatus === 'pending') {
+          // Crew can accept or deny service assignments
+          actions.push('Accept', 'Deny');
         } else if (order.orderType === 'product' && order.status === 'pending' && order.requestedBy.includes('Crew')) {
           actions.push('Cancel');
         } else {
