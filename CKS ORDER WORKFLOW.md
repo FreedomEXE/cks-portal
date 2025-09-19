@@ -22,7 +22,6 @@ Service orders are requests for CKS services (cleaning, maintenance, etc.)
 - Customers
 - Centers
 - Contractors
-- Warehouse
 
 **Approval Flow:**
 1. Customer/Center/Contractor creates service request

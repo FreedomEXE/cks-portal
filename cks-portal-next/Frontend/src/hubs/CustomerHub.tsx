@@ -252,6 +252,52 @@ export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubPro
       estimatedDuration: '200 hours',
       rejectionReason: 'Budget exceeds approved limits for this quarter',
       notes: 'High-end finishes and custom furniture'
+    },
+    // Warehouse service orders (Customer can monitor)
+    {
+      orderId: 'CTR001-ORD-SRV020',
+      orderType: 'service',
+      title: 'Inventory Management Service',
+      requestedBy: 'CTR-001',
+      destination: 'CTR-001',
+      requestedDate: '2025-09-19',
+      expectedDate: '2025-09-22',
+      status: 'in-progress',  // Customer sees as in-progress after approving
+      approvalStages: [
+        { role: 'Center', status: 'requested', user: 'CTR-001', timestamp: '2025-09-19 08:00' },
+        { role: 'Customer', status: 'approved', user: 'CUS-001', timestamp: '2025-09-19 10:00' },
+        { role: 'Contractor', status: 'approved', user: 'CON-001', timestamp: '2025-09-19 13:00' },
+        { role: 'Warehouse', status: 'pending' }  // Warehouse needs to act
+      ],
+      description: 'Complete inventory audit and organization service',
+      serviceType: 'Inventory',
+      frequency: 'Quarterly',
+      estimatedDuration: '8 hours',
+      notes: 'Full warehouse inventory count and reorganization'
+    },
+    {
+      orderId: 'CTR001-ORD-SRV023',
+      orderType: 'service',
+      title: 'Warehouse Safety Inspection',
+      requestedBy: 'CTR-001',
+      destination: 'CTR-001',
+      requestedDate: '2025-09-12',
+      expectedDate: '2025-09-15',
+      serviceStartDate: '2025-09-15',
+      status: 'service-created',  // Service completed by warehouse
+      approvalStages: [
+        { role: 'Center', status: 'requested', user: 'CTR-001', timestamp: '2025-09-12 10:00' },
+        { role: 'Customer', status: 'approved', user: 'CUS-001', timestamp: '2025-09-12 12:00' },
+        { role: 'Contractor', status: 'approved', user: 'CON-001', timestamp: '2025-09-12 15:00' },
+        { role: 'Warehouse', status: 'service-created', user: 'WHS-001', timestamp: '2025-09-15 16:00' }
+      ],
+      description: 'Comprehensive safety audit and compliance check',
+      serviceType: 'Inspection',
+      frequency: 'Annual',
+      estimatedDuration: '3 hours',
+      notes: 'Annual safety compliance inspection completed',
+      serviceCompleted: true,
+      completedDate: '2025-09-15'
     }
   ];
 

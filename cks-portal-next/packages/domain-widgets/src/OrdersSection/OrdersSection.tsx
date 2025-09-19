@@ -205,8 +205,8 @@ const OrdersSection: React.FC<OrdersSectionProps> = ({
             actions.push('View Details');
           }
         } else if (order.orderType === 'service' && order.status === 'pending') {
-          // Warehouse can create services
-          actions.push('Create Service');
+          // Warehouse can fulfill services
+          actions.push('Accept', 'Deny');
         } else {
           actions.push('View Details');
         }

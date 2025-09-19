@@ -46,6 +46,8 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
   const [activeTab, setActiveTab] = useState(initialTab);
   const [servicesTab, setServicesTab] = useState('my');
   const [servicesSearchQuery, setServicesSearchQuery] = useState('');
+  const [inventoryTab, setInventoryTab] = useState('active');
+  const [inventorySearchQuery, setInventorySearchQuery] = useState('');
 
   // Add scrollbar styles
   useEffect(() => {
@@ -112,7 +114,123 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
   ]);
 
   // Mock service orders for Warehouse - CLEARED FOR FRESH START
-  const serviceOrders: any[] = [];
+  // Warehouse service fulfillment orders - Warehouse provides services directly (no manager/crew)
+  const serviceOrders: any[] = [
+    // State 1: Pending warehouse acceptance (ACTION REQUIRED)
+    {
+      orderId: 'CTR001-ORD-SRV020',
+      orderType: 'service',
+      title: 'Inventory Management Service',
+      requestedBy: 'CTR-001',
+      destination: 'CTR-001',
+      requestedDate: '2025-09-19',
+      expectedDate: '2025-09-22',
+      status: 'pending',  // Warehouse sees as pending (needs to accept/deny)
+      approvalStages: [
+        { role: 'Center', status: 'requested', user: 'CTR-001', timestamp: '2025-09-19 08:00' },
+        { role: 'Customer', status: 'approved', user: 'CUS-001', timestamp: '2025-09-19 10:00' },
+        { role: 'Contractor', status: 'approved', user: 'CON-001', timestamp: '2025-09-19 13:00' },
+        { role: 'Warehouse', status: 'pending' }  // Their action needed - should pulse
+      ],
+      description: 'Complete inventory audit and organization service',
+      serviceType: 'Inventory',
+      frequency: 'Quarterly',
+      estimatedDuration: '8 hours',
+      notes: 'Full warehouse inventory count and reorganization'
+    },
+    // State 2: Another pending warehouse service
+    {
+      orderId: 'CTR001-ORD-SRV021',
+      orderType: 'service',
+      title: 'Logistics Optimization Consultation',
+      requestedBy: 'CTR-001',
+      destination: 'CTR-001',
+      requestedDate: '2025-09-18',
+      expectedDate: '2025-09-20',
+      status: 'pending',
+      approvalStages: [
+        { role: 'Center', status: 'requested', user: 'CTR-001', timestamp: '2025-09-18 09:00' },
+        { role: 'Customer', status: 'approved', user: 'CUS-001', timestamp: '2025-09-18 11:00' },
+        { role: 'Contractor', status: 'approved', user: 'CON-001', timestamp: '2025-09-18 14:00' },
+        { role: 'Warehouse', status: 'pending' }  // Their action needed
+      ],
+      description: 'Supply chain and logistics workflow optimization',
+      serviceType: 'Consultation',
+      frequency: 'One-time',
+      estimatedDuration: '4 hours',
+      notes: 'Review current processes and recommend improvements'
+    },
+    // State 3: Warehouse accepted, service in progress
+    {
+      orderId: 'CTR001-ORD-SRV022',
+      orderType: 'service',
+      title: 'Emergency Storage Setup',
+      requestedBy: 'CTR-001',
+      destination: 'CTR-001',
+      requestedDate: '2025-09-16',
+      expectedDate: '2025-09-18',
+      status: 'in-progress',  // Warehouse accepted and working on it
+      approvalStages: [
+        { role: 'Center', status: 'requested', user: 'CTR-001', timestamp: '2025-09-16 07:00' },
+        { role: 'Customer', status: 'approved', user: 'CUS-001', timestamp: '2025-09-16 09:00' },
+        { role: 'Contractor', status: 'approved', user: 'CON-001', timestamp: '2025-09-16 12:00' },
+        { role: 'Warehouse', status: 'accepted', user: 'WHS-001', timestamp: '2025-09-16 15:00' }
+      ],
+      description: 'Set up temporary storage solution for overflow inventory',
+      serviceType: 'Setup',
+      frequency: 'One-time',
+      estimatedDuration: '6 hours',
+      notes: 'Urgent - overflow from main warehouse needed immediately'
+    },
+    // State 4: Service completed by warehouse
+    {
+      orderId: 'CTR001-ORD-SRV023',
+      orderType: 'service',
+      title: 'Warehouse Safety Inspection',
+      requestedBy: 'CTR-001',
+      destination: 'CTR-001',
+      requestedDate: '2025-09-12',
+      expectedDate: '2025-09-15',
+      serviceStartDate: '2025-09-15',
+      status: 'service-created',  // Service completed by warehouse
+      approvalStages: [
+        { role: 'Center', status: 'requested', user: 'CTR-001', timestamp: '2025-09-12 10:00' },
+        { role: 'Customer', status: 'approved', user: 'CUS-001', timestamp: '2025-09-12 12:00' },
+        { role: 'Contractor', status: 'approved', user: 'CON-001', timestamp: '2025-09-12 15:00' },
+        { role: 'Warehouse', status: 'service-created', user: 'WHS-001', timestamp: '2025-09-15 16:00' }
+      ],
+      description: 'Comprehensive safety audit and compliance check',
+      serviceType: 'Inspection',
+      frequency: 'Annual',
+      estimatedDuration: '3 hours',
+      notes: 'Annual safety compliance inspection completed',
+      serviceCompleted: true,
+      completedDate: '2025-09-15'
+    },
+    // State 5: Rejected by warehouse
+    {
+      orderId: 'CTR001-ORD-SRV024',
+      orderType: 'service',
+      title: 'Hazardous Material Storage Setup',
+      requestedBy: 'CTR-001',
+      destination: 'CTR-001',
+      requestedDate: '2025-09-10',
+      expectedDate: '2025-09-14',
+      status: 'rejected',
+      approvalStages: [
+        { role: 'Center', status: 'requested', user: 'CTR-001', timestamp: '2025-09-10 08:00' },
+        { role: 'Customer', status: 'approved', user: 'CUS-001', timestamp: '2025-09-10 10:00' },
+        { role: 'Contractor', status: 'approved', user: 'CON-001', timestamp: '2025-09-10 13:00' },
+        { role: 'Warehouse', status: 'rejected', user: 'WHS-001', timestamp: '2025-09-10 16:00' }
+      ],
+      description: 'Setup specialized storage for hazardous materials',
+      serviceType: 'Setup',
+      frequency: 'One-time',
+      estimatedDuration: '12 hours',
+      rejectionReason: 'Facility lacks proper certification for hazardous material storage',
+      notes: 'Requires specialized licensing not currently held'
+    }
+  ];
 
   // Mock product orders data for Warehouse - orders requiring warehouse action
   const productOrders: any[] = [
@@ -322,6 +440,121 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
         { name: 'Specialty Floor Stripper Tool', quantity: 2, unit: 'units' }
       ],
       notes: 'For tile renovation project'
+    }
+  ];
+
+  // Mock inventory data for warehouse
+  const activeInventoryData = [
+    {
+      productId: 'PRD-001',
+      name: 'Industrial Floor Scrubber',
+      type: 'Equipment',
+      onHand: 3,
+      available: 2,
+      min: 2,
+      location: 'A-12-B',
+      isLow: false
+    },
+    {
+      productId: 'PRD-002',
+      name: 'Commercial Vacuum Cleaner',
+      type: 'Equipment',
+      onHand: 1,
+      available: 1,
+      min: 2,
+      location: 'A-15-C',
+      isLow: true
+    },
+    {
+      productId: 'PRD-003',
+      name: 'Industrial Floor Cleaner',
+      type: 'Products',
+      onHand: 45,
+      available: 40,
+      min: 25,
+      location: 'B-01-A',
+      isLow: false
+    },
+    {
+      productId: 'PRD-004',
+      name: 'Heavy Duty Degreaser',
+      type: 'Products',
+      onHand: 12,
+      available: 12,
+      min: 20,
+      location: 'B-02-C',
+      isLow: true
+    },
+    {
+      productId: 'PRD-005',
+      name: 'Glass Cleaner Concentrate',
+      type: 'Products',
+      onHand: 0,
+      available: 0,
+      min: 15,
+      location: 'B-03-A',
+      isLow: true
+    },
+    {
+      productId: 'PRD-006',
+      name: 'Microfiber Cleaning Cloths',
+      type: 'Materials',
+      onHand: 200,
+      available: 180,
+      min: 50,
+      location: 'C-05-C',
+      isLow: false
+    },
+    {
+      productId: 'PRD-007',
+      name: 'Disposable Gloves (Box)',
+      type: 'Materials',
+      onHand: 8,
+      available: 5,
+      min: 25,
+      location: 'C-02-A',
+      isLow: true
+    },
+    {
+      productId: 'PRD-008',
+      name: 'Mop Heads',
+      type: 'Materials',
+      onHand: 75,
+      available: 75,
+      min: 30,
+      location: 'C-10-B',
+      isLow: false
+    }
+  ];
+
+  const archivedInventoryData = [
+    {
+      productId: 'PRD-099',
+      name: 'Obsolete Floor Waxer',
+      type: 'Equipment',
+      archivedDate: '2025-08-15',
+      reason: 'Equipment replaced'
+    },
+    {
+      productId: 'PRD-098',
+      name: 'Discontinued Cleaner Brand',
+      type: 'Products',
+      archivedDate: '2025-07-20',
+      reason: 'Product discontinued'
+    },
+    {
+      productId: 'PRD-097',
+      name: 'Old Safety Gloves',
+      type: 'Materials',
+      archivedDate: '2025-06-10',
+      reason: 'Safety standards updated'
+    },
+    {
+      productId: 'PRD-096',
+      name: 'Broken Cleaning Cart',
+      type: 'Equipment',
+      archivedDate: '2025-05-25',
+      reason: 'Damaged beyond repair'
     }
   ];
 
@@ -577,6 +810,77 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
               showProductOrders={true}
               primaryColor="#8b5cf6"
             />
+            </PageWrapper>
+          ) : activeTab === 'inventory' ? (
+            <PageWrapper headerSrOnly>
+              <TabSection
+                tabs={[
+                  { id: 'active', label: 'Product Inventory', count: activeInventoryData.length },
+                  { id: 'archive', label: 'Archive', count: archivedInventoryData.length }
+                ]}
+                activeTab={inventoryTab}
+                onTabChange={setInventoryTab}
+                description={inventoryTab === 'active' ? 'Current product inventory with stock levels' : 'Archived products no longer in active inventory'}
+                searchPlaceholder={
+                  inventoryTab === 'active' ? 'Search by Product ID or name' :
+                  'Search archived products'
+                }
+                onSearch={setInventorySearchQuery}
+                primaryColor="#8b5cf6"
+              >
+
+              {inventoryTab === 'active' && (
+                <DataTable
+                  columns={[
+                    { key: 'productId', label: 'PRODUCT ID', clickable: true },
+                    { key: 'name', label: 'NAME' },
+                    { key: 'type', label: 'TYPE' },
+                    { key: 'onHand', label: 'ON HAND' },
+                    { key: 'available', label: 'AVAILABLE' },
+                    { key: 'min', label: 'MIN' },
+                    { key: 'location', label: 'LOCATION' },
+                    {
+                      key: 'isLow',
+                      label: 'LOW?',
+                      render: (value: boolean) => (
+                        <span style={{
+                          padding: '4px 8px',
+                          borderRadius: '4px',
+                          fontSize: '12px',
+                          fontWeight: 500,
+                          backgroundColor: value ? '#fee2e2' : '#dcfce7',
+                          color: value ? '#dc2626' : '#16a34a'
+                        }}>
+                          {value ? 'Yes' : 'No'}
+                        </span>
+                      )
+                    }
+                  ]}
+                  data={activeInventoryData}
+                  showSearch={false}
+                  externalSearchQuery={inventorySearchQuery}
+                  maxItems={10}
+                  onRowClick={(row) => console.log('View product details:', row)}
+                />
+              )}
+
+              {inventoryTab === 'archive' && (
+                <DataTable
+                  columns={[
+                    { key: 'productId', label: 'PRODUCT ID', clickable: true },
+                    { key: 'name', label: 'NAME' },
+                    { key: 'type', label: 'TYPE' },
+                    { key: 'archivedDate', label: 'ARCHIVED DATE' },
+                    { key: 'reason', label: 'REASON' }
+                  ]}
+                  data={archivedInventoryData}
+                  showSearch={false}
+                  externalSearchQuery={inventorySearchQuery}
+                  maxItems={10}
+                  onRowClick={(row) => console.log('View archived product:', row)}
+                />
+              )}
+              </TabSection>
             </PageWrapper>
           ) : (
             <PageWrapper title={activeTab} showHeader={true} headerSrOnly>
