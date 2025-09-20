@@ -1,0 +1,14 @@
+{
+  "name": "@cks/backend",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "tsx watch server/index.ts",
+    "build": "tsc",
+    "test": "vitest"
+  },
+  "devDependencies": {
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2"
+  }
+}

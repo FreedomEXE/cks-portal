@@ -1,0 +1,562 @@
+/*───────────────────────────────────────────────
+  Property of CKS  © 2025
+───────────────────────────────────────────────*/
+/**
+ * File: TestInterface.tsx
+ *
+ * Description:
+ * Test interface that directly renders the actual hub components
+ * with full debug tools and component tracking
+ *
+ * Responsibilities:
+ * - Allow switching between all 7 role hubs
+ * - Render actual hub components without duplication
+ * - Provide comprehensive debug information
+ * - Track component usage and locations
+ *
+ * Role in system:
+ * - Development testing interface with full debugging
+ *
+ * Notes:
+ * No code duplication - uses actual hub components
+ */
+/*───────────────────────────────────────────────
+  Manifested by Freedom_EXE
+───────────────────────────────────────────────*/
+
+import React, { useState, Suspense, lazy, useEffect } from 'react';
+import { useTabComponents, roleTabs } from './hooks/useTabComponents';
+
+// Dynamically import hub components from the actual codebase
+const hubs = {
+  admin: lazy(() => import('@cks-hubs/AdminHub')),
+  manager: lazy(() => import('@cks-hubs/ManagerHub')),
+  contractor: lazy(() => import('@cks-hubs/ContractorHub')),
+  customer: lazy(() => import('@cks-hubs/CustomerHub')),
+  center: lazy(() => import('@cks-hubs/CenterHub')),
+  crew: lazy(() => import('@cks-hubs/CrewHub')),
+  warehouse: lazy(() => import('@cks-hubs/WarehouseHub')),
+  login: lazy(() => import('./LoginWrapper')),
+  catalog: lazy(() => import('@cks-frontend/pages/CKSCatalog')),
+};
+
+type RoleType = keyof typeof hubs;
+type ViewMode = 'hub' | 'catalog' | 'config';
+
+export default function TestInterface() {
+  const [selectedRole, setSelectedRole] = useState<RoleType>('manager');
+  const [selectedTab, setSelectedTab] = useState<string>('dashboard'); // Default to dashboard
+  const [viewMode, setViewMode] = useState<ViewMode>('hub');
+  const [showDebug, setShowDebug] = useState(false);
+  const [showConfig, setShowConfig] = useState(false);
+  const [showRoleDropdown, setShowRoleDropdown] = useState<string | null>(null); // Track which role dropdown is open
+
+  const HubComponent = hubs[selectedRole];
+
+  // Use tab-specific component discovery
+  // In catalog/config views, show specific tab or all if 'all' is selected
+  const discoveryTab = selectedTab === 'all' ? 'all' : selectedTab;
+  const { allComponents, tabComponents, componentCount } = useTabComponents(selectedRole, discoveryTab);
+
+  const roleInfo = {
+    admin: {
+      color: '#111827',
+      accent: '#374151',
+      label: 'Administrator',
+      description: 'Full system administration access',
+      permissions: 33,
+      tabs: 6
+    },
+    manager: {
+      color: '#3b82f6',
+      accent: '#60a5fa',
+      label: 'Manager',
+      description: 'Service and operations management',
+      permissions: 9,
+      tabs: 7
+    },
+    contractor: {
+      color: '#10b981',
+      accent: '#34d399',
+      label: 'Contractor',
+      description: 'Premium contractor services',
+      permissions: 8,
+      tabs: 7
+    },
+    customer: {
+      color: '#eab308',
+      accent: '#facc15',
+      label: 'Customer',
+      description: 'Service requests and management',
+      permissions: 9,
+      tabs: 7
+    },
+    center: {
+      color: '#f97316',
+      accent: '#fb923c',
+      label: 'Center',
+      description: 'Facility and operations management',
+      permissions: 10,
+      tabs: 7
+    },
+    crew: {
+      color: '#ef4444',
+      accent: '#f87171',
+      label: 'Crew',
+      description: 'Task and schedule management',
+      permissions: 10,
+      tabs: 7
+    },
+    warehouse: {
+      color: '#8b5cf6',
+      accent: '#a78bfa',
+      label: 'Warehouse',
+      description: 'Inventory and order processing',
+      permissions: 8,
+      tabs: 7
+    },
+    login: {
+      color: '#6366f1',
+      accent: '#818cf8',
+      label: 'Login',
+      description: 'Authentication interface',
+      permissions: 0,
+      tabs: 1
+    },
+    catalog: {
+      color: '#ec4899',
+      accent: '#f472b6',
+      label: 'CKS Catalog',
+      description: 'Products and services catalog',
+      permissions: 1,
+      tabs: 1
+    },
+  };
+
+  const renderComponentCatalog = () => {
+    // Group components by type - show ALL components but mark which ones are used
+    const uiComponents = allComponents.filter(c => c.type === 'ui');
+    const domainComponents = allComponents.filter(c => c.type === 'domain');
+    const featureComponents = allComponents.filter(c => c.type === 'feature');
+    const hubComponents = allComponents.filter(c => c.type === 'hub');
+
+    // Count how many are actually used by this tab
+    const usedUi = uiComponents.filter(c => c.usedByTab).length;
+    const usedDomain = domainComponents.filter(c => c.usedByTab).length;
+    const usedFeatures = featureComponents.filter(c => c.usedByTab).length;
+
+    const tabLabel = selectedTab === 'all' ? 'All Components' :
+                     roleTabs[selectedRole]?.find(t => t.id === selectedTab)?.label || selectedTab;
+
+    return (
+      <div style={{ padding: '2rem', background: '#1e293b', minHeight: '100%' }}>
+        <h2 style={{ color: '#f8fafc', marginBottom: '1.5rem' }}>
+          📦 Component Catalog for {roleInfo[selectedRole].label} - {tabLabel}
+        </h2>
+        <p style={{ color: '#94a3b8', marginBottom: '1.5rem' }}>
+          Total: {allComponents.length} components | Used in {tabLabel}: {componentCount.used} components
+        </p>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }}>
+          <div style={{ background: '#0f172a', padding: '1rem', borderRadius: '0.5rem', border: '1px solid #334155' }}>
+            <h3 style={{ color: '#60a5fa', margin: '0 0 0.5rem 0' }}>
+              packages/ui/ ({usedUi}/{uiComponents.length})
+            </h3>
+            <div style={{ color: '#94a3b8', fontSize: '0.875rem', maxHeight: '300px', overflowY: 'auto' }}>
+              {uiComponents.map(comp => (
+                <div key={comp.name} style={{
+                  color: comp.usedByTab ? '#10b981' : '#64748b',
+                  fontWeight: comp.usedByTab ? '500' : '400',
+                  fontSize: '0.875rem'
+                }} title={comp.tabs?.length ? `Used in: ${comp.tabs.join(', ')}` : 'Not used'}>
+                  {comp.usedByTab ? '✅' : '○'} {comp.name}{comp.count && comp.count > 1 ? ` (${comp.count})` : ''}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ background: '#0f172a', padding: '1rem', borderRadius: '0.5rem', border: '1px solid #334155' }}>
+            <h3 style={{ color: '#10b981', margin: '0 0 0.5rem 0' }}>
+              packages/domain-widgets/ ({usedDomain}/{domainComponents.length})
+            </h3>
+            <div style={{ color: '#94a3b8', fontSize: '0.875rem', maxHeight: '300px', overflowY: 'auto' }}>
+              {domainComponents.map(comp => (
+                <div key={comp.name} style={{
+                  color: comp.usedByTab ? '#10b981' : '#64748b',
+                  fontWeight: comp.usedByTab ? '500' : '400',
+                  fontSize: '0.875rem'
+                }} title={comp.tabs?.length ? `Used in: ${comp.tabs.join(', ')}` : 'Not used'}>
+                  {comp.usedByTab ? '✅' : '○'} {comp.name}{comp.count && comp.count > 1 ? ` (${comp.count})` : ''}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ background: '#0f172a', padding: '1rem', borderRadius: '0.5rem', border: '1px solid #334155' }}>
+            <h3 style={{ color: '#f97316', margin: '0 0 0.5rem 0' }}>
+              src/features/ ({usedFeatures}/{featureComponents.length})
+            </h3>
+            <div style={{ color: '#94a3b8', fontSize: '0.875rem', maxHeight: '300px', overflowY: 'auto' }}>
+              {featureComponents.length > 0 ? (
+                featureComponents.map(comp => (
+                  <div key={comp.name} style={{
+                    color: comp.usedByTab ? '#10b981' : '#64748b',
+                    fontWeight: comp.usedByTab ? '500' : '400',
+                    fontSize: '0.875rem'
+                  }} title={comp.tabs?.length ? `Used in: ${comp.tabs.join(', ')}` : 'Not used'}>
+                    {comp.usedByTab ? '✅' : '○'} {comp.name}{comp.count && comp.count > 1 ? ` (${comp.count})` : ''}
+                  </div>
+                ))
+              ) : (
+                <div>⏳ No features loaded</div>
+              )}
+            </div>
+          </div>
+
+          <div style={{ background: '#0f172a', padding: '1rem', borderRadius: '0.5rem', border: '1px solid #334155' }}>
+            <h3 style={{ color: '#8b5cf6', margin: '0 0 0.5rem 0' }}>src/hubs/</h3>
+            <div style={{ color: '#94a3b8', fontSize: '0.875rem' }}>
+              {Object.keys(hubs).map(hub => (
+                <div key={hub} style={{
+                  color: selectedRole === hub ? '#10b981' : '#64748b',
+                  fontWeight: selectedRole === hub ? '500' : '400'
+                }}>
+                  {selectedRole === hub ? '✅' : '○'} {hub.charAt(0).toUpperCase() + hub.slice(1)}Hub
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderConfigDetails = () => {
+    const tabLabel = selectedTab === 'all' ? 'All Components' :
+                     roleTabs[selectedRole]?.find(t => t.id === selectedTab)?.label || selectedTab;
+
+    return (
+      <div style={{ padding: '2rem', background: '#1e293b', minHeight: '100%' }}>
+        <h2 style={{ color: '#f8fafc', marginBottom: '1.5rem' }}>
+          ⚙️ {roleInfo[selectedRole].label} Configuration - {tabLabel}
+        </h2>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+        <div style={{ background: '#0f172a', padding: '1rem', borderRadius: '0.5rem' }}>
+          <h3 style={{ color: roleInfo[selectedRole].color, margin: '0 0 1rem 0' }}>Role Details</h3>
+          <div style={{ color: '#94a3b8', fontSize: '0.875rem', lineHeight: 1.6 }}>
+            <div><strong>Role:</strong> {selectedRole}</div>
+            <div><strong>Display Name:</strong> {roleInfo[selectedRole].label}</div>
+            <div><strong>Description:</strong> {roleInfo[selectedRole].description}</div>
+            <div><strong>Primary Color:</strong> {roleInfo[selectedRole].color}</div>
+            <div><strong>Accent Color:</strong> {roleInfo[selectedRole].accent}</div>
+            <div><strong>Permissions:</strong> {roleInfo[selectedRole].permissions}</div>
+            <div><strong>Tabs:</strong> {roleInfo[selectedRole].tabs}</div>
+          </div>
+        </div>
+
+        <div style={{ background: '#0f172a', padding: '1rem', borderRadius: '0.5rem' }}>
+          <h3 style={{ color: roleInfo[selectedRole].color, margin: '0 0 1rem 0' }}>
+            Components Used in {tabLabel} ({componentCount.used})
+          </h3>
+          <div style={{ color: '#94a3b8', fontSize: '0.875rem', lineHeight: 1.6, fontFamily: 'monospace', maxHeight: '300px', overflowY: 'auto' }}>
+            {tabComponents.map(comp => (
+              <div key={comp.name} style={{ marginBottom: '0.25rem' }}>
+                <strong style={{ color: comp.type === 'ui' ? '#60a5fa' : comp.type === 'domain' ? '#10b981' : comp.type === 'hub' ? '#8b5cf6' : '#f97316' }}>
+                  {comp.name}:
+                </strong> {comp.location}
+              </div>
+            ))}
+            {tabComponents.length === 0 && (
+              <div style={{ color: '#64748b', fontStyle: 'italic' }}>
+                No components mapped for this role yet
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+    );
+  };
+
+  return (
+    <div style={{ width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column', background: '#0f172a' }}>
+      {/* Header with Role Switcher */}
+      <div style={{
+        background: '#1e293b',
+        padding: '1rem',
+        borderBottom: `2px solid ${roleInfo[selectedRole].color}`,
+        display: 'flex',
+        alignItems: 'center',
+        gap: '1rem',
+        flexShrink: 0
+      }}>
+        <div style={{ color: '#f9fafb', fontWeight: 'bold', fontSize: '1.125rem' }}>
+          CKS Test Interface - New Structure
+        </div>
+
+        {/* Role Switcher with Dropdowns */}
+        <div style={{ display: 'flex', gap: '0.5rem', marginLeft: '2rem' }}>
+          {Object.entries(roleInfo).map(([role, info]) => (
+            <div
+              key={role}
+              style={{ position: 'relative' }}
+              onMouseEnter={() => selectedRole === role && (viewMode === 'catalog' || viewMode === 'config') && setShowRoleDropdown(role)}
+              onMouseLeave={() => setShowRoleDropdown(null)}
+            >
+              <button
+                onClick={() => {
+                  setSelectedRole(role as RoleType);
+                  // Reset to dashboard when switching roles
+                  if (role !== selectedRole) {
+                    setSelectedTab('dashboard');
+                  }
+                }}
+                style={{
+                  padding: '0.5rem 1rem',
+                  border: 'none',
+                  borderRadius: '0.375rem',
+                  backgroundColor: selectedRole === role ? info.color : '#475569',
+                  color: 'white',
+                  cursor: 'pointer',
+                  fontSize: '0.875rem',
+                  fontWeight: selectedRole === role ? '600' : '400',
+                  transition: 'all 0.2s',
+                  textTransform: 'capitalize'
+                }}
+                onMouseEnter={(e) => {
+                  if (selectedRole !== role) {
+                    e.currentTarget.style.backgroundColor = '#64748b';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (selectedRole !== role) {
+                    e.currentTarget.style.backgroundColor = '#475569';
+                  }
+                }}
+              >
+                {info.label}
+                {selectedRole === role && selectedTab !== 'all' && (viewMode === 'catalog' || viewMode === 'config') && (
+                  <span style={{ marginLeft: '0.5rem', fontSize: '0.75rem', opacity: 0.8 }}>
+                    ({roleTabs[role]?.find(t => t.id === selectedTab)?.label || 'All'})
+                  </span>
+                )}
+              </button>
+
+              {/* Tab dropdown for the active role in catalog/config view */}
+              {showRoleDropdown === role && selectedRole === role && (viewMode === 'catalog' || viewMode === 'config') && (
+                <div style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  marginTop: '0.25rem',
+                  background: '#1e293b',
+                  border: '1px solid #374151',
+                  borderRadius: '0.375rem',
+                  padding: '0.5rem 0',
+                  minWidth: '200px',
+                  zIndex: 1000,
+                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                }}>
+                  <div
+                    onClick={() => setSelectedTab('all')}
+                    style={{
+                      padding: '0.5rem 1rem',
+                      cursor: 'pointer',
+                      color: selectedTab === 'all' ? info.color : '#94a3b8',
+                      backgroundColor: selectedTab === 'all' ? '#374151' : 'transparent',
+                      fontSize: '0.875rem'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#374151'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = selectedTab === 'all' ? '#374151' : 'transparent'}
+                  >
+                    📋 All Components
+                  </div>
+                  <div style={{ borderTop: '1px solid #374151', margin: '0.25rem 0' }} />
+                  {roleTabs[selectedRole]?.map(tab => (
+                    <div
+                      key={tab.id}
+                      onClick={() => setSelectedTab(tab.id)}
+                      style={{
+                        padding: '0.5rem 1rem',
+                        cursor: 'pointer',
+                        color: selectedTab === tab.id ? info.color : '#94a3b8',
+                        backgroundColor: selectedTab === tab.id ? '#374151' : 'transparent',
+                        fontSize: '0.875rem'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#374151'}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = selectedTab === tab.id ? '#374151' : 'transparent'}
+                    >
+                      {tab.label}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* View Mode Toggles */}
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.5rem' }}>
+          <button
+            onClick={() => setViewMode('hub')}
+            style={{
+              padding: '0.5rem 1rem',
+              border: viewMode === 'hub' ? `1px solid ${roleInfo[selectedRole].color}` : '1px solid #374151',
+              borderRadius: '0.375rem',
+              backgroundColor: viewMode === 'hub' ? '#374151' : 'transparent',
+              color: viewMode === 'hub' ? '#f8fafc' : '#94a3b8',
+              cursor: 'pointer',
+              fontSize: '0.875rem',
+            }}
+          >
+            🏠 Hub View
+          </button>
+
+          <button
+            onClick={() => setViewMode('catalog')}
+            style={{
+              padding: '0.5rem 1rem',
+              border: viewMode === 'catalog' ? `1px solid ${roleInfo[selectedRole].color}` : '1px solid #374151',
+              borderRadius: '0.375rem',
+              backgroundColor: viewMode === 'catalog' ? '#374151' : 'transparent',
+              color: viewMode === 'catalog' ? '#f8fafc' : '#94a3b8',
+              cursor: 'pointer',
+              fontSize: '0.875rem',
+            }}
+          >
+            📦 Catalog
+          </button>
+          <button
+            onClick={() => setViewMode('config')}
+            style={{
+              padding: '0.5rem 1rem',
+              border: viewMode === 'config' ? `1px solid ${roleInfo[selectedRole].color}` : '1px solid #374151',
+              borderRadius: '0.375rem',
+              backgroundColor: viewMode === 'config' ? '#374151' : 'transparent',
+              color: viewMode === 'config' ? '#f8fafc' : '#94a3b8',
+              cursor: 'pointer',
+              fontSize: '0.875rem',
+            }}
+          >
+            ⚙️ Config
+          </button>
+          <button
+            onClick={() => setShowDebug(!showDebug)}
+            style={{
+              padding: '0.5rem 1rem',
+              border: '1px solid #374151',
+              borderRadius: '0.375rem',
+              backgroundColor: showDebug ? '#059669' : 'transparent',
+              color: showDebug ? '#f8fafc' : '#94a3b8',
+              cursor: 'pointer',
+              fontSize: '0.875rem',
+            }}
+          >
+            🐛 Debug
+          </button>
+        </div>
+      </div>
+
+      {/* Debug Panel */}
+      {showDebug && (
+        <div style={{
+          background: '#111827',
+          padding: '1rem',
+          borderBottom: '1px solid #374151',
+          color: '#94a3b8',
+          fontSize: '0.875rem',
+          fontFamily: 'monospace'
+        }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem' }}>
+            <div>
+              <strong style={{ color: '#60a5fa' }}>Active Role:</strong> {selectedRole}
+              <br />
+              <strong style={{ color: '#60a5fa' }}>Selected Tab:</strong> {selectedTab === 'all' ? 'All' : roleTabs[selectedRole]?.find(t => t.id === selectedTab)?.label || selectedTab}
+            </div>
+            <div>
+              <strong style={{ color: '#10b981' }}>Components Used:</strong> {componentCount.used}/{componentCount.total}
+              <br />
+              <strong style={{ color: '#10b981' }}>View Mode:</strong> {viewMode}
+            </div>
+            <div>
+              <strong style={{ color: '#f97316' }}>Test Port:</strong> {window.location.port}
+              <br />
+              <strong style={{ color: '#f97316' }}>Environment:</strong> Development
+            </div>
+            <div>
+              <strong style={{ color: '#8b5cf6' }}>MyHubSection:</strong> ✅ Loaded
+              <br />
+              <strong style={{ color: '#8b5cf6' }}>Role Config:</strong> {roleInfo[selectedRole].tabs} tabs
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Main Content Area */}
+      <div style={{ flex: 1, overflow: 'hidden', background: '#0f172a' }}>
+        {viewMode === 'catalog' ? (
+          <div style={{ height: '100%', overflow: 'auto' }}>{renderComponentCatalog()}</div>
+        ) : viewMode === 'config' ? (
+          <div style={{ height: '100%', overflow: 'auto' }}>{renderConfigDetails()}</div>
+        ) : (
+          <div style={{ height: '100%', background: '#f9fafb' }}>
+            {/* Show actual hub with the selected tab active */}
+            <Suspense fallback={
+              <div style={{
+                height: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: '#f9fafb'
+              }}>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: '1.5rem', marginBottom: '0.5rem', color: roleInfo[selectedRole].color }}>
+                    Loading {roleInfo[selectedRole].label} Hub...
+                  </div>
+                  <div style={{ color: '#6b7280' }}>Importing components...</div>
+                </div>
+              </div>
+            }>
+              {selectedRole === 'login' || selectedRole === 'catalog' ? (
+                <HubComponent />
+              ) : (
+                <HubComponent initialTab={selectedTab === 'all' ? 'dashboard' : selectedTab} />
+              )}
+            </Suspense>
+          </div>
+        )}
+      </div>
+
+      {/* Footer Status Bar */}
+      <div style={{
+        background: '#111827',
+        padding: '0.75rem 1rem',
+        borderTop: `1px solid ${roleInfo[selectedRole].color}`,
+        display: 'flex',
+        justifyContent: 'space-between',
+        fontSize: '0.75rem',
+        color: '#64748b'
+      }}>
+        <div style={{ display: 'flex', gap: '2rem' }}>
+          <span>
+            <strong style={{ color: '#94a3b8' }}>Role:</strong> {selectedRole} ({roleInfo[selectedRole].label})
+          </span>
+          <span>
+            <strong style={{ color: '#94a3b8' }}>Permissions:</strong> {roleInfo[selectedRole].permissions} loaded
+          </span>
+          <span>
+            <strong style={{ color: '#94a3b8' }}>Tabs:</strong> {roleInfo[selectedRole].tabs} available
+          </span>
+          <span>
+            <strong style={{ color: '#94a3b8' }}>Components:</strong> {componentCount.used} in use ({componentCount.total} total)
+          </span>
+        </div>
+        <div>
+          <span style={{ color: '#10b981' }}>● </span>
+          CKS Portal Next v2.0.0 | Port {window.location.port}
+        </div>
+      </div>
+    </div>
+  );
+}

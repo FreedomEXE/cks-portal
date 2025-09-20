@@ -1,0 +1,68 @@
+# Canonical eslintignore lives in .config/eslintignore. This file is auto-generated; edit the source file.
+#-----------------------------------------------
+#  Property of CKS  © 2025
+#-----------------------------------------------
+# File: .eslintignore
+#
+# Description:
+# Ignore patterns for ESLint to skip linting certain files
+#
+# Responsibilities:
+# - Exclude build outputs and dependencies from linting
+# - Skip generated files that shouldn't be linted
+#
+# Role in system:
+# - Used by ESLint to determine which files to skip
+#
+# Notes:
+# Keep aligned with .prettierignore for consistency
+#-----------------------------------------------
+#  Manifested by Freedom_EXE
+#-----------------------------------------------
+
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build outputs
+dist/
+build/
+coverage/
+.nyc_output/
+*.tsbuildinfo
+
+# Generated files
+Shared/contracts/openapi.json
+Frontend/src/roles/
+Backend/roles/
+packages/*/dist/
+
+# Lock files
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+
+# Logs
+*.log
+logs/
+
+# Environment files
+.env*
+
+# IDE files
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Docker files
+Dockerfile*
+docker-compose*.yml
+
+# Configuration files that don't need linting
+*.config.js
+*.config.ts
+*.config.mjs
