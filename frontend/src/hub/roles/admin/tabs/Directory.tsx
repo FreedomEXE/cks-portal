@@ -1,9 +1,15 @@
 import React, { useState } from 'react';
+import { User } from '../../../../packages/domain-widgets/src/admin/types';
 
-export default function Directory() {
+interface DirectoryProps {
+  users?: User[];
+  onUserUpdate?: (user: User) => void;
+}
+
+export default function Directory({ users = [], onUserUpdate }: DirectoryProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('contractors');
-  
+
   const directoryTabs = [
     { id: 'contractors', label: 'Contractors', color: '#10b981' },
     { id: 'managers', label: 'Managers', color: '#3b82f6' },
@@ -18,14 +24,93 @@ export default function Directory() {
     { id: 'reports', label: 'Reports & Feedback', color: '#64748b' }
   ];
 
-  const mockContractors = [
-    {
-      id: 'CON-001',
-      managerId: 'MGR-001',
-      companyName: 'Network',
-      status: 'active'
+  // Use provided users or fallback to mock data
+  const mockContractors = users.length > 0 ?
+    users.filter(user => user.role === 'contractor' && user.status !== 'archived') :
+    [
+      {
+        id: 'CON-001',
+        role: 'contractor' as const,
+        status: 'active' as const,
+        assignmentStatus: 'assigned' as const,
+        assignedTo: 'MNG-001',
+        assignedToRole: 'manager' as const,
+        companyName: 'Network',
+        createdDate: '2025-09-19',
+        startDate: '2025-09-19',
+        lastUpdated: '2025-09-19',
+        createdBy: 'ADMIN-001',
+        children: [],
+        childrenRoles: []
+      }
+    ];
+
+  const mockManagers = users.length > 0 ?
+    users.filter(user => user.role === 'manager' && user.status !== 'archived') :
+    [
+      {
+        id: 'MNG-001',
+        role: 'manager' as const,
+        status: 'active' as const,
+        assignmentStatus: 'assigned' as const,
+        name: 'John Manager',
+        email: 'john@cks.com',
+        createdDate: '2025-09-19',
+        startDate: '2025-09-19',
+        lastUpdated: '2025-09-19',
+        createdBy: 'ADMIN-001',
+        children: ['CON-001'],
+        childrenRoles: ['contractor']
+      }
+    ];
+
+  const mockCustomers = users.filter(user => user.role === 'customer' && user.status !== 'archived');
+  const mockCenters = users.filter(user => user.role === 'center' && user.status !== 'archived');
+  const mockCrew = users.filter(user => user.role === 'crew' && user.status !== 'archived');
+  const mockWarehouses = users.filter(user => user.role === 'warehouse' && user.status !== 'archived');
+
+  // Get the appropriate data for the active tab
+  const getActiveTabData = () => {
+    switch (activeTab) {
+      case 'contractors':
+        return mockContractors;
+      case 'managers':
+        return mockManagers;
+      case 'customers':
+        return mockCustomers;
+      case 'centers':
+        return mockCenters;
+      case 'crew':
+        return mockCrew;
+      case 'warehouses':
+        return mockWarehouses;
+      default:
+        return [];
     }
-  ];
+  };
+
+  const activeTabData = getActiveTabData();
+
+  // Filter by search term
+  const filteredData = activeTabData.filter(item => {
+    if (!searchTerm) return true;
+    const searchLower = searchTerm.toLowerCase();
+    return (
+      item.id.toLowerCase().includes(searchLower) ||
+      (item.companyName && item.companyName.toLowerCase().includes(searchLower)) ||
+      (item.name && item.name.toLowerCase().includes(searchLower))
+    );
+  });
+
+  const getAssignmentDisplay = (user: User): string => {
+    if (user.assignmentStatus === 'unassigned') {
+      return 'Unassigned';
+    }
+    if (user.assignedTo) {
+      return user.assignedTo;
+    }
+    return 'N/A';
+  };
 
   return (
     <div>
@@ -81,37 +166,55 @@ export default function Directory() {
       <div className="ui-card" style={{ padding: 0, overflow: 'hidden' }}>
         <div style={{ padding: 16, borderBottom: '1px solid #e5e7eb', backgroundColor: '#ffffff' }}>
           <h2 style={{ fontSize: 18, fontWeight: 'bold', color: '#111827', margin: 0 }}>
-            {directoryTabs.find(t => t.id === activeTab)?.label} Directory ({activeTab === 'contractors' ? 1 : 0} entries)
+            {directoryTabs.find(t => t.id === activeTab)?.label} Directory ({filteredData.length} entries)
           </h2>
         </div>
-        
-        {activeTab === 'contractors' ? (
+
+        {filteredData.length === 0 ? (
+          <div style={{ padding: 48, textAlign: 'center', color: '#6b7280', backgroundColor: '#ffffff' }}>
+            No {directoryTabs.find(t => t.id === activeTab)?.label.toLowerCase()} found
+            {searchTerm && <div style={{ marginTop: 8, fontSize: 12 }}>Try adjusting your search term</div>}
+          </div>
+        ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%' }}>
               <thead>
                 <tr style={{ backgroundColor: '#f9fafb' }}>
-                  <th style={{ textAlign: 'left', padding: 12, color: '#374151', fontWeight: 600 }}>CONTRACTOR ID</th>
-                  <th style={{ textAlign: 'left', padding: 12, color: '#374151', fontWeight: 600 }}>CKS MANAGER</th>
-                  <th style={{ textAlign: 'left', padding: 12, color: '#374151', fontWeight: 600 }}>COMPANY NAME</th>
+                  <th style={{ textAlign: 'left', padding: 12, color: '#374151', fontWeight: 600 }}>
+                    {activeTab.toUpperCase().slice(0, -1)} ID
+                  </th>
+                  <th style={{ textAlign: 'left', padding: 12, color: '#374151', fontWeight: 600 }}>
+                    {activeTab === 'managers' ? 'NAME' : 'ASSIGNED TO'}
+                  </th>
+                  <th style={{ textAlign: 'left', padding: 12, color: '#374151', fontWeight: 600 }}>
+                    {activeTab === 'managers' || activeTab === 'crew' ? 'NAME' : 'COMPANY NAME'}
+                  </th>
                   <th style={{ textAlign: 'left', padding: 12, color: '#374151', fontWeight: 600 }}>STATUS</th>
                   <th style={{ textAlign: 'left', padding: 12, color: '#374151', fontWeight: 600 }}>ACTIONS</th>
                 </tr>
               </thead>
               <tbody>
-                {mockContractors.map((contractor) => (
-                  <tr key={contractor.id} style={{ borderBottom: '1px solid #e5e7eb', backgroundColor: '#ffffff' }}>
-                    <td style={{ padding: 12, color: '#111827' }}>{contractor.id}</td>
-                    <td style={{ padding: 12, color: '#111827' }}>{contractor.managerId}</td>
-                    <td style={{ padding: 12, color: '#111827' }}>{contractor.companyName}</td>
+                {filteredData.map((user) => (
+                  <tr key={user.id} style={{ borderBottom: '1px solid #e5e7eb', backgroundColor: '#ffffff' }}>
+                    <td style={{ padding: 12, color: '#111827', fontWeight: 600 }}>{user.id}</td>
+                    <td style={{ padding: 12, color: '#111827' }}>
+                      {activeTab === 'managers' ?
+                        (user.name || 'N/A') :
+                        getAssignmentDisplay(user)
+                      }
+                    </td>
+                    <td style={{ padding: 12, color: '#111827' }}>
+                      {user.companyName || user.name || 'N/A'}
+                    </td>
                     <td style={{ padding: 12 }}>
                       <span style={{
-                        backgroundColor: contractor.status === 'active' ? '#10b981' : '#6b7280',
+                        backgroundColor: user.status === 'active' ? '#10b981' : user.assignmentStatus === 'unassigned' ? '#f59e0b' : '#6b7280',
                         color: 'white',
                         padding: '4px 8px',
                         borderRadius: '4px',
                         fontSize: '12px'
                       }}>
-                        {contractor.status}
+                        {user.assignmentStatus === 'unassigned' ? 'Unassigned' : user.status}
                       </span>
                     </td>
                     <td style={{ padding: 12 }}>
@@ -127,15 +230,18 @@ export default function Directory() {
                         }}>
                           Details
                         </button>
-                        <button style={{
-                          backgroundColor: '#dc2626',
-                          color: 'white',
-                          border: 'none',
-                          padding: '4px 8px',
-                          borderRadius: '4px',
-                          fontSize: '12px',
-                          cursor: 'pointer'
-                        }}>
+                        <button
+                          onClick={() => onUserUpdate && onUserUpdate({...user, status: 'archived'})}
+                          style={{
+                            backgroundColor: '#dc2626',
+                            color: 'white',
+                            border: 'none',
+                            padding: '4px 8px',
+                            borderRadius: '4px',
+                            fontSize: '12px',
+                            cursor: 'pointer'
+                          }}
+                        >
                           Delete
                         </button>
                       </div>
@@ -144,10 +250,6 @@ export default function Directory() {
                 ))}
               </tbody>
             </table>
-          </div>
-        ) : (
-          <div style={{ padding: 48, textAlign: 'center', color: '#6b7280', backgroundColor: '#ffffff' }}>
-            No {directoryTabs.find(t => t.id === activeTab)?.label.toLowerCase()} found
           </div>
         )}
       </div>

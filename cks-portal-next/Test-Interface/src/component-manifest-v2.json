@@ -30,6 +30,16 @@
           "type": "domain",
           "path": "../../../packages/domain-widgets/src/memos"
         },
+        "PageHeader": {
+          "count": 2,
+          "type": "ui",
+          "path": "../../../packages/ui/src/layout/PageHeader"
+        },
+        "PageWrapper": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/layout/PageWrapper"
+        },
         "MyHubSection": {
           "count": 1,
           "type": "ui",
@@ -56,12 +66,39 @@
           "count": 1,
           "type": "ui",
           "path": "../../../packages/ui/src/navigation/TabContainer"
+        },
+        "PageWrapper": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/layout/PageWrapper"
         }
       },
       "create": {},
       "assign": {},
-      "archive": {},
-      "support": {}
+      "archive": {
+        "AdminUsersSection": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/admin"
+        },
+        "PageWrapper": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/layout/PageWrapper"
+        }
+      },
+      "support": {
+        "AdminSupportSection": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/support"
+        },
+        "PageWrapper": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/layout/PageWrapper"
+        }
+      }
     }
   },
   "manager": {
@@ -96,6 +133,16 @@
           "type": "domain",
           "path": "../../../packages/domain-widgets/src/memos"
         },
+        "PageHeader": {
+          "count": 2,
+          "type": "ui",
+          "path": "../../../packages/ui/src/layout/PageHeader"
+        },
+        "PageWrapper": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/layout/PageWrapper"
+        },
         "MyHubSection": {
           "count": 1,
           "type": "ui",
@@ -113,17 +160,17 @@
           "type": "domain",
           "path": "../../../packages/domain-widgets/src/profile"
         },
-        "PageHeader": {
+        "PageWrapper": {
           "count": 1,
           "type": "ui",
-          "path": "../../../packages/ui/src/layout/PageHeader"
+          "path": "../../../packages/ui/src/layout/PageWrapper"
         }
       },
       "ecosystem": {
-        "PageHeader": {
+        "PageWrapper": {
           "count": 1,
           "type": "ui",
-          "path": "../../../packages/ui/src/layout/PageHeader"
+          "path": "../../../packages/ui/src/layout/PageWrapper"
         }
       },
       "services": {
@@ -132,25 +179,20 @@
           "type": "ui",
           "path": "../../../packages/ui/src/tables/DataTable"
         },
-        "NavigationTab": {
-          "count": 3,
-          "type": "ui",
-          "path": "../../../packages/ui/src/navigation/NavigationTab"
-        },
-        "TabContainer": {
-          "count": 1,
-          "type": "ui",
-          "path": "../../../packages/ui/src/navigation/TabContainer"
-        },
         "Button": {
           "count": 1,
           "type": "ui",
           "path": "../../../packages/ui/src/buttons/Button"
         },
-        "PageHeader": {
+        "PageWrapper": {
           "count": 1,
           "type": "ui",
-          "path": "../../../packages/ui/src/layout/PageHeader"
+          "path": "../../../packages/ui/src/layout/PageWrapper"
+        },
+        "TabSection": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/layout/TabSection"
         }
       },
       "orders": {
@@ -158,10 +200,37 @@
           "count": 1,
           "type": "domain",
           "path": "../../../packages/domain-widgets/src/OrdersSection"
+        },
+        "PageWrapper": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/layout/PageWrapper"
         }
       },
-      "reports": {},
-      "support": {}
+      "reports": {
+        "ReportsSection": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/reports"
+        },
+        "PageWrapper": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/layout/PageWrapper"
+        }
+      },
+      "support": {
+        "SupportSection": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/support"
+        },
+        "PageWrapper": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/layout/PageWrapper"
+        }
+      }
     }
   },
   "contractor": {
@@ -196,6 +265,16 @@
           "type": "domain",
           "path": "../../../packages/domain-widgets/src/memos"
         },
+        "PageWrapper": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/layout/PageWrapper"
+        },
+        "PageHeader": {
+          "count": 2,
+          "type": "ui",
+          "path": "../../../packages/ui/src/layout/PageHeader"
+        },
         "MyHubSection": {
           "count": 1,
           "type": "ui",
@@ -212,29 +291,40 @@
           "count": 1,
           "type": "domain",
           "path": "../../../packages/domain-widgets/src/profile"
+        },
+        "PageWrapper": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/layout/PageWrapper"
         }
       },
-      "ecosystem": {},
+      "ecosystem": {
+        "PageWrapper": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/layout/PageWrapper"
+        }
+      },
       "services": {
         "DataTable": {
           "count": 3,
           "type": "ui",
           "path": "../../../packages/ui/src/tables/DataTable"
         },
-        "NavigationTab": {
-          "count": 3,
-          "type": "ui",
-          "path": "../../../packages/ui/src/navigation/NavigationTab"
-        },
-        "TabContainer": {
-          "count": 1,
-          "type": "ui",
-          "path": "../../../packages/ui/src/navigation/TabContainer"
-        },
         "Button": {
           "count": 1,
           "type": "ui",
           "path": "../../../packages/ui/src/buttons/Button"
+        },
+        "PageWrapper": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/layout/PageWrapper"
+        },
+        "TabSection": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/layout/TabSection"
         }
       },
       "orders": {
@@ -242,10 +332,37 @@
           "count": 1,
           "type": "domain",
           "path": "../../../packages/domain-widgets/src/OrdersSection"
+        },
+        "PageWrapper": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/layout/PageWrapper"
         }
       },
-      "reports": {},
-      "support": {}
+      "reports": {
+        "ReportsSection": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/reports"
+        },
+        "PageWrapper": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/layout/PageWrapper"
+        }
+      },
+      "support": {
+        "SupportSection": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/support"
+        },
+        "PageWrapper": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/layout/PageWrapper"
+        }
+      }
     }
   },
   "customer": {
@@ -280,6 +397,16 @@
           "type": "domain",
           "path": "../../../packages/domain-widgets/src/memos"
         },
+        "PageWrapper": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/layout/PageWrapper"
+        },
+        "PageHeader": {
+          "count": 2,
+          "type": "ui",
+          "path": "../../../packages/ui/src/layout/PageHeader"
+        },
         "MyHubSection": {
           "count": 1,
           "type": "ui",
@@ -296,29 +423,40 @@
           "count": 1,
           "type": "domain",
           "path": "../../../packages/domain-widgets/src/profile"
+        },
+        "PageWrapper": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/layout/PageWrapper"
         }
       },
-      "ecosystem": {},
+      "ecosystem": {
+        "PageWrapper": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/layout/PageWrapper"
+        }
+      },
       "services": {
         "DataTable": {
           "count": 2,
           "type": "ui",
           "path": "../../../packages/ui/src/tables/DataTable"
         },
-        "NavigationTab": {
-          "count": 2,
-          "type": "ui",
-          "path": "../../../packages/ui/src/navigation/NavigationTab"
-        },
-        "TabContainer": {
-          "count": 1,
-          "type": "ui",
-          "path": "../../../packages/ui/src/navigation/TabContainer"
-        },
         "Button": {
           "count": 1,
           "type": "ui",
           "path": "../../../packages/ui/src/buttons/Button"
+        },
+        "PageWrapper": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/layout/PageWrapper"
+        },
+        "TabSection": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/layout/TabSection"
         }
       },
       "orders": {
@@ -326,10 +464,37 @@
           "count": 1,
           "type": "domain",
           "path": "../../../packages/domain-widgets/src/OrdersSection"
+        },
+        "PageWrapper": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/layout/PageWrapper"
         }
       },
-      "reports": {},
-      "support": {}
+      "reports": {
+        "ReportsSection": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/reports"
+        },
+        "PageWrapper": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/layout/PageWrapper"
+        }
+      },
+      "support": {
+        "SupportSection": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/support"
+        },
+        "PageWrapper": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/layout/PageWrapper"
+        }
+      }
     }
   },
   "center": {
@@ -364,6 +529,16 @@
           "type": "domain",
           "path": "../../../packages/domain-widgets/src/memos"
         },
+        "PageWrapper": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/layout/PageWrapper"
+        },
+        "PageHeader": {
+          "count": 2,
+          "type": "ui",
+          "path": "../../../packages/ui/src/layout/PageHeader"
+        },
         "MyHubSection": {
           "count": 1,
           "type": "ui",
@@ -380,29 +555,40 @@
           "count": 1,
           "type": "domain",
           "path": "../../../packages/domain-widgets/src/profile"
+        },
+        "PageWrapper": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/layout/PageWrapper"
         }
       },
-      "ecosystem": {},
+      "ecosystem": {
+        "PageWrapper": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/layout/PageWrapper"
+        }
+      },
       "services": {
         "DataTable": {
           "count": 2,
           "type": "ui",
           "path": "../../../packages/ui/src/tables/DataTable"
         },
-        "NavigationTab": {
-          "count": 2,
-          "type": "ui",
-          "path": "../../../packages/ui/src/navigation/NavigationTab"
-        },
-        "TabContainer": {
-          "count": 1,
-          "type": "ui",
-          "path": "../../../packages/ui/src/navigation/TabContainer"
-        },
         "Button": {
           "count": 1,
           "type": "ui",
           "path": "../../../packages/ui/src/buttons/Button"
+        },
+        "PageWrapper": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/layout/PageWrapper"
+        },
+        "TabSection": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/layout/TabSection"
         }
       },
       "orders": {
@@ -410,10 +596,37 @@
           "count": 1,
           "type": "domain",
           "path": "../../../packages/domain-widgets/src/OrdersSection"
+        },
+        "PageWrapper": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/layout/PageWrapper"
         }
       },
-      "reports": {},
-      "support": {}
+      "reports": {
+        "ReportsSection": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/reports"
+        },
+        "PageWrapper": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/layout/PageWrapper"
+        }
+      },
+      "support": {
+        "SupportSection": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/support"
+        },
+        "PageWrapper": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/layout/PageWrapper"
+        }
+      }
     }
   },
   "crew": {
@@ -448,6 +661,16 @@
           "type": "domain",
           "path": "../../../packages/domain-widgets/src/memos"
         },
+        "PageHeader": {
+          "count": 2,
+          "type": "ui",
+          "path": "../../../packages/ui/src/layout/PageHeader"
+        },
+        "PageWrapper": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/layout/PageWrapper"
+        },
         "MyHubSection": {
           "count": 1,
           "type": "ui",
@@ -464,29 +687,40 @@
           "count": 1,
           "type": "domain",
           "path": "../../../packages/domain-widgets/src/profile"
+        },
+        "PageWrapper": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/layout/PageWrapper"
         }
       },
-      "ecosystem": {},
+      "ecosystem": {
+        "PageWrapper": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/layout/PageWrapper"
+        }
+      },
       "services": {
         "DataTable": {
           "count": 3,
           "type": "ui",
           "path": "../../../packages/ui/src/tables/DataTable"
         },
-        "NavigationTab": {
-          "count": 3,
-          "type": "ui",
-          "path": "../../../packages/ui/src/navigation/NavigationTab"
-        },
-        "TabContainer": {
-          "count": 1,
-          "type": "ui",
-          "path": "../../../packages/ui/src/navigation/TabContainer"
-        },
         "Button": {
           "count": 1,
           "type": "ui",
           "path": "../../../packages/ui/src/buttons/Button"
+        },
+        "PageWrapper": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/layout/PageWrapper"
+        },
+        "TabSection": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/layout/TabSection"
         }
       },
       "orders": {
@@ -494,10 +728,37 @@
           "count": 1,
           "type": "domain",
           "path": "../../../packages/domain-widgets/src/OrdersSection"
+        },
+        "PageWrapper": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/layout/PageWrapper"
         }
       },
-      "reports": {},
-      "support": {}
+      "reports": {
+        "ReportsSection": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/reports"
+        },
+        "PageWrapper": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/layout/PageWrapper"
+        }
+      },
+      "support": {
+        "SupportSection": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/support"
+        },
+        "PageWrapper": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/layout/PageWrapper"
+        }
+      }
     }
   },
   "warehouse": {
@@ -533,6 +794,16 @@
           "type": "domain",
           "path": "../../../packages/domain-widgets/src/memos"
         },
+        "PageHeader": {
+          "count": 2,
+          "type": "ui",
+          "path": "../../../packages/ui/src/layout/PageHeader"
+        },
+        "PageWrapper": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/layout/PageWrapper"
+        },
         "MyHubSection": {
           "count": 1,
           "type": "ui",
@@ -549,6 +820,11 @@
           "count": 1,
           "type": "domain",
           "path": "../../../packages/domain-widgets/src/profile"
+        },
+        "PageWrapper": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/layout/PageWrapper"
         }
       },
       "services": {
@@ -557,33 +833,92 @@
           "type": "ui",
           "path": "../../../packages/ui/src/tables/DataTable"
         },
-        "NavigationTab": {
-          "count": 3,
-          "type": "ui",
-          "path": "../../../packages/ui/src/navigation/NavigationTab"
-        },
-        "TabContainer": {
-          "count": 1,
-          "type": "ui",
-          "path": "../../../packages/ui/src/navigation/TabContainer"
-        },
         "Button": {
           "count": 1,
           "type": "ui",
           "path": "../../../packages/ui/src/buttons/Button"
+        },
+        "PageWrapper": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/layout/PageWrapper"
+        },
+        "TabSection": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/layout/TabSection"
         }
       },
-      "inventory": {},
+      "inventory": {
+        "DataTable": {
+          "count": 2,
+          "type": "ui",
+          "path": "../../../packages/ui/src/tables/DataTable"
+        },
+        "PageWrapper": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/layout/PageWrapper"
+        },
+        "TabSection": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/layout/TabSection"
+        }
+      },
       "orders": {
         "OrdersSection": {
           "count": 1,
           "type": "domain",
           "path": "../../../packages/domain-widgets/src/OrdersSection"
+        },
+        "PageWrapper": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/layout/PageWrapper"
         }
       },
-      "deliveries": {},
-      "reports": {},
-      "support": {}
+      "deliveries": {
+        "DataTable": {
+          "count": 3,
+          "type": "ui",
+          "path": "../../../packages/ui/src/tables/DataTable"
+        },
+        "PageWrapper": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/layout/PageWrapper"
+        },
+        "TabSection": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/layout/TabSection"
+        }
+      },
+      "reports": {
+        "ReportsSection": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/reports"
+        },
+        "PageWrapper": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/layout/PageWrapper"
+        }
+      },
+      "support": {
+        "SupportSection": {
+          "count": 1,
+          "type": "domain",
+          "path": "../../../packages/domain-widgets/src/support"
+        },
+        "PageWrapper": {
+          "count": 1,
+          "type": "ui",
+          "path": "../../../packages/ui/src/layout/PageWrapper"
+        }
+      }
     }
   }
 }

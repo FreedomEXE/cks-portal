@@ -1,6 +1,11 @@
 import React, { useState } from 'react';
+import { AdminUsersSection } from '../../../../../packages/domain-widgets/src/admin';
 
-export default function Create() {
+interface CreateProps {
+  onDirectoryUpdate?: (users: any[]) => void;
+}
+
+export default function Create({ onDirectoryUpdate }: CreateProps) {
   const [selectedUserType, setSelectedUserType] = useState('contractor');
   const [activeTab, setActiveTab] = useState('users');
   const [formData, setFormData] = useState({
@@ -67,174 +72,10 @@ export default function Create() {
       </div>
 
       {activeTab === 'users' && (
-        <div style={{ display: 'grid', gap: 24 }}>
-          <div className="ui-card" style={{ padding: 16 }}>
-            <h2 style={{ fontSize: 18, fontWeight: 'bold', color: '#111827', marginBottom: 8 }}>Create Users</h2>
-            <p style={{ color: '#6b7280', marginBottom: 16 }}>Create and provision all types of CKS Portal users</p>
-            
-            <div style={{ marginBottom: 16 }}>
-              <label style={{ display: 'block', color: '#6b7280', marginBottom: 8 }}>Select User Type</label>
-              <select
-                value={selectedUserType}
-                onChange={(e) => setSelectedUserType(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  backgroundColor: '#ffffff',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '6px',
-                  color: '#111827',
-                  fontSize: '14px'
-                }}
-              >
-                {userTypes.map((type) => (
-                  <option key={type.value} value={type.value}>
-                    {type.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="ui-card" style={{ padding: 16 }}>
-            <h2 style={{ fontSize: 18, fontWeight: 'bold', color: '#111827', marginBottom: 8 }}>
-              Create {userTypes.find(t => t.value === selectedUserType)?.label.split(' - ')[0]}
-            </h2>
-            <p style={{ color: '#6b7280', marginBottom: 16 }}>Create new contractor company</p>
-            
-            <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 16 }}>
-              <div>
-                <label style={{ display: 'block', color: '#6b7280', marginBottom: 8 }}>Company Name</label>
-                <input
-                  type="text"
-                  value={formData.companyName}
-                  onChange={(e) => handleInputChange('companyName', e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    backgroundColor: '#ffffff',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '6px',
-                    color: '#111827',
-                    fontSize: '14px'
-                  }}
-                  placeholder="Enter company name"
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', color: '#6b7280', marginBottom: 8 }}>Address</label>
-                <input
-                  type="text"
-                  value={formData.address}
-                  onChange={(e) => handleInputChange('address', e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    backgroundColor: '#ffffff',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '6px',
-                    color: '#111827',
-                    fontSize: '14px'
-                  }}
-                  placeholder="Enter company address"
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', color: '#6b7280', marginBottom: 8 }}>Main Contact</label>
-                <input
-                  type="text"
-                  value={formData.mainContact}
-                  onChange={(e) => handleInputChange('mainContact', e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    backgroundColor: '#ffffff',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '6px',
-                    color: '#111827',
-                    fontSize: '14px'
-                  }}
-                  placeholder="Enter main contact name"
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', color: '#6b7280', marginBottom: 8 }}>Phone</label>
-                <input
-                  type="tel"
-                  value={formData.phone}
-                  onChange={(e) => handleInputChange('phone', e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    backgroundColor: '#ffffff',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '6px',
-                    color: '#111827',
-                    fontSize: '14px'
-                  }}
-                  placeholder="Enter phone number"
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', color: '#6b7280', marginBottom: 8 }}>Email</label>
-                <input
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => handleInputChange('email', e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    backgroundColor: '#ffffff',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '6px',
-                    color: '#111827',
-                    fontSize: '14px'
-                  }}
-                  placeholder="Enter email address"
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', color: '#6b7280', marginBottom: 8 }}>Website</label>
-                <input
-                  type="url"
-                  value={formData.website}
-                  onChange={(e) => handleInputChange('website', e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    backgroundColor: '#ffffff',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '6px',
-                    color: '#111827',
-                    fontSize: '14px'
-                  }}
-                  placeholder="Enter website URL"
-                />
-              </div>
-
-              <button
-                type="submit"
-                style={{
-                  backgroundColor: '#10b981',
-                  color: 'white',
-                  padding: '12px 24px',
-                  borderRadius: '6px',
-                  border: 'none',
-                  fontSize: '14px',
-                  fontWeight: 500,
-                  cursor: 'pointer'
-                }}
-              >
-                Create {userTypes.find(t => t.value === selectedUserType)?.label.split(' - ')[0]}
-              </button>
-            </form>
-          </div>
-        </div>
+        <AdminUsersSection
+          onDirectoryUpdate={onDirectoryUpdate}
+          adminId="ADMIN-001"
+        />
       )}
 
       {activeTab !== 'users' && (

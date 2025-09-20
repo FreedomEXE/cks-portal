@@ -32,6 +32,7 @@ import NavigationTab from '../../../packages/ui/src/navigation/NavigationTab';
 import TabContainer from '../../../packages/ui/src/navigation/TabContainer';
 import Button from '../../../packages/ui/src/buttons/Button';
 import { AdminSupportSection } from '../../../packages/domain-widgets/src/support';
+import { CreateSection, AssignSection, ArchiveSection } from '../../../packages/domain-widgets/src/admin';
 import PageHeader from '../../../packages/ui/src/layout/PageHeader';
 import PageWrapper from '../../../packages/ui/src/layout/PageWrapper';
 import TabSection from '../../../packages/ui/src/layout/TabSection';
@@ -42,7 +43,7 @@ interface AdminHubProps {
 
 export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
   const [activeTab, setActiveTab] = useState(initialTab);
-  const [directoryTab, setDirectoryTab] = useState('contractors');
+  const [directoryTab, setDirectoryTab] = useState('managers');
 
   // Add scrollbar styles
   useEffect(() => {
@@ -706,22 +707,22 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
             <PageWrapper title="Directory" showHeader={true} headerSrOnly>
               <TabContainer variant="pills" spacing="compact">
                 <NavigationTab
-                  label="Contractors"
-                  isActive={directoryTab === 'contractors'}
-                  onClick={() => setDirectoryTab('contractors')}
-                  activeColor="#10b981"
-                />
-                <NavigationTab
                   label="Managers"
                   isActive={directoryTab === 'managers'}
                   onClick={() => setDirectoryTab('managers')}
                   activeColor="#3b82f6"
                 />
                 <NavigationTab
+                  label="Contractors"
+                  isActive={directoryTab === 'contractors'}
+                  onClick={() => setDirectoryTab('contractors')}
+                  activeColor="#10b981"
+                />
+                <NavigationTab
                   label="Customers"
                   isActive={directoryTab === 'customers'}
                   onClick={() => setDirectoryTab('customers')}
-                  activeColor="#8b5cf6"
+                  activeColor="#eab308"
                 />
                 <NavigationTab
                   label="Centers"
@@ -739,7 +740,7 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
                   label="Warehouses"
                   isActive={directoryTab === 'warehouses'}
                   onClick={() => setDirectoryTab('warehouses')}
-                  activeColor="#eab308"
+                  activeColor="#8b5cf6"
                 />
                 <NavigationTab
                   label="Services"
@@ -751,25 +752,25 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
                   label="Orders"
                   isActive={directoryTab === 'orders'}
                   onClick={() => setDirectoryTab('orders')}
-                  activeColor="#6366f1"
+                  activeColor="#92400e"
                 />
                 <NavigationTab
                   label="Products"
                   isActive={directoryTab === 'products'}
                   onClick={() => setDirectoryTab('products')}
-                  activeColor="#ec4899"
+                  activeColor="#374151"
                 />
                 <NavigationTab
                   label="Training & Procedures"
                   isActive={directoryTab === 'training'}
                   onClick={() => setDirectoryTab('training')}
-                  activeColor="#14b8a6"
+                  activeColor="#ec4899"
                 />
                 <NavigationTab
                   label="Reports & Feedback"
                   isActive={directoryTab === 'reports'}
                   onClick={() => setDirectoryTab('reports')}
-                  activeColor="#64748b"
+                  activeColor="#6b7280"
                 />
               </TabContainer>
 
@@ -839,6 +840,12 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
                 )}
               </div>
             </PageWrapper>
+          ) : activeTab === 'create' ? (
+            <CreateSection />
+          ) : activeTab === 'assign' ? (
+            <AssignSection />
+          ) : activeTab === 'archive' ? (
+            <ArchiveSection />
           ) : activeTab === 'support' ? (
             <PageWrapper headerSrOnly>
               <AdminSupportSection
