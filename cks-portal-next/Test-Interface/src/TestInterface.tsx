@@ -36,6 +36,8 @@ const hubs = {
   center: lazy(() => import('@cks-hubs/CenterHub')),
   crew: lazy(() => import('@cks-hubs/CrewHub')),
   warehouse: lazy(() => import('@cks-hubs/WarehouseHub')),
+  login: lazy(() => import('./LoginWrapper')),
+  catalog: lazy(() => import('@cks-frontend/pages/CKSCatalog')),
 };
 
 type RoleType = keyof typeof hubs;
@@ -112,6 +114,22 @@ export default function TestInterface() {
       description: 'Inventory and order processing',
       permissions: 8,
       tabs: 7
+    },
+    login: {
+      color: '#6366f1',
+      accent: '#818cf8',
+      label: 'Login',
+      description: 'Authentication interface',
+      permissions: 0,
+      tabs: 1
+    },
+    catalog: {
+      color: '#ec4899',
+      accent: '#f472b6',
+      label: 'CKS Catalog',
+      description: 'Products and services catalog',
+      permissions: 1,
+      tabs: 1
     },
   };
 
@@ -500,7 +518,11 @@ export default function TestInterface() {
                 </div>
               </div>
             }>
-              <HubComponent initialTab={selectedTab === 'all' ? 'dashboard' : selectedTab} />
+              {selectedRole === 'login' || selectedRole === 'catalog' ? (
+                <HubComponent />
+              ) : (
+                <HubComponent initialTab={selectedTab === 'all' ? 'dashboard' : selectedTab} />
+              )}
             </Suspense>
           </div>
         )}
