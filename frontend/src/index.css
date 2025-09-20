@@ -1,0 +1,18 @@
+/* Tailwind base utilities */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: #0f172a;
+  color: #e2e8f0;
+}
+
+.btn { @apply px-3 py-2 rounded-md; }
+.btn-primary { @apply bg-brand-600 text-white hover:bg-brand-500 focus:ring-2 focus:ring-brand-300 focus:outline-none; }
+.alert-error { @apply bg-red-600 text-white px-3 py-2 rounded-md; }
