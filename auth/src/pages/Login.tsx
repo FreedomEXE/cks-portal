@@ -1,5 +1,5 @@
 /**
- * OG Login page Ã¢â‚¬â€ copied from frontend/src/pages/Login.tsx
+ * OG Login page ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â copied from frontend/src/pages/Login.tsx
  * Kept intact to preserve visuals and flow.
  */
 import { FormEvent, useEffect, useRef, useState } from 'react';
@@ -64,6 +64,7 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const redirectedRef = useRef(false);
+  const submittingRef = useRef(false);
 
   useEffect(() => {
   if (!isSignedIn || redirectedRef.current) return;
@@ -120,90 +121,93 @@ export default function Login() {
 }, [isSignedIn, navigate, user]);
 
   async function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    setError(null);
-    if (!isLoaded) return;
-    try {
-      setLoading(true);
-      const result = await signIn!.create({ identifier, password });
-      const originalMsg = 'Sign in failed. Please try again.';
-      if (result.status === 'needs_first_factor') {
-        try {
-          const attempt = await signIn!.attemptFirstFactor({
-            strategy: 'password',
-            password,
-          });
-          if (attempt.status === 'complete') {
-            await setActive!({ session: attempt.createdSessionId });
-            try { localStorage.removeItem('me:lastRole'); localStorage.removeItem('me:lastCode'); } catch {}
-            try {
-              const rawTyped = String(identifier || '').trim();
-              const typedPrefix = rawTyped.includes('@') ? rawTyped.split('@')[0] : rawTyped;
-              const typed = typedPrefix.toLowerCase().replace(/[^a-z0-9_\-]/g, '');
-              if (typed) sessionStorage.setItem('code', typed);
-              const clerkId = user?.id || '';
-              const headers: Record<string,string> = {};
-              if (clerkId) headers['x-user-id'] = clerkId;
-              const userEmail = user?.primaryEmailAddress?.emailAddress || '';
-              if (userEmail) headers['x-user-email'] = userEmail;
-              const bootstrapUrl = buildUrl('/me/bootstrap');
-              const r = await apiFetch(bootstrapUrl, { headers });
-              if (r.ok) {
-                const js = await r.json();
-                const role = (js?.role || js?.kind || '').toLowerCase();
-                const code = js?.code || js?.internal_code || '';
-                if (role) {
-                  const uname = user?.username || (user?.primaryEmailAddress?.emailAddress || '').split('@')[0];
-                  try { sessionStorage.setItem('role', role.toLowerCase()); } catch {}
-                  try { sessionStorage.setItem('code', (code || uname || role).toLowerCase()); } catch {}
-                  const dest = `/${(uname || code || role).toLowerCase()}/hub`;
-                  navigate(dest, { replace: true });
-                  return;
-                } else if (identifier) {
-                  navigate(`/${String(identifier).toLowerCase()}/hub`, { replace: true });
-                  return;
-                }
-              }
-            } catch {}
-            navigate('/hub');
-            return;
-          } else {
-            setError('Additional verification required. Please complete the next step.');
-          }
-        } catch (err2: any) {
-          const msg2 = err2?.errors?.[0]?.message || err2?.message || 'Sign in failed. Please try again.';
-          setError(msg2);
-        }
-      } else {
-        setError(originalMsg);
-      }
-    } finally {
-      setLoading(false);
-    }
+  e.preventDefault();
+  setError(null);
+
+  if (!isLoaded || submittingRef.current) {
+    return;
   }
 
-  async function signInWithGoogle() {
-    if (!isLoaded) return;
-    try {
-      setLoading(true);
-      try {
-        const raw = String(identifier || '').trim();
-        const prefix = raw.includes('@') ? raw.split('@')[0] : raw;
-        const safe = prefix.toLowerCase().replace(/[^a-z0-9_\-]/g, '');
-        if (safe) sessionStorage.setItem('code', safe);
-      } catch {}
-      await signIn!.authenticateWithRedirect({
-        strategy: 'oauth_google',
-        redirectUrl: '/login',
-        redirectUrlComplete: '/login',
-      });
-    } catch (err: any) {
-      const msg = err?.errors?.[0]?.message || err?.message || 'Google sign-in failed.';
-      setError(msg);
-    } finally {
-      setLoading(false);
-    }
+  if (isSignedIn) {
+    navigate('/admin/hub', { replace: true });
+    return;
   }
+
+  submittingRef.current = true;
+
+  try {
+    setLoading(true);
+
+    const result = await signIn!.create({ identifier, password });
+
+    if (result.status === 'complete') {
+      await setActive!({ session: result.createdSessionId });
+      return;
+    }
+
+    if (result.status === 'needs_first_factor') {
+      const attempt = await signIn!.attemptFirstFactor({
+        strategy: 'password',
+        password,
+      });
+
+      if (attempt.status === 'complete') {
+        await setActive!({ session: attempt.createdSessionId });
+        return;
+      }
+
+      setError('Additional verification required. Please complete the next step.');
+      return;
+    }
+
+    setError('Sign in failed. Please try again.');
+  } catch (err: any) {
+    const clerkError = err?.errors?.[0];
+    if (clerkError?.code === 'session_exists') {
+      navigate('/admin/hub', { replace: true });
+      return;
+    }
+
+    const message = clerkError?.message || err?.message || 'Sign in failed. Please try again.';
+    setError(message);
+  } finally {
+    submittingRef.current = false;
+    setLoading(false);
+  }
+}
+
+  async function signInWithGoogle() {
+  if (!isLoaded || submittingRef.current) return;
+
+  if (isSignedIn) {
+    navigate('/admin/hub', { replace: true });
+    return;
+  }
+
+  try {
+    submittingRef.current = true;
+    setLoading(true);
+
+    try {
+      const raw = String(identifier || '').trim();
+      const prefix = raw.includes('@') ? raw.split('@')[0] : raw;
+      const safe = prefix.toLowerCase().replace(/[^a-z0-9_\-]/g, '');
+      if (safe) sessionStorage.setItem('code', safe);
+    } catch {}
+
+    await signIn!.authenticateWithRedirect({
+      strategy: 'oauth_google',
+      redirectUrl: '/login',
+      redirectUrlComplete: '/login',
+    });
+  } catch (err: any) {
+    const msg = err?.errors?.[0]?.message || err?.message || 'Google sign-in failed.';
+    setError(msg);
+  } finally {
+    submittingRef.current = false;
+    setLoading(false);
+  }
+}
 
   return (
     <div className="fixed inset-0 bg-[#1f1f1f] text-white flex items-center justify-center">
@@ -241,7 +245,7 @@ export default function Login() {
             />
           </div>
           <button type="submit" className="btn btn-primary w-full text-base md:text-lg py-3" disabled={loading || !isLoaded}>
-            {loading ? 'Signing inÃ¢â‚¬Â¦' : 'Sign in'}
+            {loading ? 'Signing inÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦' : 'Sign in'}
           </button>
           <div className="flex items-center justify-center mt-2 text-xs md:text-sm text-gray-400">
             <a href="/forgot" className="hover:underline">Forgot password?</a>

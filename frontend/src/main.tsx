@@ -2,8 +2,8 @@ import './index.css';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
-import { ClerkProvider } from '@clerk/clerk-react';
-import App from './App';
+import { ClerkProvider, SignedIn, SignedOut } from '@clerk/clerk-react';
+import { AuthenticatedApp, UnauthenticatedApp } from './App';
 
 const PUBLISHABLE_KEY = (import.meta as any).env?.VITE_CLERK_PUBLISHABLE_KEY || 'pk_test_dummy_key_for_ui_only';
 
@@ -18,7 +18,12 @@ root.render(
   <React.StrictMode>
     <ClerkProvider publishableKey={PUBLISHABLE_KEY}>
       <BrowserRouter>
-        <App />
+        <SignedIn>
+          <AuthenticatedApp />
+        </SignedIn>
+        <SignedOut>
+          <UnauthenticatedApp />
+        </SignedOut>
       </BrowserRouter>
     </ClerkProvider>
   </React.StrictMode>

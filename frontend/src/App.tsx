@@ -20,7 +20,6 @@ const hubComponents = {
 } as const;
 
 type HubKey = keyof typeof hubComponents;
-
 type HubComponentProps = {
   initialTab?: string;
 };
@@ -30,7 +29,7 @@ function RoleHubRoute() {
   const [searchParams] = useSearchParams();
 
   if (!role || !(role in hubComponents)) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/admin/hub" replace />;
   }
 
   const HubComponent = hubComponents[role as HubKey] as ComponentType<HubComponentProps>;
@@ -39,12 +38,20 @@ function RoleHubRoute() {
   return <HubComponent initialTab={initialTab} />;
 }
 
-export default function App() {
+export function AuthenticatedApp() {
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="/login" replace />} />
-      <Route path="/login" element={<Login />} />
+      <Route path="/" element={<Navigate to="/admin/hub" replace />} />
       <Route path="/:role/hub" element={<RoleHubRoute />} />
+      <Route path="*" element={<Navigate to="/admin/hub" replace />} />
+    </Routes>
+  );
+}
+
+export function UnauthenticatedApp() {
+  return (
+    <Routes>
+      <Route path="/login" element={<Login />} />
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   );
