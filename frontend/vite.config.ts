@@ -1,22 +1,26 @@
-﻿/*----------------------------------------------- 
-  Property of CKS  (c) 2025
------------------------------------------------*/
-/**
- * File: vite.config.ts
- *
- * Description:
- * Short what/why
- *
- * Responsibilities:
- * - Key responsibility
- * - Another responsibility
- *
- * Role in system:
- * - Who imports/uses this; high-level, not a list of files
- *
- * Notes:
- * Special behaviors, flags, envs
- */
-/*-----------------------------------------------
-  Manifested by Freedom_EXE
------------------------------------------------*/
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import path from 'path';
+
+export default defineConfig({
+  plugins: [react()],
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+      '@cks-auth': path.resolve(__dirname, '../auth/src'),
+      '@cks-ui': path.resolve(__dirname, '../packages/ui/src'),
+      '@cks-domain': path.resolve(__dirname, '../packages/domain-widgets/src'),
+      '@clerk/clerk-react': path.resolve(__dirname, '../Test-Interface/src/mocks/clerk-react.tsx'),
+    },
+  },
+  server: {
+    port: 5173,
+    open: true,
+    fs: {
+      allow: ['..'],
+    },
+  },
+  preview: {
+    port: 4173,
+  },
+});

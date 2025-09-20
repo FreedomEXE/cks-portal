@@ -62,7 +62,20 @@ importers:
         specifier: ^5.0.0
         version: 5.4.20(@types/node@20.19.14)
 
-  auth: {}
+  auth:
+    dependencies:
+      '@clerk/clerk-react':
+        specifier: ^5.47.0
+        version: 5.47.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      react:
+        specifier: ^18.2.0
+        version: 18.3.1
+      react-dom:
+        specifier: ^18.2.0
+        version: 18.3.1(react@18.3.1)
+      react-router-dom:
+        specifier: ^7.9.1
+        version: 7.9.1(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
 
   backend:
     devDependencies:
@@ -75,12 +88,21 @@ importers:
 
   frontend:
     dependencies:
+      '@cks/auth':
+        specifier: workspace:*
+        version: link:../auth
+      '@clerk/clerk-react':
+        specifier: ^5.47.0
+        version: 5.47.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       react:
         specifier: ^18.2.0
         version: 18.3.1
       react-dom:
         specifier: ^18.2.0
         version: 18.3.1(react@18.3.1)
+      react-router-dom:
+        specifier: ^7.9.1
+        version: 7.9.1(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
     devDependencies:
       '@types/react':
         specifier: ^18.2.43

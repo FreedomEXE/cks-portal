@@ -1,0 +1,442 @@
+/* Collapsible Order Item Styles - Like Recent Activity */
+.collapsedHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  user-select: none;
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+
+.expandArrow {
+  color: #6b7280;
+  flex-shrink: 0;
+}
+
+.orderTypeBadge {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.serviceType {
+  background-color: #dbeafe;
+  color: #1e40af;
+}
+
+.supplyType {
+  background-color: #fef3c7;
+  color: #92400e;
+}
+
+.orderIdCompact {
+  font-weight: 600;
+  font-size: 14px;
+  color: #3b82f6;
+  flex-shrink: 0;
+}
+
+.titleCompact {
+  font-size: 14px;
+  color: #6b7280;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.statusBadge {
+  padding: 4px 12px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.expandedContent {
+  padding: 0 16px 16px 44px;
+  border-top: 1px solid #f3f4f6;
+  margin-top: 8px;
+  animation: slideDown 0.2s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    max-height: 500px;
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.7);
+  }
+  50% {
+    opacity: 0.9;
+    box-shadow: 0 0 0 8px rgba(251, 191, 36, 0);
+  }
+}
+
+.transformedInfo {
+  margin-top: 12px;
+  padding: 8px 12px;
+  background-color: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #15803d;
+}
+
+/* Original Card Styles */
+.orderCard {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  padding: 20px;
+  margin-bottom: 16px;
+  transition: box-shadow 0.3s ease;
+}
+
+.orderCard:hover {
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
+}
+
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.orderInfo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.orderId {
+  font-weight: 600;
+  font-size: 14px;
+  color: #1f2937;
+}
+
+
+.status {
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.statusGreen {
+  background-color: #d1fae5;
+  color: #065f46;
+}
+
+.statusYellow {
+  background-color: #fef3c7;
+  color: #92400e;
+}
+
+.statusRed {
+  background-color: #fee2e2;
+  color: #991b1b;
+}
+
+.statusBlue {
+  background-color: #dbeafe;
+  color: #1e40af;
+}
+
+.statusGray {
+  background-color: #f3f4f6;
+  color: #4b5563;
+}
+
+.cardBody {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #111827;
+  margin: 0;
+}
+
+.metadata {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  font-size: 14px;
+}
+
+.metaItem {
+  display: flex;
+  gap: 6px;
+}
+
+.metaLabel {
+  color: #6b7280;
+}
+
+.metaValue {
+  color: #1f2937;
+  font-weight: 500;
+}
+
+/* Section Styles */
+.sectionTitle {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #374151;
+  margin-bottom: 12px;
+  margin-top: 0;
+}
+
+/* Order Details Section */
+.orderDetailsSection {
+  background-color: #f9fafb;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 20px;
+}
+
+.detailsRow {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.detailItem {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  flex: 1;
+  min-width: 200px;
+}
+
+.detailLabel {
+  font-size: 12px;
+  color: #6b7280;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+
+.detailLabel::after {
+  content: ':';
+  margin-left: 2px;
+}
+
+.detailValue {
+  font-size: 14px;
+  color: #111827;
+  font-weight: 500;
+}
+
+/* Approval Workflow Section */
+.approvalWorkflow {
+  background-color: #f9fafb;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 20px;
+}
+
+.workflowTitle {
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+  margin: 0 0 12px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Actions Section */
+.actionsSection {
+  background-color: #f9fafb;
+  border-radius: 6px;
+  padding: 12px;
+  margin-top: 20px;
+}
+
+.workflowStages {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px 0;
+}
+
+.stageContainer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stage {
+  min-width: 100px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  text-align: center;
+  background: white;
+  border: 2px solid;
+}
+
+.stage.statusGreen {
+  border-color: #10b981;
+  background-color: #f0fdf4;
+}
+
+.stage.statusYellow {
+  border-color: #f59e0b;
+  background-color: #fffbeb;
+}
+
+.stage.statusRed {
+  border-color: #ef4444;
+  background-color: #fef2f2;
+}
+
+.stage.statusGray {
+  border-color: #d1d5db;
+  background-color: #f9fafb;
+}
+
+/* Pulsing animation for pending/waiting stages */
+.pulsingStage {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  position: relative;
+}
+
+.stageRole {
+  font-size: 12px;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 2px;
+}
+
+.stageStatus {
+  font-size: 11px;
+  color: #6b7280;
+  text-transform: capitalize;
+}
+
+.stageUser {
+  font-size: 11px;
+  color: #4b5563;
+  margin-top: 2px;
+  font-style: italic;
+}
+
+.stageArrow {
+  color: #9ca3af;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.details {
+  padding: 12px;
+  background-color: #f9fafb;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #4b5563;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-top: 8px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.actionButton {
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.actionButton:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.actionApprove {
+  background-color: #10b981;
+  color: white;
+}
+
+.actionApprove:hover {
+  background-color: #059669;
+}
+
+.actionReject {
+  background-color: #ef4444;
+  color: white;
+}
+
+.actionReject:hover {
+  background-color: #dc2626;
+}
+
+.actionAssign {
+  background-color: #3b82f6;
+  color: white;
+}
+
+.actionAssign:hover {
+  background-color: #2563eb;
+}
+
+.actionDefault {
+  background-color: #6b7280;
+  color: white;
+}
+
+.actionDefault:hover {
+  background-color: #4b5563;
+}
+
+@media (max-width: 768px) {
+  .metadata {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .workflowStages {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .stageArrow {
+    transform: rotate(90deg);
+    margin: 4px 0;
+  }
+}

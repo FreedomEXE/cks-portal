@@ -1,6 +1,7 @@
-﻿#!/usr/bin/env sh
-if [ -f \"/_/husky.sh\" ]; then . \"/_/husky.sh\"; fi
-echo 'pre-push: codegen + typecheck + tests'
+#!/usr/bin/env sh
+if [ -f "$PWD/.husky/_/husky.sh" ]; then . "$PWD/.husky/_/husky.sh"; fi
+echo "pre-push: codegen + typecheck + tests"
 pnpm codegen || exit 1
 pnpm run typecheck || true
 pnpm test || exit 1
+
