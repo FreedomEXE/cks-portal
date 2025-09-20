@@ -1,1 +1,0 @@
-{"version":3,"file":"inventory.schema.js","sourceRoot":"","sources":["../../../../server/roles/warehouse/validators/inventory.schema.ts"],"names":[],"mappings":";AAAA;;;iDAGiD;;;AAEjD;;;;;;;GAOG;AAEH,6BAAwB;AAExB,yCAAyC;AAC5B,QAAA,iBAAiB,GAAG,OAAC,CAAC,MAAM,CAAC;IACxC,OAAO,EAAE,OAAC,CAAC,MAAM,EAAE,CAAC,OAAO,CAAC,yCAAyC,CAAC;CACvE,CAAC,CAAC"}

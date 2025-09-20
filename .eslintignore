@@ -1,8 +1,0 @@
-legacy-codebase/
-node_modules/
-dist/
-build/
-**/dist/**
-**/build/**
-**/node_modules/**
-

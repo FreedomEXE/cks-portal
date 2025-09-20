@@ -1,1 +1,0 @@
-{"version":3,"file":"orders.schema.js","sourceRoot":"","sources":["../../../../server/roles/customer/validators/orders.schema.ts"],"names":[],"mappings":";AAAA;;;iDAGiD;;;AAEjD;;;;;;;GAOG;AAEH,6BAAwB;AAExB,yCAAyC;AAC5B,QAAA,iBAAiB,GAAG,OAAC,CAAC,MAAM,CAAC;IACxC,OAAO,EAAE,OAAC,CAAC,MAAM,EAAE,CAAC,OAAO,CAAC,sCAAsC,CAAC;CACpE,CAAC,CAAC"}
