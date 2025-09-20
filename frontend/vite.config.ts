@@ -10,14 +10,18 @@ export default defineConfig({
       '@cks-auth': path.resolve(__dirname, '../auth/src'),
       '@cks-ui': path.resolve(__dirname, '../packages/ui/src'),
       '@cks-domain': path.resolve(__dirname, '../packages/domain-widgets/src'),
-      '@clerk/clerk-react': path.resolve(__dirname, '../Test-Interface/src/mocks/clerk-react.tsx'),
     },
   },
   server: {
     port: 5173,
     open: true,
-    fs: {
-      allow: ['..'],
+    fs: { allow: ['..'] },
+    proxy: {
+      '/api': {
+        target: 'http://localhost:4000',
+        changeOrigin: true,
+        secure: false,
+      },
     },
   },
   preview: {

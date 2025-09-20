@@ -1,5 +1,5 @@
 /**
- * OG Login page — copied from frontend/src/pages/Login.tsx
+ * OG Login page Ã¢â‚¬â€ copied from frontend/src/pages/Login.tsx
  * Kept intact to preserve visuals and flow.
  */
 import { FormEvent, useEffect, useRef, useState } from 'react';
@@ -65,42 +65,59 @@ export default function Login() {
   const [error, setError] = useState<string | null>(null);
   const redirectedRef = useRef(false);
 
-  useEffect(() => { try { sessionStorage.removeItem('impersonate'); } catch {} }, []);
-
   useEffect(() => {
-    if (!isSignedIn || redirectedRef.current) return;
+  if (!isSignedIn || redirectedRef.current) return;
+
+  (async () => {
     try {
       const wasLoggedOut = localStorage.getItem('userLoggedOut') === 'true';
-      if (wasLoggedOut) { localStorage.removeItem('userLoggedOut'); return; }
-    } catch {}
-    redirectedRef.current = true;
-    (async () => {
+      if (wasLoggedOut) {
+        localStorage.removeItem('userLoggedOut');
+        return;
+      }
+
+      redirectedRef.current = true;
+
+      let destId = '';
       try {
-        let destId = '';
-        try { destId = (sessionStorage.getItem('code') || '').toLowerCase(); } catch {}
+        destId = (sessionStorage.getItem('code') || '').toLowerCase();
+      } catch {}
+
+      const bootstrapUrl = buildUrl('/me/bootstrap');
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 2500);
+      const response = await apiFetch(bootstrapUrl, { signal: controller.signal });
+      clearTimeout(timeout);
+
+      if (!response.ok) {
+        console.error('Bootstrap request failed', response.status);
+        return;
+      }
+
+      const data = await response.json();
+      const role = (data?.role || data?.kind || '').toLowerCase();
+      const code = (data?.code || data?.internal_code || '').toLowerCase();
+
+      if (role) { try { sessionStorage.setItem('role', role); } catch {} }
+      if (code) { try { sessionStorage.setItem('code', code); } catch {} }
+
+      if (!destId) {
+        destId = code;
+      }
+
+      if (!destId) {
         const userEmail = user?.primaryEmailAddress?.emailAddress || '';
         const emailPrefix = (userEmail.split('@')[0] || '').toLowerCase();
         const uname = (user?.username || '').toLowerCase();
-        try {
-          const bootstrapUrl = buildUrl('/me/bootstrap');
-          const controller = new AbortController();
-          const timeout = setTimeout(() => controller.abort(), 2500);
-          const r = await apiFetch(bootstrapUrl, { signal: controller.signal });
-          clearTimeout(timeout);
-          if (r.ok) {
-            const js = await r.json();
-            const role = (js?.role || js?.kind || '').toLowerCase();
-            const code = (js?.code || js?.internal_code || '').toLowerCase();
-            if (role) { try { sessionStorage.setItem('role', role); } catch {} }
-            if (code) { try { sessionStorage.setItem('code', code); } catch {} }
-            destId = destId || code;
-          }
-        } catch {}
-        destId = destId || uname || emailPrefix;
-        navigate(destId ? `/${destId}/hub` : '/hub', { replace: true });
-      } catch { navigate('/hub', { replace: true }); }
-    })();
-  }, [isSignedIn, navigate, user]);
+        destId = emailPrefix || uname || 'admin';
+      }
+
+      navigate(destId ? `/${destId}/hub` : '/hub', { replace: true });
+    } catch (err) {
+      console.error('Bootstrap navigation skipped:', err);
+    }
+  })();
+}, [isSignedIn, navigate, user]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -224,7 +241,7 @@ export default function Login() {
             />
           </div>
           <button type="submit" className="btn btn-primary w-full text-base md:text-lg py-3" disabled={loading || !isLoaded}>
-            {loading ? 'Signing in…' : 'Sign in'}
+            {loading ? 'Signing inÃ¢â‚¬Â¦' : 'Sign in'}
           </button>
           <div className="flex items-center justify-center mt-2 text-xs md:text-sm text-gray-400">
             <a href="/forgot" className="hover:underline">Forgot password?</a>
