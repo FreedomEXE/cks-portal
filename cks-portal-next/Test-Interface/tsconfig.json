@@ -17,7 +17,9 @@
       "@/*": ["src/*"],
       "@cks-hubs/*": ["../Frontend/src/hubs/*"],
       "@cks-packages/*": ["../../packages/*"],
-      "@cks-frontend/*": ["../Frontend/src/*"]
+      "@cks-frontend/*": ["../Frontend/src/*"],
+      "@cks-auth/*": ["../Auth/src/*"],
+      "@clerk/clerk-react": ["./src/mocks/clerk-react"]
     }
   },
   "include": ["src/**/*"],

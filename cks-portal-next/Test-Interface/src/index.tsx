@@ -26,6 +26,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import TestInterface from './TestInterface'
+import './index.css'
 
 // Global test environment setup
 declare global {
