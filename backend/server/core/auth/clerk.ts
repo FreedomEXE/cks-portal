@@ -1,14 +1,12 @@
-import { FastifyReply, FastifyRequest } from 'fastify';
+﻿import { FastifyReply, FastifyRequest } from "fastify";
+import { findAdminUserByClerkIdentifier } from "../../domains/adminUsers/store";
+import type { AdminUserStatus } from "../../domains/adminUsers/types";
 
 const CLERK_SECRET_KEY = process.env.CLERK_SECRET_KEY;
-const CLERK_API_URL = process.env.CLERK_API_URL || 'https://api.clerk.com';
-const ADMIN_IDENTIFIERS = (process.env.CLERK_ADMIN_IDENTIFIERS || 'freedom_exe|freedom_exe@cks.test')
-  .split(',')
-  .map((entry) => entry.trim().toLowerCase())
-  .filter(Boolean);
+const CLERK_API_URL = process.env.CLERK_API_URL || "https://api.clerk.com";
 
 if (!CLERK_SECRET_KEY) {
-  throw new Error('CLERK_SECRET_KEY is required to verify Clerk sessions.');
+  throw new Error("CLERK_SECRET_KEY is required to verify Clerk sessions.");
 }
 
 interface ClerkSession {
@@ -28,18 +26,14 @@ export interface AuthContext {
   userId: string;
   email?: string;
   username?: string;
-  role: 'admin' | 'unknown';
-}
-
-function isAdmin(username?: string | null, email?: string | null): boolean {
-  const normalizedUser = (username || '').toLowerCase();
-  const normalizedEmail = (email || '').toLowerCase();
-  return ADMIN_IDENTIFIERS.includes(normalizedUser) || ADMIN_IDENTIFIERS.includes(normalizedEmail);
+  role: "admin" | "unknown";
+  cksCode?: string;
+  status: AdminUserStatus | "unknown";
 }
 
 export async function authenticate(request: FastifyRequest, reply: FastifyReply): Promise<AuthContext | null> {
-  const bearer = request.headers['authorization']?.replace(/^Bearer\s+/i, '');
-  const cookieSession = request.cookies['__session'] || request.cookies['__clerk_session'];
+  const bearer = request.headers["authorization"]?.replace(/^Bearer\s+/i, "");
+  const cookieSession = request.cookies["__session"] || request.cookies["__clerk_session"];
   const sessionToken = bearer || cookieSession;
 
   if (!sessionToken) {
@@ -48,10 +42,10 @@ export async function authenticate(request: FastifyRequest, reply: FastifyReply)
   }
 
   const verifyResponse = await fetch(`${CLERK_API_URL}/v1/sessions/${sessionToken}/verify`, {
-    method: 'POST',
+    method: "POST",
     headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${CLERK_SECRET_KEY}`,
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${CLERK_SECRET_KEY}`,
     },
     body: JSON.stringify({ token: sessionToken }),
   });
@@ -67,7 +61,24 @@ export async function authenticate(request: FastifyRequest, reply: FastifyReply)
   const email = user?.email_addresses?.find((e) => e.id === user.primary_email_address_id)?.email_address
     || user?.email_addresses?.[0]?.email_address;
   const username = user?.username || undefined;
-  const role: AuthContext['role'] = isAdmin(username, email) ? 'admin' : 'unknown';
+
+  const adminUser = await findAdminUserByClerkIdentifier({
+    clerkUserId: session.user_id,
+    email,
+    username,
+  });
+
+  let role: AuthContext["role"] = "unknown";
+  let cksCode: string | undefined;
+  let status: AuthContext["status"] = "unknown";
+
+  if (adminUser) {
+    status = adminUser.status;
+    if (adminUser.status === "active") {
+      role = adminUser.role;
+      cksCode = adminUser.cksCode;
+    }
+  }
 
   return {
     sessionId: session.id,
@@ -75,5 +86,7 @@ export async function authenticate(request: FastifyRequest, reply: FastifyReply)
     email,
     username,
     role,
+    cksCode,
+    status,
   };
 }

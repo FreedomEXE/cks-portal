@@ -5,9 +5,11 @@
   "scripts": {
     "dev": "tsx watch server/index.ts",
     "build": "tsc",
-    "test": "vitest"
+    "test": "vitest",
+    "migrate": "node scripts/migrate.js"
   },
   "devDependencies": {
+    "@types/pg": "^8.15.5",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2"
   },
@@ -15,6 +17,7 @@
     "@fastify/cookie": "^9.0.0",
     "@fastify/cors": "^9.0.0",
     "dotenv": "^17.2.2",
-    "fastify": "^4.26.2"
+    "fastify": "^4.26.2",
+    "pg": "^8.16.3"
   }
 }

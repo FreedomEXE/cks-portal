@@ -1,0 +1,13 @@
+﻿[
+  {
+    "id": "adm-1",
+    "clerkUserId": "usr_2a_admin",
+    "email": "admin@ckscontracting.ca",
+    "username": "freedom_exe",
+    "cksCode": "adm-cks-001",
+    "role": "admin",
+    "status": "active",
+    "createdAt": "2025-09-20T00:00:00.000Z",
+    "updatedAt": "2025-09-20T00:00:00.000Z"
+  }
+]
