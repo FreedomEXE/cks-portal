@@ -121,7 +121,7 @@ export function ActivityItem({
           fontSize: 13,
           color: colors.text,
           lineHeight: 1.5,
-          opacity: 0.9,
+          opacity: 1,
           wordWrap: 'break-word',
           overflowWrap: 'break-word',
         }}
@@ -130,10 +130,10 @@ export function ActivityItem({
       </div>
       <div
         style={{
-          fontSize: 11,
+          fontSize: 12,
           color: colors.text,
           marginTop: 6,
-          opacity: 0.6,
+          opacity: 0.85,
           display: 'flex',
           alignItems: 'center',
           gap: 8,

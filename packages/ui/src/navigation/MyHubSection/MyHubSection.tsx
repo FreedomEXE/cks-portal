@@ -102,12 +102,12 @@ export default function MyHubSection({
         {/* Welcome Message */}
         <div style={{
           fontSize: 14,
-          color: '#6b7280',
+          color: '#4b5563',
           marginBottom: 16
         }}>
           Welcome to {hubName}
           {userId && (
-            <span style={{ marginLeft: 8, fontSize: 12, color: '#9ca3af' }}>
+            <span style={{ marginLeft: 8, fontSize: 12, color: '#6b7280' }}>
               ({userId})
             </span>
           )}

@@ -1,6 +1,6 @@
-/*───────────────────────────────────────────────
-  Property of CKS  © 2025
-───────────────────────────────────────────────*/
+/*â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  Property of CKS  Â© 2025
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€*/
 /**
  * File: Button.tsx
  *
@@ -19,15 +19,15 @@
  * Notes:
  * Replaces inline button styles with consistent component
  */
-/*───────────────────────────────────────────────
+/*â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   Manifested by Freedom_EXE
-───────────────────────────────────────────────*/
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€*/
 
 import React from 'react';
 
 export interface ButtonProps {
   variant?: 'primary' | 'secondary' | 'danger' | 'ghost' | 'link';
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'sm' | 'md' | 'lg' | 'small' | 'medium' | 'large';
   onClick?: () => void;
   disabled?: boolean;
   className?: string;
@@ -107,9 +107,9 @@ export default function Button({
   };
 
   // Combine styles
-  const combinedStyles = {
+  const sizeMap: Record<string, 'sm' | 'md' | 'lg'> = { sm: 'sm', md: 'md', lg: 'lg', small: 'sm', medium: 'md', large: 'lg' };\r\n  const resolvedSize = sizeMap[size] ?? 'md';\r\n\r\n  const combinedStyles = {
     ...baseStyles,
-    ...(variant !== 'link' ? sizeStyles[size] : {}),
+    ...(variant !== 'link' ? sizeStyles[resolvedSize] : {}),
     ...variantStyles[variant],
   };
 

@@ -33,7 +33,7 @@
 .searchIcon {
   position: absolute;
   left: 16px;
-  color: #9ca3af;
+  color: #6b7280;
   pointer-events: none;
 }
 
@@ -58,7 +58,7 @@
 }
 
 .searchInput::placeholder {
-  color: #9ca3af;
+  color: #6b7280;
 }
 
 .actionButton {
