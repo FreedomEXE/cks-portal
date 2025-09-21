@@ -3,14 +3,24 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 
 export default defineConfig({
+  optimizeDeps: {
+    exclude: ['@clerk/clerk-react', 'use-sync-external-store/shim'],
+  },
+  ssr: {
+    noExternal: ['@clerk/clerk-react'],
+  },
+
   plugins: [react()],
   resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src'),
-      '@cks-auth': path.resolve(__dirname, '../auth/src'),
-      '@cks-ui': path.resolve(__dirname, '../packages/ui/src'),
-      '@cks-domain': path.resolve(__dirname, '../packages/domain-widgets/src'),
-    },
+    alias: [
+      { find: '@', replacement: path.resolve(__dirname, './src') },
+      { find: '@cks-auth', replacement: path.resolve(__dirname, '../auth/src') },
+      { find: '@cks-ui', replacement: path.resolve(__dirname, '../packages/ui/src') },
+      { find: '@cks-domain', replacement: path.resolve(__dirname, '../packages/domain-widgets/src') },
+      { find: 'use-sync-external-store/shim/index.js', replacement: path.resolve(__dirname, './src/shims/useSyncExternalStore/index.js') },
+      { find: 'use-sync-external-store/shim/index.mjs', replacement: path.resolve(__dirname, './src/shims/useSyncExternalStore/index.js') },
+      { find: 'use-sync-external-store/shim', replacement: path.resolve(__dirname, './src/shims/useSyncExternalStore/index.js') },
+    ],
   },
   server: {
     port: 5173,

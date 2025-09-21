@@ -1,12 +1,16 @@
-import './index.css';
 import '@cks-ui/styles/globals.css';
+import { ClerkProvider, SignedIn, SignedOut } from '@clerk/clerk-react';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
-import { ClerkProvider, SignedIn, SignedOut } from '@clerk/clerk-react';
 import { AuthenticatedApp, UnauthenticatedApp } from './App';
+import './index.css';
 
-const PUBLISHABLE_KEY = (import.meta as any).env?.VITE_CLERK_PUBLISHABLE_KEY || 'pk_test_dummy_key_for_ui_only';
+// Read the Clerk publishable key from Vite env. Do not hardcode or fall back to a dummy key.
+const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined;
+if (!PUBLISHABLE_KEY) {
+  throw new Error('Missing VITE_CLERK_PUBLISHABLE_KEY. Define it in frontend/.env or .env.local and restart the dev server.');
+}
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {

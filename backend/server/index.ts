@@ -1,11 +1,12 @@
-﻿import "dotenv/config";
+import "dotenv/config";
 import Fastify from "fastify";
 import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
 import { authenticate } from "./core/auth/clerk";
-import { findAdminUserByClerkIdentifier } from "./domains/adminUsers/store";
+import { getAdminUserByClerkId } from "./domains/adminUsers/store";
 import { registerAdminUserRoutes } from "./domains/adminUsers/routes";
 import type { AdminUserStatus } from "./domains/adminUsers/types";
+import { getConnection } from "./db/connection";
 
 type BootstrapResponse = {
   role: string;
@@ -34,22 +35,10 @@ export async function buildServer() {
       return reply.code(401).send({ error: "Unauthorized" });
     }
 
-    const adminUser = await findAdminUserByClerkIdentifier({
-      clerkUserId: authContext.userId,
-      email: authContext.email,
-      username: authContext.username,
-    });
+    const adminUser = await getAdminUserByClerkId(authContext.userId);
 
-    if (!adminUser) {
-      return reply.code(403).send({ error: "Forbidden" });
-    }
-
-    if (adminUser.status !== "active") {
-      return reply.code(403).send({ error: "Admin access is disabled", status: adminUser.status });
-    }
-
-    if (adminUser.role !== "admin") {
-      return reply.code(403).send({ error: "Forbidden" });
+    if (!adminUser || adminUser.status !== "active") {
+      return reply.code(401).send({ error: "Unauthorized" });
     }
 
     const response: BootstrapResponse = {
@@ -73,6 +62,16 @@ async function start() {
   const host = process.env.HOST ?? "0.0.0.0";
 
   try {
+    await server.ready();
+    try {
+      const pool = await getConnection();
+      const result = await pool.query<{ count: string }>('SELECT COUNT(*) AS count FROM admin_users');
+      const count = result.rows?.[0]?.count ?? "0";
+      server.log.info(`[db] Connected, admins: ${count}`);
+    } catch (dbError) {
+      server.log.warn({ err: dbError }, "[db] Connection check failed");
+    }
+
     await server.listen({ port, host });
     server.log.info(`Backend listening on http://${host}:${port}`);
   } catch (err) {

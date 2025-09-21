@@ -1,6 +1,6 @@
-/*â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  Property of CKS  Â© 2025
-â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€*/
+/*-----------------------------------------------
+  Property of CKS  © 2025
+-----------------------------------------------*/
 /**
  * File: AdminHub.tsx
  *
@@ -16,27 +16,26 @@
  * Notes:
  * To be implemented
  */
-/*â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+/*-----------------------------------------------
   Manifested by Freedom_EXE
-â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€*/
+-----------------------------------------------*/
 
-import React, { useState, useEffect } from 'react';
-import { fetchAdminUsers, type AdminUser } from '../shared/api/admin';
-import { Scrollbar } from '../../../packages/ui/src/Scrollbar';
-import MyHubSection from '../components/MyHubSection';
-import OverviewSection from '../../../packages/domain-widgets/src/overview';
+import { useEffect, useState } from 'react';
 import { RecentActivity, type Activity } from '../../../packages/domain-widgets/src/activity';
-import { NewsPreview } from '../../../packages/domain-widgets/src/news';
+import { ArchiveSection, AssignSection, CreateSection } from '../../../packages/domain-widgets/src/admin';
 import { MemosPreview } from '../../../packages/domain-widgets/src/memos';
-import DataTable from '../../../packages/ui/src/tables/DataTable';
-import NavigationTab from '../../../packages/ui/src/navigation/NavigationTab';
-import TabContainer from '../../../packages/ui/src/navigation/TabContainer';
-import Button from '../../../packages/ui/src/buttons/Button';
+import { NewsPreview } from '../../../packages/domain-widgets/src/news';
+import OverviewSection from '../../../packages/domain-widgets/src/overview';
 import { AdminSupportSection } from '../../../packages/domain-widgets/src/support';
-import { CreateSection, AssignSection, ArchiveSection } from '../../../packages/domain-widgets/src/admin';
+import Button from '../../../packages/ui/src/buttons/Button';
 import PageHeader from '../../../packages/ui/src/layout/PageHeader';
 import PageWrapper from '../../../packages/ui/src/layout/PageWrapper';
-import TabSection from '../../../packages/ui/src/layout/TabSection';
+import NavigationTab from '../../../packages/ui/src/navigation/NavigationTab';
+import TabContainer from '../../../packages/ui/src/navigation/TabContainer';
+import { Scrollbar } from '../../../packages/ui/src/Scrollbar';
+import DataTable from '../../../packages/ui/src/tables/DataTable';
+import MyHubSection from '../components/MyHubSection';
+import { fetchAdminUsers, useAdminUsers, type AdminUser } from '../shared/api/admin';
 
 interface AdminHubProps {
   initialTab?: string;
@@ -235,7 +234,7 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
             id: user.id,
             code,
             name,
-            email: user.email ?? '�',
+            email: user.email ?? 'N/A',
             status: user.status,
           };
         });
@@ -265,6 +264,24 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
     };
   }, []);
 
+
+  const { data: contractorUsers = [], isLoading: contractorsLoading, error: contractorsError } = useAdminUsers({ role: 'contractor', status: 'active' });
+
+  const contractorRows = contractorUsers.map((user) => {
+    const code = (user.cksCode || user.clerkUserId || '').toUpperCase();
+    const id = code || user.clerkUserId || 'N/A';
+    const displayName = user.fullName ?? user.email ?? (code || 'N/A');
+    return {
+      id,
+      companyName: displayName,
+      cksManager: user.reportsTo ?? 'N/A',
+      status: user.status,
+    };
+  });
+
+  const contractorsErrorMessage = contractorsError ? (contractorsError.message || 'Failed to load contractors') : null;
+  const contractorsStatusNotice = contractorsLoading ? 'Loading contractors...' : contractorsErrorMessage;
+  const contractorsEmptyMessage = contractorsErrorMessage ?? 'No contractors found';
 
   const directoryConfig = {
     contractors: {
@@ -299,7 +316,8 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
           )
         }
       ],
-      data: contractorsData
+      data: contractorRows,
+      emptyMessage: contractorsEmptyMessage,
     },
     managers: {
       columns: [
@@ -906,6 +924,16 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
                           : isLoadingAdminUsers
                             ? 'Loading admin directory...'
                             : `Showing ${adminUsers.length} admin ${adminUsers.length === 1 ? 'user' : 'users'}.`}
+                      </div>
+                    )}
+                    {directoryTab === 'contractors' && contractorsStatusNotice && (
+                      <div
+                        style={{
+                          fontSize: '13px',
+                          color: contractorsError ? '#dc2626' : '#64748b',
+                        }}
+                      >
+                        {contractorsStatusNotice}
                       </div>
                     )}
                     <DataTable

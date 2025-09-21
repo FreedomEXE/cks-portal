@@ -1,6 +1,6 @@
-/*â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  Property of CKS  Â© 2025
-â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€*/
+/*-----------------------------------------------
+  Property of CKS  © 2025
+-----------------------------------------------*/
 /**
  * File: ManagerHub.tsx
  *
@@ -17,27 +17,27 @@
  * Notes:
  * Uses MyHubSection for navigation
  */
-/*â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+/*-----------------------------------------------
   Manifested by Freedom_EXE
-â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€*/
+-----------------------------------------------*/
 
-import { useState, useEffect } from 'react';
-import { Scrollbar } from '../../../packages/ui/src/Scrollbar';
-import MyHubSection from '../components/MyHubSection';
-import OverviewSection from '../../../packages/domain-widgets/src/overview';
-import { RecentActivity, type Activity } from '../../../packages/domain-widgets/src/activity';
-import { NewsPreview } from '../../../packages/domain-widgets/src/news';
-import { MemosPreview } from '../../../packages/domain-widgets/src/memos';
-import { ProfileInfoCard } from '../../../packages/domain-widgets/src/profile';
+import { useEffect, useState } from 'react';
 import EcosystemTree, { type TreeNode } from '../../../packages/domain-widgets/EcosystemTree';
-import DataTable from '../../../packages/ui/src/tables/DataTable';
-import Button from '../../../packages/ui/src/buttons/Button';
+import { RecentActivity, type Activity } from '../../../packages/domain-widgets/src/activity';
+import { MemosPreview } from '../../../packages/domain-widgets/src/memos';
+import { NewsPreview } from '../../../packages/domain-widgets/src/news';
 import { OrdersSection } from '../../../packages/domain-widgets/src/OrdersSection';
-import { SupportSection } from '../../../packages/domain-widgets/src/support';
+import OverviewSection from '../../../packages/domain-widgets/src/overview';
+import { ProfileInfoCard } from '../../../packages/domain-widgets/src/profile';
 import { ReportsSection } from '../../../packages/domain-widgets/src/reports';
+import { SupportSection } from '../../../packages/domain-widgets/src/support';
+import Button from '../../../packages/ui/src/buttons/Button';
 import PageHeader from '../../../packages/ui/src/layout/PageHeader';
 import PageWrapper from '../../../packages/ui/src/layout/PageWrapper';
 import TabSection from '../../../packages/ui/src/layout/TabSection';
+import { Scrollbar } from '../../../packages/ui/src/Scrollbar';
+import DataTable from '../../../packages/ui/src/tables/DataTable';
+import MyHubSection from '../components/MyHubSection';
 
 interface ManagerHubProps {
   initialTab?: string;

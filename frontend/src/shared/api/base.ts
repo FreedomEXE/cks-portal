@@ -21,7 +21,9 @@
   Manifested by Freedom_EXE
 -----------------------------------------------*/
 
-export const API_BASE_URL = process.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
+// In Vite, use import.meta.env for runtime env vars. Default to '/api' so dev proxy can handle it.
+// Note: Avoid hardcoding a port here; rely on Vite dev server proxy or set VITE_API_BASE_URL explicitly for prod.
+export const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL || '/api';
 
 export async function fetchAPI<T = any>(endpoint: string, options?: RequestInit): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;

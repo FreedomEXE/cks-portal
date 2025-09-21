@@ -1,10 +1,10 @@
 /**
- * OG Login page ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â copied from frontend/src/pages/Login.tsx
+ * OG Login page — copied from frontend/src/pages/Login.tsx
  * Kept intact to preserve visuals and flow.
  */
+import { useAuth, useSignIn, useUser } from '@clerk/clerk-react';
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useSignIn, useAuth, useUser } from '@clerk/clerk-react';
 import logoSrc from '../assets/cks-logo.png';
 
 const DEV_PROXY_BASE = '/api';
@@ -87,7 +87,15 @@ export default function Login() {
       const bootstrapUrl = buildUrl('/me/bootstrap');
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 2500);
-      const response = await apiFetch(bootstrapUrl, { signal: controller.signal });
+      // Try to include a Bearer token for the backend in addition to cookies
+      let headers: HeadersInit | undefined = undefined;
+      try {
+        const w: any = typeof window !== 'undefined' ? (window as any) : null;
+        const token: string | null | undefined = await w?.Clerk?.session?.getToken?.();
+        if (token) headers = { Authorization: `Bearer ${token}` };
+      } catch {}
+
+      const response = await apiFetch(bootstrapUrl, { signal: controller.signal, headers });
       clearTimeout(timeout);
 
       if (!response.ok) {
@@ -245,7 +253,7 @@ export default function Login() {
             />
           </div>
           <button type="submit" className="btn btn-primary w-full text-base md:text-lg py-3" disabled={loading || !isLoaded}>
-            {loading ? 'Signing inÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦' : 'Sign in'}
+            {loading ? 'Signing in…' : 'Sign in'}
           </button>
           <div className="flex items-center justify-center mt-2 text-xs md:text-sm text-gray-400">
             <a href="/forgot" className="hover:underline">Forgot password?</a>
