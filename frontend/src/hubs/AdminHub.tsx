@@ -35,6 +35,8 @@ import TabContainer from '../../../packages/ui/src/navigation/TabContainer';
 import { Scrollbar } from '../../../packages/ui/src/Scrollbar';
 import DataTable from '../../../packages/ui/src/tables/DataTable';
 import MyHubSection from '../components/MyHubSection';
+import { useAuth as useClerkAuth } from '@clerk/clerk-react';
+
 import { fetchAdminUsers, useAdminUsers, type AdminUser } from '../shared/api/admin';
 
 interface AdminHubProps {
@@ -52,6 +54,7 @@ type AdminDirectoryRow = {
 export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
   const [activeTab, setActiveTab] = useState(initialTab);
   const [directoryTab, setDirectoryTab] = useState('managers');
+  const { getToken } = useClerkAuth();
 
   // Add scrollbar styles
   useEffect(() => {
@@ -222,7 +225,7 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
     async function loadAdminUsers() {
       setIsLoadingAdminUsers(true);
       try {
-        const data = await fetchAdminUsers();
+        const data = await fetchAdminUsers(getToken ? { getToken } : undefined);
         if (cancelled) {
           return;
         }
@@ -262,7 +265,7 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [getToken]);
 
 
   const { data: contractorUsers = [], isLoading: contractorsLoading, error: contractorsError } = useAdminUsers({ role: 'contractor', status: 'active' });

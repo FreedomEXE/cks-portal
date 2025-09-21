@@ -17,6 +17,13 @@ const RAW_API_BASE = import.meta.env.VITE_API_URL || DEV_PROXY_BASE;
 const API_BASE = RAW_API_BASE.replace(/\/+$/, '');
 const ROLE_KEY = 'role';
 const CODE_KEY = 'code';
+const BOOTSTRAP_ERROR_KEY = 'bootstrap_error';
+const BOOTSTRAP_ERROR_BACKOFF_MS = 30_000;
+
+type StoredBootstrapError = {
+  message: string;
+  at: number;
+};
 
 function sanitize(value: unknown): string | null {
   if (typeof value !== 'string') {
@@ -45,6 +52,41 @@ function writeStorage(key: string, value: string | null) {
   } catch {
     // ignore
   }
+}
+
+function readBootstrapError(): StoredBootstrapError | null {
+  try {
+    const raw = sessionStorage.getItem(BOOTSTRAP_ERROR_KEY);
+    if (!raw) {
+      return null;
+    }
+    const parsed = JSON.parse(raw) as StoredBootstrapError | null;
+    if (!parsed || typeof parsed.message !== 'string' || typeof parsed.at !== 'number') {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeBootstrapError(value: StoredBootstrapError | null) {
+  try {
+    if (!value) {
+      sessionStorage.removeItem(BOOTSTRAP_ERROR_KEY);
+      return;
+    }
+    sessionStorage.setItem(BOOTSTRAP_ERROR_KEY, JSON.stringify(value));
+  } catch {
+    // ignore
+  }
+}
+
+function shouldHoldBootstrapError(error: StoredBootstrapError | null): error is StoredBootstrapError {
+  if (!error) {
+    return false;
+  }
+  return Date.now() - error.at < BOOTSTRAP_ERROR_BACKOFF_MS;
 }
 
 function fallbackCode(existing: string | null, userEmail: string | null, username: string | null): string | null {
@@ -81,11 +123,18 @@ export function useAuth(): AuthState {
   const [state, setState] = useState<Omit<AuthState, 'refresh'>>(() => {
     const storedRole = readStorage(ROLE_KEY);
     const storedCode = readStorage(CODE_KEY);
+    const storedError = storedRole ? null : readBootstrapError();
+    const holdError = storedRole ? false : shouldHoldBootstrapError(storedError);
+
+    if (storedError && !holdError) {
+      writeBootstrapError(null);
+    }
+
     return {
-      status: storedRole ? 'ready' : 'idle',
+      status: storedRole ? 'ready' : holdError ? 'error' : 'idle',
       role: storedRole,
       code: storedCode,
-      error: null,
+      error: holdError && storedError ? new Error(storedError.message) : null,
     };
   });
 
@@ -159,6 +208,7 @@ export function useAuth(): AuthState {
       }
 
       setState({ status: 'ready', role: rawRole, code: resolvedCode, error: null });
+      writeBootstrapError(null);
     } catch (err) {
       const fallbackRole = readStorage(ROLE_KEY);
       const fallbackCodeValue = readStorage(CODE_KEY);
@@ -170,8 +220,11 @@ export function useAuth(): AuthState {
       if (isAbortError(err)) {
         if (fallbackRole) {
           setState({ status: 'ready', role: fallbackRole, code: fallbackCodeValue, error: null });
+          writeBootstrapError(null);
         } else {
-          setState({ status: 'error', role: null, code: null, error: new Error('Bootstrap aborted') });
+          const error = new Error('Bootstrap aborted');
+          setState({ status: 'error', role: null, code: null, error });
+          writeBootstrapError({ message: error.message, at: Date.now() });
         }
         return;
       }
@@ -181,10 +234,12 @@ export function useAuth(): AuthState {
 
       if (fallbackRole) {
         setState({ status: 'ready', role: fallbackRole, code: fallbackCodeValue, error: null });
+        writeBootstrapError(null);
       } else {
         setState({ status: 'error', role: null, code: null, error });
         writeStorage(ROLE_KEY, null);
         writeStorage(CODE_KEY, null);
+        writeBootstrapError({ message: error.message, at: Date.now() });
       }
     } finally {
       if (timeout) {
@@ -207,6 +262,7 @@ export function useAuth(): AuthState {
       fetchingRef.current = false;
       writeStorage(ROLE_KEY, null);
       writeStorage(CODE_KEY, null);
+      writeBootstrapError(null);
       setState({ status: 'idle', role: null, code: null, error: null });
       return;
     }
