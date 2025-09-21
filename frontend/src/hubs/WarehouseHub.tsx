@@ -1,6 +1,6 @@
-/*───────────────────────────────────────────────
-  Property of CKS  © 2025
-───────────────────────────────────────────────*/
+/*â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  Property of CKS  Â© 2025
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€*/
 /**
  * File: WarehouseHub.tsx
  *
@@ -17,13 +17,13 @@
  * Notes:
  * Uses MyHubSection for navigation
  */
-/*───────────────────────────────────────────────
+/*â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   Manifested by Freedom_EXE
-───────────────────────────────────────────────*/
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€*/
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { Scrollbar } from '../../../packages/ui/src/Scrollbar';
-import MyHubSection from '../../../packages/ui/src/navigation/MyHubSection';
+import MyHubSection from '../components/MyHubSection';
 import OverviewSection from '../../../packages/domain-widgets/src/overview';
 import { RecentActivity, type Activity } from '../../../packages/domain-widgets/src/activity';
 import { NewsPreview } from '../../../packages/domain-widgets/src/news';
@@ -578,7 +578,7 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
       quantity: 15,
       destination: 'CTR-001',
       status: 'pending',
-      deliveryDate: '—'
+      deliveryDate: 'â€”'
     },
     {
       orderId: 'CTR002-ORD-PRD003',
@@ -586,7 +586,7 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
       quantity: 8,
       destination: 'CTR-002',
       status: 'pending',
-      deliveryDate: '—'
+      deliveryDate: 'â€”'
     }
   ];
 
@@ -643,11 +643,6 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
     { id: 'support', label: 'Support', path: '/warehouse/support' }
   ];
 
-  const handleLogout = () => {
-    console.log('Warehouse Hub logout');
-    // Implement logout logic
-  };
-
   // Warehouse-specific overview cards (5 cards)
   const overviewCards = [
     { id: 'products', title: 'Product Count', dataKey: 'productCount', color: 'purple' },
@@ -669,8 +664,8 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
   // Mock services data for warehouse
   const myServicesData = [
     { serviceId: 'SRV-041', serviceName: 'Inventory Management', type: 'Recurring', certified: 'Yes', certificationDate: '2023-01-15', expires: '2026-01-15' },
-    { serviceId: 'SRV-042', serviceName: 'Order Fulfillment', type: 'One-time', certified: 'Yes', certificationDate: '2023-03-20', expires: '—' },
-    { serviceId: 'SRV-043', serviceName: 'Shipping & Receiving', type: 'Recurring', certified: 'No', certificationDate: '—', expires: '—' },
+    { serviceId: 'SRV-042', serviceName: 'Order Fulfillment', type: 'One-time', certified: 'Yes', certificationDate: '2023-03-20', expires: 'â€”' },
+    { serviceId: 'SRV-043', serviceName: 'Shipping & Receiving', type: 'Recurring', certified: 'No', certificationDate: 'â€”', expires: 'â€”' },
     { serviceId: 'SRV-044', serviceName: 'Quality Control', type: 'One-time', certified: 'Yes', certificationDate: '2024-02-10', expires: '2025-02-10' },
   ];
 
@@ -694,7 +689,6 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
         tabs={tabs}
         activeTab={activeTab}
         onTabClick={setActiveTab}
-        onLogout={handleLogout}
         userId="WHS-001"
         role="warehouse"
       />
@@ -1159,3 +1153,4 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
     </div>
   );
 }
+

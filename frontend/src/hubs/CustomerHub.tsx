@@ -1,6 +1,6 @@
-/*───────────────────────────────────────────────
-  Property of CKS  © 2025
-───────────────────────────────────────────────*/
+/*â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  Property of CKS  Â© 2025
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€*/
 /**
  * File: CustomerHub.tsx
  *
@@ -17,13 +17,13 @@
  * Notes:
  * Uses MyHubSection for navigation
  */
-/*───────────────────────────────────────────────
+/*â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   Manifested by Freedom_EXE
-───────────────────────────────────────────────*/
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€*/
 
 import React, { useState, useEffect } from 'react';
 import { Scrollbar } from '../../../packages/ui/src/Scrollbar';
-import MyHubSection from '../../../packages/ui/src/navigation/MyHubSection';
+import MyHubSection from '../components/MyHubSection';
 import OverviewSection from '../../../packages/domain-widgets/src/overview';
 import { RecentActivity, type Activity } from '../../../packages/domain-widgets/src/activity';
 import { NewsPreview } from '../../../packages/domain-widgets/src/news';
@@ -449,11 +449,6 @@ export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubPro
     { id: 'support', label: 'Support', path: '/customer/support' }
   ];
 
-  const handleLogout = () => {
-    console.log('Customer Hub logout');
-    // Implement logout logic
-  };
-
   // Customer-specific overview cards (5 cards)
   const overviewCards = [
     { id: 'services', title: 'Active Services', dataKey: 'serviceCount', color: 'blue' },
@@ -500,7 +495,6 @@ export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubPro
         tabs={tabs}
         activeTab={activeTab}
         onTabClick={setActiveTab}
-        onLogout={handleLogout}
         userId="CUS-001"
         role="customer"
       />
@@ -711,3 +705,4 @@ export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubPro
     </div>
   );
 }
+

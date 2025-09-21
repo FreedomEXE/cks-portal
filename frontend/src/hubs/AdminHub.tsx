@@ -1,6 +1,6 @@
-/*───────────────────────────────────────────────
-  Property of CKS  © 2025
-───────────────────────────────────────────────*/
+/*â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  Property of CKS  Â© 2025
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€*/
 /**
  * File: AdminHub.tsx
  *
@@ -16,13 +16,13 @@
  * Notes:
  * To be implemented
  */
-/*───────────────────────────────────────────────
+/*â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   Manifested by Freedom_EXE
-───────────────────────────────────────────────*/
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€*/
 
 import React, { useState, useEffect } from 'react';
 import { Scrollbar } from '../../../packages/ui/src/Scrollbar';
-import MyHubSection from '../../../packages/ui/src/navigation/MyHubSection';
+import MyHubSection from '../components/MyHubSection';
 import OverviewSection from '../../../packages/domain-widgets/src/overview';
 import { RecentActivity, type Activity } from '../../../packages/domain-widgets/src/activity';
 import { NewsPreview } from '../../../packages/domain-widgets/src/news';
@@ -117,11 +117,6 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
     { id: 'archive', label: 'Archive', path: '/admin/archive' },
     { id: 'support', label: 'Support', path: '/admin/support' },
   ];
-
-  const handleLogout = () => {
-    console.log('Admin logout');
-    // Implement logout logic
-  };
 
   // Admin-specific overview cards (4 cards)
   const overviewCards = [
@@ -672,7 +667,6 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
         tabs={tabs}
         activeTab={activeTab}
         onTabClick={setActiveTab}
-        onLogout={handleLogout}
         userId="ADM-001"
         role="admin"
       />
@@ -863,3 +857,4 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
     </div>
   );
 }
+

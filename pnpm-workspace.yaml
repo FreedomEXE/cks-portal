@@ -1,27 +1,11 @@
-﻿#-----------------------------------------------
-#  Property of CKS  (c) 2025
-#-----------------------------------------------
-# File: pnpm-workspace.yaml
-#
-# Description:
-# Short what/why
-#
-# Responsibilities:
-# - Key responsibility
-# - Another responsibility
-#
-# Role in system:
-# - Who imports/uses this; high-level
-#
-# Notes:
-# Special behaviors, flags, envs
-#-----------------------------------------------
-#  Manifested by Freedom_EXE
-#-----------------------------------------------
 packages:
-  - 'auth'
-  - 'gateway'
-  - 'backend'
-  - 'frontend'
-  - 'shared'
-  - 'Test-Interface'
+  - auth
+  - gateway
+  - backend
+  - frontend
+  - shared
+  - Test-Interface
+
+ignoredBuiltDependencies:
+  - '@clerk/shared'
+  - esbuild

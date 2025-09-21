@@ -1,6 +1,6 @@
-/*───────────────────────────────────────────────
-  Property of CKS  © 2025
-───────────────────────────────────────────────*/
+/*â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  Property of CKS  Â© 2025
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€*/
 /**
  * File: CrewHub.tsx
  *
@@ -17,13 +17,13 @@
  * Notes:
  * Uses MyHubSection for navigation
  */
-/*───────────────────────────────────────────────
+/*â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   Manifested by Freedom_EXE
-───────────────────────────────────────────────*/
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€*/
 
 import React, { useState, useEffect } from 'react';
 import { Scrollbar } from '../../../packages/ui/src/Scrollbar';
-import MyHubSection from '../../../packages/ui/src/navigation/MyHubSection';
+import MyHubSection from '../components/MyHubSection';
 import OverviewSection from '../../../packages/domain-widgets/src/overview';
 import { RecentActivity, type Activity } from '../../../packages/domain-widgets/src/activity';
 import { NewsPreview } from '../../../packages/domain-widgets/src/news';
@@ -411,11 +411,6 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
     { id: 'support', label: 'Support', path: '/crew/support' }
   ];
 
-  const handleLogout = () => {
-    console.log('Crew Hub logout');
-    // Implement logout logic
-  };
-
   // Crew-specific overview cards (5 cards)
   const overviewCards = [
     { id: 'services', title: 'Active Services', dataKey: 'serviceCount', color: 'blue' },
@@ -438,8 +433,8 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
   const myServicesData = [
     { serviceId: 'SRV-031', serviceName: 'Floor Care & Maintenance', type: 'Recurring', certified: 'Yes', certificationDate: '2023-03-15', expires: '2026-03-15' },
     { serviceId: 'SRV-032', serviceName: 'Window Cleaning', type: 'One-time', certified: 'Yes', certificationDate: '2023-08-20', expires: '2025-08-20' },
-    { serviceId: 'SRV-033', serviceName: 'Equipment Operation', type: 'Recurring', certified: 'No', certificationDate: '—', expires: '—' },
-    { serviceId: 'SRV-034', serviceName: 'Safety Protocols', type: 'One-time', certified: 'Yes', certificationDate: '2022-12-05', expires: '—' },
+    { serviceId: 'SRV-033', serviceName: 'Equipment Operation', type: 'Recurring', certified: 'No', certificationDate: 'â€”', expires: 'â€”' },
+    { serviceId: 'SRV-034', serviceName: 'Safety Protocols', type: 'One-time', certified: 'Yes', certificationDate: '2022-12-05', expires: 'â€”' },
   ];
 
   const activeServicesData = [
@@ -462,7 +457,6 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
         tabs={tabs}
         activeTab={activeTab}
         onTabClick={setActiveTab}
-        onLogout={handleLogout}
         userId="CRW-001"
         role="crew"
       />
@@ -696,3 +690,4 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
     </div>
   );
 }
+

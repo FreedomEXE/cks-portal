@@ -1,6 +1,6 @@
-/*───────────────────────────────────────────────
-  Property of CKS  © 2025
-───────────────────────────────────────────────*/
+/*â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  Property of CKS  Â© 2025
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€*/
 /**
  * File: ManagerHub.tsx
  *
@@ -17,13 +17,13 @@
  * Notes:
  * Uses MyHubSection for navigation
  */
-/*───────────────────────────────────────────────
+/*â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   Manifested by Freedom_EXE
-───────────────────────────────────────────────*/
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€*/
 
 import { useState, useEffect } from 'react';
 import { Scrollbar } from '../../../packages/ui/src/Scrollbar';
-import MyHubSection from '../../../packages/ui/src/navigation/MyHubSection';
+import MyHubSection from '../components/MyHubSection';
 import OverviewSection from '../../../packages/domain-widgets/src/overview';
 import { RecentActivity, type Activity } from '../../../packages/domain-widgets/src/activity';
 import { NewsPreview } from '../../../packages/domain-widgets/src/news';
@@ -515,11 +515,6 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
     { id: 'support', label: 'Support', path: '/manager/support' }
   ];
 
-  const handleLogout = () => {
-    console.log('Manager Hub logout');
-    // Implement logout logic
-  };
-
   // Manager-specific overview cards (6 cards)
   const overviewCards = [
     { id: 'contractors', title: 'My Contractors', dataKey: 'contractorCount', color: 'blue' },
@@ -543,8 +538,8 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
   // Mock services data
   const myServicesData = [
     { serviceId: 'SRV-001', serviceName: 'Commercial Deep Cleaning', certified: 'Yes', certificationDate: '2024-03-15', expires: '2026-03-15' },
-    { serviceId: 'SRV-002', serviceName: 'Floor Care & Maintenance', certified: 'Yes', certificationDate: '2024-01-10', expires: '—' },
-    { serviceId: 'SRV-003', serviceName: 'Window Cleaning Services', certified: 'No', certificationDate: '—', expires: '—' },
+    { serviceId: 'SRV-002', serviceName: 'Floor Care & Maintenance', certified: 'Yes', certificationDate: '2024-01-10', expires: 'â€”' },
+    { serviceId: 'SRV-003', serviceName: 'Window Cleaning Services', certified: 'No', certificationDate: 'â€”', expires: 'â€”' },
     { serviceId: 'SRV-004', serviceName: 'HVAC Maintenance', certified: 'Yes', certificationDate: '2024-02-20', expires: '2025-02-20' },
   ];
 
@@ -569,7 +564,6 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
         tabs={tabs}
         activeTab={activeTab}
         onTabClick={setActiveTab}
-        onLogout={handleLogout}
         userId="MGR-001"
         role="manager"
       />
@@ -799,3 +793,4 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
     </div>
   );
 }
+
