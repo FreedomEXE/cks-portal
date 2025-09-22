@@ -23,8 +23,8 @@
 ───────────────────────────────────────────────*/
 
 import React, { useState } from 'react';
-import { NavigationTab } from '../../../../ui/src/navigation/NavigationTab';
-import { TabContainer } from '../../../../ui/src/navigation/TabContainer';
+import { NavigationTab, TabContainer } from '@cks/ui';
+
 import { ProfileTab } from '../ProfileTab';
 import { AccountManagerTab, type AccountManagerInfo } from '../AccountManagerTab';
 import { SettingsTab } from '../SettingsTab';
@@ -133,3 +133,4 @@ export function ProfileInfoCard({
 }
 
 export default ProfileInfoCard;
+

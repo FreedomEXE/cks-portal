@@ -1,5 +1,4 @@
-import type { MyHubSectionProps } from '../../../packages/ui/src/navigation/MyHubSection';
-import BaseMyHubSection from '../../../packages/ui/src/navigation/MyHubSection';
+import { MyHubSection as BaseMyHubSection, type MyHubSectionProps } from '@cks/ui';
 import { useLogout } from '../hooks/useLogout';
 
 type Props = MyHubSectionProps;

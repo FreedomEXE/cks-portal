@@ -18,7 +18,7 @@ export default defineConfig({
       '@cks-packages': path.resolve(__dirname, '../../packages'),
       '@cks-frontend': path.resolve(__dirname, '../frontend/src'),
       // Auth package (pages/components/hooks)
-      '@cks-auth': path.resolve(__dirname, '../Auth/src'),
+      '@cks/auth': path.resolve(__dirname, '../../auth/src'),
       // Mock Clerk in the test interface to allow rendering Login without real keys
       '@clerk/clerk-react': path.resolve(__dirname, './src/mocks/clerk-react'),
       // Scoped package-style aliases used inside packages

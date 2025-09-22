@@ -6,7 +6,7 @@ dotenv.config({ path: path.resolve(__dirname, "../.env") });
 import Fastify from "fastify";
 import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
-import { authenticate } from "./core/auth/clerk";
+import { authenticate } from "./core/auth/authenticate";
 import { getAdminUserByClerkId } from "./domains/adminUsers/store";
 import { registerAdminUserRoutes } from "./domains/adminUsers/routes";
 import type { AdminUserStatus } from "./domains/adminUsers/types";

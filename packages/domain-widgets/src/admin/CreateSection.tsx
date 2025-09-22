@@ -19,10 +19,7 @@
 ───────────────────────────────────────────────*/
 
 import React, { useState } from 'react';
-import NavigationTab from '../../../ui/src/navigation/NavigationTab';
-import TabContainer from '../../../ui/src/navigation/TabContainer';
-import PageWrapper from '../../../ui/src/layout/PageWrapper';
-import Button from '../../../ui/src/buttons/Button';
+import { Button, NavigationTab, PageWrapper, TabContainer } from '@cks/ui';
 
 export default function CreateSection() {
   const [activeTab, setActiveTab] = useState('managers');
@@ -915,3 +912,4 @@ export default function CreateSection() {
     </PageWrapper>
   );
 }
+

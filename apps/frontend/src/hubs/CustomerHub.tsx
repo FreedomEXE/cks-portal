@@ -23,20 +23,8 @@
 
 import { useEffect, useState } from 'react';
 import EcosystemTree, { type TreeNode } from '../../../packages/domain-widgets/EcosystemTree';
-import { RecentActivity, type Activity } from '../../../packages/domain-widgets/src/activity';
-import { MemosPreview } from '../../../packages/domain-widgets/src/memos';
-import { NewsPreview } from '../../../packages/domain-widgets/src/news';
-import { OrdersSection } from '../../../packages/domain-widgets/src/OrdersSection';
-import OverviewSection from '../../../packages/domain-widgets/src/overview';
-import { ProfileInfoCard } from '../../../packages/domain-widgets/src/profile';
-import { ReportsSection } from '../../../packages/domain-widgets/src/reports';
-import { SupportSection } from '../../../packages/domain-widgets/src/support';
-import Button from '../../../packages/ui/src/buttons/Button';
-import PageHeader from '../../../packages/ui/src/layout/PageHeader';
-import PageWrapper from '../../../packages/ui/src/layout/PageWrapper';
-import TabSection from '../../../packages/ui/src/layout/TabSection';
-import { Scrollbar } from '../../../packages/ui/src/Scrollbar';
-import DataTable from '../../../packages/ui/src/tables/DataTable';
+import { MemosPreview, NewsPreview, OrdersSection, OverviewSection, ProfileInfoCard, RecentActivity, ReportsSection, SupportSection, type Activity } from '@cks/domain-widgets';
+import { Button, DataTable, PageHeader, PageWrapper, Scrollbar, TabSection } from '@cks/ui';
 import MyHubSection from '../components/MyHubSection';
 
 interface CustomerHubProps {

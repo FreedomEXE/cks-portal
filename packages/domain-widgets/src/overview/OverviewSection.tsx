@@ -24,7 +24,7 @@
 ───────────────────────────────────────────────*/
 
 import React from 'react';
-import OverviewCard from '../../../ui/src/cards/OverviewCard';
+import { OverviewCard } from '@cks/ui';
 
 export interface CardConfig {
   id: string;

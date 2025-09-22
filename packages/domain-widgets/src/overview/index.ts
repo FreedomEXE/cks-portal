@@ -1,2 +1,2 @@
-export { default } from './OverviewSection';
-export type { CardConfig, OverviewSectionProps } from './OverviewSection';
+export { default as OverviewSection } from './OverviewSection';
+export * from './OverviewSection';

@@ -19,11 +19,7 @@
 ───────────────────────────────────────────────*/
 
 import React, { useState } from 'react';
-import NavigationTab from '../../../ui/src/navigation/NavigationTab';
-import TabContainer from '../../../ui/src/navigation/TabContainer';
-import PageWrapper from '../../../ui/src/layout/PageWrapper';
-import DataTable from '../../../ui/src/tables/DataTable';
-import Button from '../../../ui/src/buttons/Button';
+import { Button, DataTable, NavigationTab, PageWrapper, TabContainer } from '@cks/ui';
 
 export default function AssignSection() {
   const [activeTab, setActiveTab] = useState('contractors');
@@ -257,3 +253,4 @@ export default function AssignSection() {
     </PageWrapper>
   );
 }
+

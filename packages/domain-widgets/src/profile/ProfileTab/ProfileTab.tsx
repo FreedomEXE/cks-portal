@@ -23,7 +23,7 @@
 ───────────────────────────────────────────────*/
 
 import React from 'react';
-import Button from '../../../../ui/src/buttons/Button';
+import { Button } from '@cks/ui';
 
 export interface ProfileTabProps {
   role: 'manager' | 'contractor' | 'customer' | 'center' | 'crew' | 'warehouse';

@@ -1,19 +1,19 @@
-﻿import React from 'react';
+import React from 'react';
 import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { renderToString } from 'react-dom/server';
 import { MemoryRouter } from 'react-router-dom';
 
 const mockUseAuth = vi.fn();
 
-vi.mock('@cks-auth/hooks/useAuth', () => ({
-  useAuth: () => mockUseAuth(),
+vi.mock('@cks/auth/hooks/useAuth', () => ({
+  useAuth: mockUseAuth,
 }));
 
 vi.mock('../hubs/AdminHub', () => ({
   default: () => <div>admin hub view</div>,
 }));
 
-vi.mock('@cks-auth/pages/Login', () => ({
+vi.mock('@cks/auth/pages/Login', () => ({
   default: () => <div>login page</div>,
 }));
 

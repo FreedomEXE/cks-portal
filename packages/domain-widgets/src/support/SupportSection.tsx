@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import TabSection from '../../../ui/src/layout/TabSection';
-import DataTable from '../../../ui/src/tables/DataTable';
+import { DataTable, TabSection } from '@cks/ui';
 
 interface FAQ {
   question: string;
@@ -570,3 +569,4 @@ const SupportSection: React.FC<SupportSectionProps> = ({
 };
 
 export default SupportSection;
+

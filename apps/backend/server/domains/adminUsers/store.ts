@@ -155,7 +155,6 @@ export async function getAdminUserByClerkId(clerkUserId: string): Promise<AdminU
     `SELECT ${SELECT_COLUMNS} FROM ${TABLE_NAME} WHERE clerk_user_id = $1 LIMIT 1`,
     [clerkUserId],
   );
-  console.log('[store] Query returned', result.rows.length, 'rows for', clerkUserId);
   return mapRow(result.rows[0]);
 }
 

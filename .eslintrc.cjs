@@ -1,2 +1,20 @@
-// Central ESLint config lives in .config/eslint.cjs to keep the repo root tidy.
-module.exports = require('./.config/eslint.cjs');
+const baseConfig = require('./.config/eslint.cjs');
+
+module.exports = {
+  ...baseConfig,
+  rules: {
+    ...(baseConfig.rules ?? {}),
+    'no-restricted-imports': [
+      'error',
+      {
+        patterns: [
+          '**/../*/src/**',
+          '**/../../*/src/**',
+          '**/../../../*/src/**'
+        ],
+        message:
+          'Import from the package public API (e.g., @cks/auth) instead of another package\'s src/.'
+      }
+    ]
+  }
+};

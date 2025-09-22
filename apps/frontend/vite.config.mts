@@ -14,7 +14,7 @@ export default defineConfig({
   resolve: {
     alias: [
       { find: '@', replacement: path.resolve(__dirname, './src') },
-      { find: '@cks-auth', replacement: path.resolve(__dirname, '../auth/src') },
+      { find: '@cks/auth', replacement: path.resolve(__dirname, '../auth/src') },
       { find: '@cks-ui', replacement: path.resolve(__dirname, '../packages/ui/src') },
       { find: '@cks-domain', replacement: path.resolve(__dirname, '../packages/domain-widgets/src') },
       { find: 'use-sync-external-store/shim/index.js', replacement: path.resolve(__dirname, './src/shims/useSyncExternalStore/index.js') },
@@ -28,7 +28,7 @@ export default defineConfig({
     fs: { allow: ['..'] },
     proxy: {
       '/api': {
-        target: 'http://localhost:4000',
+        target: 'http://localhost:3000',
         changeOrigin: true,
         secure: false,
       },

@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { ZodError } from 'zod';
-import { authenticate } from "../../core/auth/clerk";
+import { authenticate } from "../../core/auth/authenticate";
 import {
   createAdminUser,
   getAdminUserByClerkId,

@@ -22,7 +22,7 @@
 ───────────────────────────────────────────────*/
 
 import React from 'react';
-import Button from '../../../../ui/src/buttons/Button';
+import { Button } from '@cks/ui';
 
 export interface AccountManagerInfo {
   name: string;

@@ -21,19 +21,8 @@
 -----------------------------------------------*/
 
 import { useEffect, useState } from 'react';
-import { RecentActivity, type Activity } from '../../../packages/domain-widgets/src/activity';
-import { ArchiveSection, AssignSection, CreateSection } from '../../../packages/domain-widgets/src/admin';
-import { MemosPreview } from '../../../packages/domain-widgets/src/memos';
-import { NewsPreview } from '../../../packages/domain-widgets/src/news';
-import OverviewSection from '../../../packages/domain-widgets/src/overview';
-import { AdminSupportSection } from '../../../packages/domain-widgets/src/support';
-import Button from '../../../packages/ui/src/buttons/Button';
-import PageHeader from '../../../packages/ui/src/layout/PageHeader';
-import PageWrapper from '../../../packages/ui/src/layout/PageWrapper';
-import NavigationTab from '../../../packages/ui/src/navigation/NavigationTab';
-import TabContainer from '../../../packages/ui/src/navigation/TabContainer';
-import { Scrollbar } from '../../../packages/ui/src/Scrollbar';
-import DataTable from '../../../packages/ui/src/tables/DataTable';
+import { AdminSupportSection, ArchiveSection, AssignSection, CreateSection, MemosPreview, NewsPreview, OverviewSection, RecentActivity, type Activity } from '@cks/domain-widgets';
+import { Button, DataTable, NavigationTab, PageHeader, PageWrapper, Scrollbar, TabContainer } from '@cks/ui';
 import MyHubSection from '../components/MyHubSection';
 import { useAuth as useClerkAuth } from '@clerk/clerk-react';
 

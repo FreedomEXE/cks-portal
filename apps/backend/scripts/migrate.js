@@ -3,9 +3,9 @@ const path = require('path');
 const fs = require('fs/promises');
 const { Pool } = require('pg');
 
-const ROOT_DIR = path.resolve(__dirname, '..');
-const MIGRATIONS_DIR = path.join(ROOT_DIR, 'server', 'db', 'migrations');
-const SEEDS_DIR = path.join(ROOT_DIR, 'server', 'db', 'seeds');
+const BACKEND_DIR = path.resolve(__dirname, '..');
+const MIGRATIONS_DIR = path.resolve(process.cwd(), 'database', 'migrations');
+const SEEDS_DIR = path.join(BACKEND_DIR, 'server', 'db', 'seeds');
 const MIGRATIONS_TABLE = 'schema_migrations';
 
 function buildPoolConfig() {

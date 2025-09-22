@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import TabSection from '../../../ui/src/layout/TabSection';
+import { TabSection } from '@cks/ui';
 import ReportCard, { type ReportFeedback } from './ReportCard';
 
 interface ReportsSectionProps {

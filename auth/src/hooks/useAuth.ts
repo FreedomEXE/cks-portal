@@ -1,4 +1,4 @@
-﻿import { useAuth as useClerkAuth, useUser } from '@clerk/clerk-react';
+import { useAuth as useClerkAuth, useUser } from '@clerk/clerk-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
@@ -15,15 +15,6 @@ type AuthState = {
 const DEV_PROXY_BASE = '/api';
 const RAW_API_BASE = import.meta.env.VITE_API_URL || DEV_PROXY_BASE;
 const API_BASE = RAW_API_BASE.replace(/\/+$/, '');
-const ROLE_KEY = 'role';
-const CODE_KEY = 'code';
-const BOOTSTRAP_ERROR_KEY = 'bootstrap_error';
-const BOOTSTRAP_ERROR_BACKOFF_MS = 30_000;
-
-type StoredBootstrapError = {
-  message: string;
-  at: number;
-};
 
 function sanitize(value: unknown): string | null {
   if (typeof value !== 'string') {
@@ -31,62 +22,6 @@ function sanitize(value: unknown): string | null {
   }
   const trimmed = value.trim().toLowerCase();
   return trimmed || null;
-}
-
-function readStorage(key: string): string | null {
-  try {
-    const stored = sessionStorage.getItem(key);
-    return stored ? stored : null;
-  } catch {
-    return null;
-  }
-}
-
-function writeStorage(key: string, value: string | null) {
-  try {
-    if (!value) {
-      sessionStorage.removeItem(key);
-      return;
-    }
-    sessionStorage.setItem(key, value);
-  } catch {
-    // ignore
-  }
-}
-
-function readBootstrapError(): StoredBootstrapError | null {
-  try {
-    const raw = sessionStorage.getItem(BOOTSTRAP_ERROR_KEY);
-    if (!raw) {
-      return null;
-    }
-    const parsed = JSON.parse(raw) as StoredBootstrapError | null;
-    if (!parsed || typeof parsed.message !== 'string' || typeof parsed.at !== 'number') {
-      return null;
-    }
-    return parsed;
-  } catch {
-    return null;
-  }
-}
-
-function writeBootstrapError(value: StoredBootstrapError | null) {
-  try {
-    if (!value) {
-      sessionStorage.removeItem(BOOTSTRAP_ERROR_KEY);
-      return;
-    }
-    sessionStorage.setItem(BOOTSTRAP_ERROR_KEY, JSON.stringify(value));
-  } catch {
-    // ignore
-  }
-}
-
-function shouldHoldBootstrapError(error: StoredBootstrapError | null): error is StoredBootstrapError {
-  if (!error) {
-    return false;
-  }
-  return Date.now() - error.at < BOOTSTRAP_ERROR_BACKOFF_MS;
 }
 
 function fallbackCode(existing: string | null, userEmail: string | null, username: string | null): string | null {
@@ -119,52 +54,56 @@ export function useAuth(): AuthState {
   const location = useLocation();
   const abortRef = useRef<AbortController | null>(null);
   const fetchingRef = useRef(false);
+  const lastResolvedRef = useRef<{ role: string; code: string | null } | null>(null);
 
-  const [state, setState] = useState<Omit<AuthState, 'refresh'>>(() => {
-    const storedRole = readStorage(ROLE_KEY);
-    const storedCode = readStorage(CODE_KEY);
-    const storedError = storedRole ? null : readBootstrapError();
-    const holdError = storedRole ? false : shouldHoldBootstrapError(storedError);
-
-    if (storedError && !holdError) {
-      writeBootstrapError(null);
-    }
-
-    return {
-      status: storedRole ? 'ready' : holdError ? 'error' : 'idle',
-      role: storedRole,
-      code: storedCode,
-      error: holdError && storedError ? new Error(storedError.message) : null,
-    };
+  const [state, setState] = useState<Omit<AuthState, 'refresh'>>({
+    status: 'idle',
+    role: null,
+    code: null,
+    error: null,
   });
 
   const refresh = useCallback(async () => {
-    if (!authLoaded || !userLoaded || !isSignedIn) {
+    if (!authLoaded || !userLoaded) {
       return;
     }
+
+    if (!isSignedIn) {
+      abortRef.current?.abort();
+      fetchingRef.current = false;
+      lastResolvedRef.current = null;
+      setState({ status: 'idle', role: null, code: null, error: null });
+      return;
+    }
+
     if (fetchingRef.current) {
       return;
     }
 
     fetchingRef.current = true;
+
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
 
-    setState((prev) => {
-      if (prev.role) {
-        return { ...prev, error: null };
-      }
-      return { ...prev, status: 'loading', error: null };
-    });
+    setState((current) => ({
+      status: 'loading',
+      role: current.role,
+      code: current.code,
+      error: null,
+    }));
 
-    const email = user?.primaryEmailAddress?.emailAddress || null;
-    const username = user?.username || null;
+    const email =
+      user?.primaryEmailAddress?.emailAddress ??
+      user?.emailAddresses?.[0]?.emailAddress ??
+      null;
+    const username = user?.username ?? null;
+
+    const headers = new Headers();
     let timeout: ReturnType<typeof setTimeout> | null = null;
 
     try {
-      const headers = new Headers();
-      const token = await getToken?.();
+      const token = await getToken().catch(() => null);
       if (token) {
         headers.set('Authorization', `Bearer ${token}`);
       }
@@ -175,7 +114,7 @@ export function useAuth(): AuthState {
         headers.set('x-user-email', email);
       }
 
-      timeout = setTimeout(() => controller.abort(), 15000);
+      timeout = setTimeout(() => controller.abort(), 15_000);
 
       const response = await fetch(`${API_BASE}/me/bootstrap`, {
         credentials: 'include',
@@ -188,58 +127,39 @@ export function useAuth(): AuthState {
       }
 
       const data = await response.json();
-      const rawRole = sanitize(data?.role) || sanitize(data?.kind);
-      const rawCode = sanitize(data?.code) || sanitize(data?.internal_code);
-      const resolvedCode = fallbackCode(rawCode, email, username);
-
-      if (rawRole) {
-        writeStorage(ROLE_KEY, rawRole);
-      }
-      if (resolvedCode) {
-        writeStorage(CODE_KEY, resolvedCode);
-      }
-
+      const rawRole = sanitize(data?.role) ?? sanitize(data?.kind);
+      const rawCode = sanitize(data?.code) ?? sanitize(data?.internal_code);
       if (!rawRole) {
         throw new Error('Bootstrap response missing role');
       }
+
+      const resolvedCode = fallbackCode(rawCode, email, username);
 
       if (abortRef.current !== controller || controller.signal.aborted) {
         return;
       }
 
+      lastResolvedRef.current = { role: rawRole, code: resolvedCode };
       setState({ status: 'ready', role: rawRole, code: resolvedCode, error: null });
-      writeBootstrapError(null);
     } catch (err) {
-      const fallbackRole = readStorage(ROLE_KEY);
-      const fallbackCodeValue = readStorage(CODE_KEY);
-
       if (abortRef.current !== controller) {
         return;
       }
 
+      const cached = lastResolvedRef.current;
       if (isAbortError(err)) {
-        if (fallbackRole) {
-          setState({ status: 'ready', role: fallbackRole, code: fallbackCodeValue, error: null });
-          writeBootstrapError(null);
+        if (cached) {
+          setState({ status: 'ready', role: cached.role, code: cached.code, error: null });
         } else {
-          const error = new Error('Bootstrap aborted');
-          setState({ status: 'error', role: null, code: null, error });
-          writeBootstrapError({ message: error.message, at: Date.now() });
+          setState({ status: 'idle', role: null, code: null, error: null });
         }
-        return;
-      }
-
-      const error = err instanceof Error ? err : new Error('Failed to bootstrap user role');
-      console.error('useAuth bootstrap error', error);
-
-      if (fallbackRole) {
-        setState({ status: 'ready', role: fallbackRole, code: fallbackCodeValue, error: null });
-        writeBootstrapError(null);
       } else {
-        setState({ status: 'error', role: null, code: null, error });
-        writeStorage(ROLE_KEY, null);
-        writeStorage(CODE_KEY, null);
-        writeBootstrapError({ message: error.message, at: Date.now() });
+        const error = err instanceof Error ? err : new Error('Failed to bootstrap user role');
+        if (cached) {
+          setState({ status: 'ready', role: cached.role, code: cached.code, error: null });
+        } else {
+          setState({ status: 'error', role: null, code: null, error });
+        }
       }
     } finally {
       if (timeout) {
@@ -250,7 +170,7 @@ export function useAuth(): AuthState {
         abortRef.current = null;
       }
     }
-  }, [authLoaded, userLoaded, isSignedIn, getToken, user]);
+  }, [authLoaded, getToken, isSignedIn, user, userLoaded]);
 
   useEffect(() => {
     if (!authLoaded || !userLoaded) {
@@ -260,18 +180,15 @@ export function useAuth(): AuthState {
     if (!isSignedIn) {
       abortRef.current?.abort();
       fetchingRef.current = false;
-      writeStorage(ROLE_KEY, null);
-      writeStorage(CODE_KEY, null);
-      writeBootstrapError(null);
+      lastResolvedRef.current = null;
       setState({ status: 'idle', role: null, code: null, error: null });
       return;
     }
 
-    // Only refresh if we don't already have a role and aren't currently fetching
     if (!state.role && !fetchingRef.current && state.status !== 'error') {
       void refresh();
     }
-  }, [authLoaded, userLoaded, isSignedIn, state.role, state.status]);
+  }, [authLoaded, isSignedIn, refresh, state.role, state.status, userLoaded]);
 
   useEffect(() => {
     if (state.status !== 'ready' || !state.role) {
@@ -292,4 +209,3 @@ export function useAuth(): AuthState {
     refresh,
   }), [state, refresh]);
 }
-

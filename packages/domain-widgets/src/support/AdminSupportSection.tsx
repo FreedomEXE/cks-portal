@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import OverviewSection from '../overview';
-import DataTable from '../../../ui/src/tables/DataTable';
+import { DataTable } from '@cks/ui';
 
 interface AdminSupportSectionProps {
   primaryColor?: string;

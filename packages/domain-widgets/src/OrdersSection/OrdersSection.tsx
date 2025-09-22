@@ -1,7 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { OrderCard } from '../../../ui/src/cards/OrderCard';
-import Button from '../../../ui/src/buttons/Button';
-import TabSection from '../../../ui/src/layout/TabSection';
+import { Button, OrderCard, TabSection } from '@cks/ui';
 import styles from './OrdersSection.module.css';
 
 interface Order {
@@ -354,3 +352,4 @@ const OrdersSection: React.FC<OrdersSectionProps> = ({
 };
 
 export default OrdersSection;
+

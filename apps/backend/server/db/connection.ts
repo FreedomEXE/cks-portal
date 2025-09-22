@@ -129,7 +129,7 @@ export async function query<T extends QueryResultRow = QueryResultRow>(
   try {
     return await activePool.query<T>(text, params as any[]);
   } catch (error: unknown) {
-    logger.error?.('[db] query failed', { text, error });
+    logger.error?.('[db] query failed', error);
     throw error;
   }
 }

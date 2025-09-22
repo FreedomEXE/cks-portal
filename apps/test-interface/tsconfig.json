@@ -25,6 +25,9 @@
       "@cks/auth": [
         "../../auth/src/index.ts"
       ],
+      "@cks/auth/*": [
+        "../../auth/src/*"
+      ],
       "@clerk/clerk-react": [
         "./src/mocks/clerk-react"
       ]

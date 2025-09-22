@@ -1,6 +1,6 @@
 import React from 'react';
 import { ActivityItem } from './ActivityItem';
-import Button from '../../../../ui/src/buttons/Button';
+import { Button } from '@cks/ui';
 
 export interface Activity {
   id: string;

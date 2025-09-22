@@ -1,3 +1,13 @@
 {
-  "todo": "implement"
+  "rules": [
+    {
+      "from": ["**/*"],
+      "disallow": [
+        "**/../*/src/**",
+        "**/../../*/src/**",
+        "**/../../../*/src/**"
+      ],
+      "message": "Do not import from another package's src/. Import its public entrypoint instead (e.g., @cks/auth, @cks/ui)."
+    }
+  ]
 }
