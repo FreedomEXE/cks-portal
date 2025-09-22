@@ -1,4 +1,3 @@
-#!/usr/bin/env sh
 if [ -f "$PWD/.husky/_/husky.sh" ]; then . "$PWD/.husky/_/husky.sh"; fi
 echo "pre-commit: codegen + typecheck + lint"
 pnpm codegen || exit 1
