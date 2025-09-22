@@ -338,4 +338,3 @@ const EcosystemTree: React.FC<EcosystemTreeProps> = ({
 };
 
 export default EcosystemTree;
-export type { TreeNode };

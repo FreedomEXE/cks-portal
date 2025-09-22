@@ -3,8 +3,11 @@ export default {
   content: [
     './index.html',
     './src/**/*.{ts,tsx,js,jsx}',
-    '../auth/src/**/*.{ts,tsx}',
-    '../packages/**/*.{ts,tsx}'
+    // Scan auth for classes used in Login/guards
+    '../../auth/src/**/*.{ts,tsx,css}',
+    '../../auth/dist/**/*.{js,jsx,css}',
+    // Existing globs for ui/domain-widgets...
+    '../../packages/ui/src/**/*.{ts,tsx}'
   ],
   theme: {
     extend: {

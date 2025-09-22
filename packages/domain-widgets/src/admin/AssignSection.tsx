@@ -195,7 +195,7 @@ export default function AssignSection() {
   const currentConfig = assignConfigs[activeTab as keyof typeof assignConfigs];
 
   return (
-    <PageWrapper headerSrOnly>
+    <PageWrapper title="Assign" headerSrOnly>
       <TabContainer variant="pills" spacing="compact">
         <NavigationTab
           label="Contractors"

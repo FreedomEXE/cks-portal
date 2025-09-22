@@ -9,10 +9,18 @@
     "outDir": "./dist",
     "rootDir": "./src",
     "declaration": true,
-    "declarationMap": true,
+    "declarationDir": "./dist",
+    "declarationMap": false,
     "sourceMap": true,
-    "composite": true,
-    "incremental": true
+    "composite": false,
+    "incremental": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "target": "ES2020",
+    "esModuleInterop": true,
+    "noEmit": false,
+    "emitDeclarationOnly": false,
+    "typeRoots": ["./src/types", "../../node_modules/@types"]
   },
   "include": [
     "src/**/*"

@@ -95,8 +95,8 @@ export function ProfileTab({ role, profileData, primaryColor, onUpdatePhoto }: P
           fontWeight: 'bold',
           marginBottom: 16
         }}>
-          {profileData.name ? profileData.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) :
-           profileData.fullName ? profileData.fullName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : 'NA'}
+          {profileData.name ? profileData.name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2) :
+           profileData.fullName ? profileData.fullName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2) : 'NA'}
         </div>
         <Button
           variant="secondary"

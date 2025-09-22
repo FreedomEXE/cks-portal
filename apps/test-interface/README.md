@@ -29,7 +29,7 @@ The CKS Test Interface is a development tool that provides real-time component d
 ## Installation
 
 ```bash
-cd cks-portal-next/Test-Interface
+cd cks-portal/apps/test-interface
 npm install
 ```
 

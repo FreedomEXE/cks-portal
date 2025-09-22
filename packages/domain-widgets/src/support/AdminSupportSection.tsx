@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import OverviewSection from '../overview';
+import { OverviewSection } from '../overview';
 import { DataTable } from '@cks/ui';
 
 interface AdminSupportSectionProps {
@@ -56,8 +56,6 @@ const AdminSupportSection: React.FC<AdminSupportSectionProps> = ({
         <OverviewSection
           cards={overviewCards}
           data={overviewData}
-          onCardClick={handleCardClick}
-          primaryColor={primaryColor}
         />
       </div>
 

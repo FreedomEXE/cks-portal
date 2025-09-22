@@ -22,7 +22,7 @@
 /*───────────────────────────────────────────────*/
 
 import type { Meta, StoryObj } from '@storybook/react';
-import { MyHubSection, TabConfig } from './MyHubSection';
+import MyHubSection, { Tab as TabConfig } from './MyHubSection';
 
 const meta: Meta<typeof MyHubSection> = {
   title: 'Navigation/MyHubSection',
@@ -32,7 +32,7 @@ const meta: Meta<typeof MyHubSection> = {
   },
   tags: ['autodocs'],
   argTypes: {
-    onTabChange: { action: 'tab-changed' },
+    onTabClick: { action: 'tab-clicked' },
     onLogout: { action: 'logout-clicked' },
   },
 };
@@ -41,98 +41,97 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 const adminTabs: TabConfig[] = [
-  { id: 'dashboard', label: 'Dashboard' },
-  { id: 'users', label: 'Users', badge: 5 },
-  { id: 'system', label: 'System' },
-  { id: 'audit', label: 'Audit Logs' },
+  { id: 'dashboard', label: 'Dashboard', path: '/admin/dashboard' },
+  { id: 'users', label: 'Users', path: '/admin/users' },
+  { id: 'system', label: 'System', path: '/admin/system' },
+  { id: 'audit', label: 'Audit Logs', path: '/admin/audit' },
 ];
 
 const managerTabs: TabConfig[] = [
-  { id: 'dashboard', label: 'Dashboard' },
-  { id: 'ecosystem', label: 'My Ecosystem' },
-  { id: 'performance', label: 'Performance', badge: 'New' },
-  { id: 'certification', label: 'Certification' },
+  { id: 'dashboard', label: 'Dashboard', path: '/manager/dashboard' },
+  { id: 'ecosystem', label: 'My Ecosystem', path: '/manager/ecosystem' },
+  { id: 'performance', label: 'Performance', path: '/manager/performance' },
+  { id: 'certification', label: 'Certification', path: '/manager/certification' },
 ];
 
 const customerTabs: TabConfig[] = [
-  { id: 'dashboard', label: 'Dashboard' },
-  { id: 'orders', label: 'Orders', badge: 3 },
-  { id: 'services', label: 'Services' },
-  { id: 'support', label: 'Support' },
-  { id: 'profile', label: 'Profile' },
+  { id: 'dashboard', label: 'Dashboard', path: '/customer/dashboard' },
+  { id: 'orders', label: 'Orders', path: '/customer/orders' },
+  { id: 'services', label: 'Services', path: '/customer/services' },
+  { id: 'support', label: 'Support', path: '/customer/support' },
+  { id: 'profile', label: 'Profile', path: '/customer/profile' },
 ];
 
 export const AdminHub: Story = {
   args: {
+    hubName: 'Admin Hub',
     tabs: adminTabs,
     activeTab: 'dashboard',
-    userName: 'John Admin',
-    userRole: 'System Administrator',
+    userId: 'John Admin',
+    role: 'admin',
   },
 };
 
 export const ManagerHub: Story = {
   args: {
+    hubName: 'Manager Hub',
     tabs: managerTabs,
     activeTab: 'ecosystem',
-    userName: 'Sarah Manager',
-    userRole: 'Regional Manager',
+    userId: 'Sarah Manager',
+    role: 'manager',
   },
 };
 
 export const CustomerHub: Story = {
   args: {
+    hubName: 'Customer Hub',
     tabs: customerTabs,
     activeTab: 'orders',
-    userName: 'Mike Customer',
-    userRole: 'Customer',
+    userId: 'Mike Customer',
+    role: 'customer',
   },
 };
 
 export const WithIcons: Story = {
   args: {
+    hubName: 'Icon Hub',
     tabs: [
       {
         id: 'dashboard',
         label: 'Dashboard',
-        icon: (
-          <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-            <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z" />
-          </svg>
-        ),
+        path: '/dashboard',
+        icon: '📊',
       },
       {
         id: 'orders',
         label: 'Orders',
-        badge: 5,
-        icon: (
-          <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-            <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6z" />
-          </svg>
-        ),
+        path: '/orders',
+        icon: '📦',
       },
     ],
     activeTab: 'dashboard',
-    userName: 'Test User',
-    userRole: 'Customer',
+    userId: 'Test User',
+    role: 'customer',
   },
 };
 
 export const WithDisabledTab: Story = {
   args: {
+    hubName: 'Basic Hub',
     tabs: [
-      { id: 'dashboard', label: 'Dashboard' },
-      { id: 'orders', label: 'Orders' },
-      { id: 'premium', label: 'Premium Features', disabled: true },
+      { id: 'dashboard', label: 'Dashboard', path: '/dashboard' },
+      { id: 'orders', label: 'Orders', path: '/orders' },
+      { id: 'premium', label: 'Premium Features', path: '/premium' },
     ],
     activeTab: 'dashboard',
-    userName: 'Basic User',
-    userRole: 'Customer',
+    userId: 'Basic User',
+    role: 'customer',
   },
 };
 
 export const NoUserInfo: Story = {
   args: {
+    hubName: 'Anonymous Hub',
     tabs: customerTabs,
     activeTab: 'dashboard',
   },
@@ -140,11 +139,13 @@ export const NoUserInfo: Story = {
 
 export const MinimalTabs: Story = {
   args: {
+    hubName: 'Simple Hub',
     tabs: [
-      { id: 'home', label: 'Home' },
-      { id: 'profile', label: 'Profile' },
+      { id: 'home', label: 'Home', path: '/home' },
+      { id: 'profile', label: 'Profile', path: '/profile' },
     ],
     activeTab: 'home',
-    userName: 'Simple User',
+    userId: 'Simple User',
+    role: 'customer',
   },
 };

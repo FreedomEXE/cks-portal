@@ -22,7 +22,7 @@
 -----------------------------------------------*/
 
 import { useEffect, useState } from 'react';
-import EcosystemTree, { type TreeNode } from '../../../packages/domain-widgets/EcosystemTree';
+import { EcosystemTree, type TreeNode } from '@cks/domain-widgets';
 import { MemosPreview, NewsPreview, OrdersSection, OverviewSection, ProfileInfoCard, RecentActivity, ReportsSection, SupportSection, type Activity } from '@cks/domain-widgets';
 import { Button, DataTable, PageHeader, PageWrapper, Scrollbar, TabSection } from '@cks/ui';
 import MyHubSection from '../components/MyHubSection';

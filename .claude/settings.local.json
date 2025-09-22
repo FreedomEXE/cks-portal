@@ -6,7 +6,11 @@
       "Bash(pnpm build:*)",
       "Bash(pnpm install:*)",
       "Bash(pnpm --filter @cks/auth build)",
-      "Bash(pnpm:*)"
+      "Bash(pnpm:*)",
+      "Bash(npx storybook@latest init:*)",
+      "Bash(pkill:*)",
+      "Bash(npx tsc:*)",
+      "Bash(node:*)"
     ],
     "deny": [],
     "ask": []

@@ -9,10 +9,17 @@
     "outDir": "./dist",
     "rootDir": "./src",
     "declaration": true,
-    "declarationMap": true,
+    "declarationDir": "./dist",
+    "declarationMap": false,
     "sourceMap": true,
-    "composite": true,
+    "composite": false,
     "incremental": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "target": "ES2020",
+    "esModuleInterop": true,
+    "noEmit": false,
+    "emitDeclarationOnly": false,
     "jsx": "react-jsx"
   },
   "include": [
@@ -26,9 +33,5 @@
     "**/*.spec.ts",
     "**/*.spec.tsx"
   ],
-  "references": [
-    {
-      "path": "../ui"
-    }
-  ]
+  "references": []
 }

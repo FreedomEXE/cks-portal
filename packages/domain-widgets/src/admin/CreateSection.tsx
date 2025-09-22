@@ -860,7 +860,7 @@ export default function CreateSection() {
   };
 
   return (
-    <PageWrapper headerSrOnly>
+    <PageWrapper title="Create" headerSrOnly>
       <TabContainer variant="pills" spacing="compact">
         <NavigationTab
           label="Managers"

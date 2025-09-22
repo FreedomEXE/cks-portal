@@ -2,14 +2,26 @@
   "name": "@cks/domain-widgets",
   "version": "1.0.0",
   "description": "Business logic components - role aware but agnostic",
+  "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
     "dist"
   ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "sideEffects": [
+    "**/*.css"
+  ],
   "scripts": {
-    "build": "tsc",
-    "dev": "tsc --watch",
+    "build": "rimraf dist && tsc && node scripts/copy-assets.mjs",
+    "dev": "concurrently -k --raw \"tsc --watch\" \"node scripts/copy-assets.mjs --watch\"",
     "clean": "rimraf dist",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --ext .ts,.tsx",
@@ -18,22 +30,25 @@
     "test:watch": "jest --watch"
   },
   "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
     "@cks/ui": "workspace:*",
     "clsx": "^2.0.0",
-    "date-fns": "^2.30.0"
+    "date-fns": "^2.30.0",
+    "fast-glob": "^3.3.3",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.0.0",
+    "@testing-library/react": "^14.0.0",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
     "@typescript-eslint/eslint-plugin": "^6.0.0",
     "@typescript-eslint/parser": "^6.0.0",
-    "typescript": "^5.0.0",
+    "concurrently": "^8.2.0",
+    "cpy-cli": "^5.0.0",
     "jest": "^29.0.0",
-    "@testing-library/react": "^14.0.0",
-    "@testing-library/jest-dom": "^6.0.0",
-    "rimraf": "^5.0.0"
+    "rimraf": "^5.0.0",
+    "typescript": "^5.0.0"
   },
   "peerDependencies": {
     "react": ">=18.0.0",

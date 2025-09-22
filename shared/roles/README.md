@@ -87,13 +87,34 @@ pnpm run codegen:roles    # Generate from JSON configs
 pnpm run migrate:roles    # Move data from roleConfig.ts to JSONs
 ```
 
+## Architecture: Source vs Generated Files
+
+**IMPORTANT:** This system uses a source → generated pattern. Do NOT delete generated files!
+
+### **Source Files (Edit These):**
+- `shared/roles/configs/*.v1.json` - **Master role configurations** (edit here!)
+- `shared/roles/schema.ts` - TypeScript interfaces
+- `scripts/prebuild-codegen.mjs` - Generation script
+
+### **Generated Files (Never Edit Manually):**
+- `apps/frontend/src/roles/*/index.ts` - TypeScript modules for imports
+- `apps/frontend/src/roles/*/config.v1.json` - JSON copies for runtime
+- `apps/backend/server/roles/*/config.ts` - Backend TypeScript modules
+
+### **The Flow:**
+```
+shared/roles/configs/admin.v1.json  (EDIT HERE)
+           ↓ [pnpm run codegen]
+apps/frontend/src/roles/admin/index.ts  (IMPORT THIS)
+apps/backend/server/roles/admin/config.ts  (USE THIS)
+```
+
 ## Files to Update During Migration
 
 - [ ] `shared/roles/configs/*.v1.json` - Add real role data
 - [ ] `shared/roles/schema.ts` - Proper TypeScript interfaces
 - [ ] `scripts/prebuild-codegen.mjs` - Emit to correct locations
 - [ ] `apps/frontend/src/hubs/*.tsx` - Remove hardcoded tabs
-- [ ] `apps/backend/server/roles/*/config.ts` - Use generated configs
 - [ ] Delete: `apps/frontend/src/shared/schemas/roleConfig.ts`
 
 ## Architecture Philosophy

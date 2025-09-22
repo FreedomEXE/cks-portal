@@ -1,4 +1,4 @@
-import '@cks/ui/styles/globals.css';
+import '@cks/ui/assets/ui.css';
 import { ClerkProvider, SignedIn, SignedOut } from '@clerk/clerk-react';
 import React from 'react';
 import ReactDOM from 'react-dom/client';

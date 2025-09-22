@@ -3,26 +3,45 @@
   "version": "1.0.0",
   "type": "module",
   "main": "dist/index.js",
+  "module": "dist/index.js",
   "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "sideEffects": [
+    "dist/style.css",
+    "**/*.css"
+  ],
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
       "default": "./dist/index.js"
-    }
+    },
+    "./style.css": "./dist/style.css"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
-    "test": "vitest"
+    "clean": "rimraf dist",
+    "build": "vite build",
+    "dev": "vite build --watch",
+    "typecheck": "tsc --noEmit"
   },
-  "dependencies": {
-    "@clerk/clerk-react": "^5.47.0",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "react-router-dom": "^7.9.1"
+  "peerDependencies": {
+    "@clerk/clerk-react": ">=4.0.0",
+    "react": ">=18.0.0",
+    "react-dom": ">=18.0.0",
+    "react-router-dom": ">=6.0.0"
   },
   "devDependencies": {
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
-    "typescript": "^5.0.0"
+    "@vitejs/plugin-react": "^4.7.0",
+    "concurrently": "^8.2.0",
+    "cpy-cli": "^5.0.0",
+    "fast-glob": "^3.3.3",
+    "rimraf": "^5.0.10",
+    "typescript": "^5.0.0",
+    "vite": "^5.4.20",
+    "vite-plugin-dts": "^3.9.1"
   }
 }

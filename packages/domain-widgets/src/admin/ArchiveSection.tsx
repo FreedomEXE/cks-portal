@@ -537,7 +537,7 @@ export default function ArchiveSection() {
   const currentConfig = archiveConfig[activeTab as keyof typeof archiveConfig];
 
   return (
-    <PageWrapper headerSrOnly>
+    <PageWrapper title="Archive" headerSrOnly>
       <TabContainer variant="pills" spacing="compact">
         <NavigationTab
           label="Managers"
@@ -623,7 +623,6 @@ export default function ArchiveSection() {
                   data={archiveConfig.training.data}
                   searchPlaceholder="Search archived training..."
                   showSearch={true}
-                  title="Training"
                 />
               </div>
               <div style={{ width: '48%' }}>
@@ -632,7 +631,6 @@ export default function ArchiveSection() {
                   data={archiveConfig.procedures.data}
                   searchPlaceholder="Search archived procedures..."
                   showSearch={true}
-                  title="Procedures"
                 />
               </div>
             </div>
@@ -645,7 +643,6 @@ export default function ArchiveSection() {
                   data={archiveConfig.reports.data}
                   searchPlaceholder="Search archived reports..."
                   showSearch={true}
-                  title="Reports"
                 />
               </div>
               <div style={{ width: '48%' }}>
@@ -654,7 +651,6 @@ export default function ArchiveSection() {
                   data={archiveConfig.feedback.data}
                   searchPlaceholder="Search archived feedback..."
                   showSearch={true}
-                  title="Feedback"
                 />
               </div>
             </div>

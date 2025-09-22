@@ -11,6 +11,8 @@
   },
   "dependencies": {
     "@cks/auth": "workspace:*",
+    "@cks/ui": "workspace:*",
+    "@cks/domain-widgets": "workspace:*",
     "@clerk/clerk-react": "^5.47.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
