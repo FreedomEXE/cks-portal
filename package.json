@@ -4,13 +4,16 @@
   "private": true,
   "scripts": {
     "dev": "node scripts/run-dev.js",
-    "build": "pnpm run -r build",
+    "build": "pnpm -r run build",
     "test": "pnpm run -r test",
     "codegen": "node scripts/prebuild-codegen.mjs",
     "typecheck": "pnpm -r --if-present typecheck",
     "lint": "pnpm -r --if-present lint",
     "prebuild": "pnpm run codegen",
-    "prepare": "husky"
+    "prepare": "husky",
+    "dev:backend": "pnpm --filter ./apps/backend dev",
+    "dev:frontend": "pnpm --filter ./apps/frontend dev",
+    "dev:gateway": "pnpm --filter ./apps/gateway dev"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

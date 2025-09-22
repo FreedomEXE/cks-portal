@@ -1,0 +1,547 @@
+.claude/config.json
+.claude/settings.local.json
+.config/dockerignore
+.config/editorconfig
+.config/eslint.cjs
+.config/eslintignore
+.config/prettier.config.json
+.config/prettierignore
+.dockerignore
+.editorconfig
+.eslintignore
+.eslintrc.cjs
+.gitattributes
+.github/workflows/ci.yml
+.gitignore
+.husky/pre-commit
+.husky/pre-push
+.nvmrc
+.prettierignore
+.prettierrc.cjs
+.vscode/extensions.json
+.vscode/launch.json
+.vscode/settings.json
+.vscode/tasks.json
+Dockerfile.backend
+Dockerfile.frontend
+Dockerfile.worker
+Test-Interface/README.md
+Test-Interface/index.html
+Test-Interface/package-lock.json
+Test-Interface/package.json
+Test-Interface/postcss.config.cjs
+Test-Interface/postcss.config.cjs.backup
+Test-Interface/postcss.config.cjs.disabled
+Test-Interface/public/cks-logo.png
+Test-Interface/scripts/analyze-components-v2.js
+Test-Interface/scripts/analyze-components.js
+Test-Interface/scripts/discover-components.js
+Test-Interface/src/LoginWrapper.tsx
+Test-Interface/src/README.md
+Test-Interface/src/TestInterface.tsx
+Test-Interface/src/TestInterface.tsx.bak
+Test-Interface/src/component-manifest-v2.json
+Test-Interface/src/component-manifest.json
+Test-Interface/src/component-registry.json
+Test-Interface/src/hooks/useComponentRegistry.ts
+Test-Interface/src/hooks/useTabComponents.ts
+Test-Interface/src/index.css
+Test-Interface/src/index.tsx
+Test-Interface/src/mocks/clerk-react.tsx
+Test-Interface/tailwind.config.js
+Test-Interface/tsconfig.json
+Test-Interface/vite.config.ts
+auth/Dockerfile
+auth/package.json
+auth/src/assets/cks-logo.png
+auth/src/components/ProtectedRoute.tsx
+auth/src/components/RoleGuard.tsx
+auth/src/hooks/useAuth.ts
+auth/src/hooks/useCustomId.ts
+auth/src/hooks/useRole.ts
+auth/src/hooks/useUser.ts
+auth/src/pages/Callback.tsx
+auth/src/pages/Invite.tsx
+auth/src/pages/Login.tsx
+auth/src/pages/Logout.tsx
+auth/src/providers/AuthContext.tsx
+auth/src/providers/ClerkProvider.tsx
+auth/src/types/auth.d.ts
+auth/src/utils/clerkClient.ts
+auth/src/utils/customIdParser.ts
+auth/src/utils/roleExtractor.ts
+auth/src/utils/tokenValidator.ts
+auth/tsconfig.json
+backend/.env.example
+backend/package.json
+backend/scripts/migrate.js
+backend/server/core/auth/authenticate.ts
+backend/server/core/auth/clerk.ts
+backend/server/core/auth/clerkVerifier.ts
+backend/server/core/auth/customIdExtractor.ts
+backend/server/core/cache/redis.ts
+backend/server/core/cache/warmers.ts
+backend/server/core/config/featureFlags.ts
+backend/server/core/config/roleResolver.ts
+backend/server/core/config/versions.ts
+backend/server/core/events/bus.ts
+backend/server/core/events/outbox.ts
+backend/server/core/fastify/auth.ts
+backend/server/core/fastify/requireCaps.ts
+backend/server/core/fastify/roleGuard.ts
+backend/server/core/http/errors.ts
+backend/server/core/http/responses.ts
+backend/server/core/logging/audit.ts
+backend/server/core/logging/logger.ts
+backend/server/core/telemetry/metrics.ts
+backend/server/core/telemetry/tracing.ts
+backend/server/core/validation/zod.ts
+backend/server/core/workers/index.ts
+backend/server/db/connection.ts
+backend/server/db/migrations/20250921120000_create_admin_users.sql
+backend/server/db/seeds/001_initial_admin.sql
+backend/server/domains/adminUsers/index.ts
+backend/server/domains/adminUsers/routes.ts
+backend/server/domains/adminUsers/store.ts
+backend/server/domains/adminUsers/types.ts
+backend/server/domains/adminUsers/validators.ts
+backend/server/domains/archive/events.ts
+backend/server/domains/archive/index.ts
+backend/server/domains/archive/repository.ts
+backend/server/domains/archive/routes.fastify.ts
+backend/server/domains/archive/service.ts
+backend/server/domains/archive/types.ts
+backend/server/domains/archive/validators.ts
+backend/server/domains/assignments/events.ts
+backend/server/domains/assignments/index.ts
+backend/server/domains/assignments/repository.ts
+backend/server/domains/assignments/routes.fastify.ts
+backend/server/domains/assignments/service.ts
+backend/server/domains/assignments/types.ts
+backend/server/domains/assignments/validators.ts
+backend/server/domains/catalog/events.ts
+backend/server/domains/catalog/index.ts
+backend/server/domains/catalog/repository.ts
+backend/server/domains/catalog/routes.fastify.ts
+backend/server/domains/catalog/service.ts
+backend/server/domains/catalog/types.ts
+backend/server/domains/catalog/validators.ts
+backend/server/domains/dashboard/events.ts
+backend/server/domains/dashboard/index.ts
+backend/server/domains/dashboard/repository.ts
+backend/server/domains/dashboard/routes.fastify.ts
+backend/server/domains/dashboard/service.ts
+backend/server/domains/dashboard/types.ts
+backend/server/domains/dashboard/validators.ts
+backend/server/domains/deliveries/events.ts
+backend/server/domains/deliveries/index.ts
+backend/server/domains/deliveries/repository.ts
+backend/server/domains/deliveries/routes.fastify.ts
+backend/server/domains/deliveries/service.ts
+backend/server/domains/deliveries/types.ts
+backend/server/domains/deliveries/validators.ts
+backend/server/domains/directory/events.ts
+backend/server/domains/directory/index.ts
+backend/server/domains/directory/repository.ts
+backend/server/domains/directory/routes.fastify.ts
+backend/server/domains/directory/service.ts
+backend/server/domains/directory/types.ts
+backend/server/domains/directory/validators.ts
+backend/server/domains/identity/customIdGenerator.ts
+backend/server/domains/identity/customIdValidator.ts
+backend/server/domains/identity/events.ts
+backend/server/domains/identity/index.ts
+backend/server/domains/identity/repository.ts
+backend/server/domains/identity/routes.fastify.ts
+backend/server/domains/identity/service.ts
+backend/server/domains/identity/types.ts
+backend/server/domains/identity/validators.ts
+backend/server/domains/inventory/events.ts
+backend/server/domains/inventory/index.ts
+backend/server/domains/inventory/repository.ts
+backend/server/domains/inventory/routes.fastify.ts
+backend/server/domains/inventory/service.ts
+backend/server/domains/inventory/types.ts
+backend/server/domains/inventory/validators.ts
+backend/server/domains/orders/events.ts
+backend/server/domains/orders/index.ts
+backend/server/domains/orders/repository.ts
+backend/server/domains/orders/routes.fastify.ts
+backend/server/domains/orders/service.ts
+backend/server/domains/orders/types.ts
+backend/server/domains/orders/validators.ts
+backend/server/domains/profile/events.ts
+backend/server/domains/profile/index.ts
+backend/server/domains/profile/repository.ts
+backend/server/domains/profile/routes.fastify.ts
+backend/server/domains/profile/service.ts
+backend/server/domains/profile/types.ts
+backend/server/domains/profile/validators.ts
+backend/server/domains/reports/events.ts
+backend/server/domains/reports/index.ts
+backend/server/domains/reports/repository.ts
+backend/server/domains/reports/routes.fastify.ts
+backend/server/domains/reports/service.ts
+backend/server/domains/reports/types.ts
+backend/server/domains/reports/validators.ts
+backend/server/domains/support/events.ts
+backend/server/domains/support/index.ts
+backend/server/domains/support/repository.ts
+backend/server/domains/support/routes.fastify.ts
+backend/server/domains/support/service.ts
+backend/server/domains/support/types.ts
+backend/server/domains/support/validators.ts
+backend/server/fastify.ts
+backend/server/index.ts
+backend/server/roles/admin/config.ts
+backend/server/roles/center/config.ts
+backend/server/roles/contractor/config.ts
+backend/server/roles/crew/config.ts
+backend/server/roles/customer/config.ts
+backend/server/roles/manager/config.ts
+backend/server/roles/warehouse/config.ts
+backend/tests/adminUsers.test.ts
+backend/tests/connection.test.ts
+backend/tsconfig.json
+database/migrations/000_extensions.sql
+database/migrations/001_users.sql
+database/migrations/002_rbac.sql
+database/migrations/003_custom_ids.sql
+database/migrations/004_identity_sequences.sql
+database/migrations/010_activity_logs.sql
+database/migrations/020_directory.sql
+database/migrations/030_catalog.sql
+database/migrations/031_services.sql
+database/migrations/040_orders.sql
+database/migrations/050_assignments.sql
+database/migrations/060_inventory.sql
+database/migrations/070_deliveries.sql
+database/migrations/080_reports.sql
+database/rls/assignments.rls.sql
+database/rls/catalog.rls.sql
+database/rls/deliveries.rls.sql
+database/rls/directory.rls.sql
+database/rls/identity.rls.sql
+database/rls/inventory.rls.sql
+database/rls/orders.rls.sql
+database/rls/reports.rls.sql
+database/rls/users.rls.sql
+database/seeds/catalog_demo_data.sql
+docker-compose.yml
+docs/APIVersioning.md
+docs/API_Surface.md
+docs/Alerts.md
+docs/Architecture.md
+docs/Authentication.md
+docs/Backups.md
+docs/Changelog.md
+docs/ClerkIntegration.md
+docs/Codegen.md
+docs/Compliance.md
+docs/ComponentArchitecture.md
+docs/CustomIdSystem.md
+docs/DomainDesign.md
+docs/Environments.md
+docs/FASTIFY-CUTOVER-CHECKLIST.md
+docs/GatewayCutoverPlan.md
+docs/Observability.md
+docs/Oncall.md
+docs/PerformanceBudgets.md
+docs/Permissions.md
+docs/README.md
+docs/Runbooks.md
+docs/Security.md
+docs/Testing.md
+docs/docs2/README.md
+docs/docs2/SCREENSHOTS/DataTable example (admin directory tab).png
+docs/docs2/SCREENSHOTS/DataTable example (manager services tab).png
+docs/docs2/SCREENSHOTS/OG Deliveries example.png
+docs/docs2/SCREENSHOTS/OG Orders Pages Examples/Contractor.png
+docs/docs2/SCREENSHOTS/OG Orders Pages Examples/Manager.png
+docs/docs2/SCREENSHOTS/OG Orders Pages Examples/center.png
+docs/docs2/SCREENSHOTS/OG Orders Pages Examples/crew.png
+docs/docs2/SCREENSHOTS/OG Orders Pages Examples/customer.png
+docs/docs2/SCREENSHOTS/OG Orders Pages Examples/warehouse.png
+docs/docs2/SCREENSHOTS/OG Profile tabs.png
+docs/docs2/SCREENSHOTS/OG Reports/create report example.png
+docs/docs2/SCREENSHOTS/OG Reports/my items example.png
+docs/docs2/SCREENSHOTS/OG Reports/viewall example.png
+docs/docs2/SCREENSHOTS/OG account manager buttons.png
+docs/docs2/SCREENSHOTS/OG inventory examples/Screenshot 2025-09-19 062935.png
+docs/docs2/SCREENSHOTS/OG inventory examples/Screenshot 2025-09-19 063054.png
+docs/docs2/SCREENSHOTS/component wrapper concept.png
+docs/docs2/SCREENSHOTS/contractor ecosystem example.png
+docs/docs2/SCREENSHOTS/correct services style.png
+docs/docs2/SCREENSHOTS/incorrect button style.png
+docs/docs2/SCREENSHOTS/incorrect services style.png
+docs/docs2/SCREENSHOTS/manager overview example.png
+docs/docs2/SCREENSHOTS/new incorrect ecosystem.png
+docs/docs2/SCREENSHOTS/og admin archive example.png
+docs/docs2/SCREENSHOTS/og admin assign example.png
+docs/docs2/SCREENSHOTS/og admin create button.png
+docs/docs2/SCREENSHOTS/og admin create example.png
+docs/docs2/SCREENSHOTS/og news and memos.png
+docs/docs2/SCREENSHOTS/og overview cards.png
+docs/docs2/SCREENSHOTS/profile page OG.png
+docs/docs2/SCREENSHOTS/recent activity example.png
+docs/docs2/SCREENSHOTS/recent activity style example.png
+docs/docs2/SCREENSHOTS/scrollbar OG view.png
+docs/docs2/SCREENSHOTS/support OG examples/11.png
+docs/docs2/SCREENSHOTS/support OG examples/Screenshot 2025-09-19 071137.png
+docs/docs2/SCREENSHOTS/support OG examples/admin support.png
+docs/docs2/architecture/FASTIFY-CUTOVER-CHECKLIST.md
+docs/docs2/architecture/FINAL_TREE.md
+docs/docs2/archive/CKS-FIELD-MAPPING-DOCUMENTATION.md
+docs/docs2/archive/CURRENT SESSION 2025-09-02.md
+docs/docs2/archive/CURRENT SESSION 2025-09-04.md
+docs/docs2/archive/CURRENT SESSION 2025-09-05.md
+docs/docs2/archive/CURRENT SESSION 2025-09-07.md
+docs/docs2/archive/CURRENT SESSION 2025-09-08.md
+docs/docs2/archive/DATABASE_REORGANIZATION_2025-09-05.md
+docs/docs2/archive/HYBRID-IMPLEMENTATION-SUMMARY.md
+docs/docs2/archive/NEXT_AGENT_HANDOFF.md
+docs/docs2/archive/SESSION-2025-09-11-CHANGES.md
+docs/docs2/archive/SESSION-2025-09-12-CHANGES.md
+docs/docs2/archive/SESSION-2025-09-13-ADMIN-HUB-FIX.md
+docs/docs2/archive/TASKS FOR CODEX - 2025-09-08.md
+docs/docs2/archive/TESTING_CREDENTIALS.md
+docs/docs2/archive/The Prompt.md
+docs/docs2/archive/USER_TESTING_WORKFLOW_DOCUMENTATION.md
+docs/docs2/archive/index.md
+docs/docs2/archive/manager-hub-inventory.md
+docs/docs2/archive/pre-mvp-refactor-plan.md
+docs/docs2/code-reviews/AUDIT RESULTS - ALL ROLES.md
+docs/docs2/code-reviews/CODEBASE_AUDIT_REPORT.md
+docs/docs2/code-reviews/CODE_REVIEW.md
+docs/docs2/code-reviews/CODE_REVIEW_2025-09-05.md
+docs/docs2/images/CKS-Portal-Style-Black.png
+docs/docs2/images/cks-logo.png
+docs/docs2/project/AGENTS.md
+docs/docs2/project/API_ERRORS_AND_ENVELOPES.md
+docs/docs2/project/API_SURFACE_V1.md
+docs/docs2/project/ARCHIVE/CKS_PORTAL_REFACTORING_DOCUMENTATION.md
+docs/docs2/project/ARCHIVE/LEGACY-ADR-0001-single-profile-entry-point.md
+docs/docs2/project/ARCHIVE/LEGACY-QA-regression-checklist.md
+docs/docs2/project/ARCHIVE/README.md
+docs/docs2/project/ARCHIVE/backend-RUN.txt
+docs/docs2/project/ARCHIVE/frontend-RUN.txt
+docs/docs2/project/AUTH_AND_ID_MAPPING.md
+docs/docs2/project/BACKEND_REORG_PLAN.md
+docs/docs2/project/BEST_PRACTICES.md
+docs/docs2/project/CKS-Portal-Project-Outline-PRD.md
+docs/docs2/project/CONTRACTOR_PROFILE_FIELDS.md
+docs/docs2/project/HUB_TEMPLATES_AND_PROVISIONING.md
+docs/docs2/project/OVERVIEW_AND_HANDOFF.md
+docs/docs2/project/STYLEGUIDE.md
+docs/docs2/project/TODO.md
+docs/docs2/project/hubs/CENTER_HUB_SPEC.md
+docs/docs2/project/hubs/CENTER_QA_CHECKLIST.md
+docs/docs2/project/hubs/COMMUNICATIONS_SPEC.md
+docs/docs2/project/hubs/CREW_HUB_SPEC.md
+docs/docs2/project/hubs/CREW_QA_CHECKLIST.md
+docs/docs2/project/hubs/WAREHOUSE_HUB_SPEC.md
+docs/docs2/project/hubs/WAREHOUSE_QA_CHECKLIST.md
+docs/docs2/project/index.md
+docs/docs2/refactor-plans/FINAL REFACTOR PLAN - NEW REPO TREE.md
+docs/docs2/refactor-plans/REFACTOR PLAN - ALL ROLES.md
+docs/docs2/refactor-plans/REFACTOR PLAN - CHECK - ALL ROLES.md
+docs/docs2/refactor-plans/REFACTOR PLAN - CHECK - BACKEND+DB (Domain-First).md
+docs/docs2/screenshots 2/center-hub-screenshot.png
+docs/docs2/screenshots 2/contractor-hub-screenshot.png
+docs/docs2/screenshots 2/crew-hub-screenshot.png
+docs/docs2/screenshots 2/customer-hub-screenshot.png
+docs/docs2/screenshots 2/manager-hub-screenshot.png
+docs/docs2/screenshots 2/warehouse-hub-screenshot.png
+docs/docs2/sessions/SESSION WITH CLAUDE - 1 - 2025-09-16.md
+docs/docs2/sessions/SESSION WITH CLAUDE - 2025-09-15.md
+docs/docs2/sessions/SESSION WITH CLAUDE - 2025-09-16.md
+docs/docs2/sessions/SESSION WITH CLAUDE-02-2025-09-16.md
+docs/docs2/sessions/SESSION WITH CLAUDE-2025-09-17.md
+docs/docs2/sessions/SESSION WITH CLAUDE-2025-09-18.md
+docs/docs2/sessions/SESSION WITH CLAUDE-2025-09-19-02.md
+docs/docs2/sessions/SESSION WITH CLAUDE-2025-09-19-03.md
+docs/docs2/sessions/SESSION WITH CLAUDE-2025-09-19-04.md
+docs/docs2/sessions/SESSION WITH CLAUDE-2025-09-19.md
+docs/docs2/sessions/SESSION WITH CODEX-2025-09-20.md
+docs/docs2/sessions/session-archive/CURRENT SESSION 2025-08-24.md
+docs/docs2/sessions/session-archive/CURRENT SESSION 2025-08-25.md
+docs/docs2/sessions/session-archive/CURRENT SESSION 2025-08-27.md
+docs/docs2/sessions/session-archive/CURRENT SESSION 2025-08-28.md
+docs/docs2/sessions/session-archive/CURRENT SESSION 2025-08-29.md
+docs/docs2/sessions/session-archive/CURRENT SESSION 2025-08-30.md
+docs/docs2/sessions/session-archive/CURRENT SESSION 2025-08-31.md
+docs/docs2/sessions/session-archive/CURRENT SESSION 2025-09-01.md
+docs/docs2/ui-flows/CKS Ecosystem UI Flow and Descriptors.md
+docs/docs2/ui-flows/CKS Orders UI Flow and Descriptors.md
+docs/docs2/ui-flows/CKS Reports UI Flow and Descriptors.md
+docs/docs2/workflows/CKS ADMIN WORKFLOW.md
+docs/docs2/workflows/CKS ORDER WORKFLOW.md
+docs/docs2/workflows/CKS REPORTS WORKFLOW.md
+docs/docs2/workflows/SESSION-2025-09-19-ORDER-WORKFLOWS.md
+docs/images/cks-logo.png
+frontend/index.html
+frontend/package-lock.json
+frontend/package.json
+frontend/postcss.config.cjs
+frontend/src/App.tsx
+frontend/src/components/MyHubSection.tsx
+frontend/src/components/RoleGuard.tsx
+frontend/src/env.d.ts
+frontend/src/hooks/useLogout.ts
+frontend/src/hubs/AdminHub.tsx
+frontend/src/hubs/CenterHub.tsx
+frontend/src/hubs/ContractorHub.tsx
+frontend/src/hubs/CrewHub.tsx
+frontend/src/hubs/CustomerHub.tsx
+frontend/src/hubs/ManagerHub.tsx
+frontend/src/hubs/WarehouseHub.tsx
+frontend/src/index.css
+frontend/src/main.tsx
+frontend/src/pages/CKSCatalog.tsx
+frontend/src/roles/admin/config.v1.json
+frontend/src/roles/admin/index.ts
+frontend/src/roles/center/config.v1.json
+frontend/src/roles/center/index.ts
+frontend/src/roles/contractor/config.v1.json
+frontend/src/roles/contractor/index.ts
+frontend/src/roles/crew/config.v1.json
+frontend/src/roles/crew/index.ts
+frontend/src/roles/customer/config.v1.json
+frontend/src/roles/customer/index.ts
+frontend/src/roles/manager/config.v1.json
+frontend/src/roles/manager/index.ts
+frontend/src/roles/warehouse/config.v1.json
+frontend/src/roles/warehouse/index.ts
+frontend/src/shared/api/admin.ts
+frontend/src/shared/api/base.ts
+frontend/src/shared/schemas/roleConfig.ts
+frontend/src/shared/types/api.d.ts
+frontend/src/shims/useSyncExternalStore/index.d.ts
+frontend/src/shims/useSyncExternalStore/index.js
+frontend/src/tests/App.test.tsx
+frontend/tailwind.config.js
+frontend/tests/AdminHub.test.tsx
+frontend/tests/shim.test.tsx
+frontend/tsconfig.json
+frontend/tsconfig.node.json
+frontend/verify-test-interface.js
+frontend/vite.config.mts
+frontend/vite.config.test.ts
+gateway/package.json
+gateway/src/auth.ts
+gateway/src/auth/clerkMiddleware.ts
+gateway/src/auth/customIdInjector.ts
+gateway/src/config.ts
+gateway/src/featureFlags.ts
+gateway/src/health.ts
+gateway/src/index.ts
+gateway/src/proxy.ts
+gateway/src/rateLimit.ts
+gateway/src/router.ts
+gateway/src/telemetry.ts
+gateway/src/versions.ts
+gateway/tsconfig.json
+infra/alerts/alert-rules.yaml
+infra/alerts/grafana-dashboards.json
+infra/main.tf
+infra/outputs.tf
+infra/policies/security.rego
+infra/policies/terraform.rego
+infra/variables.tf
+package.json
+packages/domain-widgets/EcosystemTree.tsx
+packages/domain-widgets/package.json
+packages/domain-widgets/src/OrdersSection/OrdersSection.module.css
+packages/domain-widgets/src/OrdersSection/OrdersSection.tsx
+packages/domain-widgets/src/OrdersSection/index.ts
+packages/domain-widgets/src/activity/RecentActivity/ActivityItem.tsx
+packages/domain-widgets/src/activity/RecentActivity/RecentActivity.tsx
+packages/domain-widgets/src/activity/RecentActivity/index.ts
+packages/domain-widgets/src/activity/index.ts
+packages/domain-widgets/src/admin/ArchiveSection.tsx
+packages/domain-widgets/src/admin/AssignSection.tsx
+packages/domain-widgets/src/admin/CreateSection.tsx
+packages/domain-widgets/src/admin/index.ts
+packages/domain-widgets/src/index.ts
+packages/domain-widgets/src/memos/MemosPreview/MemosPreview.tsx
+packages/domain-widgets/src/memos/MemosPreview/index.ts
+packages/domain-widgets/src/memos/index.ts
+packages/domain-widgets/src/news/NewsPreview/NewsPreview.tsx
+packages/domain-widgets/src/news/NewsPreview/index.ts
+packages/domain-widgets/src/news/index.ts
+packages/domain-widgets/src/overview/OverviewSection.tsx
+packages/domain-widgets/src/overview/index.ts
+packages/domain-widgets/src/profile/AccountManagerTab/AccountManagerTab.tsx
+packages/domain-widgets/src/profile/AccountManagerTab/index.ts
+packages/domain-widgets/src/profile/ProfileInfoCard/ProfileInfoCard.tsx
+packages/domain-widgets/src/profile/ProfileInfoCard/index.ts
+packages/domain-widgets/src/profile/ProfileTab/ProfileTab.tsx
+packages/domain-widgets/src/profile/ProfileTab/index.ts
+packages/domain-widgets/src/profile/SettingsTab/SettingsTab.tsx
+packages/domain-widgets/src/profile/SettingsTab/index.ts
+packages/domain-widgets/src/profile/index.ts
+packages/domain-widgets/src/reports/ReportCard.tsx
+packages/domain-widgets/src/reports/ReportsSection.tsx
+packages/domain-widgets/src/reports/index.ts
+packages/domain-widgets/src/support/AdminSupportSection.tsx
+packages/domain-widgets/src/support/SupportSection.tsx
+packages/domain-widgets/src/support/index.ts
+packages/domain-widgets/tsconfig.json
+packages/ui/package.json
+packages/ui/src/Scrollbar.tsx
+packages/ui/src/buttons/Button/Button.tsx
+packages/ui/src/buttons/Button/index.ts
+packages/ui/src/buttons/index.ts
+packages/ui/src/cards/OrderCard/OrderCard.module.css
+packages/ui/src/cards/OrderCard/OrderCard.tsx
+packages/ui/src/cards/OrderCard/index.ts
+packages/ui/src/cards/OverviewCard/OverviewCard.tsx
+packages/ui/src/cards/OverviewCard/index.ts
+packages/ui/src/index.ts
+packages/ui/src/layout/PageHeader/PageHeader.module.css
+packages/ui/src/layout/PageHeader/PageHeader.tsx
+packages/ui/src/layout/PageHeader/index.ts
+packages/ui/src/layout/PageWrapper/PageWrapper.module.css
+packages/ui/src/layout/PageWrapper/PageWrapper.tsx
+packages/ui/src/layout/PageWrapper/index.ts
+packages/ui/src/layout/TabSection/TabSection.module.css
+packages/ui/src/layout/TabSection/TabSection.tsx
+packages/ui/src/layout/TabSection/index.ts
+packages/ui/src/layout/index.ts
+packages/ui/src/navigation/MyHubSection/MyHubSection.stories.tsx
+packages/ui/src/navigation/MyHubSection/MyHubSection.test.tsx
+packages/ui/src/navigation/MyHubSection/MyHubSection.tsx
+packages/ui/src/navigation/MyHubSection/index.ts
+packages/ui/src/navigation/NavigationTab/NavigationTab.tsx
+packages/ui/src/navigation/NavigationTab/index.ts
+packages/ui/src/navigation/TabContainer/TabContainer.tsx
+packages/ui/src/navigation/TabContainer/index.ts
+packages/ui/src/navigation/index.ts
+packages/ui/src/styles/globals.css
+packages/ui/src/tables/DataTable/DataTable.tsx
+packages/ui/src/tables/DataTable/index.ts
+packages/ui/tsconfig.json
+pnpm-lock.yaml
+pnpm-workspace.yaml
+prettier.config.cjs
+repo-tree.generated.txt
+scripts/devctl.js
+scripts/prebuild-codegen.mjs
+scripts/run-dev.js
+shared/constants/rolePrefix.ts
+shared/contracts/README.md
+shared/contracts/index.ts
+shared/contracts/openapi.json
+shared/roles/README.md
+shared/roles/configs/admin.v1.json
+shared/roles/configs/center.v1.json
+shared/roles/configs/contractor.v1.json
+shared/roles/configs/crew.v1.json
+shared/roles/configs/customer.v1.json
+shared/roles/configs/manager.v1.json
+shared/roles/configs/warehouse.v1.json
+shared/roles/generate.ts
+shared/roles/schema.ts
+shared/types/customId.d.ts
+shared/utils/codegen/generate-contracts.ts
+shared/utils/eslint-boundaries.json

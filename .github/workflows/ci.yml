@@ -17,11 +17,11 @@ jobs:
           node-version: '20'
       - name: Install
         run: |
-          cd Backend
+          cd apps/backend
           npm install
       - name: Build
         run: |
-          cd Backend
+          cd apps/backend
           npm run build
 
   frontend:
@@ -34,12 +34,9 @@ jobs:
           node-version: '20'
       - name: Install
         run: |
-          cd Frontend
+          cd apps/frontend
           npm install
       - name: Build
         run: |
-          cd Frontend
+          cd apps/frontend
           npm run build
-
-
-

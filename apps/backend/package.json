@@ -1,0 +1,26 @@
+{
+  "name": "@cks/backend",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "cross-env NODE_ENV=development TS_NODE_TRANSPILE_ONLY=1 tsx -r dotenv/config server/index.ts",
+    "build": "tsc",
+    "test": "vitest",
+    "migrate": "node scripts/migrate.js"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.15.5",
+    "cross-env": "^7.0.3",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2"
+  },
+  "dependencies": {
+    "@clerk/backend": "^1.9.1",
+    "@fastify/cookie": "^9.0.0",
+    "@fastify/cors": "^9.0.0",
+    "dotenv": "^17.2.2",
+    "fastify": "^4.26.2",
+    "pg": "^8.16.3",
+    "zod": "^4.1.11"
+  }
+}

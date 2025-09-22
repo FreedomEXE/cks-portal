@@ -1,0 +1,40 @@
+
+Count Name                   
+----- ----                   
+  151 docs                   
+  131 backend                
+   72 packages               
+   48 frontend               
+   26 Test-Interface         
+   24 database               
+   21 auth                   
+   17 shared                 
+   14 gateway                
+    7 infra                  
+    6 .config                
+    4 .vscode                
+    3 scripts                
+    2 .claude                
+    2 .husky                 
+    1 pnpm-lock.yaml         
+    1 .eslintignore          
+    1 package.json           
+    1 .editorconfig          
+    1 .dockerignore          
+    1 Dockerfile.worker      
+    1 repo-tree.generated.txt
+    1 pnpm-workspace.yaml    
+    1 prettier.config.cjs    
+    1 .eslintrc.cjs          
+    1 .prettierrc.cjs        
+    1 .prettierignore        
+    1 Dockerfile.backend     
+    1 Dockerfile.frontend    
+    1 .nvmrc                 
+    1 .github                
+    1 .gitattributes         
+    1 .gitignore             
+    1 docker-compose.yml     
+
+
+
