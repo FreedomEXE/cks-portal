@@ -18,7 +18,7 @@
   "devDependencies": {
     "@types/node": "^20.0.0",
     "husky": "9",
-    "typescript": "^5.0.0"
+    "typescript": "^5.9.2"
   },
   "dependencies": {
     "clsx": "^2.1.1"

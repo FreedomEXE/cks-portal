@@ -1,6 +1,5 @@
 export PATH="$PATH:/c/Program Files/Volta:/c/Program Files/nodejs:/c/Users/User/AppData/Local/Volta/tools/image/node/24.8.0"
-echo "pre-commit: codegen + typecheck + lint"
+echo "pre-push: codegen + typecheck + tests"
 pnpm codegen || exit 1
-pnpm run typecheck || true
-pnpm run lint || true
-
+pnpm run typecheck || exit 1
+pnpm run test || exit 1
