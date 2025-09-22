@@ -1,45 +1,33 @@
-/*───────────────────────────────────────────────
-  Property of CKS  © 2025
-───────────────────────────────────────────────*/
-/**
- * File: RoleGuard.tsx
- *
- * Description:
- * Role-based UI guard
- *
- * Responsibilities:
- * - Primary responsibility for RoleGuard.tsx
- * - Secondary responsibility if applicable
- *
- * Role in system:
- * - Part of CKS Portal architecture
- *
- * Notes:
- * To be implemented
- */
-/*───────────────────────────────────────────────
-  Manifested by Freedom_EXE
-───────────────────────────────────────────────*/
-
-import React from 'react';
+﻿import React from 'react';
+import { Navigate, Outlet } from 'react-router-dom';
+import { useAuth } from '../hooks/useAuth';
 
 interface RoleGuardProps {
   children?: React.ReactNode;
-  initialTab?: string;
+  fallbackPath?: string;
+  allowedRoles?: string[];
+  initialTab?: string | null;
 }
 
-export default function RoleGuard({ children, initialTab }: RoleGuardProps) {
-  return (
-    <div style={{ padding: '20px' }}>
-      <h1>🎉 Login Successful!</h1>
-      <p>You are now authenticated and in the hub.</p>
-      <p>Initial tab: {initialTab || 'none'}</p>
-      {children && (
-        <div style={{ marginTop: '20px', padding: '20px', border: '1px solid #ccc' }}>
-          <h3>Nested Content:</h3>
-          {children}
-        </div>
-      )}
-    </div>
-  );
+export default function RoleGuard({
+  children,
+  fallbackPath = '/login',
+  allowedRoles,
+  initialTab: _initialTab = null,
+}: RoleGuardProps) {
+  const { status, role } = useAuth();
+
+  if (status === 'idle' || status === 'loading') {
+    return null;
+  }
+
+  if (status === 'ready' && !role) {
+    return <Navigate to={fallbackPath} replace />;
+  }
+
+  if (role && allowedRoles && !allowedRoles.includes(role)) {
+    return <Navigate to={fallbackPath} replace />;
+  }
+
+  return <>{children ?? <Outlet />}</>;
 }

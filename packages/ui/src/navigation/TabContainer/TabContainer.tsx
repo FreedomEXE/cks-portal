@@ -33,6 +33,7 @@ export interface TabContainerProps {
   fullWidth?: boolean;
   backgroundColor?: string;
   borderBottom?: boolean;
+  activeColor?: string;
 }
 
 export function TabContainer({
@@ -42,7 +43,8 @@ export function TabContainer({
   spacing = 'normal',
   fullWidth = false,
   backgroundColor = 'transparent',
-  borderBottom = false
+  borderBottom = false,
+  activeColor
 }: TabContainerProps) {
   const getSpacing = () => {
     switch (spacing) {
@@ -93,11 +95,11 @@ export function TabContainer({
     containerStyles.padding = spacing === 'compact' ? '2px' : '4px';
   }
 
-  // Clone children and pass variant prop to NavigationTab components
+  // Clone children and pass variant and activeColor props to NavigationTab components
   const enhancedChildren = React.Children.map(children, (child) => {
     if (React.isValidElement(child) && child.type &&
         (child.type as any).name === 'NavigationTab') {
-      return React.cloneElement(child, { variant } as any);
+      return React.cloneElement(child, { variant, activeColor } as any);
     }
     return child;
   });

@@ -42,7 +42,7 @@ type AdminDirectoryRow = {
 
 export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
   const [activeTab, setActiveTab] = useState(initialTab);
-  const [directoryTab, setDirectoryTab] = useState('managers');
+  const [directoryTab, setDirectoryTab] = useState('admins');
   const { getToken } = useClerkAuth();
 
   // Add scrollbar styles
@@ -257,23 +257,14 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
   }, [getToken]);
 
 
-  const { data: contractorUsers = [], isLoading: contractorsLoading, error: contractorsError } = useAdminUsers({ role: 'contractor', status: 'active' });
-
-  const contractorRows = contractorUsers.map((user) => {
-    const code = (user.cksCode || user.clerkUserId || '').toUpperCase();
-    const id = code || user.clerkUserId || 'N/A';
-    const displayName = user.fullName ?? user.email ?? (code || 'N/A');
-    return {
-      id,
-      companyName: displayName,
-      cksManager: user.reportsTo ?? 'N/A',
-      status: user.status,
-    };
-  });
-
-  const contractorsErrorMessage = contractorsError ? (contractorsError.message || 'Failed to load contractors') : null;
-  const contractorsStatusNotice = contractorsLoading ? 'Loading contractors...' : contractorsErrorMessage;
-  const contractorsEmptyMessage = contractorsErrorMessage ?? 'No contractors found';
+  // Mock contractor data - replace with real API when contractor endpoint is available
+  const contractorRows = [
+    { id: 'CTR001', companyName: 'ABC Construction', cksManager: 'MGR001', status: 'active' },
+    { id: 'CTR002', companyName: 'XYZ Services', cksManager: 'MGR002', status: 'active' },
+    { id: 'CTR003', companyName: 'Premier Maintenance', cksManager: 'MGR001', status: 'active' },
+    { id: 'CTR004', companyName: 'Quality Builders', cksManager: 'MGR003', status: 'active' },
+    { id: 'CTR005', companyName: 'Elite Solutions', cksManager: 'MGR002', status: 'suspended' }
+  ];
 
   const directoryConfig = {
     contractors: {
@@ -308,12 +299,11 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
           )
         }
       ],
-      data: contractorRows,
-      emptyMessage: contractorsEmptyMessage,
+      data: contractorRows
     },
-    managers: {
+    admins: {
       columns: [
-        { key: 'code', label: 'ADMIN CODE', clickable: true },
+        { key: 'id', label: 'ADMIN ID', clickable: true },
         { key: 'name', label: 'ADMIN NAME' },
         {
           key: 'email',
@@ -353,9 +343,54 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
           )
         }
       ],
-      data: managerRows.map((row) => ({ ...row, actions: row.status })),
+      data: adminUsers.map(user => ({
+        id: user.cksCode || user.clerkUserId || 'N/A',
+        name: user.fullName || user.email?.split('@')[0] || 'N/A',
+        email: user.email || 'N/A',
+        status: user.status || 'active'
+      })),
       emptyMessage: isLoadingAdminUsers ? 'Loading admin users...' : (adminUsersError ?? 'No admin users found'),
-      searchFields: ['code', 'name', 'email'],
+      searchFields: ['id', 'name', 'email'],
+    },
+    managers: {
+      columns: [
+        { key: 'id', label: 'MANAGER ID', clickable: true },
+        { key: 'name', label: 'MANAGER NAME' },
+        { key: 'territory', label: 'TERRITORY' },
+        {
+          key: 'status',
+          label: 'STATUS',
+          render: (value: string) => (
+            <span style={{
+              padding: '4px 12px',
+              borderRadius: '4px',
+              fontSize: '12px',
+              fontWeight: 500,
+              backgroundColor: value === 'active' ? '#dcfce7' : '#fee2e2',
+              color: value === 'active' ? '#16a34a' : '#dc2626'
+            }}>
+              {value}
+            </span>
+          )
+        },
+        {
+          key: 'actions',
+          label: 'ACTIONS',
+          render: (_: any, row: any) => (
+            <div style={{ display: 'flex', gap: 8 }}>
+              <Button variant="secondary" size="small" onClick={() => console.log('Details', row.id)}>Details</Button>
+              <Button variant="danger" size="small" onClick={() => console.log('Delete', row.id)}>Delete</Button>
+            </div>
+          )
+        }
+      ],
+      data: [
+        { id: 'MGR001', name: 'John Smith', territory: 'Northeast', status: 'active' },
+        { id: 'MGR002', name: 'Sarah Johnson', territory: 'Southeast', status: 'active' },
+        { id: 'MGR003', name: 'Mike Williams', territory: 'Midwest', status: 'active' },
+        { id: 'MGR004', name: 'Emma Davis', territory: 'West Coast', status: 'active' },
+        { id: 'MGR005', name: 'Robert Brown', territory: 'Southwest', status: 'active' }
+      ]
     },
     customers: {
       columns: [
@@ -782,6 +817,12 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
             <PageWrapper title="Directory" showHeader={true} headerSrOnly>
               <TabContainer variant="pills" spacing="compact">
                 <NavigationTab
+                  label="Admins"
+                  isActive={directoryTab === 'admins'}
+                  onClick={() => setDirectoryTab('admins')}
+                  activeColor="#111827"
+                />
+                <NavigationTab
                   label="Managers"
                   isActive={directoryTab === 'managers'}
                   onClick={() => setDirectoryTab('managers')}
@@ -803,7 +844,7 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
                   label="Centers"
                   isActive={directoryTab === 'centers'}
                   onClick={() => setDirectoryTab('centers')}
-                  activeColor="#f59e0b"
+                  activeColor="#f97316"
                 />
                 <NavigationTab
                   label="Crew"
@@ -904,7 +945,7 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    {directoryTab === 'managers' && (
+                    {directoryTab === 'admins' && (
                       <div
                         style={{
                           fontSize: '13px',
@@ -918,20 +959,10 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
                             : `Showing ${adminUsers.length} admin ${adminUsers.length === 1 ? 'user' : 'users'}.`}
                       </div>
                     )}
-                    {directoryTab === 'contractors' && contractorsStatusNotice && (
-                      <div
-                        style={{
-                          fontSize: '13px',
-                          color: contractorsError ? '#dc2626' : '#64748b',
-                        }}
-                      >
-                        {contractorsStatusNotice}
-                      </div>
-                    )}
                     <DataTable
                       columns={directoryConfig[directoryTab as keyof typeof directoryConfig].columns}
                       data={directoryConfig[directoryTab as keyof typeof directoryConfig].data}
-                      searchPlaceholder={directoryTab === 'managers' ? 'Search admin users...' : `Search ${directoryTab}...`}
+                      searchPlaceholder={directoryTab === 'admins' ? 'Search admin users...' : `Search ${directoryTab}...`}
                       maxItems={25}
                       showSearch={true}
                       onRowClick={(row) => console.log('Clicked row:', row)}

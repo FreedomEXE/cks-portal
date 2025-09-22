@@ -19,7 +19,7 @@
   },
   "scripts": {
     "dev": "vite build --watch",
-    "build": "vite build",
+    "build": "vite build && node scripts/copy-assets.mjs",
     "clean": "rimraf dist",
     "typecheck": "tsc --noEmit",
     "lint": "echo 'Lint disabled for UI package'",

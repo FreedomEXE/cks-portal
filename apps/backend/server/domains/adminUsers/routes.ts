@@ -46,13 +46,13 @@ function coerceQuery(query: FastifyRequest['query']): AdminUserQueryOptions {
 }
 
 async function requireAdmin(request: FastifyRequest, reply: FastifyReply) {
-  const authContext = await authenticate(request);
-  if (!authContext) {
-    reply.code(401).send({ error: "Unauthorized" });
+  const auth = await authenticate(request);
+  if (!auth.ok) {
+    reply.code(401).send({ error: "Unauthorized", reason: auth.reason });
     return null;
   }
 
-  const adminUser = await getAdminUserByClerkId(authContext.userId);
+  const adminUser = await getAdminUserByClerkId(auth.userId);
   if (!adminUser) {
     reply.code(403).send({ error: "Forbidden" });
     return null;

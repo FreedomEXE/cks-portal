@@ -35,6 +35,11 @@ function buildPoolConfig(): PoolConfig {
     throw new Error('DATABASE_URL environment variable is not set.');
   }
 
+  // Validate the connection string format
+  if (!connectionString.startsWith('postgresql://') && !connectionString.startsWith('postgres://')) {
+    throw new Error('DATABASE_URL must be a valid PostgreSQL connection string starting with postgresql:// or postgres://');
+  }
+
   return {
     connectionString,
     max: 20,
@@ -49,6 +54,9 @@ async function delay(ms: number) {
 }
 
 async function createPool(): Promise<Pool> {
+  if (!process.env.DATABASE_URL) {
+    throw new Error('DATABASE_URL missing');
+  }
   const config = buildPoolConfig();
   const nextPool = new Pool(config);
 

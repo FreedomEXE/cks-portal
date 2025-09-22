@@ -2,12 +2,13 @@
 export default {
   content: [
     './index.html',
-    './src/**/*.{ts,tsx,js,jsx}',
-    // Scan auth for classes used in Login/guards
+    './src/**/*.{ts,tsx,js,jsx,css}',
     '../../auth/src/**/*.{ts,tsx,css}',
     '../../auth/dist/**/*.{js,jsx,css}',
-    // Existing globs for ui/domain-widgets...
-    '../../packages/ui/src/**/*.{ts,tsx}'
+    '../../packages/ui/src/**/*.{ts,tsx,css}',
+    '../../packages/ui/dist/**/*.{js,jsx,css}',
+    '../../packages/domain-widgets/src/**/*.{ts,tsx,css}',
+    '../../packages/domain-widgets/dist/**/*.{js,jsx,css}'
   ],
   theme: {
     extend: {

@@ -49,7 +49,7 @@ export function NavigationTab({
   const getTabStyles = () => {
     const baseStyles: React.CSSProperties = {
       position: 'relative',
-      padding: variant === 'pills' ? '8px 16px' : '10px 16px',
+      padding: '10px 20px',
       fontSize: '14px',
       fontWeight: isActive ? '600' : '400',
       cursor: disabled ? 'not-allowed' : 'pointer',
@@ -61,37 +61,35 @@ export function NavigationTab({
       opacity: disabled ? 0.5 : 1,
       border: 'none',
       background: 'transparent',
-      fontFamily: 'inherit'
+      fontFamily: 'inherit',
+      borderRadius: '8px'
     };
 
     if (variant === 'pills') {
       return {
         ...baseStyles,
-        padding: '8px 16px',
-        borderRadius: '6px',
-        border: '1px solid #e5e7eb',
-        backgroundColor: isActive ? activeColor : isHovered && !disabled ? '#f3f4f6' : 'white',
-        color: isActive ? '#ffffff' : disabled ? '#9ca3af' : '#111827',
+        backgroundColor: isActive ? activeColor : isHovered && !disabled ? `${activeColor}15` : 'transparent',
+        color: isActive ? '#ffffff' : disabled ? '#9ca3af' : '#374151',
         fontSize: '14px',
-        fontWeight: '600'
+        fontWeight: isActive ? '600' : '500'
       };
     }
 
     if (variant === 'underline') {
       return {
         ...baseStyles,
-        borderBottom: isActive ? '2px solid #3b82f6' : '2px solid transparent',
-        color: isActive ? '#3b82f6' : disabled ? '#9ca3af' : isHovered && !disabled ? '#1f2937' : '#6b7280',
-        paddingBottom: '12px'
+        borderBottom: isActive ? `2px solid ${activeColor}` : '2px solid transparent',
+        color: isActive ? activeColor : disabled ? '#9ca3af' : isHovered && !disabled ? '#1f2937' : '#6b7280',
+        paddingBottom: '12px',
+        borderRadius: '0'
       };
     }
 
     // default variant
     return {
       ...baseStyles,
-      backgroundColor: isActive ? '#f3f4f6' : isHovered && !disabled ? '#f9fafb' : 'transparent',
-      color: isActive ? '#1f2937' : disabled ? '#9ca3af' : '#4b5563',
-      borderRadius: '4px'
+      backgroundColor: isActive ? activeColor : isHovered && !disabled ? `${activeColor}15` : 'transparent',
+      color: isActive ? '#ffffff' : disabled ? '#9ca3af' : '#374151'
     };
   };
 

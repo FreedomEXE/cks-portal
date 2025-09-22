@@ -54,6 +54,7 @@ export function useAuth(): AuthState {
   const location = useLocation();
   const abortRef = useRef<AbortController | null>(null);
   const fetchingRef = useRef(false);
+  const lastRequestRef = useRef(0);
   const lastResolvedRef = useRef<{ role: string; code: string | null } | null>(null);
 
   const [state, setState] = useState<Omit<AuthState, 'refresh'>>({
@@ -72,6 +73,7 @@ export function useAuth(): AuthState {
       abortRef.current?.abort();
       fetchingRef.current = false;
       lastResolvedRef.current = null;
+      lastRequestRef.current = 0;
       setState({ status: 'idle', role: null, code: null, error: null });
       return;
     }
@@ -79,6 +81,12 @@ export function useAuth(): AuthState {
     if (fetchingRef.current) {
       return;
     }
+
+    const now = Date.now();
+    if (now - lastRequestRef.current < 1000) {
+      return;
+    }
+    lastRequestRef.current = now;
 
     fetchingRef.current = true;
 
@@ -123,6 +131,11 @@ export function useAuth(): AuthState {
       });
 
       if (!response.ok) {
+        if (response.status === 401) {
+          lastResolvedRef.current = null;
+          setState({ status: 'ready', role: null, code: null, error: null });
+          return;
+        }
         throw new Error(`Bootstrap failed with status ${response.status}`);
       }
 
@@ -148,11 +161,13 @@ export function useAuth(): AuthState {
 
       const cached = lastResolvedRef.current;
       if (isAbortError(err)) {
-        if (cached) {
-          setState({ status: 'ready', role: cached.role, code: cached.code, error: null });
-        } else {
-          setState({ status: 'idle', role: null, code: null, error: null });
-        }
+        // Retryable
+        setState({
+          status: 'idle',
+          role: cached?.role ?? null,
+          code: cached?.code ?? null,
+          error: null,
+        });
       } else {
         const error = err instanceof Error ? err : new Error('Failed to bootstrap user role');
         if (cached) {
@@ -181,6 +196,7 @@ export function useAuth(): AuthState {
       abortRef.current?.abort();
       fetchingRef.current = false;
       lastResolvedRef.current = null;
+      lastRequestRef.current = 0;
       setState({ status: 'idle', role: null, code: null, error: null });
       return;
     }
