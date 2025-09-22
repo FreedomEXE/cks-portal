@@ -10,7 +10,8 @@
       "Bash(npx storybook@latest init:*)",
       "Bash(pkill:*)",
       "Bash(npx tsc:*)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": []
