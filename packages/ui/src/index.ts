@@ -26,7 +26,7 @@ export { default as OverviewCard } from './cards/OverviewCard';
 export * from './cards/OverviewCard';
 
 export { default as OrderCard } from './cards/OrderCard';
-export * from './cards/OrderCard';
+export type { OrderCardProps, ApprovalStage } from './cards/OrderCard';
 
 export { default as Scrollbar } from './Scrollbar';
 export * from './Scrollbar';

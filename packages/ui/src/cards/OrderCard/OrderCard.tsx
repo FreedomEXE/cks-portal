@@ -427,3 +427,4 @@ const OrderCard: React.FC<OrderCardProps> = ({
 };
 
 export default OrderCard;
+export type { OrderCardProps, ApprovalStage };

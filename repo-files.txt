@@ -1,3 +1,5 @@
+.changeset/README.md
+.changeset/config.json
 .claude/config.json
 .claude/settings.local.json
 .config/dockerignore
@@ -29,8 +31,6 @@ apps/backend/.env.example
 apps/backend/package.json
 apps/backend/scripts/migrate.js
 apps/backend/server/core/auth/authenticate.ts
-apps/backend/server/core/auth/clerk.ts
-apps/backend/server/core/auth/clerkVerifier.ts
 apps/backend/server/core/auth/customIdExtractor.ts
 apps/backend/server/core/cache/redis.ts
 apps/backend/server/core/cache/warmers.ts
@@ -51,7 +51,6 @@ apps/backend/server/core/telemetry/tracing.ts
 apps/backend/server/core/validation/zod.ts
 apps/backend/server/core/workers/index.ts
 apps/backend/server/db/connection.ts
-apps/backend/server/db/migrations/20250921120000_create_admin_users.sql
 apps/backend/server/db/seeds/001_initial_admin.sql
 apps/backend/server/domains/adminUsers/index.ts
 apps/backend/server/domains/adminUsers/routes.ts
@@ -162,7 +161,6 @@ apps/frontend/package.json
 apps/frontend/postcss.config.cjs
 apps/frontend/src/App.tsx
 apps/frontend/src/components/MyHubSection.tsx
-apps/frontend/src/components/RoleGuard.tsx
 apps/frontend/src/env.d.ts
 apps/frontend/src/hooks/useLogout.ts
 apps/frontend/src/hubs/AdminHub.tsx
@@ -206,7 +204,6 @@ apps/frontend/vite.config.mts
 apps/frontend/vite.config.test.ts
 apps/gateway/package.json
 apps/gateway/src/auth.ts
-apps/gateway/src/auth/clerkMiddleware.js
 apps/gateway/src/auth/clerkMiddleware.ts
 apps/gateway/src/auth/customIdInjector.js
 apps/gateway/src/auth/customIdInjector.ts
@@ -255,6 +252,7 @@ auth/src/hooks/useAuth.ts
 auth/src/hooks/useCustomId.ts
 auth/src/hooks/useRole.ts
 auth/src/hooks/useUser.ts
+auth/src/index.ts
 auth/src/pages/Callback.tsx
 auth/src/pages/Invite.tsx
 auth/src/pages/Login.tsx
@@ -266,6 +264,7 @@ auth/src/utils/clerkClient.ts
 auth/src/utils/customIdParser.ts
 auth/src/utils/roleExtractor.ts
 auth/src/utils/tokenValidator.ts
+auth/tsconfig.build.json
 auth/tsconfig.json
 database/migrations/000_extensions.sql
 database/migrations/001_users.sql
@@ -281,6 +280,7 @@ database/migrations/050_assignments.sql
 database/migrations/060_inventory.sql
 database/migrations/070_deliveries.sql
 database/migrations/080_reports.sql
+database/migrations/20250921120000_create_admin_users.sql
 database/rls/assignments.rls.sql
 database/rls/catalog.rls.sql
 database/rls/deliveries.rls.sql

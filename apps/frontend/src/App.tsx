@@ -1,6 +1,5 @@
 import { Navigate, Outlet, Route, Routes, useSearchParams } from 'react-router-dom';
-import RoleGuard from '@cks/auth/components/RoleGuard';
-import Login from '@cks/auth/pages/Login';
+import { RoleGuard, Login } from '@cks/auth';
 
 function RoleHubRoute() {
   const [searchParams] = useSearchParams();

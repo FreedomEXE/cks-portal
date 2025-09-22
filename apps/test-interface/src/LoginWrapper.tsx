@@ -1,7 +1,7 @@
 import React from 'react';
 import { BrowserRouter } from 'react-router-dom';
 import { ClerkProvider } from '@clerk/clerk-react';
-import Login from '@cks/auth/pages/Login';
+import { Login } from '@cks/auth';
 
 // Use env publishable key if provided; fall back to a harmless test string for UI-only rendering
 const PUBLISHABLE_KEY = (import.meta as any).env?.VITE_CLERK_PUBLISHABLE_KEY || 'pk_test_dummy_key_for_ui_only';

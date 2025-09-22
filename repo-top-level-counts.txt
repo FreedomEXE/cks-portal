@@ -1,26 +1,27 @@
 
 Count Name                     
 ----- ----                     
-  221 apps                     
+  216 apps                     
   151 docs                     
    72 packages                 
-   24 database                 
-   21 auth                     
+   25 database                 
+   23 auth                     
    17 shared                   
     7 infra                    
     6 .config                  
     4 .vscode                  
     3 scripts                  
-    2 .claude                  
+    2 .changeset               
     2 .husky                   
-    1 repo-files.txt           
-    1 docker-compose.yml       
+    2 .claude                  
     1 repo-top-level-counts.txt
-    1 tsconfig.base.json       
-    1 package.json             
+    1 docker-compose.yml       
     1 pnpm-lock.yaml           
-    1 prettier.config.cjs      
+    1 tsconfig.base.json       
     1 pnpm-workspace.yaml      
+    1 package.json             
+    1 repo-files.txt           
+    1 prettier.config.cjs      
     1 .eslintrc.cjs            
     1 .gitattributes           
     1 .github                  

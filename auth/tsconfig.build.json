@@ -4,7 +4,11 @@
     "outDir": "dist",
     "declaration": true,
     "emitDeclarationOnly": false,
-    "sourceMap": true
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "target": "ES2022",
+    "jsx": "react-jsx",
+    "rootDir": "src"
   },
   "include": ["src"]
 }
