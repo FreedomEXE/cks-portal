@@ -28,6 +28,12 @@
       "@cks/auth/*": [
         "../../auth/src/*"
       ],
+      "@cks/ui": [
+        "../../packages/ui/src/index.ts"
+      ],
+      "@cks/ui/*": [
+        "../../packages/ui/src/*"
+      ],
       "@clerk/clerk-react": [
         "./src/mocks/clerk-react"
       ]

@@ -1,4 +1,4 @@
-﻿import { resolve } from "node:path";
+import { resolve } from "node:path";
 import dotenv from "dotenv";
 
 dotenv.config({ path: resolve(__dirname, "../.env") });
@@ -11,6 +11,9 @@ import z from "zod";
 import { authenticate } from "./core/auth/authenticate";
 import { getAdminUserByClerkId } from "./domains/adminUsers/store";
 import { registerAdminUserRoutes } from "./domains/adminUsers/routes";
+import { registerDirectoryRoutes } from "./domains/directory/routes.fastify";
+import { registerProvisioningRoutes } from "./domains/provisioning";
+import { registerAssignmentRoutes } from "./domains/assignments";
 import type { AdminUserStatus } from "./domains/adminUsers/types";
 
 type BootstrapResponse = {
@@ -18,6 +21,9 @@ type BootstrapResponse = {
   code: string | null;
   email: string | null;
   status: AdminUserStatus;
+  fullName: string | null;
+  firstName: string | null;
+  ownerFirstName: string | null;
 };
 
 const bootstrapSchema = z.object({
@@ -29,7 +35,50 @@ const bootstrapResponseSchema = z.object({
   code: z.string().nullable(),
   email: z.string().nullable(),
   status: z.enum(['active']),
+  fullName: z.string().nullable(),
+  firstName: z.string().nullable(),
+  ownerFirstName: z.string().nullable(),
 });
+
+function extractFirstName(fullName?: string | null): string | null {
+  if (!fullName) {
+    return null;
+  }
+  const trimmed = fullName.trim();
+  if (!trimmed) {
+    return null;
+  }
+  const [first] = trimmed.split(/\s+/);
+  return first || null;
+}
+
+function emailPrefix(email?: string | null): string | null {
+  if (!email) {
+    return null;
+  }
+  const prefix = email.split('@')[0]?.trim();
+  return prefix ? prefix : null;
+}
+
+function resolveFirstName(options: {
+  fullName?: string | null;
+  email?: string | null;
+  fallback?: string | null;
+}): string | null {
+  const firstFromName = extractFirstName(options.fullName);
+  if (firstFromName) {
+    return firstFromName;
+  }
+  const prefix = emailPrefix(options.email);
+  if (prefix) {
+    return prefix;
+  }
+  if (options.fallback) {
+    const trimmed = options.fallback.trim();
+    return trimmed ? trimmed : null;
+  }
+  return null;
+}
 
 export async function buildServer() {
   const server = Fastify({ logger: true });
@@ -82,11 +131,21 @@ export async function buildServer() {
       const role = adminUser.role;
       console.log('[bootstrap] Sending role:', role);
 
+      const resolvedEmail = adminUser.email ?? authContext.email ?? null;
+      const firstName = resolveFirstName({
+        fullName: adminUser.fullName,
+        email: resolvedEmail,
+        fallback: adminUser.cksCode ?? authContext.userId,
+      });
+
       const response: BootstrapResponse = {
         role,
         code: adminUser.cksCode ?? null,
-        email: adminUser.email ?? authContext.email ?? null,
+        email: resolvedEmail,
         status: adminUser.status,
+        fullName: adminUser.fullName ?? null,
+        firstName,
+        ownerFirstName: firstName,
       };
 
       return reply.send(bootstrapResponseSchema.parse(response));
@@ -97,6 +156,9 @@ export async function buildServer() {
   });
 
   await registerAdminUserRoutes(server);
+  await registerProvisioningRoutes(server);
+  await registerAssignmentRoutes(server);
+  await registerDirectoryRoutes(server);
 
   return server;
 }
@@ -119,4 +181,3 @@ async function start() {
 if (require.main === module) {
   start();
 }
-

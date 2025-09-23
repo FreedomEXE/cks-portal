@@ -1,6 +1,7 @@
 import { useAuth as useClerkAuth, useUser } from '@clerk/clerk-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { clearImpersonation, readImpersonation, getCodeFromPath } from '../utils/impersonation';
 
 type AuthStatus = 'idle' | 'loading' | 'ready' | 'error';
 
@@ -8,8 +9,32 @@ type AuthState = {
   status: AuthStatus;
   role: string | null;
   code: string | null;
+  fullName: string | null;
+  firstName: string | null;
+  ownerFirstName: string | null;
   error: Error | null;
+  impersonating: boolean;
   refresh: () => Promise<void>;
+};
+
+type InternalAuthState = Omit<AuthState, 'refresh' | 'impersonating'>;
+
+type AuthSnapshot = {
+  role: string;
+  code: string | null;
+  fullName: string | null;
+  firstName: string | null;
+  ownerFirstName: string | null;
+};
+
+const INITIAL_STATE: InternalAuthState = {
+  status: 'idle',
+  role: null,
+  code: null,
+  fullName: null,
+  firstName: null,
+  ownerFirstName: null,
+  error: null,
 };
 
 const DEV_PROXY_BASE = '/api';
@@ -22,6 +47,53 @@ function sanitize(value: unknown): string | null {
   }
   const trimmed = value.trim().toLowerCase();
   return trimmed || null;
+}
+
+function sanitizePreservingCase(value: unknown): string | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed || null;
+}
+
+function firstFromFullName(fullName: string | null): string | null {
+  if (!fullName) {
+    return null;
+  }
+  const [first] = fullName.split(/\s+/);
+  return first || null;
+}
+
+function emailPrefix(email: string | null): string | null {
+  if (!email) {
+    return null;
+  }
+  const [prefix] = email.split('@');
+  const trimmed = prefix?.trim();
+  return trimmed ? trimmed : null;
+}
+
+function resolveFirstName({
+  firstName,
+  fullName,
+  email,
+  username,
+  code,
+}: {
+  firstName?: string | null;
+  fullName?: string | null;
+  email?: string | null;
+  username?: string | null;
+  code?: string | null;
+}): string | null {
+  return (
+    sanitizePreservingCase(firstName) ??
+    firstFromFullName(sanitizePreservingCase(fullName)) ??
+    sanitizePreservingCase(username) ??
+    emailPrefix(email ?? null) ??
+    sanitizePreservingCase(code)
+  );
 }
 
 function fallbackCode(existing: string | null, userEmail: string | null, username: string | null): string | null {
@@ -55,26 +127,35 @@ export function useAuth(): AuthState {
   const abortRef = useRef<AbortController | null>(null);
   const fetchingRef = useRef(false);
   const lastRequestRef = useRef(0);
-  const lastResolvedRef = useRef<{ role: string; code: string | null } | null>(null);
+  const lastResolvedRef = useRef<AuthSnapshot | null>(null);
 
-  const [state, setState] = useState<Omit<AuthState, 'refresh'>>({
-    status: 'idle',
-    role: null,
-    code: null,
-    error: null,
+  const [state, setState] = useState<InternalAuthState>({ ...INITIAL_STATE });
+
+  // Debug logging
+  console.log('[useAuth] Current state:', {
+    status: state.status,
+    authLoaded,
+    userLoaded,
+    isSignedIn,
+    userId: user?.id,
+    API_BASE,
   });
 
   const refresh = useCallback(async () => {
+    console.log('[useAuth] refresh() called:', { authLoaded, userLoaded, isSignedIn });
+
     if (!authLoaded || !userLoaded) {
+      console.log('[useAuth] Waiting for Clerk to load');
       return;
     }
 
     if (!isSignedIn) {
+      console.log('[useAuth] User not signed in, resetting state');
       abortRef.current?.abort();
       fetchingRef.current = false;
       lastResolvedRef.current = null;
       lastRequestRef.current = 0;
-      setState({ status: 'idle', role: null, code: null, error: null });
+      setState({ ...INITIAL_STATE });
       return;
     }
 
@@ -95,9 +176,8 @@ export function useAuth(): AuthState {
     abortRef.current = controller;
 
     setState((current) => ({
+      ...current,
       status: 'loading',
-      role: current.role,
-      code: current.code,
       error: null,
     }));
 
@@ -124,56 +204,124 @@ export function useAuth(): AuthState {
 
       timeout = setTimeout(() => controller.abort(), 15_000);
 
-      const response = await fetch(`${API_BASE}/me/bootstrap`, {
+      const bootstrapUrl = `${API_BASE}/me/bootstrap`;
+      console.log('[useAuth] Calling bootstrap:', bootstrapUrl, { hasToken: !!token });
+
+      const response = await fetch(bootstrapUrl, {
         credentials: 'include',
         headers,
         signal: controller.signal,
       });
 
+      console.log('[useAuth] Bootstrap response:', response.status, response.statusText);
+
       if (!response.ok) {
         if (response.status === 401) {
+          console.log('[useAuth] 401 Unauthorized - clearing auth state');
           lastResolvedRef.current = null;
-          setState({ status: 'ready', role: null, code: null, error: null });
+          setState({
+            status: 'ready',
+            role: null,
+            code: null,
+            fullName: null,
+            firstName: null,
+            ownerFirstName: null,
+            error: null,
+          });
           return;
         }
         throw new Error(`Bootstrap failed with status ${response.status}`);
       }
 
       const data = await response.json();
+      console.log('[useAuth] Bootstrap data received:', data);
       const rawRole = sanitize(data?.role) ?? sanitize(data?.kind);
-      const rawCode = sanitize(data?.code) ?? sanitize(data?.internal_code);
+      const rawCode = sanitizePreservingCase(data?.code) ?? sanitizePreservingCase(data?.internal_code);
       if (!rawRole) {
         throw new Error('Bootstrap response missing role');
       }
 
       const resolvedCode = fallbackCode(rawCode, email, username);
+      const fullName = sanitizePreservingCase(data?.fullName);
+      const serverFirstName = sanitizePreservingCase(data?.firstName);
+      const serverOwnerFirstName = sanitizePreservingCase(data?.ownerFirstName);
+      const resolvedFirstName = resolveFirstName({
+        firstName: serverFirstName,
+        fullName,
+        email: (typeof data?.email === 'string' ? data.email : null) ?? email,
+        username,
+        code: resolvedCode,
+      });
+      const resolvedOwnerFirstName =
+        resolveFirstName({
+          firstName: serverOwnerFirstName,
+          fullName,
+          email: (typeof data?.email === 'string' ? data.email : null) ?? email,
+          username,
+          code: resolvedCode,
+        }) ?? resolvedFirstName;
 
       if (abortRef.current !== controller || controller.signal.aborted) {
         return;
       }
 
-      lastResolvedRef.current = { role: rawRole, code: resolvedCode };
-      setState({ status: 'ready', role: rawRole, code: resolvedCode, error: null });
+      const snapshot: AuthSnapshot = {
+        role: rawRole,
+        code: resolvedCode,
+        fullName,
+        firstName: resolvedFirstName,
+        ownerFirstName: resolvedOwnerFirstName,
+      };
+      lastResolvedRef.current = snapshot;
+      setState({
+        status: 'ready',
+        role: snapshot.role,
+        code: snapshot.code,
+        fullName: snapshot.fullName,
+        firstName: snapshot.firstName,
+        ownerFirstName: snapshot.ownerFirstName,
+        error: null,
+      });
     } catch (err) {
+      console.error('[useAuth] Bootstrap error:', err);
       if (abortRef.current !== controller) {
         return;
       }
 
       const cached = lastResolvedRef.current;
       if (isAbortError(err)) {
-        // Retryable
+        lastRequestRef.current = 0;
         setState({
           status: 'idle',
           role: cached?.role ?? null,
           code: cached?.code ?? null,
+          fullName: cached?.fullName ?? null,
+          firstName: cached?.firstName ?? null,
+          ownerFirstName: cached?.ownerFirstName ?? null,
           error: null,
         });
       } else {
         const error = err instanceof Error ? err : new Error('Failed to bootstrap user role');
         if (cached) {
-          setState({ status: 'ready', role: cached.role, code: cached.code, error: null });
+          setState({
+            status: 'ready',
+            role: cached.role,
+            code: cached.code,
+            fullName: cached.fullName,
+            firstName: cached.firstName,
+            ownerFirstName: cached.ownerFirstName,
+            error: null,
+          });
         } else {
-          setState({ status: 'error', role: null, code: null, error });
+          setState({
+            status: 'error',
+            role: null,
+            code: null,
+            fullName: null,
+            firstName: null,
+            ownerFirstName: null,
+            error,
+          });
         }
       }
     } finally {
@@ -188,20 +336,38 @@ export function useAuth(): AuthState {
   }, [authLoaded, getToken, isSignedIn, user, userLoaded]);
 
   useEffect(() => {
+    const pathCode = getCodeFromPath(location.pathname);
+    if (!pathCode) {
+      clearImpersonation();
+    }
+  }, [location.pathname]);
+  useEffect(() => {
+    console.log('[useAuth] useEffect triggered:', {
+      authLoaded,
+      userLoaded,
+      isSignedIn,
+      stateRole: state.role,
+      stateStatus: state.status,
+      fetchingRef: fetchingRef.current,
+    });
+
     if (!authLoaded || !userLoaded) {
+      console.log('[useAuth] Clerk not fully loaded yet');
       return;
     }
 
     if (!isSignedIn) {
+      console.log('[useAuth] Not signed in - resetting');
       abortRef.current?.abort();
       fetchingRef.current = false;
       lastResolvedRef.current = null;
       lastRequestRef.current = 0;
-      setState({ status: 'idle', role: null, code: null, error: null });
+      setState({ ...INITIAL_STATE });
       return;
     }
 
     if (!state.role && !fetchingRef.current && state.status !== 'error') {
+      console.log('[useAuth] Triggering refresh()');
       void refresh();
     }
   }, [authLoaded, isSignedIn, refresh, state.role, state.status, userLoaded]);
@@ -210,7 +376,7 @@ export function useAuth(): AuthState {
     if (state.status !== 'ready' || !state.role) {
       return;
     }
-    if (location.pathname.startsWith('/hub')) {
+    if (location.pathname === '/hub' || getCodeFromPath(location.pathname)) {
       return;
     }
     navigate('/hub', { replace: true });
@@ -220,8 +386,54 @@ export function useAuth(): AuthState {
     abortRef.current?.abort();
   }, []);
 
+  const impersonationSnapshot = useMemo(() => {
+    const snapshot = readImpersonation();
+    if (!snapshot.isActive) {
+      return snapshot;
+    }
+    const pathCode = getCodeFromPath(location.pathname);
+    if (!pathCode || (snapshot.code && snapshot.code !== pathCode)) {
+      return { ...snapshot, isActive: false };
+    }
+    return {
+      ...snapshot,
+      code: snapshot.code ?? pathCode,
+    };
+  }, [location.pathname]);
+
+  const effectiveState = useMemo<InternalAuthState>(() => {
+    if (!impersonationSnapshot.isActive) {
+      return state;
+    }
+    const role = impersonationSnapshot.role ?? state.role;
+    const code = impersonationSnapshot.code ?? state.code;
+    const displayName = impersonationSnapshot.displayName ?? state.fullName;
+    const firstName = impersonationSnapshot.firstName ?? state.firstName;
+    const ownerFirstName =
+      impersonationSnapshot.firstName ??
+      state.ownerFirstName ??
+      state.firstName;
+
+    return {
+      ...state,
+      role,
+      code,
+      fullName: displayName,
+      firstName,
+      ownerFirstName,
+    };
+  }, [state, impersonationSnapshot]);
+
   return useMemo<AuthState>(() => ({
-    ...state,
+    ...effectiveState,
+    impersonating: impersonationSnapshot.isActive,
     refresh,
-  }), [state, refresh]);
+  }), [effectiveState, impersonationSnapshot.isActive, refresh]);
+
+
+
+
+
+
 }
+

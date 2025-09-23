@@ -5,47 +5,194 @@
  * File: AdminHub.tsx
  *
  * Description:
- * AdminHub.tsx implementation
- *
- * Responsibilities:
- * - Provide AdminHub.tsx functionality
- *
- * Role in system:
- * - Used by CKS Portal system
- *
- * Notes:
- * To be implemented
+ * Administrator hub container that wires dashboard metrics,
+ * directory views, create/assign flows, and support tools.
  */
 /*-----------------------------------------------
   Manifested by Freedom_EXE
 -----------------------------------------------*/
 
-import { useEffect, useState } from 'react';
-import { AdminSupportSection, ArchiveSection, AssignSection, CreateSection, MemosPreview, NewsPreview, OverviewSection, RecentActivity, type Activity } from '@cks/domain-widgets';
-import { Button, DataTable, NavigationTab, PageHeader, PageWrapper, Scrollbar, TabContainer } from '@cks/ui';
-import MyHubSection from '../components/MyHubSection';
-import { useAuth as useClerkAuth } from '@clerk/clerk-react';
+import { inferRoleFromIdentifier, normalizeImpersonationCode, persistImpersonation } from '@cks/auth';
+import {
+  AdminSupportSection,
+  ArchiveSection,
+  MemosPreview,
+  NewsPreview,
+  OverviewSection,
+  RecentActivity,
+  type Activity,
+} from '@cks/domain-widgets';
+import {
+  DataTable,
+  NavigationTab,
+  PageHeader,
+  PageWrapper,
+  Scrollbar,
+  TabContainer,
+} from '@cks/ui';
+import type { ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
-import { fetchAdminUsers, useAdminUsers, type AdminUser } from '../shared/api/admin';
+import MyHubSection from '../components/MyHubSection';
+import AdminAssignSection from './components/AdminAssignSection';
+import AdminCreateSection from './components/AdminCreateSection';
+
+import { useAdminUsers } from '../shared/api/admin';
+import {
+  useActivities,
+  useCenters,
+  useContractors,
+  useCrew,
+  useCustomers,
+  useFeedback,
+  useManagers,
+  useOrders,
+  useProcedures,
+  useProducts,
+  useReports,
+  useServices,
+  useTraining,
+  useWarehouses,
+} from '../shared/api/directory';
+
+const MILLIS_PER_DAY = 1000 * 60 * 60 * 24;
 
 interface AdminHubProps {
   initialTab?: string;
 }
 
-type AdminDirectoryRow = {
-  id: string;
-  code: string;
-  name: string;
-  email: string;
-  status: string;
+const GO_LIVE_DATE_INPUT = (import.meta as any).env?.VITE_GO_LIVE_DATE as string | undefined;
+const GO_LIVE_TIMESTAMP = (() => {
+  if (!GO_LIVE_DATE_INPUT) {
+    return null;
+  }
+  const parsed = new Date(GO_LIVE_DATE_INPUT);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.getTime();
+})();
+
+type StatusPalette = {
+  bg: string;
+  fg: string;
 };
+
+const STATUS_PALETTES: Record<string, StatusPalette> = {
+  active: { bg: '#dcfce7', fg: '#16a34a' },
+  available: { bg: '#dcfce7', fg: '#16a34a' },
+  operational: { bg: '#dcfce7', fg: '#16a34a' },
+  open: { bg: '#dcfce7', fg: '#16a34a' },
+  pending: { bg: '#fef3c7', fg: '#d97706' },
+  in_progress: { bg: '#fef3c7', fg: '#d97706' },
+  processing: { bg: '#fef3c7', fg: '#d97706' },
+  scheduled: { bg: '#fef3c7', fg: '#d97706' },
+  suspended: { bg: '#fee2e2', fg: '#dc2626' },
+  archived: { bg: '#fee2e2', fg: '#dc2626' },
+  inactive: { bg: '#fee2e2', fg: '#dc2626' },
+  closed: { bg: '#fee2e2', fg: '#dc2626' },
+  cancelled: { bg: '#fee2e2', fg: '#dc2626' },
+  unassigned: { bg: '#e0f2fe', fg: '#0369a1' },
+  unknown: { bg: '#e2e8f0', fg: '#475569' },
+};
+
+function renderStatusBadge(value: string | null | undefined) {
+  const normalized = (value ?? 'unassigned').toLowerCase().trim().replace(/\s+/g, '_');
+  const palette = STATUS_PALETTES[normalized] ?? STATUS_PALETTES.unknown;
+  const label = (value ?? 'Unassigned').replace(/_/g, ' ');
+  return (
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '4px 12px',
+        borderRadius: '999px',
+        fontSize: 12,
+        fontWeight: 500,
+        backgroundColor: palette.bg,
+        color: palette.fg,
+      }}
+    >
+      {label}
+    </span>
+  );
+}
+
+function formatDate(value?: string | null): string {
+  if (!value) {
+    return '�';
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return '�';
+  }
+  return parsed.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: '2-digit' });
+}
+
+function formatText(value?: string | null): string {
+  if (!value) {
+    return '�';
+  }
+  const trimmed = value.trim();
+  return trimmed.length ? trimmed : '�';
+}
+
+const HUB_TABS = [
+  { id: 'dashboard', label: 'Dashboard' },
+  { id: 'directory', label: 'Directory' },
+  { id: 'create', label: 'Create' },
+  { id: 'assign', label: 'Assign' },
+  { id: 'archive', label: 'Archive' },
+  { id: 'support', label: 'Support' },
+];
+
+const DIRECTORY_TABS: Array<{ id: string; label: string; color: string }> = [
+  { id: 'admins', label: 'Admins', color: '#0f172a' },
+  { id: 'managers', label: 'Managers', color: '#2563eb' },
+  { id: 'contractors', label: 'Contractors', color: '#0ea5e9' },
+  { id: 'customers', label: 'Customers', color: '#10b981' },
+  { id: 'centers', label: 'Centers', color: '#f97316' },
+  { id: 'crew', label: 'Crew', color: '#ef4444' },
+  { id: 'warehouses', label: 'Warehouses', color: '#8b5cf6' },
+  { id: 'services', label: 'Services', color: '#0ea5e9' },
+  { id: 'orders', label: 'Orders', color: '#7c3aed' },
+  { id: 'products', label: 'Products', color: '#0f172a' },
+  { id: 'training', label: 'Training & Procedures', color: '#ec4899' },
+  { id: 'reports', label: 'Reports & Feedback', color: '#6b7280' },
+];
+
+interface DirectorySectionConfig {
+  columns: Array<{ key: string; label: string; clickable?: boolean; render?: (value: any, row?: any) => ReactNode }>;
+  data: Record<string, any>[];
+  emptyMessage: string;
+}
 
 export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
   const [activeTab, setActiveTab] = useState(initialTab);
-  const [directoryTab, setDirectoryTab] = useState('admins');
-  const { getToken } = useClerkAuth();
+  const [directoryTab, setDirectoryTab] = useState<string>('admins');
+  const navigate = useNavigate();
 
-  // Add scrollbar styles
+  const { data: adminUsers, isLoading: adminUsersLoading, error: adminUsersError } = useAdminUsers();
+  const { data: managers, isLoading: managersLoading, error: managersError } = useManagers();
+  const { data: contractors, isLoading: contractorsLoading, error: contractorsError } = useContractors();
+  const { data: customers, isLoading: customersLoading, error: customersError } = useCustomers();
+  const { data: centers, isLoading: centersLoading, error: centersError } = useCenters();
+  const { data: crew, isLoading: crewLoading, error: crewError } = useCrew();
+  const { data: warehouses, isLoading: warehousesLoading, error: warehousesError } = useWarehouses();
+  const { data: services, isLoading: servicesLoading, error: servicesError } = useServices();
+  const { data: orders, isLoading: ordersLoading, error: ordersError } = useOrders();
+  const { data: products, isLoading: productsLoading, error: productsError } = useProducts();
+  const { data: trainingRecords, isLoading: trainingLoading, error: trainingError } = useTraining();
+  const { data: procedures, isLoading: proceduresLoading, error: proceduresError } = useProcedures();
+  const { data: reports, isLoading: reportsLoading, error: reportsError } = useReports();
+  const { data: feedbackEntries, isLoading: feedbackLoading, error: feedbackError } = useFeedback();
+  const { data: activityItems, isLoading: activitiesLoading, error: activitiesError } = useActivities();
+
+  const [activityFeed, setActivityFeed] = useState<Activity[]>([]);
+
+  useEffect(() => {
+    setActivityFeed(activityItems);
+  }, [activityItems]);
+
   useEffect(() => {
     const style = document.createElement('style');
     style.textContent = `
@@ -70,921 +217,763 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
     };
   }, []);
 
-  // Mock activities for admin
-  const [activities, setActivities] = useState<Activity[]>([
-    {
-      id: 'act-1',
-      message: 'New user registered: USR-2024-156',
-      timestamp: new Date(Date.now() - 10 * 60 * 1000), // 10 minutes ago
-      type: 'info',
-      metadata: { role: 'admin', userId: 'ADM-001', title: 'User Registration' }
+  const navigateToHub = useCallback(
+    (identifier?: string | null, displayName?: string | null, roleHint?: string | null) => {
+      const normalized = normalizeImpersonationCode(identifier ?? null);
+      if (!normalized) {
+        return;
+      }
+
+      const stored = persistImpersonation({
+        code: normalized,
+        role: roleHint ?? inferRoleFromIdentifier(normalized),
+        displayName,
+      });
+
+      if (!stored) {
+        console.warn('[admin] Unable to prepare impersonation context for', normalized);
+        return;
+      }
+
+      const pathSegment = normalized.toLowerCase();
+      const destination = `/${encodeURIComponent(pathSegment)}/hub`;
+      navigate(destination);
     },
-    {
-      id: 'act-2',
-      message: 'System backup completed successfully',
-      timestamp: new Date(Date.now() - 1 * 60 * 60 * 1000), // 1 hour ago
-      type: 'success',
-      metadata: { role: 'admin', userId: 'ADM-001', title: 'System Maintenance' }
-    },
-    {
-      id: 'act-3',
-      message: 'High priority ticket escalated: TKT-2024-089',
-      timestamp: new Date(Date.now() - 3 * 60 * 60 * 1000), // 3 hours ago
-      type: 'warning',
-      metadata: { role: 'admin', userId: 'ADM-001', title: 'Support Alert' }
-    },
-    {
-      id: 'act-4',
-      message: 'Security update applied to all servers',
-      timestamp: new Date(Date.now() - 12 * 60 * 60 * 1000), // 12 hours ago
-      type: 'action',
-      metadata: { role: 'admin', userId: 'ADM-001', title: 'Security Update' }
-    },
-    {
-      id: 'act-5',
-      message: 'Monthly report generated and sent',
-      timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000), // 1 day ago
-      type: 'info',
-      metadata: { role: 'admin', userId: 'ADM-001', title: 'Report Generated' }
-    }
-  ]);
+    [navigate],
+  );
 
-  const tabs = [
-    { id: 'dashboard', label: 'Dashboard', path: '/admin/dashboard' },
-    { id: 'directory', label: 'Directory', path: '/admin/directory' },
-    { id: 'create', label: 'Create', path: '/admin/create' },
-    { id: 'assign', label: 'Assign', path: '/admin/assign' },
-    { id: 'archive', label: 'Archive', path: '/admin/archive' },
-    { id: 'support', label: 'Support', path: '/admin/support' },
-  ];
+  const handleDirectoryRowClick = useCallback(
+    (row: Record<string, any>) => {
+      if (!row) {
+        return;
+      }
 
-  // Admin-specific overview cards (4 cards)
-  const overviewCards = [
-    { id: 'users', title: 'Total Users', dataKey: 'userCount', color: 'black' },
-    { id: 'tickets', title: 'Open Support Tickets', dataKey: 'ticketCount', color: 'blue' },
-    { id: 'priority', title: 'High Priority', dataKey: 'highPriorityCount', color: 'red' },
-    { id: 'uptime', title: 'Days Online', dataKey: 'daysOnline', color: 'green' }
-  ];
+      let target: string | null = null;
+      let roleHint: string | null = null;
+      let displayName: string | null = null;
 
-  // Dashboard metrics
-  const defaultOverviewData = {
-    userCount: 156,
-    ticketCount: 23,
-    highPriorityCount: 4,
-    daysOnline: 247
-  };
-  const [overviewData, setOverviewData] = useState(defaultOverviewData);
-
-  const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
-  const [isLoadingAdminUsers, setIsLoadingAdminUsers] = useState(true);
-  const [adminUsersError, setAdminUsersError] = useState<string | null>(null);
-
-  const defaultManagerRows: AdminDirectoryRow[] = [
-    { id: 'adm-placeholder-1', code: 'ADM-001', name: 'John Smith', email: 'john.smith@example.com', status: 'active' },
-    { id: 'adm-placeholder-2', code: 'ADM-002', name: 'Sarah Johnson', email: 'sarah.johnson@example.com', status: 'active' },
-  ];
-  const [managerRows, setManagerRows] = useState<AdminDirectoryRow[]>(defaultManagerRows);
-
-  // Directory mock data
-
-  const customersData = [
-    { id: 'CUS-001', customerName: 'Downtown Mall', cksManager: 'MGR-001', status: 'active' },
-    { id: 'CUS-002', customerName: 'Tech Park Plaza', cksManager: 'MGR-002', status: 'active' },
-    { id: 'CUS-003', customerName: 'City Hospital', cksManager: 'MGR-001', status: 'active' },
-    { id: 'CUS-004', customerName: 'Business Center', cksManager: 'MGR-001', status: 'inactive' },
-  ];
-
-  const centersData = [
-    { id: 'CTR-001', centerName: 'Main Street Center', cksManager: 'MGR-001', status: 'active' },
-    { id: 'CTR-002', centerName: 'Tech Hub', cksManager: 'MGR-002', status: 'active' },
-  ];
-
-  const crewData = [
-    { id: 'CRW-001', crewName: 'Mike Johnson', cksManager: 'MGR-001', status: 'active' },
-    { id: 'CRW-002', crewName: 'Lisa Wang', cksManager: 'MGR-001', status: 'active' },
-    { id: 'CRW-003', crewName: 'David Brown', cksManager: 'MGR-002', status: 'active' },
-  ];
-
-  const warehousesData = [
-    { id: 'WH-001', warehouseName: 'Central Warehouse', cksManager: 'MGR-001', status: 'operational' },
-    { id: 'WH-002', warehouseName: 'North Storage', cksManager: 'MGR-002', status: 'operational' },
-  ];
-
-  const servicesData = [
-    { id: 'SRV-001', serviceName: 'Commercial Deep Cleaning', createdBy: 'MGR-001', status: 'available' },
-    { id: 'SRV-002', serviceName: 'Floor Care & Maintenance', createdBy: 'MGR-002', status: 'available' },
-    { id: 'SRV-003', serviceName: 'Window Cleaning', createdBy: 'MGR-001', status: 'available' },
-  ];
-
-  const ordersData = [
-    { id: 'ORD-001', orderType: 'Commercial Cleaning', createdBy: 'MGR-001', status: 'completed' },
-    { id: 'ORD-002', orderType: 'Maintenance Service', createdBy: 'MGR-002', status: 'in_progress' },
-    { id: 'ORD-003', orderType: 'Window Cleaning', createdBy: 'MGR-001', status: 'pending' },
-  ];
-
-  const productsData = [
-    { id: 'PRD-001', warehouseId: 'WH-001', createdBy: 'MGR-001', status: 'available' },
-    { id: 'PRD-002', warehouseId: 'WH-002', createdBy: 'MGR-002', status: 'available' },
-    { id: 'PRD-003', warehouseId: 'WH-001', createdBy: 'MGR-001', status: 'available' },
-  ];
-
-  const trainingData = [
-    { id: 'TRN-001', serviceId: 'SRV-001', createdBy: 'MGR-001', status: 'active' },
-    { id: 'TRN-002', serviceId: 'SRV-002', createdBy: 'MGR-002', status: 'active' },
-  ];
-
-  const proceduresData = [
-    { id: 'PRC-001', serviceId: 'SRV-001', createdBy: 'MGR-001', status: 'active' },
-    { id: 'PRC-002', serviceId: 'SRV-003', createdBy: 'MGR-002', status: 'active' },
-  ];
-
-  const reportsData = [
-    { id: 'RPT-001', type: 'Analytics', createdBy: 'System', status: 'reviewed' },
-    { id: 'RPT-002', type: 'Performance', createdBy: 'MGR-001', status: 'pending' },
-  ];
-
-  const feedbackData = [
-    { id: 'FBK-001', type: 'Customer', createdBy: 'MGR-001', status: 'reviewed' },
-    { id: 'FBK-002', type: 'Service', createdBy: 'MGR-002', status: 'pending' },
-  ];
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadAdminUsers() {
-      setIsLoadingAdminUsers(true);
-      try {
-        const data = await fetchAdminUsers(getToken ? { getToken } : undefined);
-        if (cancelled) {
-          return;
+      switch (directoryTab) {
+        case 'admins': {
+          const code = typeof row.code === 'string' ? row.code.trim() : '';
+          target = code || (typeof row.id === 'string' ? row.id : null);
+          displayName =
+            typeof row.name === 'string' && row.name.trim()
+              ? row.name.trim()
+              : typeof row.fullName === 'string' && row.fullName.trim()
+                ? row.fullName.trim()
+                : typeof row.email === 'string' && row.email.trim()
+                  ? row.email.trim()
+                  : null;
+          roleHint = 'admin';
+          break;
         }
-        setAdminUsers(data);
-        const rows = data.map((user) => {
-          const code = (user.cksCode || user.id || '').toString().toUpperCase();
-          const name = user.username || (user.email ? user.email.split('@')[0] : code) || code;
-          return {
-            id: user.id,
-            code,
-            name,
-            email: user.email ?? 'N/A',
-            status: user.status,
-          };
-        });
-
-        setManagerRows(rows.length > 0 ? rows : defaultManagerRows);
-        setOverviewData((prev) => ({
-          ...prev,
-          userCount: data.length,
-        }));
-        setAdminUsersError(null);
-      } catch (error) {
-        if (!cancelled) {
-          const message = error instanceof Error ? error.message : 'Failed to load admin directory';
-          setAdminUsersError(message);
+        case 'managers': {
+          const managerId = typeof row.managerId === 'string' ? row.managerId.trim() : '';
+          target = managerId || (typeof row.id === 'string' ? row.id : null);
+          displayName =
+            typeof row.name === 'string' && row.name.trim()
+              ? row.name.trim()
+              : typeof row.fullName === 'string' && row.fullName.trim()
+                ? row.fullName.trim()
+                : null;
+          roleHint = 'manager';
+          break;
         }
-      } finally {
-        if (!cancelled) {
-          setIsLoadingAdminUsers(false);
+        case 'contractors': {
+          target = typeof row.id === 'string' ? row.id : null;
+          displayName =
+            typeof row.companyName === 'string' && row.companyName.trim()
+              ? row.companyName.trim()
+              : typeof row.name === 'string' && row.name.trim()
+                ? row.name.trim()
+                : null;
+          roleHint = 'contractor';
+          break;
+        }
+        case 'customers': {
+          target = typeof row.id === 'string' ? row.id : null;
+          displayName =
+            typeof row.name === 'string' && row.name.trim()
+              ? row.name.trim()
+              : typeof row.companyName === 'string' && row.companyName.trim()
+                ? row.companyName.trim()
+                : null;
+          roleHint = 'customer';
+          break;
+        }
+        case 'centers': {
+          target = typeof row.id === 'string' ? row.id : null;
+          displayName =
+            typeof row.name === 'string' && row.name.trim()
+              ? row.name.trim()
+              : null;
+          roleHint = 'center';
+          break;
+        }
+        case 'crew': {
+          target = typeof row.id === 'string' ? row.id : null;
+          displayName =
+            typeof row.name === 'string' && row.name.trim()
+              ? row.name.trim()
+              : null;
+          roleHint = 'crew';
+          break;
+        }
+        case 'warehouses': {
+          target = typeof row.id === 'string' ? row.id : null;
+          displayName =
+            typeof row.name === 'string' && row.name.trim()
+              ? row.name.trim()
+              : null;
+          roleHint = 'warehouse';
+          break;
+        }
+        default: {
+          target = null;
         }
       }
+
+      if (typeof target !== 'string') {
+        return;
+      }
+
+      const trimmed = target.trim();
+      if (!trimmed) {
+        return;
+      }
+
+      navigateToHub(trimmed, displayName, roleHint);
+    },
+    [directoryTab, navigateToHub],
+  );
+
+  const overviewCards = useMemo(
+    () => [
+      { id: 'users', title: 'Total Users', dataKey: 'userCount', color: 'black' },
+      { id: 'tickets', title: 'Open Support Tickets', dataKey: 'ticketCount', color: '#2563eb' },
+      { id: 'priority', title: 'High Priority', dataKey: 'highPriorityCount', color: '#dc2626' },
+      { id: 'uptime', title: 'Days Online', dataKey: 'daysOnline', color: '#16a34a' },
+    ],
+    [],
+  );
+
+  const overviewData = useMemo(() => {
+    const totalUsers =
+      adminUsers.length +
+      managers.length +
+      contractors.length +
+      customers.length +
+      centers.length +
+      crew.length;
+
+    const openReportsCount = reports.filter((report) => {
+      const status = (report.status ?? '').toLowerCase();
+      return status === 'open' || status === 'pending' || status === 'in_progress';
+    }).length;
+
+    const highPriorityReports = reports.filter((report) => {
+      return typeof report.severity === 'string' && report.severity.toLowerCase().includes('high');
+    }).length;
+
+    const timestamps: number[] = [];
+    const pushTimestamp = (value?: string | null) => {
+      if (!value) {
+        return;
+      }
+      const parsed = new Date(value);
+      if (!Number.isNaN(parsed.getTime())) {
+        timestamps.push(parsed.getTime());
+      }
+    };
+
+    adminUsers.forEach((user) => pushTimestamp(user.createdAt));
+    managers.forEach((manager) => pushTimestamp(manager.createdAt));
+    contractors.forEach((contractor) => pushTimestamp(contractor.createdAt));
+    warehouses.forEach((warehouse) => pushTimestamp(warehouse.createdAt));
+
+    if (timestamps.length === 0 && activityItems.length > 0) {
+      activityItems.forEach((activity) => {
+        const timestamp =
+          activity.timestamp instanceof Date ? activity.timestamp : new Date(activity.timestamp);
+        if (!Number.isNaN(timestamp.getTime())) {
+          timestamps.push(timestamp.getTime());
+        }
+      });
     }
 
-    loadAdminUsers();
+    let daysOnline = 0;
+    if (timestamps.length) {
+      const earliest = Math.min(...timestamps);
+      daysOnline = Math.max(1, Math.round((Date.now() - earliest) / MILLIS_PER_DAY));
+    } else if (GO_LIVE_TIMESTAMP && GO_LIVE_TIMESTAMP <= Date.now()) {
+      daysOnline = Math.max(0, Math.round((Date.now() - GO_LIVE_TIMESTAMP) / MILLIS_PER_DAY));
+    }
 
-    return () => {
-      cancelled = true;
+    if ((!GO_LIVE_TIMESTAMP || GO_LIVE_TIMESTAMP > Date.now()) && timestamps.length === 0) {
+      daysOnline = 0;
+    }
+
+    return {
+      userCount: totalUsers,
+      ticketCount: openReportsCount,
+      highPriorityCount: highPriorityReports,
+      daysOnline,
     };
-  }, [getToken]);
+  }, [activityItems, adminUsers, managers, contractors, warehouses, crew, customers, centers, reports]);
 
+  const adminRows = useMemo(
+    () =>
+      adminUsers.map((admin) => ({
+        id: admin.id,
+        code: (admin.cksCode ?? admin.id).toUpperCase(),
+        name: admin.fullName ?? admin.email ?? admin.cksCode ?? admin.id,
+        email: formatText(admin.email),
+        role: formatText(admin.role),
+        status: (admin.status ?? 'unassigned').toLowerCase(),
+        createdAt: formatDate(admin.createdAt),
+      })),
+    [adminUsers],
+  );
 
-  // Mock contractor data - replace with real API when contractor endpoint is available
-  const contractorRows = [
-    { id: 'CTR001', companyName: 'ABC Construction', cksManager: 'MGR001', status: 'active' },
-    { id: 'CTR002', companyName: 'XYZ Services', cksManager: 'MGR002', status: 'active' },
-    { id: 'CTR003', companyName: 'Premier Maintenance', cksManager: 'MGR001', status: 'active' },
-    { id: 'CTR004', companyName: 'Quality Builders', cksManager: 'MGR003', status: 'active' },
-    { id: 'CTR005', companyName: 'Elite Solutions', cksManager: 'MGR002', status: 'suspended' }
-  ];
+  const managerRows = useMemo(
+    () =>
+      managers.map((manager) => ({
+        id: manager.id,
+        managerId: manager.id,
+        name: formatText(manager.name),
+        territory: formatText(manager.territory),
+        email: formatText(manager.email),
+        phone: formatText(manager.phone),
+        status: (manager.status ?? 'unassigned').toLowerCase(),
+        createdAt: formatDate(manager.createdAt),
+      })),
+    [managers],
+  );
 
-  const directoryConfig = {
-    contractors: {
-      columns: [
-        { key: 'id', label: 'CONTRACTOR ID', clickable: true },
-        { key: 'companyName', label: 'COMPANY NAME' },
-        { key: 'cksManager', label: 'CKS MANAGER' },
-        {
-          key: 'status',
-          label: 'STATUS',
-          render: (value: string) => (
-            <span style={{
-              padding: '4px 12px',
-              borderRadius: '4px',
-              fontSize: '12px',
-              fontWeight: 500,
-              backgroundColor: value === 'active' ? '#dcfce7' : '#fee2e2',
-              color: value === 'active' ? '#16a34a' : '#dc2626'
-            }}>
-              {value}
-            </span>
-          )
-        },
-        {
-          key: 'actions',
-          label: 'ACTIONS',
-          render: (_: any, row: any) => (
-            <div style={{ display: 'flex', gap: 8 }}>
-              <Button variant="secondary" size="small" onClick={() => console.log('Details', row.id)}>Details</Button>
-              <Button variant="danger" size="small" onClick={() => console.log('Delete', row.id)}>Delete</Button>
-            </div>
-          )
-        }
-      ],
-      data: contractorRows
-    },
+  const contractorRows = useMemo(
+    () =>
+      contractors.map((contractor) => ({
+        id: contractor.id,
+        companyName: formatText(contractor.companyName),
+        managerId: formatText(contractor.managerId),
+        email: formatText(contractor.email),
+        phone: formatText(contractor.phone),
+        status: (contractor.status ?? 'unassigned').toLowerCase(),
+        createdAt: formatDate(contractor.createdAt),
+      })),
+    [contractors],
+  );
+
+  const customerRows = useMemo(
+    () =>
+      customers.map((customer) => ({
+        id: customer.id,
+        name: formatText(customer.name),
+        managerId: formatText(customer.managerId),
+        contactName: formatText(customer.contactName),
+        email: formatText(customer.email),
+        phone: formatText(customer.phone),
+        totalCenters: customer.totalCenters ?? 0,
+        status: customer.managerId ? 'active' : 'unassigned',
+      })),
+    [customers],
+  );
+
+  const centerRows = useMemo(
+    () =>
+      centers.map((center) => ({
+        id: center.id,
+        name: formatText(center.name),
+        contractorId: formatText(center.contractorId),
+        customerId: formatText(center.customerId),
+        managerId: formatText(center.managerId),
+        email: formatText(center.email),
+        phone: formatText(center.phone),
+        status: center.customerId ? 'active' : 'unassigned',
+      })),
+    [centers],
+  );
+
+  const crewRows = useMemo(
+    () =>
+      crew.map((member) => ({
+        id: member.id,
+        name: formatText(member.name),
+        role: formatText(member.role),
+        email: formatText(member.email),
+        phone: formatText(member.phone),
+        assignedCenter: formatText(member.assignedCenter),
+        status: member.assignedCenter ? 'active' : 'unassigned',
+      })),
+    [crew],
+  );
+
+  const warehouseRows = useMemo(
+    () =>
+      warehouses.map((warehouse) => ({
+        id: warehouse.id,
+        name: formatText(warehouse.name),
+        managerName: formatText(warehouse.managerName),
+        warehouseType: formatText(warehouse.warehouseType),
+        status: (warehouse.status ?? 'operational').toLowerCase(),
+        createdAt: formatDate(warehouse.createdAt),
+      })),
+    [warehouses],
+  );
+
+  const serviceRows = useMemo(
+    () =>
+      services.map((service) => ({
+        id: service.id,
+        name: formatText(service.name),
+        category: formatText(service.category),
+        status: formatText(service.status),
+        updatedAt: formatDate(service.updatedAt),
+      })),
+    [services],
+  );
+
+  const orderRows = useMemo(
+    () =>
+      orders.map((order) => ({
+        id: order.id,
+        customerId: formatText(order.customerId),
+        centerId: formatText(order.centerId),
+        serviceId: formatText(order.serviceId),
+        status: formatText(order.status),
+        orderDate: formatDate(order.orderDate),
+      })),
+    [orders],
+  );
+
+  const productRows = useMemo(
+    () =>
+      products.map((product) => ({
+        id: product.id,
+        name: formatText(product.name),
+        category: formatText(product.category),
+        status: formatText(product.status),
+        updatedAt: formatDate(product.updatedAt),
+      })),
+    [products],
+  );
+
+  const trainingRows = useMemo(
+    () =>
+      trainingRecords.map((record) => ({
+        id: record.id,
+        crewName: formatText(record.crewName),
+        serviceName: formatText(record.serviceName),
+        status: formatText(record.status),
+        startDate: formatDate(record.date),
+      })),
+    [trainingRecords],
+  );
+
+  const procedureRows = useMemo(
+    () =>
+      procedures.map((procedure) => ({
+        id: procedure.id,
+        serviceId: formatText(procedure.serviceId),
+        type: formatText(procedure.type),
+        contractorId: formatText(procedure.contractorId),
+        customerId: formatText(procedure.customerId),
+      })),
+    [procedures],
+  );
+
+  const reportRows = useMemo(
+    () =>
+      reports.map((report) => ({
+        id: report.id,
+        title: report.title,
+        severity: formatText(report.severity),
+        customerId: formatText(report.customerId),
+        centerId: formatText(report.centerId),
+        status: formatText(report.status),
+        createdAt: formatDate(report.createdAt),
+      })),
+    [reports],
+  );
+
+  const feedbackRows = useMemo(
+    () =>
+      feedbackEntries.map((entry) => ({
+        id: entry.id,
+        kind: formatText(entry.kind),
+        title: entry.title,
+        customerId: formatText(entry.customerId),
+        centerId: formatText(entry.centerId),
+        createdAt: formatDate(entry.createdAt),
+      })),
+    [feedbackEntries],
+  );
+
+  const directoryConfig = useMemo(() => ({
     admins: {
       columns: [
-        { key: 'id', label: 'ADMIN ID', clickable: true },
-        { key: 'name', label: 'ADMIN NAME' },
-        {
-          key: 'email',
-          label: 'EMAIL',
-          render: (value: string) => value && value !== 'N/A' ? (
-            <span>{value}</span>
-          ) : (
-            <span style={{ color: '#94a3b8' }}>No email</span>
-          ),
-        },
-        {
-          key: 'status',
-          label: 'STATUS',
-          render: (value: string) => (
-            <span
-              style={{
-                padding: '4px 12px',
-                borderRadius: '4px',
-                fontSize: '12px',
-                fontWeight: 500,
-                backgroundColor: value === 'active' ? '#dcfce7' : '#fee2e2',
-                color: value === 'active' ? '#16a34a' : '#dc2626'
-              }}
-            >
-              {value}
-            </span>
-          )
-        },
-        {
-          key: 'actions',
-          label: 'ACTIONS',
-          render: (_: any, row: any) => (
-            <div style={{ display: 'flex', gap: 8 }}>
-              <Button variant="secondary" size="small" onClick={() => console.log('View admin', row.code)}>Details</Button>
-              <Button variant="danger" size="small" onClick={() => console.log('Disable admin', row.code)}>Disable</Button>
-            </div>
-          )
-        }
+        { key: 'code', label: 'ADMIN ID', clickable: true },
+        { key: 'name', label: 'NAME' },
+        { key: 'email', label: 'EMAIL' },
+        { key: 'role', label: 'ROLE' },
+        { key: 'status', label: 'STATUS', render: renderStatusBadge },
+        { key: 'createdAt', label: 'CREATED' },
       ],
-      data: adminUsers.map(user => ({
-        id: user.cksCode || user.clerkUserId || 'N/A',
-        name: user.fullName || user.email?.split('@')[0] || 'N/A',
-        email: user.email || 'N/A',
-        status: user.status || 'active'
-      })),
-      emptyMessage: isLoadingAdminUsers ? 'Loading admin users...' : (adminUsersError ?? 'No admin users found'),
-      searchFields: ['id', 'name', 'email'],
+      data: adminRows,
+      emptyMessage: 'No admin users found yet.',
     },
     managers: {
       columns: [
-        { key: 'id', label: 'MANAGER ID', clickable: true },
-        { key: 'name', label: 'MANAGER NAME' },
+        { key: 'managerId', label: 'MANAGER ID', clickable: true },
+        { key: 'name', label: 'NAME' },
         { key: 'territory', label: 'TERRITORY' },
-        {
-          key: 'status',
-          label: 'STATUS',
-          render: (value: string) => (
-            <span style={{
-              padding: '4px 12px',
-              borderRadius: '4px',
-              fontSize: '12px',
-              fontWeight: 500,
-              backgroundColor: value === 'active' ? '#dcfce7' : '#fee2e2',
-              color: value === 'active' ? '#16a34a' : '#dc2626'
-            }}>
-              {value}
-            </span>
-          )
-        },
-        {
-          key: 'actions',
-          label: 'ACTIONS',
-          render: (_: any, row: any) => (
-            <div style={{ display: 'flex', gap: 8 }}>
-              <Button variant="secondary" size="small" onClick={() => console.log('Details', row.id)}>Details</Button>
-              <Button variant="danger" size="small" onClick={() => console.log('Delete', row.id)}>Delete</Button>
-            </div>
-          )
-        }
+        { key: 'email', label: 'EMAIL' },
+        { key: 'phone', label: 'PHONE' },
+        { key: 'status', label: 'STATUS', render: renderStatusBadge },
       ],
-      data: [
-        { id: 'MGR001', name: 'John Smith', territory: 'Northeast', status: 'active' },
-        { id: 'MGR002', name: 'Sarah Johnson', territory: 'Southeast', status: 'active' },
-        { id: 'MGR003', name: 'Mike Williams', territory: 'Midwest', status: 'active' },
-        { id: 'MGR004', name: 'Emma Davis', territory: 'West Coast', status: 'active' },
-        { id: 'MGR005', name: 'Robert Brown', territory: 'Southwest', status: 'active' }
-      ]
+      data: managerRows,
+      emptyMessage: 'No managers found.',
+    },
+    contractors: {
+      columns: [
+        { key: 'id', label: 'CONTRACTOR ID', clickable: true },
+        { key: 'companyName', label: 'COMPANY' },
+        { key: 'managerId', label: 'ASSIGNED MANAGER' },
+        { key: 'email', label: 'EMAIL' },
+        { key: 'phone', label: 'PHONE' },
+        { key: 'status', label: 'STATUS', render: renderStatusBadge },
+      ],
+      data: contractorRows,
+      emptyMessage: 'No contractors found.',
     },
     customers: {
       columns: [
         { key: 'id', label: 'CUSTOMER ID', clickable: true },
-        { key: 'customerName', label: 'CUSTOMER NAME' },
-        { key: 'cksManager', label: 'CKS MANAGER' },
-        {
-          key: 'status',
-          label: 'STATUS',
-          render: (value: string) => (
-            <span style={{
-              padding: '4px 12px',
-              borderRadius: '4px',
-              fontSize: '12px',
-              fontWeight: 500,
-              backgroundColor: value === 'active' ? '#dcfce7' : '#fee2e2',
-              color: value === 'active' ? '#16a34a' : '#dc2626'
-            }}>
-              {value}
-            </span>
-          )
-        },
-        {
-          key: 'actions',
-          label: 'ACTIONS',
-          render: (_: any, row: any) => (
-            <div style={{ display: 'flex', gap: 8 }}>
-              <Button variant="secondary" size="small" onClick={() => console.log('Details', row.id)}>Details</Button>
-              <Button variant="danger" size="small" onClick={() => console.log('Delete', row.id)}>Delete</Button>
-            </div>
-          )
-        }
+        { key: 'name', label: 'NAME' },
+        { key: 'managerId', label: 'MANAGER' },
+        { key: 'contactName', label: 'CONTACT' },
+        { key: 'email', label: 'EMAIL' },
+        { key: 'totalCenters', label: '# CENTERS' },
+        { key: 'status', label: 'STATUS', render: renderStatusBadge },
       ],
-      data: customersData
+      data: customerRows,
+      emptyMessage: 'No customers found.',
     },
     centers: {
       columns: [
         { key: 'id', label: 'CENTER ID', clickable: true },
-        { key: 'centerName', label: 'CENTER NAME' },
-        { key: 'cksManager', label: 'CKS MANAGER' },
-        {
-          key: 'status',
-          label: 'STATUS',
-          render: (value: string) => (
-            <span style={{
-              padding: '4px 12px',
-              borderRadius: '4px',
-              fontSize: '12px',
-              fontWeight: 500,
-              backgroundColor: value === 'active' ? '#dcfce7' : '#fee2e2',
-              color: value === 'active' ? '#16a34a' : '#dc2626'
-            }}>
-              {value}
-            </span>
-          )
-        },
-        {
-          key: 'actions',
-          label: 'ACTIONS',
-          render: (_: any, row: any) => (
-            <div style={{ display: 'flex', gap: 8 }}>
-              <Button variant="secondary" size="small" onClick={() => console.log('Details', row.id)}>Details</Button>
-              <Button variant="danger" size="small" onClick={() => console.log('Delete', row.id)}>Delete</Button>
-            </div>
-          )
-        }
+        { key: 'name', label: 'NAME' },
+        { key: 'customerId', label: 'CUSTOMER' },
+        { key: 'contractorId', label: 'CONTRACTOR' },
+        { key: 'managerId', label: 'MANAGER' },
+        { key: 'status', label: 'STATUS', render: renderStatusBadge },
       ],
-      data: centersData
+      data: centerRows,
+      emptyMessage: 'No centers found.',
     },
     crew: {
       columns: [
         { key: 'id', label: 'CREW ID', clickable: true },
-        { key: 'crewName', label: 'CREW NAME' },
-        { key: 'cksManager', label: 'CKS MANAGER' },
-        {
-          key: 'status',
-          label: 'STATUS',
-          render: (value: string) => (
-            <span style={{
-              padding: '4px 12px',
-              borderRadius: '4px',
-              fontSize: '12px',
-              fontWeight: 500,
-              backgroundColor: value === 'active' ? '#dcfce7' : '#fee2e2',
-              color: value === 'active' ? '#16a34a' : '#dc2626'
-            }}>
-              {value}
-            </span>
-          )
-        },
-        {
-          key: 'actions',
-          label: 'ACTIONS',
-          render: (_: any, row: any) => (
-            <div style={{ display: 'flex', gap: 8 }}>
-              <Button variant="secondary" size="small" onClick={() => console.log('Details', row.id)}>Details</Button>
-              <Button variant="danger" size="small" onClick={() => console.log('Delete', row.id)}>Delete</Button>
-            </div>
-          )
-        }
+        { key: 'name', label: 'NAME' },
+        { key: 'role', label: 'ROLE' },
+        { key: 'assignedCenter', label: 'ASSIGNED CENTER' },
+        { key: 'phone', label: 'PHONE' },
+        { key: 'status', label: 'STATUS', render: renderStatusBadge },
       ],
-      data: crewData
+      data: crewRows,
+      emptyMessage: 'No crew members found.',
     },
     warehouses: {
       columns: [
         { key: 'id', label: 'WAREHOUSE ID', clickable: true },
-        { key: 'warehouseName', label: 'WAREHOUSE NAME' },
-        { key: 'cksManager', label: 'CKS MANAGER' },
-        {
-          key: 'status',
-          label: 'STATUS',
-          render: (value: string) => (
-            <span style={{
-              padding: '4px 12px',
-              borderRadius: '4px',
-              fontSize: '12px',
-              fontWeight: 500,
-              backgroundColor: value === 'operational' ? '#dcfce7' : '#fee2e2',
-              color: value === 'operational' ? '#16a34a' : '#dc2626'
-            }}>
-              {value}
-            </span>
-          )
-        },
-        {
-          key: 'actions',
-          label: 'ACTIONS',
-          render: (_: any, row: any) => (
-            <div style={{ display: 'flex', gap: 8 }}>
-              <Button variant="secondary" size="small" onClick={() => console.log('Details', row.id)}>Details</Button>
-              <Button variant="danger" size="small" onClick={() => console.log('Delete', row.id)}>Delete</Button>
-            </div>
-          )
-        }
+        { key: 'name', label: 'NAME' },
+        { key: 'managerName', label: 'MANAGER' },
+        { key: 'warehouseType', label: 'TYPE' },
+        { key: 'status', label: 'STATUS', render: renderStatusBadge },
+        { key: 'createdAt', label: 'CREATED' },
       ],
-      data: warehousesData
+      data: warehouseRows,
+      emptyMessage: 'No warehouses found.',
     },
     services: {
       columns: [
         { key: 'id', label: 'SERVICE ID', clickable: true },
-        { key: 'serviceName', label: 'SERVICE NAME' },
-        { key: 'createdBy', label: 'CREATED BY' },
-        {
-          key: 'status',
-          label: 'STATUS',
-          render: (value: string) => (
-            <span style={{
-              padding: '4px 12px',
-              borderRadius: '4px',
-              fontSize: '12px',
-              fontWeight: 500,
-              backgroundColor: value === 'available' ? '#dcfce7' : '#fee2e2',
-              color: value === 'available' ? '#16a34a' : '#dc2626'
-            }}>
-              {value}
-            </span>
-          )
-        },
-        {
-          key: 'actions',
-          label: 'ACTIONS',
-          render: (_: any, row: any) => (
-            <div style={{ display: 'flex', gap: 8 }}>
-              <Button variant="secondary" size="small" onClick={() => console.log('Details', row.id)}>Details</Button>
-              <Button variant="danger" size="small" onClick={() => console.log('Delete', row.id)}>Delete</Button>
-            </div>
-          )
-        }
+        { key: 'name', label: 'NAME' },
+        { key: 'category', label: 'CATEGORY' },
+        { key: 'status', label: 'STATUS', render: renderStatusBadge },
+        { key: 'updatedAt', label: 'UPDATED' },
       ],
-      data: servicesData
+      data: serviceRows,
+      emptyMessage: 'No services in the catalog yet.',
     },
     orders: {
       columns: [
         { key: 'id', label: 'ORDER ID', clickable: true },
-        { key: 'orderType', label: 'ORDER TYPE' },
-        { key: 'createdBy', label: 'CREATED BY' },
-        {
-          key: 'status',
-          label: 'STATUS',
-          render: (value: string) => {
-            const colors = {
-              completed: { bg: '#dcfce7', text: '#16a34a' },
-              in_progress: { bg: '#fef3c7', text: '#d97706' },
-              pending: { bg: '#e0e7ff', text: '#4338ca' }
-            };
-            const color = colors[value as keyof typeof colors] || colors.pending;
-            return (
-              <span style={{
-                padding: '4px 12px',
-                borderRadius: '4px',
-                fontSize: '12px',
-                fontWeight: 500,
-                backgroundColor: color.bg,
-                color: color.text
-              }}>
-                {value.replace('_', ' ')}
-              </span>
-            );
-          }
-        },
-        {
-          key: 'actions',
-          label: 'ACTIONS',
-          render: (_: any, row: any) => (
-            <div style={{ display: 'flex', gap: 8 }}>
-              <Button variant="secondary" size="small" onClick={() => console.log('Details', row.id)}>Details</Button>
-              <Button variant="danger" size="small" onClick={() => console.log('Delete', row.id)}>Delete</Button>
-            </div>
-          )
-        }
+        { key: 'customerId', label: 'CUSTOMER' },
+        { key: 'centerId', label: 'CENTER' },
+        { key: 'serviceId', label: 'SERVICE' },
+        { key: 'status', label: 'STATUS', render: renderStatusBadge },
+        { key: 'orderDate', label: 'ORDER DATE' },
       ],
-      data: ordersData
+      data: orderRows,
+      emptyMessage: 'No orders recorded.',
     },
     products: {
       columns: [
         { key: 'id', label: 'PRODUCT ID', clickable: true },
-        { key: 'warehouseId', label: 'WAREHOUSE ID' },
-        { key: 'createdBy', label: 'CREATED BY' },
-        {
-          key: 'status',
-          label: 'STATUS',
-          render: (value: string) => (
-            <span style={{
-              padding: '4px 12px',
-              borderRadius: '4px',
-              fontSize: '12px',
-              fontWeight: 500,
-              backgroundColor: value === 'available' ? '#dcfce7' : '#fee2e2',
-              color: value === 'available' ? '#16a34a' : '#dc2626'
-            }}>
-              {value}
-            </span>
-          )
-        },
-        {
-          key: 'actions',
-          label: 'ACTIONS',
-          render: (_: any, row: any) => (
-            <div style={{ display: 'flex', gap: 8 }}>
-              <Button variant="secondary" size="small" onClick={() => console.log('Details', row.id)}>Details</Button>
-              <Button variant="danger" size="small" onClick={() => console.log('Delete', row.id)}>Delete</Button>
-            </div>
-          )
-        }
+        { key: 'name', label: 'NAME' },
+        { key: 'category', label: 'CATEGORY' },
+        { key: 'status', label: 'STATUS', render: renderStatusBadge },
+        { key: 'updatedAt', label: 'UPDATED' },
       ],
-      data: productsData
+      data: productRows,
+      emptyMessage: 'No products available.',
     },
     training: {
       columns: [
         { key: 'id', label: 'TRAINING ID', clickable: true },
-        { key: 'serviceId', label: 'SERVICE ID' },
-        { key: 'createdBy', label: 'CREATED BY' },
-        {
-          key: 'status',
-          label: 'STATUS',
-          render: (value: string) => (
-            <span style={{
-              padding: '4px 12px',
-              borderRadius: '4px',
-              fontSize: '12px',
-              fontWeight: 500,
-              backgroundColor: value === 'active' ? '#dcfce7' : '#fee2e2',
-              color: value === 'active' ? '#16a34a' : '#dc2626'
-            }}>
-              {value}
-            </span>
-          )
-        },
-        {
-          key: 'actions',
-          label: 'ACTIONS',
-          render: (_: any, row: any) => (
-            <div style={{ display: 'flex', gap: 8 }}>
-              <Button variant="secondary" size="small" onClick={() => console.log('Details', row.id)}>Details</Button>
-              <Button variant="danger" size="small" onClick={() => console.log('Delete', row.id)}>Delete</Button>
-            </div>
-          )
-        }
+        { key: 'crewName', label: 'CREW' },
+        { key: 'serviceName', label: 'SERVICE' },
+        { key: 'status', label: 'STATUS', render: renderStatusBadge },
+        { key: 'startDate', label: 'DATE' },
       ],
-      data: trainingData
+      data: trainingRows,
+      emptyMessage: 'No training records.',
     },
     procedures: {
       columns: [
         { key: 'id', label: 'PROCEDURE ID', clickable: true },
-        { key: 'serviceId', label: 'SERVICE ID' },
-        { key: 'createdBy', label: 'CREATED BY' },
-        {
-          key: 'status',
-          label: 'STATUS',
-          render: (value: string) => (
-            <span style={{
-              padding: '4px 12px',
-              borderRadius: '4px',
-              fontSize: '12px',
-              fontWeight: 500,
-              backgroundColor: value === 'active' ? '#dcfce7' : '#fee2e2',
-              color: value === 'active' ? '#16a34a' : '#dc2626'
-            }}>
-              {value}
-            </span>
-          )
-        },
-        {
-          key: 'actions',
-          label: 'ACTIONS',
-          render: (_: any, row: any) => (
-            <div style={{ display: 'flex', gap: 8 }}>
-              <Button variant="secondary" size="small" onClick={() => console.log('Details', row.id)}>Details</Button>
-              <Button variant="danger" size="small" onClick={() => console.log('Delete', row.id)}>Delete</Button>
-            </div>
-          )
-        }
+        { key: 'type', label: 'TYPE' },
+        { key: 'serviceId', label: 'SERVICE' },
+        { key: 'contractorId', label: 'CONTRACTOR' },
+        { key: 'customerId', label: 'CUSTOMER' },
       ],
-      data: proceduresData
+      data: procedureRows,
+      emptyMessage: 'No procedures recorded.',
     },
     reports: {
       columns: [
         { key: 'id', label: 'REPORT ID', clickable: true },
-        { key: 'type', label: 'TYPE' },
-        { key: 'createdBy', label: 'CREATED BY' },
-        {
-          key: 'status',
-          label: 'STATUS',
-          render: (value: string) => (
-            <span style={{
-              padding: '4px 12px',
-              borderRadius: '4px',
-              fontSize: '12px',
-              fontWeight: 500,
-              backgroundColor: value === 'reviewed' ? '#dcfce7' : '#fef3c7',
-              color: value === 'reviewed' ? '#16a34a' : '#d97706'
-            }}>
-              {value}
-            </span>
-          )
-        },
-        {
-          key: 'actions',
-          label: 'ACTIONS',
-          render: (_: any, row: any) => (
-            <div style={{ display: 'flex', gap: 8 }}>
-              <Button variant="secondary" size="small" onClick={() => console.log('Details', row.id)}>Details</Button>
-              <Button variant="danger" size="small" onClick={() => console.log('Delete', row.id)}>Delete</Button>
-            </div>
-          )
-        }
+        { key: 'title', label: 'TITLE' },
+        { key: 'severity', label: 'SEVERITY' },
+        { key: 'customerId', label: 'CUSTOMER' },
+        { key: 'centerId', label: 'CENTER' },
+        { key: 'status', label: 'STATUS', render: renderStatusBadge },
+        { key: 'createdAt', label: 'CREATED' },
       ],
-      data: reportsData
+      data: reportRows,
+      emptyMessage: 'No reports filed.',
     },
     feedback: {
       columns: [
         { key: 'id', label: 'FEEDBACK ID', clickable: true },
-        { key: 'type', label: 'TYPE' },
-        { key: 'createdBy', label: 'CREATED BY' },
-        {
-          key: 'status',
-          label: 'STATUS',
-          render: (value: string) => (
-            <span style={{
-              padding: '4px 12px',
-              borderRadius: '4px',
-              fontSize: '12px',
-              fontWeight: 500,
-              backgroundColor: value === 'reviewed' ? '#dcfce7' : '#fef3c7',
-              color: value === 'reviewed' ? '#16a34a' : '#d97706'
-            }}>
-              {value}
-            </span>
-          )
-        },
-        {
-          key: 'actions',
-          label: 'ACTIONS',
-          render: (_: any, row: any) => (
-            <div style={{ display: 'flex', gap: 8 }}>
-              <Button variant="secondary" size="small" onClick={() => console.log('Details', row.id)}>Details</Button>
-              <Button variant="danger" size="small" onClick={() => console.log('Delete', row.id)}>Delete</Button>
-            </div>
-          )
-        }
+        { key: 'kind', label: 'KIND' },
+        { key: 'title', label: 'TITLE' },
+        { key: 'customerId', label: 'CUSTOMER' },
+        { key: 'centerId', label: 'CENTER' },
+        { key: 'createdAt', label: 'CREATED' },
       ],
-      data: feedbackData
+      data: feedbackRows,
+      emptyMessage: 'No feedback submitted.',
+    },
+  }) satisfies Record<string, DirectorySectionConfig>, [
+    adminRows,
+    managerRows,
+    contractorRows,
+    customerRows,
+    centerRows,
+    crewRows,
+    warehouseRows,
+    serviceRows,
+    orderRows,
+    productRows,
+    trainingRows,
+    procedureRows,
+    reportRows,
+    feedbackRows,
+  ]);
+
+  const directoryLoading =
+    adminUsersLoading ||
+    managersLoading ||
+    contractorsLoading ||
+    customersLoading ||
+    centersLoading ||
+    crewLoading ||
+    warehousesLoading ||
+    servicesLoading ||
+    ordersLoading ||
+    productsLoading ||
+    trainingLoading ||
+    proceduresLoading ||
+    reportsLoading ||
+    feedbackLoading;
+
+  const directoryError =
+    adminUsersError ||
+    managersError ||
+    contractorsError ||
+    customersError ||
+    centersError ||
+    crewError ||
+    warehousesError ||
+    servicesError ||
+    ordersError ||
+    productsError ||
+    trainingError ||
+    proceduresError ||
+    reportsError ||
+    feedbackError;
+  const renderDirectoryBody = () => {
+    if (directoryLoading) {
+      return <div style={{ color: '#2563eb', fontSize: 14 }}>Loading directory data.</div>;
     }
+    if (directoryError) {
+      return (
+        <div style={{ color: '#dc2626', fontSize: 14 }}>
+          Failed to load directory: {directoryError.message}
+        </div>
+      );
+    }
+    if (directoryTab === 'training') {
+      return (
+        <div style={{ display: 'flex', gap: '4%' }}>
+          <div style={{ width: '48%' }}>
+            <DataTable
+              columns={directoryConfig.training.columns}
+              data={directoryConfig.training.data}
+              emptyMessage={directoryConfig.training.emptyMessage}
+              searchPlaceholder="Search training..."
+              maxItems={25}
+              showSearch
+              onRowClick={handleDirectoryRowClick}
+            />
+          </div>
+          <div style={{ width: '48%' }}>
+            <DataTable
+              columns={directoryConfig.procedures.columns}
+              data={directoryConfig.procedures.data}
+              emptyMessage={directoryConfig.procedures.emptyMessage}
+              searchPlaceholder="Search procedures..."
+              maxItems={25}
+              showSearch
+              onRowClick={handleDirectoryRowClick}
+            />
+          </div>
+        </div>
+      );
+    }
+    if (directoryTab === 'reports') {
+      return (
+        <div style={{ display: 'flex', gap: '4%' }}>
+          <div style={{ width: '48%' }}>
+            <DataTable
+              columns={directoryConfig.reports.columns}
+              data={directoryConfig.reports.data}
+              emptyMessage={directoryConfig.reports.emptyMessage}
+              searchPlaceholder="Search reports..."
+              maxItems={25}
+              showSearch
+              onRowClick={handleDirectoryRowClick}
+            />
+          </div>
+          <div style={{ width: '48%' }}>
+            <DataTable
+              columns={directoryConfig.feedback.columns}
+              data={directoryConfig.feedback.data}
+              emptyMessage={directoryConfig.feedback.emptyMessage}
+              searchPlaceholder="Search feedback..."
+              maxItems={25}
+              showSearch
+              onRowClick={handleDirectoryRowClick}
+            />
+          </div>
+        </div>
+      );
+    }
+    const section = directoryConfig[directoryTab];
+    if (!section) {
+      return <div style={{ color: '#64748b', fontSize: 14 }}>No data available.</div>;
+    }
+    return (
+      <DataTable
+        columns={section.columns}
+        data={section.data}
+        emptyMessage={section.emptyMessage}
+        searchPlaceholder={`Search ${directoryTab}...`}
+        maxItems={25}
+        showSearch
+        onRowClick={handleDirectoryRowClick}
+      />
+    );
   };
+
+  const activityEmptyMessage = activitiesError
+    ? 'Failed to load activity feed.'
+    : activitiesLoading
+      ? 'Loading recent activity...'
+      : 'No recent activity yet.';
+
+  const handleClearActivity = () => setActivityFeed([]);
 
   return (
     <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: '#f9fafb' }}>
       <MyHubSection
         hubName="Administrator Hub"
-        tabs={tabs}
+        tabs={HUB_TABS}
         activeTab={activeTab}
         onTabClick={setActiveTab}
-        userId="ADM-001"
-        role="admin"
       />
 
-      {/* Content Area */}
-      <Scrollbar style={{
-        flex: 1,
-        padding: '0 24px'
-      }}>
-        <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
+      <Scrollbar style={{ flex: 1, padding: '0 24px' }} className="hub-content-scroll">
+        <div style={{ maxWidth: 1400, margin: '0 auto' }}>
           {activeTab === 'dashboard' ? (
             <PageWrapper title="Dashboard" showHeader={false}>
               <PageHeader title="Overview" />
-              <OverviewSection
-                cards={overviewCards}
-                data={overviewData}
-              />
+              <OverviewSection cards={overviewCards} data={overviewData} />
+
               <PageHeader title="Recent Activity" />
               <RecentActivity
-                activities={activities}
-                onClear={() => setActivities([])}
-                emptyMessage="No recent system activity"
+                activities={activityFeed}
+                onClear={handleClearActivity}
+                emptyMessage={activityEmptyMessage}
               />
 
-              {/* Communication Hub */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 24 }}>
-                <NewsPreview color="#111827" onViewAll={() => console.log('View all news')} />
+                <NewsPreview color="#111827" onViewAll={() => console.log('View news')} />
                 <MemosPreview color="#111827" onViewAll={() => console.log('View memos')} />
               </div>
             </PageWrapper>
           ) : activeTab === 'directory' ? (
-            <PageWrapper title="Directory" showHeader={true} headerSrOnly>
+            <PageWrapper title="Directory" showHeader>
               <TabContainer variant="pills" spacing="compact">
-                <NavigationTab
-                  label="Admins"
-                  isActive={directoryTab === 'admins'}
-                  onClick={() => setDirectoryTab('admins')}
-                  activeColor="#111827"
-                />
-                <NavigationTab
-                  label="Managers"
-                  isActive={directoryTab === 'managers'}
-                  onClick={() => setDirectoryTab('managers')}
-                  activeColor="#3b82f6"
-                />
-                <NavigationTab
-                  label="Contractors"
-                  isActive={directoryTab === 'contractors'}
-                  onClick={() => setDirectoryTab('contractors')}
-                  activeColor="#10b981"
-                />
-                <NavigationTab
-                  label="Customers"
-                  isActive={directoryTab === 'customers'}
-                  onClick={() => setDirectoryTab('customers')}
-                  activeColor="#eab308"
-                />
-                <NavigationTab
-                  label="Centers"
-                  isActive={directoryTab === 'centers'}
-                  onClick={() => setDirectoryTab('centers')}
-                  activeColor="#f97316"
-                />
-                <NavigationTab
-                  label="Crew"
-                  isActive={directoryTab === 'crew'}
-                  onClick={() => setDirectoryTab('crew')}
-                  activeColor="#ef4444"
-                />
-                <NavigationTab
-                  label="Warehouses"
-                  isActive={directoryTab === 'warehouses'}
-                  onClick={() => setDirectoryTab('warehouses')}
-                  activeColor="#8b5cf6"
-                />
-                <NavigationTab
-                  label="Services"
-                  isActive={directoryTab === 'services'}
-                  onClick={() => setDirectoryTab('services')}
-                  activeColor="#06b6d4"
-                />
-                <NavigationTab
-                  label="Orders"
-                  isActive={directoryTab === 'orders'}
-                  onClick={() => setDirectoryTab('orders')}
-                  activeColor="#92400e"
-                />
-                <NavigationTab
-                  label="Products"
-                  isActive={directoryTab === 'products'}
-                  onClick={() => setDirectoryTab('products')}
-                  activeColor="#374151"
-                />
-                <NavigationTab
-                  label="Training & Procedures"
-                  isActive={directoryTab === 'training'}
-                  onClick={() => setDirectoryTab('training')}
-                  activeColor="#ec4899"
-                />
-                <NavigationTab
-                  label="Reports & Feedback"
-                  isActive={directoryTab === 'reports'}
-                  onClick={() => setDirectoryTab('reports')}
-                  activeColor="#6b7280"
-                />
+                {DIRECTORY_TABS.map((tab) => (
+                  <NavigationTab
+                    key={tab.id}
+                    label={tab.label}
+                    isActive={directoryTab === tab.id}
+                    onClick={() => setDirectoryTab(tab.id)}
+                    activeColor={tab.color}
+                  />
+                ))}
               </TabContainer>
 
               <div style={{ marginTop: 24 }}>
-                {directoryTab === 'training' ? (
-                  // Split side-by-side tables for Training & Procedures
-                  <div style={{ display: 'flex', gap: '4%' }}>
-                    <div style={{ width: '48%' }}>
-                      <DataTable
-                        columns={directoryConfig.training.columns}
-                        data={directoryConfig.training.data}
-                        searchPlaceholder="Search training..."
-                        maxItems={25}
-                        showSearch={true}
-                        onRowClick={(row) => console.log('Clicked row:', row)}
-                        title="Training"
-                      />
-                    </div>
-                    <div style={{ width: '48%' }}>
-                      <DataTable
-                        columns={directoryConfig.procedures.columns}
-                        data={directoryConfig.procedures.data}
-                        searchPlaceholder="Search procedures..."
-                        maxItems={25}
-                        showSearch={true}
-                        onRowClick={(row) => console.log('Clicked row:', row)}
-                        title="Procedures"
-                      />
-                    </div>
-                  </div>
-                ) : directoryTab === 'reports' ? (
-                  // Split side-by-side tables for Reports & Feedback
-                  <div style={{ display: 'flex', gap: '4%' }}>
-                    <div style={{ width: '48%' }}>
-                      <DataTable
-                        columns={directoryConfig.reports.columns}
-                        data={directoryConfig.reports.data}
-                        searchPlaceholder="Search reports..."
-                        maxItems={25}
-                        showSearch={true}
-                        onRowClick={(row) => console.log('Clicked row:', row)}
-                        title="Reports"
-                      />
-                    </div>
-                    <div style={{ width: '48%' }}>
-                      <DataTable
-                        columns={directoryConfig.feedback.columns}
-                        data={directoryConfig.feedback.data}
-                        searchPlaceholder="Search feedback..."
-                        maxItems={25}
-                        showSearch={true}
-                        onRowClick={(row) => console.log('Clicked row:', row)}
-                        title="Feedback"
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    {directoryTab === 'admins' && (
-                      <div
-                        style={{
-                          fontSize: '13px',
-                          color: adminUsersError ? '#dc2626' : '#64748b',
-                        }}
-                      >
-                        {adminUsersError
-                          ? `Failed to load admin directory: ${adminUsersError}`
-                          : isLoadingAdminUsers
-                            ? 'Loading admin directory...'
-                            : `Showing ${adminUsers.length} admin ${adminUsers.length === 1 ? 'user' : 'users'}.`}
-                      </div>
-                    )}
-                    <DataTable
-                      columns={directoryConfig[directoryTab as keyof typeof directoryConfig].columns}
-                      data={directoryConfig[directoryTab as keyof typeof directoryConfig].data}
-                      searchPlaceholder={directoryTab === 'admins' ? 'Search admin users...' : `Search ${directoryTab}...`}
-                      maxItems={25}
-                      showSearch={true}
-                      onRowClick={(row) => console.log('Clicked row:', row)}
-                    />
-                  </div>
-                )}
+                {renderDirectoryBody()}
               </div>
             </PageWrapper>
           ) : activeTab === 'create' ? (
-            <CreateSection />
+            <AdminCreateSection />
           ) : activeTab === 'assign' ? (
-            <AssignSection />
+            <AdminAssignSection />
           ) : activeTab === 'archive' ? (
             <ArchiveSection />
           ) : activeTab === 'support' ? (
             <PageWrapper headerSrOnly>
-              <AdminSupportSection
-                primaryColor="#6366f1"
-              />
+              <AdminSupportSection primaryColor="#6366f1" />
             </PageWrapper>
           ) : (
-            <PageWrapper title={activeTab} showHeader={true} headerSrOnly>
+            <PageWrapper title={activeTab} showHeader>
               <h2>Admin {activeTab} content</h2>
               <p>Content for {activeTab} will be implemented here.</p>
             </PageWrapper>
@@ -994,6 +983,17 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
 
 
 

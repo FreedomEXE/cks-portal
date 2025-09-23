@@ -1,8 +1,9 @@
 import { useCallback } from 'react';
 import { useClerk } from '@clerk/clerk-react';
 import { useNavigate } from 'react-router-dom';
+import { clearImpersonation } from '@cks/auth';
 
-const SESSION_KEYS = ['role', 'code', 'impersonate'];
+const SESSION_KEYS = ['role', 'code', 'impersonate', 'impersonate:firstName', 'impersonate:displayName'];
 const LOCAL_KEYS = ['userLoggedOut'];
 
 export function useLogout() {
@@ -16,6 +17,7 @@ export function useLogout() {
       console.error('Error during sign out', err);
     } finally {
       try {
+        clearImpersonation();
         SESSION_KEYS.forEach((key) => sessionStorage.removeItem(key));
         LOCAL_KEYS.forEach((key) => localStorage.removeItem(key));
       } catch {}
@@ -24,3 +26,4 @@ export function useLogout() {
     }
   }, [signOut, navigate]);
 }
+

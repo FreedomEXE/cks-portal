@@ -1,26 +1,3 @@
-/*───────────────────────────────────────────────
-  Property of CKS  © 2025
-───────────────────────────────────────────────*/
-/**
- * File: MyHubSection.stories.tsx
- *
- * Description:
- * Storybook stories for MyHubSection component
- *
- * Responsibilities:
- * - Provide visual documentation and testing scenarios
- * - Demonstrate component variations and states
- *
- * Role in system:
- * - Used by Storybook for component development and documentation
- *
- * Notes:
- * Covers different role configurations and states
- */
-/*───────────────────────────────────────────────*/
-//  Manifested by Freedom_EXE
-/*───────────────────────────────────────────────*/
-
 import type { Meta, StoryObj } from '@storybook/react';
 import MyHubSection, { Tab as TabConfig } from './MyHubSection';
 
@@ -67,8 +44,9 @@ export const AdminHub: Story = {
     hubName: 'Admin Hub',
     tabs: adminTabs,
     activeTab: 'dashboard',
-    userId: 'John Admin',
     role: 'admin',
+    userId: 'adm-001',
+    welcomeName: 'Admin',
   },
 };
 
@@ -77,8 +55,9 @@ export const ManagerHub: Story = {
     hubName: 'Manager Hub',
     tabs: managerTabs,
     activeTab: 'ecosystem',
-    userId: 'Sarah Manager',
     role: 'manager',
+    userId: 'mgr-204',
+    welcomeName: 'Sarah',
   },
 };
 
@@ -87,8 +66,9 @@ export const CustomerHub: Story = {
     hubName: 'Customer Hub',
     tabs: customerTabs,
     activeTab: 'orders',
-    userId: 'Mike Customer',
     role: 'customer',
+    userId: 'cust-443',
+    welcomeName: 'Mike',
   },
 };
 
@@ -96,22 +76,13 @@ export const WithIcons: Story = {
   args: {
     hubName: 'Icon Hub',
     tabs: [
-      {
-        id: 'dashboard',
-        label: 'Dashboard',
-        path: '/dashboard',
-        icon: '📊',
-      },
-      {
-        id: 'orders',
-        label: 'Orders',
-        path: '/orders',
-        icon: '📦',
-      },
+      { id: 'dashboard', label: 'Dashboard', path: '/dashboard', icon: 'icon-dash' },
+      { id: 'orders', label: 'Orders', path: '/orders', icon: 'icon-orders' },
     ],
     activeTab: 'dashboard',
-    userId: 'Test User',
     role: 'customer',
+    userId: 'demo-100',
+    welcomeName: 'Demo',
   },
 };
 
@@ -124,8 +95,9 @@ export const WithDisabledTab: Story = {
       { id: 'premium', label: 'Premium Features', path: '/premium' },
     ],
     activeTab: 'dashboard',
-    userId: 'Basic User',
     role: 'customer',
+    userId: 'basic-010',
+    welcomeName: 'Jordan',
   },
 };
 
@@ -145,7 +117,8 @@ export const MinimalTabs: Story = {
       { id: 'profile', label: 'Profile', path: '/profile' },
     ],
     activeTab: 'home',
-    userId: 'Simple User',
     role: 'customer',
+    userId: 'simple-001',
+    welcomeName: 'Taylor',
   },
 };

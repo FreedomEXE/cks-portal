@@ -1,7 +1,7 @@
 # CKS Ecosystem UI Flow and Descriptors
 
-**Document Version:** 1.0  
-**Last Updated:** December 09, 2025  
+**Document Version:** 1.0
+**Last Updated:** December 09, 2025
 **Purpose:** Comprehensive specification for CKS ecosystem visualization system architecture, UI flows, and business logic
 
 ---
@@ -50,8 +50,8 @@ The CKS ecosystem visualization system provides hierarchical network views for s
 ## Entity Types & Structure
 
 ### 1. Manager (MGR)
-**Purpose:** Territory oversight and business network management  
-**ID Format:** `MGR-[XXX]`  
+**Purpose:** Territory oversight and business network management
+**ID Format:** `MGR-[XXX]`
 **Examples:** `MGR-001`, `MGR-045`
 
 **Key Fields:**
@@ -62,8 +62,8 @@ The CKS ecosystem visualization system provides hierarchical network views for s
 - `children`: Array of managed contractors
 
 ### 2. Contractor (CON)
-**Purpose:** Service provider with customer and crew networks  
-**ID Format:** `CON-[XXX]`  
+**Purpose:** Service provider with customer and crew networks
+**ID Format:** `CON-[XXX]`
 **Examples:** `CON-001`, `CON-023`
 
 **Key Fields:**
@@ -74,8 +74,8 @@ The CKS ecosystem visualization system provides hierarchical network views for s
 - `children`: Array of customers and direct crew
 
 ### 3. Customer (CUS)
-**Purpose:** Service recipient with center and crew assignments  
-**ID Format:** `CUS-[XXX]`  
+**Purpose:** Service recipient with center and crew assignments
+**ID Format:** `CUS-[XXX]`
 **Examples:** `CUS-001`, `CUS-098`
 
 **Key Fields:**
@@ -86,9 +86,9 @@ The CKS ecosystem visualization system provides hierarchical network views for s
 - `children`: Array of service centers
 
 ### 4. Center (CTR)
-**Purpose:** Service location with assigned crew members  
-**ID Format:** `CTR-[XXX]`  
-**Examples:** `CTR-001`, `CTR-156`
+**Purpose:** Service location with assigned crew members
+**ID Format:** `CEN-[XXX]`
+**Examples:** `CEN-001`, `CEN-156`
 
 **Key Fields:**
 - `center_id`: Unique identifier
@@ -98,8 +98,8 @@ The CKS ecosystem visualization system provides hierarchical network views for s
 - `children`: Array of assigned crew members
 
 ### 5. Crew (CRW)
-**Purpose:** Individual service personnel  
-**ID Format:** `CRW-[XXX]`  
+**Purpose:** Individual service personnel
+**ID Format:** `CRW-[XXX]`
 **Examples:** `CRW-001`, `CRW-234`
 
 **Key Fields:**
@@ -114,7 +114,7 @@ The CKS ecosystem visualization system provides hierarchical network views for s
 ## User Roles & Visibility
 
 ### Manager Ecosystem View
-**Root Entity:** Manager (themselves)  
+**Root Entity:** Manager (themselves)
 **Can View:**
 - Complete territory network: ✅
 - All contractors under management: ✅
@@ -127,7 +127,7 @@ The CKS ecosystem visualization system provides hierarchical network views for s
 **Statistical Overview:** Territory-wide counts at each level
 
 ### Contractor Ecosystem View
-**Root Entity:** Contractor (themselves)  
+**Root Entity:** Contractor (themselves)
 **Can View:**
 - Own business network: ✅
 - Direct customers: ✅
@@ -140,7 +140,7 @@ The CKS ecosystem visualization system provides hierarchical network views for s
 **Statistical Overview:** Business network counts
 
 ### Customer Ecosystem View
-**Root Entity:** Customer (themselves)  
+**Root Entity:** Customer (themselves)
 **Can View:**
 - Own service network: ✅
 - Assigned service centers: ✅
@@ -151,7 +151,7 @@ The CKS ecosystem visualization system provides hierarchical network views for s
 **Statistical Overview:** Service assignment counts
 
 ### Center Ecosystem View
-**Root Entity:** Center (themselves)  
+**Root Entity:** Center (themselves)
 **Can View:**
 - Own operational network: ✅
 - Assigned crew members: ✅
@@ -162,7 +162,7 @@ The CKS ecosystem visualization system provides hierarchical network views for s
 **Statistical Overview:** Crew assignment counts
 
 ### Crew Ecosystem View
-**Root Entity:** Crew (themselves)  
+**Root Entity:** Crew (themselves)
 **Can View:**
 - Own assignment information: ✅
 - Center assignment: ✅
@@ -173,7 +173,7 @@ The CKS ecosystem visualization system provides hierarchical network views for s
 **Statistical Overview:** Personal assignment info
 
 ### Warehouse Ecosystem View
-**Root Entity:** Warehouse (themselves)  
+**Root Entity:** Warehouse (themselves)
 **Can View:**
 - Service network for deliveries: ✅
 - Associated centers and locations: ✅

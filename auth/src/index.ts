@@ -20,6 +20,7 @@ export * from './utils/clerkClient';
 export * from './utils/roleExtractor';
 export * from './utils/customIdParser';
 export * from './utils/tokenValidator';
+export * from './utils/impersonation';
 
 // Types
 export * from './types/auth.d';

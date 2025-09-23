@@ -1,28 +1,3 @@
-/*───────────────────────────────────────────────
-  Property of CKS  © 2025
-───────────────────────────────────────────────*/
-/**
- * File: MyHubSection.tsx
- *
- * Description:
- * Reusable navigation header component for all role hubs
- *
- * Responsibilities:
- * - Display hub name and welcome message
- * - Render navigation tabs with active state
- * - Handle logout functionality
- * - Apply role-based color theming
- *
- * Role in system:
- * - Used by all 7 hub orchestrators (Admin, Manager, Contractor, etc.)
- *
- * Notes:
- * Extracted from common pattern across all role hubs
- */
-/*───────────────────────────────────────────────
-  Manifested by Freedom_EXE
-───────────────────────────────────────────────*/
-
 import React from 'react';
 import Button from '../../buttons/Button';
 
@@ -41,6 +16,7 @@ export interface MyHubSectionProps {
   onLogout: () => void;
   userId?: string;
   role?: string;
+  welcomeName?: string;
 }
 
 // Role-based color mapping
@@ -61,9 +37,22 @@ export default function MyHubSection({
   onTabClick,
   onLogout,
   userId,
-  role = 'manager'
+  role = 'manager',
+  welcomeName,
 }: MyHubSectionProps) {
   const colors = roleColors[role.toLowerCase()] || roleColors.manager;
+
+  const welcomeContent = welcomeName ? (
+    <>
+      Welcome to your CKS Portal{' '}
+      <span style={{ fontWeight: 600, color: colors.primary }}>
+        {welcomeName}
+      </span>
+      !
+    </>
+  ) : (
+    <>Welcome to {hubName}</>
+  );
 
   return (
     <div style={{ padding: '16px 24px 24px 24px', background: '#f9fafb' }}>
@@ -103,9 +92,11 @@ export default function MyHubSection({
         <div style={{
           fontSize: 14,
           color: '#4b5563',
-          marginBottom: 16
+          marginBottom: 16,
+          display: 'flex',
+          alignItems: 'center',
         }}>
-          Welcome to {hubName}
+          {welcomeContent}
           {userId && (
             <span style={{ marginLeft: 8, fontSize: 12, color: '#6b7280' }}>
               ({userId})
@@ -158,3 +149,4 @@ export default function MyHubSection({
     </div>
   );
 }
+

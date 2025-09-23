@@ -1,15 +1,14 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { ZodError } from 'zod';
-import { authenticate } from "../../core/auth/authenticate";
 import {
   createAdminUser,
-  getAdminUserByClerkId,
   getAdminUserById,
   getAdminUsers,
   removeAdminUser,
   setAdminUserStatus,
   updateAdminUser,
 } from "./store";
+import { requireActiveAdmin } from "./guards";
 import type { AdminUserCreateInput, AdminUserUpdateInput, AdminUserQueryOptions } from "./types";
 
 function coerceQuery(query: FastifyRequest['query']): AdminUserQueryOptions {
@@ -45,32 +44,6 @@ function coerceQuery(query: FastifyRequest['query']): AdminUserQueryOptions {
   return options;
 }
 
-async function requireAdmin(request: FastifyRequest, reply: FastifyReply) {
-  const auth = await authenticate(request);
-  if (!auth.ok) {
-    reply.code(401).send({ error: "Unauthorized", reason: auth.reason });
-    return null;
-  }
-
-  const adminUser = await getAdminUserByClerkId(auth.userId);
-  if (!adminUser) {
-    reply.code(403).send({ error: "Forbidden" });
-    return null;
-  }
-
-  if (adminUser.role !== "admin") {
-    reply.code(403).send({ error: "Forbidden" });
-    return null;
-  }
-
-  if (adminUser.status !== "active") {
-    reply.code(403).send({ error: "Admin access is disabled", status: adminUser.status });
-    return null;
-  }
-
-  return adminUser;
-}
-
 function handleValidationError(reply: FastifyReply, error: unknown) {
   if (error instanceof ZodError) {
     const message = error.issues.map((issue) => issue.message).join(', ');
@@ -82,7 +55,7 @@ function handleValidationError(reply: FastifyReply, error: unknown) {
 
 export async function registerAdminUserRoutes(server: FastifyInstance) {
   server.get("/api/admin/users", async (request, reply) => {
-    const auth = await requireAdmin(request, reply);
+    const auth = await requireActiveAdmin(request, reply);
     if (!auth) return;
 
     try {
@@ -96,7 +69,7 @@ export async function registerAdminUserRoutes(server: FastifyInstance) {
   });
 
   server.get("/api/admin/users/:id", async (request, reply) => {
-    const auth = await requireAdmin(request, reply);
+    const auth = await requireActiveAdmin(request, reply);
     if (!auth) return;
 
     const { id } = request.params as { id: string };
@@ -110,7 +83,7 @@ export async function registerAdminUserRoutes(server: FastifyInstance) {
   });
 
   server.post("/api/admin/users", async (request, reply) => {
-    const auth = await requireAdmin(request, reply);
+    const auth = await requireActiveAdmin(request, reply);
     if (!auth) return;
 
     const body = request.body as AdminUserCreateInput;
@@ -131,7 +104,7 @@ export async function registerAdminUserRoutes(server: FastifyInstance) {
   });
 
   server.patch("/api/admin/users/:id", async (request, reply) => {
-    const auth = await requireAdmin(request, reply);
+    const auth = await requireActiveAdmin(request, reply);
     if (!auth) return;
 
     const { id } = request.params as { id: string };
@@ -160,7 +133,7 @@ export async function registerAdminUserRoutes(server: FastifyInstance) {
   });
 
   server.post("/api/admin/users/:id/suspend", async (request, reply) => {
-    const auth = await requireAdmin(request, reply);
+    const auth = await requireActiveAdmin(request, reply);
     if (!auth) return;
 
     const { id } = request.params as { id: string };
@@ -174,7 +147,7 @@ export async function registerAdminUserRoutes(server: FastifyInstance) {
   });
 
   server.post("/api/admin/users/:id/activate", async (request, reply) => {
-    const auth = await requireAdmin(request, reply);
+    const auth = await requireActiveAdmin(request, reply);
     if (!auth) return;
 
     const { id } = request.params as { id: string };
@@ -188,7 +161,7 @@ export async function registerAdminUserRoutes(server: FastifyInstance) {
   });
 
   server.delete("/api/admin/users/:id", async (request, reply) => {
-    const auth = await requireAdmin(request, reply);
+    const auth = await requireActiveAdmin(request, reply);
     if (!auth) return;
 
     const { id } = request.params as { id: string };

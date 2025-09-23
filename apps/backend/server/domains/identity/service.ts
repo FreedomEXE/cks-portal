@@ -1,24 +1,8 @@
-﻿/*----------------------------------------------- 
-  Property of CKS  (c) 2025
------------------------------------------------*/
-/**
- * File: service.ts
- *
- * Description:
- * Short what/why
- *
- * Responsibilities:
- * - Key responsibility
- * - Another responsibility
- *
- * Role in system:
- * - Who imports/uses this; high-level, not a list of files
- *
- * Notes:
- * Special behaviors, flags, envs
- */
-/*-----------------------------------------------
-  Manifested by Freedom_EXE
------------------------------------------------*/
+import { generatePrefixedId, normalizeIdentity } from './customIdGenerator';
+import type { IdentityEntity } from './types';
 
-export {};
+export async function nextIdentityId(entity: IdentityEntity): Promise<string> {
+  return generatePrefixedId(entity);
+}
+
+export { normalizeIdentity };

@@ -31,7 +31,6 @@ export async function authenticate(req: FastifyRequest): Promise<AuthResult> {
   try {
     const payload = await verifyToken(token, {
       secretKey: CLERK_SECRET_KEY,
-      issuer: process.env.CLERK_JWT_ISSUER,
       audience: process.env.CLERK_JWT_AUDIENCE || undefined,
     });
 

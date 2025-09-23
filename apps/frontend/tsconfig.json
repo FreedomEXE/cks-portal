@@ -29,6 +29,8 @@
       "@test/*": ["src/test-interface/*"],
       "@cks/auth": ["../auth/src/index.ts"],
       "@cks/auth/*": ["../auth/src/*"],
+      "@cks/ui": ["../packages/ui/src/index.ts"],
+      "@cks/ui/*": ["../packages/ui/src/*"],
       "@cks-domain/*": ["../packages/domain-widgets/src/*"]
     }
   },

@@ -1,6 +1,6 @@
-import type { ComponentType } from 'react';
-import { Navigate, Route, Routes, useSearchParams } from 'react-router-dom';
-import { RoleGuard, Login, useAuth } from '@cks/auth';
+import { useEffect, type ComponentType } from 'react';
+import { Navigate, Route, Routes, useParams, useSearchParams } from 'react-router-dom';
+import { RoleGuard, Login, useAuth, persistImpersonation, clearImpersonation, normalizeImpersonationCode, inferRoleFromIdentifier } from '@cks/auth';
 
 import AdminHub from './hubs/AdminHub';
 import ManagerHub from './hubs/ManagerHub';
@@ -30,6 +30,17 @@ function sanitizeTab(value: string | null): string | undefined {
   return trimmed ? trimmed : undefined;
 }
 
+function decodeSubject(value: string | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
 function HubLoader({ initialTab }: { initialTab?: string }): JSX.Element | null {
   const { status, role } = useAuth();
 
@@ -53,6 +64,43 @@ function RoleHubRoute(): JSX.Element {
   const [searchParams] = useSearchParams();
   const initialTab = sanitizeTab(searchParams.get('tab'));
 
+  useEffect(() => {
+    clearImpersonation();
+  }, []);
+  return (
+    <RoleGuard initialTab={initialTab}>
+      <HubLoader initialTab={initialTab} />
+    </RoleGuard>
+  );
+}
+
+function ImpersonatedHubRoute(): JSX.Element {
+  const { subject } = useParams<{ subject: string }>();
+  const [searchParams] = useSearchParams();
+  const initialTab = sanitizeTab(searchParams.get('tab'));
+  const decoded = decodeSubject(subject);
+  const normalized = normalizeImpersonationCode(decoded);
+
+  useEffect(() => {
+    if (!normalized) {
+      clearImpersonation();
+      return;
+    }
+
+    const stored = persistImpersonation({
+      code: normalized,
+      role: inferRoleFromIdentifier(normalized),
+    });
+
+    if (!stored) {
+      clearImpersonation();
+    }
+  }, [normalized]);
+
+  if (!normalized) {
+    return <Navigate to="/hub" replace />;
+  }
+
   return (
     <RoleGuard initialTab={initialTab}>
       <HubLoader initialTab={initialTab} />
@@ -65,6 +113,7 @@ export function AuthenticatedApp(): JSX.Element {
     <Routes>
       <Route path="/" element={<Navigate to="/hub" replace />} />
       <Route path="/hub" element={<RoleHubRoute />} />
+      <Route path="/:subject/hub" element={<ImpersonatedHubRoute />} />
       <Route path="/hub/*" element={<Navigate to="/hub" replace />} />
       <Route path="*" element={<Navigate to="/hub" replace />} />
     </Routes>
@@ -79,3 +128,4 @@ export function UnauthenticatedApp(): JSX.Element {
     </Routes>
   );
 }
+
