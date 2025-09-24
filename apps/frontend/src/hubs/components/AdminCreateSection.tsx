@@ -1,25 +1,28 @@
-import { useMemo, useState } from 'react';
+function getReportsToOptions(role: string | undefined): Array<{ value: string; label: string }> {
+  if (!role) return [];
+  return MANAGER_REPORTS_TO_MAP[role] || [];
+}
+
+function stringOrUndefined(val: string | undefined): string | undefined {
+  return val && val.trim() ? val.trim() : undefined;
+}
 import { Button, NavigationTab, PageWrapper, TabContainer } from '@cks/ui';
+import { useAuth } from '@clerk/clerk-react';
+import { useMemo, useState } from 'react';
 import { useSWRConfig } from 'swr';
 import {
-  createManager,
-  createContractor,
-  createCustomer,
   createCenter,
+  createContractor,
   createCrew,
+  createCustomer,
+  createManager,
   createWarehouse,
-  type ManagerCreatePayload,
-  type ManagerRecord,
-  type ContractorCreatePayload,
-  type ContractorRecord,
-  type CustomerCreatePayload,
-  type CustomerRecord,
   type CenterCreatePayload,
-  type CenterRecord,
+  type ContractorCreatePayload,
   type CrewCreatePayload,
-  type CrewRecord,
-  type WarehouseCreatePayload,
-  type WarehouseRecord,
+  type CustomerCreatePayload,
+  type ManagerCreatePayload,
+  type WarehouseCreatePayload
 } from '../../shared/api/provisioning';
 
 type TabKey = 'managers' | 'contractors' | 'customers' | 'centers' | 'crew' | 'warehouses';
@@ -44,7 +47,7 @@ type TabConfig<TRecord> = {
   color: string;
   fields: FieldConfig[];
   submitLabel: string;
-  create: (input: Record<string, string>) => Promise<TRecord>;
+  create: (input: Record<string, string>, getToken?: () => Promise<string | null>) => Promise<TRecord>;
   resetValues: Record<string, string>;
   successMessage: (record: TRecord) => string;
   mutateKeys: string[];
@@ -73,27 +76,18 @@ const MANAGER_REPORTS_TO_MAP: Record<string, Array<{ value: string; label: strin
   ],
   'Operations Manager': [
     { value: 'CEO', label: 'CEO' },
-    { value: 'strategic-manager', label: 'Strategic Manager' },
+    { value: 'Strategic Manager', label: 'Strategic Manager' },
   ],
   'Field Manager': [
     { value: 'CEO', label: 'CEO' },
-    { value: 'strategic-manager', label: 'Strategic Manager' },
-    { value: 'operations-manager', label: 'Operations Manager' },
+    { value: 'Strategic Manager', label: 'Strategic Manager' },
+    { value: 'Operations Manager', label: 'Operations Manager' },
   ],
   'Development Manager': [
     { value: 'CEO', label: 'CEO' },
-    { value: 'strategic-manager', label: 'Strategic Manager' },
+    { value: 'Strategic Manager', label: 'Strategic Manager' },
   ],
 };
-
-function getReportsToOptions(role: string): Array<{ value: string; label: string }> {
-  return MANAGER_REPORTS_TO_MAP[role] ?? [];
-}
-
-function stringOrUndefined(value: string): string | undefined {
-  const trimmed = value.trim();
-  return trimmed ? trimmed : undefined;
-}
 
 function buildFieldValues(fields: FieldConfig[]): Record<string, string> {
   return fields.reduce<Record<string, string>>((acc, field) => {
@@ -136,6 +130,7 @@ function FormTable({
             : field.options ?? [];
           const isSelect = field.control === 'select' || resolvedOptions.length > 0;
           const fieldDisabled = disabled || (field.disabled ? field.disabled(values) : false);
+          const isSelectLike = field.control === 'select' || resolvedOptions.length > 0;
           const placeholder =
             typeof field.placeholder === 'function'
               ? field.placeholder(values)
@@ -172,7 +167,7 @@ function FormTable({
                     value={value}
                     onChange={(event) => onChange(field.name, event.target.value)}
                     required={field.required}
-                    disabled={fieldDisabled || (field.control === 'select' && resolvedOptions.length === 0)}
+                    disabled={fieldDisabled || (isSelectLike && resolvedOptions.length === 0)}
                     style={{
                       width: '324px',
                       padding: '8px 12px',
@@ -234,53 +229,52 @@ function buildTabConfigs(): TabConfig<unknown>[] {
     {
       name: 'reportsTo',
       label: 'Reports To',
-      required: true,
       control: 'select',
       getOptions: (values) => getReportsToOptions(values.role),
-      placeholder: (values) => (values.role ? 'Select Reports To' : 'Select Role First'),
+      placeholder: (values) => (values.role ? 'Select Reports To (optional)' : 'Select Role First'),
       disabled: (values) => !values.role,
     },
     { name: 'address', label: 'Address', required: true, placeholder: '123 Main St, Springfield' },
   ];
+
   const contractorFields: FieldConfig[] = [
-    { name: 'companyName', label: 'Company Name', required: true, placeholder: 'Acme Facilities' },
-    { name: 'contactPerson', label: 'Main Contact', placeholder: 'Primary contact name' },
-    { name: 'email', label: 'Email', inputType: 'email', placeholder: 'contact@acme.com' },
-    { name: 'phone', label: 'Phone', inputType: 'tel', placeholder: '(555) 987-6543' },
-    { name: 'address', label: 'Address', placeholder: 'Street, City, State' },
+    { name: 'name', label: 'Contractor Name', required: true, placeholder: 'Acme Facilities' },
+    { name: 'mainContact', label: 'Main Contact', required: true, placeholder: 'Primary contact name' },
+    { name: 'email', label: 'Email', required: true, inputType: 'email', placeholder: 'contact@acme.com' },
+    { name: 'phone', label: 'Phone', required: true, inputType: 'tel', placeholder: '(555) 987-6543' },
+    { name: 'address', label: 'Address', required: true, placeholder: 'Street, City, State' },
   ];
 
   const customerFields: FieldConfig[] = [
     { name: 'name', label: 'Customer Name', required: true, placeholder: 'Sunrise Clinics' },
-    { name: 'contactName', label: 'Main Contact', placeholder: 'Primary contact name' },
-    { name: 'email', label: 'Email', inputType: 'email', placeholder: 'contact@sunrise.com' },
-    { name: 'phone', label: 'Phone', inputType: 'tel', placeholder: '(555) 123-7890' },
-    { name: 'address', label: 'Address', placeholder: 'Street, City, State' },
+    { name: 'mainContact', label: 'Main Contact', required: true, placeholder: 'Primary contact name' },
+    { name: 'email', label: 'Email', required: true, inputType: 'email', placeholder: 'contact@sunrise.com' },
+    { name: 'phone', label: 'Phone', required: true, inputType: 'tel', placeholder: '(555) 123-7890' },
+    { name: 'address', label: 'Address', required: true, placeholder: 'Street, City, State' },
   ];
 
   const centerFields: FieldConfig[] = [
     { name: 'name', label: 'Center Name', required: true, placeholder: 'Downtown Campus' },
-    { name: 'contactName', label: 'Main Contact', placeholder: 'Primary contact name' },
-    { name: 'email', label: 'Email', inputType: 'email', placeholder: 'center@example.com' },
-    { name: 'phone', label: 'Phone', inputType: 'tel', placeholder: '(555) 654-3210' },
-    { name: 'address', label: 'Address', placeholder: 'Street, City, State' },
+    { name: 'mainContact', label: 'Main Contact', required: true, placeholder: 'Primary contact name' },
+    { name: 'email', label: 'Email', required: true, inputType: 'email', placeholder: 'center@example.com' },
+    { name: 'phone', label: 'Phone', required: true, inputType: 'tel', placeholder: '(555) 654-3210' },
+    { name: 'address', label: 'Address', required: true, placeholder: 'Street, City, State' },
   ];
 
   const crewFields: FieldConfig[] = [
     { name: 'name', label: 'Crew Name', required: true, placeholder: 'Alpha Team' },
-    { name: 'role', label: 'Role', placeholder: 'Lead Technician' },
-    { name: 'email', label: 'Email', inputType: 'email', placeholder: 'crew@example.com' },
-    { name: 'phone', label: 'Phone', inputType: 'tel', placeholder: '(555) 222-1111' },
-    { name: 'address', label: 'Address', placeholder: 'Street, City, State' },
+    { name: 'emergencyContact', label: 'Emergency Contact', required: true, placeholder: 'Maria Martinez (555) 890-5678' },
+    { name: 'email', label: 'Email', required: true, inputType: 'email', placeholder: 'crew@example.com' },
+    { name: 'phone', label: 'Phone', required: true, inputType: 'tel', placeholder: '(555) 222-1111' },
+    { name: 'address', label: 'Address', required: true, placeholder: 'Street, City, State' },
   ];
 
   const warehouseFields: FieldConfig[] = [
     { name: 'name', label: 'Warehouse Name', required: true, placeholder: 'North Logistics Hub' },
-    { name: 'managerId', label: 'Manager ID', placeholder: 'MGR-001' },
-    { name: 'email', label: 'Email', inputType: 'email', placeholder: 'warehouse@example.com' },
-    { name: 'phone', label: 'Phone', inputType: 'tel', placeholder: '(555) 777-8888' },
-    { name: 'warehouseType', label: 'Warehouse Type', placeholder: 'Regional' },
-    { name: 'address', label: 'Address', placeholder: 'Street, City, State' },
+    { name: 'mainContact', label: 'Main Contact', required: true, placeholder: 'Primary contact name' },
+    { name: 'email', label: 'Email', required: true, inputType: 'email', placeholder: 'warehouse@example.com' },
+    { name: 'phone', label: 'Phone', required: true, inputType: 'tel', placeholder: '(555) 777-8888' },
+    { name: 'address', label: 'Address', required: true, placeholder: 'Street, City, State' },
   ];
 
   const configs: TabConfig<unknown>[] = [
@@ -290,20 +284,20 @@ function buildTabConfigs(): TabConfig<unknown>[] {
       color: '#3b82f6',
       fields: managerFields,
       submitLabel: 'Create Manager',
-      create: async (values) => {
+      create: async (values, getToken) => {
         const payload: ManagerCreatePayload = {
           fullName: values.fullName.trim(),
           territory: values.territory.trim(),
           phone: values.phone.trim(),
           email: values.email.trim(),
           role: values.role,
-          reportsTo: values.reportsTo,
+          reportsTo: stringOrUndefined(values.reportsTo),
           address: values.address.trim(),
         };
-        return createManager(payload);
+        return createManager(payload, getToken);
       },
       resetValues: buildFieldValues(managerFields),
-      successMessage: (record) => `Manager ${(record as ManagerRecord).id} created successfully`,
+      successMessage: () => 'Manager created successfully',
       mutateKeys: ['/admin/directory/managers'],
     },
     {
@@ -312,18 +306,18 @@ function buildTabConfigs(): TabConfig<unknown>[] {
       color: '#10b981',
       fields: contractorFields,
       submitLabel: 'Create Contractor',
-      create: async (values) => {
+      create: async (values, getToken) => {
         const payload: ContractorCreatePayload = {
-          companyName: values.companyName.trim(),
-          contactPerson: stringOrUndefined(values.contactPerson),
-          email: stringOrUndefined(values.email),
-          phone: stringOrUndefined(values.phone),
-          address: stringOrUndefined(values.address),
+          name: values.name.trim(),
+          mainContact: values.mainContact.trim(),
+          email: values.email.trim(),
+          phone: values.phone.trim(),
+          address: values.address.trim(),
         };
-        return createContractor(payload);
+        return createContractor(payload, getToken);
       },
       resetValues: buildFieldValues(contractorFields),
-      successMessage: (record) => `Contractor ${(record as ContractorRecord).id} created`,
+      successMessage: () => 'Contractor created',
       mutateKeys: ['/admin/directory/contractors', '/admin/assignments/contractors/unassigned'],
     },
     {
@@ -332,18 +326,18 @@ function buildTabConfigs(): TabConfig<unknown>[] {
       color: '#eab308',
       fields: customerFields,
       submitLabel: 'Create Customer',
-      create: async (values) => {
+      create: async (values, getToken) => {
         const payload: CustomerCreatePayload = {
           name: values.name.trim(),
-          contactName: stringOrUndefined(values.contactName),
-          email: stringOrUndefined(values.email),
-          phone: stringOrUndefined(values.phone),
-          address: stringOrUndefined(values.address),
+          mainContact: values.mainContact.trim(),
+          email: values.email.trim(),
+          phone: values.phone.trim(),
+          address: values.address.trim(),
         };
-        return createCustomer(payload);
+        return createCustomer(payload, getToken);
       },
       resetValues: buildFieldValues(customerFields),
-      successMessage: (record) => `Customer ${(record as CustomerRecord).id} created`,
+      successMessage: () => 'Customer created',
       mutateKeys: ['/admin/directory/customers', '/admin/assignments/customers/unassigned'],
     },
     {
@@ -352,18 +346,18 @@ function buildTabConfigs(): TabConfig<unknown>[] {
       color: '#f59e0b',
       fields: centerFields,
       submitLabel: 'Create Center',
-      create: async (values) => {
+      create: async (values, getToken) => {
         const payload: CenterCreatePayload = {
           name: values.name.trim(),
-          contactName: stringOrUndefined(values.contactName),
-          email: stringOrUndefined(values.email),
-          phone: stringOrUndefined(values.phone),
-          address: stringOrUndefined(values.address),
+          mainContact: values.mainContact.trim(),
+          email: values.email.trim(),
+          phone: values.phone.trim(),
+          address: values.address.trim(),
         };
-        return createCenter(payload);
+        return createCenter(payload, getToken);
       },
       resetValues: buildFieldValues(centerFields),
-      successMessage: (record) => `Center ${(record as CenterRecord).id} created`,
+      successMessage: () => 'Center created',
       mutateKeys: ['/admin/directory/centers', '/admin/assignments/centers/unassigned'],
     },
     {
@@ -372,18 +366,18 @@ function buildTabConfigs(): TabConfig<unknown>[] {
       color: '#ef4444',
       fields: crewFields,
       submitLabel: 'Create Crew',
-      create: async (values) => {
+      create: async (values, getToken) => {
         const payload: CrewCreatePayload = {
           name: values.name.trim(),
-          role: stringOrUndefined(values.role),
-          email: stringOrUndefined(values.email),
-          phone: stringOrUndefined(values.phone),
-          address: stringOrUndefined(values.address),
+          emergencyContact: values.emergencyContact.trim(),
+          email: values.email.trim(),
+          phone: values.phone.trim(),
+          address: values.address.trim(),
         };
-        return createCrew(payload);
+        return createCrew(payload, getToken);
       },
       resetValues: buildFieldValues(crewFields),
-      successMessage: (record) => `Crew ${(record as CrewRecord).id} created`,
+      successMessage: () => 'Crew created',
       mutateKeys: ['/admin/directory/crew', '/admin/assignments/crew/unassigned'],
     },
     {
@@ -392,19 +386,18 @@ function buildTabConfigs(): TabConfig<unknown>[] {
       color: '#8b5cf6',
       fields: warehouseFields,
       submitLabel: 'Create Warehouse',
-      create: async (values) => {
+      create: async (values, getToken) => {
         const payload: WarehouseCreatePayload = {
           name: values.name.trim(),
-          managerId: stringOrUndefined(values.managerId),
-          email: stringOrUndefined(values.email),
-          phone: stringOrUndefined(values.phone),
-          warehouseType: stringOrUndefined(values.warehouseType),
-          address: stringOrUndefined(values.address),
+          mainContact: values.mainContact.trim(),
+          email: values.email.trim(),
+          phone: values.phone.trim(),
+          address: values.address.trim(),
         };
-        return createWarehouse(payload);
+        return createWarehouse(payload, getToken);
       },
       resetValues: buildFieldValues(warehouseFields),
-      successMessage: (record) => `Warehouse ${(record as WarehouseRecord).id} created`,
+      successMessage: () => 'Warehouse created',
       mutateKeys: ['/admin/directory/warehouses'],
     },
   ];
@@ -413,6 +406,7 @@ function buildTabConfigs(): TabConfig<unknown>[] {
 }
 
 export default function AdminCreateSection() {
+  const { getToken } = useAuth();
   const tabConfigs = useMemo(() => buildTabConfigs(), []);
   const tabMap = useMemo(
     () =>
@@ -468,7 +462,7 @@ export default function AdminCreateSection() {
     const values = forms[tab];
 
     try {
-      const record = await config.create(values);
+      const record = await config.create(values, getToken);
       setStatuses((prev) => ({
         ...prev,
         [tab]: {
@@ -481,7 +475,11 @@ export default function AdminCreateSection() {
         ...prev,
         [tab]: { ...config.resetValues },
       }));
-      await Promise.all(config.mutateKeys.map((key) => mutate(key, undefined, { revalidate: true })));
+      try {
+        await Promise.all(config.mutateKeys.map((key) => mutate(key, undefined, { revalidate: true })));
+      } catch (mutateError) {
+        console.error('Failed to invalidate cache:', mutateError);
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Request failed';
       setStatuses((prev) => ({
@@ -540,5 +538,10 @@ export default function AdminCreateSection() {
     </PageWrapper>
   );
 }
+
+
+
+
+
 
 

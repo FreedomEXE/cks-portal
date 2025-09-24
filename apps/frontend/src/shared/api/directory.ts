@@ -1,5 +1,5 @@
 import useSWR from 'swr';
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useAuth as useClerkAuth } from '@clerk/clerk-react';
 import type { Activity } from '@cks/domain-widgets';
 import { apiFetch, type ApiFetchInit, type ApiResponse } from './client';
@@ -10,6 +10,9 @@ export interface Manager {
   email: string | null;
   phone: string | null;
   territory: string | null;
+  role: string | null;
+  reportsTo: string | null;
+  address: string | null;
   status: string | null;
   createdAt: string | null;
   updatedAt: string | null;
@@ -19,8 +22,8 @@ export interface Manager {
 export interface Contractor {
   id: string;
   managerId: string | null;
-  companyName: string | null;
-  contactPerson: string | null;
+  name: string | null;
+  mainContact: string | null;
   email: string | null;
   phone: string | null;
   address: string | null;
@@ -34,7 +37,7 @@ export interface Customer {
   id: string;
   managerId: string | null;
   name: string | null;
-  contactName: string | null;
+  mainContact: string | null;
   email: string | null;
   phone: string | null;
   address: string | null;
@@ -48,7 +51,7 @@ export interface Center {
   name: string | null;
   contractorId: string | null;
   customerId: string | null;
-  contactName: string | null;
+  mainContact: string | null;
   email: string | null;
   phone: string | null;
   address: string | null;
@@ -59,7 +62,7 @@ export interface CrewMember {
   id: string;
   name: string | null;
   status: string | null;
-  role: string | null;
+  emergencyContact: string | null;
   email: string | null;
   phone: string | null;
   address: string | null;
@@ -72,6 +75,7 @@ export interface Warehouse {
   name: string | null;
   managerId: string | null;
   managerName: string | null;
+  mainContact: string | null;
   warehouseType: string | null;
   address: string | null;
   email: string | null;
@@ -212,8 +216,11 @@ function createDirectoryResource<TResponse, TMapped = TResponse>(
     );
 
     const { data, error, isLoading } = useSWR<TMapped[], Error>(config.path, fetcher);
+    const fallbackData = useMemo<TMapped[]>(() => [], []);
+    const safeData = data ?? fallbackData;
+
     return {
-      data: data ?? [],
+      data: safeData,
       isLoading,
       error,
     };
@@ -314,3 +321,4 @@ export const useFeedback = feedbackResource.useResource;
 export const fetchFeedback = feedbackResource.fetchResource;
 export const useActivities = activitiesResource.useResource;
 export const fetchActivities = activitiesResource.fetchResource;
+

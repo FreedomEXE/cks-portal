@@ -37,6 +37,9 @@ export const managerDirectoryEntrySchema = z.object({
   email: nullableString,
   phone: nullableString,
   territory: nullableString,
+  role: nullableString,
+  reportsTo: nullableString,
+  address: nullableString,
   status: nullableString,
   createdAt: isoDateString,
   updatedAt: isoDateString,
@@ -45,9 +48,9 @@ export const managerDirectoryEntrySchema = z.object({
 
 export const contractorDirectoryEntrySchema = z.object({
   id: z.string(),
-  companyName: nullableString,
+  name: z.string(),
   managerId: nullableString,
-  contactPerson: nullableString,
+  mainContact: nullableString,
   email: nullableString,
   phone: nullableString,
   address: nullableString,
@@ -61,11 +64,13 @@ export const customerDirectoryEntrySchema = z.object({
   id: z.string(),
   name: nullableString,
   managerId: nullableString,
-  contactName: nullableString,
+  mainContact: nullableString,
   email: nullableString,
   phone: nullableString,
   address: nullableString,
   totalCenters: nullableNumber,
+  createdAt: isoDateString,
+  updatedAt: isoDateString,
   archivedAt: isoDateString,
 });
 
@@ -75,10 +80,12 @@ export const centerDirectoryEntrySchema = z.object({
   managerId: nullableString,
   contractorId: nullableString,
   customerId: nullableString,
-  contactName: nullableString,
+  mainContact: nullableString,
   email: nullableString,
   phone: nullableString,
   address: nullableString,
+  createdAt: isoDateString,
+  updatedAt: isoDateString,
   archivedAt: isoDateString,
 });
 
@@ -86,11 +93,13 @@ export const crewDirectoryEntrySchema = z.object({
   id: z.string(),
   name: nullableString,
   status: nullableString,
-  role: nullableString,
+  emergencyContact: nullableString,
   email: nullableString,
   phone: nullableString,
   address: nullableString,
   assignedCenter: nullableString,
+  createdAt: isoDateString,
+  updatedAt: isoDateString,
   archivedAt: isoDateString,
 });
 
@@ -99,6 +108,7 @@ export const warehouseDirectoryEntrySchema = z.object({
   name: nullableString,
   managerId: nullableString,
   managerName: nullableString,
+  mainContact: nullableString,
   warehouseType: nullableString,
   address: nullableString,
   email: nullableString,
@@ -131,7 +141,7 @@ export const orderDirectoryEntrySchema = z.object({
   serviceId: nullableString,
   orderDate: isoDateString,
   completionDate: isoDateString,
-  totalAmount: nullableString,
+  totalAmount: nullableNumber,
   status: nullableString,
   notes: nullableString,
   assignedWarehouse: nullableString,
@@ -144,7 +154,7 @@ export const productDirectoryEntrySchema = z.object({
   name: z.string(),
   category: nullableString,
   description: nullableString,
-  price: nullableString,
+  price: nullableNumber,
   unit: nullableString,
   status: nullableString,
   createdAt: isoDateString,
@@ -158,9 +168,11 @@ export const trainingDirectoryEntrySchema = z.object({
   serviceId: nullableString,
   serviceName: nullableString,
   date: isoDateString,
-  expense: nullableString,
+  expense: nullableNumber,
   days: nullableNumber,
   status: nullableString,
+  createdAt: isoDateString,
+  updatedAt: isoDateString,
 });
 
 export const procedureDirectoryEntrySchema = z.object({
@@ -231,3 +243,4 @@ export const directoryResourceSchemas = {
 } as const satisfies { [K in DirectoryResourceKey]: z.ZodType<DirectoryResourceMap[K]> };
 
 export type DirectoryResourceSchemaMap = typeof directoryResourceSchemas;
+

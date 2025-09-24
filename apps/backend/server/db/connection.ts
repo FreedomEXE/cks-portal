@@ -54,9 +54,6 @@ async function delay(ms: number) {
 }
 
 async function createPool(): Promise<Pool> {
-  if (!process.env.DATABASE_URL) {
-    throw new Error('DATABASE_URL missing');
-  }
   const config = buildPoolConfig();
   const nextPool = new Pool(config);
 

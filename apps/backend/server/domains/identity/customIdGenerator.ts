@@ -27,6 +27,10 @@ async function ensureSequence(sequence: string): Promise<void> {
   if (!VALID_SEQUENCES.has(sequence)) {
     throw new Error(`Unsupported sequence requested: ${sequence}`);
   }
+  // Additional validation for SQL safety
+  if (!/^[a-z_]+$/.test(sequence)) {
+    throw new Error(`Invalid sequence name format: ${sequence}`);
+  }
   await query(`CREATE SEQUENCE IF NOT EXISTS ${sequence} AS BIGINT START WITH 1 INCREMENT BY 1 OWNED BY NONE`);
 }
 

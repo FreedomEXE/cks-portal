@@ -78,25 +78,44 @@ export function ProfileTab({ role, profileData, primaryColor, onUpdatePhoto }: P
 
   const fields = getFieldsForRole();
 
+  const getInitials = () => {
+    const name = profileData.name || profileData.fullName;
+    if (!name) return 'NA';
+    return name
+      .split(' ')
+      .map((n: string) => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
+  const formatFieldValue = (value: any) => {
+    if (value === null || value === undefined || value === '') {
+      return 'Not Set';
+    }
+    return String(value);
+  };
+
   return (
-    <div style={{ display: 'flex', gap: 32 }}>
+    <div style={{ display: 'flex', gap: '48px', alignItems: 'flex-start' }}>
       {/* Photo Section - Left Side */}
-      <div style={{ textAlign: 'center' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
         <div style={{
-          width: 150,
-          height: 150,
+          width: '160px',
+          height: '160px',
           borderRadius: '50%',
-          background: '#f3f4f6',
+          background: 'linear-gradient(135deg, #f3f4f6, #e5e7eb)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          fontSize: 48,
+          fontSize: '48px',
           color: '#6b7280',
-          fontWeight: 'bold',
-          marginBottom: 16
+          fontWeight: 600,
+          marginBottom: '20px',
+          border: '3px solid #ffffff',
+          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
         }}>
-          {profileData.name ? profileData.name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2) :
-           profileData.fullName ? profileData.fullName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2) : 'NA'}
+          <span style={{ userSelect: 'none' }}>{getInitials()}</span>
         </div>
         <Button
           variant="secondary"
@@ -107,28 +126,41 @@ export function ProfileTab({ role, profileData, primaryColor, onUpdatePhoto }: P
       </div>
 
       {/* Profile Info Grid - Right Side */}
-      <div style={{ flex: 1 }}>
-        <table style={{ width: '100%', borderSpacing: '0 16px' }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <table style={{ width: '100%', borderSpacing: 0 }}>
           <tbody>
-            {fields.map((field) => (
-              <tr key={field}>
-                <td style={{
-                  fontSize: 16,
-                  color: '#111827',
-                  fontWeight: 500,
-                  width: '200px',
-                  verticalAlign: 'top'
-                }}>
-                  {getFieldLabel(field)}
-                </td>
-                <td style={{
-                  fontSize: 16,
-                  color: '#111827'
-                }}>
-                  {profileData[field] || 'Not Set'}
-                </td>
-              </tr>
-            ))}
+            {fields.map((field) => {
+              const value = formatFieldValue(profileData[field]);
+              const isNotSet = value === 'Not Set';
+
+              return (
+                <tr key={field} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                  <td style={{
+                    fontSize: '14px',
+                    color: '#6b7280',
+                    fontWeight: 500,
+                    padding: '16px 24px 16px 0',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.025em',
+                    verticalAlign: 'top',
+                    width: '180px',
+                    minWidth: '180px'
+                  }}>
+                    {getFieldLabel(field)}
+                  </td>
+                  <td style={{
+                    fontSize: '16px',
+                    color: isNotSet ? '#9ca3af' : '#111827',
+                    padding: '16px 0',
+                    lineHeight: 1.5,
+                    wordBreak: 'break-word',
+                    fontStyle: isNotSet ? 'italic' : 'normal'
+                  }}>
+                    {value}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

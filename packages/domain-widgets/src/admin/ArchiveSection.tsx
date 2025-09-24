@@ -21,21 +21,21 @@ function buildColumns(tabId: string) {
     case 'contractors':
       return [
         { key: 'id', label: 'CONTRACTOR ID', clickable: true },
-        { key: 'companyName', label: 'COMPANY NAME' },
+        { key: 'name', label: 'NAME' },
         { key: 'manager', label: 'ASSIGNED MANAGER' },
         { key: 'archivedDate', label: 'ARCHIVED ON' },
       ];
     case 'customers':
       return [
         { key: 'id', label: 'CUSTOMER ID', clickable: true },
-        { key: 'customerName', label: 'CUSTOMER NAME' },
+        { key: 'name', label: 'NAME' },
         { key: 'manager', label: 'ASSIGNED MANAGER' },
         { key: 'archivedDate', label: 'ARCHIVED ON' },
       ];
     case 'centers':
       return [
         { key: 'id', label: 'CENTER ID', clickable: true },
-        { key: 'centerName', label: 'CENTER NAME' },
+        { key: 'name', label: 'NAME' },
         { key: 'location', label: 'LOCATION' },
         { key: 'archivedDate', label: 'ARCHIVED ON' },
       ];
@@ -43,7 +43,7 @@ function buildColumns(tabId: string) {
       return [
         { key: 'id', label: 'CREW ID', clickable: true },
         { key: 'crewName', label: 'CREW NAME' },
-        { key: 'role', label: 'ROLE' },
+        { key: 'emergencyContact', label: 'EMERGENCY CONTACT' },
         { key: 'archivedDate', label: 'ARCHIVED ON' },
       ];
     default:

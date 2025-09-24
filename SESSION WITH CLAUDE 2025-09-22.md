@@ -77,12 +77,6 @@ Reviewed initial code assessment from Claude Opus and worked with developer to a
 ## Technical Details
 
 ### Environment Configuration
-```env
-# apps/backend/.env
-DATABASE_URL=postgresql://cks_portal_db_user:***@dpg-***.oregon-postgres.render.com/cks_portal_db
-CLERK_PUBLISHABLE_KEY=pk_test_***
-CLERK_SECRET_KEY=sk_test_***
-```
 
 ### Key Files Modified
 1. `apps/backend/server/index.ts` - Bootstrap endpoint with Zod validation
@@ -112,7 +106,16 @@ type AdminUser = {
 From the original code review (see `CLAUDE CODE REVIEW - 2025-09-22.md`):
 
 ### High Priority
-1. **CORS Configuration** - Still allows all origins, needs whitelist
+1. **CORS Configuration** - Update to remove wildcard and implement strict origin whitelist:
+  - Remove `Access-Control-Allow-Origin: '*'` from all server responses.
+  - Implement server-side validation: maintain a whitelist of allowed origins (scheme+host+port).
+  - For each request, validate the incoming `Origin` header against the whitelist. If matched, return the exact allowed origin in `Access-Control-Allow-Origin`; otherwise, deny the request.
+  - If credentialed requests are needed, return only one allowed origin and set `Access-Control-Allow-Credentials: true` (never use `'*'` with credentials).
+  - Restrict `Access-Control-Allow-Methods` and `Access-Control-Allow-Headers` to the minimum required for each endpoint.
+  - Enable CORS only on the specific endpoints that need it, not globally.
+  - Set a reasonable `Access-Control-Max-Age` to reduce preflight requests (e.g., 600 seconds).
+  - Add logging for denied origins and CORS errors for monitoring and debugging.
+  - Add CI tests that assert denied origins and correct CORS behavior per [MDN](https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS) and [OWASP](https://owasp.org/www-community/controls/CORS_OriginHeaderScrutiny) guidance.
 2. **Environment Variable Security** - Clerk keys need secure management
 3. **Test Coverage** - All tests are disabled/mocked
 

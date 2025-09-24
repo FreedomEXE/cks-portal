@@ -1,24 +1,24 @@
-import { useMemo, useState } from 'react';
 import { Button, NavigationTab, PageWrapper, TabContainer } from '@cks/ui';
+import { useMemo, useState } from 'react';
 import { useSWRConfig } from 'swr';
+import type {
+  AssignmentResult,
+  UnassignedCenter,
+  UnassignedContractor,
+  UnassignedCrewMember,
+  UnassignedCustomer,
+} from '../../shared/api/assignments';
 import {
-  useManagers,
-  useContractors,
-  useCustomers,
-  useCenters,
-} from '../../shared/api/directory';
-import {
-  useUnassigned,
   assignResource,
+  useUnassigned,
   type AssignmentResource,
 } from '../../shared/api/assignments';
-import type {
-  UnassignedContractor,
-  UnassignedCustomer,
-  UnassignedCenter,
-  UnassignedCrewMember,
-  AssignmentResult,
-} from '../../shared/api/assignments';
+import {
+  useCenters,
+  useContractors,
+  useCustomers,
+  useManagers,
+} from '../../shared/api/directory';
 
 type AssignTabKey = 'contractors' | 'customers' | 'centers' | 'crew';
 
@@ -26,6 +26,17 @@ type Option = {
   id: string;
   label: string;
 };
+
+type UnassignedRow =
+  | UnassignedContractor
+  | UnassignedCustomer
+  | UnassignedCenter
+  | UnassignedCrewMember;
+
+function isCrewRow(row: UnassignedRow): row is UnassignedCrewMember {
+  return 'emergencyContact' in row;
+}
+
 
 type AssignmentStatus = {
   loading: boolean;
@@ -130,12 +141,12 @@ export default function AdminAssignSection() {
   const { data: centers, isLoading: centersLoading } = useCenters();
 
   const managerOptions: Option[] = useMemo(
-    () => managers.map((item) => ({ id: item.id, label: formatOptionLabel(item.name, item.id) })),
+    () => managers.map((item) => ({ id: item.id, label: formatOptionLabel(item.name ?? item.id, item.id) })),
     [managers],
   );
 
   const contractorOptions: Option[] = useMemo(
-    () => contractors.map((item) => ({ id: item.id, label: formatOptionLabel(item.companyName ?? item.id, item.id) })),
+    () => contractors.map((item) => ({ id: item.id, label: formatOptionLabel(item.name ?? item.id, item.id) })),
     [contractors],
   );
 
@@ -211,15 +222,23 @@ export default function AdminAssignSection() {
     }));
 
     try {
-      const payloadKey = activeConfig.resource === 'contractors'
-        ? { managerId: targetId }
-        : activeConfig.resource === 'customers'
-          ? { contractorId: targetId }
-          : activeConfig.resource === 'centers'
-            ? { customerId: targetId }
-            : { centerId: targetId };
+      const getPayload = (resource: AssignmentResource, targetId: string) => {
+        switch (resource) {
+          case 'contractors':
+            return { managerId: targetId };
+          case 'customers':
+            return { contractorId: targetId };
+          case 'centers':
+            return { customerId: targetId };
+          case 'crew':
+            return { centerId: targetId };
+          default:
+            throw new Error(`Unknown resource type: ${resource}`);
+        }
+      };
 
-      const result = await assignResource(activeConfig.resource, subjectId, payloadKey as any);
+      const payload = getPayload(activeConfig.resource, targetId);
+      const result = await assignResource(activeConfig.resource, subjectId, payload);
       const assignment = result as AssignmentResult;
       setStatuses((prev) => ({
         ...prev,
@@ -251,7 +270,6 @@ export default function AdminAssignSection() {
       }));
     }
   }
-
   function renderTable() {
     if (unassignedHook.isLoading) {
       return <div style={{ color: '#2563eb' }}>Loading unassigned {activeConfig.label.toLowerCase()}...</div>;
@@ -261,12 +279,7 @@ export default function AdminAssignSection() {
       return <div style={{ color: '#dc2626' }}>Failed to load unassigned list: {unassignedHook.error.message}</div>;
     }
 
-    const rows = unassignedHook.data as (
-      | UnassignedContractor
-      | UnassignedCustomer
-      | UnassignedCenter
-      | UnassignedCrewMember
-    )[];
+    const rows = (unassignedHook.data ?? []) as UnassignedRow[];
 
     if (!rows.length) {
       return <div style={{ color: '#64748b' }}>No unassigned {activeConfig.label.toLowerCase()} found.</div>;
@@ -284,7 +297,7 @@ export default function AdminAssignSection() {
               <th style={{ padding: '8px 12px', fontSize: 13, color: '#475569' }}>ID</th>
               <th style={{ padding: '8px 12px', fontSize: 13, color: '#475569' }}>Name</th>
               {activeTab === 'crew' ? (
-                <th style={{ padding: '8px 12px', fontSize: 13, color: '#475569' }}>Role</th>
+                <th style={{ padding: '8px 12px', fontSize: 13, color: '#475569' }}>Emergency Contact</th>
               ) : null}
               <th style={{ padding: '8px 12px', fontSize: 13, color: '#475569' }}>Email</th>
               <th style={{ padding: '8px 12px', fontSize: 13, color: '#475569' }}>Phone</th>
@@ -293,30 +306,20 @@ export default function AdminAssignSection() {
             </tr>
           </thead>
           <tbody>
-            {rows.map((row) => {
+            {rows.map((row: UnassignedRow) => {
               const selectionValue = selectionMap[row.id] ?? '';
               const disableAssign = !selectionValue || activeStatus.loading || optionsLoading;
-              const displayName =
-                'companyName' in row
-                  ? row.companyName ?? row.id
-                  : 'name' in row
-                    ? row.name ?? row.id
-                    : row.id;
+              const displayName = row.name ?? row.id;
+              const emergencyInfo = isCrewRow(row) ? row.emergencyContact ?? '-' : '-';
               return (
                 <tr key={row.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
                   <td style={{ padding: '10px 12px', fontSize: 13, color: '#1e293b' }}>{row.id}</td>
                   <td style={{ padding: '10px 12px', fontSize: 13, color: '#1e293b' }}>{displayName}</td>
                   {activeTab === 'crew' ? (
-                    <td style={{ padding: '10px 12px', fontSize: 13, color: '#475569' }}>
-                      {'role' in row ? row.role ?? '—' : '—'}
-                    </td>
+                    <td style={{ padding: '10px 12px', fontSize: 13, color: '#475569' }}>{emergencyInfo}</td>
                   ) : null}
-                  <td style={{ padding: '10px 12px', fontSize: 13, color: '#475569' }}>
-                    {'email' in row ? row.email ?? '—' : '—'}
-                  </td>
-                  <td style={{ padding: '10px 12px', fontSize: 13, color: '#475569' }}>
-                    {'phone' in row ? row.phone ?? '—' : '—'}
-                  </td>
+                  <td style={{ padding: '10px 12px', fontSize: 13, color: '#475569' }}>{row.email ?? '-'}</td>
+                  <td style={{ padding: '10px 12px', fontSize: 13, color: '#475569' }}>{row.phone ?? '-'}</td>
                   <td style={{ padding: '10px 12px' }}>
                     {optionsLoading ? (
                       <span style={{ fontSize: 13, color: '#2563eb' }}>Loading {activeConfig.targetLabel.toLowerCase()}s...</span>

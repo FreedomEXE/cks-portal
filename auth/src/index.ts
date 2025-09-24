@@ -1,26 +1,28 @@
 // Auth package exports
+export { default as Callback } from './pages/Callback';
+export { default as Invite } from './pages/Invite';
 export { default as Login } from './pages/Login';
 export { default as Logout } from './pages/Logout';
-export { default as Invite } from './pages/Invite';
-export { default as Callback } from './pages/Callback';
 
 // Components
 export { default as ProtectedRoute } from './components/ProtectedRoute';
 export { default as RoleGuard } from './components/RoleGuard';
 
 // Providers
-export { default as ClerkProvider } from './providers/ClerkProvider';
 export { default as AuthContext } from './providers/AuthContext';
+export { default as ClerkProvider } from './providers/ClerkProvider';
 
 // Hooks
 export { useAuth } from './hooks/useAuth';
 
 // Utils
 export * from './utils/clerkClient';
-export * from './utils/roleExtractor';
 export * from './utils/customIdParser';
+export { clearImpersonation, normalizeImpersonationCode, readImpersonation, triggerImpersonation } from './utils/impersonation';
+export type { ImpersonationPayload, ImpersonationRequestOptions } from './utils/impersonation';
+export * from './utils/roleExtractor';
 export * from './utils/tokenValidator';
-export * from './utils/impersonation';
 
 // Types
 export * from './types/auth.d';
+

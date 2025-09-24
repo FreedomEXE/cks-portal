@@ -5,7 +5,7 @@ export type AssignmentResource = 'contractors' | 'customers' | 'centers' | 'crew
 
 export interface UnassignedContractor {
   id: string;
-  companyName: string;
+  name: string;
   email: string | null;
   phone: string | null;
 }
@@ -27,7 +27,7 @@ export interface UnassignedCenter {
 export interface UnassignedCrewMember {
   id: string;
   name: string;
-  role: string | null;
+  emergencyContact: string | null;
   email: string | null;
   phone: string | null;
 }
@@ -90,9 +90,14 @@ export async function assignResource<Resource extends AssignmentResource>(
   payload: AssignmentPayloadMap[Resource],
 ): Promise<AssignmentResult> {
   const endpoint = ASSIGNMENT_ENDPOINTS[resource](id);
-  const response = await apiFetch<ApiResponse<AssignmentResult>>(endpoint, {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  });
-  return response.data;
+  try {
+    const response = await apiFetch<ApiResponse<AssignmentResult>>(endpoint, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    return response.data;
+  } catch (error) {
+    console.error('[assignments] Failed to assign resource:', { resource, id, error });
+    throw new Error(`Failed to assign ${resource} ${id}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
 }

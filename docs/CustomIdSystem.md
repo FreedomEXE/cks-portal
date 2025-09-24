@@ -165,18 +165,18 @@ Most IDs use sequential generation with the following rules:
 6. No upper limit on ID length
 
 ### Database Implementation
-```sql
 -- Example sequence for Managers
 CREATE SEQUENCE mgr_id_seq START WITH 1;
 
 -- Generate next Manager ID (auto-extends beyond 999)
-SELECT 'MGR-' || LPAD(nextval('mgr_id_seq')::text, GREATEST(3, LENGTH(nextval('mgr_id_seq')::text)), '0') AS next_mgr_id;
+-- Store sequence value once to avoid double increment
+WITH next_val AS (SELECT nextval('mgr_id_seq') AS val)
+SELECT 'MGR-' || LPAD(next_val.val::text, GREATEST(3, LENGTH(next_val.val::text)), '0') AS next_mgr_id
+FROM next_val;
 
 -- Alternative simpler approach
 SELECT 'MGR-' || LPAD(nextval('mgr_id_seq')::text, 3, '0') AS next_mgr_id; -- For 001-999
 SELECT 'MGR-' || nextval('mgr_id_seq')::text AS next_mgr_id; -- For 1000+
-```
-
 ### Validation Patterns
 ```typescript
 // TypeScript validation examples (supports variable length IDs)
@@ -205,9 +205,17 @@ The system automatically derives user roles from ID prefixes:
 
 ```typescript
 function deriveRole(cksId: string): string {
+  if (!cksId || typeof cksId !== 'string') {
+    return 'unknown';
+  }
+
   // Special case for admin custom IDs (no dash means admin)
   if (!cksId.includes('-')) {
     return 'admin';
+  }
+
+  if (cksId.length < 7) { // Minimum: "XXX-001"
+    return 'unknown';
   }
 
   // Extract first 3 characters and uppercase
@@ -224,8 +232,6 @@ function deriveRole(cksId: string): string {
 
   return roleMap[prefix] || 'unknown';
 }
-```
-
 ## Order Lifecycle Management
 
 Orders follow different lifecycles depending on type and creator:
@@ -235,7 +241,7 @@ Any authorized user creates an order:
 - **Format:** `{UserID}-ORD-{TypeID}`
 - **Examples:**
   - Crew creates: `CRW001-ORD-PRD001` (product request)
-  - Customer creates: `CUS050-ORD-SRV002` (service request)
+  - Customer creates: `CEN010-ORD-SRV002` (service request for center 010, created by customer)
   - Center creates: `CEN010-ORD-PRD005` (product request)
 
 ### 2. Order Processing & Approval
@@ -250,9 +256,7 @@ Orders follow role-based approval workflows:
 - Flow: Creator → Manager Review → Service Creation
 - Transformation: `CEN001-ORD-SRV001` → `CEN001-SRV001` (drops "ORD")
 - Service metadata includes: `createdBy` (original requester), `approvedBy` (manager)
-- Status progression: pending → service-created
-
-### 3. Order Completion
+- Status progression: pending → service-created### 3. Order Completion
 
 **Service Orders:**
 - Transform by dropping "ORD": `CEN001-ORD-SRV001` → `CEN001-SRV001`

@@ -260,4 +260,61 @@ Warehouse (1) --> (N) Products
 
 ---
 
+## TO DO - Future Improvements (Identified by Code Review)
+
+### 1. Address Tight ID Coupling
+- **Issue:** Service IDs like `CEN001-SRV001` and Order IDs like `CRW001-ORD-PRD001` embed parent entity IDs
+- **Solution:** Implement independent IDs (e.g., `SRV-2025-000001`) with separate foreign key columns
+- **Impact:** Reduces coupling, easier maintenance when parent IDs change
+
+### 2. Complete Complex Field Definitions
+- **Issue:** Items array and approvalChain fields lack complete schemas
+- **Solution:** Create detailed TypeScript interfaces for:
+  - OrderItem schema (itemId, productId, quantity, pricing, discounts, tax)
+  - ApprovalStep and ApprovalChain schemas
+  - Metadata validation schemas
+- **Impact:** Better type safety and validation
+
+### 3. Centralize Status Definitions
+- **Issue:** Different status enums across entities are duplicated
+- **Solution:** Create shared enums:
+  - EntityStatus (active, inactive, suspended, archived)
+  - OrderStatus (draft, pending, approved, in_progress, completed, cancelled)
+  - ApprovalStatus (pending, approved, rejected, expired)
+  - ServiceStatus (available, unavailable, scheduled, in_progress, completed)
+- **Impact:** Consistency across application
+
+### 4. Add JSON Field Validation Rules
+- **Issue:** Missing validation for complex JSON fields
+- **Solution:** Implement Zod schemas for:
+  - Order items validation
+  - Metadata validation (max 50 keys)
+  - Settings validation
+- **Impact:** Runtime validation and better data integrity
+
+### 5. Migration Strategy
+**Phased approach over 7 weeks:**
+- Week 1: Document schemas and standards
+- Week 2-3: Database schema updates (non-breaking)
+- Week 3-4: Application updates with backward compatibility
+- Week 5-6: Data migration with parallel ID formats
+- Week 7: Cleanup and remove old formats
+
+### 6. Implement Type Safety
+- **Solution:** Create branded types for IDs:
+  ```typescript
+  type ServiceId = string & { __brand: 'ServiceId' };
+  type OrderId = string & { __brand: 'OrderId' };
+  ```
+- **Impact:** Prevents ID mix-ups at compile time
+
+### Benefits of These Improvements
+- Better maintainability with reduced coupling
+- Type safety to prevent errors
+- Consistent validation across the application
+- Easier to modify parent-child relationships
+- Better database performance with simpler ID formats
+
+---
+
 *Property of CKS © 2025 - Manifested by Freedom*

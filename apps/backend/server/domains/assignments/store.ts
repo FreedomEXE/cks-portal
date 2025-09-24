@@ -4,7 +4,7 @@ import type { AuditContext } from '../provisioning';
 
 export interface UnassignedContractor {
   id: string;
-  companyName: string;
+  name: string;
   email: string | null;
   phone: string | null;
 }
@@ -26,7 +26,7 @@ export interface UnassignedCenter {
 export interface UnassignedCrewMember {
   id: string;
   name: string;
-  role: string | null;
+  emergencyContact: string | null;
   email: string | null;
   phone: string | null;
 }
@@ -116,7 +116,7 @@ export async function listUnassignedContractors(limit = 250): Promise<Unassigned
 
   return result.rows.map((row) => ({
     id: formatPrefixedId(row.contractor_id, 'CON'),
-    companyName: row.company_name ?? formatPrefixedId(row.contractor_id, 'CON'),
+    name: row.company_name ?? formatPrefixedId(row.contractor_id, 'CON'),
     email: row.email,
     phone: row.phone,
   }));
@@ -174,11 +174,11 @@ export async function listUnassignedCrew(limit = 250): Promise<UnassignedCrewMem
   const result = await query<{
     crew_id: string;
     name: string | null;
-    role: string | null;
+    emergency_contact: string | null;
     email: string | null;
     phone: string | null;
   }>(
-    `SELECT crew_id, name, role, email, phone
+    `SELECT crew_id, name, emergency_contact, email, phone
      FROM crew
      WHERE (assigned_center IS NULL OR assigned_center = '')
        AND (archived_at IS NULL)
@@ -190,7 +190,7 @@ export async function listUnassignedCrew(limit = 250): Promise<UnassignedCrewMem
   return result.rows.map((row) => ({
     id: formatPrefixedId(row.crew_id, 'CRW'),
     name: row.name ?? formatPrefixedId(row.crew_id, 'CRW'),
-    role: row.role,
+    emergencyContact: row.emergency_contact,
     email: row.email,
     phone: row.phone,
   }));

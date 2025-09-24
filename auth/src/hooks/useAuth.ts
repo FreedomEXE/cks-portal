@@ -1,7 +1,7 @@
 import { useAuth as useClerkAuth, useUser } from '@clerk/clerk-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { clearImpersonation, readImpersonation, getCodeFromPath } from '../utils/impersonation';
+import { clearImpersonation, getCodeFromPath, readImpersonation } from '../utils/impersonation';
 
 type AuthStatus = 'idle' | 'loading' | 'ready' | 'error';
 
@@ -35,6 +35,11 @@ const INITIAL_STATE: InternalAuthState = {
   firstName: null,
   ownerFirstName: null,
   error: null,
+};
+
+const SIGNED_OUT_STATE: InternalAuthState = {
+  ...INITIAL_STATE,
+  status: 'ready',
 };
 
 const DEV_PROXY_BASE = '/api';
@@ -126,7 +131,7 @@ export function useAuth(): AuthState {
   const location = useLocation();
   const abortRef = useRef<AbortController | null>(null);
   const fetchingRef = useRef(false);
-  const lastRequestRef = useRef(0);
+  const requestIdRef = useRef(0);
   const lastResolvedRef = useRef<AuthSnapshot | null>(null);
 
   const [state, setState] = useState<InternalAuthState>({ ...INITIAL_STATE });
@@ -154,21 +159,13 @@ export function useAuth(): AuthState {
       abortRef.current?.abort();
       fetchingRef.current = false;
       lastResolvedRef.current = null;
-      lastRequestRef.current = 0;
-      setState({ ...INITIAL_STATE });
+      requestIdRef.current = 0;
+      setState({ ...SIGNED_OUT_STATE });
       return;
     }
 
-    if (fetchingRef.current) {
-      return;
-    }
-
-    const now = Date.now();
-    if (now - lastRequestRef.current < 1000) {
-      return;
-    }
-    lastRequestRef.current = now;
-
+    // Throttle: only allow one refresh per 1000ms
+    const id = ++requestIdRef.current;
     fetchingRef.current = true;
 
     abortRef.current?.abort();
@@ -189,6 +186,13 @@ export function useAuth(): AuthState {
 
     const headers = new Headers();
     let timeout: ReturnType<typeof setTimeout> | null = null;
+
+    // Check if we're impersonating
+    const impersonationData = readImpersonation();
+    if (impersonationData.isActive && impersonationData.code) {
+      console.log('[useAuth] Adding impersonation header:', impersonationData.code);
+      headers.set('x-impersonate-code', impersonationData.code);
+    }
 
     try {
       const token = await getToken().catch(() => null);
@@ -219,6 +223,8 @@ export function useAuth(): AuthState {
         if (response.status === 401) {
           console.log('[useAuth] 401 Unauthorized - clearing auth state');
           lastResolvedRef.current = null;
+          // Trigger re-authentication or show user notification
+          // Consider calling Clerk's signOut() or redirecting to login
           setState({
             status: 'ready',
             role: null,
@@ -229,8 +235,7 @@ export function useAuth(): AuthState {
             error: null,
           });
           return;
-        }
-        throw new Error(`Bootstrap failed with status ${response.status}`);
+        }        throw new Error(`Bootstrap failed with status ${response.status}`);
       }
 
       const data = await response.json();
@@ -261,7 +266,8 @@ export function useAuth(): AuthState {
           code: resolvedCode,
         }) ?? resolvedFirstName;
 
-      if (abortRef.current !== controller || controller.signal.aborted) {
+      // Only update state if this is the latest request
+      if (requestIdRef.current !== id || controller.signal.aborted) {
         return;
       }
 
@@ -283,14 +289,17 @@ export function useAuth(): AuthState {
         error: null,
       });
     } catch (err) {
-      console.error('[useAuth] Bootstrap error:', err);
-      if (abortRef.current !== controller) {
+      const aborted = isAbortError(err);
+      if (!aborted) {
+        console.error('[useAuth] Bootstrap error:', err);
+      }
+      if (requestIdRef.current !== id) {
         return;
       }
 
       const cached = lastResolvedRef.current;
-      if (isAbortError(err)) {
-        lastRequestRef.current = 0;
+      if (aborted) {
+        requestIdRef.current = 0;
         setState({
           status: 'idle',
           role: cached?.role ?? null,
@@ -361,8 +370,8 @@ export function useAuth(): AuthState {
       abortRef.current?.abort();
       fetchingRef.current = false;
       lastResolvedRef.current = null;
-      lastRequestRef.current = 0;
-      setState({ ...INITIAL_STATE });
+      requestIdRef.current = 0;
+      setState({ ...SIGNED_OUT_STATE });
       return;
     }
 
@@ -405,6 +414,13 @@ export function useAuth(): AuthState {
     if (!impersonationSnapshot.isActive) {
       return state;
     }
+
+    // Validate impersonation state consistency
+    if (!impersonationSnapshot.role && !state.role) {
+      console.warn('[useAuth] Invalid impersonation state - no role available');
+      return state;
+    }
+
     const role = impersonationSnapshot.role ?? state.role;
     const code = impersonationSnapshot.code ?? state.code;
     const displayName = impersonationSnapshot.displayName ?? state.fullName;
@@ -423,17 +439,12 @@ export function useAuth(): AuthState {
       ownerFirstName,
     };
   }, [state, impersonationSnapshot]);
-
   return useMemo<AuthState>(() => ({
     ...effectiveState,
     impersonating: impersonationSnapshot.isActive,
     refresh,
   }), [effectiveState, impersonationSnapshot.isActive, refresh]);
-
-
-
-
-
-
 }
+
+
 

@@ -12,7 +12,8 @@
   Manifested by Freedom_EXE
 -----------------------------------------------*/
 
-import { inferRoleFromIdentifier, normalizeImpersonationCode, persistImpersonation } from '@cks/auth';
+import { useAuth as useClerkAuth } from '@clerk/clerk-react';
+import { normalizeImpersonationCode, triggerImpersonation, type ImpersonationPayload } from '@cks/auth';
 import {
   AdminSupportSection,
   ArchiveSection,
@@ -23,6 +24,8 @@ import {
   type Activity,
 } from '@cks/domain-widgets';
 import {
+  ActionModal,
+  Button,
   DataTable,
   NavigationTab,
   PageHeader,
@@ -35,6 +38,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import MyHubSection from '../components/MyHubSection';
+import { useLogout } from '../hooks/useLogout';
+import { apiFetch } from '../shared/api/client';
 import AdminAssignSection from './components/AdminAssignSection';
 import AdminCreateSection from './components/AdminCreateSection';
 
@@ -56,7 +61,7 @@ import {
   useWarehouses,
 } from '../shared/api/directory';
 
-const MILLIS_PER_DAY = 1000 * 60 * 60 * 24;
+// Removed unused: const MILLIS_PER_DAY = 1000 * 60 * 60 * 24;
 
 interface AdminHubProps {
   initialTab?: string;
@@ -137,12 +142,12 @@ function formatText(value?: string | null): string {
 }
 
 const HUB_TABS = [
-  { id: 'dashboard', label: 'Dashboard' },
-  { id: 'directory', label: 'Directory' },
-  { id: 'create', label: 'Create' },
-  { id: 'assign', label: 'Assign' },
-  { id: 'archive', label: 'Archive' },
-  { id: 'support', label: 'Support' },
+  { id: 'dashboard', label: 'Dashboard', path: '/dashboard' },
+  { id: 'directory', label: 'Directory', path: '/directory' },
+  { id: 'create', label: 'Create', path: '/create' },
+  { id: 'assign', label: 'Assign', path: '/assign' },
+  { id: 'archive', label: 'Archive', path: '/archive' },
+  { id: 'support', label: 'Support', path: '/support' },
 ];
 
 const DIRECTORY_TABS: Array<{ id: string; label: string; color: string }> = [
@@ -167,9 +172,48 @@ interface DirectorySectionConfig {
 }
 
 export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
+  // Dynamic overview cards for admin metrics
+  const overviewCards = [
+    { id: 'users', title: 'Total Users', dataKey: 'userCount', color: 'blue' },
+    { id: 'tickets', title: 'Open Support Tickets', dataKey: 'ticketCount', color: 'orange' },
+    { id: 'priority', title: 'High Priority', dataKey: 'highPriorityCount', color: 'red' },
+    { id: 'days', title: 'Days Online', dataKey: 'daysOnline', color: 'green' },
+  ];
   const [activeTab, setActiveTab] = useState(initialTab);
   const [directoryTab, setDirectoryTab] = useState<string>('admins');
+  const [showActionModal, setShowActionModal] = useState(false);
+  const [selectedEntity, setSelectedEntity] = useState<Record<string, any> | null>(null);
   const navigate = useNavigate();
+  const { getToken } = useClerkAuth();
+  const logout = useLogout();
+
+  const impersonationRequest = useCallback(
+    async (code: string): Promise<ImpersonationPayload | null> => {
+      try {
+        console.log('[AdminHub] impersonationRequest called with code:', code);
+        console.log('[AdminHub] getToken available:', !!getToken);
+
+        // Test token retrieval directly
+        if (getToken) {
+          const testToken = await getToken();
+          console.log('[AdminHub] Direct token test:', testToken ? 'Token retrieved' : 'Token is null');
+        }
+
+        const result = await apiFetch<ImpersonationPayload>('/admin/impersonate', {
+          method: 'POST',
+          body: JSON.stringify({ code }),
+          getToken,
+        });
+
+        console.log('[AdminHub] impersonationRequest result:', result);
+        return result;
+      } catch (error) {
+        console.warn('[admin] Impersonation request failed', error);
+        return null;
+      }
+    },
+    [getToken],
+  );
 
   const { data: adminUsers, isLoading: adminUsersLoading, error: adminUsersError } = useAdminUsers();
   const { data: managers, isLoading: managersLoading, error: managersError } = useManagers();
@@ -218,28 +262,65 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
   }, []);
 
   const navigateToHub = useCallback(
-    (identifier?: string | null, displayName?: string | null, roleHint?: string | null) => {
+    (identifier?: string | null) => {
       const normalized = normalizeImpersonationCode(identifier ?? null);
       if (!normalized) {
         return;
       }
+      (async () => {
+        const ok = await triggerImpersonation(normalized, { request: impersonationRequest, getToken });
+        if (!ok) {
+          console.warn('[admin] Unable to impersonate', normalized);
+          return;
+        }
+        const pathSegment = normalized.toLowerCase();
+        const destination = `/${encodeURIComponent(pathSegment)}/hub`;
+        navigate(destination);
+      })();
+    },
+    [impersonationRequest, navigate],
+  );
 
-      const stored = persistImpersonation({
-        code: normalized,
-        role: roleHint ?? inferRoleFromIdentifier(normalized),
-        displayName,
-      });
+  const extractEntityInfo = (row: Record<string, any>, idField: string, roleHint: string) => {
+    const id =
+      typeof row[idField] === 'string'
+        ? row[idField].trim()
+        : typeof row.id === 'string'
+          ? row.id
+          : null;
+    const displayName =
+      typeof row.name === 'string' && row.name.trim()
+        ? row.name.trim()
+        : typeof row.fullName === 'string' && row.fullName.trim()
+          ? row.fullName.trim()
+          : typeof row.email === 'string' && row.email.trim()
+            ? row.email.trim()
+            : null;
+    return { target: id, displayName, roleHint };
+  };
 
-      if (!stored) {
-        console.warn('[admin] Unable to prepare impersonation context for', normalized);
+  const handleModalClose = useCallback(() => {
+    setShowActionModal(false);
+    setSelectedEntity(null);
+  }, []);
+
+  const handleView = useCallback(
+    (row: Record<string, any> | null) => {
+      if (!row) {
         return;
       }
-
-      const pathSegment = normalized.toLowerCase();
-      const destination = `/${encodeURIComponent(pathSegment)}/hub`;
-      navigate(destination);
+      setSelectedEntity(row);
+      setShowActionModal(true);
     },
-    [navigate],
+    [],
+  );
+
+  const handleDelete = useCallback(
+    (entity: Record<string, any>) => {
+      console.log('Delete entity:', entity);
+      handleModalClose();
+    },
+    [handleModalClose],
   );
 
   const handleDirectoryRowClick = useCallback(
@@ -248,178 +329,73 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
         return;
       }
 
-      let target: string | null = null;
-      let roleHint: string | null = null;
-      let displayName: string | null = null;
+      const entityConfig: Record<string, { idField: string; role: string }> = {
+        admins: { idField: 'code', role: 'admin' },
+        managers: { idField: 'managerId', role: 'manager' },
+        contractors: { idField: 'id', role: 'contractor' },
+        customers: { idField: 'id', role: 'customer' },
+        centers: { idField: 'id', role: 'center' },
+        crew: { idField: 'id', role: 'crew' },
+        warehouses: { idField: 'id', role: 'warehouse' },
+      };
 
-      switch (directoryTab) {
-        case 'admins': {
-          const code = typeof row.code === 'string' ? row.code.trim() : '';
-          target = code || (typeof row.id === 'string' ? row.id : null);
-          displayName =
-            typeof row.name === 'string' && row.name.trim()
-              ? row.name.trim()
-              : typeof row.fullName === 'string' && row.fullName.trim()
-                ? row.fullName.trim()
-                : typeof row.email === 'string' && row.email.trim()
-                  ? row.email.trim()
-                  : null;
-          roleHint = 'admin';
-          break;
-        }
-        case 'managers': {
-          const managerId = typeof row.managerId === 'string' ? row.managerId.trim() : '';
-          target = managerId || (typeof row.id === 'string' ? row.id : null);
-          displayName =
-            typeof row.name === 'string' && row.name.trim()
-              ? row.name.trim()
-              : typeof row.fullName === 'string' && row.fullName.trim()
-                ? row.fullName.trim()
-                : null;
-          roleHint = 'manager';
-          break;
-        }
-        case 'contractors': {
-          target = typeof row.id === 'string' ? row.id : null;
-          displayName =
-            typeof row.companyName === 'string' && row.companyName.trim()
-              ? row.companyName.trim()
-              : typeof row.name === 'string' && row.name.trim()
-                ? row.name.trim()
-                : null;
-          roleHint = 'contractor';
-          break;
-        }
-        case 'customers': {
-          target = typeof row.id === 'string' ? row.id : null;
-          displayName =
-            typeof row.name === 'string' && row.name.trim()
-              ? row.name.trim()
-              : typeof row.companyName === 'string' && row.companyName.trim()
-                ? row.companyName.trim()
-                : null;
-          roleHint = 'customer';
-          break;
-        }
-        case 'centers': {
-          target = typeof row.id === 'string' ? row.id : null;
-          displayName =
-            typeof row.name === 'string' && row.name.trim()
-              ? row.name.trim()
-              : null;
-          roleHint = 'center';
-          break;
-        }
-        case 'crew': {
-          target = typeof row.id === 'string' ? row.id : null;
-          displayName =
-            typeof row.name === 'string' && row.name.trim()
-              ? row.name.trim()
-              : null;
-          roleHint = 'crew';
-          break;
-        }
-        case 'warehouses': {
-          target = typeof row.id === 'string' ? row.id : null;
-          displayName =
-            typeof row.name === 'string' && row.name.trim()
-              ? row.name.trim()
-              : null;
-          roleHint = 'warehouse';
-          break;
-        }
-        default: {
-          target = null;
-        }
+      const config = entityConfig[directoryTab];
+      if (!config) {
+        return;
       }
+
+      const { target } = extractEntityInfo(row, config.idField, config.role);
 
       if (typeof target !== 'string') {
         return;
       }
 
-      const trimmed = target.trim();
+      const trimmed: string = typeof target === 'string' ? target.trim() : '';
       if (!trimmed) {
         return;
       }
 
-      navigateToHub(trimmed, displayName, roleHint);
+      navigateToHub(trimmed);
     },
     [directoryTab, navigateToHub],
   );
 
-  const overviewCards = useMemo(
-    () => [
-      { id: 'users', title: 'Total Users', dataKey: 'userCount', color: 'black' },
-      { id: 'tickets', title: 'Open Support Tickets', dataKey: 'ticketCount', color: '#2563eb' },
-      { id: 'priority', title: 'High Priority', dataKey: 'highPriorityCount', color: '#dc2626' },
-      { id: 'uptime', title: 'Days Online', dataKey: 'daysOnline', color: '#16a34a' },
-    ],
-    [],
-  );
-
+  // Example: Fix for missing variable declarations and misplaced code
   const overviewData = useMemo(() => {
-    const totalUsers =
-      adminUsers.length +
-      managers.length +
-      contractors.length +
-      customers.length +
-      centers.length +
-      crew.length;
-
-    const openReportsCount = reports.filter((report) => {
-      const status = (report.status ?? '').toLowerCase();
-      return status === 'open' || status === 'pending' || status === 'in_progress';
-    }).length;
-
-    const highPriorityReports = reports.filter((report) => {
-      return typeof report.severity === 'string' && report.severity.toLowerCase().includes('high');
-    }).length;
-
-    const timestamps: number[] = [];
-    const pushTimestamp = (value?: string | null) => {
-      if (!value) {
-        return;
-      }
-      const parsed = new Date(value);
-      if (!Number.isNaN(parsed.getTime())) {
-        timestamps.push(parsed.getTime());
-      }
-    };
-
-    adminUsers.forEach((user) => pushTimestamp(user.createdAt));
-    managers.forEach((manager) => pushTimestamp(manager.createdAt));
-    contractors.forEach((contractor) => pushTimestamp(contractor.createdAt));
-    warehouses.forEach((warehouse) => pushTimestamp(warehouse.createdAt));
-
-    if (timestamps.length === 0 && activityItems.length > 0) {
-      activityItems.forEach((activity) => {
-        const timestamp =
-          activity.timestamp instanceof Date ? activity.timestamp : new Date(activity.timestamp);
-        if (!Number.isNaN(timestamp.getTime())) {
-          timestamps.push(timestamp.getTime());
-        }
-      });
-    }
-
+    // Calculate days online from GO_LIVE_TIMESTAMP
     let daysOnline = 0;
-    if (timestamps.length) {
-      const earliest = Math.min(...timestamps);
-      daysOnline = Math.max(1, Math.round((Date.now() - earliest) / MILLIS_PER_DAY));
-    } else if (GO_LIVE_TIMESTAMP && GO_LIVE_TIMESTAMP <= Date.now()) {
-      daysOnline = Math.max(0, Math.round((Date.now() - GO_LIVE_TIMESTAMP) / MILLIS_PER_DAY));
+    if (GO_LIVE_TIMESTAMP) {
+      const now = Date.now();
+      daysOnline = Math.max(0, Math.floor((now - GO_LIVE_TIMESTAMP) / (1000 * 60 * 60 * 24)));
     }
 
-    if ((!GO_LIVE_TIMESTAMP || GO_LIVE_TIMESTAMP > Date.now()) && timestamps.length === 0) {
-      daysOnline = 0;
-    }
+    // Total users: sum all user arrays
+    const userCount =
+      (adminUsers?.length || 0) +
+      (managers?.length || 0) +
+      (contractors?.length || 0) +
+      (customers?.length || 0) +
+      (centers?.length || 0) +
+      (crew?.length || 0) +
+      (warehouses?.length || 0);
+
+    // Open support tickets: count open reports
+    const ticketCount = Array.isArray(reports)
+      ? reports.filter((r) => r.status === 'open').length
+      : 0;
+
+    // High priority tickets: count reports with severity 'high'
+    const highPriorityCount = Array.isArray(reports)
+      ? reports.filter((r) => r.severity === 'high').length
+      : 0;
 
     return {
-      userCount: totalUsers,
-      ticketCount: openReportsCount,
-      highPriorityCount: highPriorityReports,
+      userCount,
+      ticketCount,
+      highPriorityCount,
       daysOnline,
     };
-  }, [activityItems, adminUsers, managers, contractors, warehouses, crew, customers, centers, reports]);
+  }, [adminUsers, managers, contractors, customers, centers, crew, warehouses, reports, GO_LIVE_TIMESTAMP]);
 
   const adminRows = useMemo(
     () =>
@@ -454,7 +430,8 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
     () =>
       contractors.map((contractor) => ({
         id: contractor.id,
-        companyName: formatText(contractor.companyName),
+        name: formatText(contractor.name),
+        mainContact: formatText(contractor.mainContact),
         managerId: formatText(contractor.managerId),
         email: formatText(contractor.email),
         phone: formatText(contractor.phone),
@@ -463,22 +440,19 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
       })),
     [contractors],
   );
-
   const customerRows = useMemo(
     () =>
       customers.map((customer) => ({
         id: customer.id,
         name: formatText(customer.name),
         managerId: formatText(customer.managerId),
-        contactName: formatText(customer.contactName),
+        mainContact: formatText(customer.mainContact),
         email: formatText(customer.email),
-        phone: formatText(customer.phone),
         totalCenters: customer.totalCenters ?? 0,
         status: customer.managerId ? 'active' : 'unassigned',
       })),
     [customers],
   );
-
   const centerRows = useMemo(
     () =>
       centers.map((center) => ({
@@ -487,19 +461,19 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
         contractorId: formatText(center.contractorId),
         customerId: formatText(center.customerId),
         managerId: formatText(center.managerId),
+        mainContact: formatText(center.mainContact),
         email: formatText(center.email),
         phone: formatText(center.phone),
         status: center.customerId ? 'active' : 'unassigned',
       })),
     [centers],
   );
-
   const crewRows = useMemo(
     () =>
       crew.map((member) => ({
         id: member.id,
         name: formatText(member.name),
-        role: formatText(member.role),
+        emergencyContact: formatText(member.emergencyContact),
         email: formatText(member.email),
         phone: formatText(member.phone),
         assignedCenter: formatText(member.assignedCenter),
@@ -507,12 +481,12 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
       })),
     [crew],
   );
-
   const warehouseRows = useMemo(
     () =>
       warehouses.map((warehouse) => ({
         id: warehouse.id,
         name: formatText(warehouse.name),
+        mainContact: formatText(warehouse.mainContact),
         managerName: formatText(warehouse.managerName),
         warehouseType: formatText(warehouse.warehouseType),
         status: (warehouse.status ?? 'operational').toLowerCase(),
@@ -520,7 +494,6 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
       })),
     [warehouses],
   );
-
   const serviceRows = useMemo(
     () =>
       services.map((service) => ({
@@ -609,13 +582,28 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
     [feedbackEntries],
   );
 
+  const renderActions = useCallback(
+    (_value: any, row: Record<string, any>) => (
+      <Button
+        variant="primary"
+        size="small"
+        onClick={() => {
+          handleView(row);
+        }}
+      >
+        View
+      </Button>
+    ),
+    [handleView],
+  );
+
   const directoryConfig = useMemo(() => ({
     admins: {
       columns: [
         { key: 'code', label: 'ADMIN ID', clickable: true },
         { key: 'name', label: 'NAME' },
         { key: 'email', label: 'EMAIL' },
-        { key: 'role', label: 'ROLE' },
+        { key: 'emergencyContact', label: 'EMERGENCY CONTACT' },
         { key: 'status', label: 'STATUS', render: renderStatusBadge },
         { key: 'createdAt', label: 'CREATED' },
       ],
@@ -630,6 +618,7 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
         { key: 'email', label: 'EMAIL' },
         { key: 'phone', label: 'PHONE' },
         { key: 'status', label: 'STATUS', render: renderStatusBadge },
+        { key: 'actions', label: 'ACTIONS', render: renderActions },
       ],
       data: managerRows,
       emptyMessage: 'No managers found.',
@@ -637,11 +626,13 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
     contractors: {
       columns: [
         { key: 'id', label: 'CONTRACTOR ID', clickable: true },
-        { key: 'companyName', label: 'COMPANY' },
+        { key: 'name', label: 'NAME' },
+        { key: 'mainContact', label: 'MAIN CONTACT' },
         { key: 'managerId', label: 'ASSIGNED MANAGER' },
         { key: 'email', label: 'EMAIL' },
         { key: 'phone', label: 'PHONE' },
         { key: 'status', label: 'STATUS', render: renderStatusBadge },
+        { key: 'actions', label: 'ACTIONS', render: renderActions },
       ],
       data: contractorRows,
       emptyMessage: 'No contractors found.',
@@ -651,10 +642,11 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
         { key: 'id', label: 'CUSTOMER ID', clickable: true },
         { key: 'name', label: 'NAME' },
         { key: 'managerId', label: 'MANAGER' },
-        { key: 'contactName', label: 'CONTACT' },
+        { key: 'mainContact', label: 'MAIN CONTACT' },
         { key: 'email', label: 'EMAIL' },
         { key: 'totalCenters', label: '# CENTERS' },
         { key: 'status', label: 'STATUS', render: renderStatusBadge },
+        { key: 'actions', label: 'ACTIONS', render: renderActions },
       ],
       data: customerRows,
       emptyMessage: 'No customers found.',
@@ -663,10 +655,12 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
       columns: [
         { key: 'id', label: 'CENTER ID', clickable: true },
         { key: 'name', label: 'NAME' },
+        { key: 'mainContact', label: 'MAIN CONTACT' },
         { key: 'customerId', label: 'CUSTOMER' },
         { key: 'contractorId', label: 'CONTRACTOR' },
         { key: 'managerId', label: 'MANAGER' },
         { key: 'status', label: 'STATUS', render: renderStatusBadge },
+        { key: 'actions', label: 'ACTIONS', render: renderActions },
       ],
       data: centerRows,
       emptyMessage: 'No centers found.',
@@ -675,10 +669,11 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
       columns: [
         { key: 'id', label: 'CREW ID', clickable: true },
         { key: 'name', label: 'NAME' },
-        { key: 'role', label: 'ROLE' },
+        { key: 'emergencyContact', label: 'EMERGENCY CONTACT' },
         { key: 'assignedCenter', label: 'ASSIGNED CENTER' },
         { key: 'phone', label: 'PHONE' },
         { key: 'status', label: 'STATUS', render: renderStatusBadge },
+        { key: 'actions', label: 'ACTIONS', render: renderActions },
       ],
       data: crewRows,
       emptyMessage: 'No crew members found.',
@@ -687,10 +682,12 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
       columns: [
         { key: 'id', label: 'WAREHOUSE ID', clickable: true },
         { key: 'name', label: 'NAME' },
+        { key: 'mainContact', label: 'MAIN CONTACT' },
         { key: 'managerName', label: 'MANAGER' },
         { key: 'warehouseType', label: 'TYPE' },
         { key: 'status', label: 'STATUS', render: renderStatusBadge },
         { key: 'createdAt', label: 'CREATED' },
+        { key: 'actions', label: 'ACTIONS', render: renderActions },
       ],
       data: warehouseRows,
       emptyMessage: 'No warehouses found.',
@@ -840,9 +837,9 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
         <div style={{ display: 'flex', gap: '4%' }}>
           <div style={{ width: '48%' }}>
             <DataTable
-              columns={directoryConfig.training.columns}
-              data={directoryConfig.training.data}
-              emptyMessage={directoryConfig.training.emptyMessage}
+              columns={(directoryConfig as any).training.columns}
+              data={(directoryConfig as any).training.data}
+              emptyMessage={(directoryConfig as any).training.emptyMessage}
               searchPlaceholder="Search training..."
               maxItems={25}
               showSearch
@@ -851,9 +848,9 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
           </div>
           <div style={{ width: '48%' }}>
             <DataTable
-              columns={directoryConfig.procedures.columns}
-              data={directoryConfig.procedures.data}
-              emptyMessage={directoryConfig.procedures.emptyMessage}
+              columns={(directoryConfig as any).procedures.columns}
+              data={(directoryConfig as any).procedures.data}
+              emptyMessage={(directoryConfig as any).procedures.emptyMessage}
               searchPlaceholder="Search procedures..."
               maxItems={25}
               showSearch
@@ -868,9 +865,9 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
         <div style={{ display: 'flex', gap: '4%' }}>
           <div style={{ width: '48%' }}>
             <DataTable
-              columns={directoryConfig.reports.columns}
-              data={directoryConfig.reports.data}
-              emptyMessage={directoryConfig.reports.emptyMessage}
+              columns={(directoryConfig as any).reports.columns}
+              data={(directoryConfig as any).reports.data}
+              emptyMessage={(directoryConfig as any).reports.emptyMessage}
               searchPlaceholder="Search reports..."
               maxItems={25}
               showSearch
@@ -879,9 +876,9 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
           </div>
           <div style={{ width: '48%' }}>
             <DataTable
-              columns={directoryConfig.feedback.columns}
-              data={directoryConfig.feedback.data}
-              emptyMessage={directoryConfig.feedback.emptyMessage}
+              columns={(directoryConfig as any).feedback.columns}
+              data={(directoryConfig as any).feedback.data}
+              emptyMessage={(directoryConfig as any).feedback.emptyMessage}
               searchPlaceholder="Search feedback..."
               maxItems={25}
               showSearch
@@ -891,7 +888,7 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
         </div>
       );
     }
-    const section = directoryConfig[directoryTab];
+    const section = (directoryConfig as any)[directoryTab];
     if (!section) {
       return <div style={{ color: '#64748b', fontSize: 14 }}>No data available.</div>;
     }
@@ -917,12 +914,13 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
   const handleClearActivity = () => setActivityFeed([]);
 
   return (
-    <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: '#f9fafb' }}>
+  <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: '#f9fafb' }}>
       <MyHubSection
         hubName="Administrator Hub"
         tabs={HUB_TABS}
         activeTab={activeTab}
         onTabClick={setActiveTab}
+        onLogout={logout}
       />
 
       <Scrollbar style={{ flex: 1, padding: '0 24px' }} className="hub-content-scroll">
@@ -969,7 +967,7 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
           ) : activeTab === 'archive' ? (
             <ArchiveSection />
           ) : activeTab === 'support' ? (
-            <PageWrapper headerSrOnly>
+            <PageWrapper title="Support" headerSrOnly>
               <AdminSupportSection primaryColor="#6366f1" />
             </PageWrapper>
           ) : (
@@ -980,9 +978,40 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
           )}
         </div>
       </Scrollbar>
+
+      <ActionModal
+        isOpen={showActionModal}
+        onClose={handleModalClose}
+        entity={selectedEntity ?? undefined}
+        onSendInvite={() => {
+          console.log('Send Invite clicked for:', selectedEntity);
+        }}
+        onEditProfile={() => {
+          console.log('Edit User Profile clicked for:', selectedEntity);
+        }}
+        onPauseAccount={() => {
+          console.log('Pause Account clicked for:', selectedEntity);
+        }}
+        onDeleteAccount={() => {
+          if (selectedEntity) {
+            handleDelete(selectedEntity);
+          }
+        }}
+      />
     </div>
   );
+
 }
+
+
+
+
+
+
+
+
+
+
 
 
 

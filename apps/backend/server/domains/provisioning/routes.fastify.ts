@@ -2,11 +2,11 @@ import type { FastifyInstance, FastifyReply } from 'fastify';
 import { ZodError } from 'zod';
 import { requireActiveAdmin } from '../adminUsers/guards';
 import {
-  createManager,
-  createContractor,
-  createCustomer,
   createCenter,
+  createContractor,
   createCrew,
+  createCustomer,
+  createManager,
   createWarehouse,
 } from './store';
 
@@ -31,112 +31,42 @@ function sendValidationError(reply: FastifyReply, error: ZodError) {
   });
 }
 
+interface ProvisioningConfig {
+  path: string;
+  createFn: (body: any, actor: any) => Promise<any>;
+  entityName: string;
+}
+
+const provisioningConfigs: ProvisioningConfig[] = [
+  { path: '/api/admin/provision/managers', createFn: createManager, entityName: 'manager' },
+  { path: '/api/admin/provision/contractors', createFn: createContractor, entityName: 'contractor' },
+  { path: '/api/admin/provision/customers', createFn: createCustomer, entityName: 'customer' },
+  { path: '/api/admin/provision/centers', createFn: createCenter, entityName: 'center' },
+  { path: '/api/admin/provision/crew', createFn: createCrew, entityName: 'crew member' },
+  { path: '/api/admin/provision/warehouses', createFn: createWarehouse, entityName: 'warehouse' },
+];
+
+async function createProvisioningHandler(config: ProvisioningConfig) {
+  return async (request: any, reply: any) => {
+    const admin = await requireActiveAdmin(request, reply);
+    if (!admin) return;
+
+    try {
+      const record = await config.createFn(request.body ?? {}, mapAdminActor(admin));
+      reply.code(201).send({ data: record });
+    } catch (error) {
+      if (error instanceof ZodError) {
+        sendValidationError(reply, error);
+        return;
+      }
+      request.log.error({ err: error }, `${config.entityName} provisioning failed`);
+      reply.code(500).send({ error: `Failed to create ${config.entityName}` });
+    }
+  };
+}
+
 export async function registerProvisioningRoutes(server: FastifyInstance) {
-  server.post('/api/admin/provision/managers', async (request, reply) => {
-    const admin = await requireActiveAdmin(request, reply);
-    if (!admin) {
-      return;
-    }
-    try {
-      const record = await createManager(request.body ?? {}, mapAdminActor(admin));
-      reply.code(201).send({ data: record });
-    } catch (error) {
-      if (error instanceof ZodError) {
-        sendValidationError(reply, error);
-        return;
-      }
-      request.log.error({ err: error }, 'manager provisioning failed');
-      reply.code(500).send({ error: 'Failed to create manager' });
-    }
-  });
-
-  server.post('/api/admin/provision/contractors', async (request, reply) => {
-    const admin = await requireActiveAdmin(request, reply);
-    if (!admin) {
-      return;
-    }
-    try {
-      const record = await createContractor(request.body ?? {}, mapAdminActor(admin));
-      reply.code(201).send({ data: record });
-    } catch (error) {
-      if (error instanceof ZodError) {
-        sendValidationError(reply, error);
-        return;
-      }
-      request.log.error({ err: error }, 'contractor provisioning failed');
-      reply.code(500).send({ error: 'Failed to create contractor' });
-    }
-  });
-
-  server.post('/api/admin/provision/customers', async (request, reply) => {
-    const admin = await requireActiveAdmin(request, reply);
-    if (!admin) {
-      return;
-    }
-    try {
-      const record = await createCustomer(request.body ?? {}, mapAdminActor(admin));
-      reply.code(201).send({ data: record });
-    } catch (error) {
-      if (error instanceof ZodError) {
-        sendValidationError(reply, error);
-        return;
-      }
-      request.log.error({ err: error }, 'customer provisioning failed');
-      reply.code(500).send({ error: 'Failed to create customer' });
-    }
-  });
-
-  server.post('/api/admin/provision/centers', async (request, reply) => {
-    const admin = await requireActiveAdmin(request, reply);
-    if (!admin) {
-      return;
-    }
-    try {
-      const record = await createCenter(request.body ?? {}, mapAdminActor(admin));
-      reply.code(201).send({ data: record });
-    } catch (error) {
-      if (error instanceof ZodError) {
-        sendValidationError(reply, error);
-        return;
-      }
-      request.log.error({ err: error }, 'center provisioning failed');
-      reply.code(500).send({ error: 'Failed to create center' });
-    }
-  });
-
-  server.post('/api/admin/provision/crew', async (request, reply) => {
-    const admin = await requireActiveAdmin(request, reply);
-    if (!admin) {
-      return;
-    }
-    try {
-      const record = await createCrew(request.body ?? {}, mapAdminActor(admin));
-      reply.code(201).send({ data: record });
-    } catch (error) {
-      if (error instanceof ZodError) {
-        sendValidationError(reply, error);
-        return;
-      }
-      request.log.error({ err: error }, 'crew provisioning failed');
-      reply.code(500).send({ error: 'Failed to create crew member' });
-    }
-  });
-
-  server.post('/api/admin/provision/warehouses', async (request, reply) => {
-    const admin = await requireActiveAdmin(request, reply);
-    if (!admin) {
-      return;
-    }
-    try {
-      const record = await createWarehouse(request.body ?? {}, mapAdminActor(admin));
-      reply.code(201).send({ data: record });
-    } catch (error) {
-      if (error instanceof ZodError) {
-        sendValidationError(reply, error);
-        return;
-      }
-      request.log.error({ err: error }, 'warehouse provisioning failed');
-      reply.code(500).send({ error: 'Failed to create warehouse' });
-    }
-  });
+  for (const config of provisioningConfigs) {
+    server.post(config.path, await createProvisioningHandler(config));
+  }
 }

@@ -6,7 +6,7 @@ export interface ManagerCreatePayload {
   phone: string;
   email: string;
   role: string;
-  reportsTo: string;
+  reportsTo?: string;
   address: string;
   status?: string;
 }
@@ -24,18 +24,17 @@ export interface ManagerRecord {
 }
 
 export interface ContractorCreatePayload {
-  companyName: string;
-  contactPerson?: string;
-  email?: string;
-  phone?: string;
-  address?: string;
-  status?: string;
+  name: string;
+  mainContact: string;
+  email: string;
+  phone: string;
+  address: string;
 }
 
 export interface ContractorRecord {
   id: string;
-  companyName: string;
-  contactPerson: string | null;
+  name: string;
+  mainContact: string | null;
   email: string | null;
   phone: string | null;
   address: string | null;
@@ -45,17 +44,16 @@ export interface ContractorRecord {
 
 export interface CustomerCreatePayload {
   name: string;
-  contactName?: string;
-  email?: string;
-  phone?: string;
-  address?: string;
-  status?: string;
+  mainContact: string;
+  email: string;
+  phone: string;
+  address: string;
 }
 
 export interface CustomerRecord {
   id: string;
   name: string;
-  contactName: string | null;
+  mainContact: string | null;
   email: string | null;
   phone: string | null;
   address: string | null;
@@ -65,17 +63,16 @@ export interface CustomerRecord {
 
 export interface CenterCreatePayload {
   name: string;
-  contactName?: string;
-  email?: string;
-  phone?: string;
-  address?: string;
-  status?: string;
+  mainContact: string;
+  email: string;
+  phone: string;
+  address: string;
 }
 
 export interface CenterRecord {
   id: string;
   name: string;
-  contactName: string | null;
+  mainContact: string | null;
   email: string | null;
   phone: string | null;
   address: string | null;
@@ -86,17 +83,16 @@ export interface CenterRecord {
 
 export interface CrewCreatePayload {
   name: string;
-  role?: string;
-  email?: string;
-  phone?: string;
-  address?: string;
-  status?: string;
+  emergencyContact: string;
+  email: string;
+  phone: string;
+  address: string;
 }
 
 export interface CrewRecord {
   id: string;
   name: string;
-  role: string | null;
+  emergencyContact: string | null;
   email: string | null;
   phone: string | null;
   address: string | null;
@@ -106,17 +102,16 @@ export interface CrewRecord {
 
 export interface WarehouseCreatePayload {
   name: string;
-  managerId?: string;
-  email?: string;
-  phone?: string;
-  address?: string;
-  warehouseType?: string;
-  status?: string;
+  mainContact: string;
+  email: string;
+  phone: string;
+  address: string;
 }
 
 export interface WarehouseRecord {
   id: string;
   name: string;
+  mainContact: string | null;
   email: string | null;
   phone: string | null;
   address: string | null;
@@ -128,33 +123,44 @@ export interface WarehouseRecord {
 function postProvision<TData, TPayload>(
   path: string,
   payload: TPayload,
+  getToken?: () => Promise<string | null>,
 ): Promise<TData> {
   return apiFetch<ApiResponse<TData>>(path, {
     method: 'POST',
     body: JSON.stringify(payload),
-  }).then((response) => response.data);
+    getToken,
+  }).then((response) => {
+    if (!response.data) {
+      throw new Error('Invalid response: missing data field');
+    }
+    return response.data;
+  }).catch((error) => {
+    console.error('[provisioning] API call failed:', { path, error });
+    throw error;
+  });
 }
 
-export function createManager(payload: ManagerCreatePayload): Promise<ManagerRecord> {
-  return postProvision<ManagerRecord, ManagerCreatePayload>('/admin/provision/managers', payload);
+export function createManager(payload: ManagerCreatePayload, getToken?: () => Promise<string | null>): Promise<ManagerRecord> {
+  return postProvision<ManagerRecord, ManagerCreatePayload>('/admin/provision/managers', payload, getToken);
 }
 
-export function createContractor(payload: ContractorCreatePayload): Promise<ContractorRecord> {
-  return postProvision<ContractorRecord, ContractorCreatePayload>('/admin/provision/contractors', payload);
+export function createContractor(payload: ContractorCreatePayload, getToken?: () => Promise<string | null>): Promise<ContractorRecord> {
+  return postProvision<ContractorRecord, ContractorCreatePayload>('/admin/provision/contractors', payload, getToken);
 }
 
-export function createCustomer(payload: CustomerCreatePayload): Promise<CustomerRecord> {
-  return postProvision<CustomerRecord, CustomerCreatePayload>('/admin/provision/customers', payload);
+export function createCustomer(payload: CustomerCreatePayload, getToken?: () => Promise<string | null>): Promise<CustomerRecord> {
+  return postProvision<CustomerRecord, CustomerCreatePayload>('/admin/provision/customers', payload, getToken);
 }
 
-export function createCenter(payload: CenterCreatePayload): Promise<CenterRecord> {
-  return postProvision<CenterRecord, CenterCreatePayload>('/admin/provision/centers', payload);
+export function createCenter(payload: CenterCreatePayload, getToken?: () => Promise<string | null>): Promise<CenterRecord> {
+  return postProvision<CenterRecord, CenterCreatePayload>('/admin/provision/centers', payload, getToken);
 }
 
-export function createCrew(payload: CrewCreatePayload): Promise<CrewRecord> {
-  return postProvision<CrewRecord, CrewCreatePayload>('/admin/provision/crew', payload);
+export function createCrew(payload: CrewCreatePayload, getToken?: () => Promise<string | null>): Promise<CrewRecord> {
+  return postProvision<CrewRecord, CrewCreatePayload>('/admin/provision/crew', payload, getToken);
 }
 
-export function createWarehouse(payload: WarehouseCreatePayload): Promise<WarehouseRecord> {
-  return postProvision<WarehouseRecord, WarehouseCreatePayload>('/admin/provision/warehouses', payload);
+export function createWarehouse(payload: WarehouseCreatePayload, getToken?: () => Promise<string | null>): Promise<WarehouseRecord> {
+  return postProvision<WarehouseRecord, WarehouseCreatePayload>('/admin/provision/warehouses', payload, getToken);
 }
+

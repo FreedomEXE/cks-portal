@@ -1,4 +1,3 @@
-import React from 'react';
 import Button from '../../buttons/Button';
 
 export interface Tab {
@@ -40,20 +39,11 @@ export default function MyHubSection({
   role = 'manager',
   welcomeName,
 }: MyHubSectionProps) {
-  const colors = roleColors[role.toLowerCase()] || roleColors.manager;
+  const colors = roleColors[role?.toLowerCase() || 'manager'] || roleColors.manager;
 
-  const welcomeContent = welcomeName ? (
-    <>
-      Welcome to your CKS Portal{' '}
-      <span style={{ fontWeight: 600, color: colors.primary }}>
-        {welcomeName}
-      </span>
-      !
-    </>
-  ) : (
-    <>Welcome to {hubName}</>
+  const welcomeContent = (
+    <>Welcome to {hubName}!</>
   );
-
   return (
     <div style={{ padding: '16px 24px 24px 24px', background: '#f9fafb' }}>
       <div style={{
@@ -63,7 +53,7 @@ export default function MyHubSection({
         padding: '20px 24px',
         boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'
       }}>
-        {/* Header Row */}
+  {/* Header Row */}
         <div style={{
           display: 'flex',
           justifyContent: 'space-between',

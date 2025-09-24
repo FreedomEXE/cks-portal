@@ -22,6 +22,7 @@
 -----------------------------------------------*/
 
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { EcosystemTree, type TreeNode } from '@cks/domain-widgets';
 import { MemosPreview, NewsPreview, OrdersSection, OverviewSection, ProfileInfoCard, RecentActivity, ReportsSection, SupportSection, type Activity } from '@cks/domain-widgets';
 import { Button, DataTable, PageHeader, PageWrapper, Scrollbar, TabSection } from '@cks/ui';
@@ -32,6 +33,7 @@ interface CustomerHubProps {
 }
 
 export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubProps) {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState(initialTab);
   const [servicesSearchQuery, setServicesSearchQuery] = useState('');
   const [servicesTab, setServicesTab] = useState('my');
@@ -574,7 +576,7 @@ export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubPro
                   <Button
                     variant="primary"
                     roleColor="#000000"
-                    onClick={() => console.log('Browse catalog')}
+                    onClick={() => navigate('/catalog')}
                   >
                     Browse CKS Catalog
                   </Button>

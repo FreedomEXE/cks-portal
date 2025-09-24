@@ -1,20 +1,20 @@
-import { resolve } from "node:path";
 import dotenv from "dotenv";
+import { resolve } from "node:path";
 
 dotenv.config({ path: resolve(__dirname, "../.env") });
 console.log('DATABASE_URL loaded?', !!process.env.DATABASE_URL ? 'yes' : 'no');
 
-import Fastify from "fastify";
 import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
+import Fastify from "fastify";
 import z from "zod";
 import { authenticate } from "./core/auth/authenticate";
-import { getAdminUserByClerkId } from "./domains/adminUsers/store";
 import { registerAdminUserRoutes } from "./domains/adminUsers/routes";
+import { getAdminUserByClerkId } from "./domains/adminUsers/store";
+import type { AdminUserStatus } from "./domains/adminUsers/types";
+import { registerAssignmentRoutes } from "./domains/assignments";
 import { registerDirectoryRoutes } from "./domains/directory/routes.fastify";
 import { registerProvisioningRoutes } from "./domains/provisioning";
-import { registerAssignmentRoutes } from "./domains/assignments";
-import type { AdminUserStatus } from "./domains/adminUsers/types";
 
 type BootstrapResponse = {
   role: string;
@@ -120,6 +120,33 @@ export async function buildServer() {
         return reply.code(401).send({ error: 'Unauthorized' });
       }
 
+      // Check for impersonation header
+      const impersonationCode = request.headers['x-impersonate-code'] as string | undefined;
+      console.log('[bootstrap] Impersonation code:', impersonationCode);
+
+      if (impersonationCode) {
+        // User is impersonating, look up the target user
+        const { findUserByCode } = await import('./domains/identity/impersonation.routes');
+        const targetUser = await (findUserByCode as any)(impersonationCode);
+
+        if (targetUser) {
+          console.log('[bootstrap] Impersonating user:', targetUser);
+
+          const response: BootstrapResponse = {
+            role: targetUser.role,
+            code: targetUser.code,
+            email: null,  // Don't expose impersonated user's email
+            status: 'active',
+            fullName: targetUser.displayName,
+            firstName: targetUser.firstName,
+            ownerFirstName: targetUser.firstName,
+          };
+
+          return reply.send(bootstrapResponseSchema.parse(response));
+        }
+        console.log('[bootstrap] Failed to find impersonated user:', impersonationCode);
+      }
+
       const adminUser = await getAdminUserByClerkId(authContext.userId);
       if (!adminUser) {
         return reply.code(404).send({ error: 'Not provisioned' });
@@ -159,6 +186,8 @@ export async function buildServer() {
   await registerProvisioningRoutes(server);
   await registerAssignmentRoutes(server);
   await registerDirectoryRoutes(server);
+  const { registerImpersonationRoutes } = await import('./domains/identity/impersonation.routes');
+  await registerImpersonationRoutes(server);
 
   return server;
 }

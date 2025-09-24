@@ -1,4 +1,4 @@
-﻿/*----------------------------------------------- 
+﻿/*-----------------------------------------------
   Property of CKS  (c) 2025
 -----------------------------------------------*/
 /**
@@ -21,4 +21,12 @@
   Manifested by Freedom_EXE
 -----------------------------------------------*/
 
-export {};
+/**
+ * POST /api/admin/impersonate
+ * Request body: { code: string }
+ * Response: { code, role, displayName, firstName } if valid
+ * Only admins can impersonate; all attempts are audited.
+ * See impersonation.routes.ts for implementation.
+ */
+export { };
+

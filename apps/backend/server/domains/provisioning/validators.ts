@@ -1,5 +1,4 @@
-import z from 'zod';
-
+import { z } from 'zod';
 const optionalString = z
   .string()
   .trim()
@@ -7,6 +6,10 @@ const optionalString = z
   .max(255)
   .optional()
   .transform((value) => (value ? value : undefined));
+
+function requiredString(field: string, max = 255) {
+  return z.string().trim().min(1, `${field} is required`).max(max);
+}
 
 const managerRoleSchema = z.enum(['Strategic Manager', 'Operations Manager', 'Field Manager', 'Development Manager']);
 const reportsToSchema = z.enum(['CEO', 'strategic-manager', 'operations-manager']);
@@ -18,31 +21,28 @@ const managerReportsToMap: Record<z.infer<typeof managerRoleSchema>, Array<z.inf
   'Development Manager': ['CEO', 'strategic-manager'],
 };
 
+const requiredEmail = z
+  .string()
+  .trim()
+  .min(1, 'Email is required')
+  .email('Provide a valid email address')
+  .max(255);
+
+const requiredPhone = z.string().trim().min(1, 'Phone number is required').max(50);
+
 export const managerCreateSchema = z
   .object({
-    fullName: z.string().trim().min(1, 'Manager name is required').max(255),
-    territory: z.string().trim().min(1, 'Territory is required').max(255),
-    phone: z.string().trim().min(1, 'Phone number is required').max(50),
-    email: z
-      .string()
-      .trim()
-      .min(1, 'Email is required')
-      .email('Provide a valid email address')
-      .max(255),
+    fullName: requiredString('Manager name'),
+    territory: requiredString('Territory'),
+    phone: requiredPhone,
+    email: requiredEmail,
     role: managerRoleSchema,
-    reportsTo: reportsToSchema,
-    address: z.string().trim().min(1, 'Address is required').max(255),
-    status: z
-      .string()
-      .trim()
-      .min(1)
-      .max(50)
-      .optional()
-      .default('active'),
+    reportsTo: reportsToSchema.optional(),
+    address: requiredString('Address'),
   })
   .superRefine((data, ctx) => {
     const allowed = managerReportsToMap[data.role];
-    if (!allowed.includes(data.reportsTo)) {
+    if (data.reportsTo && !allowed.includes(data.reportsTo)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['reportsTo'],
@@ -52,79 +52,45 @@ export const managerCreateSchema = z
   });
 
 export const contractorCreateSchema = z.object({
-  companyName: z.string().trim().min(1, 'Company name is required').max(255),
-  contactPerson: optionalString,
-  email: optionalString,
-  phone: optionalString,
-  address: optionalString,
-  status: z
-    .string()
-    .trim()
-    .min(1)
-    .max(50)
-    .optional()
-    .default('active'),
+  name: requiredString('Contractor name'),
+  mainContact: requiredString('Main contact'),
+  email: requiredEmail,
+  phone: requiredPhone,
+  address: requiredString('Address'),
 });
 
 export const customerCreateSchema = z.object({
-  name: z.string().trim().min(1, 'Customer name is required').max(255),
-  contactName: optionalString,
-  email: optionalString,
-  phone: optionalString,
-  address: optionalString,
-  status: z
-    .string()
-    .trim()
-    .min(1)
-    .max(50)
-    .optional()
-    .default('active'),
+  name: requiredString('Customer name'),
+  mainContact: requiredString('Main contact'),
+  email: requiredEmail,
+  phone: requiredPhone,
+  address: requiredString('Address'),
 });
 
 export const centerCreateSchema = z.object({
-  name: z.string().trim().min(1, 'Center name is required').max(255),
-  contactName: optionalString,
-  email: optionalString,
-  phone: optionalString,
-  address: optionalString,
-  status: z
-    .string()
-    .trim()
-    .min(1)
-    .max(50)
-    .optional()
-    .default('active'),
+  name: requiredString('Center name'),
+  mainContact: requiredString('Main contact'),
+  email: requiredEmail,
+  phone: requiredPhone,
+  address: requiredString('Address'),
 });
 
 export const crewCreateSchema = z.object({
-  name: z.string().trim().min(1, 'Crew name is required').max(255),
-  role: optionalString,
-  email: optionalString,
-  phone: optionalString,
-  address: optionalString,
-  status: z
-    .string()
-    .trim()
-    .min(1)
-    .max(50)
-    .optional()
-    .default('active'),
+  name: requiredString('Crew name'),
+  emergencyContact: requiredString('Emergency contact'),
+  email: requiredEmail,
+  phone: requiredPhone,
+  address: requiredString('Address'),
 });
 
 export const warehouseCreateSchema = z.object({
-  name: z.string().trim().min(1, 'Warehouse name is required').max(255),
+  name: requiredString('Warehouse name'),
+  mainContact: requiredString('Main contact'),
+  email: requiredEmail,
+  phone: requiredPhone,
+  address: requiredString('Address'),
   managerId: optionalString,
-  email: optionalString,
-  phone: optionalString,
-  address: optionalString,
   warehouseType: optionalString,
-  status: z
-    .string()
-    .trim()
-    .min(1)
-    .max(50)
-    .optional()
-    .default('active'),
 });
 
 export type ManagerCreateInput = z.infer<typeof managerCreateSchema>;
@@ -133,4 +99,3 @@ export type CustomerCreateInput = z.infer<typeof customerCreateSchema>;
 export type CenterCreateInput = z.infer<typeof centerCreateSchema>;
 export type CrewCreateInput = z.infer<typeof crewCreateSchema>;
 export type WarehouseCreateInput = z.infer<typeof warehouseCreateSchema>;
-

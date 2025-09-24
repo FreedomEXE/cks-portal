@@ -1,5 +1,5 @@
 /*-----------------------------------------------
-  Property of CKS  © 2025
+  Property of CKS  Ac 2025
 -----------------------------------------------*/
 /**
  * File: ManagerHub.tsx
@@ -21,22 +21,265 @@
   Manifested by Freedom_EXE
 -----------------------------------------------*/
 
-import { useEffect, useState } from 'react';
-import { EcosystemTree, type TreeNode } from '@cks/domain-widgets';
-import { MemosPreview, NewsPreview, OrdersSection, OverviewSection, ProfileInfoCard, RecentActivity, ReportsSection, SupportSection, type Activity } from '@cks/domain-widgets';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@cks/auth';
+import { EcosystemTree } from '@cks/domain-widgets';
+import {
+  MemosPreview,
+  NewsPreview,
+  OrdersSection,
+  OverviewSection,
+  ProfileInfoCard,
+  RecentActivity,
+  ReportsSection,
+  SupportSection,
+  type Activity,
+} from '@cks/domain-widgets';
 import { Button, DataTable, PageHeader, PageWrapper, Scrollbar, TabSection } from '@cks/ui';
 import MyHubSection from '../components/MyHubSection';
+import {
+  useActivities,
+  useCenters,
+  useContractors,
+  useCrew,
+  useCustomers,
+  useManagers,
+  useOrders,
+  useServices,
+} from '../shared/api/directory';
 
 interface ManagerHubProps {
   initialTab?: string;
 }
 
-export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps) {
-  const [activeTab, setActiveTab] = useState(initialTab);
-  const [servicesTab, setServicesTab] = useState('my');
-  const [servicesSearchQuery, setServicesSearchQuery] = useState('');
+type OrderStatus = 'pending' | 'in-progress' | 'approved' | 'rejected' | 'cancelled' | 'delivered' | 'service-created';
 
-  // Add scrollbar styles
+type HubOrder = {
+  orderId: string;
+  orderType: 'service' | 'product';
+  title: string;
+  requestedBy: string;
+  destination?: string;
+  requestedDate: string;
+  expectedDate?: string;
+  serviceStartDate?: string;
+  deliveryDate?: string;
+  status: OrderStatus;
+  approvalStages?: Array<{
+    role: string;
+    status: 'pending' | 'approved' | 'rejected' | 'waiting' | 'accepted' | 'requested' | 'delivered';
+    user?: string;
+    timestamp?: string;
+  }>;
+  transformedId?: string;
+};
+
+const HUB_TABS = [
+  { id: 'dashboard', label: 'Dashboard', path: '/manager/dashboard' },
+  { id: 'profile', label: 'My Profile', path: '/manager/profile' },
+  { id: 'ecosystem', label: 'My Ecosystem', path: '/manager/ecosystem' },
+  { id: 'services', label: 'My Services', path: '/manager/services' },
+  { id: 'orders', label: 'Orders', path: '/manager/orders' },
+  { id: 'reports', label: 'Reports', path: '/manager/reports' },
+  { id: 'support', label: 'Support', path: '/manager/support' },
+];
+
+const OVERVIEW_CARDS = [
+  { id: 'contractors', title: 'My Contractors', dataKey: 'contractorCount', color: 'blue' },
+  { id: 'customers', title: 'My Customers', dataKey: 'customerCount', color: 'green' },
+  { id: 'centers', title: 'My Centers', dataKey: 'centerCount', color: 'purple' },
+  { id: 'crew', title: 'My Crew', dataKey: 'crewCount', color: 'orange' },
+  { id: 'orders', title: 'Pending Orders', dataKey: 'pendingOrders', color: 'red' },
+  { id: 'status', title: 'Account Status', dataKey: 'accountStatus', color: 'green' },
+];
+
+const MY_SERVICES_COLUMNS = [
+  { key: 'serviceId', label: 'SERVICE ID', clickable: true },
+  { key: 'serviceName', label: 'SERVICE NAME' },
+  { key: 'certified', label: 'CERTIFIED' },
+  { key: 'certificationDate', label: 'CERTIFICATION DATE' },
+  { key: 'expires', label: 'EXPIRES' },
+];
+
+const ACTIVE_SERVICES_COLUMNS = [
+  { key: 'serviceId', label: 'SERVICE ID', clickable: true },
+  { key: 'serviceName', label: 'SERVICE NAME' },
+  { key: 'centerId', label: 'CENTER ID' },
+  { key: 'type', label: 'TYPE' },
+  { key: 'startDate', label: 'START DATE' },
+];
+
+const SERVICE_HISTORY_COLUMNS = [
+  { key: 'serviceId', label: 'SERVICE ID', clickable: true },
+  { key: 'serviceName', label: 'SERVICE NAME' },
+  { key: 'centerId', label: 'CENTER ID' },
+  { key: 'type', label: 'TYPE' },
+  {
+    key: 'status',
+    label: 'STATUS',
+    render: (value: string | null | undefined) => {
+      if (!value) {
+        return (
+          <span
+            style={{
+              padding: '4px 12px',
+              borderRadius: '4px',
+              fontSize: '12px',
+              fontWeight: 500,
+              backgroundColor: '#e2e8f0',
+              color: '#475569',
+            }}
+          >
+            N/A
+          </span>
+        );
+      }
+      const palette = getStatusBadgePalette(value);
+      return (
+        <span
+          style={{
+            padding: '4px 12px',
+            borderRadius: '4px',
+            fontSize: '12px',
+            fontWeight: 500,
+            backgroundColor: palette.background,
+            color: palette.color,
+          }}
+        >
+          {formatStatusLabel(value)}
+        </span>
+      );
+    },
+  },
+  { key: 'startDate', label: 'START DATE' },
+  { key: 'endDate', label: 'END DATE' },
+];
+
+const MANAGER_PRIMARY_COLOR = '#3b82f6';
+
+type EcosystemNode = {
+  user: {
+    id: string;
+    role: string;
+    name: string;
+  };
+  count?: number;
+  type?: string;
+  children?: EcosystemNode[];
+};
+
+function normalizeId(value: string | null | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed ? trimmed.toUpperCase() : null;
+}
+
+function formatDate(value: string | null | undefined): string {
+  if (!value) {
+    return 'N/A';
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: '2-digit' });
+}
+
+function normalizeOrderStatus(status: string | null | undefined): OrderStatus {
+  const normalized = (status ?? 'pending').trim().toLowerCase().replace(/\s+/g, '-').replace(/_/g, '-');
+  switch (normalized) {
+    case 'pending':
+    case 'approved':
+    case 'rejected':
+    case 'cancelled':
+    case 'delivered':
+    case 'service-created':
+      return normalized;
+    case 'in-progress':
+    case 'inprogress':
+    case 'processing':
+    case 'scheduled':
+      return 'in-progress';
+    case 'completed':
+      return 'delivered';
+    case 'closed':
+    case 'archived':
+      return 'cancelled';
+    default:
+      return 'pending';
+  }
+}
+
+function formatStatusLabel(status: string | null | undefined): string {
+  const normalized = normalizeOrderStatus(status);
+  if (normalized === 'in-progress') {
+    return 'In Progress';
+  }
+  if (normalized === 'service-created') {
+    return 'Service Created';
+  }
+  return normalized.replace(/-/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function getStatusBadgePalette(value: string): { background: string; color: string } {
+  const normalized = normalizeOrderStatus(value);
+  switch (normalized) {
+    case 'delivered':
+    case 'approved':
+    case 'service-created':
+      return { background: '#dcfce7', color: '#16a34a' };
+    case 'pending':
+    case 'in-progress':
+      return { background: '#fef9c3', color: '#b45309' };
+    case 'rejected':
+    case 'cancelled':
+      return { background: '#fee2e2', color: '#dc2626' };
+    default:
+      return { background: '#e2e8f0', color: '#475569' };
+  }
+}
+
+function formatAccountStatus(status: string | null | undefined): string {
+  if (!status) {
+    return 'Unknown';
+  }
+  const trimmed = status.trim();
+  if (!trimmed) {
+    return 'Unknown';
+  }
+  return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+}
+
+function formatReportsTo(value: string | null | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+  if (trimmed === trimmed.toUpperCase()) {
+    return trimmed;
+  }
+  return trimmed
+    .replace(/[._-]+/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function createNodeSorter(a: EcosystemNode, b: EcosystemNode): number {
+  return a.user.name.localeCompare(b.user.name);
+}
+
+export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps) {
+  const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState(initialTab);
+  const [servicesTab, setServicesTab] = useState<'my' | 'active' | 'history'>('my');
+  const [servicesSearchQuery, setServicesSearchQuery] = useState('');
+  const [activityFeed, setActivityFeed] = useState<Activity[]>([]);
+
   useEffect(() => {
     const style = document.createElement('style');
     style.textContent = `
@@ -61,556 +304,530 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
     };
   }, []);
 
-  // Mock ecosystem data for manager (shows full hierarchy)
-  const ecosystemData: TreeNode = {
-    user: { id: 'MGR-001', role: 'Manager', name: 'John Smith' },
-    children: [
-      {
-        user: { id: 'CON-001', role: 'Contractor', name: 'Premium Contractor LLC' },
-        count: 3,
-        type: 'customers',
-        children: [
-          {
-            user: { id: 'CUS-001', role: 'Customer', name: 'Acme Corporation' },
-            count: 3,
-            type: 'centers',
-            children: [
-              {
-                user: { id: 'CTR-001', role: 'Center', name: 'Acme Downtown Office' },
-                count: 2,
-                type: 'crew',
-                children: [
-                  { user: { id: 'CRW-001', role: 'Crew', name: 'John Smith (Lead)' } },
-                  { user: { id: 'CRW-002', role: 'Crew', name: 'Jane Doe (Specialist)' } }
-                ]
-              },
-              {
-                user: { id: 'CTR-002', role: 'Center', name: 'Acme Warehouse' },
-                count: 3,
-                type: 'crew',
-                children: [
-                  { user: { id: 'CRW-003', role: 'Crew', name: 'Mike Johnson (Lead)' } },
-                  { user: { id: 'CRW-004', role: 'Crew', name: 'Sarah Wilson' } },
-                  { user: { id: 'CRW-005', role: 'Crew', name: 'Bob Brown' } }
-                ]
-              }
-            ]
-          },
-          {
-            user: { id: 'CUS-002', role: 'Customer', name: 'Global Tech Solutions' },
-            count: 2,
-            type: 'centers',
-            children: [
-              {
-                user: { id: 'CTR-003', role: 'Center', name: 'Global Tech HQ' },
-                count: 2,
-                type: 'crew'
-              }
-            ]
-          }
-        ]
-      },
-      {
-        user: { id: 'CON-002', role: 'Contractor', name: 'Elite Services Inc' },
-        count: 2,
-        type: 'customers',
-        children: [
-          {
-            user: { id: 'CUS-003', role: 'Customer', name: 'Local Business Center' },
-            count: 1,
-            type: 'centers'
-          }
-        ]
-      }
-    ]
-  };
+  const { code, fullName, firstName } = useAuth();
 
-  // Mock activities for manager - showing activities from various roles
-  const [activities, setActivities] = useState<Activity[]>([
-    {
-      id: 'act-1',
-      message: 'System maintenance scheduled for this weekend',
-      timestamp: new Date(Date.now() - 30 * 60 * 1000), // 30 minutes ago
-      type: 'warning',
-      metadata: { role: 'admin', userId: 'ADM-001', title: 'Admin Notice' }
-    },
-    {
-      id: 'act-2',
-      message: 'Assigned CON-001 to new project',
-      timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
-      type: 'action',
-      metadata: { role: 'manager', userId: 'MGR-001', title: 'Manager Action' }
-    },
-    {
-      id: 'act-3',
-      message: 'New Contractor Created: CON-002 (Network Solutions)',
-      timestamp: new Date(Date.now() - 3 * 60 * 60 * 1000), // 3 hours ago
-      type: 'success',
-      metadata: { role: 'contractor', userId: 'CON-002', title: 'Contractor Update' }
-    },
-    {
-      id: 'act-4',
-      message: 'Service request SR-2024-055 submitted for review',
-      timestamp: new Date(Date.now() - 5 * 60 * 60 * 1000), // 5 hours ago
-      type: 'info',
-      metadata: { role: 'customer', userId: 'CUS-005', title: 'Customer Request' }
-    },
-    {
-      id: 'act-5',
-      message: 'Equipment check-in completed at Center CTR-003',
-      timestamp: new Date(Date.now() - 8 * 60 * 60 * 1000), // 8 hours ago
-      type: 'success',
-      metadata: { role: 'center', userId: 'CEN-003', title: 'Center Activity' }
-    },
-    {
-      id: 'act-6',
-      message: 'Crew member CRW-007 completed safety training',
-      timestamp: new Date(Date.now() - 12 * 60 * 60 * 1000), // 12 hours ago
-      type: 'success',
-      metadata: { role: 'crew', userId: 'CRW-007', title: 'Crew Update' }
-    },
-    {
-      id: 'act-7',
-      message: 'Low inventory alert: Parts needed for upcoming jobs',
-      timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000), // 1 day ago
-      type: 'warning',
-      metadata: { role: 'warehouse', userId: 'WHS-001', title: 'Warehouse Alert' }
-    },
-    {
-      id: 'act-8',
-      message: 'Weekly report generated and available for review',
-      timestamp: new Date(Date.now() - 48 * 60 * 60 * 1000), // 2 days ago
-      type: 'info',
-      metadata: { role: 'system', userId: 'SYSTEM', title: 'System Report' }
+  const { data: managerEntries } = useManagers();
+  const { data: contractorEntries } = useContractors();
+  const { data: customerEntries } = useCustomers();
+  const { data: centerEntries } = useCenters();
+  const { data: crewEntries } = useCrew();
+  const { data: serviceEntries } = useServices();
+  const { data: orderEntries } = useOrders();
+  const { data: activityItems, isLoading: activitiesLoading, error: activitiesError } = useActivities();
+
+  useEffect(() => {
+    setActivityFeed(activityItems);
+  }, [activityItems]);
+
+  const managerCode = useMemo(() => normalizeId(code), [code]);
+
+  const managerRecord = useMemo(() => {
+    if (!managerCode) {
+      return null;
     }
+    return managerEntries.find((entry) => normalizeId(entry.id) === managerCode) ?? null;
+  }, [managerEntries, managerCode]);
+
+  const managerDisplayName = managerRecord?.name ?? fullName ?? firstName ?? 'Manager';
+  const managerRootId = managerRecord?.id ?? managerCode ?? 'MANAGER';
+
+  const managerContractors = useMemo(() => {
+    if (!managerCode) {
+      return [] as typeof contractorEntries;
+    }
+    return contractorEntries.filter((contractor) => normalizeId(contractor.managerId) === managerCode);
+  }, [contractorEntries, managerCode]);
+
+  const managerCustomers = useMemo(() => {
+    if (!managerCode) {
+      return [] as typeof customerEntries;
+    }
+    return customerEntries.filter((customer) => normalizeId(customer.managerId) === managerCode);
+  }, [customerEntries, managerCode]);
+
+  const managerContractorIdSet = useMemo(() => {
+    const set = new Set<string>();
+    managerContractors.forEach((contractor) => {
+      const id = normalizeId(contractor.id);
+      if (id) {
+        set.add(id);
+      }
+    });
+    return set;
+  }, [managerContractors]);
+
+  const managerCustomerIdSet = useMemo(() => {
+    const set = new Set<string>();
+    managerCustomers.forEach((customer) => {
+      const id = normalizeId(customer.id);
+      if (id) {
+        set.add(id);
+      }
+    });
+    return set;
+  }, [managerCustomers]);
+
+  const managerCenters = useMemo(() => {
+    if (!managerCode && managerCustomerIdSet.size === 0 && managerContractorIdSet.size === 0) {
+      return [] as typeof centerEntries;
+    }
+    return centerEntries.filter((center) => {
+      const centerManager = normalizeId(center.managerId);
+      const customerId = normalizeId(center.customerId);
+      const contractorId = normalizeId(center.contractorId);
+      if (managerCode && centerManager === managerCode) {
+        return true;
+      }
+      if (customerId && managerCustomerIdSet.has(customerId)) {
+        return true;
+      }
+      if (contractorId && managerContractorIdSet.has(contractorId)) {
+        return true;
+      }
+      return false;
+    });
+  }, [centerEntries, managerCode, managerCustomerIdSet, managerContractorIdSet]);
+
+  const managerCenterIdSet = useMemo(() => {
+    const set = new Set<string>();
+    managerCenters.forEach((center) => {
+      const id = normalizeId(center.id);
+      if (id) {
+        set.add(id);
+      }
+    });
+    return set;
+  }, [managerCenters]);
+
+  const managerCrew = useMemo(
+    () =>
+      crewEntries.filter((member) => {
+        const centerId = normalizeId(member.assignedCenter);
+        return !!centerId && managerCenterIdSet.has(centerId);
+      }),
+    [crewEntries, managerCenterIdSet],
+  );
+
+  const customerNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    customerEntries.forEach((customer) => {
+      const id = normalizeId(customer.id);
+      if (id) {
+        map.set(id, customer.name ?? customer.mainContact ?? id);
+      }
+    });
+    return map;
+  }, [customerEntries]);
+
+  const centerNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    centerEntries.forEach((center) => {
+      const id = normalizeId(center.id);
+      if (id) {
+        map.set(id, center.name ?? id);
+      }
+    });
+    return map;
+  }, [centerEntries]);
+
+  const serviceById = useMemo(() => {
+    const map = new Map<string, (typeof serviceEntries)[number]>();
+    serviceEntries.forEach((service) => {
+      const id = normalizeId(service.id);
+      if (id) {
+        map.set(id, service);
+      }
+    });
+    return map;
+  }, [serviceEntries]);
+
+  const managerOrders = useMemo(
+    () =>
+      orderEntries.filter((order) => {
+        const customerId = normalizeId(order.customerId);
+        const centerId = normalizeId(order.centerId);
+        return (customerId && managerCustomerIdSet.has(customerId)) || (centerId && managerCenterIdSet.has(centerId));
+      }),
+    [orderEntries, managerCustomerIdSet, managerCenterIdSet],
+  );
+
+  const managerServiceOrders = useMemo(
+    () => managerOrders.filter((order) => !!normalizeId(order.serviceId)),
+    [managerOrders],
+  );
+
+  const managerProductOrders = useMemo(
+    () => managerOrders.filter((order) => !normalizeId(order.serviceId)),
+    [managerOrders],
+  );
+
+  const managerServices = useMemo(() => {
+    const unique = new Map<string, (typeof serviceEntries)[number]>();
+    managerServiceOrders.forEach((order) => {
+      const serviceId = normalizeId(order.serviceId);
+      if (!serviceId || unique.has(serviceId)) {
+        return;
+      }
+      const service = serviceById.get(serviceId);
+      if (service) {
+        unique.set(serviceId, service);
+      }
+    });
+    return Array.from(unique.values());
+  }, [managerServiceOrders, serviceById]);
+
+  const myServicesData = useMemo(
+    () =>
+      managerServices.map((service) => {
+        const status = service.status?.toLowerCase() ?? 'unknown';
+        const certified = status === 'active' || status === 'approved' ? 'Yes' : status === 'unknown' ? 'Unknown' : 'No';
+        return {
+          serviceId: service.id ?? 'SRV-???',
+          serviceName: service.name ?? 'Service',
+          certified,
+          certificationDate: formatDate(service.createdAt),
+          expires: formatDate(service.updatedAt),
+        };
+      }),
+    [managerServices],
+  );
+
+  const activeServicesData = useMemo(
+    () =>
+      managerServiceOrders
+        .filter((order) => {
+          const status = normalizeOrderStatus(order.status);
+          return status === 'pending' || status === 'in-progress' || status === 'approved';
+        })
+        .map((order) => {
+          const serviceId = normalizeId(order.serviceId);
+          const service = serviceId ? serviceById.get(serviceId) : null;
+          const centerId = normalizeId(order.centerId);
+          return {
+            serviceId: order.serviceId ?? order.id,
+            serviceName: service?.name ?? (order.serviceId ?? 'Service'),
+            centerId: centerId ?? 'N/A',
+            type: service?.category ?? 'Service',
+            startDate: formatDate(order.orderDate),
+          };
+        }),
+    [managerServiceOrders, serviceById],
+  );
+
+  const serviceHistoryData = useMemo(
+    () =>
+      managerServiceOrders
+        .filter((order) => {
+          const status = normalizeOrderStatus(order.status);
+          return status === 'delivered' || status === 'service-created' || status === 'cancelled' || status === 'rejected';
+        })
+        .map((order) => {
+          const serviceId = normalizeId(order.serviceId);
+          const service = serviceId ? serviceById.get(serviceId) : null;
+          const centerId = normalizeId(order.centerId);
+          return {
+            serviceId: order.serviceId ?? order.id,
+            serviceName: service?.name ?? (order.serviceId ?? 'Service'),
+            centerId: centerId ?? 'N/A',
+            type: service?.category ?? 'Service',
+            status: formatStatusLabel(order.status),
+            startDate: formatDate(order.orderDate),
+            endDate: formatDate(order.completionDate),
+          };
+        }),
+    [managerServiceOrders, serviceById],
+  );
+
+  const overviewData = useMemo(() => {
+    const pendingOrders = managerServiceOrders.reduce((count, order) => {
+      const status = normalizeOrderStatus(order.status);
+      return count + (status === 'pending' || status === 'in-progress' ? 1 : 0);
+    }, 0);
+    return {
+      contractorCount: managerContractors.length,
+      customerCount: managerCustomers.length,
+      centerCount: managerCenters.length,
+      crewCount: managerCrew.length,
+      pendingOrders,
+      accountStatus: formatAccountStatus(managerRecord?.status),
+    };
+  }, [managerContractors, managerCustomers, managerCenters, managerCrew, managerServiceOrders, managerRecord]);
+
+  const managerProfileData = useMemo(
+    () => ({
+      fullName: managerDisplayName,
+      managerId: managerRecord?.id ?? managerCode ?? 'N/A',
+      address: managerRecord?.address ?? null,
+      phone: managerRecord?.phone ?? null,
+      email: managerRecord?.email ?? null,
+      territory: managerRecord?.territory ?? null,
+      role: managerRecord?.role ?? 'Manager',
+      reportsTo: formatReportsTo(managerRecord?.reportsTo),
+      startDate: managerRecord?.createdAt ? formatDate(managerRecord.createdAt) : null,
+    }),
+    [managerCode, managerDisplayName, managerRecord],
+  );
+
+  const managerServiceOrderCards = useMemo<HubOrder[]>(
+    () =>
+      managerServiceOrders.map((order) => {
+        const serviceId = normalizeId(order.serviceId);
+        const service = serviceId ? serviceById.get(serviceId) : null;
+        const customerId = normalizeId(order.customerId);
+        const centerId = normalizeId(order.centerId);
+        const status = normalizeOrderStatus(order.status);
+        const requestedBy = customerId ? customerNameMap.get(customerId) ?? order.customerId ?? 'Customer' : order.customerId ?? 'Customer';
+        const destination = centerId ? centerNameMap.get(centerId) ?? centerId : undefined;
+        const deliveryDate = status === 'delivered' ? formatDate(order.completionDate) : undefined;
+        return {
+          orderId: order.id,
+          orderType: 'service',
+          title: service?.name ?? (order.serviceId ?? 'Service Order'),
+          requestedBy,
+          destination,
+          requestedDate: formatDate(order.orderDate),
+          expectedDate: formatDate(order.completionDate),
+          serviceStartDate: status === 'service-created' ? formatDate(order.orderDate) : undefined,
+          deliveryDate,
+          status,
+          approvalStages: [],
+        };
+      }),
+    [customerNameMap, centerNameMap, managerServiceOrders, serviceById],
+  );
+
+  const managerProductOrderCards = useMemo<HubOrder[]>(
+    () =>
+      managerProductOrders.map((order) => {
+        const customerId = normalizeId(order.customerId);
+        const centerId = normalizeId(order.centerId);
+        const status = normalizeOrderStatus(order.status);
+        const requestedBy = customerId ? customerNameMap.get(customerId) ?? order.customerId ?? 'Customer' : order.customerId ?? 'Customer';
+        const destination = centerId ? centerNameMap.get(centerId) ?? centerId : undefined;
+        const deliveryDate = status === 'delivered' ? formatDate(order.completionDate) : undefined;
+        return {
+          orderId: order.id,
+          orderType: 'product',
+          title: order.notes ?? `Product Order ${order.id}`,
+          requestedBy,
+          destination,
+          requestedDate: formatDate(order.orderDate),
+          expectedDate: formatDate(order.completionDate),
+          deliveryDate,
+          status,
+          approvalStages: [],
+        };
+      }),
+    [customerNameMap, centerNameMap, managerProductOrders],
+  );
+
+  const centersByCustomerId = useMemo(() => {
+    const map = new Map<string, (typeof managerCenters)[number][]>();
+    managerCenters.forEach((center) => {
+      const customerId = normalizeId(center.customerId);
+      if (!customerId) {
+        return;
+      }
+      const existing = map.get(customerId);
+      if (existing) {
+        existing.push(center);
+      } else {
+        map.set(customerId, [center]);
+      }
+    });
+    return map;
+  }, [managerCenters]);
+
+  const crewByCenterId = useMemo(() => {
+    const map = new Map<string, (typeof managerCrew)[number][]>();
+    managerCrew.forEach((member) => {
+      const centerId = normalizeId(member.assignedCenter);
+      if (!centerId) {
+        return;
+      }
+      const existing = map.get(centerId);
+      if (existing) {
+        existing.push(member);
+      } else {
+        map.set(centerId, [member]);
+      }
+    });
+    return map;
+  }, [managerCrew]);
+
+  const ecosystemTree = useMemo<EcosystemNode>(() => {
+    const children: EcosystemNode[] = [];
+
+    const contractorNodes = managerContractors
+      .map<EcosystemNode>((contractor) => ({
+        user: {
+          id: contractor.id ?? 'CONTRACTOR',
+          role: 'Contractor',
+          name: contractor.name ?? 'Contractor',
+        },
+      }))
+      .sort(createNodeSorter);
+
+    const customerNodes = managerCustomers
+      .map<EcosystemNode>((customer) => {
+        const customerId = normalizeId(customer.id);
+        const centersForCustomer = customerId ? centersByCustomerId.get(customerId) ?? [] : [];
+        const centerNodes = centersForCustomer
+          .map<EcosystemNode>((center) => {
+            const centerId = normalizeId(center.id);
+            const crewForCenter = centerId ? crewByCenterId.get(centerId) ?? [] : [];
+            const crewNodes = crewForCenter
+              .map<EcosystemNode>((member) => ({
+                user: {
+                  id: member.id ?? 'CREW',
+                  role: 'Crew',
+                  name: member.name ?? 'Crew Member',
+                },
+              }))
+              .sort(createNodeSorter);
+
+            return {
+              user: {
+                id: center.id ?? 'CENTER',
+                role: 'Center',
+                name: center.name ?? 'Service Center',
+              },
+              children: crewNodes.length > 0 ? crewNodes : undefined,
+            };
+          })
+          .sort(createNodeSorter);
+
+        return {
+          user: {
+            id: customer.id ?? 'CUSTOMER',
+            role: 'Customer',
+            name: customer.name ?? customer.mainContact ?? 'Customer',
+          },
+          children: centerNodes.length > 0 ? centerNodes : undefined,
+        };
+      })
+      .sort(createNodeSorter);
+
+    const orphanCenters = managerCenters.filter((center) => {
+      const customerId = normalizeId(center.customerId);
+      return !customerId || !managerCustomerIdSet.has(customerId);
+    });
+
+    const orphanCenterNodes = orphanCenters
+      .map<EcosystemNode>((center) => {
+        const centerId = normalizeId(center.id);
+        const crewForCenter = centerId ? crewByCenterId.get(centerId) ?? [] : [];
+        const crewNodes = crewForCenter
+          .map<EcosystemNode>((member) => ({
+            user: {
+              id: member.id ?? 'CREW',
+              role: 'Crew',
+              name: member.name ?? 'Crew Member',
+            },
+          }))
+          .sort(createNodeSorter);
+
+        return {
+          user: {
+            id: center.id ?? 'CENTER',
+            role: 'Center',
+            name: center.name ?? 'Service Center',
+          },
+          children: crewNodes.length > 0 ? crewNodes : undefined,
+        };
+      })
+      .sort(createNodeSorter);
+
+    children.push(...contractorNodes, ...customerNodes, ...orphanCenterNodes);
+
+    const root: EcosystemNode = {
+      user: {
+        id: managerRootId,
+        role: 'Manager',
+        name: managerDisplayName,
+      },
+    };
+
+    if (children.length > 0) {
+      root.children = children;
+    }
+
+    return root;
+  }, [
+    managerContractors,
+    managerCustomers,
+    managerCenters,
+    managerCustomerIdSet,
+    managerDisplayName,
+    managerRootId,
+    centersByCustomerId,
+    crewByCenterId,
   ]);
 
-  // Mock orders data - Manager sees service requests that need their approval and crew assignment
-  const serviceOrders: any[] = [
-    // State 1: All approved, pending manager to create service (ACTION REQUIRED)
-    {
-      orderId: 'CTR001-ORD-SRV003',
-      orderType: 'service',
-      title: 'Security System Installation',
-      requestedBy: 'CTR-001',
-      destination: 'CTR-001',
-      requestedDate: '2025-09-17',
-      expectedDate: '2025-09-30',
-      status: 'pending',  // Manager sees as pending (needs to create service)
-      approvalStages: [
-        { role: 'Center', status: 'requested', user: 'CTR-001', timestamp: '2025-09-17 08:00' },
-        { role: 'Customer', status: 'approved', user: 'CUS-001', timestamp: '2025-09-17 11:00' },
-        { role: 'Contractor', status: 'approved', user: 'CON-001', timestamp: '2025-09-17 15:00' },
-        { role: 'Manager', status: 'pending' }  // Their action needed - only this should pulse
-      ],
-      description: 'Installation of new security camera system',
-      serviceType: 'Installation',
-      frequency: 'One-time',
-      estimatedDuration: '12 hours',
-      notes: 'Requires specialized security clearance'
-    },
-    // State 2: Manager created service and assigned crew (SERVICE ACTIVE)
-    {
-      orderId: 'CTR001-ORD-SRV004',
-      orderType: 'service',
-      title: 'Landscaping Maintenance Service',
-      requestedBy: 'CTR-001',
-      destination: 'CTR-001',
-      requestedDate: '2025-09-15',
-      expectedDate: '2025-09-20',
-      serviceStartDate: '2025-09-20',
-      status: 'service-created',  // Service has been created and assigned
-      approvalStages: [
-        { role: 'Center', status: 'requested', user: 'CTR-001', timestamp: '2025-09-15 09:00' },
-        { role: 'Customer', status: 'approved', user: 'CUS-001', timestamp: '2025-09-15 12:00' },
-        { role: 'Contractor', status: 'approved', user: 'CON-001', timestamp: '2025-09-15 16:00' },
-        { role: 'Manager', status: 'service-created', user: 'MGR-001', timestamp: '2025-09-16 10:00' }
-      ],
-      description: 'Weekly landscaping and grounds maintenance',
-      serviceType: 'Landscaping',
-      frequency: 'Weekly',
-      estimatedDuration: '6 hours',
-      assignedCrew: 'CRW-003',
-      notes: 'Includes lawn care and shrub trimming'
-    },
-    // State 3: Another pending service creation
-    {
-      orderId: 'CTR001-ORD-SRV007',
-      orderType: 'service',
-      title: 'Plumbing Repair Service',
-      requestedBy: 'CTR-001',
-      destination: 'CTR-001',
-      requestedDate: '2025-09-19',
-      expectedDate: '2025-09-22',
-      status: 'pending',
-      approvalStages: [
-        { role: 'Center', status: 'requested', user: 'CTR-001', timestamp: '2025-09-19 08:00' },
-        { role: 'Customer', status: 'approved', user: 'CUS-001', timestamp: '2025-09-19 10:00' },
-        { role: 'Contractor', status: 'approved', user: 'CON-001', timestamp: '2025-09-19 13:00' },
-        { role: 'Manager', status: 'pending' }  // Action needed
-      ],
-      description: 'Emergency plumbing repairs in main office',
-      serviceType: 'Plumbing',
-      frequency: 'One-time',
-      estimatedDuration: '4 hours',
-      notes: 'Pipe leak in conference room - urgent'
-    },
-    // State 4: Another completed service
-    {
-      orderId: 'CTR001-ORD-SRV008',
-      orderType: 'service',
-      title: 'HVAC System Maintenance',
-      requestedBy: 'CTR-001',
-      destination: 'CTR-001',
-      requestedDate: '2025-09-12',
-      expectedDate: '2025-09-15',
-      serviceStartDate: '2025-09-15',
-      status: 'service-created',
-      approvalStages: [
-        { role: 'Center', status: 'requested', user: 'CTR-001', timestamp: '2025-09-12 09:00' },
-        { role: 'Customer', status: 'approved', user: 'CUS-001', timestamp: '2025-09-12 11:00' },
-        { role: 'Contractor', status: 'approved', user: 'CON-001', timestamp: '2025-09-12 14:00' },
-        { role: 'Manager', status: 'service-created', user: 'MGR-001', timestamp: '2025-09-13 09:00' }
-      ],
-      description: 'Routine HVAC system maintenance and filter replacement',
-      serviceType: 'Maintenance',
-      frequency: 'Quarterly',
-      estimatedDuration: '3 hours',
-      assignedCrew: 'CRW-005',
-      notes: 'Standard quarterly maintenance'
-    },
-    // Warehouse service orders (Manager can monitor but not interact)
-    {
-      orderId: 'CTR001-ORD-SRV020',
-      orderType: 'service',
-      title: 'Inventory Management Service',
-      requestedBy: 'CTR-001',
-      destination: 'CTR-001',
-      requestedDate: '2025-09-19',
-      expectedDate: '2025-09-22',
-      status: 'in-progress',  // Manager can monitor
-      approvalStages: [
-        { role: 'Center', status: 'requested', user: 'CTR-001', timestamp: '2025-09-19 08:00' },
-        { role: 'Customer', status: 'approved', user: 'CUS-001', timestamp: '2025-09-19 10:00' },
-        { role: 'Contractor', status: 'approved', user: 'CON-001', timestamp: '2025-09-19 13:00' },
-        { role: 'Warehouse', status: 'pending' }  // Warehouse needs to act
-      ],
-      description: 'Complete inventory audit and organization service',
-      serviceType: 'Inventory',
-      frequency: 'Quarterly',
-      estimatedDuration: '8 hours',
-      notes: 'Full warehouse inventory count and reorganization'
-    },
-    {
-      orderId: 'CTR001-ORD-SRV023',
-      orderType: 'service',
-      title: 'Warehouse Safety Inspection',
-      requestedBy: 'CTR-001',
-      destination: 'CTR-001',
-      requestedDate: '2025-09-12',
-      expectedDate: '2025-09-15',
-      serviceStartDate: '2025-09-15',
-      status: 'service-created',  // Service completed by warehouse
-      approvalStages: [
-        { role: 'Center', status: 'requested', user: 'CTR-001', timestamp: '2025-09-12 10:00' },
-        { role: 'Customer', status: 'approved', user: 'CUS-001', timestamp: '2025-09-12 12:00' },
-        { role: 'Contractor', status: 'approved', user: 'CON-001', timestamp: '2025-09-12 15:00' },
-        { role: 'Warehouse', status: 'service-created', user: 'WHS-001', timestamp: '2025-09-15 16:00' }
-      ],
-      description: 'Comprehensive safety audit and compliance check',
-      serviceType: 'Inspection',
-      frequency: 'Annual',
-      estimatedDuration: '3 hours',
-      notes: 'Annual safety compliance inspection completed',
-      serviceCompleted: true,
-      completedDate: '2025-09-15'
-    }
-  ];
-  const productOrders: any[] = [
-    // Same orders as CrewHub - Manager can monitor crew orders
-    // State 1: Pending warehouse acceptance
-    {
-      orderId: 'CRW001-ORD-PRD001',
-      orderType: 'product',
-      title: 'Cleaning Supplies - Standard Package',
-      requestedBy: 'CRW-001',
-      destination: 'CTR-001',
-      requestedDate: '2025-09-19',
-      expectedDate: '2025-09-22',
-      status: 'in-progress',
-      approvalStages: [
-        { role: 'Crew', status: 'requested', user: 'CRW-001', timestamp: '2025-09-19 09:00' },
-        { role: 'Warehouse', status: 'pending' }
-      ],
-      approvalStage: {
-        currentStage: 'warehouse',
-        warehouseApproval: 'pending',
-        warehouseNotes: null
-      },
-      items: [
-        { name: 'All-Purpose Cleaner', quantity: 10, unit: 'bottles' },
-        { name: 'Microfiber Cloths', quantity: 50, unit: 'pieces' },
-        { name: 'Disinfectant Spray', quantity: 15, unit: 'cans' }
-      ],
-      notes: 'Urgent - running low on supplies for upcoming service'
-    },
-    // State 2: Accepted by warehouse (pending delivery)
-    {
-      orderId: 'CRW001-ORD-PRD002',
-      orderType: 'product',
-      title: 'Safety Equipment Restock',
-      requestedBy: 'CRW-001',
-      destination: 'CTR-002',
-      requestedDate: '2025-09-17',
-      expectedDate: '2025-09-20',
-      status: 'in-progress',
-      approvalStages: [
-        { role: 'Crew', status: 'requested', user: 'CRW-001', timestamp: '2025-09-17 14:30' },
-        { role: 'Warehouse', status: 'accepted' }
-      ],
-      approvalStage: {
-        currentStage: 'delivery',
-        warehouseApproval: 'approved',
-        warehouseApprovedBy: 'WHS-001',
-        warehouseApprovedDate: '2025-09-18',
-        warehouseNotes: 'Stock available - preparing for shipment',
-        deliveryStatus: 'pending'
-      },
-      items: [
-        { name: 'Safety Gloves', quantity: 100, unit: 'pairs' },
-        { name: 'Face Masks', quantity: 200, unit: 'pieces' },
-        { name: 'Safety Goggles', quantity: 20, unit: 'pieces' }
-      ],
-      notes: 'Monthly safety equipment restock'
-    },
-    // State 3: Delivered (archived)
-    {
-      orderId: 'CRW001-ORD-PRD003',
-      orderType: 'product',
-      title: 'Floor Care Products',
-      requestedBy: 'CRW-001',
-      destination: 'CTR-003',
-      requestedDate: '2025-09-14',
-      expectedDate: '2025-09-16',
-      deliveryDate: '2025-09-16',
-      status: 'delivered',
-      approvalStages: [
-        { role: 'Crew', status: 'requested', user: 'CRW-001', timestamp: '2025-09-14 08:00' },
-        { role: 'Warehouse', status: 'delivered', user: 'WHS-001', timestamp: '2025-09-16 15:45' }
-      ],
-      approvalStage: {
-        currentStage: 'completed',
-        warehouseApproval: 'approved',
-        warehouseApprovedBy: 'WHS-001',
-        warehouseApprovedDate: '2025-09-14',
-        deliveryStatus: 'delivered',
-        deliveredBy: 'WHS-001',
-        deliveredDate: '2025-09-16',
-        deliveryNotes: 'Delivered to loading dock - signed by J. Smith'
-      },
-      items: [
-        { name: 'Floor Wax', quantity: 5, unit: 'gallons' },
-        { name: 'Floor Stripper', quantity: 3, unit: 'gallons' },
-        { name: 'Mop Heads', quantity: 24, unit: 'pieces' }
-      ],
-      notes: 'For scheduled floor maintenance at CTR-003'
-    },
-    // State 4: Rejected (archived)
-    {
-      orderId: 'CRW001-ORD-PRD004',
-      orderType: 'product',
-      title: 'Specialized Equipment Request',
-      requestedBy: 'CRW-001',
-      destination: 'CTR-001',
-      requestedDate: '2025-09-12',
-      expectedDate: '2025-09-15',
-      status: 'rejected',
-      approvalStages: [
-        { role: 'Crew', status: 'requested', user: 'CRW-001', timestamp: '2025-09-12 10:00' },
-        { role: 'Warehouse', status: 'rejected', user: 'WHS-001', timestamp: '2025-09-13 09:30' }
-      ],
-      approvalStage: {
-        currentStage: 'rejected',
-        warehouseApproval: 'rejected',
-        warehouseRejectedBy: 'WHS-001',
-        warehouseRejectedDate: '2025-09-13',
-        warehouseNotes: 'Items not in current inventory - please contact procurement for special order',
-        rejectionReason: 'Out of stock - requires special order'
-      },
-      items: [
-        { name: 'Industrial Steam Cleaner', quantity: 2, unit: 'units' },
-        { name: 'High-Pressure Washer', quantity: 1, unit: 'unit' }
-      ],
-      notes: 'Need for deep cleaning project'
-    },
-    // Manager monitors all Center->Customer->Contractor->Warehouse flows
-    // Example 1: Pending customer approval
-    {
-      orderId: 'CTR001-ORD-PRD001',
-      orderType: 'product',
-      title: 'Office Supplies - Monthly Restock',
-      requestedBy: 'CTR-001',
-      destination: 'CTR-001',
-      requestedDate: '2025-09-19',
-      expectedDate: '2025-09-25',
-      status: 'in-progress',  // Manager sees all as in-progress (monitoring)
-      approvalStages: [
-        { role: 'Center', status: 'requested', user: 'CTR-001', timestamp: '2025-09-19 10:00' },
-        { role: 'Customer', status: 'pending' },
-        { role: 'Contractor', status: 'waiting' },
-        { role: 'Warehouse', status: 'waiting' }
-      ],
-      items: [
-        { name: 'Paper Towels', quantity: 100, unit: 'rolls' },
-        { name: 'Hand Soap', quantity: 50, unit: 'bottles' },
-        { name: 'Trash Bags', quantity: 200, unit: 'bags' }
-      ],
-      notes: 'Monthly restocking for all bathrooms and break rooms'
-    },
-    // Example 2: Full approval chain completed, delivered
-    {
-      orderId: 'CTR001-ORD-PRD005',
-      orderType: 'product',
-      title: 'HVAC Filters Bulk Order',
-      requestedBy: 'CTR-001',
-      destination: 'CTR-001',
-      requestedDate: '2025-09-10',
-      expectedDate: '2025-09-15',
-      deliveryDate: '2025-09-15',
-      status: 'delivered',
-      approvalStages: [
-        { role: 'Center', status: 'requested', user: 'CTR-001', timestamp: '2025-09-10 09:00' },
-        { role: 'Customer', status: 'approved', user: 'CUS-001', timestamp: '2025-09-10 11:00' },
-        { role: 'Contractor', status: 'approved', user: 'CON-001', timestamp: '2025-09-11 10:00' },
-        { role: 'Warehouse', status: 'accepted', user: 'WHS-001', timestamp: '2025-09-12 08:00' },
-        { role: 'Warehouse', status: 'delivered', user: 'WHS-001', timestamp: '2025-09-15 14:00' }
-      ],
-      items: [
-        { name: 'HVAC Filters 20x25x1', quantity: 50, unit: 'filters' },
-        { name: 'HVAC Filters 16x20x1', quantity: 30, unit: 'filters' }
-      ],
-      notes: 'Quarterly filter replacement stock'
-    }
-  ];
+  const activityEmptyMessage = activitiesError
+    ? 'Failed to load activity feed.'
+    : activitiesLoading
+      ? 'Loading recent activity...'
+      : 'No recent manager activity';
 
-    const tabs = [
-    { id: 'dashboard', label: 'Dashboard', path: '/manager/dashboard' },
-    { id: 'profile', label: 'My Profile', path: '/manager/profile' },
-    { id: 'ecosystem', label: 'My Ecosystem', path: '/manager/ecosystem' },
-    { id: 'services', label: 'My Services', path: '/manager/services' },
-    { id: 'orders', label: 'Orders', path: '/manager/orders' },
-    { id: 'reports', label: 'Reports', path: '/manager/reports' },
-    { id: 'support', label: 'Support', path: '/manager/support' }
-  ];
+  const handleClearActivity = useCallback(() => {
+    setActivityFeed([]);
+  }, []);
 
-  // Manager-specific overview cards (6 cards)
-  const overviewCards = [
-    { id: 'contractors', title: 'My Contractors', dataKey: 'contractorCount', color: 'blue' },
-    { id: 'customers', title: 'My Customers', dataKey: 'customerCount', color: 'green' },
-    { id: 'centers', title: 'My Centers', dataKey: 'centerCount', color: 'purple' },
-    { id: 'crew', title: 'My Crew', dataKey: 'crewCount', color: 'orange' },
-    { id: 'orders', title: 'Pending Orders', dataKey: 'pendingOrders', color: 'red' },
-    { id: 'status', title: 'Account Status', dataKey: 'accountStatus', color: 'green' }
-  ];
+  const handleOrderAction = useCallback((orderId: string, action: string) => {
+    console.log('[manager] order action', { orderId, action });
+  }, []);
 
-  // Mock data - replace with actual API data
-  const overviewData = {
-    contractorCount: 3,
-    customerCount: 12,
-    centerCount: 4,
-    crewCount: 8,
-    pendingOrders: 7,
-    accountStatus: 'Active'
-  };
-
-  // Mock services data
-  const myServicesData = [
-    { serviceId: 'SRV-001', serviceName: 'Commercial Deep Cleaning', certified: 'Yes', certificationDate: '2024-03-15', expires: '2026-03-15' },
-    { serviceId: 'SRV-002', serviceName: 'Floor Care & Maintenance', certified: 'Yes', certificationDate: '2024-01-10', expires: 'â€”' },
-    { serviceId: 'SRV-003', serviceName: 'Window Cleaning Services', certified: 'No', certificationDate: 'â€”', expires: 'â€”' },
-    { serviceId: 'SRV-004', serviceName: 'HVAC Maintenance', certified: 'Yes', certificationDate: '2024-02-20', expires: '2025-02-20' },
-  ];
-
-  const activeServicesData = [
-    { serviceId: 'CTR001-SRV001', serviceName: 'Commercial Deep Cleaning', centerId: 'CTR001', type: 'Recurring', startDate: '2025-09-01' },
-    { serviceId: 'CTR002-SRV002', serviceName: 'Floor Care & Maintenance', centerId: 'CTR002', type: 'One-time', startDate: '2025-09-10' },
-    { serviceId: 'CTR001-SRV003', serviceName: 'Window Cleaning Services', centerId: 'CTR001', type: 'Recurring', startDate: '2025-08-15' },
-  ];
-
-  const serviceHistoryData = [
-    { serviceId: 'CTR003-SRV001', serviceName: 'Commercial Deep Cleaning', centerId: 'CTR003', type: 'Recurring', status: 'Completed', startDate: '2025-06-01', endDate: '2025-08-20' },
-    { serviceId: 'CTR002-SRV003', serviceName: 'Window Cleaning Services', centerId: 'CTR002', type: 'One-time', status: 'Cancelled', startDate: '2025-07-15', endDate: '2025-08-02' },
-    { serviceId: 'CTR001-SRV002', serviceName: 'Floor Care & Maintenance', centerId: 'CTR001', type: 'Recurring', status: 'Completed', startDate: '2025-05-31', endDate: '2025-07-31' },
-    { serviceId: 'CTR004-SRV004', serviceName: 'HVAC Maintenance', centerId: 'CTR004', type: 'One-time', status: 'Completed', startDate: '2025-07-01', endDate: '2025-07-15' },
-  ];
-
+  const handleNodeClick = useCallback((userId: string) => {
+    console.log('[manager] view ecosystem node', userId);
+  }, []);
 
   return (
     <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: '#f9fafb' }}>
       <MyHubSection
         hubName="Manager Hub"
-        tabs={tabs}
+        tabs={HUB_TABS}
         activeTab={activeTab}
         onTabClick={setActiveTab}
-        userId="MGR-001"
-        role="manager"
       />
 
-      {/* Content Area */}
-      <Scrollbar style={{
-        flex: 1,
-        padding: '0 24px'
-      }}>
+      <Scrollbar style={{ flex: 1, padding: '0 24px' }} className="hub-content-scroll">
         <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
           {activeTab === 'dashboard' ? (
             <PageWrapper title="Dashboard" showHeader={false}>
-              {/* Section headers remain for dashboard */}
               <PageHeader title="Overview" />
-              <OverviewSection
-                cards={overviewCards}
-                data={overviewData}
-              />
+              <OverviewSection cards={OVERVIEW_CARDS} data={overviewData} />
+
               <PageHeader title="Recent Activity" />
               <RecentActivity
-                activities={activities}
-                onClear={() => setActivities([])}
-                emptyMessage="No recent manager activity"
+                activities={activityFeed}
+                onClear={handleClearActivity}
+                emptyMessage={activityEmptyMessage}
               />
 
-              {/* Communication Hub */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 24 }}>
-                <NewsPreview color="#3b82f6" onViewAll={() => console.log('View all news')} />
-                <MemosPreview color="#3b82f6" onViewAll={() => console.log('View memos')} />
+                <NewsPreview color={MANAGER_PRIMARY_COLOR} onViewAll={() => console.log('[manager] view news')} />
+                <MemosPreview color={MANAGER_PRIMARY_COLOR} onViewAll={() => console.log('[manager] view memos')} />
               </div>
             </PageWrapper>
           ) : activeTab === 'profile' ? (
-            <PageWrapper title="My Profile" showHeader={true} headerSrOnly>
+            <PageWrapper title="My Profile" showHeader headerSrOnly>
               <ProfileInfoCard
-              role="manager"
-              profileData={{
-                fullName: 'John Smith',
-                managerId: 'MGR-001',
-                address: '123 Business Ave, Suite 100, New York, NY 10001',
-                phone: '(555) 123-4567',
-                email: 'john.smith@cks.com',
-                territory: 'Northeast Region',
-                role: 'Senior Manager',
-                reportsTo: 'Regional Director',
-                startDate: '2021-01-15'
-              }}
-              accountManager={null}
-              primaryColor="#3b82f6"
-              onUpdatePhoto={() => console.log('Update photo')}
-            />
+                role="manager"
+                profileData={managerProfileData}
+                accountManager={null}
+                primaryColor={MANAGER_PRIMARY_COLOR}
+                onUpdatePhoto={() => console.log('[manager] update photo')}
+              />
             </PageWrapper>
           ) : activeTab === 'ecosystem' ? (
-            <PageWrapper title="My Ecosystem" showHeader={true} headerSrOnly>
+            <PageWrapper title="My Ecosystem" showHeader headerSrOnly>
               <EcosystemTree
-                rootUser={{ id: 'MGR-001', role: 'Manager', name: 'John Smith' }}
-                treeData={ecosystemData}
-                onNodeClick={(userId: string) => console.log('View details for:', userId)}
-                expandedNodes={['MGR-001']}
-                currentUserId="MGR-001"
+                rootUser={{ id: managerRootId, role: 'Manager', name: managerDisplayName }}
+                treeData={ecosystemTree}
+                onNodeClick={handleNodeClick}
+                expandedNodes={[managerRootId]}
+                currentUserId={managerRootId}
                 title="My Ecosystem"
                 subtitle="Your Territory Overview"
                 description="Click any row with an arrow to expand and explore your territory ecosystem"
@@ -619,159 +836,106 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
                   contractor: '#dcfce7',
                   customer: '#fef9c3',
                   center: '#ffedd5',
-                  crew: '#fee2e2'
+                  crew: '#fee2e2',
                 }}
               />
             </PageWrapper>
           ) : activeTab === 'services' ? (
-            <PageWrapper title="My Services" showHeader={true} headerSrOnly>
+            <PageWrapper title="My Services" showHeader headerSrOnly>
               <TabSection
                 tabs={[
-                  { id: 'my', label: 'My Services', count: 4 },
-                  { id: 'active', label: 'Active Services', count: 3 },
-                  { id: 'history', label: 'Service History', count: 4 }
+                  { id: 'my', label: 'My Services', count: myServicesData.length },
+                  { id: 'active', label: 'Active Services', count: activeServicesData.length },
+                  { id: 'history', label: 'Service History', count: serviceHistoryData.length },
                 ]}
                 activeTab={servicesTab}
-                onTabChange={setServicesTab}
+                onTabChange={(tabId) => {
+                  setServicesTab(tabId as 'my' | 'active' | 'history');
+                  setServicesSearchQuery('');
+                }}
                 description={
-                  servicesTab === 'my' ? 'Services you are certified in and qualified to train' :
-                  servicesTab === 'active' ? 'Services you currently manage' :
-                  'Services you no longer manage'
-                }
-                searchPlaceholder={
-                  servicesTab === 'my' ? 'Search by Service ID or name' :
-                  servicesTab === 'active' ? 'Search active services' :
-                  'Search service history'
+                  servicesTab === 'my'
+                    ? 'Services you are certified in and qualified to train'
+                    : servicesTab === 'active'
+                      ? 'Services you currently manage'
+                      : 'Services you no longer manage'
                 }
                 onSearch={setServicesSearchQuery}
+                searchPlaceholder={
+                  servicesTab === 'history'
+                    ? 'Search service history...'
+                    : servicesTab === 'active'
+                      ? 'Search active services...'
+                      : 'Search services...'
+                }
                 actionButton={
                   <Button
                     variant="primary"
                     roleColor="#000000"
-                    onClick={() => console.log('Browse catalog')}
+                    onClick={() => navigate('/catalog')}
                   >
                     Browse CKS Catalog
                   </Button>
                 }
-                primaryColor="#3b82f6"
+                primaryColor={MANAGER_PRIMARY_COLOR}
               >
                 {servicesTab === 'my' && (
                   <DataTable
-                    columns={[
-                      { key: 'serviceId', label: 'SERVICE ID', clickable: true },
-                      { key: 'serviceName', label: 'SERVICE NAME' },
-                      { key: 'certified', label: 'CERTIFIED' },
-                      { key: 'certificationDate', label: 'CERTIFICATION DATE' },
-                      { key: 'expires', label: 'EXPIRES' }
-                    ]}
+                    columns={MY_SERVICES_COLUMNS}
                     data={myServicesData}
                     showSearch={false}
                     externalSearchQuery={servicesSearchQuery}
                     maxItems={10}
-                    onRowClick={(row: unknown) => console.log('View service:', row)}
+                    onRowClick={(row: unknown) => console.log('[manager] view service', row)}
                   />
                 )}
 
                 {servicesTab === 'active' && (
                   <DataTable
-                    columns={[
-                      { key: 'serviceId', label: 'SERVICE ID', clickable: true },
-                      { key: 'serviceName', label: 'SERVICE NAME' },
-                      { key: 'centerId', label: 'CENTER ID' },
-                      { key: 'type', label: 'TYPE' },
-                      { key: 'startDate', label: 'START DATE' }
-                    ]}
+                    columns={ACTIVE_SERVICES_COLUMNS}
                     data={activeServicesData}
                     showSearch={false}
                     externalSearchQuery={servicesSearchQuery}
                     maxItems={10}
-                    onRowClick={(row: unknown) => console.log('View order:', row)}
+                    onRowClick={(row: unknown) => console.log('[manager] view active service', row)}
                   />
                 )}
 
                 {servicesTab === 'history' && (
                   <DataTable
-                    columns={[
-                      { key: 'serviceId', label: 'SERVICE ID', clickable: true },
-                      { key: 'serviceName', label: 'SERVICE NAME' },
-                      { key: 'centerId', label: 'CENTER ID' },
-                      { key: 'type', label: 'TYPE' },
-                      {
-                        key: 'status',
-                        label: 'STATUS',
-                        render: (value: string) => (
-                          <span style={{
-                            padding: '4px 12px',
-                            borderRadius: '4px',
-                            fontSize: '12px',
-                            fontWeight: 500,
-                            backgroundColor: value === 'Completed' ? '#dcfce7' : '#fee2e2',
-                            color: value === 'Completed' ? '#16a34a' : '#dc2626'
-                          }}>
-                            {value}
-                          </span>
-                        )
-                      },
-                      { key: 'startDate', label: 'START DATE' },
-                      { key: 'endDate', label: 'END DATE' }
-                    ]}
+                    columns={SERVICE_HISTORY_COLUMNS}
                     data={serviceHistoryData}
                     showSearch={false}
                     externalSearchQuery={servicesSearchQuery}
                     maxItems={10}
-                    onRowClick={(row: unknown) => console.log('View history:', row)}
+                    onRowClick={(row: unknown) => console.log('[manager] view service history', row)}
                   />
                 )}
               </TabSection>
             </PageWrapper>
           ) : activeTab === 'orders' ? (
-            <PageWrapper title="Orders" showHeader={true} headerSrOnly>
+            <PageWrapper title="Orders" showHeader headerSrOnly>
               <OrdersSection
                 userRole="manager"
-                serviceOrders={serviceOrders}
-                productOrders={productOrders}
-                onCreateProductOrder={() => console.log('Request Products')}
-                onOrderAction={(orderId: string, action: string) => {
-                  if (action === 'View Details') {
-                    // Find the order to determine its status
-                    const allOrders = [...serviceOrders, ...productOrders];
-                    const order = allOrders.find(o => o.orderId === orderId);
-
-                    if (order) {
-                      if (order.status === 'delivered') {
-                        alert('Delivery and order details will show here later. We will be able to add a POD or waybill here.');
-                      } else if (order.status === 'rejected') {
-                        alert('Rejection details will show here later. It will also show a waybill and a rejection reason.');
-                      } else if (order.status === 'pending' || order.status === 'in-progress') {
-                        alert('List of products ordered will show here and some other info.');
-                      }
-                    }
-                  } else {
-                    console.log(`Order ${orderId}: ${action}`);
-                  }
-                }}
-                showServiceOrders={true}
-                showProductOrders={true}
-                primaryColor="#3b82f6"
+                serviceOrders={managerServiceOrderCards}
+                productOrders={managerProductOrderCards}
+                onCreateProductOrder={() => console.log('[manager] request products')}
+                onOrderAction={handleOrderAction}
+                showServiceOrders
+                showProductOrders
+                primaryColor={MANAGER_PRIMARY_COLOR}
               />
             </PageWrapper>
           ) : activeTab === 'support' ? (
             <PageWrapper headerSrOnly>
-              <SupportSection
-                role="manager"
-                primaryColor="#3b82f6"
-              />
+              <SupportSection role="manager" primaryColor={MANAGER_PRIMARY_COLOR} />
             </PageWrapper>
           ) : activeTab === 'reports' ? (
             <PageWrapper headerSrOnly>
-              <ReportsSection
-                role="manager"
-                userId="MNG-001"
-                primaryColor="#3b82f6"
-              />
+              <ReportsSection role="manager" userId={managerRootId} primaryColor={MANAGER_PRIMARY_COLOR} />
             </PageWrapper>
           ) : (
-            <PageWrapper title={activeTab} showHeader={true} headerSrOnly>
+            <PageWrapper title={activeTab} showHeader headerSrOnly>
               <h2>Manager Hub - {activeTab}</h2>
               <p>Content for {activeTab} will be implemented here.</p>
             </PageWrapper>
@@ -781,4 +945,5 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
     </div>
   );
 }
+
 

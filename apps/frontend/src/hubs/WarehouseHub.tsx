@@ -22,6 +22,7 @@
 -----------------------------------------------*/
 
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { MemosPreview, NewsPreview, OrdersSection, OverviewSection, ProfileInfoCard, RecentActivity, ReportsSection, SupportSection, type Activity } from '@cks/domain-widgets';
 import { Button, DataTable, PageHeader, PageWrapper, Scrollbar, TabSection } from '@cks/ui';
 import MyHubSection from '../components/MyHubSection';
@@ -31,6 +32,7 @@ interface WarehouseHubProps {
 }
 
 export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubProps) {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState(initialTab);
   const [servicesTab, setServicesTab] = useState('my');
   const [servicesSearchQuery, setServicesSearchQuery] = useState('');
@@ -756,7 +758,7 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
                   <Button
                     variant="primary"
                     roleColor="#000000"
-                    onClick={() => console.log('Browse catalog')}
+                    onClick={() => navigate('/catalog')}
                   >
                     Browse CKS Catalog
                   </Button>

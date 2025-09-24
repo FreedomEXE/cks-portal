@@ -11,7 +11,18 @@
       "Bash(pkill:*)",
       "Bash(npx tsc:*)",
       "Bash(node:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(dos2unix:*)",
+      "Bash(sed:*)",
+      "Bash(npm test)",
+      "mcp__ide__getDiagnostics",
+      "Bash(test:*)",
+      "Bash(npx dotenv-cli pnpm migrate:*)",
+      "Bash(npx dotenv-cli:*)",
+      "Read(//c/Users/User/Documents/YourProjectName/**)",
+      "Bash(curl: -X GET https://api.yourservice.com/*)",
+      "Bash(taskkill: /IM node.exe /F)",
+      "Bash(taskkill:*)"
     ],
     "deny": [],
     "ask": []

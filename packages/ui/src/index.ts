@@ -30,3 +30,6 @@ export type { OrderCardProps, ApprovalStage } from './cards/OrderCard';
 
 export { default as Scrollbar } from './Scrollbar';
 export * from './Scrollbar';
+
+export { default as ActionModal } from './modals/ActionModal';
+export type { ActionModalProps } from './modals/ActionModal';

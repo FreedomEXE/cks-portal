@@ -13,6 +13,60 @@ const ROLE_PREFIXES: Record<string, string> = {
   WH: 'warehouse',
 };
 
+export type ImpersonationRequestOptions = {
+  request?: (code: string) => Promise<ImpersonationPayload | null>;
+  getToken?: () => Promise<string | null>;
+};
+
+export async function requestImpersonationFromBackend(
+  code: string,
+  options?: ImpersonationRequestOptions,
+): Promise<ImpersonationPayload | null> {
+  try {
+    const headers = new Headers({
+      'Content-Type': 'application/json',
+    });
+
+    const tokenProvider = options?.getToken;
+    if (tokenProvider) {
+      try {
+        const token = await tokenProvider();
+        console.log('[impersonation] Token received:', !!token);
+        if (token) {
+          headers.set('Authorization', 'Bearer ' + token);
+          console.log('[impersonation] Authorization header set');
+        }
+      } catch (error) {
+        console.warn('[impersonation] Failed to resolve auth token', error);
+      }
+    }
+
+    console.log('[impersonation] Making request with headers:', Object.fromEntries(headers.entries()));
+
+    const response = await fetch('http://localhost:3000/api/admin/impersonate', {
+      method: 'POST',
+      headers,
+      credentials: 'include',
+      body: JSON.stringify({ code }),
+    });
+
+    if (!response.ok) {
+      console.warn('[impersonation] Backend rejected impersonation:', response.status);
+      return null;
+    }
+    const data = await response.json();
+    return {
+      code: data.code,
+      role: data.role,
+      displayName: data.displayName,
+      firstName: data.firstName,
+    };
+  } catch (error) {
+    console.warn('[impersonation] Backend impersonation error', error);
+    return null;
+  }
+}
+
 function getSessionStorage(): Storage | null {
   if (typeof window === 'undefined') {
     return null;
@@ -93,6 +147,26 @@ export type ImpersonationSnapshot = {
 };
 
 const SESSION_KEYS = ['impersonate', 'role', 'code', 'impersonate:firstName', 'impersonate:displayName'] as const;
+
+export async function triggerImpersonation(code: string, options?: ImpersonationRequestOptions): Promise<boolean> {
+  let payload: ImpersonationPayload | null = null;
+
+  if (options?.request) {
+    try {
+      payload = await options.request(code);
+    } catch (error) {
+      console.warn('[impersonation] Custom request failed', error);
+      payload = null;
+    }
+  } else {
+    payload = await requestImpersonationFromBackend(code, options);
+  }
+
+  if (!payload) {
+    return false;
+  }
+  return persistImpersonation(payload);
+}
 
 export function persistImpersonation(payload: ImpersonationPayload): boolean {
   const storage = getSessionStorage();

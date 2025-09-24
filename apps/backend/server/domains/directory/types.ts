@@ -1,9 +1,54 @@
+export interface CustomerRow {
+  customer_id: string;
+  cks_manager: string | null;
+  company_name: string | null;
+  main_contact: string | null;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  num_centers: number | null;
+  created_at: string | null;
+  updated_at: string | null;
+  archived_at: string | null;
+}
+
+export interface CenterRow {
+  center_id: string;
+  cks_manager: string | null;
+  name: string | null;
+  contractor_id: string | null;
+  customer_id: string | null;
+  main_contact: string | null;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+  archived_at: string | null;
+}
+
+export interface CrewRow {
+  crew_id: string;
+  name: string | null;
+  status: string | null;
+  emergency_contact: string | null;
+  address: string | null;
+  phone: string | null;
+  email: string | null;
+  assigned_center: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+  archived_at: string | null;
+}
 export interface ManagerDirectoryEntry {
   id: string;
   name: string;
   email: string | null;
   phone: string | null;
   territory: string | null;
+  role: string | null;
+  reportsTo: string | null;
+  address: string | null;
   status: string | null;
   createdAt: string | null;
   updatedAt: string | null;
@@ -12,9 +57,9 @@ export interface ManagerDirectoryEntry {
 
 export interface ContractorDirectoryEntry {
   id: string;
-  companyName: string | null;
+  name: string;
   managerId: string | null;
-  contactPerson: string | null;
+  mainContact: string | null;
   email: string | null;
   phone: string | null;
   address: string | null;
@@ -28,11 +73,13 @@ export interface CustomerDirectoryEntry {
   id: string;
   name: string | null;
   managerId: string | null;
-  contactName: string | null;
+  mainContact: string | null;
   email: string | null;
   phone: string | null;
   address: string | null;
   totalCenters: number | null;
+  createdAt: string | null;
+  updatedAt: string | null;
   archivedAt: string | null;
 }
 
@@ -42,10 +89,12 @@ export interface CenterDirectoryEntry {
   managerId: string | null;
   contractorId: string | null;
   customerId: string | null;
-  contactName: string | null;
+  mainContact: string | null;
   email: string | null;
   phone: string | null;
   address: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
   archivedAt: string | null;
 }
 
@@ -53,11 +102,13 @@ export interface CrewDirectoryEntry {
   id: string;
   name: string | null;
   status: string | null;
-  role: string | null;
+  emergencyContact: string | null;
   email: string | null;
   phone: string | null;
   address: string | null;
   assignedCenter: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
   archivedAt: string | null;
 }
 
@@ -66,6 +117,7 @@ export interface WarehouseDirectoryEntry {
   name: string | null;
   managerId: string | null;
   managerName: string | null;
+  mainContact: string | null;
   warehouseType: string | null;
   address: string | null;
   email: string | null;
@@ -85,8 +137,6 @@ export interface ServiceDirectoryEntry {
   category: string | null;
   description: string | null;
   pricingModel: string | null;
-  requirements: string | null;
-  status: string | null;
   createdAt: string | null;
   updatedAt: string | null;
 }
@@ -98,7 +148,7 @@ export interface OrderDirectoryEntry {
   serviceId: string | null;
   orderDate: string | null;
   completionDate: string | null;
-  totalAmount: string | null;
+  totalAmount: number | null;
   status: string | null;
   notes: string | null;
   assignedWarehouse: string | null;
@@ -111,7 +161,7 @@ export interface ProductDirectoryEntry {
   name: string;
   category: string | null;
   description: string | null;
-  price: string | null;
+  price: number | null;
   unit: string | null;
   status: string | null;
   createdAt: string | null;
@@ -125,9 +175,11 @@ export interface TrainingDirectoryEntry {
   serviceId: string | null;
   serviceName: string | null;
   date: string | null;
-  expense: string | null;
+  expense: number | null;
   days: number | null;
   status: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
 }
 
 export interface ProcedureDirectoryEntry {
@@ -198,3 +250,8 @@ export interface DirectoryResourceMap {
 }
 
 export type DirectoryResourceKey = keyof DirectoryResourceMap;
+
+
+
+
+

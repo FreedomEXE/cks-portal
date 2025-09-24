@@ -1,21 +1,24 @@
 import { query } from '../../db/connection';
 import type {
   ActivityEntry,
+  CenterDirectoryEntry,
+  CenterRow,
   ContractorDirectoryEntry,
+  CrewDirectoryEntry,
+  CrewRow,
   CustomerDirectoryEntry,
+  CustomerRow,
   DirectoryResourceKey,
   DirectoryResourceMap,
-  ManagerDirectoryEntry,
-  CenterDirectoryEntry,
-  CrewDirectoryEntry,
-  WarehouseDirectoryEntry,
-  ServiceDirectoryEntry,
-  OrderDirectoryEntry,
-  ProductDirectoryEntry,
-  TrainingDirectoryEntry,
-  ProcedureDirectoryEntry,
-  ReportDirectoryEntry,
   FeedbackDirectoryEntry,
+  ManagerDirectoryEntry,
+  OrderDirectoryEntry,
+  ProcedureDirectoryEntry,
+  ProductDirectoryEntry,
+  ReportDirectoryEntry,
+  ServiceDirectoryEntry,
+  TrainingDirectoryEntry,
+  WarehouseDirectoryEntry,
 } from './types';
 const DEFAULT_LIMIT = 250;
 
@@ -63,12 +66,22 @@ function toNullableNumber(value: unknown): number | null {
   return Number.isNaN(num) ? null : num;
 }
 
+function isMissingColumnError(error: unknown, column: string): boolean {
+  if (!(error instanceof Error) || typeof error.message !== 'string') {
+    return false;
+  }
+  const sanitizedColumn = column.toLowerCase().replace(/['"]/g, '');
+  return error.message.toLowerCase().includes(`column "${sanitizedColumn}" does not exist`);
+}
 type ManagerRow = {
   manager_id: string;
   manager_name: string;
   email: string | null;
   phone: string | null;
   territory: string | null;
+  role: string | null;
+  reports_to: string | null;
+  address: string | null;
   status: string | null;
   created_at: Date | null;
   updated_at: Date | null;
@@ -89,32 +102,8 @@ type ContractorRow = {
   archived_at: Date | null;
 };
 
-type CustomerRow = {
-  customer_id: string;
-  cks_manager: string | null;
-  company_name: string | null;
-  main_contact: string | null;
-  email: string | null;
-  phone: string | null;
-  address: string | null;
-  num_centers: number | null;
-  archived_at: Date | null;
-};
 
-type CenterRow = {
-  center_id: string;
-  cks_manager: string | null;
-  name: string | null;
-  contractor_id: string | null;
-  customer_id: string | null;
-  main_contact: string | null;
-  email: string | null;
-  phone: string | null;
-  address: string | null;
-  archived_at: Date | null;
-};
-
-type CrewRow = {
+type LegacyCrewRow = {
   crew_id: string;
   name: string | null;
   status: string | null;
@@ -127,6 +116,26 @@ type CrewRow = {
 };
 
 type WarehouseRow = {
+  warehouse_id: string;
+  name: string | null;
+  manager_id: string | null;
+  manager: string | null;
+  warehouse_name: string | null;
+  main_contact: string | null;
+  warehouse_type: string | null;
+  address: string | null;
+  phone: string | null;
+  email: string | null;
+  capacity: number | null;
+  current_utilization: number | null;
+  status: string | null;
+  date_acquired: Date | null;
+  created_at: Date | null;
+  updated_at: Date | null;
+  archived_at: Date | null;
+};
+
+type LegacyWarehouseRow = {
   warehouse_id: string;
   name: string | null;
   manager_id: string | null;
@@ -253,13 +262,16 @@ const activityTypeCategory: Record<string, string> = {
 };
 
 async function listManagers(limit = DEFAULT_LIMIT): Promise<ManagerDirectoryEntry[]> {
-  const result = await query<ManagerRow>('SELECT manager_id, manager_name, email, phone, territory, status, created_at, updated_at, archived_at FROM managers ORDER BY manager_id LIMIT $1', [limit]);
+  const result = await query<ManagerRow>('SELECT manager_id, manager_name, email, phone, territory, role, reports_to, address, status, created_at, updated_at, archived_at FROM managers ORDER BY manager_id LIMIT $1', [limit]);
   return result.rows.map((row) => ({
     id: formatPrefixedId(row.manager_id, 'MGR'),
     name: row.manager_name ?? row.manager_id,
     email: toNullableString(row.email),
     phone: toNullableString(row.phone),
     territory: toNullableString(row.territory),
+    role: toNullableString(row.role),
+    reportsTo: toNullableString(row.reports_to),
+    address: toNullableString(row.address),
     status: toNullableString(row.status),
     createdAt: toIso(row.created_at),
     updatedAt: toIso(row.updated_at),
@@ -269,86 +281,151 @@ async function listManagers(limit = DEFAULT_LIMIT): Promise<ManagerDirectoryEntr
 
 async function listContractors(limit = DEFAULT_LIMIT): Promise<ContractorDirectoryEntry[]> {
   const result = await query<ContractorRow>('SELECT contractor_id, cks_manager, company_name, contact_person, email, phone, address, status, created_at, updated_at, archived_at FROM contractors ORDER BY contractor_id LIMIT $1', [limit]);
-  return result.rows.map((row) => ({
-    id: formatPrefixedId(row.contractor_id, 'CON'),
-    managerId: toNullableString(row.cks_manager),
-    companyName: toNullableString(row.company_name),
-    contactPerson: toNullableString(row.contact_person),
-    email: toNullableString(row.email),
-    phone: toNullableString(row.phone),
-    address: toNullableString(row.address),
-    status: toNullableString(row.status),
-    createdAt: toIso(row.created_at),
-    updatedAt: toIso(row.updated_at),
-    archivedAt: toIso(row.archived_at),
-  }));
+    return result.rows.map((row) => ({
+      id: formatPrefixedId(row.contractor_id, 'CON'),
+      managerId: toNullableString(row.cks_manager),
+      name: row.company_name ?? '',
+      mainContact: toNullableString(row.contact_person),
+      email: toNullableString(row.email),
+      phone: toNullableString(row.phone),
+      address: toNullableString(row.address),
+      status: toNullableString(row.status),
+      createdAt: toIso(row.created_at),
+      updatedAt: toIso(row.updated_at),
+      archivedAt: toIso(row.archived_at),
+    }));
 }
 
 async function listCustomers(limit = DEFAULT_LIMIT): Promise<CustomerDirectoryEntry[]> {
-  const result = await query<CustomerRow>('SELECT customer_id, cks_manager, company_name, main_contact, email, phone, address, num_centers, archived_at FROM customers ORDER BY customer_id LIMIT $1', [limit]);
-  return result.rows.map((row) => ({
-    id: formatPrefixedId(row.customer_id, 'CUS'),
-    managerId: toNullableString(row.cks_manager),
-    name: toNullableString(row.company_name),
-    contactName: toNullableString(row.main_contact),
-    email: toNullableString(row.email),
-    phone: toNullableString(row.phone),
-    address: toNullableString(row.address),
-    totalCenters: toNullableNumber(row.num_centers),
-    archivedAt: toIso(row.archived_at),
-  }));
+  const result = await query<CustomerRow>(
+    `SELECT customer_id, cks_manager, company_name, main_contact, email, phone, address, num_centers, created_at, updated_at, archived_at
+     FROM customers ORDER BY customer_id LIMIT $1`,
+    [limit]
+  );
+    return result.rows.map((row) => ({
+      id: formatPrefixedId(row.customer_id, 'CUS'),
+      managerId: toNullableString(row.cks_manager),
+      name: toNullableString(row.company_name),
+      mainContact: toNullableString(row.main_contact),
+      email: toNullableString(row.email),
+      phone: toNullableString(row.phone),
+      address: toNullableString(row.address),
+      totalCenters: toNullableNumber(row.num_centers),
+      createdAt: toIso(row.created_at),
+      updatedAt: toIso(row.updated_at),
+      archivedAt: toIso(row.archived_at),
+    }));
 }
 
 async function listCenters(limit = DEFAULT_LIMIT): Promise<CenterDirectoryEntry[]> {
-  const result = await query<CenterRow>('SELECT center_id, cks_manager, name, contractor_id, customer_id, main_contact, email, phone, address, archived_at FROM centers ORDER BY center_id LIMIT $1', [limit]);
-  return result.rows.map((row) => ({
-    id: formatPrefixedId(row.center_id, 'CEN'),
-    managerId: toNullableString(row.cks_manager),
-    name: toNullableString(row.name),
-    contractorId: toNullableString(row.contractor_id),
-    customerId: toNullableString(row.customer_id),
-    contactName: toNullableString(row.main_contact),
-    email: toNullableString(row.email),
-    phone: toNullableString(row.phone),
-    address: toNullableString(row.address),
-    archivedAt: toIso(row.archived_at),
-  }));
+  const result = await query<CenterRow>(
+    `SELECT center_id, cks_manager, name, contractor_id, customer_id, main_contact, email, phone, address, created_at, updated_at, archived_at
+     FROM centers ORDER BY center_id LIMIT $1`,
+    [limit]
+  );
+    return result.rows.map((row) => ({
+      id: formatPrefixedId(row.center_id, 'CEN'),
+      managerId: toNullableString(row.cks_manager),
+      name: toNullableString(row.name),
+      contractorId: toNullableString(row.contractor_id),
+      customerId: toNullableString(row.customer_id),
+      mainContact: toNullableString(row.main_contact),
+      email: toNullableString(row.email),
+      phone: toNullableString(row.phone),
+      address: toNullableString(row.address),
+      createdAt: toIso(row.created_at),
+      updatedAt: toIso(row.updated_at),
+      archivedAt: toIso(row.archived_at),
+    }));
 }
 
 async function listCrew(limit = DEFAULT_LIMIT): Promise<CrewDirectoryEntry[]> {
-  const result = await query<CrewRow>('SELECT crew_id, name, status, role, address, phone, email, assigned_center, archived_at FROM crew ORDER BY crew_id LIMIT $1', [limit]);
-  return result.rows.map((row) => ({
-    id: formatPrefixedId(row.crew_id, 'CRW'),
-    name: toNullableString(row.name),
-    status: toNullableString(row.status),
-    role: toNullableString(row.role),
-    email: toNullableString(row.email),
-    phone: toNullableString(row.phone),
-    address: toNullableString(row.address),
-    assignedCenter: toNullableString(row.assigned_center),
-    archivedAt: toIso(row.archived_at),
-  }));
+  try {
+    const result = await query<CrewRow>(
+      `SELECT crew_id, name, status, emergency_contact, address, phone, email, assigned_center, created_at, updated_at, archived_at
+       FROM crew ORDER BY crew_id LIMIT $1`,
+      [limit]
+    );
+      return result.rows.map((row) => ({
+        id: formatPrefixedId(row.crew_id, 'CRW'),
+        name: toNullableString(row.name),
+        status: toNullableString(row.status),
+        emergencyContact: toNullableString(row.emergency_contact),
+        email: toNullableString(row.email),
+        phone: toNullableString(row.phone),
+        address: toNullableString(row.address),
+        assignedCenter: toNullableString(row.assigned_center),
+        createdAt: toIso(row.created_at),
+        updatedAt: toIso(row.updated_at),
+        archivedAt: toIso(row.archived_at),
+      }));
+  } catch (error) {
+    if (isMissingColumnError(error, 'emergency_contact')) {
+      const fallback = await query<LegacyCrewRow>('SELECT crew_id, name, status, role, address, phone, email, assigned_center, archived_at FROM crew ORDER BY crew_id LIMIT $1', [limit]);
+      return fallback.rows.map((row) => ({
+        id: formatPrefixedId(row.crew_id, 'CRW'),
+        name: toNullableString(row.name),
+        status: toNullableString(row.status),
+        emergencyContact: null, // Not available in legacy schema
+        email: toNullableString(row.email),
+        phone: toNullableString(row.phone),
+        address: toNullableString(row.address),
+        assignedCenter: toNullableString(row.assigned_center),
+        createdAt: null,
+        updatedAt: null,
+        archivedAt: toIso(row.archived_at),
+      }));    }
+
+    throw error;
+  }
 }
 
 async function listWarehouses(limit = DEFAULT_LIMIT): Promise<WarehouseDirectoryEntry[]> {
-  const result = await query<WarehouseRow>('SELECT warehouse_id, COALESCE(warehouse_name, name) AS warehouse_name, manager_id, manager, warehouse_type, address, phone, email, capacity, current_utilization, status, date_acquired, created_at, updated_at, archived_at FROM warehouses ORDER BY warehouse_id LIMIT $1', [limit]);
-  return result.rows.map((row) => ({
-    id: formatPrefixedId(row.warehouse_id, 'WHS'),
-    name: toNullableString(row.warehouse_name ?? row.name),
-    managerId: toNullableString(row.manager_id),
-    managerName: toNullableString(row.manager),
-    warehouseType: toNullableString(row.warehouse_type),
-    address: toNullableString(row.address),
-    email: toNullableString(row.email),
-    phone: toNullableString(row.phone),
-    capacity: toNullableNumber(row.capacity),
-    utilization: toNullableNumber(row.current_utilization),
-    status: toNullableString(row.status),
-    dateAcquired: toIso(row.date_acquired),
-    createdAt: toIso(row.created_at),
-    updatedAt: toIso(row.updated_at),
-    archivedAt: toIso(row.archived_at),
-  }));
+  try {
+    const result = await query<WarehouseRow>('SELECT warehouse_id, COALESCE(warehouse_name, name) AS warehouse_name, manager_id, manager, warehouse_type, main_contact, address, phone, email, capacity, current_utilization, status, date_acquired, created_at, updated_at, archived_at FROM warehouses ORDER BY warehouse_id LIMIT $1', [limit]);
+    return result.rows.map((row) => ({
+      id: formatPrefixedId(row.warehouse_id, 'WHS'),
+      name: toNullableString(row.warehouse_name ?? row.name),
+      managerId: toNullableString(row.manager_id),
+      managerName: toNullableString(row.manager),
+      mainContact: toNullableString(row.main_contact),
+      warehouseType: toNullableString(row.warehouse_type),
+      address: toNullableString(row.address),
+      phone: toNullableString(row.phone),
+      email: toNullableString(row.email),
+      capacity: toNullableNumber(row.capacity),
+      utilization: toNullableNumber(row.current_utilization),
+      status: toNullableString(row.status),
+      dateAcquired: toIso(row.date_acquired),
+      createdAt: toIso(row.created_at),
+      updatedAt: toIso(row.updated_at),
+      archivedAt: toIso(row.archived_at),
+    }));
+  } catch (error) {
+    if (isMissingColumnError(error, 'main_contact')) {
+      const fallback = await query<LegacyWarehouseRow>('SELECT warehouse_id, COALESCE(warehouse_name, name) AS warehouse_name, manager_id, manager, warehouse_type, address, phone, email, capacity, current_utilization, status, date_acquired, created_at, updated_at, archived_at FROM warehouses ORDER BY warehouse_id LIMIT $1', [limit]);
+      return fallback.rows.map((row) => ({
+        id: formatPrefixedId(row.warehouse_id, 'WHS'),
+        name: toNullableString(row.warehouse_name ?? row.name),
+        managerId: toNullableString(row.manager_id),
+        managerName: toNullableString(row.manager),
+        mainContact: toNullableString(row.manager),
+        warehouseType: toNullableString(row.warehouse_type),
+        address: toNullableString(row.address),
+        phone: toNullableString(row.phone),
+        email: toNullableString(row.email),
+        capacity: toNullableNumber(row.capacity),
+        utilization: toNullableNumber(row.current_utilization),
+        status: toNullableString(row.status),
+        dateAcquired: toIso(row.date_acquired),
+        createdAt: toIso(row.created_at),
+        updatedAt: toIso(row.updated_at),
+        archivedAt: toIso(row.archived_at),
+      }));
+    }
+
+    throw error;
+  }
 }
 
 async function listServices(limit = DEFAULT_LIMIT): Promise<ServiceDirectoryEntry[]> {
@@ -368,14 +445,17 @@ async function listServices(limit = DEFAULT_LIMIT): Promise<ServiceDirectoryEntr
 
 async function listOrders(limit = DEFAULT_LIMIT): Promise<OrderDirectoryEntry[]> {
   const result = await query<OrderRow>('SELECT order_id, customer_id, center_id, service_id, order_date, completion_date, total_amount, status, notes, assigned_warehouse, created_at, updated_at FROM orders ORDER BY order_id LIMIT $1', [limit]);
+  if (!result || !result.rows) {
+    return [];
+  }
   return result.rows.map((row) => ({
-    id: row.order_id,
+    id: formatPrefixedId(row.order_id, 'ORD'),
     customerId: formatPrefixedId(row.customer_id, 'CUS'),
     centerId: toNullableString(row.center_id),
     serviceId: toNullableString(row.service_id),
     orderDate: toIso(row.order_date),
     completionDate: toIso(row.completion_date),
-    totalAmount: toNullableString(row.total_amount),
+    totalAmount: toNullableNumber(row.total_amount),
     status: toNullableString(row.status),
     notes: toNullableString(row.notes),
     assignedWarehouse: toNullableString(row.assigned_warehouse),
@@ -391,7 +471,7 @@ async function listProducts(limit = DEFAULT_LIMIT): Promise<ProductDirectoryEntr
     name: row.product_name,
     category: toNullableString(row.category),
     description: toNullableString(row.description),
-    price: toNullableString(row.price),
+    price: toNullableNumber(row.price),
     unit: toNullableString(row.unit),
     status: toNullableString(row.status),
     createdAt: toIso(row.created_at),
@@ -408,16 +488,21 @@ async function listTraining(limit = DEFAULT_LIMIT): Promise<TrainingDirectoryEnt
     serviceId: toNullableString(row.service_id),
     serviceName: toNullableString(row.service_name),
     date: toIso(row.date),
-    expense: toNullableString(row.expense),
+    expense: toNullableNumber(row.expense),
     days: toNullableNumber(row.days),
     status: toNullableString(row.status),
+    createdAt: null,
+    updatedAt: null,
   }));
 }
 
 async function listProcedures(limit = DEFAULT_LIMIT): Promise<ProcedureDirectoryEntry[]> {
   const result = await query<ProcedureRow>('SELECT procedure_id, service, type, contractor, customer, center FROM procedures ORDER BY procedure_id LIMIT $1', [limit]);
+  if (!result || !result.rows) {
+    return [];
+  }
   return result.rows.map((row) => ({
-    id: row.procedure_id,
+    id: formatPrefixedId(row.procedure_id, 'PRC'),
     serviceId: toNullableString(row.service),
     type: toNullableString(row.type),
     contractorId: toNullableString(row.contractor),
@@ -429,7 +514,7 @@ async function listProcedures(limit = DEFAULT_LIMIT): Promise<ProcedureDirectory
 async function listReports(limit = DEFAULT_LIMIT): Promise<ReportDirectoryEntry[]> {
   const result = await query<ReportRow>('SELECT report_id, type, severity, title, description, center_id, customer_id, status, created_by_role, created_by_id, created_at, updated_at, archived_at FROM reports ORDER BY report_id LIMIT $1', [limit]);
   return result.rows.map((row) => ({
-    id: row.report_id,
+    id: formatPrefixedId(row.report_id, 'RPT'),
     type: row.type,
     severity: toNullableString(row.severity),
     title: row.title,
@@ -448,7 +533,7 @@ async function listReports(limit = DEFAULT_LIMIT): Promise<ReportDirectoryEntry[
 async function listFeedback(limit = DEFAULT_LIMIT): Promise<FeedbackDirectoryEntry[]> {
   const result = await query<FeedbackRow>('SELECT feedback_id, kind, title, message, center_id, customer_id, created_by_role, created_by_id, created_at, archived_at FROM feedback ORDER BY feedback_id LIMIT $1', [limit]);
   return result.rows.map((row) => ({
-    id: row.feedback_id,
+    id: formatPrefixedId(row.feedback_id, 'FBK'),
     kind: row.kind,
     title: row.title,
     message: toNullableString(row.message),
@@ -461,8 +546,8 @@ async function listFeedback(limit = DEFAULT_LIMIT): Promise<FeedbackDirectoryEnt
   }));
 }
 
-async function listActivities(limit = 25): Promise<ActivityEntry[]> {
-  const result = await query<ActivityRow>('SELECT activity_id, activity_type, actor_id, actor_role, target_id, target_type, description, metadata, created_at FROM system_activity ORDER BY created_at DESC LIMIT $1', [limit]);
+async function listActivities(limit = DEFAULT_LIMIT): Promise<ActivityEntry[]> {
+  const result = await query<ActivityRow>('SELECT activity_id, description, activity_type, actor_id, actor_role, target_id, target_type, metadata, created_at FROM system_activity ORDER BY activity_id LIMIT $1', [limit]);
   return result.rows.map((row) => ({
     id: String(row.activity_id),
     description: row.description,
@@ -501,6 +586,23 @@ export async function listDirectoryResource<K extends DirectoryResourceKey>(key:
   const loader = loaders[key];
   return loader(limit);
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

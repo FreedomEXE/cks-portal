@@ -29,8 +29,8 @@ export interface ManagerRecord {
 
 export interface ContractorRecord {
   id: string;
-  companyName: string;
-  contactPerson: string | null;
+  name: string;
+  mainContact: string | null;
   email: string | null;
   phone: string | null;
   address: string | null;
@@ -41,7 +41,7 @@ export interface ContractorRecord {
 export interface CustomerRecord {
   id: string;
   name: string;
-  contactName: string | null;
+  mainContact: string | null;
   email: string | null;
   phone: string | null;
   address: string | null;
@@ -52,7 +52,7 @@ export interface CustomerRecord {
 export interface CenterRecord {
   id: string;
   name: string;
-  contactName: string | null;
+  mainContact: string | null;
   email: string | null;
   phone: string | null;
   address: string | null;
@@ -64,7 +64,7 @@ export interface CenterRecord {
 export interface CrewRecord {
   id: string;
   name: string;
-  role: string | null;
+  emergencyContact: string | null;
   email: string | null;
   phone: string | null;
   address: string | null;
@@ -75,6 +75,7 @@ export interface CrewRecord {
 export interface WarehouseRecord {
   id: string;
   name: string;
+  mainContact: string | null;
   email: string | null;
   phone: string | null;
   address: string | null;
@@ -175,13 +176,13 @@ export async function createManager(
     [
       id,
       payload.fullName.trim(),
-      toNullableLower(payload.email),
-      toNullable(payload.phone),
+      payload.email.trim().toLowerCase(),
+      payload.phone.trim(),
       toNullable(payload.territory),
       payload.role,
-      payload.reportsTo,
-      toNullable(payload.address),
-      payload.status ?? 'active',
+      payload.reportsTo ?? null,
+      payload.address.trim(),
+      'active',
     ],
   );
 
@@ -247,12 +248,12 @@ export async function createContractor(
     RETURNING contractor_id, company_name, contact_person, email, phone, address, status, cks_manager`,
     [
       id,
-      payload.companyName.trim(),
-      toNullable(payload.contactPerson),
-      toNullableLower(payload.email),
-      toNullable(payload.phone),
-      toNullable(payload.address),
-      payload.status ?? 'active',
+      payload.name.trim(),
+      payload.mainContact.trim(),
+      payload.email.trim().toLowerCase(),
+      payload.phone.trim(),
+      payload.address.trim(),
+      'unassigned',
     ],
   );
 
@@ -267,13 +268,13 @@ export async function createContractor(
     description: `Contractor ${id} created`,
     targetId: id,
     targetType: 'contractor',
-    metadata: { companyName: payload.companyName.trim() },
+    metadata: { name: payload.name.trim() },
   });
 
   return {
     id,
-    companyName: row.company_name,
-    contactPerson: row.contact_person,
+    name: row.company_name,
+    mainContact: row.contact_person,
     email: row.email,
     phone: row.phone,
     address: row.address,
@@ -281,6 +282,7 @@ export async function createContractor(
     managerId: row.cks_manager,
   };
 }
+
 
 export async function createCustomer(
   input: unknown,
@@ -315,11 +317,11 @@ export async function createCustomer(
     [
       id,
       payload.name.trim(),
-      toNullable(payload.contactName),
-      toNullableLower(payload.email),
-      toNullable(payload.phone),
-      toNullable(payload.address),
-      payload.status ?? 'active',
+      payload.mainContact.trim(),
+      payload.email.trim().toLowerCase(),
+      payload.phone.trim(),
+      payload.address.trim(),
+      'unassigned',
     ],
   );
 
@@ -340,14 +342,15 @@ export async function createCustomer(
   return {
     id,
     name: row.company_name,
-    contactName: row.main_contact,
+    mainContact: row.main_contact,
     email: row.email,
     phone: row.phone,
     address: row.address,
-    status: row.status ?? 'active',
+    status: row.status ?? 'unassigned',
     contractorId: row.contractor_id,
   };
 }
+
 
 export async function createCenter(
   input: unknown,
@@ -384,11 +387,11 @@ export async function createCenter(
     [
       id,
       payload.name.trim(),
-      toNullable(payload.contactName),
-      toNullableLower(payload.email),
-      toNullable(payload.phone),
-      toNullable(payload.address),
-      payload.status ?? 'active',
+      payload.mainContact.trim(),
+      payload.email.trim().toLowerCase(),
+      payload.phone.trim(),
+      payload.address.trim(),
+      'unassigned',
     ],
   );
 
@@ -409,15 +412,16 @@ export async function createCenter(
   return {
     id,
     name: row.name,
-    contactName: row.main_contact,
+    mainContact: row.main_contact,
     email: row.email,
     phone: row.phone,
     address: row.address,
-    status: row.status ?? 'active',
+    status: row.status ?? 'unassigned',
     customerId: row.customer_id,
     contractorId: row.contractor_id,
   };
 }
+
 
 export async function createCrew(
   input: unknown,
@@ -429,7 +433,7 @@ export async function createCrew(
   const result = await query<{
     crew_id: string;
     name: string;
-    role: string | null;
+    emergency_contact: string | null;
     email: string | null;
     phone: string | null;
     address: string | null;
@@ -439,7 +443,7 @@ export async function createCrew(
     `INSERT INTO crew (
       crew_id,
       name,
-      role,
+      emergency_contact,
       email,
       phone,
       address,
@@ -448,15 +452,15 @@ export async function createCrew(
       created_at,
       updated_at
     ) VALUES ($1, $2, $3, $4, $5, $6, $7, NULL, NOW(), NOW())
-    RETURNING crew_id, name, role, email, phone, address, status, assigned_center`,
+    RETURNING crew_id, name, emergency_contact, email, phone, address, status, assigned_center`,
     [
       id,
       payload.name.trim(),
-      toNullable(payload.role),
-      toNullableLower(payload.email),
-      toNullable(payload.phone),
-      toNullable(payload.address),
-      payload.status ?? 'active',
+      payload.emergencyContact.trim(),
+      payload.email.trim().toLowerCase(),
+      payload.phone.trim(),
+      payload.address.trim(),
+      'unassigned',
     ],
   );
 
@@ -477,7 +481,7 @@ export async function createCrew(
   return {
     id,
     name: row.name,
-    role: row.role,
+    emergencyContact: row.emergency_contact,
     email: row.email,
     phone: row.phone,
     address: row.address,
@@ -485,6 +489,7 @@ export async function createCrew(
     assignedCenter: row.assigned_center,
   };
 }
+
 
 export async function createWarehouse(
   input: unknown,
@@ -496,6 +501,7 @@ export async function createWarehouse(
   const result = await query<{
     warehouse_id: string;
     warehouse_name: string;
+    main_contact: string | null;
     email: string | null;
     phone: string | null;
     address: string | null;
@@ -506,6 +512,7 @@ export async function createWarehouse(
     `INSERT INTO warehouses (
       warehouse_id,
       warehouse_name,
+      main_contact,
       email,
       phone,
       address,
@@ -514,15 +521,16 @@ export async function createWarehouse(
       manager_id,
       created_at,
       updated_at
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
-    RETURNING warehouse_id, warehouse_name, email, phone, address, status, warehouse_type, manager_id`,
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
+    RETURNING warehouse_id, warehouse_name, main_contact, email, phone, address, status, warehouse_type, manager_id`,
     [
       id,
       payload.name.trim(),
-      toNullableLower(payload.email),
-      toNullable(payload.phone),
-      toNullable(payload.address),
-      payload.status ?? 'active',
+      payload.mainContact.trim(),
+      payload.email.trim().toLowerCase(),
+      payload.phone.trim(),
+      payload.address.trim(),
+      'operational',
       toNullable(payload.warehouseType),
       normalizeIdentity(payload.managerId ?? null),
     ],
@@ -545,11 +553,14 @@ export async function createWarehouse(
   return {
     id,
     name: row.warehouse_name,
+    mainContact: row.main_contact,
     email: row.email,
     phone: row.phone,
     address: row.address,
-    status: row.status ?? 'active',
+    status: row.status ?? 'operational',
     warehouseType: row.warehouse_type,
     managerId: row.manager_id,
   };
 }
+
+

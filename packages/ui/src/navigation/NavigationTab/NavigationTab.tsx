@@ -68,7 +68,7 @@ export function NavigationTab({
     if (variant === 'pills') {
       return {
         ...baseStyles,
-        backgroundColor: isActive ? activeColor : isHovered && !disabled ? `${activeColor}15` : 'transparent',
+        backgroundColor: isActive ? activeColor : isHovered && !disabled ? `color-mix(in srgb, ${activeColor} 8%, transparent)` : 'transparent',
         color: isActive ? '#ffffff' : disabled ? '#9ca3af' : '#374151',
         fontSize: '14px',
         fontWeight: isActive ? '600' : '500'
