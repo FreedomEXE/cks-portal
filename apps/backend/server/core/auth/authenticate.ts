@@ -22,7 +22,10 @@ export async function authenticate(req: FastifyRequest): Promise<AuthResult> {
   const authorization = req.headers.authorization ?? '';
   const [scheme, token] = authorization.split(' ');
 
-  console.log('[auth] Header received:', token ? `yes (preview: ${token.slice(0, 10)}...)` : 'no');
+  // Log only in development mode without exposing token data
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[auth] Header received:', token ? 'yes' : 'no');
+  }
 
   if (scheme !== 'Bearer' || !token) {
     return { ok: false, reason: 'missing_header' };
@@ -47,7 +50,10 @@ export async function authenticate(req: FastifyRequest): Promise<AuthResult> {
         ? (claims['email_address'] as string)
         : null;
 
-    console.log('[auth] Verified userId:', userId);
+    // Log only in development mode without exposing full userId
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[auth] User authenticated successfully');
+    }
 
     return {
       ok: true,
@@ -55,7 +61,10 @@ export async function authenticate(req: FastifyRequest): Promise<AuthResult> {
       email,
     };
   } catch (error) {
-    console.error('[auth] Verify fail:', (error as Error)?.message ?? error);
+    // Log error without exposing sensitive details
+    if (process.env.NODE_ENV === 'development') {
+      console.error('[auth] Token verification failed');
+    }
     req.log?.warn?.({ err: error }, 'Failed to verify Clerk token');
     return { ok: false, reason: 'verify_fail' };
   }

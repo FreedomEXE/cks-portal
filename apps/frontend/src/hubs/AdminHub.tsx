@@ -12,7 +12,6 @@
   Manifested by Freedom_EXE
 -----------------------------------------------*/
 
-import { useAuth as useClerkAuth } from '@clerk/clerk-react';
 import { normalizeImpersonationCode, triggerImpersonation, type ImpersonationPayload } from '@cks/auth';
 import {
   AdminSupportSection,
@@ -33,13 +32,17 @@ import {
   Scrollbar,
   TabContainer,
 } from '@cks/ui';
+import { useAuth as useClerkAuth } from '@clerk/clerk-react';
 import type { ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useSWRConfig } from 'swr';
 
 import MyHubSection from '../components/MyHubSection';
 import { useLogout } from '../hooks/useLogout';
+import { archiveAPI, type EntityType } from '../shared/api/archive';
 import { apiFetch } from '../shared/api/client';
+import '../shared/api/test-archive'; // Temporary test import
 import AdminAssignSection from './components/AdminAssignSection';
 import AdminCreateSection from './components/AdminCreateSection';
 
@@ -186,6 +189,7 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
   const navigate = useNavigate();
   const { getToken } = useClerkAuth();
   const logout = useLogout();
+  const { mutate } = useSWRConfig();
 
   const impersonationRequest = useCallback(
     async (code: string): Promise<ImpersonationPayload | null> => {
@@ -316,11 +320,108 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
   );
 
   const handleDelete = useCallback(
-    (entity: Record<string, any>) => {
-      console.log('Delete entity:', entity);
-      handleModalClose();
+    async (entity: Record<string, any>) => {
+      // Determine entity type based on the active directory tab
+      let entityType: EntityType | null = null;
+      let entityId: string | null = null;
+
+      // Check which tab we're in and extract the appropriate ID
+      if (directoryTab === 'managers' && entity.manager_id) {
+        entityType = 'manager';
+        entityId = entity.manager_id;
+      } else if (directoryTab === 'contractors' && entity.contractor_id) {
+        entityType = 'contractor';
+        entityId = entity.contractor_id;
+      } else if (directoryTab === 'customers' && entity.customer_id) {
+        entityType = 'customer';
+        entityId = entity.customer_id;
+      } else if (directoryTab === 'centers' && entity.center_id) {
+        entityType = 'center';
+        entityId = entity.center_id;
+      } else if (directoryTab === 'crew' && entity.crew_id) {
+        entityType = 'crew';
+        entityId = entity.crew_id;
+      } else if (directoryTab === 'warehouses' && entity.id) {
+        entityType = 'warehouse';
+        entityId = entity.id;
+      } else if (directoryTab === 'services' && entity.id) {
+        entityType = 'service';
+        entityId = entity.id;
+      } else if (directoryTab === 'products' && entity.id) {
+        entityType = 'product';
+        entityId = entity.id;
+      } else if (entity.id) {
+        // Fallback to generic id field and guess based on tab
+        entityId = entity.id;
+        if (directoryTab === 'managers') entityType = 'manager';
+        else if (directoryTab === 'contractors') entityType = 'contractor';
+        else if (directoryTab === 'customers') entityType = 'customer';
+        else if (directoryTab === 'centers') entityType = 'center';
+        else if (directoryTab === 'crew') entityType = 'crew';
+        else if (directoryTab === 'warehouses') entityType = 'warehouse';
+        else if (directoryTab === 'services') entityType = 'service';
+        else if (directoryTab === 'products') entityType = 'product';
+      }
+
+      if (!entityType || !entityId) {
+        alert('Unable to determine entity type or ID for deletion');
+        return;
+      }
+
+      const confirmDelete = confirm(
+        `Are you sure you want to archive ${entityType} ${entityId}?\n\n` +
+        `This will:\n` +
+        `• Move the ${entityType} to the archive\n` +
+        `• Unassign any children to the unassigned bucket\n` +
+        `• Schedule for permanent deletion in 30 days\n\n` +
+        `You can restore from the Archive section if needed.`
+      );
+
+      if (!confirmDelete) {
+        return;
+      }
+
+      try {
+        const result = await archiveAPI.archiveEntity(entityType, entityId);
+        handleModalClose();
+
+        // Refresh the specific data based on entity type
+        // This will trigger a re-fetch of the data without page reload
+        if (entityType === 'manager') {
+          mutate('/admin/directory/managers');
+        } else if (entityType === 'contractor') {
+          mutate('/admin/directory/contractors');
+        } else if (entityType === 'customer') {
+          mutate('/admin/directory/customers');
+        } else if (entityType === 'center') {
+          mutate('/admin/directory/centers');
+        } else if (entityType === 'crew') {
+          mutate('/admin/directory/crew');
+        } else if (entityType === 'warehouse') {
+          mutate('/admin/directory/warehouses');
+        } else if (entityType === 'service') {
+          mutate('/admin/directory/services');
+        } else if (entityType === 'product') {
+          mutate('/admin/directory/products');
+        }
+
+        // Also refresh the archive list
+        mutate('/admin/archive/list');
+
+        // Show success message
+        const message = `${entityType} ${entityId} has been archived.` +
+          (result.unassignedChildren ? `\n${result.unassignedChildren} children were moved to unassigned.` : '');
+
+        // Use a less intrusive notification (for now still using alert but no page refresh)
+        setTimeout(() => {
+          alert(message);
+        }, 100);
+      } catch (error) {
+        console.error('Failed to archive entity:', error);
+        alert(`Failed to archive ${entityType}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
     },
-    [handleModalClose],
+    [handleModalClose, directoryTab, mutate],
   );
 
   const handleDirectoryRowClick = useCallback(
@@ -587,7 +688,8 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
       <Button
         variant="primary"
         size="small"
-        onClick={() => {
+        onClick={(e: React.MouseEvent) => {
+          e.stopPropagation(); // Prevent row click from triggering
           handleView(row);
         }}
       >
@@ -603,7 +705,6 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
         { key: 'code', label: 'ADMIN ID', clickable: true },
         { key: 'name', label: 'NAME' },
         { key: 'email', label: 'EMAIL' },
-        { key: 'emergencyContact', label: 'EMERGENCY CONTACT' },
         { key: 'status', label: 'STATUS', render: renderStatusBadge },
         { key: 'createdAt', label: 'CREATED' },
       ],
@@ -614,10 +715,10 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
       columns: [
         { key: 'managerId', label: 'MANAGER ID', clickable: true },
         { key: 'name', label: 'NAME' },
-        { key: 'territory', label: 'TERRITORY' },
         { key: 'email', label: 'EMAIL' },
         { key: 'phone', label: 'PHONE' },
         { key: 'status', label: 'STATUS', render: renderStatusBadge },
+        { key: 'createdAt', label: 'CREATED' },
         { key: 'actions', label: 'ACTIONS', render: renderActions },
       ],
       data: managerRows,
@@ -627,11 +728,10 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
       columns: [
         { key: 'id', label: 'CONTRACTOR ID', clickable: true },
         { key: 'name', label: 'NAME' },
-        { key: 'mainContact', label: 'MAIN CONTACT' },
-        { key: 'managerId', label: 'ASSIGNED MANAGER' },
         { key: 'email', label: 'EMAIL' },
         { key: 'phone', label: 'PHONE' },
         { key: 'status', label: 'STATUS', render: renderStatusBadge },
+        { key: 'createdAt', label: 'CREATED' },
         { key: 'actions', label: 'ACTIONS', render: renderActions },
       ],
       data: contractorRows,
@@ -641,11 +741,10 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
       columns: [
         { key: 'id', label: 'CUSTOMER ID', clickable: true },
         { key: 'name', label: 'NAME' },
-        { key: 'managerId', label: 'MANAGER' },
-        { key: 'mainContact', label: 'MAIN CONTACT' },
         { key: 'email', label: 'EMAIL' },
-        { key: 'totalCenters', label: '# CENTERS' },
+        { key: 'phone', label: 'PHONE' },
         { key: 'status', label: 'STATUS', render: renderStatusBadge },
+        { key: 'createdAt', label: 'CREATED' },
         { key: 'actions', label: 'ACTIONS', render: renderActions },
       ],
       data: customerRows,
@@ -655,11 +754,10 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
       columns: [
         { key: 'id', label: 'CENTER ID', clickable: true },
         { key: 'name', label: 'NAME' },
-        { key: 'mainContact', label: 'MAIN CONTACT' },
-        { key: 'customerId', label: 'CUSTOMER' },
-        { key: 'contractorId', label: 'CONTRACTOR' },
-        { key: 'managerId', label: 'MANAGER' },
+        { key: 'email', label: 'EMAIL' },
+        { key: 'phone', label: 'PHONE' },
         { key: 'status', label: 'STATUS', render: renderStatusBadge },
+        { key: 'createdAt', label: 'CREATED' },
         { key: 'actions', label: 'ACTIONS', render: renderActions },
       ],
       data: centerRows,
@@ -669,10 +767,10 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
       columns: [
         { key: 'id', label: 'CREW ID', clickable: true },
         { key: 'name', label: 'NAME' },
-        { key: 'emergencyContact', label: 'EMERGENCY CONTACT' },
-        { key: 'assignedCenter', label: 'ASSIGNED CENTER' },
+        { key: 'email', label: 'EMAIL' },
         { key: 'phone', label: 'PHONE' },
         { key: 'status', label: 'STATUS', render: renderStatusBadge },
+        { key: 'createdAt', label: 'CREATED' },
         { key: 'actions', label: 'ACTIONS', render: renderActions },
       ],
       data: crewRows,
@@ -682,9 +780,8 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
       columns: [
         { key: 'id', label: 'WAREHOUSE ID', clickable: true },
         { key: 'name', label: 'NAME' },
-        { key: 'mainContact', label: 'MAIN CONTACT' },
-        { key: 'managerName', label: 'MANAGER' },
-        { key: 'warehouseType', label: 'TYPE' },
+        { key: 'email', label: 'EMAIL' },
+        { key: 'phone', label: 'PHONE' },
         { key: 'status', label: 'STATUS', render: renderStatusBadge },
         { key: 'createdAt', label: 'CREATED' },
         { key: 'actions', label: 'ACTIONS', render: renderActions },
@@ -965,7 +1062,7 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
           ) : activeTab === 'assign' ? (
             <AdminAssignSection />
           ) : activeTab === 'archive' ? (
-            <ArchiveSection />
+            <ArchiveSection archiveAPI={archiveAPI} />
           ) : activeTab === 'support' ? (
             <PageWrapper title="Support" headerSrOnly>
               <AdminSupportSection primaryColor="#6366f1" />

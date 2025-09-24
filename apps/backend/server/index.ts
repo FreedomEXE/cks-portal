@@ -6,6 +6,8 @@ console.log('DATABASE_URL loaded?', !!process.env.DATABASE_URL ? 'yes' : 'no');
 
 import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
+import helmet from "@fastify/helmet";
+import rateLimit from "@fastify/rate-limit";
 import Fastify from "fastify";
 import z from "zod";
 import { authenticate } from "./core/auth/authenticate";
@@ -15,6 +17,7 @@ import type { AdminUserStatus } from "./domains/adminUsers/types";
 import { registerAssignmentRoutes } from "./domains/assignments";
 import { registerDirectoryRoutes } from "./domains/directory/routes.fastify";
 import { registerProvisioningRoutes } from "./domains/provisioning";
+import { registerArchiveRoutes } from "./domains/archive/routes.fastify";
 
 type BootstrapResponse = {
   role: string;
@@ -83,14 +86,62 @@ function resolveFirstName(options: {
 export async function buildServer() {
   const server = Fastify({ logger: true });
 
+  // CORS configuration with proper origin validation
+  const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS?.split(',') || [
+    'http://localhost:3000',
+    'http://localhost:5173',
+    'http://127.0.0.1:3000',
+    'http://127.0.0.1:5173'
+  ];
+
   await server.register(cors, {
-    origin: (_origin, cb) => {
-      cb(null, true);
+    origin: (origin, cb) => {
+      // Allow requests with no origin (like mobile apps or Postman)
+      if (!origin) {
+        cb(null, true);
+        return;
+      }
+
+      // Check if the origin is in our whitelist
+      if (ALLOWED_ORIGINS.includes(origin)) {
+        cb(null, true);
+      } else {
+        console.warn(`CORS: Blocked request from unauthorized origin: ${origin}`);
+        cb(new Error('Not allowed by CORS'));
+      }
     },
     credentials: true,
   });
 
   await server.register(cookie);
+
+  // Security headers with Helmet
+  await server.register(helmet, {
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        scriptSrc: ["'self'"],
+        imgSrc: ["'self'", "data:", "https:"],
+        connectSrc: ["'self'"],
+        fontSrc: ["'self'"],
+        objectSrc: ["'none'"],
+        mediaSrc: ["'self'"],
+        frameSrc: ["'none'"],
+      },
+    },
+    crossOriginEmbedderPolicy: false, // May need to be false for some API integrations
+  });
+
+  // Rate limiting
+  await server.register(rateLimit, {
+    max: 100, // Maximum 100 requests
+    timeWindow: '1 minute', // Per minute
+    cache: 10000, // Cache up to 10000 entries
+    allowList: [], // You can add IPs to bypass rate limiting
+    continueExceeding: false,
+    skipOnError: false,
+  });
 
   server.get("/api/health", async () => ({ status: "ok" }));
 
@@ -108,12 +159,13 @@ export async function buildServer() {
       }
 
       const auth = await authenticate(request);
-      console.log(
-        '[bootstrap] Auth context:',
-        auth.ok
-          ? `valid (userId: ${auth.userId.slice(-4)})`
-          : `invalid (${auth.reason || 'unknown'})`,
-      );
+      // Log authentication status without exposing sensitive data
+      if (process.env.NODE_ENV === 'development') {
+        console.log(
+          '[bootstrap] Auth context:',
+          auth.ok ? 'valid' : `invalid (${auth.reason || 'unknown'})`
+        );
+      }
 
       const authContext = auth.ok ? auth : null;
       if (!authContext) {
@@ -122,7 +174,9 @@ export async function buildServer() {
 
       // Check for impersonation header
       const impersonationCode = request.headers['x-impersonate-code'] as string | undefined;
-      console.log('[bootstrap] Impersonation code:', impersonationCode);
+      if (process.env.NODE_ENV === 'development' && impersonationCode) {
+        console.log('[bootstrap] Impersonation attempt detected');
+      }
 
       if (impersonationCode) {
         // User is impersonating, look up the target user
@@ -130,7 +184,9 @@ export async function buildServer() {
         const targetUser = await (findUserByCode as any)(impersonationCode);
 
         if (targetUser) {
-          console.log('[bootstrap] Impersonating user:', targetUser);
+          if (process.env.NODE_ENV === 'development') {
+            console.log('[bootstrap] Impersonation successful');
+          }
 
           const response: BootstrapResponse = {
             role: targetUser.role,
@@ -144,7 +200,9 @@ export async function buildServer() {
 
           return reply.send(bootstrapResponseSchema.parse(response));
         }
-        console.log('[bootstrap] Failed to find impersonated user:', impersonationCode);
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[bootstrap] Failed to find impersonated user');
+        }
       }
 
       const adminUser = await getAdminUserByClerkId(authContext.userId);
@@ -186,6 +244,7 @@ export async function buildServer() {
   await registerProvisioningRoutes(server);
   await registerAssignmentRoutes(server);
   await registerDirectoryRoutes(server);
+  await registerArchiveRoutes(server);
   const { registerImpersonationRoutes } = await import('./domains/identity/impersonation.routes');
   await registerImpersonationRoutes(server);
 

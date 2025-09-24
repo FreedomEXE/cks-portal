@@ -18,6 +18,8 @@
     "@clerk/backend": "^1.9.1",
     "@fastify/cookie": "^9.0.0",
     "@fastify/cors": "^9.0.0",
+    "@fastify/helmet": "11.1.1",
+    "@fastify/rate-limit": "9.1.0",
     "dotenv": "^17.2.2",
     "fastify": "^4.26.2",
     "pg": "^8.16.3",

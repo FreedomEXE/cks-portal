@@ -262,7 +262,7 @@ const activityTypeCategory: Record<string, string> = {
 };
 
 async function listManagers(limit = DEFAULT_LIMIT): Promise<ManagerDirectoryEntry[]> {
-  const result = await query<ManagerRow>('SELECT manager_id, manager_name, email, phone, territory, role, reports_to, address, status, created_at, updated_at, archived_at FROM managers ORDER BY manager_id LIMIT $1', [limit]);
+  const result = await query<ManagerRow>('SELECT manager_id, manager_name, email, phone, territory, role, reports_to, address, status, created_at, updated_at, archived_at FROM managers WHERE archived_at IS NULL ORDER BY manager_id LIMIT $1', [limit]);
   return result.rows.map((row) => ({
     id: formatPrefixedId(row.manager_id, 'MGR'),
     name: row.manager_name ?? row.manager_id,
@@ -280,7 +280,7 @@ async function listManagers(limit = DEFAULT_LIMIT): Promise<ManagerDirectoryEntr
 }
 
 async function listContractors(limit = DEFAULT_LIMIT): Promise<ContractorDirectoryEntry[]> {
-  const result = await query<ContractorRow>('SELECT contractor_id, cks_manager, company_name, contact_person, email, phone, address, status, created_at, updated_at, archived_at FROM contractors ORDER BY contractor_id LIMIT $1', [limit]);
+  const result = await query<ContractorRow>('SELECT contractor_id, cks_manager, company_name, contact_person, email, phone, address, status, created_at, updated_at, archived_at FROM contractors WHERE archived_at IS NULL ORDER BY contractor_id LIMIT $1', [limit]);
     return result.rows.map((row) => ({
       id: formatPrefixedId(row.contractor_id, 'CON'),
       managerId: toNullableString(row.cks_manager),
@@ -299,7 +299,7 @@ async function listContractors(limit = DEFAULT_LIMIT): Promise<ContractorDirecto
 async function listCustomers(limit = DEFAULT_LIMIT): Promise<CustomerDirectoryEntry[]> {
   const result = await query<CustomerRow>(
     `SELECT customer_id, cks_manager, company_name, main_contact, email, phone, address, num_centers, created_at, updated_at, archived_at
-     FROM customers ORDER BY customer_id LIMIT $1`,
+     FROM customers WHERE archived_at IS NULL ORDER BY customer_id LIMIT $1`,
     [limit]
   );
     return result.rows.map((row) => ({
@@ -320,7 +320,7 @@ async function listCustomers(limit = DEFAULT_LIMIT): Promise<CustomerDirectoryEn
 async function listCenters(limit = DEFAULT_LIMIT): Promise<CenterDirectoryEntry[]> {
   const result = await query<CenterRow>(
     `SELECT center_id, cks_manager, name, contractor_id, customer_id, main_contact, email, phone, address, created_at, updated_at, archived_at
-     FROM centers ORDER BY center_id LIMIT $1`,
+     FROM centers WHERE archived_at IS NULL ORDER BY center_id LIMIT $1`,
     [limit]
   );
     return result.rows.map((row) => ({
@@ -343,7 +343,7 @@ async function listCrew(limit = DEFAULT_LIMIT): Promise<CrewDirectoryEntry[]> {
   try {
     const result = await query<CrewRow>(
       `SELECT crew_id, name, status, emergency_contact, address, phone, email, assigned_center, created_at, updated_at, archived_at
-       FROM crew ORDER BY crew_id LIMIT $1`,
+       FROM crew WHERE archived_at IS NULL ORDER BY crew_id LIMIT $1`,
       [limit]
     );
       return result.rows.map((row) => ({
@@ -382,7 +382,7 @@ async function listCrew(limit = DEFAULT_LIMIT): Promise<CrewDirectoryEntry[]> {
 
 async function listWarehouses(limit = DEFAULT_LIMIT): Promise<WarehouseDirectoryEntry[]> {
   try {
-    const result = await query<WarehouseRow>('SELECT warehouse_id, COALESCE(warehouse_name, name) AS warehouse_name, manager_id, manager, warehouse_type, main_contact, address, phone, email, capacity, current_utilization, status, date_acquired, created_at, updated_at, archived_at FROM warehouses ORDER BY warehouse_id LIMIT $1', [limit]);
+    const result = await query<WarehouseRow>('SELECT warehouse_id, COALESCE(warehouse_name, name) AS warehouse_name, manager_id, manager, warehouse_type, main_contact, address, phone, email, capacity, current_utilization, status, date_acquired, created_at, updated_at, archived_at FROM warehouses WHERE archived_at IS NULL ORDER BY warehouse_id LIMIT $1', [limit]);
     return result.rows.map((row) => ({
       id: formatPrefixedId(row.warehouse_id, 'WHS'),
       name: toNullableString(row.warehouse_name ?? row.name),

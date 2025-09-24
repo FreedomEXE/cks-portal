@@ -22,7 +22,10 @@
       "Read(//c/Users/User/Documents/YourProjectName/**)",
       "Bash(curl: -X GET https://api.yourservice.com/*)",
       "Bash(taskkill: /IM node.exe /F)",
-      "Bash(taskkill:*)"
+      "Bash(taskkill:*)",
+      "Bash(curl:*)",
+      "Bash(python:*)",
+      "Read(//tmp/**)"
     ],
     "deny": [],
     "ask": []
