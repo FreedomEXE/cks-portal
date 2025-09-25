@@ -11,6 +11,15 @@ function toCount(row: { count?: string | number } | undefined): number {
   return Number.isNaN(value) ? 0 : value;
 }
 
+function normalizeStatus(status: string | null): string | null {
+  if (!status) return null;
+  // Transform 'assigned' and 'operational' to 'active'
+  if (status === 'assigned' || status === 'operational') {
+    return 'active';
+  }
+  return status;
+}
+
 async function getCustomerDashboard(cksCode: string): Promise<CustomerDashboardPayload | null> {
   const customerResult = await query<{ status: string | null }>(
     `SELECT status
@@ -63,7 +72,7 @@ async function getCustomerDashboard(cksCode: string): Promise<CustomerDashboardP
     centerCount: toCount(centerResult.rows[0]),
     crewCount: toCount(crewResult.rows[0]),
     pendingRequests: toCount(pendingResult.rows[0]),
-    accountStatus: customerResult.rows[0]?.status ?? null,
+    accountStatus: normalizeStatus(customerResult.rows[0]?.status ?? null),
   };
 }
 
@@ -111,7 +120,7 @@ async function getManagerDashboard(cksCode: string): Promise<HubDashboardPayload
     centerCount: toCount(centers.rows[0]),
     crewCount: toCount(crew.rows[0]),
     pendingOrders: toCount(pendingOrders.rows[0]),
-    accountStatus: managerResult.rows[0]?.status ?? null,
+    accountStatus: normalizeStatus(managerResult.rows[0]?.status ?? null),
   };
 }
 
@@ -156,7 +165,7 @@ async function getContractorDashboard(cksCode: string): Promise<HubDashboardPayl
     crewCount: toCount(crew.rows[0]),
     activeServices: toCount(activeServices.rows[0]),
     pendingOrders: toCount(pendingOrders.rows[0]),
-    accountStatus: contractorResult.rows[0]?.status ?? null,
+    accountStatus: normalizeStatus(contractorResult.rows[0]?.status ?? null),
   };
 }
 
@@ -195,7 +204,7 @@ async function getCenterDashboard(cksCode: string): Promise<HubDashboardPayload 
     activeServices: toCount(activeServices.rows[0]),
     pendingRequests: toCount(pendingRequests.rows[0]),
     equipmentCount: toCount(equipment.rows[0]),
-    accountStatus: centerResult.rows[0]?.status ?? null,
+    accountStatus: normalizeStatus(centerResult.rows[0]?.status ?? null),
     customerId: centerResult.rows[0]?.customer_id ?? null,
   };
 }
@@ -232,7 +241,7 @@ async function getCrewDashboard(cksCode: string): Promise<HubDashboardPayload | 
     activeServices: toCount(activeServices.rows[0]),
     completedToday: toCount(completedToday.rows[0]),
     trainings: toCount(trainings.rows[0]),
-    accountStatus: crewResult.rows[0]?.status ?? null,
+    accountStatus: normalizeStatus(crewResult.rows[0]?.status ?? null),
     assignedCenter: crewResult.rows[0]?.assigned_center ?? null,
   };
 }
@@ -272,7 +281,7 @@ async function getWarehouseDashboard(cksCode: string): Promise<HubDashboardPaylo
     pendingOrders: toCount(pendingOrders.rows[0]),
     deliveriesScheduled: toCount(deliveriesScheduled.rows[0]),
     lowStockItems: toCount(lowStock.rows[0]),
-    accountStatus: warehouseResult.rows[0]?.status ?? null,
+    accountStatus: normalizeStatus(warehouseResult.rows[0]?.status ?? null),
   };
 }
 

@@ -82,7 +82,7 @@ async function storeRelationships(entityType: string, entityId: string, actor: A
       // Store parent manager
       const result = await query(
         `SELECT cks_manager,
-         (SELECT manager_name FROM managers WHERE manager_id = contractors.cks_manager) as manager_name
+         (SELECT name FROM managers WHERE manager_id = contractors.cks_manager) as name
          FROM contractors WHERE contractor_id = $1`,
         [entityId]
       );
@@ -92,7 +92,7 @@ async function storeRelationships(entityType: string, entityId: string, actor: A
            (entity_type, entity_id, parent_type, parent_id, relationship_data, archived_by)
            VALUES ($1, $2, $3, $4, $5::jsonb, $6)`,
           [entityType, entityId, 'manager', result.rows[0].cks_manager,
-           JSON.stringify({ relationship: 'parent', name: result.rows[0].manager_name }), actorId]
+           JSON.stringify({ relationship: 'parent', name: result.rows[0].name }), actorId]
         );
       }
 
@@ -213,7 +213,7 @@ async function storeRelationships(entityType: string, entityId: string, actor: A
       // Store manager relationship if exists
       const result = await query(
         `SELECT manager_id,
-         (SELECT manager_name FROM managers WHERE manager_id = warehouses.manager_id) as manager_name
+         (SELECT name FROM managers WHERE manager_id = warehouses.manager_id) as name
          FROM warehouses WHERE warehouse_id = $1`,
         [entityId]
       );
@@ -223,7 +223,7 @@ async function storeRelationships(entityType: string, entityId: string, actor: A
            (entity_type, entity_id, parent_type, parent_id, relationship_data, archived_by)
            VALUES ($1, $2, $3, $4, $5::jsonb, $6)`,
           [entityType, entityId, 'manager', result.rows[0].manager_id,
-           JSON.stringify({ relationship: 'managed_by', name: result.rows[0].manager_name }), actorId]
+           JSON.stringify({ relationship: 'managed_by', name: result.rows[0].name }), actorId]
         );
       }
       break;
@@ -493,7 +493,7 @@ export async function listArchivedEntities(
       case 'manager':
         tableName = 'managers';
         idColumn = 'manager_id';
-        nameColumn = 'manager_name';
+        nameColumn = 'name';
         break;
       case 'center':
         tableName = 'centers';

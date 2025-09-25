@@ -1,11 +1,12 @@
 export interface CustomerRow {
   customer_id: string;
   cks_manager: string | null;
-  company_name: string | null;
+  name: string | null;
   main_contact: string | null;
   email: string | null;
   phone: string | null;
   address: string | null;
+  status: string | null;
   num_centers: number | null;
   created_at: string | null;
   updated_at: string | null;
@@ -22,6 +23,7 @@ export interface CenterRow {
   email: string | null;
   phone: string | null;
   address: string | null;
+  status: string | null;
   created_at: string | null;
   updated_at: string | null;
   archived_at: string | null;
@@ -77,6 +79,7 @@ export interface CustomerDirectoryEntry {
   email: string | null;
   phone: string | null;
   address: string | null;
+  status: string | null;
   totalCenters: number | null;
   createdAt: string | null;
   updatedAt: string | null;
@@ -93,6 +96,7 @@ export interface CenterDirectoryEntry {
   email: string | null;
   phone: string | null;
   address: string | null;
+  status: string | null;
   createdAt: string | null;
   updatedAt: string | null;
   archivedAt: string | null;

@@ -108,6 +108,10 @@ async function fetchLegacyOrders(queryText: string, params: readonly unknown[]):
 
 async function getCustomerOrders(cksCode: string): Promise<HubOrdersPayload> {
   const normalized = normalizeIdentity(cksCode);
+  if (!normalized) {
+    throw new Error('Invalid CKS code');
+  }
+
   const orders = await fetchLegacyOrders(
     `SELECT order_id, customer_id, center_id, service_id, order_date, completion_date,
             total_amount, status, notes, assigned_warehouse
@@ -130,6 +134,10 @@ async function getCustomerOrders(cksCode: string): Promise<HubOrdersPayload> {
 
 async function getManagerOrders(cksCode: string): Promise<HubOrdersPayload> {
   const normalized = normalizeIdentity(cksCode);
+  if (!normalized) {
+    throw new Error('Invalid CKS code');
+  }
+
   const orders = await fetchLegacyOrders(
     `SELECT order_id, customer_id, center_id, service_id, order_date, completion_date,
             total_amount, status, notes, assigned_warehouse
@@ -151,6 +159,10 @@ async function getManagerOrders(cksCode: string): Promise<HubOrdersPayload> {
 
 async function getContractorOrders(cksCode: string): Promise<HubOrdersPayload> {
   const normalized = normalizeIdentity(cksCode);
+  if (!normalized) {
+    throw new Error('Invalid CKS code');
+  }
+
   const orders = await fetchLegacyOrders(
     `SELECT order_id, customer_id, center_id, service_id, order_date, completion_date,
             total_amount, status, notes, assigned_warehouse
@@ -172,6 +184,10 @@ async function getContractorOrders(cksCode: string): Promise<HubOrdersPayload> {
 
 async function getCenterOrders(cksCode: string): Promise<HubOrdersPayload> {
   const normalized = normalizeIdentity(cksCode);
+  if (!normalized) {
+    throw new Error('Invalid CKS code');
+  }
+
   const orders = await fetchLegacyOrders(
     `SELECT order_id, customer_id, center_id, service_id, order_date, completion_date,
             total_amount, status, notes, assigned_warehouse
@@ -191,6 +207,10 @@ async function getCenterOrders(cksCode: string): Promise<HubOrdersPayload> {
 
 async function getCrewOrders(cksCode: string): Promise<HubOrdersPayload> {
   const normalized = normalizeIdentity(cksCode);
+  if (!normalized) {
+    throw new Error('Invalid CKS code');
+  }
+
   const crewRow = await query<{ assigned_center: string | null }>(
     `SELECT assigned_center FROM crew WHERE UPPER(crew_id) = $1 LIMIT 1`,
     [normalized],
@@ -225,6 +245,10 @@ async function getCrewOrders(cksCode: string): Promise<HubOrdersPayload> {
 
 async function getWarehouseOrders(cksCode: string): Promise<HubOrdersPayload> {
   const normalized = normalizeIdentity(cksCode);
+  if (!normalized) {
+    throw new Error('Invalid CKS code');
+  }
+
   const orders = await fetchLegacyOrders(
     `SELECT order_id, customer_id, center_id, service_id, order_date, completion_date,
             total_amount, status, notes, assigned_warehouse
@@ -290,7 +314,7 @@ export interface CreateOrderInput {
   items: readonly CreateOrderItemInput[];
 }
 
-export async function createOrder(): Promise<HubOrderItem> {
+export async function createOrder(input: CreateOrderInput): Promise<HubOrderItem> {
   throw new Error('Order creation is not available in this build.');
 }
 
@@ -305,6 +329,6 @@ export interface OrderActionInput {
   notes?: string | null;
 }
 
-export async function applyOrderAction(): Promise<HubOrderItem | null> {
+export async function applyOrderAction(input: OrderActionInput): Promise<HubOrderItem | null> {
   throw new Error('Order actions are not available in this build.');
 }

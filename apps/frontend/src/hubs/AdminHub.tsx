@@ -103,9 +103,10 @@ const STATUS_PALETTES: Record<string, StatusPalette> = {
 };
 
 function renderStatusBadge(value: string | null | undefined) {
-  const normalized = (value ?? 'unassigned').toLowerCase().trim().replace(/\s+/g, '_');
+  if (!value) return null;
+  const normalized = value.toLowerCase().trim().replace(/\s+/g, '_');
   const palette = STATUS_PALETTES[normalized] ?? STATUS_PALETTES.unknown;
-  const label = (value ?? 'Unassigned').replace(/_/g, ' ');
+  const label = value.replace(/_/g, ' ');
   return (
     <span
       style={{
@@ -551,11 +552,10 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
       customers.map((customer) => ({
         id: customer.id,
         name: formatText(customer.name),
-        managerId: formatText(customer.managerId),
-        mainContact: formatText(customer.mainContact),
         email: formatText(customer.email),
-        totalCenters: customer.totalCenters ?? 0,
-        status: customer.managerId ? 'active' : 'unassigned',
+        phone: formatText(customer.phone),
+        status: customer.status?.toLowerCase() ?? null,
+        createdAt: formatDate(customer.createdAt),
       })),
     [customers],
   );
@@ -571,6 +571,7 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
         email: formatText(center.email),
         phone: formatText(center.phone),
         status: center.customerId ? 'active' : 'unassigned',
+        createdAt: formatDate(center.createdAt),
       })),
     [centers],
   );
@@ -584,6 +585,7 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
         phone: formatText(member.phone),
         assignedCenter: formatText(member.assignedCenter),
         status: member.assignedCenter ? 'active' : 'unassigned',
+        createdAt: formatDate(member.createdAt),
       })),
     [crew],
   );
@@ -1100,6 +1102,9 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
   );
 
 }
+
+
+
 
 
 

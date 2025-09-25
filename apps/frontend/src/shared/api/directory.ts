@@ -1,7 +1,7 @@
-import useSWR from 'swr';
-import { useCallback, useMemo } from 'react';
-import { useAuth as useClerkAuth } from '@clerk/clerk-react';
 import type { Activity } from '@cks/domain-widgets';
+import { useAuth as useClerkAuth } from '@clerk/clerk-react';
+import { useCallback, useMemo } from 'react';
+import useSWR from 'swr';
 import { apiFetch, type ApiFetchInit, type ApiResponse } from './client';
 
 export interface Manager {
@@ -42,32 +42,37 @@ export interface Customer {
   phone: string | null;
   address: string | null;
   totalCenters: number | null;
+  createdAt: string | null;
+  updatedAt: string | null;
   archivedAt: string | null;
 }
 
 export interface Center {
   id: string;
-  managerId: string | null;
   name: string | null;
-  contractorId: string | null;
-  customerId: string | null;
   mainContact: string | null;
   email: string | null;
   phone: string | null;
   address: string | null;
-  archivedAt: string | null;
+  customerId: string | null;
+  contractorId: string | null;
+  managerId: string | null;
+  status: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
 }
 
 export interface CrewMember {
   id: string;
   name: string | null;
-  status: string | null;
   emergencyContact: string | null;
   email: string | null;
   phone: string | null;
   address: string | null;
   assignedCenter: string | null;
-  archivedAt: string | null;
+  status: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
 }
 
 export interface Warehouse {
@@ -321,4 +326,7 @@ export const useFeedback = feedbackResource.useResource;
 export const fetchFeedback = feedbackResource.fetchResource;
 export const useActivities = activitiesResource.useResource;
 export const fetchActivities = activitiesResource.fetchResource;
+
+
+
 

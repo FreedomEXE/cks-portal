@@ -4,7 +4,7 @@ import type { HubProfilePayload, HubRelatedContact, HubRole } from "./types";
 
 interface CustomerRow {
   customer_id: string;
-  company_name: string | null;
+  name: string | null;
   main_contact: string | null;
   email: string | null;
   phone: string | null;
@@ -18,7 +18,7 @@ interface CustomerRow {
 
 interface ManagerRow {
   manager_id: string;
-  manager_name: string | null;
+  name: string | null;
   email: string | null;
   phone: string | null;
   address: string | null;
@@ -31,7 +31,7 @@ interface ManagerRow {
 
 interface ContractorRow {
   contractor_id: string;
-  company_name: string | null;
+  name: string | null;
   contact_person: string | null;
   email: string | null;
   phone: string | null;
@@ -71,7 +71,7 @@ interface CrewRow {
 
 interface WarehouseRow {
   warehouse_id: string;
-  warehouse_name: string | null;
+  name: string | null;
   main_contact: string | null;
   manager_id: string | null;
   warehouse_type: string | null;
@@ -124,7 +124,7 @@ async function loadManagerContact(managerId: string | null): Promise<HubRelatedC
     return null;
   }
   const result = await query<ManagerRow>(
-    `SELECT manager_id, manager_name, email, phone
+    `SELECT manager_id, name, email, phone
      FROM managers
      WHERE UPPER(manager_id) = $1
      LIMIT 1`,
@@ -136,7 +136,7 @@ async function loadManagerContact(managerId: string | null): Promise<HubRelatedC
   }
   return mapContact({
     id: row.manager_id,
-    name: row.manager_name,
+    name: row.name,
     email: row.email,
     phone: row.phone,
   });
@@ -151,7 +151,7 @@ async function loadContractorContact(contractorId: string | null): Promise<HubRe
     return null;
   }
   const result = await query<ContractorRow>(
-    `SELECT contractor_id, company_name, contact_person, email, phone
+    `SELECT contractor_id, name, contact_person, email, phone
      FROM contractors
      WHERE UPPER(contractor_id) = $1
      LIMIT 1`,
@@ -161,7 +161,7 @@ async function loadContractorContact(contractorId: string | null): Promise<HubRe
   if (!row) {
     return null;
   }
-  const name = row.company_name ?? row.contact_person;
+  const name = row.name ?? row.contact_person;
   return mapContact({
     id: row.contractor_id,
     name: name ?? row.contractor_id,
@@ -179,7 +179,7 @@ async function loadCustomerContact(customerId: string | null): Promise<HubRelate
     return null;
   }
   const result = await query<CustomerRow>(
-    `SELECT customer_id, company_name, main_contact, email, phone
+    `SELECT customer_id, name, main_contact, email, phone
      FROM customers
      WHERE UPPER(customer_id) = $1
      LIMIT 1`,
@@ -191,7 +191,7 @@ async function loadCustomerContact(customerId: string | null): Promise<HubRelate
   }
   return mapContact({
     id: row.customer_id,
-    name: row.company_name ?? row.customer_id,
+    name: row.name ?? row.customer_id,
     email: row.email,
     phone: row.phone,
   });
@@ -240,7 +240,7 @@ async function loadCenterDetails(centerId: string | null): Promise<CenterDetails
 
 async function getCustomerProfile(cksCode: string): Promise<HubProfilePayload | null> {
   const result = await query<CustomerRow>(
-    `SELECT customer_id, company_name, main_contact, email, phone, address, status,
+    `SELECT customer_id, name, main_contact, email, phone, address, status,
             cks_manager, contractor_id, created_at, updated_at
      FROM customers
      WHERE UPPER(customer_id) = $1
@@ -259,7 +259,7 @@ async function getCustomerProfile(cksCode: string): Promise<HubProfilePayload | 
   return {
     role: "customer",
     cksCode: row.customer_id,
-    name: row.company_name ?? row.customer_id,
+    name: row.name ?? row.customer_id,
     status: row.status ?? null,
     mainContact: row.main_contact ?? null,
     email: row.email ?? null,
@@ -278,7 +278,7 @@ async function getCustomerProfile(cksCode: string): Promise<HubProfilePayload | 
 
 async function getManagerProfile(cksCode: string): Promise<HubProfilePayload | null> {
   const result = await query<ManagerRow>(
-    `SELECT manager_id, manager_name, email, phone, address, status, territory, reports_to, created_at, updated_at
+    `SELECT manager_id, name, email, phone, address, status, territory, reports_to, created_at, updated_at
      FROM managers
      WHERE UPPER(manager_id) = $1
      LIMIT 1`,
@@ -295,9 +295,9 @@ async function getManagerProfile(cksCode: string): Promise<HubProfilePayload | n
   return {
     role: "manager",
     cksCode: row.manager_id,
-    name: row.manager_name ?? row.manager_id,
+    name: row.name ?? row.manager_id,
     status: row.status ?? null,
-    mainContact: row.manager_name ?? null,
+    mainContact: row.name ?? null,
     email: row.email ?? null,
     phone: row.phone ?? null,
     address: row.address ?? null,
@@ -313,7 +313,7 @@ async function getManagerProfile(cksCode: string): Promise<HubProfilePayload | n
 
 async function getContractorProfile(cksCode: string): Promise<HubProfilePayload | null> {
   const result = await query<ContractorRow>(
-    `SELECT contractor_id, company_name, contact_person, email, phone, address, status, cks_manager, created_at, updated_at
+    `SELECT contractor_id, name, contact_person, email, phone, address, status, cks_manager, created_at, updated_at
      FROM contractors
      WHERE UPPER(contractor_id) = $1
      LIMIT 1`,
@@ -330,7 +330,7 @@ async function getContractorProfile(cksCode: string): Promise<HubProfilePayload 
   return {
     role: "contractor",
     cksCode: row.contractor_id,
-    name: row.company_name ?? row.contractor_id,
+    name: row.name ?? row.contractor_id,
     status: row.status ?? null,
     mainContact: row.contact_person ?? null,
     email: row.email ?? null,
@@ -429,7 +429,7 @@ async function getCrewProfile(cksCode: string): Promise<HubProfilePayload | null
 
 async function getWarehouseProfile(cksCode: string): Promise<HubProfilePayload | null> {
   const result = await query<WarehouseRow>(
-    `SELECT warehouse_id, COALESCE(warehouse_name, name) AS warehouse_name, main_contact, manager_id, warehouse_type, address, phone, email, status, capacity, current_utilization, created_at, updated_at
+    `SELECT warehouse_id, name, main_contact, manager_id, warehouse_type, address, phone, email, status, capacity, current_utilization, created_at, updated_at
      FROM warehouses
      WHERE UPPER(warehouse_id) = $1
      LIMIT 1`,
@@ -446,7 +446,7 @@ async function getWarehouseProfile(cksCode: string): Promise<HubProfilePayload |
   return {
     role: "warehouse",
     cksCode: row.warehouse_id,
-    name: row.warehouse_name ?? row.warehouse_id,
+    name: row.name ?? row.warehouse_id,
     status: row.status ?? null,
     mainContact: row.main_contact ?? null,
     email: row.email ?? null,

@@ -231,7 +231,7 @@ export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHu
     crewCount: (dashboard as any)?.crewCount ?? 0,
     activeServices: (dashboard as any)?.activeServices ?? 0,
     pendingOrders: (dashboard as any)?.pendingOrders ?? 0,
-    accountStatus: dashboard?.accountStatus ?? 'Unknown',
+    accountStatus: dashboard?.accountStatus === 'assigned' ? 'Active' : (dashboard?.accountStatus ?? 'Unknown'),
   }), [dashboard]);
 
   const ecosystemData = useMemo<TreeNode>(() => ({

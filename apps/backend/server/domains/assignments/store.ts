@@ -101,11 +101,11 @@ async function recordActivity(payload: ActivityPayload): Promise<void> {
 export async function listUnassignedContractors(limit = 250): Promise<UnassignedContractor[]> {
   const result = await query<{
     contractor_id: string;
-    company_name: string | null;
+    name: string | null;
     email: string | null;
     phone: string | null;
   }>(
-    `SELECT contractor_id, company_name, email, phone
+    `SELECT contractor_id, name, email, phone
      FROM contractors
      WHERE (cks_manager IS NULL OR cks_manager = '')
        AND (archived_at IS NULL)
@@ -116,7 +116,7 @@ export async function listUnassignedContractors(limit = 250): Promise<Unassigned
 
   return result.rows.map((row) => ({
     id: formatPrefixedId(row.contractor_id, 'CON'),
-    name: row.company_name ?? formatPrefixedId(row.contractor_id, 'CON'),
+    name: row.name ?? formatPrefixedId(row.contractor_id, 'CON'),
     email: row.email,
     phone: row.phone,
   }));
@@ -125,11 +125,11 @@ export async function listUnassignedContractors(limit = 250): Promise<Unassigned
 export async function listUnassignedCustomers(limit = 250): Promise<UnassignedCustomer[]> {
   const result = await query<{
     customer_id: string;
-    company_name: string | null;
+    name: string | null;
     email: string | null;
     phone: string | null;
   }>(
-    `SELECT customer_id, company_name, email, phone
+    `SELECT customer_id, name, email, phone
      FROM customers
      WHERE (contractor_id IS NULL OR contractor_id = '')
        AND (archived_at IS NULL)
@@ -140,7 +140,7 @@ export async function listUnassignedCustomers(limit = 250): Promise<UnassignedCu
 
   return result.rows.map((row) => ({
     id: formatPrefixedId(row.customer_id, 'CUS'),
-    name: row.company_name ?? formatPrefixedId(row.customer_id, 'CUS'),
+    name: row.name ?? formatPrefixedId(row.customer_id, 'CUS'),
     email: row.email,
     phone: row.phone,
   }));
@@ -199,9 +199,10 @@ export async function listUnassignedCrew(limit = 250): Promise<UnassignedCrewMem
 async function fetchContractor(contractorId: string) {
   const result = await query<{
     contractor_id: string;
-    company_name: string | null;
+    name: string | null;
+    cks_manager: string | null;
   }>(
-    `SELECT contractor_id, company_name
+    `SELECT contractor_id, name, cks_manager
      FROM contractors
      WHERE UPPER(contractor_id) = $1
        AND archived_at IS NULL
@@ -214,9 +215,9 @@ async function fetchContractor(contractorId: string) {
 async function fetchManager(managerId: string) {
   const result = await query<{
     manager_id: string;
-    manager_name: string | null;
+    name: string | null;
   }>(
-    `SELECT manager_id, manager_name
+    `SELECT manager_id, name
      FROM managers
      WHERE UPPER(manager_id) = $1
        AND archived_at IS NULL
@@ -229,10 +230,11 @@ async function fetchManager(managerId: string) {
 async function fetchCustomer(customerId: string) {
   const result = await query<{
     customer_id: string;
-    company_name: string | null;
+    name: string | null;
     contractor_id: string | null;
+    cks_manager: string | null;
   }>(
-    `SELECT customer_id, company_name, contractor_id
+    `SELECT customer_id, name, contractor_id, cks_manager
      FROM customers
      WHERE UPPER(customer_id) = $1
        AND archived_at IS NULL
@@ -247,8 +249,9 @@ async function fetchCenter(centerId: string) {
     center_id: string;
     name: string | null;
     contractor_id: string | null;
+    cks_manager: string | null;
   }>(
-    `SELECT center_id, name, contractor_id
+    `SELECT center_id, name, contractor_id, cks_manager
      FROM centers
      WHERE UPPER(center_id) = $1
        AND archived_at IS NULL
@@ -296,9 +299,38 @@ export async function assignContractorToManager(
   await query(
     `UPDATE contractors
      SET cks_manager = $1,
-         status = 'assigned',
+         status = 'active',
          updated_at = NOW()
      WHERE contractor_id = $2`,
+    [manager.manager_id, contractor.contractor_id],
+  );
+
+  // Cascade manager to all customers of this contractor
+  await query(
+    `UPDATE customers
+     SET cks_manager = $1,
+         updated_at = NOW()
+     WHERE contractor_id = $2`,
+    [manager.manager_id, contractor.contractor_id],
+  );
+
+  // Cascade manager to all centers of this contractor
+  await query(
+    `UPDATE centers
+     SET cks_manager = $1,
+         updated_at = NOW()
+     WHERE contractor_id = $2`,
+    [manager.manager_id, contractor.contractor_id],
+  );
+
+  // Cascade manager to all crew members in centers of this contractor
+  await query(
+    `UPDATE crew
+     SET cks_manager = $1,
+         updated_at = NOW()
+     WHERE assigned_center IN (
+       SELECT center_id FROM centers WHERE contractor_id = $2
+     )`,
     [manager.manager_id, contractor.contractor_id],
   );
 
@@ -310,17 +342,17 @@ export async function assignContractorToManager(
     targetType: 'contractor',
     metadata: {
       contractorId: contractor.contractor_id,
-      contractorName: contractor.company_name,
+      contractorName: contractor.name,
       managerId: manager.manager_id,
-      managerName: manager.manager_name,
+      managerName: manager.name,
     },
   });
 
   return {
     id: contractor.contractor_id,
-    name: contractor.company_name ?? contractor.contractor_id,
+    name: contractor.name ?? contractor.contractor_id,
     assignedId: manager.manager_id,
-    assignedName: manager.manager_name ?? manager.manager_id,
+    assignedName: manager.name ?? manager.manager_id,
   };
 }
 
@@ -347,10 +379,31 @@ export async function assignCustomerToContractor(
   await query(
     `UPDATE customers
      SET contractor_id = $1,
-         status = 'assigned',
+         cks_manager = $2,
+         status = 'active',
+         updated_at = NOW()
+     WHERE customer_id = $3`,
+    [contractor.contractor_id, contractor.cks_manager, customer.customer_id],
+  );
+
+  // Cascade manager to all centers of this customer
+  await query(
+    `UPDATE centers
+     SET cks_manager = $1,
          updated_at = NOW()
      WHERE customer_id = $2`,
-    [contractor.contractor_id, customer.customer_id],
+    [contractor.cks_manager, customer.customer_id],
+  );
+
+  // Cascade manager to all crew in centers of this customer
+  await query(
+    `UPDATE crew
+     SET cks_manager = $1,
+         updated_at = NOW()
+     WHERE assigned_center IN (
+       SELECT center_id FROM centers WHERE customer_id = $2
+     )`,
+    [contractor.cks_manager, customer.customer_id],
   );
 
   await recordActivity({
@@ -361,17 +414,17 @@ export async function assignCustomerToContractor(
     targetType: 'customer',
     metadata: {
       customerId: customer.customer_id,
-      customerName: customer.company_name,
+      customerName: customer.name,
       contractorId: contractor.contractor_id,
-      contractorName: contractor.company_name,
+      contractorName: contractor.name,
     },
   });
 
   return {
     id: customer.customer_id,
-    name: customer.company_name ?? customer.customer_id,
+    name: customer.name ?? customer.customer_id,
     assignedId: contractor.contractor_id,
-    assignedName: contractor.company_name ?? contractor.contractor_id,
+    assignedName: contractor.name ?? contractor.contractor_id,
   };
 }
 
@@ -396,15 +449,26 @@ export async function assignCenterToCustomer(
   }
 
   const contractorId = customer.contractor_id;
+  const managerId = customer.cks_manager;
 
   await query(
     `UPDATE centers
      SET customer_id = $1,
          contractor_id = COALESCE($2, contractor_id),
-         status = 'assigned',
+         cks_manager = COALESCE($3, cks_manager),
+         status = 'active',
          updated_at = NOW()
-     WHERE center_id = $3`,
-    [customer.customer_id, contractorId, center.center_id],
+     WHERE center_id = $4`,
+    [customer.customer_id, contractorId, managerId, center.center_id],
+  );
+
+  // Cascade manager to all crew in this center
+  await query(
+    `UPDATE crew
+     SET cks_manager = $1,
+         updated_at = NOW()
+     WHERE assigned_center = $2`,
+    [managerId, center.center_id],
   );
 
   await recordActivity({
@@ -417,7 +481,7 @@ export async function assignCenterToCustomer(
       centerId: center.center_id,
       centerName: center.name,
       customerId: customer.customer_id,
-      customerName: customer.company_name,
+      customerName: customer.name,
       contractorId,
     },
   });
@@ -426,7 +490,7 @@ export async function assignCenterToCustomer(
     id: center.center_id,
     name: center.name ?? center.center_id,
     assignedId: customer.customer_id,
-    assignedName: customer.company_name ?? customer.customer_id,
+    assignedName: customer.name ?? customer.customer_id,
   };
 }
 
@@ -453,10 +517,11 @@ export async function assignCrewToCenter(
   await query(
     `UPDATE crew
      SET assigned_center = $1,
-         status = 'assigned',
+         cks_manager = $2,
+         status = 'active',
          updated_at = NOW()
-     WHERE crew_id = $2`,
-    [center.center_id, crew.crew_id],
+     WHERE crew_id = $3`,
+    [center.center_id, center.cks_manager, crew.crew_id],
   );
 
   await recordActivity({
@@ -512,13 +577,13 @@ export async function unassignContractorFromManager(
     targetType: 'contractor',
     metadata: {
       contractorId: contractor.contractor_id,
-      contractorName: contractor.company_name,
+      contractorName: contractor.name,
     },
   });
 
   return {
     id: contractor.contractor_id,
-    name: contractor.company_name ?? contractor.contractor_id,
+    name: contractor.name ?? contractor.contractor_id,
   };
 }
 
@@ -553,13 +618,13 @@ export async function unassignCustomerFromContractor(
     targetType: 'customer',
     metadata: {
       customerId: customer.customer_id,
-      customerName: customer.company_name,
+      customerName: customer.name,
     },
   });
 
   return {
     id: customer.customer_id,
-    name: customer.company_name ?? customer.customer_id,
+    name: customer.name ?? customer.customer_id,
   };
 }
 

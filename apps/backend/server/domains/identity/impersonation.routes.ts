@@ -45,7 +45,7 @@ export async function findUserByCode(code: string): Promise<{
 
   // Check managers table
   const managerResult = await query(
-    'SELECT manager_id, manager_name FROM managers WHERE UPPER(manager_id) = $1 LIMIT 1',
+    'SELECT manager_id, name FROM managers WHERE UPPER(manager_id) = $1 LIMIT 1',
     [normalizedCode]
   );
   if (managerResult.rows.length > 0) {
@@ -53,14 +53,14 @@ export async function findUserByCode(code: string): Promise<{
     return {
       code: manager.manager_id,
       role: 'manager',
-      displayName: manager.manager_name || manager.manager_id,
-      firstName: manager.manager_name?.split(' ')[0] ?? null,
+      displayName: manager.name || manager.manager_id,
+      firstName: manager.name?.split(' ')[0] ?? null,
     };
   }
 
   // Check contractors table
   const contractorResult = await query(
-    'SELECT contractor_id, company_name, contact_person FROM contractors WHERE UPPER(contractor_id) = $1 LIMIT 1',
+    'SELECT contractor_id, name, contact_person FROM contractors WHERE UPPER(contractor_id) = $1 LIMIT 1',
     [normalizedCode]
   );
   if (contractorResult.rows.length > 0) {
@@ -68,14 +68,14 @@ export async function findUserByCode(code: string): Promise<{
     return {
       code: contractor.contractor_id,
       role: 'contractor',
-      displayName: contractor.contact_person || contractor.company_name || contractor.contractor_id,
+      displayName: contractor.contact_person || contractor.name || contractor.contractor_id,
       firstName: contractor.contact_person?.split(' ')[0] ?? null,
     };
   }
 
   // Check customers table
   const customerResult = await query(
-    'SELECT customer_id, company_name, main_contact FROM customers WHERE UPPER(customer_id) = $1 LIMIT 1',
+    'SELECT customer_id, name, main_contact FROM customers WHERE UPPER(customer_id) = $1 LIMIT 1',
     [normalizedCode]
   );
   if (customerResult.rows.length > 0) {
@@ -83,7 +83,7 @@ export async function findUserByCode(code: string): Promise<{
     return {
       code: customer.customer_id,
       role: 'customer',
-      displayName: customer.main_contact || customer.company_name || customer.customer_id,
+      displayName: customer.main_contact || customer.name || customer.customer_id,
       firstName: customer.main_contact?.split(' ')[0] ?? null,
     };
   }
@@ -105,7 +105,7 @@ export async function findUserByCode(code: string): Promise<{
 
   // Check warehouses table
   const warehouseResult = await query(
-    'SELECT warehouse_id, COALESCE(warehouse_name, name) AS warehouse_name, manager FROM warehouses WHERE UPPER(warehouse_id) = $1 LIMIT 1',
+    'SELECT warehouse_id, name, manager FROM warehouses WHERE UPPER(warehouse_id) = $1 LIMIT 1',
     [normalizedCode]
   );
   if (warehouseResult.rows.length > 0) {
@@ -113,7 +113,7 @@ export async function findUserByCode(code: string): Promise<{
     return {
       code: warehouse.warehouse_id,
       role: 'warehouse',
-      displayName: warehouse.manager || warehouse.warehouse_name || warehouse.warehouse_id,
+      displayName: warehouse.manager || warehouse.name || warehouse.warehouse_id,
       firstName: warehouse.manager?.split(' ')[0] ?? null,
     };
   }

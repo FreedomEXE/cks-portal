@@ -150,7 +150,7 @@ export async function createManager(
 
   const result = await query<{
     manager_id: string;
-    manager_name: string;
+    name: string;
     email: string | null;
     phone: string | null;
     territory: string | null;
@@ -161,7 +161,7 @@ export async function createManager(
   }>(
     `INSERT INTO managers (
       manager_id,
-      manager_name,
+      name,
       email,
       phone,
       territory,
@@ -172,7 +172,7 @@ export async function createManager(
       created_at,
       updated_at
     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
-    RETURNING manager_id, manager_name, email, phone, territory, role, reports_to, address, status`,
+    RETURNING manager_id, name, email, phone, territory, role, reports_to, address, status`,
     [
       id,
       payload.fullName.trim(),
@@ -206,7 +206,7 @@ export async function createManager(
 
   return {
     id,
-    name: row.manager_name,
+    name: row.name,
     email: row.email,
     phone: row.phone,
     territory: row.territory,
@@ -500,7 +500,7 @@ export async function createWarehouse(
 
   const result = await query<{
     warehouse_id: string;
-    warehouse_name: string;
+    name: string;
     main_contact: string | null;
     email: string | null;
     phone: string | null;
@@ -511,7 +511,7 @@ export async function createWarehouse(
   }>(
     `INSERT INTO warehouses (
       warehouse_id,
-      warehouse_name,
+      name,
       main_contact,
       email,
       phone,
@@ -522,7 +522,7 @@ export async function createWarehouse(
       created_at,
       updated_at
     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
-    RETURNING warehouse_id, warehouse_name, main_contact, email, phone, address, status, warehouse_type, manager_id`,
+    RETURNING warehouse_id, name, main_contact, email, phone, address, status, warehouse_type, manager_id`,
     [
       id,
       payload.name.trim(),
@@ -530,7 +530,7 @@ export async function createWarehouse(
       payload.email.trim().toLowerCase(),
       payload.phone.trim(),
       payload.address.trim(),
-      'operational',
+      'active',
       toNullable(payload.warehouseType),
       normalizeIdentity(payload.managerId ?? null),
     ],
@@ -552,12 +552,12 @@ export async function createWarehouse(
 
   return {
     id,
-    name: row.warehouse_name,
+    name: row.name,
     mainContact: row.main_contact,
     email: row.email,
     phone: row.phone,
     address: row.address,
-    status: row.status ?? 'operational',
+    status: row.status ?? 'active',
     warehouseType: row.warehouse_type,
     managerId: row.manager_id,
   };

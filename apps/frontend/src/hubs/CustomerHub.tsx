@@ -231,7 +231,7 @@ export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubPro
     centerCount: dashboard?.centerCount ?? 0,
     crewCount: dashboard?.crewCount ?? 0,
     pendingRequests: dashboard?.pendingRequests ?? 0,
-    accountStatus: dashboard?.accountStatus ?? 'Unknown',
+    accountStatus: dashboard?.accountStatus === 'assigned' ? 'Active' : (dashboard?.accountStatus ?? 'Unknown'),
   }), [dashboard]);
 
   const ecosystemData = useMemo<TreeNode>(() => ({

@@ -21,6 +21,7 @@ export interface HubReportsPayload {
   cksCode: string;
   reports: ReportItem[];
   feedback: ReportItem[];
+  // ...existing code...
 }
 
 async function getManagerReports(cksCode: string): Promise<HubReportsPayload> {
@@ -149,7 +150,6 @@ async function getContractorReports(cksCode: string): Promise<HubReportsPayload>
 
 async function getCrewReports(cksCode: string): Promise<HubReportsPayload> {
   // Crew can only submit feedback, not reports
-  // They see feedback they've submitted
   const reportsResult = await query<any>(
     `SELECT * FROM reports
      WHERE UPPER(crew_member_id) = $1
