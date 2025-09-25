@@ -71,7 +71,7 @@ const TAB_DEFINITIONS: TabDefinition[] = [
   {
     key: 'customers',
     label: 'Customers',
-    color: '#0ea5e9',
+    color: '#eab308',
     subjectLabel: 'Customer',
     targetLabel: 'Contractor',
     resource: 'customers',

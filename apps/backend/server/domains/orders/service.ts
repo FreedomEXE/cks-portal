@@ -1,24 +1,52 @@
-﻿/*----------------------------------------------- 
-  Property of CKS  (c) 2025
------------------------------------------------*/
-/**
- * File: service.ts
- *
- * Description:
- * Short what/why
- *
- * Responsibilities:
- * - Key responsibility
- * - Another responsibility
- *
- * Role in system:
- * - Who imports/uses this; high-level, not a list of files
- *
- * Notes:
- * Special behaviors, flags, envs
- */
-/*-----------------------------------------------
-  Manifested by Freedom_EXE
------------------------------------------------*/
+import type { HubRole } from '../profile/types';
+import type { HubOrderItem, HubOrdersPayload } from './types';
+import {
+  applyOrderAction as storeApplyOrderAction,
+  createOrder as storeCreateOrder,
+  getHubOrders as storeGetHubOrders,
+  type CreateOrderInput,
+  type OrderActionInput,
+  type OrderActionType,
+} from './store';
 
-export {};
+const PRODUCT_ORDER_CREATORS = new Set<HubRole>(['manager', 'contractor', 'customer', 'center', 'crew']);
+const SERVICE_ORDER_CREATORS = new Set<HubRole>(['contractor', 'customer', 'center']);
+
+const ROLE_ACTIONS: Record<HubRole, readonly OrderActionType[]> = {
+  manager: ['create-service', 'cancel'],
+  contractor: ['cancel'],
+  customer: ['cancel'],
+  center: ['cancel'],
+  crew: ['cancel'],
+  warehouse: ['accept', 'reject', 'deliver', 'cancel'],
+};
+
+export type { CreateOrderInput, OrderActionInput, OrderActionType };
+
+export async function getHubOrders(role: HubRole, cksCode: string): Promise<HubOrdersPayload | null> {
+  return storeGetHubOrders(role, cksCode);
+}
+
+export async function createOrder(input: CreateOrderInput): Promise<HubOrderItem> {
+  const role = input.creator.role;
+  if (input.orderType === 'product' && !PRODUCT_ORDER_CREATORS.has(role)) {
+    throw new Error('This role cannot create product orders.');
+  }
+  if (input.orderType === 'service') {
+    if (!SERVICE_ORDER_CREATORS.has(role)) {
+      throw new Error('This role cannot create service orders.');
+    }
+  }
+  if (role === 'warehouse') {
+    throw new Error('Warehouses may not initiate orders.');
+  }
+  return storeCreateOrder(input);
+}
+
+export async function applyOrderAction(input: OrderActionInput): Promise<HubOrderItem | null> {
+  const allowed = ROLE_ACTIONS[input.actorRole];
+  if (!allowed || !allowed.includes(input.action)) {
+    throw new Error('This role cannot perform the requested order action.');
+  }
+  return storeApplyOrderAction(input);
+}

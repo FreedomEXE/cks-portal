@@ -1,24 +1,6 @@
-﻿/*----------------------------------------------- 
-  Property of CKS  (c) 2025
------------------------------------------------*/
-/**
- * File: service.ts
- *
- * Description:
- * Short what/why
- *
- * Responsibilities:
- * - Key responsibility
- * - Another responsibility
- *
- * Role in system:
- * - Who imports/uses this; high-level, not a list of files
- *
- * Notes:
- * Special behaviors, flags, envs
- */
-/*-----------------------------------------------
-  Manifested by Freedom_EXE
------------------------------------------------*/
+import type { CatalogFilters, CatalogListResult } from './types';
+import { fetchCatalogItems } from './store';
 
-export {};
+export async function getCatalogItems(filters: CatalogFilters): Promise<CatalogListResult> {
+  return fetchCatalogItems(filters);
+}

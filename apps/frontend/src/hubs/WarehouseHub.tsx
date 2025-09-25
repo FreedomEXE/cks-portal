@@ -5,17 +5,7 @@
  * File: WarehouseHub.tsx
  *
  * Description:
- * Warehouse Hub orchestrator component
- *
- * Responsibilities:
- * - Orchestrate warehouse role hub interface
- * - Manage tab navigation and content rendering
- *
- * Role in system:
- * - Primary interface for warehouse users
- *
- * Notes:
- * Uses MyHubSection for navigation
+ * Warehouse Hub orchestrator component wired to real backend data.
  */
 /*-----------------------------------------------
   Manifested by Freedom_EXE
@@ -23,26 +13,170 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MemosPreview, NewsPreview, OrdersSection, OverviewSection, ProfileInfoCard, RecentActivity, ReportsSection, SupportSection, type Activity } from '@cks/domain-widgets';
-import { Button, DataTable, PageHeader, PageWrapper, Scrollbar, TabSection } from '@cks/ui';
+import {
+  MemosPreview,
+  NewsPreview,
+  OrdersSection,
+  OverviewSection,
+  ProfileInfoCard,
+  RecentActivity,
+  ReportsSection,
+  SupportSection,
+  type Activity,
+} from '@cks/domain-widgets';
+import { DataTable, PageHeader, PageWrapper, Scrollbar, TabSection } from '@cks/ui';
+import { useAuth } from '@cks/auth';
+
 import MyHubSection from '../components/MyHubSection';
+import {
+  useHubDashboard,
+  useHubOrders,
+  useHubProfile,
+  useHubReports,
+  useHubInventory,
+  type HubOrderItem,
+  type HubInventoryItem,
+} from '../shared/api/hub';
 
 interface WarehouseHubProps {
   initialTab?: string;
 }
 
+const HISTORY_STATUSES = new Set(['delivered', 'rejected', 'cancelled', 'completed', 'service-created']);
+
+function normalizeIdentity(value?: string | null) {
+  if (!value) {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length ? trimmed.toUpperCase() : null;
+}
+
+function normalizeStatusValue(value?: string | null) {
+  if (!value) {
+    return 'pending';
+  }
+  return value.trim().toLowerCase().replace(/\s+/g, '-');
+}
+
+
+function formatStatusLabel(value?: string | null) {
+  const normalized = normalizeStatusValue(value);
+  if (!normalized) {
+    return 'Pending';
+  }
+  return normalized
+    .split('-')
+    .map((segment) => (segment ? segment[0]?.toUpperCase() + segment.slice(1) : segment))
+    .join(' ');
+}
+
+function getStatusBadgePalette(status: string | undefined) {
+  const normalized = normalizeStatusValue(status);
+  if (normalized === 'completed' || normalized === 'delivered' || normalized === 'active') {
+    return { background: '#dcfce7', color: '#16a34a' };
+  }
+  if (normalized === 'cancelled' || normalized === 'rejected') {
+    return { background: '#fee2e2', color: '#dc2626' };
+  }
+  if (normalized === 'in-progress' || normalized === 'approved') {
+    return { background: '#ede9fe', color: '#7c3aed' };
+  }
+  if (normalized === 'scheduled') {
+    return { background: '#dbeafe', color: '#2563eb' };
+  }
+  return { background: '#fef3c7', color: '#d97706' };
+}
+
+function formatDisplayDate(value?: string | null) {
+  if (!value) {
+    return '—';
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  return date.toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: '2-digit',
+  });
+}
+
+function normalizeOrderStatus(value?: string | null): HubOrderItem['status'] {
+  const normalized = normalizeStatusValue(value);
+  switch (normalized) {
+    case 'pending':
+    case 'in-progress':
+    case 'approved':
+    case 'rejected':
+    case 'cancelled':
+    case 'delivered':
+    case 'service-created':
+      return normalized;
+    default:
+      return 'pending';
+  }
+}
+
+function buildActivities(serviceOrders: HubOrderItem[], productOrders: HubOrderItem[]): Activity[] {
+  const combined = [...serviceOrders, ...productOrders]
+    .map((order) => ({
+      order,
+      timestamp: order.requestedDate ? new Date(order.requestedDate) : new Date(),
+    }))
+    .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
+    .slice(0, 10);
+
+  return combined.map(({ order, timestamp }) => ({
+    id: order.orderId,
+    message: `${order.orderType === 'service' ? 'Service' : 'Product'} order ${order.orderId} ${formatStatusLabel(order.status)}`,
+    timestamp,
+    type: getStatusBadgePalette(order.status).color === '#16a34a' ? 'success' : 'info',
+    metadata: {
+      role: 'warehouse',
+      orderType: order.orderType,
+      status: order.status,
+    },
+  }));
+}
+
 export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubProps) {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState(initialTab);
-  const [servicesTab, setServicesTab] = useState('my');
+  const [servicesTab, setServicesTab] = useState<'active' | 'history'>('active');
   const [servicesSearchQuery, setServicesSearchQuery] = useState('');
-  const [inventoryTab, setInventoryTab] = useState('active');
-  const [inventorySearchQuery, setInventorySearchQuery] = useState('');
-  const [inventoryFilter, setInventoryFilter] = useState('');
-  const [deliveriesTab, setDeliveriesTab] = useState('onetime');
+  const [deliveriesTab, setDeliveriesTab] = useState<'pending' | 'completed'>('pending');
   const [deliveriesSearchQuery, setDeliveriesSearchQuery] = useState('');
+  const [inventoryTab, setInventoryTab] = useState<'active' | 'archive'>('active');
+  const [inventorySearchQuery, setInventorySearchQuery] = useState('');
+  const [inventoryFilter, setInventoryFilter] = useState<string>('');
 
-  // Add scrollbar styles
+  const { code: authCode } = useAuth();
+  const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
+
+  const {
+    data: profile,
+    isLoading: profileLoading,
+    error: profileError,
+  } = useHubProfile(normalizedCode);
+  const {
+    data: dashboard,
+    isLoading: dashboardLoading,
+    error: dashboardError,
+  } = useHubDashboard(normalizedCode);
+  const {
+    data: orders,
+    isLoading: ordersLoading,
+    error: ordersError,
+  } = useHubOrders(normalizedCode);
+  const { data: reportsData, isLoading: reportsLoading } = useHubReports(normalizedCode);
+  const {
+    data: inventory,
+    isLoading: inventoryLoading,
+    error: inventoryError,
+  } = useHubInventory(normalizedCode);
+
   useEffect(() => {
     const style = document.createElement('style');
     style.textContent = `
@@ -67,815 +201,256 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
     };
   }, []);
 
-  // Mock activities for warehouse
-  const [activities, setActivities] = useState<Activity[]>([
-    {
-      id: 'act-1',
-      message: 'New shipment received: 500 units of product SKU-123',
-      timestamp: new Date(Date.now() - 15 * 60 * 1000), // 15 minutes ago
-      type: 'success',
-      metadata: { role: 'warehouse', userId: 'WHS-001', title: 'Shipment Received' }
-    },
-    {
-      id: 'act-2',
-      message: 'Low stock alert: Product SKU-456 below threshold',
-      timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
-      type: 'warning',
-      metadata: { role: 'warehouse', userId: 'WHS-001', title: 'Stock Alert' }
-    },
-    {
-      id: 'act-3',
-      message: 'Order WO-2024-089 prepared for delivery',
-      timestamp: new Date(Date.now() - 5 * 60 * 60 * 1000), // 5 hours ago
-      type: 'info',
-      metadata: { role: 'warehouse', userId: 'WHS-001', title: 'Order Prepared' }
-    },
-    {
-      id: 'act-4',
-      message: 'Inventory audit completed for Section A',
-      timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000), // 1 day ago
-      type: 'success',
-      metadata: { role: 'warehouse', userId: 'WHS-001', title: 'Audit Complete' }
-    },
-    {
-      id: 'act-5',
-      message: 'Restocking order placed for 10 items',
-      timestamp: new Date(Date.now() - 48 * 60 * 60 * 1000), // 2 days ago
-      type: 'action',
-      metadata: { role: 'warehouse', userId: 'WHS-001', title: 'Restock Ordered' }
+  const serviceOrders = useMemo<HubOrderItem[]>(() => {
+    if (!orders?.serviceOrders) {
+      return [];
     }
-  ]);
+    return orders.serviceOrders.map((order) => ({
+      ...order,
+      title: order.title ?? order.serviceId ?? order.orderId,
+      status: normalizeOrderStatus(order.status),
+    }));
+  }, [orders]);
 
-  // Mock service orders for Warehouse - CLEARED FOR FRESH START
-  // Warehouse service fulfillment orders - Warehouse provides services directly (no manager/crew)
-  const serviceOrders: any[] = [
-    // State 1: Pending warehouse acceptance (ACTION REQUIRED)
-    {
-      orderId: 'CTR001-ORD-SRV020',
-      orderType: 'service',
-      title: 'Inventory Management Service',
-      requestedBy: 'CTR-001',
-      destination: 'CTR-001',
-      requestedDate: '2025-09-19',
-      expectedDate: '2025-09-22',
-      status: 'pending',  // Warehouse sees as pending (needs to accept/deny)
-      approvalStages: [
-        { role: 'Center', status: 'requested', user: 'CTR-001', timestamp: '2025-09-19 08:00' },
-        { role: 'Customer', status: 'approved', user: 'CUS-001', timestamp: '2025-09-19 10:00' },
-        { role: 'Contractor', status: 'approved', user: 'CON-001', timestamp: '2025-09-19 13:00' },
-        { role: 'Warehouse', status: 'pending' }  // Their action needed - should pulse
-      ],
-      description: 'Complete inventory audit and organization service',
-      serviceType: 'Inventory',
-      frequency: 'Quarterly',
-      estimatedDuration: '8 hours',
-      notes: 'Full warehouse inventory count and reorganization'
-    },
-    // State 2: Another pending warehouse service
-    {
-      orderId: 'CTR001-ORD-SRV021',
-      orderType: 'service',
-      title: 'Logistics Optimization Consultation',
-      requestedBy: 'CTR-001',
-      destination: 'CTR-001',
-      requestedDate: '2025-09-18',
-      expectedDate: '2025-09-20',
-      status: 'pending',
-      approvalStages: [
-        { role: 'Center', status: 'requested', user: 'CTR-001', timestamp: '2025-09-18 09:00' },
-        { role: 'Customer', status: 'approved', user: 'CUS-001', timestamp: '2025-09-18 11:00' },
-        { role: 'Contractor', status: 'approved', user: 'CON-001', timestamp: '2025-09-18 14:00' },
-        { role: 'Warehouse', status: 'pending' }  // Their action needed
-      ],
-      description: 'Supply chain and logistics workflow optimization',
-      serviceType: 'Consultation',
-      frequency: 'One-time',
-      estimatedDuration: '4 hours',
-      notes: 'Review current processes and recommend improvements'
-    },
-    // State 3: Warehouse accepted, service in progress
-    {
-      orderId: 'CTR001-ORD-SRV022',
-      orderType: 'service',
-      title: 'Emergency Storage Setup',
-      requestedBy: 'CTR-001',
-      destination: 'CTR-001',
-      requestedDate: '2025-09-16',
-      expectedDate: '2025-09-18',
-      status: 'in-progress',  // Warehouse accepted and working on it
-      approvalStages: [
-        { role: 'Center', status: 'requested', user: 'CTR-001', timestamp: '2025-09-16 07:00' },
-        { role: 'Customer', status: 'approved', user: 'CUS-001', timestamp: '2025-09-16 09:00' },
-        { role: 'Contractor', status: 'approved', user: 'CON-001', timestamp: '2025-09-16 12:00' },
-        { role: 'Warehouse', status: 'accepted', user: 'WHS-001', timestamp: '2025-09-16 15:00' }
-      ],
-      description: 'Set up temporary storage solution for overflow inventory',
-      serviceType: 'Setup',
-      frequency: 'One-time',
-      estimatedDuration: '6 hours',
-      notes: 'Urgent - overflow from main warehouse needed immediately'
-    },
-    // State 4: Service completed by warehouse
-    {
-      orderId: 'CTR001-ORD-SRV023',
-      orderType: 'service',
-      title: 'Warehouse Safety Inspection',
-      requestedBy: 'CTR-001',
-      destination: 'CTR-001',
-      requestedDate: '2025-09-12',
-      expectedDate: '2025-09-15',
-      serviceStartDate: '2025-09-15',
-      status: 'service-created',  // Service completed by warehouse
-      approvalStages: [
-        { role: 'Center', status: 'requested', user: 'CTR-001', timestamp: '2025-09-12 10:00' },
-        { role: 'Customer', status: 'approved', user: 'CUS-001', timestamp: '2025-09-12 12:00' },
-        { role: 'Contractor', status: 'approved', user: 'CON-001', timestamp: '2025-09-12 15:00' },
-        { role: 'Warehouse', status: 'service-created', user: 'WHS-001', timestamp: '2025-09-15 16:00' }
-      ],
-      description: 'Comprehensive safety audit and compliance check',
-      serviceType: 'Inspection',
-      frequency: 'Annual',
-      estimatedDuration: '3 hours',
-      notes: 'Annual safety compliance inspection completed',
-      serviceCompleted: true,
-      completedDate: '2025-09-15'
-    },
-    // State 5: Rejected by warehouse
-    {
-      orderId: 'CTR001-ORD-SRV024',
-      orderType: 'service',
-      title: 'Hazardous Material Storage Setup',
-      requestedBy: 'CTR-001',
-      destination: 'CTR-001',
-      requestedDate: '2025-09-10',
-      expectedDate: '2025-09-14',
-      status: 'rejected',
-      approvalStages: [
-        { role: 'Center', status: 'requested', user: 'CTR-001', timestamp: '2025-09-10 08:00' },
-        { role: 'Customer', status: 'approved', user: 'CUS-001', timestamp: '2025-09-10 10:00' },
-        { role: 'Contractor', status: 'approved', user: 'CON-001', timestamp: '2025-09-10 13:00' },
-        { role: 'Warehouse', status: 'rejected', user: 'WHS-001', timestamp: '2025-09-10 16:00' }
-      ],
-      description: 'Setup specialized storage for hazardous materials',
-      serviceType: 'Setup',
-      frequency: 'One-time',
-      estimatedDuration: '12 hours',
-      rejectionReason: 'Facility lacks proper certification for hazardous material storage',
-      notes: 'Requires specialized licensing not currently held'
+  const productOrders = useMemo<HubOrderItem[]>(() => {
+    if (!orders?.productOrders) {
+      return [];
     }
-  ];
+    return orders.productOrders.map((order) => ({
+      ...order,
+      title: order.title ?? order.orderId,
+      status: normalizeOrderStatus(order.status),
+    }));
+  }, [orders]);
 
-  // Mock product orders data for Warehouse - orders requiring warehouse action
-  const productOrders: any[] = [
-    // State 1: Pending warehouse acceptance (ACTION REQUIRED)
-    {
-      orderId: 'CRW001-ORD-PRD001',
-      orderType: 'product',
-      title: 'Cleaning Supplies - Standard Package',
-      requestedBy: 'CRW-001',
-      destination: 'CTR-001',
-      requestedDate: '2025-09-19',
-      expectedDate: '2025-09-22',
-      status: 'pending',  // Warehouse sees as 'pending' (action required)
-      approvalStages: [
-        { role: 'Crew', status: 'requested', user: 'CRW-001', timestamp: '2025-09-19 09:00' },
-        { role: 'Warehouse', status: 'waiting' }  // 'waiting' shows yellow pending state
-      ],
-      approvalStage: {
-        currentStage: 'warehouse',
-        warehouseApproval: 'pending',
-        warehouseNotes: null
-      },
-      items: [
-        { name: 'All-Purpose Cleaner', quantity: 10, unit: 'bottles' },
-        { name: 'Microfiber Cloths', quantity: 50, unit: 'pieces' },
-        { name: 'Disinfectant Spray', quantity: 15, unit: 'cans' }
-      ],
-      notes: 'Urgent - running low on supplies for upcoming service'
-    },
-    // State 2: Accepted by warehouse (DELIVERY ACTION REQUIRED)
-    {
-      orderId: 'CRW001-ORD-PRD002',
-      orderType: 'product',
-      title: 'Safety Equipment Restock',
-      requestedBy: 'CRW-001',
-      destination: 'CTR-002',
-      requestedDate: '2025-09-17',
-      expectedDate: '2025-09-20',
-      status: 'approved',  // Warehouse approved, pending delivery
-      approvalStages: [
-        { role: 'Crew', status: 'requested', user: 'CRW-001', timestamp: '2025-09-17 14:30' },
-        { role: 'Warehouse', status: 'accepted' }
-      ],
-      approvalStage: {
-        currentStage: 'delivery',
-        warehouseApproval: 'approved',
-        warehouseApprovedBy: 'WHS-001',
-        warehouseApprovedDate: '2025-09-18',
-        warehouseNotes: 'Stock available - preparing for shipment',
-        deliveryStatus: 'pending'
-      },
-      items: [
-        { name: 'Safety Gloves', quantity: 100, unit: 'pairs' },
-        { name: 'Face Masks', quantity: 200, unit: 'pieces' },
-        { name: 'Safety Goggles', quantity: 20, unit: 'pieces' }
-      ],
-      notes: 'Monthly safety equipment restock'
-    },
-    // State 3: Delivered (archived - no action)
-    {
-      orderId: 'CRW001-ORD-PRD003',
-      orderType: 'product',
-      title: 'Floor Care Products',
-      requestedBy: 'CRW-001',
-      destination: 'CTR-003',
-      requestedDate: '2025-09-14',
-      expectedDate: '2025-09-16',
-      deliveryDate: '2025-09-16',
-      status: 'delivered',
-      approvalStages: [
-        { role: 'Crew', status: 'requested', user: 'CRW-001', timestamp: '2025-09-14 08:00' },
-        { role: 'Warehouse', status: 'accepted', user: 'WHS-001', timestamp: '2025-09-14 11:30' },
-        { role: 'Warehouse', status: 'delivered', user: 'WHS-001', timestamp: '2025-09-16 15:45' }
-      ],
-      approvalStage: {
-        currentStage: 'completed',
-        warehouseApproval: 'approved',
-        warehouseApprovedBy: 'WHS-001',
-        warehouseApprovedDate: '2025-09-14',
-        deliveryStatus: 'delivered',
-        deliveredBy: 'WHS-001',
-        deliveredDate: '2025-09-16',
-        deliveryNotes: 'Delivered to loading dock - signed by J. Smith'
-      },
-      items: [
-        { name: 'Floor Wax', quantity: 5, unit: 'gallons' },
-        { name: 'Floor Stripper', quantity: 3, unit: 'gallons' },
-        { name: 'Mop Heads', quantity: 24, unit: 'pieces' }
-      ],
-      notes: 'For scheduled floor maintenance at CTR-003'
-    },
-    // State 4: Rejected (archived - no action)
-    {
-      orderId: 'CRW001-ORD-PRD004',
-      orderType: 'product',
-      title: 'Specialized Equipment Request',
-      requestedBy: 'CRW-001',
-      destination: 'CTR-001',
-      requestedDate: '2025-09-12',
-      expectedDate: '2025-09-15',
-      status: 'rejected',
-      approvalStages: [
-        { role: 'Crew', status: 'requested', user: 'CRW-001', timestamp: '2025-09-12 10:00' },
-        { role: 'Warehouse', status: 'rejected', user: 'WHS-001', timestamp: '2025-09-13 09:30' }
-      ],
-      approvalStage: {
-        currentStage: 'rejected',
-        warehouseApproval: 'rejected',
-        warehouseRejectedBy: 'WHS-001',
-        warehouseRejectedDate: '2025-09-13',
-        warehouseNotes: 'Items not in current inventory - please contact procurement for special order',
-        rejectionReason: 'Out of stock - requires special order'
-      },
-      items: [
-        { name: 'Industrial Steam Cleaner', quantity: 2, unit: 'units' },
-        { name: 'High-Pressure Washer', quantity: 1, unit: 'unit' }
-      ],
-      notes: 'Need for deep cleaning project'
-    },
-    // Center-initiated orders that have gone through full approval chain
-    // State: Fully approved by Center->Customer->Contractor, pending warehouse
-    {
-      orderId: 'CTR001-ORD-PRD003',
-      orderType: 'product',
-      title: 'Emergency Supplies Request',
-      requestedBy: 'CTR-001',
-      destination: 'CTR-001',
-      requestedDate: '2025-09-16',
-      expectedDate: '2025-09-20',
-      status: 'pending',  // Warehouse sees as pending (ACTION REQUIRED)
-      approvalStages: [
-        { role: 'Center', status: 'requested', user: 'CTR-001', timestamp: '2025-09-16 08:00' },
-        { role: 'Customer', status: 'approved', user: 'CUS-001', timestamp: '2025-09-16 09:15' },
-        { role: 'Contractor', status: 'approved', user: 'CON-001', timestamp: '2025-09-16 11:00' },
-        { role: 'Warehouse', status: 'pending' }  // Their action needed
-      ],
-      items: [
-        { name: 'Spill Kit', quantity: 3, unit: 'kits' },
-        { name: 'Safety Cones', quantity: 10, unit: 'units' },
-        { name: 'Wet Floor Signs', quantity: 6, unit: 'signs' }
-      ],
-      notes: 'Urgent safety equipment needed'
-    },
-    // State: Warehouse accepted, pending delivery
-    {
-      orderId: 'CTR001-ORD-PRD004',
-      orderType: 'product',
-      title: 'Seasonal Decoration Supplies',
-      requestedBy: 'CTR-001',
-      destination: 'CTR-001',
-      requestedDate: '2025-09-14',
-      expectedDate: '2025-09-18',
-      status: 'approved',  // Warehouse accepted, pending delivery
-      approvalStages: [
-        { role: 'Center', status: 'requested', user: 'CTR-001', timestamp: '2025-09-14 10:00' },
-        { role: 'Customer', status: 'approved', user: 'CUS-001', timestamp: '2025-09-14 14:00' },
-        { role: 'Contractor', status: 'approved', user: 'CON-001', timestamp: '2025-09-15 09:00' },
-        { role: 'Warehouse', status: 'accepted' }
-      ],
-      items: [
-        { name: 'Holiday Decorations', quantity: 1, unit: 'set' },
-        { name: 'String Lights', quantity: 20, unit: 'strands' }
-      ],
-      notes: 'For upcoming holiday season'
-    },
-    // State: Delivered
-    {
-      orderId: 'CTR001-ORD-PRD005',
-      orderType: 'product',
-      title: 'HVAC Filters Bulk Order',
-      requestedBy: 'CTR-001',
-      destination: 'CTR-001',
-      requestedDate: '2025-09-10',
-      expectedDate: '2025-09-15',
-      deliveryDate: '2025-09-15',
-      status: 'delivered',
-      approvalStages: [
-        { role: 'Center', status: 'requested', user: 'CTR-001', timestamp: '2025-09-10 09:00' },
-        { role: 'Customer', status: 'approved', user: 'CUS-001', timestamp: '2025-09-10 11:00' },
-        { role: 'Contractor', status: 'approved', user: 'CON-001', timestamp: '2025-09-11 10:00' },
-        { role: 'Warehouse', status: 'delivered', user: 'WHS-001', timestamp: '2025-09-15 14:00' }
-      ],
-      items: [
-        { name: 'HVAC Filters 20x25x1', quantity: 50, unit: 'filters' },
-        { name: 'HVAC Filters 16x20x1', quantity: 30, unit: 'filters' }
-      ],
-      notes: 'Quarterly filter replacement stock'
-    },
-    // State: Rejected by warehouse
-    {
-      orderId: 'CTR001-ORD-PRD008',
-      orderType: 'product',
-      title: 'Specialty Tools Request',
-      requestedBy: 'CTR-001',
-      destination: 'CTR-001',
-      requestedDate: '2025-09-03',
-      expectedDate: '2025-09-08',
-      status: 'rejected',
-      approvalStages: [
-        { role: 'Center', status: 'requested', user: 'CTR-001', timestamp: '2025-09-03 10:00' },
-        { role: 'Customer', status: 'approved', user: 'CUS-001', timestamp: '2025-09-03 14:00' },
-        { role: 'Contractor', status: 'approved', user: 'CON-001', timestamp: '2025-09-04 09:00' },
-        { role: 'Warehouse', status: 'rejected', user: 'WHS-001', timestamp: '2025-09-04 15:00' }
-      ],
-      rejectionReason: 'Items discontinued - suggest alternative products',
-      items: [
-        { name: 'Specialty Floor Stripper Tool', quantity: 2, unit: 'units' }
-      ],
-      notes: 'For tile renovation project'
-    }
-  ];
+  const activities = useMemo(() => buildActivities(serviceOrders, productOrders), [serviceOrders, productOrders]);
 
-  // Mock inventory data for warehouse
-  const activeInventoryData = [
-    {
-      productId: 'PRD-001',
-      name: 'Industrial Floor Scrubber',
-      type: 'Equipment',
-      onHand: 3,
-      min: 2,
-      location: 'A-12-B',
-      isLow: false
-    },
-    {
-      productId: 'PRD-002',
-      name: 'Commercial Vacuum Cleaner',
-      type: 'Equipment',
-      onHand: 1,
-      min: 2,
-      location: 'A-15-C',
-      isLow: true
-    },
-    {
-      productId: 'PRD-003',
-      name: 'Industrial Floor Cleaner',
-      type: 'Products',
-      onHand: 45,
-      min: 25,
-      location: 'B-01-A',
-      isLow: false
-    },
-    {
-      productId: 'PRD-004',
-      name: 'Heavy Duty Degreaser',
-      type: 'Products',
-      onHand: 12,
-      min: 20,
-      location: 'B-02-C',
-      isLow: true
-    },
-    {
-      productId: 'PRD-005',
-      name: 'Glass Cleaner Concentrate',
-      type: 'Products',
-      onHand: 0,
-      min: 15,
-      location: 'B-03-A',
-      isLow: true
-    },
-    {
-      productId: 'PRD-006',
-      name: 'Microfiber Cleaning Cloths',
-      type: 'Materials',
-      onHand: 200,
-      min: 50,
-      location: 'C-05-C',
-      isLow: false
-    },
-    {
-      productId: 'PRD-007',
-      name: 'Disposable Gloves (Box)',
-      type: 'Materials',
-      onHand: 8,
-      min: 25,
-      location: 'C-02-A',
-      isLow: true
-    },
-    {
-      productId: 'PRD-008',
-      name: 'Mop Heads',
-      type: 'Materials',
-      onHand: 75,
-      min: 30,
-      location: 'C-10-B',
-      isLow: false
-    }
-  ];
+  const overviewData = useMemo(() => ({
+    inventoryCount: (dashboard as any)?.inventoryCount ?? 0,
+    pendingOrders: (dashboard as any)?.pendingOrders ?? 0,
+    deliveriesScheduled: (dashboard as any)?.deliveriesScheduled ?? 0,
+    lowStockItems: (dashboard as any)?.lowStockItems ?? 0,
+    accountStatus: dashboard?.accountStatus ?? 'Unknown',
+  }), [dashboard]);
 
-  const archivedInventoryData = [
-    {
-      productId: 'PRD-099',
-      name: 'Obsolete Floor Waxer',
-      type: 'Equipment',
-      archivedDate: '2025-08-15',
-      reason: 'Equipment replaced'
-    },
-    {
-      productId: 'PRD-098',
-      name: 'Discontinued Cleaner Brand',
-      type: 'Products',
-      archivedDate: '2025-07-20',
-      reason: 'Product discontinued'
-    },
-    {
-      productId: 'PRD-097',
-      name: 'Old Safety Gloves',
-      type: 'Materials',
-      archivedDate: '2025-06-10',
-      reason: 'Safety standards updated'
-    },
-    {
-      productId: 'PRD-096',
-      name: 'Broken Cleaning Cart',
-      type: 'Equipment',
-      archivedDate: '2025-05-25',
-      reason: 'Damaged beyond repair'
+
+  const { pendingDeliveries, completedDeliveries } = useMemo(() => {
+    const pending: Array<{ deliveryId: string; itemName: string; destination: string; status: string; scheduledDate: string }>
+      = [];
+    const completed: Array<{ deliveryId: string; itemName: string; destination: string; status: string; scheduledDate: string; completedDate: string }>
+      = [];
+
+    productOrders.forEach((order) => {
+      const normalizedStatus = normalizeStatusValue(order.status);
+      const base = {
+        deliveryId: order.orderId,
+        itemName: order.title ?? order.orderId,
+        destination: order.recipient ?? 'Warehouse',
+        status: formatStatusLabel(order.status),
+        scheduledDate: formatDisplayDate(order.requestedDate),
+        completedDate: formatDisplayDate(order.expectedDate),
+      };
+
+      if (normalizedStatus === 'delivered' || normalizedStatus === 'completed') {
+        completed.push(base);
+      } else if (normalizedStatus === 'pending' || normalizedStatus === 'in-progress' || normalizedStatus === 'approved') {
+        pending.push(base);
+      }
+    });
+
+    return { pendingDeliveries: pending, completedDeliveries: completed };
+  }, [productOrders]);
+
+  // Get inventory data from API
+  const activeInventoryData = useMemo<HubInventoryItem[]>(() => {
+    if (!inventory?.activeItems) {
+      return [];
     }
-  ];
+    return inventory.activeItems;
+  }, [inventory]);
+
+  const archivedInventoryData = useMemo<HubInventoryItem[]>(() => {
+    if (!inventory?.archivedItems) {
+      return [];
+    }
+    return inventory.archivedItems;
+  }, [inventory]);
 
   // Filter inventory data based on type filter
   const filteredActiveInventoryData = useMemo(() => {
-    if (!inventoryFilter || inventoryFilter === 'All Types') {
-      return activeInventoryData;
+    let filtered = activeInventoryData;
+
+    if (inventoryFilter && inventoryFilter !== 'All Types') {
+      filtered = filtered.filter(item => item.type === inventoryFilter);
     }
-    return activeInventoryData.filter(item => item.type === inventoryFilter);
-  }, [inventoryFilter]);
+
+    if (inventorySearchQuery) {
+      const query = inventorySearchQuery.toLowerCase();
+      filtered = filtered.filter(item =>
+        item.productId.toLowerCase().includes(query) ||
+        item.name.toLowerCase().includes(query)
+      );
+    }
+
+    return filtered;
+  }, [inventoryFilter, inventorySearchQuery, activeInventoryData]);
 
   const filteredArchivedInventoryData = useMemo(() => {
-    if (!inventoryFilter || inventoryFilter === 'All Types') {
-      return archivedInventoryData;
-    }
-    return archivedInventoryData.filter(item => item.type === inventoryFilter);
-  }, [inventoryFilter]);
+    let filtered = archivedInventoryData;
 
-  // Mock deliveries data for warehouse
-  const onetimeDeliveriesData = [
-    {
-      orderId: 'CRW001-ORD-PRD001',
-      orderDate: '2025-09-11',
-      quantity: 15,
-      destination: 'CTR-001',
-      status: 'pending',
-      deliveryDate: 'â€”'
-    },
-    {
-      orderId: 'CTR002-ORD-PRD003',
-      orderDate: '2025-09-10',
-      quantity: 8,
-      destination: 'CTR-002',
-      status: 'pending',
-      deliveryDate: 'â€”'
+    if (inventoryFilter && inventoryFilter !== 'All Types') {
+      filtered = filtered.filter(item => item.type === inventoryFilter);
     }
-  ];
 
-  const recurringDeliveriesData = [
-    {
-      orderId: 'CRW003-ORD-PRD005',
-      creationDate: '2025-09-01',
-      quantity: 25,
-      destination: 'CTR-003',
-      deliveryFrequency: 'Weekly',
-      nextDelivery: '2025-09-18',
-      status: 'pending'
-    },
-    {
-      orderId: 'CTR001-ORD-PRD002',
-      creationDate: '2025-08-15',
-      quantity: 12,
-      destination: 'CTR-004',
-      deliveryFrequency: 'Monthly',
-      nextDelivery: '2025-10-15',
-      status: 'pending'
+    if (inventorySearchQuery) {
+      const query = inventorySearchQuery.toLowerCase();
+      filtered = filtered.filter(item =>
+        item.productId.toLowerCase().includes(query) ||
+        item.name.toLowerCase().includes(query)
+      );
     }
-  ];
 
-  const archivedDeliveriesData = [
-    {
-      orderId: 'CRW002-ORD-PRD006',
-      orderDate: '2025-09-08',
-      quantity: 20,
-      destination: 'CTR-005',
-      status: 'delivered',
-      deliveryDate: '2025-09-09',
-      type: 'One-time'
-    },
-    {
-      orderId: 'CTR003-ORD-PRD004',
-      orderDate: '2025-09-07',
-      quantity: 30,
-      destination: 'CTR-006',
-      status: 'delivered',
-      deliveryDate: '2025-09-08',
-      type: 'One-time'
-    }
-  ];
+    return filtered;
+  }, [inventoryFilter, inventorySearchQuery, archivedInventoryData]);
 
-    const tabs = [
+  const { activeServicesData, serviceHistoryData } = useMemo(() => {
+    const active: Array<{ serviceId: string; serviceName: string; type: string; status: string; startDate: string }>
+      = [];
+    const history: Array<{ serviceId: string; serviceName: string; type: string; status: string; startDate: string; endDate: string }>
+      = [];
+
+    serviceOrders.forEach((order) => {
+      const normalizedStatus = normalizeStatusValue(order.status);
+      const base = {
+        serviceId: order.serviceId ?? order.orderId,
+        serviceName: order.title ?? order.serviceId ?? order.orderId,
+        type: order.orderType === 'service' ? 'Service' : 'Product',
+        status: formatStatusLabel(order.status),
+        startDate: formatDisplayDate(order.requestedDate),
+        endDate: formatDisplayDate(order.expectedDate),
+      };
+
+      if (HISTORY_STATUSES.has(normalizedStatus)) {
+        history.push(base);
+      } else {
+        active.push(base);
+      }
+    });
+
+    return { activeServicesData: active, serviceHistoryData: history };
+  }, [serviceOrders]);
+
+  const tabs = useMemo(() => [
     { id: 'dashboard', label: 'Dashboard', path: '/warehouse/dashboard' },
     { id: 'profile', label: 'My Profile', path: '/warehouse/profile' },
-    { id: 'services', label: 'My Services', path: '/warehouse/services' },
     { id: 'inventory', label: 'Inventory', path: '/warehouse/inventory' },
-    { id: 'orders', label: 'Orders', path: '/warehouse/orders' },
+    { id: 'services', label: 'Services', path: '/warehouse/services' },
     { id: 'deliveries', label: 'Deliveries', path: '/warehouse/deliveries' },
+    { id: 'orders', label: 'Orders', path: '/warehouse/orders' },
     { id: 'reports', label: 'Reports', path: '/warehouse/reports' },
-    { id: 'support', label: 'Support', path: '/warehouse/support' }
-  ];
+    { id: 'support', label: 'Support', path: '/warehouse/support' },
+  ], []);
 
-  // Warehouse-specific overview cards (5 cards)
-  const overviewCards = [
-    { id: 'products', title: 'Product Count', dataKey: 'productCount', color: 'purple' },
-    { id: 'lowstock', title: 'Low Stock', dataKey: 'lowStockCount', color: 'red' },
-    { id: 'orders', title: 'Pending Orders', dataKey: 'pendingOrders', color: 'orange' },
-    { id: 'deliveries', title: 'Pending Deliveries', dataKey: 'pendingDeliveries', color: 'blue' },
-    { id: 'status', title: 'Account Status', dataKey: 'accountStatus', color: 'green' }
-  ];
+  const overviewCards = useMemo(() => [
+    { id: 'inventory', title: 'Inventory Items', dataKey: 'inventoryCount', color: 'purple' },
+    { id: 'pending', title: 'Pending Orders', dataKey: 'pendingOrders', color: 'indigo' },
+    { id: 'deliveries', title: 'Scheduled Deliveries', dataKey: 'deliveriesScheduled', color: 'purple' },
+    { id: 'lowstock', title: 'Low Stock Items', dataKey: 'lowStockItems', color: 'magenta' },
+    { id: 'status', title: 'Status', dataKey: 'accountStatus', color: 'purple' },
+  ], []);
 
-  // Mock data - replace with actual API data
-  const overviewData = {
-    productCount: '2,456',
-    lowStockCount: 23,
-    pendingOrders: 34,
-    pendingDeliveries: 12,
-    accountStatus: 'Active'
-  };
+  const profileCardData = useMemo(() => ({
+    name: profile?.name ?? '—',
+    warehouseId: normalizedCode ?? '—',
+    address: profile?.address ?? '—',
+    phone: profile?.phone ?? '—',
+    email: profile?.email ?? '—',
+    mainContact: profile?.mainContact ?? '—',
+    startDate: formatDisplayDate(profile?.createdAt ?? null),
+  }), [profile, normalizedCode]);
 
-  // Mock services data for warehouse
-  const myServicesData = [
-    { serviceId: 'SRV-041', serviceName: 'Inventory Management', type: 'Recurring', certified: 'Yes', certificationDate: '2023-01-15', expires: '2026-01-15' },
-    { serviceId: 'SRV-042', serviceName: 'Order Fulfillment', type: 'One-time', certified: 'Yes', certificationDate: '2023-03-20', expires: 'â€”' },
-    { serviceId: 'SRV-043', serviceName: 'Shipping & Receiving', type: 'Recurring', certified: 'No', certificationDate: 'â€”', expires: 'â€”' },
-    { serviceId: 'SRV-044', serviceName: 'Quality Control', type: 'One-time', certified: 'Yes', certificationDate: '2024-02-10', expires: '2025-02-10' },
-  ];
+  const profileLoadMessage = profileLoading && !profile ? 'Loading profile details…' : null;
+  const ordersLoadMessage = ordersLoading && serviceOrders.length === 0 && productOrders.length === 0
+    ? 'Loading latest orders…'
+    : null;
 
-  const activeServicesData = [
-    { serviceId: 'CTR001-SRV041', serviceName: 'Inventory Management', centerId: 'CTR001', type: 'Recurring', startDate: '2025-09-15' },
-    { serviceId: 'CTR002-SRV042', serviceName: 'Order Fulfillment', centerId: 'CTR002', type: 'One-time', startDate: '2025-09-18' },
-    { serviceId: 'CTR003-SRV044', serviceName: 'Quality Control', centerId: 'CTR003', type: 'Recurring', startDate: '2025-09-20' },
-  ];
-
-  const serviceHistoryData = [
-    { serviceId: 'CTR001-SRV045', serviceName: 'Order Fulfillment', centerId: 'CTR001', type: 'One-time', status: 'Completed', startDate: '2025-09-10', endDate: '2025-09-16' },
-    { serviceId: 'CTR002-SRV046', serviceName: 'Shipping & Receiving', centerId: 'CTR002', type: 'Recurring', status: 'Completed', startDate: '2025-09-12', endDate: '2025-09-15' },
-    { serviceId: 'CTR003-SRV047', serviceName: 'Quality Control', centerId: 'CTR003', type: 'One-time', status: 'Completed', startDate: '2025-09-08', endDate: '2025-09-14' },
-    { serviceId: 'CTR001-SRV048', serviceName: 'Inventory Management', centerId: 'CTR001', type: 'Recurring', status: 'Cancelled', startDate: '2025-09-05', endDate: '2025-09-12' },
-  ];
+  const profileErrorMessage = profileError ? 'Unable to load profile details. Showing cached values if available.' : null;
+  const dashboardErrorMessage = dashboardError ? 'Unable to load dashboard metrics. Showing cached values if available.' : null;
+  const ordersErrorMessage = ordersError ? 'Unable to load order data. Showing cached values if available.' : null;
+  const inventoryErrorMessage = inventoryError ? 'Unable to load inventory data. Showing cached values if available.' : null;
+  const inventoryLoadMessage = inventoryLoading && activeInventoryData.length === 0 && archivedInventoryData.length === 0
+    ? 'Loading inventory data…'
+    : null;
 
   return (
-    <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: '#f9fafb' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#f8fafc' }}>
       <MyHubSection
         hubName="Warehouse Hub"
         tabs={tabs}
         activeTab={activeTab}
         onTabClick={setActiveTab}
-        userId="WHS-001"
+        userId={normalizedCode ?? 'WAREHOUSE'}
         role="warehouse"
       />
 
-      {/* Content Area */}
-      <Scrollbar style={{
-        flex: 1,
-        padding: '0 24px'
-      }}>
-        <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
+      <Scrollbar className="hub-content-scroll" style={{ flex: 1, padding: '0 24px' }}>
+        <div style={{ maxWidth: 1400, margin: '0 auto' }}>
           {activeTab === 'dashboard' ? (
             <PageWrapper title="Dashboard" showHeader={false}>
               <PageHeader title="Overview" />
+              {dashboardErrorMessage && (
+                <div style={{ marginBottom: 12, color: '#dc2626' }}>{dashboardErrorMessage}</div>
+              )}
               <OverviewSection
                 cards={overviewCards}
                 data={overviewData}
+                loading={dashboardLoading}
               />
+
               <PageHeader title="Recent Activity" />
               <RecentActivity
                 activities={activities}
-                onClear={() => setActivities([])}
+                onClear={() => undefined}
                 emptyMessage="No recent warehouse activity"
               />
 
-              {/* Communication Hub */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 24 }}>
-                <NewsPreview onViewAll={() => console.log('View all news')} />
-                <MemosPreview onViewAll={() => console.log('View memos')} />
+                <NewsPreview color="#8b5cf6" onViewAll={() => navigate('/news')} />
+                <MemosPreview color="#8b5cf6" onViewAll={() => navigate('/memos')} />
               </div>
             </PageWrapper>
           ) : activeTab === 'profile' ? (
-            <PageWrapper title="My Profile" showHeader={true} headerSrOnly>
+            <PageWrapper headerSrOnly>
+              {profileLoadMessage && (
+                <div style={{ marginBottom: 12, color: '#475569' }}>{profileLoadMessage}</div>
+              )}
+              {profileErrorMessage && (
+                <div style={{ marginBottom: 12, color: '#dc2626' }}>{profileErrorMessage}</div>
+              )}
               <ProfileInfoCard
-              role="warehouse"
-              profileData={{
-                name: 'Central Distribution Warehouse',
-                warehouseId: 'WHS-001',
-                address: '999 Logistics Parkway, Dallas, TX 75201',
-                phone: '(555) 012-3456',
-                email: 'central@cks-warehouse.com',
-                territory: 'Central Region',
-                mainContact: 'Kevin Thompson',
-                startDate: '2017-09-12'
-              }}
-              accountManager={{
-                name: 'Jennifer Brown',
-                id: 'MGR-006',
-                email: 'jennifer.brown@cks.com',
-                phone: '(555) 123-4567'
-              }}
-              primaryColor="#8b5cf6"
-              onUpdatePhoto={() => console.log('Update photo')}
-              onContactManager={() => console.log('Contact manager')}
-              onScheduleMeeting={() => console.log('Schedule meeting')}
-            />
-            </PageWrapper>
-          ) : activeTab === 'services' ? (
-            <PageWrapper title="My Services" showHeader={true} headerSrOnly>
-              <TabSection
-                tabs={[
-                  { id: 'my', label: 'My Services', count: 4 },
-                  { id: 'active', label: 'Active Services', count: 3 },
-                  { id: 'history', label: 'Service History', count: 4 }
-                ]}
-                activeTab={servicesTab}
-                onTabChange={setServicesTab}
-                description={
-                  servicesTab === 'my' ? 'Services you are trained and certified in' :
-                  servicesTab === 'active' ? 'Services you are currently assigned to' :
-                  'Services Archive'
-                }
-                searchPlaceholder={
-                  servicesTab === 'my' ? 'Search by Service ID or name' :
-                  servicesTab === 'active' ? 'Search active services' :
-                  'Search service history'
-                }
-                onSearch={setServicesSearchQuery}
-                actionButton={
-                  <Button
-                    variant="primary"
-                    roleColor="#000000"
-                    onClick={() => navigate('/catalog')}
-                  >
-                    Browse CKS Catalog
-                  </Button>
-                }
+                role="warehouse"
+                profileData={profileCardData}
                 primaryColor="#8b5cf6"
-              >
-
-              {servicesTab === 'my' && (
-                <DataTable
-                  columns={[
-                    { key: 'serviceId', label: 'SERVICE ID', clickable: true },
-                    { key: 'serviceName', label: 'SERVICE NAME' },
-                    { key: 'type', label: 'TYPE' },
-                    { key: 'certified', label: 'CERTIFIED' },
-                    { key: 'certificationDate', label: 'CERTIFICATION DATE' },
-                    { key: 'expires', label: 'EXPIRES' }
-                  ]}
-                  data={myServicesData}
-                  showSearch={false}
-                  externalSearchQuery={servicesSearchQuery}
-                  maxItems={10}
-                  onRowClick={(row) => console.log('View service:', row)}
-                />
-              )}
-
-              {servicesTab === 'active' && (
-                <DataTable
-                  columns={[
-                    { key: 'serviceId', label: 'SERVICE ID', clickable: true },
-                    { key: 'serviceName', label: 'SERVICE NAME' },
-                    { key: 'centerId', label: 'CENTER ID' },
-                    { key: 'type', label: 'TYPE' },
-                    { key: 'startDate', label: 'START DATE' }
-                  ]}
-                  data={activeServicesData}
-                  showSearch={false}
-                  externalSearchQuery={servicesSearchQuery}
-                  maxItems={10}
-                  onRowClick={(row) => console.log('View order:', row)}
-                />
-              )}
-
-              {servicesTab === 'history' && (
-                <DataTable
-                  columns={[
-                    { key: 'serviceId', label: 'SERVICE ID', clickable: true },
-                    { key: 'serviceName', label: 'SERVICE NAME' },
-                    { key: 'centerId', label: 'CENTER ID' },
-                    { key: 'type', label: 'TYPE' },
-                    {
-                      key: 'status',
-                      label: 'STATUS',
-                      render: (value: string) => (
-                        <span style={{
-                          padding: '4px 12px',
-                          borderRadius: '4px',
-                          fontSize: '12px',
-                          fontWeight: 500,
-                          backgroundColor: value === 'Completed' ? '#dcfce7' : '#fee2e2',
-                          color: value === 'Completed' ? '#16a34a' : '#dc2626'
-                        }}>
-                          {value}
-                        </span>
-                      )
-                    },
-                    { key: 'startDate', label: 'START DATE' },
-                    { key: 'endDate', label: 'END DATE' }
-                  ]}
-                  data={serviceHistoryData}
-                  showSearch={false}
-                  externalSearchQuery={servicesSearchQuery}
-                  maxItems={10}
-                  onRowClick={(row) => console.log('View history:', row)}
-                />
-              )}
-              </TabSection>
-            </PageWrapper>
-          ) : activeTab === 'orders' ? (
-            <PageWrapper title="Orders" showHeader={true} headerSrOnly>
-              <OrdersSection
-              userRole="warehouse"
-              serviceOrders={serviceOrders}
-              productOrders={productOrders}
-              onCreateServiceOrder={() => console.log('Request Service')}
-              onOrderAction={(orderId, action) => {
-                if (action === 'View Details') {
-                  // Find the order to determine its status
-                  const allOrders = [...serviceOrders, ...productOrders];
-                  const order = allOrders.find(o => o.orderId === orderId);
-
-                  if (order) {
-                    if (order.status === 'delivered') {
-                      alert('Delivery and order details will show here later. We will be able to add a POD or waybill here.');
-                    } else if (order.status === 'rejected') {
-                      alert('Rejection details will show here later. It will also show a waybill and a rejection reason.');
-                    } else if (order.status === 'pending' || order.status === 'in-progress') {
-                      alert('List of products ordered will show here and some other info.');
-                    }
-                  }
-                } else {
-                  console.log(`Order ${orderId}: ${action}`);
-                }
-              }}
-              showServiceOrders={true}
-              showProductOrders={true}
-              primaryColor="#8b5cf6"
-            />
+                onUpdatePhoto={() => undefined}
+                onContactManager={() => undefined}
+                onScheduleMeeting={() => undefined}
+              />
             </PageWrapper>
           ) : activeTab === 'inventory' ? (
             <PageWrapper headerSrOnly>
+              {inventoryLoadMessage && (
+                <div style={{ marginBottom: 12, color: '#475569' }}>{inventoryLoadMessage}</div>
+              )}
+              {inventoryErrorMessage && (
+                <div style={{ marginBottom: 12, color: '#dc2626' }}>{inventoryErrorMessage}</div>
+              )}
               <TabSection
                 tabs={[
                   { id: 'active', label: 'Product Inventory', count: filteredActiveInventoryData.length },
                   { id: 'archive', label: 'Archive', count: filteredArchivedInventoryData.length }
                 ]}
                 activeTab={inventoryTab}
-                onTabChange={setInventoryTab}
+                onTabChange={(tab) => setInventoryTab(tab as 'active' | 'archive')}
                 description={inventoryTab === 'active' ? 'Current product inventory with stock levels' : 'Archived products no longer in active inventory'}
                 searchPlaceholder={
                   inventoryTab === 'active' ? 'Search by Product ID or name' :
@@ -918,7 +493,6 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
                   ]}
                   data={filteredActiveInventoryData}
                   showSearch={false}
-                  externalSearchQuery={inventorySearchQuery}
                   maxItems={10}
                   onRowClick={(row) => console.log('View product details:', row)}
                 />
@@ -935,7 +509,6 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
                   ]}
                   data={filteredArchivedInventoryData}
                   showSearch={false}
-                  externalSearchQuery={inventorySearchQuery}
                   maxItems={10}
                   onRowClick={(row) => console.log('View archived product:', row)}
                 />
@@ -944,194 +517,275 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
             </PageWrapper>
           ) : activeTab === 'deliveries' ? (
             <PageWrapper headerSrOnly>
+              {ordersLoadMessage && (
+                <div style={{ marginBottom: 12, color: '#475569' }}>{ordersLoadMessage}</div>
+              )}
+              {ordersErrorMessage && (
+                <div style={{ marginBottom: 12, color: '#dc2626' }}>{ordersErrorMessage}</div>
+              )}
               <TabSection
                 tabs={[
-                  { id: 'onetime', label: 'One-Time', count: onetimeDeliveriesData.length },
-                  { id: 'recurring', label: 'Recurring', count: recurringDeliveriesData.length },
-                  { id: 'archive', label: 'Archive', count: archivedDeliveriesData.length }
+                  { id: 'pending', label: 'Pending Deliveries', count: pendingDeliveries.length },
+                  { id: 'completed', label: 'Completed Deliveries', count: completedDeliveries.length },
                 ]}
                 activeTab={deliveriesTab}
-                onTabChange={setDeliveriesTab}
+                onTabChange={(tab) => setDeliveriesTab(tab as 'pending' | 'completed')}
                 description={
-                  deliveriesTab === 'onetime' ? 'One-time product deliveries pending completion' :
-                  deliveriesTab === 'recurring' ? 'Recurring delivery schedules and frequencies' :
-                  'Completed delivery records archive'
+                  deliveriesTab === 'pending'
+                    ? 'Deliveries pending or in transit'
+                    : 'Completed deliveries archive'
                 }
-                searchPlaceholder={
-                  deliveriesTab === 'onetime' ? 'Search by Order ID or destination' :
-                  deliveriesTab === 'recurring' ? 'Search recurring deliveries' :
-                  'Search archived deliveries'
-                }
+                searchPlaceholder="Search deliveries"
                 onSearch={setDeliveriesSearchQuery}
                 primaryColor="#8b5cf6"
               >
+                {deliveriesTab === 'pending' && (
+                  <DataTable
+                    columns={[
+                      { key: 'deliveryId', label: 'DELIVERY ID', clickable: true },
+                      { key: 'itemName', label: 'ITEM' },
+                      { key: 'destination', label: 'DESTINATION' },
+                      {
+                        key: 'status',
+                        label: 'STATUS',
+                        render: (value: string) => {
+                          const palette = getStatusBadgePalette(value);
+                          return (
+                            <span
+                              style={{
+                                padding: '4px 12px',
+                                borderRadius: '4px',
+                                fontSize: '12px',
+                                fontWeight: 500,
+                                backgroundColor: palette.background,
+                                color: palette.color,
+                              }}
+                            >
+                              {value ?? '—'}
+                            </span>
+                          );
+                        },
+                      },
+                      { key: 'scheduledDate', label: 'SCHEDULED DATE' },
+                    ]}
+                    data={pendingDeliveries.filter((row) => {
+                      if (!deliveriesSearchQuery) {
+                        return true;
+                      }
+                      const query = deliveriesSearchQuery.toLowerCase();
+                      return (
+                        row.deliveryId.toLowerCase().includes(query) ||
+                        row.itemName.toLowerCase().includes(query) ||
+                        row.destination.toLowerCase().includes(query)
+                      );
+                    })}
+                    showSearch={false}
+                    maxItems={10}
+                    onRowClick={() => undefined}
+                  />
+                )}
 
-              {deliveriesTab === 'onetime' && (
-                <DataTable
-                  columns={[
-                    { key: 'orderId', label: 'ORDER ID', clickable: true },
-                    { key: 'orderDate', label: 'ORDER DATE' },
-                    { key: 'quantity', label: 'QUANTITY' },
-                    { key: 'destination', label: 'DESTINATION' },
-                    { key: 'status', label: 'STATUS' },
-                    { key: 'deliveryDate', label: 'DELIVERY DATE' },
-                    {
-                      key: 'actions',
-                      label: 'ACTIONS',
-                      render: (value, row) => (
-                        <div style={{ display: 'flex', gap: '8px' }}>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              console.log(`Marking ${row.orderId} as delivered`);
-                              // This would archive the order with status 'delivered'
-                            }}
-                            style={{
-                              padding: '6px 12px',
-                              fontSize: '12px',
-                              fontWeight: 500,
-                              backgroundColor: '#8b5cf6',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '4px',
-                              cursor: 'pointer'
-                            }}
-                          >
-                            Delivered
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              console.log(`Cancelling ${row.orderId}`);
-                              // This would archive the order with status 'cancelled'
-                            }}
-                            style={{
-                              padding: '6px 12px',
-                              fontSize: '12px',
-                              fontWeight: 500,
-                              backgroundColor: '#dc2626',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '4px',
-                              cursor: 'pointer'
-                            }}
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      )
-                    }
-                  ]}
-                  data={onetimeDeliveriesData}
-                  showSearch={false}
-                  externalSearchQuery={deliveriesSearchQuery}
-                  maxItems={10}
-                  onRowClick={(row) => console.log('View delivery details:', row)}
-                />
-              )}
-
-              {deliveriesTab === 'recurring' && (
-                <DataTable
-                  columns={[
-                    { key: 'orderId', label: 'ORDER ID', clickable: true },
-                    { key: 'creationDate', label: 'CREATION DATE' },
-                    { key: 'quantity', label: 'QUANTITY' },
-                    { key: 'destination', label: 'DESTINATION' },
-                    { key: 'deliveryFrequency', label: 'DELIVERY FREQUENCY' },
-                    { key: 'nextDelivery', label: 'NEXT DELIVERY' },
-                    { key: 'status', label: 'STATUS' },
-                    {
-                      key: 'actions',
-                      label: 'ACTIONS',
-                      render: (value, row) => (
-                        <div style={{ display: 'flex', gap: '8px' }}>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              console.log(`Marking ${row.orderId} as delivered`);
-                              // This would archive the order with status 'delivered'
-                            }}
-                            style={{
-                              padding: '6px 12px',
-                              fontSize: '12px',
-                              fontWeight: 500,
-                              backgroundColor: '#8b5cf6',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '4px',
-                              cursor: 'pointer'
-                            }}
-                          >
-                            Delivered
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              console.log(`Cancelling ${row.orderId}`);
-                              // This would archive the order with status 'cancelled'
-                            }}
-                            style={{
-                              padding: '6px 12px',
-                              fontSize: '12px',
-                              fontWeight: 500,
-                              backgroundColor: '#dc2626',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '4px',
-                              cursor: 'pointer'
-                            }}
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      )
-                    }
-                  ]}
-                  data={recurringDeliveriesData}
-                  showSearch={false}
-                  externalSearchQuery={deliveriesSearchQuery}
-                  maxItems={10}
-                  onRowClick={(row) => console.log('View recurring delivery:', row)}
-                />
-              )}
-
-              {deliveriesTab === 'archive' && (
-                <DataTable
-                  columns={[
-                    { key: 'orderId', label: 'ORDER ID', clickable: true },
-                    { key: 'orderDate', label: 'ORDER DATE' },
-                    { key: 'quantity', label: 'QUANTITY' },
-                    { key: 'destination', label: 'DESTINATION' },
-                    { key: 'status', label: 'STATUS' },
-                    { key: 'deliveryDate', label: 'DELIVERY DATE' },
-                    { key: 'type', label: 'TYPE' }
-                  ]}
-                  data={archivedDeliveriesData}
-                  showSearch={false}
-                  externalSearchQuery={deliveriesSearchQuery}
-                  maxItems={10}
-                  onRowClick={(row) => console.log('View archived delivery:', row)}
-                />
-              )}
+                {deliveriesTab === 'completed' && (
+                  <DataTable
+                    columns={[
+                      { key: 'deliveryId', label: 'DELIVERY ID', clickable: true },
+                      { key: 'itemName', label: 'ITEM' },
+                      { key: 'destination', label: 'DESTINATION' },
+                      {
+                        key: 'status',
+                        label: 'STATUS',
+                        render: (value: string) => {
+                          const palette = getStatusBadgePalette(value);
+                          return (
+                            <span
+                              style={{
+                                padding: '4px 12px',
+                                borderRadius: '4px',
+                                fontSize: '12px',
+                                fontWeight: 500,
+                                backgroundColor: palette.background,
+                                color: palette.color,
+                              }}
+                            >
+                              {value ?? '—'}
+                            </span>
+                          );
+                        },
+                      },
+                      { key: 'scheduledDate', label: 'SCHEDULED DATE' },
+                      { key: 'completedDate', label: 'COMPLETED DATE' },
+                    ]}
+                    data={completedDeliveries.filter((row) => {
+                      if (!deliveriesSearchQuery) {
+                        return true;
+                      }
+                      const query = deliveriesSearchQuery.toLowerCase();
+                      return (
+                        row.deliveryId.toLowerCase().includes(query) ||
+                        row.itemName.toLowerCase().includes(query) ||
+                        row.destination.toLowerCase().includes(query)
+                      );
+                    })}
+                    showSearch={false}
+                    maxItems={10}
+                    onRowClick={() => undefined}
+                  />
+                )}
               </TabSection>
+            </PageWrapper>
+          ) : activeTab === 'services' ? (
+            <PageWrapper headerSrOnly>
+              {ordersLoadMessage && (
+                <div style={{ marginBottom: 12, color: '#475569' }}>{ordersLoadMessage}</div>
+              )}
+              {ordersErrorMessage && (
+                <div style={{ marginBottom: 12, color: '#dc2626' }}>{ordersErrorMessage}</div>
+              )}
+              <TabSection
+                tabs={[
+                  { id: 'active', label: 'Active Services', count: activeServicesData.length },
+                  { id: 'history', label: 'Service History', count: serviceHistoryData.length },
+                ]}
+                activeTab={servicesTab}
+                onTabChange={(tab) => setServicesTab(tab as 'active' | 'history')}
+                description={
+                  servicesTab === 'active'
+                    ? 'Active warehouse services'
+                    : 'Completed services archive'
+                }
+                searchPlaceholder="Search services"
+                onSearch={setServicesSearchQuery}
+                primaryColor="#8b5cf6"
+              >
+                {servicesTab === 'active' && (
+                  <DataTable
+                    columns={[
+                      { key: 'serviceId', label: 'SERVICE ID', clickable: true },
+                      { key: 'serviceName', label: 'SERVICE NAME' },
+                      { key: 'type', label: 'TYPE' },
+                      {
+                        key: 'status',
+                        label: 'STATUS',
+                        render: (value: string) => {
+                          const palette = getStatusBadgePalette(value);
+                          return (
+                            <span
+                              style={{
+                                padding: '4px 12px',
+                                borderRadius: '4px',
+                                fontSize: '12px',
+                                fontWeight: 500,
+                                backgroundColor: palette.background,
+                                color: palette.color,
+                              }}
+                            >
+                              {value ?? '—'}
+                            </span>
+                          );
+                        },
+                      },
+                      { key: 'startDate', label: 'START DATE' },
+                    ]}
+                    data={activeServicesData.filter((row) => {
+                      if (!servicesSearchQuery) {
+                        return true;
+                      }
+                      const query = servicesSearchQuery.toLowerCase();
+                      return (
+                        row.serviceId.toLowerCase().includes(query) ||
+                        row.serviceName.toLowerCase().includes(query)
+                      );
+                    })}
+                    showSearch={false}
+                    maxItems={10}
+                    onRowClick={() => undefined}
+                  />
+                )}
+
+                {servicesTab === 'history' && (
+                  <DataTable
+                    columns={[
+                      { key: 'serviceId', label: 'SERVICE ID', clickable: true },
+                      { key: 'serviceName', label: 'SERVICE NAME' },
+                      { key: 'type', label: 'TYPE' },
+                      {
+                        key: 'status',
+                        label: 'STATUS',
+                        render: (value: string) => {
+                          const palette = getStatusBadgePalette(value);
+                          return (
+                            <span
+                              style={{
+                                padding: '4px 12px',
+                                borderRadius: '4px',
+                                fontSize: '12px',
+                                fontWeight: 500,
+                                backgroundColor: palette.background,
+                                color: palette.color,
+                              }}
+                            >
+                              {value ?? '—'}
+                            </span>
+                          );
+                        },
+                      },
+                      { key: 'startDate', label: 'START DATE' },
+                      { key: 'endDate', label: 'END DATE' },
+                    ]}
+                    data={serviceHistoryData.filter((row) => {
+                      if (!servicesSearchQuery) {
+                        return true;
+                      }
+                      const query = servicesSearchQuery.toLowerCase();
+                      return (
+                        row.serviceId.toLowerCase().includes(query) ||
+                        row.serviceName.toLowerCase().includes(query)
+                      );
+                    })}
+                    showSearch={false}
+                    maxItems={10}
+                    onRowClick={() => undefined}
+                  />
+                )}
+              </TabSection>
+            </PageWrapper>
+          ) : activeTab === 'orders' ? (
+            <PageWrapper headerSrOnly>
+              {ordersLoadMessage && (
+                <div style={{ marginBottom: 12, color: '#475569' }}>{ordersLoadMessage}</div>
+              )}
+              {ordersErrorMessage && (
+                <div style={{ marginBottom: 12, color: '#dc2626' }}>{ordersErrorMessage}</div>
+              )}
+              <OrdersSection
+                userRole="warehouse"
+                serviceOrders={serviceOrders}
+                productOrders={productOrders}
+                onCreateServiceOrder={() => navigate('/orders/new-service')}
+                onCreateProductOrder={() => navigate('/orders/new-product')}
+                onOrderAction={() => undefined}
+                showServiceOrders={true}
+                showProductOrders={true}
+                primaryColor="#8b5cf6"
+              />
             </PageWrapper>
           ) : activeTab === 'reports' ? (
             <PageWrapper headerSrOnly>
               <ReportsSection
                 role="warehouse"
-                userId="WHS-001"
+                userId={normalizedCode ?? undefined}
                 primaryColor="#8b5cf6"
+                reports={reportsData?.reports || []}
+                feedback={reportsData?.feedback || []}
+                isLoading={reportsLoading}
               />
             </PageWrapper>
           ) : activeTab === 'support' ? (
             <PageWrapper headerSrOnly>
-              <SupportSection
-                role="warehouse"
-                primaryColor="#8b5cf6"
-              />
+              <SupportSection role="warehouse" primaryColor="#8b5cf6" />
             </PageWrapper>
           ) : (
-            <PageWrapper title={activeTab} showHeader={true} headerSrOnly>
+            <PageWrapper title={activeTab} showHeader headerSrOnly>
               <h2>Warehouse Hub - {activeTab}</h2>
               <p>Content for {activeTab} will be implemented here.</p>
             </PageWrapper>
@@ -1141,4 +795,5 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
     </div>
   );
 }
+
 

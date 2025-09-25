@@ -156,16 +156,16 @@ const HUB_TABS = [
 const DIRECTORY_TABS: Array<{ id: string; label: string; color: string }> = [
   { id: 'admins', label: 'Admins', color: '#0f172a' },
   { id: 'managers', label: 'Managers', color: '#2563eb' },
-  { id: 'contractors', label: 'Contractors', color: '#0ea5e9' },
-  { id: 'customers', label: 'Customers', color: '#10b981' },
+  { id: 'contractors', label: 'Contractors', color: '#10b981' },
+  { id: 'customers', label: 'Customers', color: '#eab308' },
   { id: 'centers', label: 'Centers', color: '#f97316' },
   { id: 'crew', label: 'Crew', color: '#ef4444' },
   { id: 'warehouses', label: 'Warehouses', color: '#8b5cf6' },
-  { id: 'services', label: 'Services', color: '#0ea5e9' },
-  { id: 'orders', label: 'Orders', color: '#7c3aed' },
-  { id: 'products', label: 'Products', color: '#0f172a' },
+  { id: 'services', label: 'Services', color: '#14b8a6' },
+  { id: 'orders', label: 'Orders', color: '#6366f1' },
+  { id: 'products', label: 'Products', color: '#d946ef' },
   { id: 'training', label: 'Training & Procedures', color: '#ec4899' },
-  { id: 'reports', label: 'Reports & Feedback', color: '#6b7280' },
+  { id: 'reports', label: 'Reports & Feedback', color: '#92400e' },
 ];
 
 interface DirectorySectionConfig {
@@ -266,7 +266,7 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
   }, []);
 
   const navigateToHub = useCallback(
-    (identifier?: string | null) => {
+    (identifier?: string | null, openInNewTab?: boolean) => {
       const normalized = normalizeImpersonationCode(identifier ?? null);
       if (!normalized) {
         return;
@@ -279,7 +279,12 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
         }
         const pathSegment = normalized.toLowerCase();
         const destination = `/${encodeURIComponent(pathSegment)}/hub`;
-        navigate(destination);
+
+        if (openInNewTab) {
+          window.open(destination, '_blank');
+        } else {
+          navigate(destination);
+        }
       })();
     },
     [impersonationRequest, navigate],
@@ -456,7 +461,7 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
         return;
       }
 
-      navigateToHub(trimmed);
+      navigateToHub(trimmed, true);
     },
     [directoryTab, navigateToHub],
   );
@@ -587,9 +592,8 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
       warehouses.map((warehouse) => ({
         id: warehouse.id,
         name: formatText(warehouse.name),
-        mainContact: formatText(warehouse.mainContact),
-        managerName: formatText(warehouse.managerName),
-        warehouseType: formatText(warehouse.warehouseType),
+        email: formatText(warehouse.email),
+        phone: formatText(warehouse.phone),
         status: (warehouse.status ?? 'operational').toLowerCase(),
         createdAt: formatDate(warehouse.createdAt),
       })),
@@ -688,10 +692,7 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
       <Button
         variant="primary"
         size="small"
-        onClick={(e: React.MouseEvent) => {
-          e.stopPropagation(); // Prevent row click from triggering
-          handleView(row);
-        }}
+        onClick={() => handleView(row)}
       >
         View
       </Button>
@@ -1099,6 +1100,10 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
   );
 
 }
+
+
+
+
 
 
 

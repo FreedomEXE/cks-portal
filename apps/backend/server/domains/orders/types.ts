@@ -1,24 +1,78 @@
-﻿/*----------------------------------------------- 
-  Property of CKS  (c) 2025
------------------------------------------------*/
-/**
- * File: types.ts
- *
- * Description:
- * Short what/why
- *
- * Responsibilities:
- * - Key responsibility
- * - Another responsibility
- *
- * Role in system:
- * - Who imports/uses this; high-level, not a list of files
- *
- * Notes:
- * Special behaviors, flags, envs
- */
-/*-----------------------------------------------
-  Manifested by Freedom_EXE
------------------------------------------------*/
+import type { HubRole } from '../profile/types';
 
-export {};
+export type OrderStatus =
+  | 'pending'
+  | 'in-progress'
+  | 'approved'
+  | 'rejected'
+  | 'cancelled'
+  | 'delivered'
+  | 'service-created';
+
+export type OrderViewerStatus =
+  | 'pending'
+  | 'in-progress'
+  | 'rejected'
+  | 'cancelled'
+  | 'delivered'
+  | 'service-created';
+
+export interface OrderApprovalStage {
+  role: string;
+  status:
+    | 'pending'
+    | 'approved'
+    | 'accepted'
+    | 'rejected'
+    | 'cancelled'
+    | 'delivered'
+    | 'service-created'
+    | 'requested';
+  userId: string | null;
+  timestamp: string | null;
+}
+
+export interface HubOrderLineItem {
+  id: string;
+  code: string | null;
+  name: string;
+  description: string | null;
+  itemType: 'service' | 'product';
+  quantity: number;
+  unitOfMeasure: string | null;
+  unitPrice: string | null;
+  currency: string | null;
+  totalPrice: string | null;
+  metadata: Record<string, unknown> | null;
+}
+
+export interface HubOrderItem {
+  orderId: string;
+  orderType: 'service' | 'product';
+  title: string | null;
+  requestedBy: string | null;
+  requesterRole: HubRole | null;
+  destination: string | null;
+  destinationRole: HubRole | null;
+  requestedDate: string | null;
+  expectedDate: string | null;
+  serviceStartDate: string | null;
+  deliveryDate: string | null;
+  status: OrderStatus;
+  viewerStatus: OrderViewerStatus;
+  approvalStages: OrderApprovalStage[];
+  items: HubOrderLineItem[];
+  totalAmount: string | null;
+  currency: string | null;
+  transformedId: string | null;
+  nextActorRole: HubRole | null;
+  rejectionReason: string | null;
+  notes: string | null;
+}
+
+export interface HubOrdersPayload {
+  role: HubRole;
+  cksCode: string;
+  serviceOrders: HubOrderItem[];
+  productOrders: HubOrderItem[];
+}

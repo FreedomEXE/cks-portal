@@ -55,94 +55,122 @@ export function AccountManagerTab({
   }
 
   return (
-    <div style={{ display: 'flex', gap: 32 }}>
-      {/* Manager Avatar - Left Side */}
-      <div style={{ textAlign: 'center' }}>
+    <div style={{ display: 'flex', gap: '48px', alignItems: 'flex-start' }}>
+      {/* Manager Photo Section - Left Side */}
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
         <div style={{
-          width: 150,
-          height: 150,
+          width: '160px',
+          height: '160px',
           borderRadius: '50%',
-          background: '#f3f4f6',
+          background: 'linear-gradient(135deg, #f3f4f6, #e5e7eb)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          fontSize: 48,
+          fontSize: '48px',
           color: '#6b7280',
-          fontWeight: 'bold',
-          marginBottom: 16
+          fontWeight: 600,
+          marginBottom: '20px',
+          border: '3px solid #ffffff',
+          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
         }}>
-          {accountManager.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+          <span style={{ userSelect: 'none' }}>
+            {accountManager.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+          </span>
         </div>
       </div>
 
       {/* Manager Info - Right Side */}
-      <div style={{ flex: 1 }}>
-        <table style={{ width: '100%', borderSpacing: '0 16px' }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <table style={{ width: '100%', borderSpacing: 0 }}>
           <tbody>
-            <tr>
+            <tr style={{ borderBottom: '1px solid #f3f4f6' }}>
               <td style={{
-                fontSize: 16,
-                color: '#111827',
+                fontSize: '14px',
+                color: '#6b7280',
                 fontWeight: 500,
-                width: '200px',
-                verticalAlign: 'top'
+                padding: '16px 24px 16px 0',
+                textTransform: 'uppercase',
+                letterSpacing: '0.025em',
+                verticalAlign: 'top',
+                width: '180px',
+                minWidth: '180px'
               }}>
                 Manager Name
               </td>
               <td style={{
-                fontSize: 16,
-                color: '#111827'
+                fontSize: '16px',
+                color: '#111827',
+                padding: '16px 0',
+                verticalAlign: 'top'
               }}>
                 {accountManager.name}
               </td>
             </tr>
-            <tr>
+            <tr style={{ borderBottom: '1px solid #f3f4f6' }}>
               <td style={{
-                fontSize: 16,
-                color: '#111827',
+                fontSize: '14px',
+                color: '#6b7280',
                 fontWeight: 500,
-                width: '200px',
-                verticalAlign: 'top'
+                padding: '16px 24px 16px 0',
+                textTransform: 'uppercase',
+                letterSpacing: '0.025em',
+                verticalAlign: 'top',
+                width: '180px',
+                minWidth: '180px'
               }}>
                 Manager ID
               </td>
               <td style={{
-                fontSize: 16,
-                color: '#111827'
+                fontSize: '16px',
+                color: '#111827',
+                padding: '16px 0',
+                verticalAlign: 'top'
               }}>
                 {accountManager.id}
               </td>
             </tr>
-            <tr>
+            <tr style={{ borderBottom: '1px solid #f3f4f6' }}>
               <td style={{
-                fontSize: 16,
-                color: '#111827',
+                fontSize: '14px',
+                color: '#6b7280',
                 fontWeight: 500,
-                width: '200px',
-                verticalAlign: 'top'
+                padding: '16px 24px 16px 0',
+                textTransform: 'uppercase',
+                letterSpacing: '0.025em',
+                verticalAlign: 'top',
+                width: '180px',
+                minWidth: '180px'
               }}>
                 Email
               </td>
               <td style={{
-                fontSize: 16,
-                color: '#111827'
+                fontSize: '16px',
+                color: '#111827',
+                padding: '16px 0',
+                verticalAlign: 'top'
               }}>
                 {accountManager.email}
               </td>
             </tr>
-            <tr>
+            <tr style={{ borderBottom: '1px solid #f3f4f6' }}>
               <td style={{
-                fontSize: 16,
-                color: '#111827',
+                fontSize: '14px',
+                color: '#6b7280',
                 fontWeight: 500,
-                width: '200px',
-                verticalAlign: 'top'
+                padding: '16px 24px 16px 0',
+                textTransform: 'uppercase',
+                letterSpacing: '0.025em',
+                verticalAlign: 'top',
+                width: '180px',
+                minWidth: '180px'
               }}>
                 Phone
               </td>
               <td style={{
-                fontSize: 16,
-                color: '#111827'
+                fontSize: '16px',
+                color: '#111827',
+                padding: '16px 0',
+                verticalAlign: 'top'
               }}>
                 {accountManager.phone}
               </td>

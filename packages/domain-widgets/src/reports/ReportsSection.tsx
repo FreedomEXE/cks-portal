@@ -6,12 +6,18 @@ interface ReportsSectionProps {
   role: string;
   userId: string;
   primaryColor?: string;
+  reports?: ReportFeedback[];
+  feedback?: ReportFeedback[];
+  isLoading?: boolean;
 }
 
 const ReportsSection: React.FC<ReportsSectionProps> = ({
   role,
   userId,
-  primaryColor = '#3b82f6'
+  primaryColor = '#3b82f6',
+  reports = [],
+  feedback = [],
+  isLoading = false
 }) => {
   const [activeTab, setActiveTab] = useState('all-reports');
   const [searchQuery, setSearchQuery] = useState('');
@@ -55,91 +61,22 @@ const ReportsSection: React.FC<ReportsSectionProps> = ({
     }
   };
 
-  // Mock data - replace with actual API data
-  const mockReports: ReportFeedback[] = [
-    {
-      id: 'RPT-001',
-      type: 'report',
-      category: 'Service Quality',
-      title: 'Cleaning service incomplete',
-      description: 'The crew left without finishing the bathroom cleaning. Several areas were missed including mirrors and floor mopping.',
-      submittedBy: 'CUS-001',
-      submittedDate: '2025-09-18',
-      status: 'open',
-      relatedService: 'CTR001-SRV001',
-      acknowledgments: [
-        { userId: 'CTR-001', date: '2025-09-18' },
-        { userId: 'MNG-001', date: '2025-09-19' }
-      ],
-      tags: ['incomplete', 'bathroom']
-    },
-    {
-      id: 'FBK-001',
-      type: 'feedback',
-      category: 'Staff Performance',
-      title: 'Excellent service from crew team',
-      description: 'The cleaning crew was professional, thorough, and completed the job ahead of schedule. Very impressed with their attention to detail.',
-      submittedBy: 'CUS-002',
-      submittedDate: '2025-09-17',
-      status: 'open',
-      relatedService: 'CTR002-SRV002',
-      acknowledgments: [
-        { userId: 'CRW-001', date: '2025-09-17' },
-        { userId: 'MNG-001', date: '2025-09-18' }
-      ],
-      tags: ['professional', 'punctual']
-    },
-    {
-      id: 'RPT-002',
-      type: 'report',
-      category: 'Product Quality',
-      title: 'Defective cleaning supplies received',
-      description: 'Received a batch of floor cleaner that appears diluted and ineffective. Multiple bottles from the same shipment have the same issue.',
-      submittedBy: 'CRW-002',
-      submittedDate: '2025-09-16',
-      status: 'closed',
-      relatedOrder: 'CRW002-ORD-PRD001',
-      acknowledgments: [
-        { userId: 'WHS-001', date: '2025-09-16' }
-      ],
-      resolution: {
-        resolvedBy: 'WHS-001',
-        resolvedDate: '2025-09-17',
-        actionTaken: 'Replaced entire batch with new stock',
-        notes: 'Contacted supplier about quality control issue. Implemented additional testing procedures for incoming products.'
-      },
-      tags: ['defective', 'batch-issue']
-    },
-    {
-      id: 'FBK-002',
-      type: 'feedback',
-      category: 'Process Improvement',
-      title: 'Suggestion for inventory tracking',
-      description: 'It would be helpful to have real-time inventory levels visible in the ordering system to avoid requesting out-of-stock items.',
-      submittedBy: 'MNG-001',
-      submittedDate: '2025-09-15',
-      status: 'open',
-      acknowledgments: [
-        { userId: 'WHS-001', date: '2025-09-15' }
-      ],
-      tags: ['inventory', 'efficiency']
-    }
-  ];
+  // Combine reports and feedback from props
+  const allReports: ReportFeedback[] = [...reports, ...feedback];
 
   // Filter reports based on tab and user
   const getFilteredReports = () => {
-    let filtered = mockReports;
+    let filtered = allReports;
 
     switch (activeTab) {
       case 'my-reports':
-        filtered = mockReports.filter(report => report.submittedBy === userId);
+        filtered = allReports.filter(report => report.submittedBy === userId);
         break;
       case 'all-reports':
-        // In real implementation, this would filter based on user tree/ecosystem
-        filtered = mockReports.filter(report => report.status === 'open');
+        filtered = allReports.filter(report => report.status === 'open');
         break;
       case 'archive':
-        filtered = mockReports.filter(report => report.status === 'closed');
+        filtered = allReports.filter(report => report.status === 'closed');
         break;
       default:
         filtered = [];
@@ -448,7 +385,19 @@ const ReportsSection: React.FC<ReportsSectionProps> = ({
 
   const renderReportsList = () => (
     <div style={{ padding: '24px' }}>
-      {filteredReports.length === 0 ? (
+      {isLoading ? (
+        <div style={{
+          textAlign: 'center',
+          padding: '48px 24px'
+        }}>
+          <p style={{
+            fontSize: '16px',
+            color: '#9ca3af'
+          }}>
+            Loading reports...
+          </p>
+        </div>
+      ) : filteredReports.length === 0 ? (
         <div style={{
           textAlign: 'center',
           padding: '48px 24px'
@@ -488,10 +437,10 @@ const ReportsSection: React.FC<ReportsSectionProps> = ({
   return (
     <TabSection
       tabs={[
-        { id: 'all-reports', label: 'All Reports', count: mockReports.filter(r => r.status === 'open').length },
-        { id: 'my-reports', label: 'My Reports', count: mockReports.filter(r => r.submittedBy === userId).length },
+        { id: 'all-reports', label: 'All Reports', count: allReports.filter(r => r.status === 'open').length },
+        { id: 'my-reports', label: 'My Reports', count: allReports.filter(r => r.submittedBy === userId).length },
         { id: 'create', label: 'Create' },
-        { id: 'archive', label: 'Archive', count: mockReports.filter(r => r.status === 'closed').length }
+        { id: 'archive', label: 'Archive', count: allReports.filter(r => r.status === 'closed').length }
       ]}
       activeTab={activeTab}
       onTabChange={setActiveTab}

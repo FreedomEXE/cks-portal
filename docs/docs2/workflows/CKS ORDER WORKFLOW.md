@@ -12,6 +12,7 @@ All orders follow a consistent ID format: `{UserID}-ORD-{TypeID}`
 Examples:
 - `CRW001-ORD-PRD001` - Product order created by Crew member CRW001
 - `CTR002-ORD-SRV005` - Service order created by Center CTR002
+The original orderId stays immutable for history and auditing. When a service is created, the resulting serviceId (for example, `CTR002-SRV005`) is stored separately in `transformedId` while the order keeps its original identifier.
 
 ## Order Types
 
@@ -38,6 +39,7 @@ Product orders are requests for supplies and equipment from the warehouse.
 - Contractors
 - Customers
 - Managers
+Note: Warehouse users do not initiate product orders; their role begins at review and fulfillment stages.
 
 **Approval Flow:**
 1. Requester creates product order
@@ -210,7 +212,7 @@ Center (✓ Approved) → Manager (✓ Service Created)
 - **Deliveries Tab**: Three sub-tabs (One-Time, Recurring, Archive)
   - **Delivered Button**: Marks order as delivered (moves to archive, status: "delivered")
   - **Cancel Button**: Cancels order (moves to archive, status: "cancelled")
-- Cannot see service orders unless warehouse created them
+- Does not create service or product orders; engagement starts at review and delivery steps only.
 
 ### Crew View
 - Can create product orders
@@ -238,7 +240,7 @@ Each tab shows:
 ## Action Buttons by Role
 
 ### Request Service Button
-Available for: Contractor, Customer, Center, Warehouse
+Available for: Contractor, Customer, Center
 
 ### Request Products Button
 Available for: Contractor, Customer, Center, Crew, Manager
@@ -282,6 +284,13 @@ Shows full details including:
 3. **Warehouse delivers**:
    - All users see: status = 'delivered'
    - Order moves to Archive tab
+
+### Viewer-Specific Status Presentation
+
+Orders carry a canonical `status` for system logic alongside a derived `viewerStatus` that drives UI colours and action prompts.
+- `viewerStatus` is `pending` (yellow) for the next role in the approval sequence.
+- All other viewers see `viewerStatus` of `in-progress` (blue), indicating read-only or already-completed actions.
+- Rejected/cancelled states still surface as `rejected`/`cancelled` for every viewer.
 
 ### For Service Orders:
 1. **Customer/Center creates**:
@@ -328,8 +337,11 @@ Pulsing indicates stages requiring attention or awaiting action.
 - `requestedBy`: User ID who created order
 - `requestedDate`: Creation date
 - `status`: Current order status
+- `viewerStatus`: Derived status for the current viewer (controls badge colour/action state).
 
 ### Optional Fields
+
+These fields are present in the MVP payload so we can validate the UX; we can prune any that prove unnecessary after live review.
 - `destination`: Delivery destination (for product orders)
 - `expectedDate`: Requested delivery/service date
 - `deliveryDate`: Actual delivery completion

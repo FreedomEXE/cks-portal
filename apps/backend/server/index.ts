@@ -18,6 +18,10 @@ import { registerAssignmentRoutes } from "./domains/assignments";
 import { registerDirectoryRoutes } from "./domains/directory/routes.fastify";
 import { registerProvisioningRoutes } from "./domains/provisioning";
 import { registerArchiveRoutes } from "./domains/archive/routes.fastify";
+import { registerProfileRoutes } from "./domains/profile/routes.fastify";
+import { registerDashboardRoutes } from "./domains/dashboard/routes.fastify";
+import { registerOrdersRoutes } from "./domains/orders/routes.fastify";
+import { reportsRoutes } from "./domains/reports/routes.fastify";
 
 type BootstrapResponse = {
   role: string;
@@ -107,7 +111,7 @@ export async function buildServer() {
         cb(null, true);
       } else {
         console.warn(`CORS: Blocked request from unauthorized origin: ${origin}`);
-        cb(new Error('Not allowed by CORS'));
+        cb(new Error('Not allowed by CORS'), false);
       }
     },
     credentials: true,
@@ -245,6 +249,10 @@ export async function buildServer() {
   await registerAssignmentRoutes(server);
   await registerDirectoryRoutes(server);
   await registerArchiveRoutes(server);
+  await registerProfileRoutes(server);
+  await registerDashboardRoutes(server);
+  await registerOrdersRoutes(server);
+  await server.register(reportsRoutes, { prefix: '/api' });
   const { registerImpersonationRoutes } = await import('./domains/identity/impersonation.routes');
   await registerImpersonationRoutes(server);
 
@@ -269,3 +277,4 @@ async function start() {
 if (require.main === module) {
   start();
 }
+

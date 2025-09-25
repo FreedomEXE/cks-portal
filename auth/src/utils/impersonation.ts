@@ -146,7 +146,7 @@ export type ImpersonationSnapshot = {
   firstName: string | null;
 };
 
-const SESSION_KEYS = ['impersonate', 'role', 'code', 'impersonate:firstName', 'impersonate:displayName'] as const;
+const SESSION_KEYS = ['impersonate', 'role', 'code', 'cks_impersonation_code', 'impersonate:firstName', 'impersonate:displayName'] as const;
 
 export async function triggerImpersonation(code: string, options?: ImpersonationRequestOptions): Promise<boolean> {
   let payload: ImpersonationPayload | null = null;
@@ -192,6 +192,7 @@ export function persistImpersonation(payload: ImpersonationPayload): boolean {
   try {
     storage.setItem('impersonate', 'true');
     storage.setItem('code', code);
+    storage.setItem('cks_impersonation_code', code);
     storage.setItem('role', role);
 
     if (displayName) {
@@ -251,7 +252,7 @@ export function readImpersonation(): ImpersonationSnapshot {
       };
     }
 
-    const code = storage.getItem('code');
+    const code = storage.getItem('code') ?? storage.getItem('cks_impersonation_code');
     const role = storage.getItem('role');
     const displayName = storage.getItem('impersonate:displayName');
     const firstName = storage.getItem('impersonate:firstName');
@@ -296,3 +297,4 @@ export function getCodeFromPath(pathname: string): string | null {
 export function isImpersonationPath(pathname: string): boolean {
   return getCodeFromPath(pathname) !== null;
 }
+

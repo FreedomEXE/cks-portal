@@ -11,6 +11,10 @@ import {
   assignCustomerToContractor,
   assignCenterToCustomer,
   assignCrewToCenter,
+  unassignContractorFromManager,
+  unassignCustomerFromContractor,
+  unassignCenterFromCustomer,
+  unassignCrewFromCenter,
 } from './store';
 import {
   contractorAssignmentSchema,
@@ -162,6 +166,75 @@ export async function registerAssignmentRoutes(server: FastifyInstance) {
       }
       request.log.error({ err: error, crewId }, 'crew assignment failed');
       reply.code(500).send({ error: (error as Error).message ?? 'Failed to assign crew member' });
+    }
+  });
+
+  // Unassignment endpoints
+  server.delete('/api/admin/assignments/contractors/:id/manager', async (request, reply) => {
+    const admin = await requireActiveAdmin(request, reply);
+    if (!admin) {
+      return;
+    }
+
+    const contractorId = String((request.params as { id?: string }).id ?? '');
+
+    try {
+      const result = await unassignContractorFromManager(contractorId, mapAdminActor(admin));
+      reply.send({ data: result });
+    } catch (error) {
+      request.log.error({ err: error, contractorId }, 'contractor unassignment failed');
+      reply.code(500).send({ error: (error as Error).message ?? 'Failed to unassign contractor' });
+    }
+  });
+
+  server.delete('/api/admin/assignments/customers/:id/contractor', async (request, reply) => {
+    const admin = await requireActiveAdmin(request, reply);
+    if (!admin) {
+      return;
+    }
+
+    const customerId = String((request.params as { id?: string }).id ?? '');
+
+    try {
+      const result = await unassignCustomerFromContractor(customerId, mapAdminActor(admin));
+      reply.send({ data: result });
+    } catch (error) {
+      request.log.error({ err: error, customerId }, 'customer unassignment failed');
+      reply.code(500).send({ error: (error as Error).message ?? 'Failed to unassign customer' });
+    }
+  });
+
+  server.delete('/api/admin/assignments/centers/:id/customer', async (request, reply) => {
+    const admin = await requireActiveAdmin(request, reply);
+    if (!admin) {
+      return;
+    }
+
+    const centerId = String((request.params as { id?: string }).id ?? '');
+
+    try {
+      const result = await unassignCenterFromCustomer(centerId, mapAdminActor(admin));
+      reply.send({ data: result });
+    } catch (error) {
+      request.log.error({ err: error, centerId }, 'center unassignment failed');
+      reply.code(500).send({ error: (error as Error).message ?? 'Failed to unassign center' });
+    }
+  });
+
+  server.delete('/api/admin/assignments/crew/:id/center', async (request, reply) => {
+    const admin = await requireActiveAdmin(request, reply);
+    if (!admin) {
+      return;
+    }
+
+    const crewId = String((request.params as { id?: string }).id ?? '');
+
+    try {
+      const result = await unassignCrewFromCenter(crewId, mapAdminActor(admin));
+      reply.send({ data: result });
+    } catch (error) {
+      request.log.error({ err: error, crewId }, 'crew unassignment failed');
+      reply.code(500).send({ error: (error as Error).message ?? 'Failed to unassign crew member' });
     }
   });
 }

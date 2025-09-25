@@ -296,6 +296,7 @@ export async function assignContractorToManager(
   await query(
     `UPDATE contractors
      SET cks_manager = $1,
+         status = 'assigned',
          updated_at = NOW()
      WHERE contractor_id = $2`,
     [manager.manager_id, contractor.contractor_id],
@@ -346,6 +347,7 @@ export async function assignCustomerToContractor(
   await query(
     `UPDATE customers
      SET contractor_id = $1,
+         status = 'assigned',
          updated_at = NOW()
      WHERE customer_id = $2`,
     [contractor.contractor_id, customer.customer_id],
@@ -399,6 +401,7 @@ export async function assignCenterToCustomer(
     `UPDATE centers
      SET customer_id = $1,
          contractor_id = COALESCE($2, contractor_id),
+         status = 'assigned',
          updated_at = NOW()
      WHERE center_id = $3`,
     [customer.customer_id, contractorId, center.center_id],
@@ -450,6 +453,7 @@ export async function assignCrewToCenter(
   await query(
     `UPDATE crew
      SET assigned_center = $1,
+         status = 'assigned',
          updated_at = NOW()
      WHERE crew_id = $2`,
     [center.center_id, crew.crew_id],
@@ -474,5 +478,170 @@ export async function assignCrewToCenter(
     name: crew.name ?? crew.crew_id,
     assignedId: center.center_id,
     assignedName: center.name ?? center.center_id,
+  };
+}
+
+export async function unassignContractorFromManager(
+  contractorIdInput: string,
+  actor: AuditContext,
+): Promise<{ id: string; name: string }> {
+  const contractorLookup = normalizeIdentity(contractorIdInput);
+  if (!contractorLookup) {
+    throw new Error('Invalid contractor ID');
+  }
+
+  const contractor = await fetchContractor(contractorLookup);
+  if (!contractor) {
+    throw new Error('Contractor not found');
+  }
+
+  await query(
+    `UPDATE contractors
+     SET cks_manager = NULL,
+         status = 'unassigned',
+         updated_at = NOW()
+     WHERE contractor_id = $1`,
+    [contractor.contractor_id],
+  );
+
+  await recordActivity({
+    actor,
+    activityType: 'contractor_unassigned_from_manager',
+    description: `Unassigned contractor ${contractor.contractor_id} from manager`,
+    targetId: contractor.contractor_id,
+    targetType: 'contractor',
+    metadata: {
+      contractorId: contractor.contractor_id,
+      contractorName: contractor.company_name,
+    },
+  });
+
+  return {
+    id: contractor.contractor_id,
+    name: contractor.company_name ?? contractor.contractor_id,
+  };
+}
+
+export async function unassignCustomerFromContractor(
+  customerIdInput: string,
+  actor: AuditContext,
+): Promise<{ id: string; name: string }> {
+  const customerLookup = normalizeIdentity(customerIdInput);
+  if (!customerLookup) {
+    throw new Error('Invalid customer ID');
+  }
+
+  const customer = await fetchCustomer(customerLookup);
+  if (!customer) {
+    throw new Error('Customer not found');
+  }
+
+  await query(
+    `UPDATE customers
+     SET contractor_id = NULL,
+         status = 'unassigned',
+         updated_at = NOW()
+     WHERE customer_id = $1`,
+    [customer.customer_id],
+  );
+
+  await recordActivity({
+    actor,
+    activityType: 'customer_unassigned_from_contractor',
+    description: `Unassigned customer ${customer.customer_id} from contractor`,
+    targetId: customer.customer_id,
+    targetType: 'customer',
+    metadata: {
+      customerId: customer.customer_id,
+      customerName: customer.company_name,
+    },
+  });
+
+  return {
+    id: customer.customer_id,
+    name: customer.company_name ?? customer.customer_id,
+  };
+}
+
+export async function unassignCenterFromCustomer(
+  centerIdInput: string,
+  actor: AuditContext,
+): Promise<{ id: string; name: string }> {
+  const centerLookup = normalizeIdentity(centerIdInput);
+  if (!centerLookup) {
+    throw new Error('Invalid center ID');
+  }
+
+  const center = await fetchCenter(centerLookup);
+  if (!center) {
+    throw new Error('Center not found');
+  }
+
+  await query(
+    `UPDATE centers
+     SET customer_id = NULL,
+         contractor_id = NULL,
+         status = 'unassigned',
+         updated_at = NOW()
+     WHERE center_id = $1`,
+    [center.center_id],
+  );
+
+  await recordActivity({
+    actor,
+    activityType: 'center_unassigned_from_customer',
+    description: `Unassigned center ${center.center_id} from customer`,
+    targetId: center.center_id,
+    targetType: 'center',
+    metadata: {
+      centerId: center.center_id,
+      centerName: center.name,
+    },
+  });
+
+  return {
+    id: center.center_id,
+    name: center.name ?? center.center_id,
+  };
+}
+
+export async function unassignCrewFromCenter(
+  crewIdInput: string,
+  actor: AuditContext,
+): Promise<{ id: string; name: string }> {
+  const crewLookup = normalizeIdentity(crewIdInput);
+  if (!crewLookup) {
+    throw new Error('Invalid crew ID');
+  }
+
+  const crew = await fetchCrewMember(crewLookup);
+  if (!crew) {
+    throw new Error('Crew member not found');
+  }
+
+  await query(
+    `UPDATE crew
+     SET assigned_center = NULL,
+         status = 'unassigned',
+         updated_at = NOW()
+     WHERE crew_id = $1`,
+    [crew.crew_id],
+  );
+
+  await recordActivity({
+    actor,
+    activityType: 'crew_unassigned_from_center',
+    description: `Unassigned crew member ${crew.crew_id} from center`,
+    targetId: crew.crew_id,
+    targetType: 'crew',
+    metadata: {
+      crewId: crew.crew_id,
+      crewName: crew.name,
+    },
+  });
+
+  return {
+    id: crew.crew_id,
+    name: crew.name ?? crew.crew_id,
   };
 }

@@ -1,24 +1,20 @@
-﻿/*----------------------------------------------- 
-  Property of CKS  (c) 2025
------------------------------------------------*/
-/**
- * File: routes.fastify.ts
- *
- * Description:
- * Short what/why
- *
- * Responsibilities:
- * - Key responsibility
- * - Another responsibility
- *
- * Role in system:
- * - Who imports/uses this; high-level, not a list of files
- *
- * Notes:
- * Special behaviors, flags, envs
- */
-/*-----------------------------------------------
-  Manifested by Freedom_EXE
------------------------------------------------*/
+﻿import type { FastifyInstance } from 'fastify';
+import { requireActiveRole } from '../../core/auth/guards';
+import { getHubReports } from './store';
+import type { HubRole } from '../profile/types';
 
-export {};
+export async function reportsRoutes(fastify: FastifyInstance) {
+  fastify.get('/hub/reports/:cksCode', async (request, reply) => {
+    const user = await requireActiveRole(request, reply);
+    if (!user) return;
+
+    const { cksCode } = request.params as { cksCode: string };
+
+    const reports = await getHubReports(user.role as HubRole, cksCode);
+    if (!reports) {
+      return reply.code(404).send({ error: 'Reports not found' });
+    }
+
+    return reports;
+  });
+}

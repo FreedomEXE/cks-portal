@@ -31,12 +31,12 @@ export interface ArchiveSectionProps {
 const ARCHIVE_TABS = [
   { id: 'manager', label: 'Managers', color: '#3b82f6', search: 'archived managers' },
   { id: 'contractor', label: 'Contractors', color: '#10b981', search: 'archived contractors' },
-  { id: 'customer', label: 'Customers', color: '#0ea5e9', search: 'archived customers' },
+  { id: 'customer', label: 'Customers', color: '#eab308', search: 'archived customers' },
   { id: 'center', label: 'Centers', color: '#f97316', search: 'archived centers' },
   { id: 'crew', label: 'Crew', color: '#ef4444', search: 'archived crew' },
   { id: 'warehouse', label: 'Warehouses', color: '#8b5cf6', search: 'archived warehouses' },
-  { id: 'service', label: 'Services', color: '#ec4899', search: 'archived services' },
-  { id: 'product', label: 'Products', color: '#14b8a6', search: 'archived products' },
+  { id: 'service', label: 'Services', color: '#14b8a6', search: 'archived services' },
+  { id: 'product', label: 'Products', color: '#d946ef', search: 'archived products' },
 ];
 
 const TAB_COLUMN_CONFIG = {
@@ -267,7 +267,7 @@ export default function ArchiveSection({ archiveAPI }: ArchiveSectionProps) {
             }}
             style={{
               padding: '8px 16px',
-              backgroundColor: '#3b82f6',
+              backgroundColor: '#0f172a',
               color: 'white',
               border: 'none',
               borderRadius: '6px',

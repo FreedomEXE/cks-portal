@@ -48,6 +48,7 @@ import {
   useOrders,
   useServices,
 } from '../shared/api/directory';
+import { useHubReports } from '../shared/api/hub';
 
 interface ManagerHubProps {
   initialTab?: string;
@@ -86,11 +87,11 @@ const HUB_TABS = [
 ];
 
 const OVERVIEW_CARDS = [
-  { id: 'contractors', title: 'My Contractors', dataKey: 'contractorCount', color: 'blue' },
-  { id: 'customers', title: 'My Customers', dataKey: 'customerCount', color: 'green' },
-  { id: 'centers', title: 'My Centers', dataKey: 'centerCount', color: 'purple' },
-  { id: 'crew', title: 'My Crew', dataKey: 'crewCount', color: 'orange' },
-  { id: 'orders', title: 'Pending Orders', dataKey: 'pendingOrders', color: 'red' },
+  { id: 'contractors', title: 'My Contractors', dataKey: 'contractorCount', color: 'green' },
+  { id: 'customers', title: 'My Customers', dataKey: 'customerCount', color: 'yellow' },
+  { id: 'centers', title: 'My Centers', dataKey: 'centerCount', color: 'orange' },
+  { id: 'crew', title: 'My Crew', dataKey: 'crewCount', color: 'red' },
+  { id: 'orders', title: 'Pending Orders', dataKey: 'pendingOrders', color: 'indigo' },
   { id: 'status', title: 'Account Status', dataKey: 'accountStatus', color: 'green' },
 ];
 
@@ -330,6 +331,9 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
 
   const managerDisplayName = managerRecord?.name ?? fullName ?? firstName ?? 'Manager';
   const managerRootId = managerRecord?.id ?? managerCode ?? 'MANAGER';
+
+  // Fetch reports data
+  const { data: reportsData, isLoading: reportsLoading } = useHubReports(managerCode);
 
   const managerContractors = useMemo(() => {
     if (!managerCode) {
@@ -932,7 +936,14 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
             </PageWrapper>
           ) : activeTab === 'reports' ? (
             <PageWrapper headerSrOnly>
-              <ReportsSection role="manager" userId={managerRootId} primaryColor={MANAGER_PRIMARY_COLOR} />
+              <ReportsSection
+                role="manager"
+                userId={managerRootId}
+                primaryColor={MANAGER_PRIMARY_COLOR}
+                reports={reportsData?.reports || []}
+                feedback={reportsData?.feedback || []}
+                isLoading={reportsLoading}
+              />
             </PageWrapper>
           ) : (
             <PageWrapper title={activeTab} showHeader headerSrOnly>

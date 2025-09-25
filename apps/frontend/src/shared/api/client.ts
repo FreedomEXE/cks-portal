@@ -1,5 +1,6 @@
 import { useAuth as useClerkAuth } from '@clerk/clerk-react';
 import { useCallback } from 'react';
+import { readImpersonation } from '@cks/auth';
 
 const RAW_API_BASE = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:3000/api';
 export const API_BASE = RAW_API_BASE.replace(/\/+$/, '');
@@ -23,6 +24,26 @@ export async function apiFetch<T>(path: string, init?: ApiFetchInit): Promise<T>
   }
   if (restInit.body && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json');
+  }
+
+  // Add impersonation header if available
+  if (!headers.has('x-impersonate-code')) {
+    let impersonationCode: string | null = null;
+    try {
+      const snapshot = readImpersonation();
+      impersonationCode = snapshot.code;
+      if (!impersonationCode && typeof window !== 'undefined') {
+        impersonationCode = window.sessionStorage?.getItem?.('cks_impersonation_code')
+          ?? window.sessionStorage?.getItem?.('code')
+          ?? null;
+      }
+    } catch (error) {
+      console.warn('[apiFetch] Failed to resolve impersonation context', error);
+    }
+    if (impersonationCode) {
+      headers.set('x-impersonate-code', impersonationCode);
+      console.log('[apiFetch] Added impersonation header:', impersonationCode);
+    }
   }
 
   // Enhanced token resolution with better error handling
@@ -93,6 +114,11 @@ export function useAuthedFetcher<T>(path: string, transform?: (input: T) => T) {
     return transform ? transform(result) : result;
   }, [getToken, path, transform]);
 }
+
+
+
+
+
 
 
 
