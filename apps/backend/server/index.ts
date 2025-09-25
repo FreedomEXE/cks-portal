@@ -22,6 +22,7 @@ import { registerProfileRoutes } from "./domains/profile/routes.fastify";
 import { registerDashboardRoutes } from "./domains/dashboard/routes.fastify";
 import { registerOrdersRoutes } from "./domains/orders/routes.fastify";
 import { reportsRoutes } from "./domains/reports/routes.fastify";
+import { registerInventoryRoutes } from "./domains/inventory/routes.fastify";
 
 type BootstrapResponse = {
   role: string;
@@ -252,6 +253,7 @@ export async function buildServer() {
   await registerProfileRoutes(server);
   await registerDashboardRoutes(server);
   await registerOrdersRoutes(server);
+  await registerInventoryRoutes(server);
   await server.register(reportsRoutes, { prefix: '/api' });
   const { registerImpersonationRoutes } = await import('./domains/identity/impersonation.routes');
   await registerImpersonationRoutes(server);

@@ -294,6 +294,19 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
     startDate: formatDisplayDate(profile?.createdAt ?? null),
   }), [profile, normalizedCode]);
 
+  const accountManagerCard = useMemo(() => {
+    // Crew members get their manager through their assigned center
+    if (!profile?.manager) {
+      return null;
+    }
+    return {
+      name: profile.manager.name ?? '—',
+      id: profile.manager.id ?? '—',
+      email: profile.manager.email ?? '—',
+      phone: profile.manager.phone ?? '—',
+    };
+  }, [profile]);
+
   const profileLoadMessage = profileLoading && !profile ? 'Loading profile details…' : null;
   const ordersLoadMessage = ordersLoading && serviceOrders.length === 0 && productOrders.length === 0
     ? 'Loading latest orders…'
@@ -351,6 +364,7 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
               <ProfileInfoCard
                 role="crew"
                 profileData={profileCardData}
+                accountManager={accountManagerCard}
                 primaryColor="#ef4444"
                 onUpdatePhoto={() => undefined}
                 onContactManager={() => undefined}

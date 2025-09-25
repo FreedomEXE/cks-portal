@@ -1,24 +1,24 @@
-﻿/*----------------------------------------------- 
+/*-----------------------------------------------
   Property of CKS  (c) 2025
 -----------------------------------------------*/
 /**
  * File: service.ts
  *
  * Description:
- * Short what/why
+ * Inventory domain service layer
  *
  * Responsibilities:
- * - Key responsibility
- * - Another responsibility
+ * - Export inventory business logic
+ * - Provide interface to inventory store
  *
  * Role in system:
- * - Who imports/uses this; high-level, not a list of files
+ * - Used by inventory routes
  *
  * Notes:
- * Special behaviors, flags, envs
+ * Re-exports store functions for consistency
  */
 /*-----------------------------------------------
   Manifested by Freedom_EXE
 -----------------------------------------------*/
 
-export {};
+export { getHubInventory } from './store';

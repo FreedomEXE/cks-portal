@@ -16,7 +16,7 @@
  * - Primary profile component for all roles except Admin
  *
  * Notes:
- * Manager has 2 tabs, all other roles have 3 tabs
+ * Manager and Warehouse have 2 tabs, all other roles have 3 tabs
  */
 /*───────────────────────────────────────────────
   Manifested by Freedom_EXE
@@ -50,10 +50,10 @@ export function ProfileInfoCard({
 }: ProfileInfoCardProps) {
   const [activeTab, setActiveTab] = useState('profile');
 
-  // Manager role has only Profile and Settings tabs
+  // Manager and Warehouse roles have only Profile and Settings tabs
   // All other roles have Profile, Account Manager, and Settings tabs
-  const isManager = role === 'manager';
-  const tabs = isManager
+  const hasNoAccountManager = role === 'manager' || role === 'warehouse';
+  const tabs = hasNoAccountManager
     ? ['profile', 'settings']
     : ['profile', 'accountManager', 'settings'];
 

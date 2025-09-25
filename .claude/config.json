@@ -32,6 +32,8 @@
     }
   },
   "development": {
+    "IMPORTANT": "NEVER UNDER ANY CIRCUMSTANCE RESTART THE DEV SERVERS OR ANY SERVERS",
+    "DATABASE_NOTE": "For database queries or migrations, provide SQL scripts for the user to run in Beekeeper Studio. Do NOT run database commands directly.",
     "preferredCommands": {
       "dev": "pnpm run dev",
       "build": "pnpm run build",
@@ -56,7 +58,7 @@
     "roleSystem": "Evaluate this role/permission implementation for correctness and security"
   },
   "conventions": {
-    "fileHeaders": "Use CKS standard headers with Property of CKS © 2025",
+    "fileHeaders": "Use CKS standard headers with Property of CKS ï¿½ 2025",
     "naming": "Use PascalCase for components, camelCase for functions, kebab-case for files",
     "imports": "Absolute imports preferred, respect package boundaries",
     "testing": "Unit tests for business logic, integration tests for APIs, e2e for critical flows"

@@ -179,32 +179,22 @@ async function getCrewReports(cksCode: string): Promise<HubReportsPayload> {
 }
 
 async function getWarehouseReports(cksCode: string): Promise<HubReportsPayload> {
-  // Warehouse sees reports related to deliveries
-  const reportsResult = await query<any>(
-    `SELECT * FROM reports
-     WHERE UPPER(warehouse_id) = $1 OR UPPER(assigned_warehouse) = $1
-     ORDER BY created_at DESC NULLS LAST`,
-    [cksCode],
-  );
+  // Warehouses see reports related to product and service orders they were involved in
+  // This will be mapped out in more detail later when we wire and test the entire reports flow
+  // Per CKS REPORTS WORKFLOW doc: Warehouses can create feedback only and can resolve reports
 
-  const reports: ReportItem[] = reportsResult.rows.map(row => ({
-    id: row.id,
-    type: row.kind === 'feedback' ? 'feedback' : 'report',
-    category: row.severity ?? 'General',
-    title: row.title ?? 'Untitled',
-    description: row.description ?? '',
-    submittedBy: row.warehouse_id ?? 'Unknown',
-    submittedDate: row.created_at,
-    status: row.status ?? 'open',
-    relatedService: row.service_id,
-    tags: row.tags ? row.tags.split(',') : [],
-  }));
+  // TODO: Implement proper query once the reports table has proper warehouse linkage
+  // The query should:
+  // 1. Find all orders (product/service) involving this warehouse
+  // 2. Get reports related to those orders via relatedOrder/relatedService fields
+  // 3. Also get any feedback submitted by this warehouse
 
+  // For now, return empty arrays to prevent errors
   return {
     role: 'warehouse',
     cksCode,
-    reports: reports.filter(r => r.type === 'report'),
-    feedback: reports.filter(r => r.type === 'feedback'),
+    reports: [],
+    feedback: [],
   };
 }
 

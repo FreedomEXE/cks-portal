@@ -311,18 +311,17 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
     startDate: formatDisplayDate(profile?.createdAt ?? null),
   }), [profile, normalizedCode, dashboard]);
 
-  const customerCard = useMemo(() => {
-    const customerId = (dashboard as any)?.customerId;
-    if (!customerId) {
+  const accountManagerCard = useMemo(() => {
+    if (!profile?.manager) {
       return null;
     }
     return {
-      name: getMetadataString(profile?.metadata ?? null, 'customerName') ?? customerId,
-      id: customerId,
-      email: getMetadataString(profile?.metadata ?? null, 'customerEmail') ?? '—',
-      phone: getMetadataString(profile?.metadata ?? null, 'customerPhone') ?? '—',
+      name: profile.manager.name ?? '—',
+      id: profile.manager.id ?? '—',
+      email: profile.manager.email ?? '—',
+      phone: profile.manager.phone ?? '—',
     };
-  }, [profile, dashboard]);
+  }, [profile]);
 
   const profileLoadMessage = profileLoading && !profile ? 'Loading profile details…' : null;
   const ordersLoadMessage = ordersLoading && serviceOrders.length === 0 && productOrders.length === 0
@@ -381,7 +380,7 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
               <ProfileInfoCard
                 role="center"
                 profileData={profileCardData}
-                accountManager={customerCard}
+                accountManager={accountManagerCard}
                 primaryColor="#f97316"
                 onUpdatePhoto={() => undefined}
                 onContactManager={() => undefined}

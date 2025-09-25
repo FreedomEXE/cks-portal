@@ -1,24 +1,42 @@
-﻿/*----------------------------------------------- 
+﻿/*-----------------------------------------------
   Property of CKS  (c) 2025
 -----------------------------------------------*/
 /**
  * File: types.ts
  *
  * Description:
- * Short what/why
+ * Inventory domain types and interfaces
  *
  * Responsibilities:
- * - Key responsibility
- * - Another responsibility
+ * - Define inventory item structure
+ * - Define hub inventory payload format
  *
  * Role in system:
- * - Who imports/uses this; high-level, not a list of files
+ * - Used by inventory service and routes for type safety
  *
  * Notes:
- * Special behaviors, flags, envs
+ * Matches frontend HubInventoryItem interface
  */
 /*-----------------------------------------------
   Manifested by Freedom_EXE
 -----------------------------------------------*/
 
-export {};
+export interface InventoryItem {
+  productId: string;
+  name: string;
+  type: string;
+  onHand: number;
+  min: number;
+  location: string;
+  isLow: boolean;
+  status?: 'active' | 'archived';
+  archivedDate?: string | null;
+  reason?: string | null;
+}
+
+export interface HubInventoryPayload {
+  role: string;
+  cksCode: string;
+  activeItems: InventoryItem[];
+  archivedItems: InventoryItem[];
+}
