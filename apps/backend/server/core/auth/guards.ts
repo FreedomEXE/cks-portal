@@ -1,7 +1,13 @@
-﻿import type { FastifyReply, FastifyRequest } from "fastify";
+import type { FastifyReply, FastifyRequest } from "fastify";
 import { authenticate } from "./authenticate";
 import { getAdminUserByClerkId } from "../../domains/adminUsers/store";
-import { normalizeIdentity } from "../../domains/identity";
+import {
+  normalizeIdentity,
+  getHubAccountByClerkId,
+  type HubAccountRecord,
+  type HubAccountRole,
+} from "../../domains/identity";
+import type { AdminUserRecord } from "../../domains/adminUsers/types";
 
 export type RequiredRole = string | readonly string[];
 
@@ -10,6 +16,15 @@ export interface RoleGuardOptions {
   cksCode?: string | readonly string[];
   allowInactive?: boolean;
 }
+
+const HUB_ROLES = ["manager", "contractor", "customer", "center", "crew", "warehouse"] as const;
+const DEV_ROLE_SET = new Set<string>(["admin", ...HUB_ROLES]);
+
+type GuardAccount = HubAccountRecord & {
+  isAdmin: boolean;
+};
+
+export type RequireActiveRoleResult = GuardAccount;
 
 function matchesRole(actual: string | null | undefined, expected: RequiredRole | undefined): boolean {
   if (!expected) {
@@ -39,11 +54,105 @@ function matchesCksCode(actual: string | null | undefined, expected: string | re
   return expected.some((candidate) => normalizedActual === normalizeIdentity(candidate));
 }
 
+function parseDevRole(value: string | null | undefined): HubAccountRole | null {
+  if (!value) {
+    return null;
+  }
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) {
+    return null;
+  }
+  return DEV_ROLE_SET.has(normalized) ? (normalized as HubAccountRole) : null;
+}
+
+function ensureAccountAllowed(account: GuardAccount, options: RoleGuardOptions, reply: FastifyReply): boolean {
+  if (!options.allowInactive) {
+    const status = (account.status ?? "").trim().toLowerCase();
+    if (status && status !== "active") {
+      if ((account.role ?? "").trim().toLowerCase() === "admin") {
+        reply.code(403).send({ error: "Admin access is disabled", status: account.status });
+      } else {
+        reply.code(403).send({ error: "Account access is disabled", status: account.status });
+      }
+      return false;
+    }
+  }
+
+  if (!matchesRole(account.role, options.role)) {
+    if (!account.isAdmin) {
+      reply.code(403).send({ error: "Forbidden", reason: "role_mismatch" });
+      return false;
+    }
+  }
+
+  if (!matchesCksCode(account.cksCode, options.cksCode)) {
+    reply.code(403).send({ error: "Forbidden", reason: "code_mismatch" });
+    return false;
+  }
+
+  return true;
+}
+
+function buildAdminAccount(adminUser: AdminUserRecord, fallbackEmail: string | null): GuardAccount {
+  const role = (adminUser.role ?? "admin").trim().toLowerCase();
+  const cksCode = normalizeIdentity(adminUser.cksCode) ?? adminUser.cksCode ?? "";
+  return {
+    role,
+    cksCode,
+    status: adminUser.status ?? null,
+    fullName: adminUser.fullName ?? null,
+    email: adminUser.email ?? fallbackEmail,
+    isAdmin: true,
+  };
+}
+
+function asString(value: unknown): string | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  const text = String(value).trim();
+  return text.length ? text : null;
+}
+
 export async function requireActiveRole(
   request: FastifyRequest,
   reply: FastifyReply,
   options: RoleGuardOptions = {},
-) {
+): Promise<RequireActiveRoleResult | null> {
+  if (process.env.CKS_ENABLE_DEV_AUTH === "true") {
+    const devRoleHeader = asString(request.headers["x-cks-dev-role"]);
+    const devCodeHeader = asString(request.headers["x-cks-dev-code"]);
+
+    if (devRoleHeader) {
+      const devRole = parseDevRole(devRoleHeader);
+      if (!devRole) {
+        reply.code(400).send({ error: "Invalid dev role override" });
+        return null;
+      }
+
+      const normalizedCode = normalizeIdentity(devCodeHeader ?? null);
+      if (devRole !== "admin" && !normalizedCode) {
+        reply.code(400).send({ error: "Dev override requires a valid CKS code" });
+        return null;
+      }
+
+      const devAccount: GuardAccount = {
+        role: devRole,
+        cksCode: normalizedCode ?? "",
+        status: "active",
+        fullName: null,
+        email: null,
+        isAdmin: devRole === "admin",
+      };
+
+      if (!ensureAccountAllowed(devAccount, options, reply)) {
+        return null;
+      }
+
+      return devAccount;
+    }
+  }
+
   const auth = await authenticate(request);
   if (!auth.ok) {
     reply.code(401).send({ error: "Unauthorized", reason: auth.reason });
@@ -51,45 +160,32 @@ export async function requireActiveRole(
   }
 
   const adminUser = await getAdminUserByClerkId(auth.userId);
-  if (!adminUser) {
+  const isAdmin = adminUser?.role?.trim().toLowerCase() === "admin";
+
+  if (adminUser && isAdmin) {
+    const baseAccount = buildAdminAccount(adminUser, auth.email);
+
+    if (!ensureAccountAllowed(baseAccount, options, reply)) {
+      return null;
+    }
+
+    return baseAccount;
+  }
+
+  const account = await getHubAccountByClerkId(auth.userId);
+  if (!account) {
     reply.code(403).send({ error: "Forbidden", reason: "not_provisioned" });
     return null;
   }
 
-  if (!options.allowInactive && adminUser.status !== "active") {
-    reply.code(403).send({ error: "Admin access is disabled", status: adminUser.status });
+  const guardAccount: GuardAccount = {
+    ...account,
+    isAdmin: false,
+  };
+
+  if (!ensureAccountAllowed(guardAccount, options, reply)) {
     return null;
   }
 
-  // Check for impersonation header
-  const impersonationCode = request.headers['x-impersonate-code'] as string | undefined;
-  if (impersonationCode && adminUser.role === 'admin') {
-    // Admin is impersonating - load the target user
-    const { findUserByCode } = await import('../../domains/identity/impersonation.routes');
-    const targetUser = await (findUserByCode as any)(impersonationCode);
-
-    if (targetUser) {
-      // Return a synthetic user object with the impersonated role and code
-      return {
-        ...adminUser,
-        role: targetUser.role,
-        cksCode: targetUser.code,
-        fullName: targetUser.displayName,
-        // Keep the admin's actual ID for audit purposes
-        impersonatedBy: adminUser.id,
-      };
-    }
-  }
-
-  if (!matchesRole(adminUser.role, options.role)) {
-    reply.code(403).send({ error: "Forbidden", reason: "role_mismatch" });
-    return null;
-  }
-
-  if (!matchesCksCode(adminUser.cksCode, options.cksCode)) {
-    reply.code(403).send({ error: "Forbidden", reason: "code_mismatch" });
-    return null;
-  }
-
-  return adminUser;
+  return guardAccount;
 }

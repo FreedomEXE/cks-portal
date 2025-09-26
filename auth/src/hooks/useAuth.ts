@@ -1,7 +1,6 @@
 import { useAuth as useClerkAuth, useUser } from '@clerk/clerk-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { clearImpersonation, getCodeFromPath, readImpersonation } from '../utils/impersonation';
 
 type AuthStatus = 'idle' | 'loading' | 'ready' | 'error';
 
@@ -13,11 +12,10 @@ type AuthState = {
   firstName: string | null;
   ownerFirstName: string | null;
   error: Error | null;
-  impersonating: boolean;
   refresh: () => Promise<void>;
 };
 
-type InternalAuthState = Omit<AuthState, 'refresh' | 'impersonating'>;
+type InternalAuthState = Omit<AuthState, 'refresh'>;
 
 type AuthSnapshot = {
   role: string;
@@ -187,13 +185,6 @@ export function useAuth(): AuthState {
     const headers = new Headers();
     let timeout: ReturnType<typeof setTimeout> | null = null;
 
-    // Check if we're impersonating
-    const impersonationData = readImpersonation();
-    if (impersonationData.isActive && impersonationData.code) {
-      console.log('[useAuth] Adding impersonation header:', impersonationData.code);
-      headers.set('x-impersonate-code', impersonationData.code);
-    }
-
     try {
       const token = await getToken().catch(() => null);
       if (token) {
@@ -345,12 +336,6 @@ export function useAuth(): AuthState {
   }, [authLoaded, getToken, isSignedIn, user, userLoaded]);
 
   useEffect(() => {
-    const pathCode = getCodeFromPath(location.pathname);
-    if (!pathCode) {
-      clearImpersonation();
-    }
-  }, [location.pathname]);
-  useEffect(() => {
     console.log('[useAuth] useEffect triggered:', {
       authLoaded,
       userLoaded,
@@ -385,7 +370,7 @@ export function useAuth(): AuthState {
     if (state.status !== 'ready' || !state.role) {
       return;
     }
-    if (location.pathname === '/hub' || getCodeFromPath(location.pathname)) {
+    if (location.pathname === '/hub') {
       return;
     }
     navigate('/hub', { replace: true });
@@ -395,55 +380,10 @@ export function useAuth(): AuthState {
     abortRef.current?.abort();
   }, []);
 
-  const impersonationSnapshot = useMemo(() => {
-    const snapshot = readImpersonation();
-    if (!snapshot.isActive) {
-      return snapshot;
-    }
-    const pathCode = getCodeFromPath(location.pathname);
-    if (!pathCode || (snapshot.code && snapshot.code !== pathCode)) {
-      return { ...snapshot, isActive: false };
-    }
-    return {
-      ...snapshot,
-      code: snapshot.code ?? pathCode,
-    };
-  }, [location.pathname]);
-
-  const effectiveState = useMemo<InternalAuthState>(() => {
-    if (!impersonationSnapshot.isActive) {
-      return state;
-    }
-
-    // Validate impersonation state consistency
-    if (!impersonationSnapshot.role && !state.role) {
-      console.warn('[useAuth] Invalid impersonation state - no role available');
-      return state;
-    }
-
-    const role = impersonationSnapshot.role ?? state.role;
-    const code = impersonationSnapshot.code ?? state.code;
-    const displayName = impersonationSnapshot.displayName ?? state.fullName;
-    const firstName = impersonationSnapshot.firstName ?? state.firstName;
-    const ownerFirstName =
-      impersonationSnapshot.firstName ??
-      state.ownerFirstName ??
-      state.firstName;
-
-    return {
-      ...state,
-      role,
-      code,
-      fullName: displayName,
-      firstName,
-      ownerFirstName,
-    };
-  }, [state, impersonationSnapshot]);
   return useMemo<AuthState>(() => ({
-    ...effectiveState,
-    impersonating: impersonationSnapshot.isActive,
+    ...state,
     refresh,
-  }), [effectiveState, impersonationSnapshot.isActive, refresh]);
+  }), [state, refresh]);
 }
 
 

@@ -63,7 +63,7 @@ async function storeRelationships(entityType: string, entityId: string, actor: A
     case 'manager': {
       // Store child contractors
       const contractors = await query(
-        `SELECT contractor_id, company_name FROM contractors WHERE cks_manager = $1 AND archived_at IS NULL`,
+        `SELECT contractor_id, name FROM contractors WHERE cks_manager = $1 AND archived_at IS NULL`,
         [entityId]
       );
       for (const contractor of contractors.rows) {
@@ -72,7 +72,7 @@ async function storeRelationships(entityType: string, entityId: string, actor: A
            (entity_type, entity_id, parent_type, parent_id, relationship_data, archived_by)
            VALUES ($1, $2, $3, $4, $5::jsonb, $6)`,
           ['contractor', contractor.contractor_id, 'manager', entityId,
-           JSON.stringify({ relationship: 'child', name: contractor.company_name }), actorId]
+           JSON.stringify({ relationship: 'child', name: contractor.name }), actorId]
         );
       }
       break;
@@ -98,7 +98,7 @@ async function storeRelationships(entityType: string, entityId: string, actor: A
 
       // Store child customers
       const customers = await query(
-        `SELECT customer_id, company_name FROM customers WHERE contractor_id = $1 AND archived_at IS NULL`,
+        `SELECT customer_id, name FROM customers WHERE contractor_id = $1 AND archived_at IS NULL`,
         [entityId]
       );
       for (const customer of customers.rows) {
@@ -107,7 +107,7 @@ async function storeRelationships(entityType: string, entityId: string, actor: A
            (entity_type, entity_id, parent_type, parent_id, relationship_data, archived_by)
            VALUES ($1, $2, $3, $4, $5::jsonb, $6)`,
           ['customer', customer.customer_id, 'contractor', entityId,
-           JSON.stringify({ relationship: 'child', name: customer.company_name }), actorId]
+           JSON.stringify({ relationship: 'child', name: customer.name }), actorId]
         );
       }
       break;
@@ -117,7 +117,7 @@ async function storeRelationships(entityType: string, entityId: string, actor: A
       // Store parent contractor
       const result = await query(
         `SELECT contractor_id,
-         (SELECT company_name FROM contractors WHERE contractor_id = customers.contractor_id) as contractor_name
+         (SELECT name FROM contractors WHERE contractor_id = customers.contractor_id) as contractor_name
          FROM customers WHERE customer_id = $1`,
         [entityId]
       );
@@ -152,8 +152,8 @@ async function storeRelationships(entityType: string, entityId: string, actor: A
       // Store parent customer (and contractor reference)
       const result = await query(
         `SELECT customer_id, contractor_id,
-         (SELECT company_name FROM customers WHERE customer_id = centers.customer_id) as customer_name,
-         (SELECT company_name FROM contractors WHERE contractor_id = centers.contractor_id) as contractor_name
+         (SELECT name FROM customers WHERE customer_id = centers.customer_id) as customer_name,
+         (SELECT name FROM contractors WHERE contractor_id = centers.contractor_id) as contractor_name
          FROM centers WHERE center_id = $1`,
         [entityId]
       );
@@ -478,7 +478,7 @@ export async function listArchivedEntities(
       case 'warehouse':
         tableName = 'warehouses';
         idColumn = 'warehouse_id';
-        nameColumn = 'COALESCE(warehouse_name, name)';
+        nameColumn = 'name';
         break;
       case 'service':
         tableName = 'services';
@@ -503,7 +503,7 @@ export async function listArchivedEntities(
       default:
         tableName = `${entityType}s`;
         idColumn = `${entityType}_id`;
-        nameColumn = 'company_name';
+        nameColumn = 'name';
         break;
     }
 

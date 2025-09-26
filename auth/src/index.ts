@@ -18,8 +18,6 @@ export { useAuth } from './hooks/useAuth';
 // Utils
 export * from './utils/clerkClient';
 export * from './utils/customIdParser';
-export { clearImpersonation, normalizeImpersonationCode, readImpersonation, triggerImpersonation } from './utils/impersonation';
-export type { ImpersonationPayload, ImpersonationRequestOptions } from './utils/impersonation';
 export * from './utils/roleExtractor';
 export * from './utils/tokenValidator';
 

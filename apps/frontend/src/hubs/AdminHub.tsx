@@ -1,5 +1,5 @@
 /*-----------------------------------------------
-  Property of CKS  © 2025
+  Property of CKS  (c) 2025
 -----------------------------------------------*/
 /**
  * File: AdminHub.tsx
@@ -12,7 +12,6 @@
   Manifested by Freedom_EXE
 -----------------------------------------------*/
 
-import { normalizeImpersonationCode, triggerImpersonation, type ImpersonationPayload } from '@cks/auth';
 import {
   AdminSupportSection,
   ArchiveSection,
@@ -32,16 +31,13 @@ import {
   Scrollbar,
   TabContainer,
 } from '@cks/ui';
-import { useAuth as useClerkAuth } from '@clerk/clerk-react';
 import type { ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useSWRConfig } from 'swr';
 
 import MyHubSection from '../components/MyHubSection';
 import { useLogout } from '../hooks/useLogout';
 import { archiveAPI, type EntityType } from '../shared/api/archive';
-import { apiFetch } from '../shared/api/client';
 import '../shared/api/test-archive'; // Temporary test import
 import AdminAssignSection from './components/AdminAssignSection';
 import AdminCreateSection from './components/AdminCreateSection';
@@ -128,21 +124,21 @@ function renderStatusBadge(value: string | null | undefined) {
 
 function formatDate(value?: string | null): string {
   if (!value) {
-    return '�';
+    return 'N/A';
   }
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) {
-    return '�';
+    return 'N/A';
   }
   return parsed.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: '2-digit' });
 }
 
 function formatText(value?: string | null): string {
   if (!value) {
-    return '�';
+    return 'N/A';
   }
   const trimmed = value.trim();
-  return trimmed.length ? trimmed : '�';
+  return trimmed.length ? trimmed : 'N/A';
 }
 
 const HUB_TABS = [
@@ -187,38 +183,9 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
   const [directoryTab, setDirectoryTab] = useState<string>('admins');
   const [showActionModal, setShowActionModal] = useState(false);
   const [selectedEntity, setSelectedEntity] = useState<Record<string, any> | null>(null);
-  const navigate = useNavigate();
-  const { getToken } = useClerkAuth();
   const logout = useLogout();
   const { mutate } = useSWRConfig();
 
-  const impersonationRequest = useCallback(
-    async (code: string): Promise<ImpersonationPayload | null> => {
-      try {
-        console.log('[AdminHub] impersonationRequest called with code:', code);
-        console.log('[AdminHub] getToken available:', !!getToken);
-
-        // Test token retrieval directly
-        if (getToken) {
-          const testToken = await getToken();
-          console.log('[AdminHub] Direct token test:', testToken ? 'Token retrieved' : 'Token is null');
-        }
-
-        const result = await apiFetch<ImpersonationPayload>('/admin/impersonate', {
-          method: 'POST',
-          body: JSON.stringify({ code }),
-          getToken,
-        });
-
-        console.log('[AdminHub] impersonationRequest result:', result);
-        return result;
-      } catch (error) {
-        console.warn('[admin] Impersonation request failed', error);
-        return null;
-      }
-    },
-    [getToken],
-  );
 
   const { data: adminUsers, isLoading: adminUsersLoading, error: adminUsersError } = useAdminUsers();
   const { data: managers, isLoading: managersLoading, error: managersError } = useManagers();
@@ -266,48 +233,7 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
     };
   }, []);
 
-  const navigateToHub = useCallback(
-    (identifier?: string | null, openInNewTab?: boolean) => {
-      const normalized = normalizeImpersonationCode(identifier ?? null);
-      if (!normalized) {
-        return;
-      }
-      (async () => {
-        const ok = await triggerImpersonation(normalized, { request: impersonationRequest, getToken });
-        if (!ok) {
-          console.warn('[admin] Unable to impersonate', normalized);
-          return;
-        }
-        const pathSegment = normalized.toLowerCase();
-        const destination = `/${encodeURIComponent(pathSegment)}/hub`;
 
-        if (openInNewTab) {
-          window.open(destination, '_blank');
-        } else {
-          navigate(destination);
-        }
-      })();
-    },
-    [impersonationRequest, navigate],
-  );
-
-  const extractEntityInfo = (row: Record<string, any>, idField: string, roleHint: string) => {
-    const id =
-      typeof row[idField] === 'string'
-        ? row[idField].trim()
-        : typeof row.id === 'string'
-          ? row.id
-          : null;
-    const displayName =
-      typeof row.name === 'string' && row.name.trim()
-        ? row.name.trim()
-        : typeof row.fullName === 'string' && row.fullName.trim()
-          ? row.fullName.trim()
-          : typeof row.email === 'string' && row.email.trim()
-            ? row.email.trim()
-            : null;
-    return { target: id, displayName, roleHint };
-  };
 
   const handleModalClose = useCallback(() => {
     setShowActionModal(false);
@@ -377,9 +303,9 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
       const confirmDelete = confirm(
         `Are you sure you want to archive ${entityType} ${entityId}?\n\n` +
         `This will:\n` +
-        `• Move the ${entityType} to the archive\n` +
-        `• Unassign any children to the unassigned bucket\n` +
-        `• Schedule for permanent deletion in 30 days\n\n` +
+        `- Move the ${entityType} to the archive\n` +
+        `- Unassign any children to the unassigned bucket\n` +
+        `- Schedule for permanent deletion in 30 days\n\n` +
         `You can restore from the Archive section if needed.`
       );
 
@@ -430,43 +356,17 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
     [handleModalClose, directoryTab, mutate],
   );
 
+
   const handleDirectoryRowClick = useCallback(
     (row: Record<string, any>) => {
       if (!row) {
         return;
       }
-
-      const entityConfig: Record<string, { idField: string; role: string }> = {
-        admins: { idField: 'code', role: 'admin' },
-        managers: { idField: 'managerId', role: 'manager' },
-        contractors: { idField: 'id', role: 'contractor' },
-        customers: { idField: 'id', role: 'customer' },
-        centers: { idField: 'id', role: 'center' },
-        crew: { idField: 'id', role: 'crew' },
-        warehouses: { idField: 'id', role: 'warehouse' },
-      };
-
-      const config = entityConfig[directoryTab];
-      if (!config) {
-        return;
-      }
-
-      const { target } = extractEntityInfo(row, config.idField, config.role);
-
-      if (typeof target !== 'string') {
-        return;
-      }
-
-      const trimmed: string = typeof target === 'string' ? target.trim() : '';
-      if (!trimmed) {
-        return;
-      }
-
-      navigateToHub(trimmed, true);
+      setSelectedEntity(row);
+      setShowActionModal(true);
     },
-    [directoryTab, navigateToHub],
+    []
   );
-
   // Example: Fix for missing variable declarations and misplaced code
   const overviewData = useMemo(() => {
     // Calculate days online from GO_LIVE_TIMESTAMP

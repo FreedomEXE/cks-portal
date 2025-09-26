@@ -1,9 +1,7 @@
-import { useAuth as useClerkAuth } from '@clerk/clerk-react';
-import { clearImpersonation, Login, normalizeImpersonationCode, RoleGuard, triggerImpersonation, type ImpersonationPayload, useAuth } from '@cks/auth';
-import { useCallback, useEffect, type ComponentType } from 'react';
-import { Navigate, Route, Routes, useParams, useSearchParams } from 'react-router-dom';
+import { Login, RoleGuard, useAuth } from '@cks/auth';
+import { type ComponentType } from 'react';
+import { Navigate, Route, Routes, useSearchParams } from 'react-router-dom';
 
-import { apiFetch } from './shared/api/client';
 import AdminHub from './hubs/AdminHub';
 import CenterHub from './hubs/CenterHub';
 import ContractorHub from './hubs/ContractorHub';
@@ -33,21 +31,10 @@ function sanitizeTab(value: string | null): string | undefined {
   return trimmed ? trimmed : undefined;
 }
 
-function decodeSubject(value: string | undefined): string | null {
-  if (!value) {
-    return null;
-  }
-  try {
-    return decodeURIComponent(value);
-  } catch {
-    return value;
-  }
-}
-
 function HubLoader({ initialTab }: { initialTab?: string }): JSX.Element | null {
-  const { status, role, impersonating, code } = useAuth();
+  const { status, role, code } = useAuth();
 
-  console.log('[HubLoader] Auth state:', { status, role, impersonating, code });
+  console.log('[HubLoader] Auth state:', { status, role, code });
 
   if (status === 'idle' || status === 'loading') {
     console.log('[HubLoader] Still loading...');
@@ -74,9 +61,6 @@ function RoleHubRoute(): JSX.Element {
   const [searchParams] = useSearchParams();
   const initialTab = sanitizeTab(searchParams.get('tab'));
 
-  useEffect(() => {
-    clearImpersonation();
-  }, []);
   return (
     <RoleGuard initialTab={initialTab}>
       <HubLoader initialTab={initialTab} />
@@ -84,71 +68,12 @@ function RoleHubRoute(): JSX.Element {
   );
 }
 
-function ImpersonatedHubRoute(): JSX.Element {
-  const { subject } = useParams<{ subject: string }>();
-  const [searchParams] = useSearchParams();
-  const initialTab = sanitizeTab(searchParams.get('tab'));
-  const decoded = decodeSubject(subject);
-  const normalized = normalizeImpersonationCode(decoded);
-  const { getToken } = useClerkAuth();
-
-  console.log('[ImpersonatedHubRoute] Starting with:', { subject, decoded, normalized });
-
-  const impersonationRequest = useCallback(
-    async (code: string): Promise<ImpersonationPayload | null> => {
-      try {
-        console.log('[ImpersonatedHubRoute] Making impersonation request for:', code);
-        const result = await apiFetch<ImpersonationPayload>('/admin/impersonate', {
-          method: 'POST',
-          body: JSON.stringify({ code }),
-          getToken,
-        });
-        console.log('[ImpersonatedHubRoute] Impersonation response:', result);
-        return result;
-      } catch (error) {
-        console.warn('[ImpersonatedHubRoute] Impersonation request failed', error);
-        return null;
-      }
-    },
-    [getToken],
-  );
-
-  useEffect(() => {
-    let active = true;
-    if (!normalized) {
-      console.log('[ImpersonatedHubRoute] No normalized code, clearing impersonation');
-      clearImpersonation();
-      return;
-    }
-    (async () => {
-      console.log('[ImpersonatedHubRoute] Triggering impersonation for:', normalized);
-      const ok = await triggerImpersonation(normalized, { request: impersonationRequest });
-      console.log('[ImpersonatedHubRoute] Impersonation result:', ok);
-      if (active && !ok) {
-        console.log('[ImpersonatedHubRoute] Impersonation failed, clearing');
-        clearImpersonation();
-      }
-    })();
-    return () => { active = false; };
-  }, [impersonationRequest, normalized]);
-
-  if (!normalized) {
-    return <Navigate to="/hub" replace />;
-  }
-
-  return (
-    <RoleGuard initialTab={initialTab}>
-      <HubLoader initialTab={initialTab} />
-    </RoleGuard>
-  );
-}
 export function AuthenticatedApp(): JSX.Element {
   return (
     <Routes>
       <Route path="/" element={<Navigate to="/hub" replace />} />
       <Route path="/hub" element={<RoleHubRoute />} />
       <Route path="/catalog" element={<CKSCatalog />} />
-      <Route path="/:subject/hub" element={<ImpersonatedHubRoute />} />
       <Route path="/hub/*" element={<Navigate to="/hub" replace />} />
       <Route path="*" element={<Navigate to="/hub" replace />} />
     </Routes>
@@ -163,4 +88,3 @@ export function UnauthenticatedApp(): JSX.Element {
     </Routes>
   );
 }
-

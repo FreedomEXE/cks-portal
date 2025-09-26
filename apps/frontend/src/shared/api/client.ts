@@ -1,9 +1,14 @@
 import { useAuth as useClerkAuth } from '@clerk/clerk-react';
 import { useCallback } from 'react';
-import { readImpersonation } from '@cks/auth';
 
 const RAW_API_BASE = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:3000/api';
 export const API_BASE = RAW_API_BASE.replace(/\/+$/, '');
+declare global {
+  interface Window {
+    __cksDevAuth?: (options?: { role?: string | null; code?: string | null }) => void;
+  }
+}
+const DEV_AUTH_ENABLED = ((import.meta as any).env?.VITE_CKS_ENABLE_DEV_AUTH ?? 'false') === 'true';
 
 export type ApiResponse<T> = { data: T };
 
@@ -15,6 +20,9 @@ export async function apiFetch<T>(path: string, init?: ApiFetchInit): Promise<T>
   const url = API_BASE + path;
   const { getToken: providedGetToken, headers: initHeaders, ...restInit } = (init ?? {}) as ApiFetchInit;
   const headers = new Headers(initHeaders as HeadersInit | undefined);
+  const normalizedPath = path.startsWith('/') ? path : '/' + path;
+  const isAdminApiRequest = normalizedPath === '/admin' || normalizedPath.startsWith('/admin/');
+  const shouldApplyDevOverride = DEV_AUTH_ENABLED && typeof window !== 'undefined' && !isAdminApiRequest;
 
   console.log('[apiFetch] Starting request to:', path);
   console.log('[apiFetch] providedGetToken:', !!providedGetToken);
@@ -26,24 +34,31 @@ export async function apiFetch<T>(path: string, init?: ApiFetchInit): Promise<T>
     headers.set('Content-Type', 'application/json');
   }
 
-  // Add impersonation header if available
-  if (!headers.has('x-impersonate-code')) {
-    let impersonationCode: string | null = null;
+  if (shouldApplyDevOverride) {
     try {
-      const snapshot = readImpersonation();
-      impersonationCode = snapshot.code;
-      if (!impersonationCode && typeof window !== 'undefined') {
-        impersonationCode = window.sessionStorage?.getItem?.('cks_impersonation_code')
-          ?? window.sessionStorage?.getItem?.('code')
-          ?? null;
+      if (!headers.has('x-cks-dev-role')) {
+        const storedRole = window.sessionStorage?.getItem?.('cks_dev_role') ?? null;
+        const normalizedRole = storedRole?.trim();
+        if (normalizedRole) {
+          headers.set('x-cks-dev-role', normalizedRole);
+          console.log('[apiFetch] Added dev role header:', normalizedRole);
+        }
+      }
+      if (!headers.has('x-cks-dev-code')) {
+        const storedCode = window.sessionStorage?.getItem?.('cks_dev_code') ?? null;
+        const normalizedCode = storedCode?.trim();
+        if (normalizedCode) {
+          const headerCode = normalizedCode.toUpperCase();
+          headers.set('x-cks-dev-code', headerCode);
+          console.log('[apiFetch] Added dev code header:', headerCode);
+        }
       }
     } catch (error) {
-      console.warn('[apiFetch] Failed to resolve impersonation context', error);
+      console.warn('[apiFetch] Failed to apply dev auth override', error);
     }
-    if (impersonationCode) {
-      headers.set('x-impersonate-code', impersonationCode);
-      console.log('[apiFetch] Added impersonation header:', impersonationCode);
-    }
+  } else if (DEV_AUTH_ENABLED && typeof window !== 'undefined') {
+    headers.delete('x-cks-dev-role');
+    headers.delete('x-cks-dev-code');
   }
 
   // Enhanced token resolution with better error handling
@@ -125,3 +140,41 @@ export function useAuthedFetcher<T>(path: string, transform?: (input: T) => T) {
 
 
 
+
+
+
+
+
+
+
+
+
+if (DEV_AUTH_ENABLED && typeof window !== 'undefined' && !window.__cksDevAuth) {
+  window.__cksDevAuth = (options: { role?: string | null; code?: string | null } = {}) => {
+    const role = options.role ?? undefined;
+    const code = options.code ?? undefined;
+
+    if (role !== undefined) {
+      const trimmedRole = role ? role.trim() : '';
+      if (trimmedRole) {
+        window.sessionStorage?.setItem('cks_dev_role', trimmedRole);
+      } else {
+        window.sessionStorage?.removeItem('cks_dev_role');
+      }
+    }
+
+    if (code !== undefined) {
+      const trimmedCode = code ? code.trim() : '';
+      if (trimmedCode) {
+        window.sessionStorage?.setItem('cks_dev_code', trimmedCode.toUpperCase());
+      } else {
+        window.sessionStorage?.removeItem('cks_dev_code');
+      }
+    }
+
+    console.info('[apiFetch] Dev auth override updated', {
+      role: window.sessionStorage?.getItem?.('cks_dev_role') ?? null,
+      code: window.sessionStorage?.getItem?.('cks_dev_code') ?? null,
+    });
+  };
+}

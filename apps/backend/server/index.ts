@@ -176,41 +176,7 @@ export async function buildServer() {
       if (!authContext) {
         return reply.code(401).send({ error: 'Unauthorized' });
       }
-
-      // Check for impersonation header
-      const impersonationCode = request.headers['x-impersonate-code'] as string | undefined;
-      if (process.env.NODE_ENV === 'development' && impersonationCode) {
-        console.log('[bootstrap] Impersonation attempt detected');
-      }
-
-      if (impersonationCode) {
-        // User is impersonating, look up the target user
-        const { findUserByCode } = await import('./domains/identity/impersonation.routes');
-        const targetUser = await (findUserByCode as any)(impersonationCode);
-
-        if (targetUser) {
-          if (process.env.NODE_ENV === 'development') {
-            console.log('[bootstrap] Impersonation successful');
-          }
-
-          const response: BootstrapResponse = {
-            role: targetUser.role,
-            code: targetUser.code,
-            email: null,  // Don't expose impersonated user's email
-            status: 'active',
-            fullName: targetUser.displayName,
-            firstName: targetUser.firstName,
-            ownerFirstName: targetUser.firstName,
-          };
-
-          return reply.send(bootstrapResponseSchema.parse(response));
-        }
-        if (process.env.NODE_ENV === 'development') {
-          console.log('[bootstrap] Failed to find impersonated user');
-        }
-      }
-
-      const adminUser = await getAdminUserByClerkId(authContext.userId);
+        const adminUser = await getAdminUserByClerkId(authContext.userId);
       if (!adminUser) {
         return reply.code(404).send({ error: 'Not provisioned' });
       }
@@ -255,8 +221,6 @@ export async function buildServer() {
   await registerOrdersRoutes(server);
   await registerInventoryRoutes(server);
   await server.register(reportsRoutes, { prefix: '/api' });
-  const { registerImpersonationRoutes } = await import('./domains/identity/impersonation.routes');
-  await registerImpersonationRoutes(server);
 
   return server;
 }
