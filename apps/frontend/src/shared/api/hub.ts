@@ -28,8 +28,8 @@ interface HubContactReference {
   phone: string | null;
 }
 
-export interface HubDashboardResponse {
-  role: string;
+export interface CustomerDashboardResponse {
+  role: 'customer';
   cksCode: string;
   serviceCount: number;
   centerCount: number;
@@ -38,6 +38,65 @@ export interface HubDashboardResponse {
   accountStatus: string | null;
 }
 
+export interface ManagerDashboardResponse {
+  role: 'manager';
+  cksCode: string;
+  contractorCount: number;
+  customerCount: number;
+  centerCount: number;
+  crewCount: number;
+  pendingOrders: number;
+  accountStatus: string | null;
+}
+
+export interface ContractorDashboardResponse {
+  role: 'contractor';
+  cksCode: string;
+  centerCount: number;
+  crewCount: number;
+  activeServices: number;
+  pendingOrders: number;
+  accountStatus: string | null;
+}
+
+export interface CenterDashboardResponse {
+  role: 'center';
+  cksCode: string;
+  crewCount: number;
+  activeServices: number;
+  pendingRequests: number;
+  equipmentCount: number;
+  accountStatus: string | null;
+  customerId: string | null;
+}
+
+export interface CrewDashboardResponse {
+  role: 'crew';
+  cksCode: string;
+  activeServices: number;
+  completedToday: number;
+  trainings: number;
+  accountStatus: string | null;
+  assignedCenter: string | null;
+}
+
+export interface WarehouseDashboardResponse {
+  role: 'warehouse';
+  cksCode: string;
+  inventoryCount: number;
+  pendingOrders: number;
+  deliveriesScheduled: number;
+  lowStockItems: number;
+  accountStatus: string | null;
+}
+
+export type HubDashboardResponse =
+  | CustomerDashboardResponse
+  | ManagerDashboardResponse
+  | ContractorDashboardResponse
+  | CenterDashboardResponse
+  | CrewDashboardResponse
+  | WarehouseDashboardResponse;
 export interface HubOrderItem {
   orderId: string;
   orderType: 'service' | 'product';
@@ -101,6 +160,89 @@ export interface HubInventoryResponse {
   activeItems: HubInventoryItem[];
   archivedItems: HubInventoryItem[];
 }
+
+export interface ManagerScopeContractor {
+  contractorId: string;
+  name: string | null;
+  contactPerson: string | null;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  status: string | null;
+}
+
+export interface ManagerScopeCustomer {
+  customerId: string;
+  contractorId: string | null;
+  name: string | null;
+  mainContact: string | null;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  status: string | null;
+}
+
+export interface ManagerScopeCenter {
+  centerId: string;
+  contractorId: string | null;
+  customerId: string | null;
+  name: string | null;
+  mainContact: string | null;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  status: string | null;
+}
+
+export interface ManagerScopeCrewMember {
+  crewId: string;
+  assignedCenter: string | null;
+  name: string | null;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  status: string | null;
+}
+
+export interface ManagerRoleScopeResponse {
+  role: 'manager';
+  cksCode: string;
+  summary: {
+    contractorCount: number;
+    customerCount: number;
+    centerCount: number;
+    crewCount: number;
+    pendingOrders: number;
+    accountStatus: string | null;
+  };
+  relationships: {
+    contractors: ManagerScopeContractor[];
+    customers: ManagerScopeCustomer[];
+    centers: ManagerScopeCenter[];
+    crew: ManagerScopeCrewMember[];
+  };
+}
+
+export type HubRoleScopeResponse = ManagerRoleScopeResponse;
+
+export interface HubActivityItem {
+  id: string;
+  description: string;
+  category: string;
+  actorId: string | null;
+  actorRole: string | null;
+  targetId: string | null;
+  targetType: string | null;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
+}
+
+export interface HubActivitiesResponse {
+  role: 'manager';
+  cksCode: string;
+  activities: HubActivityItem[];
+}
+
 
 type Fetcher<T> = (endpoint: string) => Promise<T>;
 
@@ -220,3 +362,36 @@ export async function fetchHubInventory(cksCode: string, init?: ApiFetchInit) {
 }
 
 
+
+export function useHubRoleScope(cksCode?: string | null) {
+  const key = sectionPath('scope', cksCode);
+  const result = useHubSWR<HubRoleScopeResponse>(key);
+  return {
+    data: result.data ?? null,
+    isLoading: result.isLoading,
+    error: result.error,
+  };
+}
+
+export async function fetchHubRoleScope(cksCode: string, init?: ApiFetchInit) {
+  const response = await apiFetch<ApiResponse<HubRoleScopeResponse>>(`/hub/scope/${encodeURIComponent(cksCode)}`, init);
+  return response.data;
+}
+
+export function useHubActivities(cksCode?: string | null) {
+  const key = sectionPath('activities', cksCode);
+  const result = useHubSWR<HubActivitiesResponse>(key, (value) => ({
+    ...value,
+    activities: Array.isArray(value.activities) ? value.activities : [],
+  }));
+  return {
+    data: result.data ?? null,
+    isLoading: result.isLoading,
+    error: result.error,
+  };
+}
+
+export async function fetchHubActivities(cksCode: string, init?: ApiFetchInit) {
+  const response = await apiFetch<ApiResponse<HubActivitiesResponse>>(`/hub/activities/${encodeURIComponent(cksCode)}`, init);
+  return response.data;
+}

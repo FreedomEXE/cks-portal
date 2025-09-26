@@ -1,4 +1,4 @@
-import dotenv from "dotenv";
+﻿import dotenv from "dotenv";
 import { resolve } from "node:path";
 
 dotenv.config({ path: resolve(__dirname, "../.env") });
@@ -13,13 +13,14 @@ import z from "zod";
 import { authenticate } from "./core/auth/authenticate";
 import { registerAdminUserRoutes } from "./domains/adminUsers/routes";
 import { getAdminUserByClerkId } from "./domains/adminUsers/store";
-import type { AdminUserStatus } from "./domains/adminUsers/types";
+import { getHubAccountByClerkId } from "./domains/identity";
 import { registerAssignmentRoutes } from "./domains/assignments";
 import { registerDirectoryRoutes } from "./domains/directory/routes.fastify";
 import { registerProvisioningRoutes } from "./domains/provisioning";
 import { registerArchiveRoutes } from "./domains/archive/routes.fastify";
 import { registerProfileRoutes } from "./domains/profile/routes.fastify";
 import { registerDashboardRoutes } from "./domains/dashboard/routes.fastify";
+import { registerScopeRoutes } from "./domains/scope/routes.fastify";
 import { registerOrdersRoutes } from "./domains/orders/routes.fastify";
 import { reportsRoutes } from "./domains/reports/routes.fastify";
 import { registerInventoryRoutes } from "./domains/inventory/routes.fastify";
@@ -28,7 +29,7 @@ type BootstrapResponse = {
   role: string;
   code: string | null;
   email: string | null;
-  status: AdminUserStatus;
+  status: string | null;
   fullName: string | null;
   firstName: string | null;
   ownerFirstName: string | null;
@@ -42,7 +43,7 @@ const bootstrapResponseSchema = z.object({
   role: z.string(),
   code: z.string().nullable(),
   email: z.string().nullable(),
-  status: z.enum(['active']),
+  status: z.string().nullable(),
   fullName: z.string().nullable(),
   firstName: z.string().nullable(),
   ownerFirstName: z.string().nullable(),
@@ -164,11 +165,10 @@ export async function buildServer() {
       }
 
       const auth = await authenticate(request);
-      // Log authentication status without exposing sensitive data
       if (process.env.NODE_ENV === 'development') {
         console.log(
           '[bootstrap] Auth context:',
-          auth.ok ? 'valid' : `invalid (${auth.reason || 'unknown'})`
+          auth.ok ? 'valid' : 'invalid (' + (auth.reason || 'unknown') + ')'
         );
       }
 
@@ -176,30 +176,58 @@ export async function buildServer() {
       if (!authContext) {
         return reply.code(401).send({ error: 'Unauthorized' });
       }
-        const adminUser = await getAdminUserByClerkId(authContext.userId);
-      if (!adminUser) {
+
+      const adminUser = await getAdminUserByClerkId(authContext.userId);
+      if (adminUser) {
+        if (adminUser.status !== 'active') {
+          return reply.code(403).send({ error: 'Inactive' });
+        }
+
+        const resolvedEmail = adminUser.email ?? authContext.email ?? null;
+        const firstName = resolveFirstName({
+          fullName: adminUser.fullName,
+          email: resolvedEmail,
+          fallback: adminUser.cksCode ?? authContext.userId,
+        });
+
+        const response: BootstrapResponse = {
+          role: adminUser.role,
+          code: adminUser.cksCode ?? null,
+          email: resolvedEmail,
+          status: adminUser.status ?? 'active',
+          fullName: adminUser.fullName ?? null,
+          firstName,
+          ownerFirstName: firstName,
+        };
+
+        return reply.send(bootstrapResponseSchema.parse(response));
+      }
+
+      const hubAccount = await getHubAccountByClerkId(authContext.userId);
+      if (!hubAccount) {
         return reply.code(404).send({ error: 'Not provisioned' });
       }
-      if (adminUser.status !== 'active') {
-        return reply.code(403).send({ error: 'Inactive' });
+
+      const normalizedStatus = (hubAccount.status ?? '').trim().toLowerCase();
+      if (normalizedStatus && normalizedStatus !== 'active') {
+        return reply.code(403).send({ error: 'Inactive', status: hubAccount.status });
       }
 
-      const role = adminUser.role;
-      console.log('[bootstrap] Sending role:', role);
-
-      const resolvedEmail = adminUser.email ?? authContext.email ?? null;
+      const resolvedEmail = hubAccount.email ?? authContext.email ?? null;
+      const responseCode = hubAccount.cksCode ?? null;
+      const fallback = responseCode ?? authContext.userId;
       const firstName = resolveFirstName({
-        fullName: adminUser.fullName,
+        fullName: hubAccount.fullName,
         email: resolvedEmail,
-        fallback: adminUser.cksCode ?? authContext.userId,
+        fallback,
       });
 
       const response: BootstrapResponse = {
-        role,
-        code: adminUser.cksCode ?? null,
+        role: hubAccount.role,
+        code: responseCode,
         email: resolvedEmail,
-        status: adminUser.status,
-        fullName: adminUser.fullName ?? null,
+        status: hubAccount.status ?? 'active',
+        fullName: hubAccount.fullName ?? null,
         firstName,
         ownerFirstName: firstName,
       };
@@ -218,6 +246,7 @@ export async function buildServer() {
   await registerArchiveRoutes(server);
   await registerProfileRoutes(server);
   await registerDashboardRoutes(server);
+  await registerScopeRoutes(server);
   await registerOrdersRoutes(server);
   await registerInventoryRoutes(server);
   await server.register(reportsRoutes, { prefix: '/api' });

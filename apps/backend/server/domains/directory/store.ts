@@ -120,9 +120,8 @@ type WarehouseRow = {
   name: string | null;
   manager_id: string | null;
   manager: string | null;
-  name: string | null;
-  main_contact: string | null;
   warehouse_type: string | null;
+  main_contact: string | null;
   address: string | null;
   phone: string | null;
   email: string | null;
@@ -140,7 +139,6 @@ type LegacyWarehouseRow = {
   name: string | null;
   manager_id: string | null;
   manager: string | null;
-  name: string | null;
   warehouse_type: string | null;
   address: string | null;
   phone: string | null;
@@ -570,24 +568,3 @@ export async function listDirectoryResource<K extends DirectoryResourceKey>(key:
   const loader = loaders[key];
   return loader(limit);
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

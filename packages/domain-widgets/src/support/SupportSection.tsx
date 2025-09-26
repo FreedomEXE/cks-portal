@@ -205,27 +205,8 @@ const SupportSection: React.FC<SupportSectionProps> = ({
 
   const faqs = getFAQs(role);
 
-  // Mock tickets data
-  const myTickets: SupportTicket[] = [
-    {
-      ticketId: 'TKT-001',
-      subject: 'Cannot update inventory levels',
-      issueType: 'Bug Report',
-      priority: 'High',
-      status: 'In Progress',
-      dateCreated: '2025-09-18',
-      lastUpdated: '2025-09-19'
-    },
-    {
-      ticketId: 'TKT-002',
-      subject: 'Need help with delivery scheduling',
-      issueType: 'General Question',
-      priority: 'Medium',
-      status: 'Resolved',
-      dateCreated: '2025-09-15',
-      lastUpdated: '2025-09-16'
-    }
-  ];
+  // TODO: Fetch real tickets from backend API
+  const myTickets: SupportTicket[] = [];
 
   const handleSubmitTicket = () => {
     console.log('Submitting ticket:', ticketForm);

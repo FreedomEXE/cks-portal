@@ -42,6 +42,7 @@ export interface Customer {
   phone: string | null;
   address: string | null;
   totalCenters: number | null;
+  status: string | null;
   createdAt: string | null;
   updatedAt: string | null;
   archivedAt: string | null;

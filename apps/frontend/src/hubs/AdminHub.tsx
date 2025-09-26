@@ -357,16 +357,6 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
   );
 
 
-  const handleDirectoryRowClick = useCallback(
-    (row: Record<string, any>) => {
-      if (!row) {
-        return;
-      }
-      setSelectedEntity(row);
-      setShowActionModal(true);
-    },
-    []
-  );
   // Example: Fix for missing variable declarations and misplaced code
   const overviewData = useMemo(() => {
     // Calculate days online from GO_LIVE_TIMESTAMP
@@ -605,18 +595,19 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
   const directoryConfig = useMemo(() => ({
     admins: {
       columns: [
-        { key: 'code', label: 'ADMIN ID', clickable: true },
+        { key: 'code', label: 'ADMIN ID' },
         { key: 'name', label: 'NAME' },
         { key: 'email', label: 'EMAIL' },
         { key: 'status', label: 'STATUS', render: renderStatusBadge },
         { key: 'createdAt', label: 'CREATED' },
+        { key: 'actions', label: 'ACTIONS', render: renderActions },
       ],
       data: adminRows,
       emptyMessage: 'No admin users found yet.',
     },
     managers: {
       columns: [
-        { key: 'managerId', label: 'MANAGER ID', clickable: true },
+        { key: 'managerId', label: 'MANAGER ID' },
         { key: 'name', label: 'NAME' },
         { key: 'email', label: 'EMAIL' },
         { key: 'phone', label: 'PHONE' },
@@ -629,7 +620,7 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
     },
     contractors: {
       columns: [
-        { key: 'id', label: 'CONTRACTOR ID', clickable: true },
+        { key: 'id', label: 'CONTRACTOR ID' },
         { key: 'name', label: 'NAME' },
         { key: 'email', label: 'EMAIL' },
         { key: 'phone', label: 'PHONE' },
@@ -642,7 +633,7 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
     },
     customers: {
       columns: [
-        { key: 'id', label: 'CUSTOMER ID', clickable: true },
+        { key: 'id', label: 'CUSTOMER ID' },
         { key: 'name', label: 'NAME' },
         { key: 'email', label: 'EMAIL' },
         { key: 'phone', label: 'PHONE' },
@@ -655,7 +646,7 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
     },
     centers: {
       columns: [
-        { key: 'id', label: 'CENTER ID', clickable: true },
+        { key: 'id', label: 'CENTER ID' },
         { key: 'name', label: 'NAME' },
         { key: 'email', label: 'EMAIL' },
         { key: 'phone', label: 'PHONE' },
@@ -668,7 +659,7 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
     },
     crew: {
       columns: [
-        { key: 'id', label: 'CREW ID', clickable: true },
+        { key: 'id', label: 'CREW ID' },
         { key: 'name', label: 'NAME' },
         { key: 'email', label: 'EMAIL' },
         { key: 'phone', label: 'PHONE' },
@@ -681,7 +672,7 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
     },
     warehouses: {
       columns: [
-        { key: 'id', label: 'WAREHOUSE ID', clickable: true },
+        { key: 'id', label: 'WAREHOUSE ID' },
         { key: 'name', label: 'NAME' },
         { key: 'email', label: 'EMAIL' },
         { key: 'phone', label: 'PHONE' },
@@ -694,7 +685,7 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
     },
     services: {
       columns: [
-        { key: 'id', label: 'SERVICE ID', clickable: true },
+        { key: 'id', label: 'SERVICE ID' },
         { key: 'name', label: 'NAME' },
         { key: 'category', label: 'CATEGORY' },
         { key: 'status', label: 'STATUS', render: renderStatusBadge },
@@ -705,7 +696,7 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
     },
     orders: {
       columns: [
-        { key: 'id', label: 'ORDER ID', clickable: true },
+        { key: 'id', label: 'ORDER ID' },
         { key: 'customerId', label: 'CUSTOMER' },
         { key: 'centerId', label: 'CENTER' },
         { key: 'serviceId', label: 'SERVICE' },
@@ -717,7 +708,7 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
     },
     products: {
       columns: [
-        { key: 'id', label: 'PRODUCT ID', clickable: true },
+        { key: 'id', label: 'PRODUCT ID' },
         { key: 'name', label: 'NAME' },
         { key: 'category', label: 'CATEGORY' },
         { key: 'status', label: 'STATUS', render: renderStatusBadge },
@@ -728,7 +719,7 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
     },
     training: {
       columns: [
-        { key: 'id', label: 'TRAINING ID', clickable: true },
+        { key: 'id', label: 'TRAINING ID' },
         { key: 'crewName', label: 'CREW' },
         { key: 'serviceName', label: 'SERVICE' },
         { key: 'status', label: 'STATUS', render: renderStatusBadge },
@@ -739,7 +730,7 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
     },
     procedures: {
       columns: [
-        { key: 'id', label: 'PROCEDURE ID', clickable: true },
+        { key: 'id', label: 'PROCEDURE ID' },
         { key: 'type', label: 'TYPE' },
         { key: 'serviceId', label: 'SERVICE' },
         { key: 'contractorId', label: 'CONTRACTOR' },
@@ -750,7 +741,7 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
     },
     reports: {
       columns: [
-        { key: 'id', label: 'REPORT ID', clickable: true },
+        { key: 'id', label: 'REPORT ID' },
         { key: 'title', label: 'TITLE' },
         { key: 'severity', label: 'SEVERITY' },
         { key: 'customerId', label: 'CUSTOMER' },
@@ -763,7 +754,7 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
     },
     feedback: {
       columns: [
-        { key: 'id', label: 'FEEDBACK ID', clickable: true },
+        { key: 'id', label: 'FEEDBACK ID' },
         { key: 'kind', label: 'KIND' },
         { key: 'title', label: 'TITLE' },
         { key: 'customerId', label: 'CUSTOMER' },
@@ -843,7 +834,6 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
               searchPlaceholder="Search training..."
               maxItems={25}
               showSearch
-              onRowClick={handleDirectoryRowClick}
             />
           </div>
           <div style={{ width: '48%' }}>
@@ -854,7 +844,6 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
               searchPlaceholder="Search procedures..."
               maxItems={25}
               showSearch
-              onRowClick={handleDirectoryRowClick}
             />
           </div>
         </div>
@@ -871,7 +860,6 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
               searchPlaceholder="Search reports..."
               maxItems={25}
               showSearch
-              onRowClick={handleDirectoryRowClick}
             />
           </div>
           <div style={{ width: '48%' }}>
@@ -882,7 +870,6 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
               searchPlaceholder="Search feedback..."
               maxItems={25}
               showSearch
-              onRowClick={handleDirectoryRowClick}
             />
           </div>
         </div>
@@ -900,7 +887,6 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
         searchPlaceholder={`Search ${directoryTab}...`}
         maxItems={25}
         showSearch
-        onRowClick={handleDirectoryRowClick}
       />
     );
   };

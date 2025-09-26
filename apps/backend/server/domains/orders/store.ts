@@ -143,7 +143,7 @@ async function getManagerOrders(cksCode: string): Promise<HubOrdersPayload> {
             total_amount, status, notes, assigned_warehouse
      FROM orders
      WHERE UPPER(customer_id) IN (
-       SELECT UPPER(customer_id) FROM customers WHERE UPPER(manager_id) = $1
+       SELECT UPPER(customer_id) FROM customers WHERE UPPER(cks_manager) = $1
      )
      ORDER BY order_date DESC NULLS LAST, order_id DESC`,
     [normalized],
@@ -332,3 +332,4 @@ export interface OrderActionInput {
 export async function applyOrderAction(input: OrderActionInput): Promise<HubOrderItem | null> {
   throw new Error('Order actions are not available in this build.');
 }
+

@@ -29,9 +29,12 @@ function mapAdminActor(admin: {
   role: string;
   fullName?: string | null;
 }): AuditContext {
+  const actorCode = (admin.cksCode ?? "").trim();
+  const actorId = actorCode.length ? actorCode : admin.clerkUserId;
+  const actorRole = (admin.role ?? "admin").trim().toLowerCase() || "admin";
   return {
-    actorId: admin.cksCode ?? admin.clerkUserId,
-    actorRole: admin.role ?? 'admin',
+    actorId,
+    actorRole,
     actorName: admin.fullName ?? null,
   };
 }

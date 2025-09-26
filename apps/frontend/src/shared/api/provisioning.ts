@@ -21,6 +21,7 @@ export interface ManagerRecord {
   reportsTo: string | null;
   address: string | null;
   status: string;
+  clerkUserId: string | null;
 }
 
 export interface ContractorCreatePayload {

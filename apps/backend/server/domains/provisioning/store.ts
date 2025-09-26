@@ -1,4 +1,5 @@
 import { query } from '../../db/connection';
+import { clerkClient } from '../../core/clerk/client';
 import { nextIdentityId, normalizeIdentity } from '../identity';
 import {
   managerCreateSchema,
@@ -25,6 +26,7 @@ export interface ManagerRecord {
   reportsTo: string | null;
   address: string | null;
   status: string;
+  clerkUserId: string | null;
 }
 
 export interface ContractorRecord {
@@ -158,6 +160,7 @@ export async function createManager(
     reports_to: string | null;
     address: string | null;
     status: string;
+    clerk_user_id: string | null;
   }>(
     `INSERT INTO managers (
       manager_id,
@@ -172,7 +175,7 @@ export async function createManager(
       created_at,
       updated_at
     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
-    RETURNING manager_id, name, email, phone, territory, role, reports_to, address, status`,
+    RETURNING manager_id, name, email, phone, territory, role, reports_to, address, status, clerk_user_id`,
     [
       id,
       payload.fullName.trim(),
@@ -191,6 +194,39 @@ export async function createManager(
     throw new Error('Failed to insert manager record');
   }
 
+  const emailAddresses = row.email ? [row.email] : undefined;
+
+  try {
+    const clerkUser = await clerkClient.users.createUser({
+      username: id.toLowerCase(),
+      externalId: id,
+      emailAddress: emailAddresses,
+      publicMetadata: {
+        cksCode: id,
+        role: 'manager',
+        // Clerk test tenant rejects the phone_number field, so stash it in metadata for UI usage.
+        ...(row.phone ? { contactPhone: row.phone } : {}),
+      },
+      skipPasswordRequirement: true,
+    });
+
+    await query(
+      `UPDATE managers SET clerk_user_id = $1, updated_at = NOW() WHERE manager_id = $2`,
+      [clerkUser.id, id],
+    );
+
+    row.clerk_user_id = clerkUser.id;
+  } catch (error) {
+    console.error('[provisioning] Failed to create Clerk user for manager', { managerId: id, error });
+
+    await query('DELETE FROM managers WHERE manager_id = $1', [id]).catch((cleanupError) => {
+      console.warn('[provisioning] Failed to remove manager after Clerk error', { managerId: id, cleanupError });
+    });
+
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to create Clerk user for manager ${id}: ${message}`);
+  }
+
   await recordActivity({
     actor,
     activityType: 'manager_created',
@@ -201,6 +237,7 @@ export async function createManager(
       name: payload.fullName.trim(),
       role: payload.role,
       reportsTo: payload.reportsTo,
+      clerkUserId: row.clerk_user_id,
     },
   });
 
@@ -214,6 +251,7 @@ export async function createManager(
     reportsTo: row.reports_to,
     address: row.address,
     status: row.status,
+    clerkUserId: row.clerk_user_id,
   };
 }
 

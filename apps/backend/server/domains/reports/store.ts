@@ -29,9 +29,9 @@ async function getManagerReports(cksCode: string): Promise<HubReportsPayload> {
   const reportsResult = await query<any>(
     `SELECT r.* FROM reports r
      WHERE r.customer_id IN (
-       SELECT customer_id FROM customers WHERE UPPER(manager_id) = $1
+       SELECT customer_id FROM customers WHERE UPPER(cks_manager) = $1
      ) OR r.center_id IN (
-       SELECT center_id FROM centers WHERE UPPER(manager_id) = $1
+       SELECT center_id FROM centers WHERE UPPER(cks_manager) = $1
      )
      ORDER BY r.created_at DESC NULLS LAST`,
     [cksCode],
@@ -221,3 +221,4 @@ export async function getHubReports(role: HubRole, cksCode: string): Promise<Hub
       return null;
   }
 }
+

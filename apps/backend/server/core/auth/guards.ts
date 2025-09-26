@@ -22,6 +22,7 @@ const DEV_ROLE_SET = new Set<string>(["admin", ...HUB_ROLES]);
 
 type GuardAccount = HubAccountRecord & {
   isAdmin: boolean;
+  clerkUserId: string;
 };
 
 export type RequireActiveRoleResult = GuardAccount;
@@ -94,15 +95,16 @@ function ensureAccountAllowed(account: GuardAccount, options: RoleGuardOptions, 
 }
 
 function buildAdminAccount(adminUser: AdminUserRecord, fallbackEmail: string | null): GuardAccount {
-  const role = (adminUser.role ?? "admin").trim().toLowerCase();
+  const resolvedRole = parseDevRole(adminUser.role) ?? "admin";
   const cksCode = normalizeIdentity(adminUser.cksCode) ?? adminUser.cksCode ?? "";
   return {
-    role,
+    role: resolvedRole,
     cksCode,
     status: adminUser.status ?? null,
     fullName: adminUser.fullName ?? null,
     email: adminUser.email ?? fallbackEmail,
     isAdmin: true,
+    clerkUserId: adminUser.clerkUserId,
   };
 }
 
@@ -142,6 +144,7 @@ export async function requireActiveRole(
         status: "active",
         fullName: null,
         email: null,
+        clerkUserId: devRole === "admin" ? "dev-admin" : `dev-${devRole}`,
         isAdmin: devRole === "admin",
       };
 
@@ -181,7 +184,9 @@ export async function requireActiveRole(
   const guardAccount: GuardAccount = {
     ...account,
     isAdmin: false,
+    clerkUserId: auth.userId,
   };
+
 
   if (!ensureAccountAllowed(guardAccount, options, reply)) {
     return null;

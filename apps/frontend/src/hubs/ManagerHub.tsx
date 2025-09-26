@@ -35,20 +35,20 @@ import {
   ReportsSection,
   SupportSection,
   type Activity,
+  type ReportFeedback,
 } from '@cks/domain-widgets';
 import { Button, DataTable, PageHeader, PageWrapper, Scrollbar, TabSection } from '@cks/ui';
 import MyHubSection from '../components/MyHubSection';
+import { useLogout } from '../hooks/useLogout';
 import {
-  useActivities,
-  useCenters,
-  useContractors,
-  useCrew,
-  useCustomers,
-  useManagers,
-  useOrders,
-  useServices,
-} from '../shared/api/directory';
-import { useHubReports } from '../shared/api/hub';
+  useHubReports,
+  useHubRoleScope,
+  useHubActivities,
+  useHubOrders,
+  useHubProfile,
+  useHubDashboard,
+  type HubReportItem,
+} from '../shared/api/hub';
 
 interface ManagerHubProps {
   initialTab?: string;
@@ -158,6 +158,64 @@ const SERVICE_HISTORY_COLUMNS = [
 ];
 
 const MANAGER_PRIMARY_COLOR = '#3b82f6';
+
+const REPORT_CATEGORY_VALUES = new Set<ReportFeedback['category']>([
+  'Service Quality',
+  'Product Quality',
+  'Crew Performance',
+  'Delivery Issues',
+  'System Bug',
+  'Safety Concern',
+  'Other',
+]);
+
+const FEEDBACK_CATEGORY_VALUES = new Set<ReportFeedback['category']>([
+  'Service Excellence',
+  'Staff Performance',
+  'Process Improvement',
+  'Product Suggestion',
+  'System Enhancement',
+  'Recognition',
+  'Other',
+]);
+
+function normalizeReportCategory(item: HubReportItem, fallbackType: 'report' | 'feedback'): ReportFeedback['category'] {
+  const rawCategory = (item.category ?? '').trim();
+  const type = item.type === 'report' || item.type === 'feedback' ? item.type : fallbackType;
+  const categories = type === 'feedback' ? FEEDBACK_CATEGORY_VALUES : REPORT_CATEGORY_VALUES;
+  if (categories.has(rawCategory as ReportFeedback['category'])) {
+    return rawCategory as ReportFeedback['category'];
+  }
+  return 'Other';
+}
+
+function mapHubReportItem(item: HubReportItem, fallbackType: 'report' | 'feedback'): ReportFeedback {
+  const type = item.type === 'report' || item.type === 'feedback' ? item.type : fallbackType;
+  const category = normalizeReportCategory(item, type);
+  const status = item.status === 'closed' ? 'closed' : 'open';
+  const tags = Array.isArray(item.tags) ? item.tags : [];
+  const acknowledgments = Array.isArray(item.acknowledgments)
+    ? item.acknowledgments.map((ack) => ({
+        userId: ack.userId ?? 'unknown',
+        date: ack.date ?? new Date().toISOString(),
+      }))
+    : [];
+
+  return {
+    id: item.id,
+    type,
+    category,
+    tags,
+    title: item.title ?? 'Untitled',
+    description: item.description ?? '',
+    submittedBy: item.submittedBy ?? 'System',
+    submittedDate: item.submittedDate ?? new Date().toISOString(),
+    status,
+    relatedService: item.relatedService ?? undefined,
+    acknowledgments,
+  };
+}
+
 
 type EcosystemNode = {
   user: {
@@ -306,48 +364,66 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
   }, []);
 
   const { code, fullName, firstName } = useAuth();
+  const logout = useLogout();
 
-  const { data: managerEntries } = useManagers();
-  const { data: contractorEntries } = useContractors();
-  const { data: customerEntries } = useCustomers();
-  const { data: centerEntries } = useCenters();
-  const { data: crewEntries } = useCrew();
-  const { data: serviceEntries } = useServices();
-  const { data: orderEntries } = useOrders();
-  const { data: activityItems, isLoading: activitiesLoading, error: activitiesError } = useActivities();
+  const managerCode = useMemo(() => normalizeId(code), [code]);
+
+  // Fetch hub-scoped data
+  const { data: profileData } = useHubProfile(managerCode);
+  const { data: dashboardData } = useHubDashboard(managerCode);
+  const { data: scopeData } = useHubRoleScope(managerCode);
+  const { data: activitiesData, isLoading: activitiesLoading, error: activitiesError } = useHubActivities(managerCode);
+  const { data: ordersData } = useHubOrders(managerCode);
+
+  // Extract role-scoped entities from scope data
+  const managerEntries = scopeData?.scope?.managers ?? [];
+  const contractorEntries = scopeData?.scope?.contractors ?? [];
+  const customerEntries = scopeData?.scope?.customers ?? [];
+  const centerEntries = scopeData?.scope?.centers ?? [];
+  const crewEntries = scopeData?.scope?.crew ?? [];
+  const serviceEntries = []; // Services will need a separate hub endpoint
+  const orderEntries = ordersData?.orders ?? [];
+
+  // Map hub activities to the Activity format expected by RecentActivity component
+  const activityItems = useMemo(() => {
+    if (!activitiesData?.activities) return [];
+    return activitiesData.activities.map(item => ({
+      id: item.id,
+      timestamp: item.createdAt ? new Date(item.createdAt) : new Date(),
+      actorType: item.actorRole ?? 'Manager',
+      actorName: item.actorId ?? 'System',
+      action: item.category ?? 'action',
+      target: item.targetId ?? '',
+      details: item.description ?? '',
+      location: item.targetType ?? '',
+      status: 'completed' as const
+    }));
+  }, [activitiesData]);
 
   useEffect(() => {
     setActivityFeed(activityItems);
   }, [activityItems]);
 
-  const managerCode = useMemo(() => normalizeId(code), [code]);
-
-  const managerRecord = useMemo(() => {
-    if (!managerCode) {
-      return null;
-    }
-    return managerEntries.find((entry) => normalizeId(entry.id) === managerCode) ?? null;
-  }, [managerEntries, managerCode]);
-
-  const managerDisplayName = managerRecord?.name ?? fullName ?? firstName ?? 'Manager';
-  const managerRootId = managerRecord?.id ?? managerCode ?? 'MANAGER';
+  const managerRecord = profileData;
+  const managerDisplayName = profileData?.name ?? fullName ?? firstName ?? 'Manager';
+  const managerRootId = profileData?.cksCode ?? managerCode ?? 'MANAGER';
 
   // Fetch reports data
   const { data: reportsData, isLoading: reportsLoading } = useHubReports(managerCode);
+  const managerReports = useMemo<ReportFeedback[]>(
+    () => (reportsData?.reports ?? []).map((item) => mapHubReportItem(item, 'report')),
+    [reportsData],
+  );
 
-  const managerContractors = useMemo(() => {
-    if (!managerCode) {
-      return [] as typeof contractorEntries;
-    }
-    return contractorEntries.filter((contractor) => normalizeId(contractor.managerId) === managerCode);
-  }, [contractorEntries, managerCode]);
+  const managerFeedback = useMemo<ReportFeedback[]>(
+    () => (reportsData?.feedback ?? []).map((item) => mapHubReportItem(item, 'feedback')),
+    [reportsData],
+  );
 
-  const managerCustomers = useMemo(() => {
-    if (!managerCode) {
-      return [] as typeof customerEntries;
-    }
-    return customerEntries.filter((customer) => normalizeId(customer.managerId) === managerCode);
-  }, [customerEntries, managerCode]);
+
+  // Hub scope data is already filtered for this manager
+  const managerContractors = contractorEntries;
+  const managerCustomers = customerEntries;
 
   const managerContractorIdSet = useMemo(() => {
     const set = new Set<string>();
@@ -371,26 +447,8 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
     return set;
   }, [managerCustomers]);
 
-  const managerCenters = useMemo(() => {
-    if (!managerCode && managerCustomerIdSet.size === 0 && managerContractorIdSet.size === 0) {
-      return [] as typeof centerEntries;
-    }
-    return centerEntries.filter((center) => {
-      const centerManager = normalizeId(center.managerId);
-      const customerId = normalizeId(center.customerId);
-      const contractorId = normalizeId(center.contractorId);
-      if (managerCode && centerManager === managerCode) {
-        return true;
-      }
-      if (customerId && managerCustomerIdSet.has(customerId)) {
-        return true;
-      }
-      if (contractorId && managerContractorIdSet.has(contractorId)) {
-        return true;
-      }
-      return false;
-    });
-  }, [centerEntries, managerCode, managerCustomerIdSet, managerContractorIdSet]);
+  // Hub scope data is already filtered for this manager
+  const managerCenters = centerEntries;
 
   const managerCenterIdSet = useMemo(() => {
     const set = new Set<string>();
@@ -403,14 +461,8 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
     return set;
   }, [managerCenters]);
 
-  const managerCrew = useMemo(
-    () =>
-      crewEntries.filter((member) => {
-        const centerId = normalizeId(member.assignedCenter);
-        return !!centerId && managerCenterIdSet.has(centerId);
-      }),
-    [crewEntries, managerCenterIdSet],
-  );
+  // Hub scope data is already filtered for this manager
+  const managerCrew = crewEntries;
 
   const customerNameMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -445,15 +497,8 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
     return map;
   }, [serviceEntries]);
 
-  const managerOrders = useMemo(
-    () =>
-      orderEntries.filter((order) => {
-        const customerId = normalizeId(order.customerId);
-        const centerId = normalizeId(order.centerId);
-        return (customerId && managerCustomerIdSet.has(customerId)) || (centerId && managerCenterIdSet.has(centerId));
-      }),
-    [orderEntries, managerCustomerIdSet, managerCenterIdSet],
-  );
+  // Hub orders are already filtered for this manager
+  const managerOrders = orderEntries;
 
   const managerServiceOrders = useMemo(
     () => managerOrders.filter((order) => !!normalizeId(order.serviceId)),
@@ -543,33 +588,44 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
   );
 
   const overviewData = useMemo(() => {
-    const pendingOrders = managerServiceOrders.reduce((count, order) => {
+    if (dashboardData) {
+      return {
+        contractorCount: dashboardData.contractorCount ?? 0,
+        customerCount: dashboardData.customerCount ?? 0,
+        centerCount: dashboardData.centerCount ?? 0,
+        crewCount: dashboardData.crewCount ?? 0,
+        pendingOrders: dashboardData.pendingOrders ?? 0,
+        accountStatus: formatAccountStatus(dashboardData.accountStatus),
+      };
+    }
+    // Fallback to counting from scope data
+    const pendingOrders = orderEntries.reduce((count, order) => {
       const status = normalizeOrderStatus(order.status);
       return count + (status === 'pending' || status === 'in-progress' ? 1 : 0);
     }, 0);
     return {
-      contractorCount: managerContractors.length,
-      customerCount: managerCustomers.length,
-      centerCount: managerCenters.length,
-      crewCount: managerCrew.length,
+      contractorCount: contractorEntries.length,
+      customerCount: customerEntries.length,
+      centerCount: centerEntries.length,
+      crewCount: crewEntries.length,
       pendingOrders,
-      accountStatus: formatAccountStatus(managerRecord?.status),
+      accountStatus: formatAccountStatus(profileData?.status),
     };
-  }, [managerContractors, managerCustomers, managerCenters, managerCrew, managerServiceOrders, managerRecord]);
+  }, [dashboardData, contractorEntries, customerEntries, centerEntries, crewEntries, orderEntries, profileData]);
 
   const managerProfileData = useMemo(
     () => ({
       fullName: managerDisplayName,
-      managerId: managerRecord?.id ?? managerCode ?? 'N/A',
-      address: managerRecord?.address ?? null,
-      phone: managerRecord?.phone ?? null,
-      email: managerRecord?.email ?? null,
-      territory: managerRecord?.territory ?? null,
-      role: managerRecord?.role ?? 'Manager',
-      reportsTo: formatReportsTo(managerRecord?.reportsTo),
-      startDate: managerRecord?.createdAt ? formatDate(managerRecord.createdAt) : null,
+      managerId: profileData?.cksCode ?? managerCode ?? 'N/A',
+      address: profileData?.address ?? null,
+      phone: profileData?.phone ?? null,
+      email: profileData?.email ?? null,
+      territory: profileData?.metadata?.territory as string ?? null,
+      role: profileData?.role ?? 'Manager',
+      reportsTo: formatReportsTo(profileData?.metadata?.reportsTo as string ?? null),
+      startDate: profileData?.createdAt ? formatDate(profileData.createdAt) : null,
     }),
-    [managerCode, managerDisplayName, managerRecord],
+    [managerCode, managerDisplayName, profileData],
   );
 
   const managerServiceOrderCards = useMemo<HubOrder[]>(
@@ -793,6 +849,7 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
         tabs={HUB_TABS}
         activeTab={activeTab}
         onTabClick={setActiveTab}
+        onLogout={logout}
       />
 
       <Scrollbar style={{ flex: 1, padding: '0 24px' }} className="hub-content-scroll">
@@ -931,17 +988,17 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
               />
             </PageWrapper>
           ) : activeTab === 'support' ? (
-            <PageWrapper headerSrOnly>
+            <PageWrapper title="Support" headerSrOnly>
               <SupportSection role="manager" primaryColor={MANAGER_PRIMARY_COLOR} />
             </PageWrapper>
           ) : activeTab === 'reports' ? (
-            <PageWrapper headerSrOnly>
+            <PageWrapper title="Reports" headerSrOnly>
               <ReportsSection
                 role="manager"
                 userId={managerRootId}
                 primaryColor={MANAGER_PRIMARY_COLOR}
-                reports={reportsData?.reports || []}
-                feedback={reportsData?.feedback || []}
+                reports={managerReports}
+                feedback={managerFeedback}
                 isLoading={reportsLoading}
               />
             </PageWrapper>

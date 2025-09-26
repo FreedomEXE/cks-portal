@@ -32,4 +32,5 @@ export * from './Scrollbar';
 export { default as Scrollbar } from './Scrollbar';
 
 export * from './modals/ActionModal';
+export { default as ActionModal } from './modals/ActionModal';
 

@@ -10,15 +10,20 @@ import {
   createWarehouse,
 } from './store';
 
-function mapAdminActor(admin: {
+type AdminActor = {
   cksCode: string | null;
   clerkUserId: string;
   role: string;
   fullName?: string | null;
-}) {
+};
+
+function mapAdminActor(admin: AdminActor) {
+  const actorCode = (admin.cksCode ?? "").trim();
+  const actorId = actorCode.length ? actorCode : admin.clerkUserId;
+  const actorRole = (admin.role ?? "admin").trim().toLowerCase() || "admin";
   return {
-    actorId: admin.cksCode ?? admin.clerkUserId,
-    actorRole: admin.role ?? 'admin',
+    actorId,
+    actorRole,
     actorName: admin.fullName ?? null,
   };
 }

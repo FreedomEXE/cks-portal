@@ -29,7 +29,7 @@ const createOrderSchema = z.object({
     .optional(),
   expectedDate: z.string().trim().min(1).optional(),
   notes: z.string().trim().max(1000).optional(),
-  metadata: z.record(z.any()).optional(),
+  metadata: z.record(z.string(), z.any()).optional(),
   participants: z
     .object({
       manager: z.union([z.string(), z.array(z.string())]).optional(),
@@ -45,7 +45,7 @@ const createOrderSchema = z.object({
       z.object({
         catalogCode: z.string().trim().min(1),
         quantity: z.coerce.number().positive(),
-        metadata: z.record(z.any()).optional(),
+        metadata: z.record(z.string(), z.any()).optional(),
       }),
     )
     .min(1),
