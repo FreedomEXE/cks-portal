@@ -50,7 +50,6 @@ export function RecentActivity({
               variant="secondary"
               size="sm"
               onClick={onClear}
-              style={{ backgroundColor: '#0f172a', borderColor: '#0f172a', color: 'white' }}
             >
               Clear
             </Button>

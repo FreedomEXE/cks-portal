@@ -69,7 +69,8 @@ function parseDevRole(value: string | null | undefined): HubAccountRole | null {
 function ensureAccountAllowed(account: GuardAccount, options: RoleGuardOptions, reply: FastifyReply): boolean {
   if (!options.allowInactive) {
     const status = (account.status ?? "").trim().toLowerCase();
-    if (status && status !== "active") {
+    const allowedStatuses = new Set(['', 'active', 'unassigned', 'pending']);
+    if (status && !allowedStatuses.has(status)) {
       if ((account.role ?? "").trim().toLowerCase() === "admin") {
         reply.code(403).send({ error: "Admin access is disabled", status: account.status });
       } else {

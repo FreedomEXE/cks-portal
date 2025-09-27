@@ -42,6 +42,7 @@ export interface ContractorRecord {
 }
 export interface CustomerRecord {
   id: string;
+  clerkUserId: string | null;
   name: string;
   mainContact: string | null;
   email: string | null;
@@ -53,6 +54,7 @@ export interface CustomerRecord {
 
 export interface CenterRecord {
   id: string;
+  clerkUserId: string | null;
   name: string;
   mainContact: string | null;
   email: string | null;
@@ -65,6 +67,7 @@ export interface CenterRecord {
 
 export interface CrewRecord {
   id: string;
+  clerkUserId: string | null;
   name: string;
   emergencyContact: string | null;
   email: string | null;
@@ -76,6 +79,7 @@ export interface CrewRecord {
 
 export interface WarehouseRecord {
   id: string;
+  clerkUserId: string | null;
   name: string;
   mainContact: string | null;
   email: string | null;
@@ -380,6 +384,7 @@ export async function createCustomer(
     address: string | null;
     status: string | null;
     contractor_id: string | null;
+    clerk_user_id: string | null;
   }>(
     `INSERT INTO customers (
       customer_id,
@@ -393,7 +398,7 @@ export async function createCustomer(
       created_at,
       updated_at
     ) VALUES ($1, $2, $3, $4, $5, $6, $7, NULL, NOW(), NOW())
-    RETURNING customer_id, name, main_contact, email, phone, address, status, contractor_id`,
+    RETURNING customer_id, name, main_contact, email, phone, address, status, contractor_id, clerk_user_id`,
     [
       id,
       payload.name.trim(),
@@ -410,13 +415,50 @@ export async function createCustomer(
     throw new Error('Failed to insert customer record');
   }
 
+  const emailAddresses = row.email ? [row.email] : undefined;
+
+  try {
+    const clerkUser = await clerkClient.users.createUser({
+      username: id.toLowerCase(),
+      externalId: id,
+      firstName: row.main_contact ?? row.name ?? undefined,
+      emailAddress: emailAddresses,
+      publicMetadata: {
+        cksCode: id,
+        role: 'customer',
+        ...(row.main_contact ? { mainContact: row.main_contact } : {}),
+        ...(row.contractor_id ? { contractorId: row.contractor_id } : {}),
+      },
+      skipPasswordRequirement: true,
+    });
+
+    await query(
+      `UPDATE customers SET clerk_user_id = $1, updated_at = NOW() WHERE customer_id = $2`,
+      [clerkUser.id, id],
+    );
+
+    row.clerk_user_id = clerkUser.id;
+  } catch (error) {
+    console.error('[provisioning] Failed to create Clerk user for customer', { customerId: id, error });
+
+    await query('DELETE FROM customers WHERE customer_id = $1', [id]).catch((cleanupError) => {
+      console.warn('[provisioning] Failed to remove customer after Clerk error', {
+        customerId: id,
+        cleanupError,
+      });
+    });
+
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to create Clerk user for customer ${id}: ${message}`);
+  }
+
   await recordActivity({
     actor,
     activityType: 'customer_created',
     description: `Customer ${id} created`,
     targetId: id,
     targetType: 'customer',
-    metadata: { name: payload.name.trim() },
+    metadata: { name: payload.name.trim(), clerkUserId: row.clerk_user_id },
   });
 
   return {
@@ -428,10 +470,9 @@ export async function createCustomer(
     address: row.address,
     status: row.status ?? 'unassigned',
     contractorId: row.contractor_id,
+    clerkUserId: row.clerk_user_id,
   };
 }
-
-
 export async function createCenter(
   input: unknown,
   actor: AuditContext,
@@ -449,6 +490,7 @@ export async function createCenter(
     status: string | null;
     customer_id: string | null;
     contractor_id: string | null;
+    clerk_user_id: string | null;
   }>(
     `INSERT INTO centers (
       center_id,
@@ -463,7 +505,7 @@ export async function createCenter(
       created_at,
       updated_at
     ) VALUES ($1, $2, $3, $4, $5, $6, $7, NULL, NULL, NOW(), NOW())
-    RETURNING center_id, name, main_contact, email, phone, address, status, customer_id, contractor_id`,
+    RETURNING center_id, name, main_contact, email, phone, address, status, customer_id, contractor_id, clerk_user_id`,
     [
       id,
       payload.name.trim(),
@@ -480,13 +522,51 @@ export async function createCenter(
     throw new Error('Failed to insert center record');
   }
 
+  const emailAddresses = row.email ? [row.email] : undefined;
+
+  try {
+    const clerkUser = await clerkClient.users.createUser({
+      username: id.toLowerCase(),
+      externalId: id,
+      firstName: row.main_contact ?? row.name ?? undefined,
+      emailAddress: emailAddresses,
+      publicMetadata: {
+        cksCode: id,
+        role: 'center',
+        ...(row.main_contact ? { mainContact: row.main_contact } : {}),
+        ...(row.customer_id ? { customerId: row.customer_id } : {}),
+        ...(row.contractor_id ? { contractorId: row.contractor_id } : {}),
+      },
+      skipPasswordRequirement: true,
+    });
+
+    await query(
+      `UPDATE centers SET clerk_user_id = $1, updated_at = NOW() WHERE center_id = $2`,
+      [clerkUser.id, id],
+    );
+
+    row.clerk_user_id = clerkUser.id;
+  } catch (error) {
+    console.error('[provisioning] Failed to create Clerk user for center', { centerId: id, error });
+
+    await query('DELETE FROM centers WHERE center_id = $1', [id]).catch((cleanupError) => {
+      console.warn('[provisioning] Failed to remove center after Clerk error', {
+        centerId: id,
+        cleanupError,
+      });
+    });
+
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to create Clerk user for center ${id}: ${message}`);
+  }
+
   await recordActivity({
     actor,
     activityType: 'center_created',
     description: `Center ${id} created`,
     targetId: id,
     targetType: 'center',
-    metadata: { name: payload.name.trim() },
+    metadata: { name: payload.name.trim(), clerkUserId: row.clerk_user_id },
   });
 
   return {
@@ -499,10 +579,9 @@ export async function createCenter(
     status: row.status ?? 'unassigned',
     customerId: row.customer_id,
     contractorId: row.contractor_id,
+    clerkUserId: row.clerk_user_id,
   };
 }
-
-
 export async function createCrew(
   input: unknown,
   actor: AuditContext,
@@ -519,6 +598,7 @@ export async function createCrew(
     address: string | null;
     status: string;
     assigned_center: string | null;
+    clerk_user_id: string | null;
   }>(
     `INSERT INTO crew (
       crew_id,
@@ -532,7 +612,7 @@ export async function createCrew(
       created_at,
       updated_at
     ) VALUES ($1, $2, $3, $4, $5, $6, $7, NULL, NOW(), NOW())
-    RETURNING crew_id, name, emergency_contact, email, phone, address, status, assigned_center`,
+    RETURNING crew_id, name, emergency_contact, email, phone, address, status, assigned_center, clerk_user_id`,
     [
       id,
       payload.name.trim(),
@@ -549,13 +629,50 @@ export async function createCrew(
     throw new Error('Failed to insert crew record');
   }
 
+  const emailAddresses = row.email ? [row.email] : undefined;
+
+  try {
+    const clerkUser = await clerkClient.users.createUser({
+      username: id.toLowerCase(),
+      externalId: id,
+      firstName: row.name ?? undefined,
+      emailAddress: emailAddresses,
+      publicMetadata: {
+        cksCode: id,
+        role: 'crew',
+        ...(row.emergency_contact ? { emergencyContact: row.emergency_contact } : {}),
+        ...(row.assigned_center ? { assignedCenter: row.assigned_center } : {}),
+      },
+      skipPasswordRequirement: true,
+    });
+
+    await query(
+      `UPDATE crew SET clerk_user_id = $1, updated_at = NOW() WHERE crew_id = $2`,
+      [clerkUser.id, id],
+    );
+
+    row.clerk_user_id = clerkUser.id;
+  } catch (error) {
+    console.error('[provisioning] Failed to create Clerk user for crew', { crewId: id, error });
+
+    await query('DELETE FROM crew WHERE crew_id = $1', [id]).catch((cleanupError) => {
+      console.warn('[provisioning] Failed to remove crew after Clerk error', {
+        crewId: id,
+        cleanupError,
+      });
+    });
+
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to create Clerk user for crew ${id}: ${message}`);
+  }
+
   await recordActivity({
     actor,
     activityType: 'crew_created',
     description: `Crew ${id} created`,
     targetId: id,
     targetType: 'crew',
-    metadata: { name: payload.name.trim() },
+    metadata: { name: payload.name.trim(), clerkUserId: row.clerk_user_id },
   });
 
   return {
@@ -567,10 +684,9 @@ export async function createCrew(
     address: row.address,
     status: row.status,
     assignedCenter: row.assigned_center,
+    clerkUserId: row.clerk_user_id,
   };
 }
-
-
 export async function createWarehouse(
   input: unknown,
   actor: AuditContext,
@@ -588,6 +704,7 @@ export async function createWarehouse(
     status: string | null;
     warehouse_type: string | null;
     manager_id: string | null;
+    clerk_user_id: string | null;
   }>(
     `INSERT INTO warehouses (
       warehouse_id,
@@ -602,7 +719,7 @@ export async function createWarehouse(
       created_at,
       updated_at
     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
-    RETURNING warehouse_id, name, main_contact, email, phone, address, status, warehouse_type, manager_id`,
+    RETURNING warehouse_id, name, main_contact, email, phone, address, status, warehouse_type, manager_id, clerk_user_id`,
     [
       id,
       payload.name.trim(),
@@ -621,13 +738,51 @@ export async function createWarehouse(
     throw new Error('Failed to insert warehouse record');
   }
 
+  const emailAddresses = row.email ? [row.email] : undefined;
+
+  try {
+    const clerkUser = await clerkClient.users.createUser({
+      username: id.toLowerCase(),
+      externalId: id,
+      firstName: row.main_contact ?? row.name ?? undefined,
+      emailAddress: emailAddresses,
+      publicMetadata: {
+        cksCode: id,
+        role: 'warehouse',
+        ...(row.main_contact ? { mainContact: row.main_contact } : {}),
+        ...(row.warehouse_type ? { warehouseType: row.warehouse_type } : {}),
+        ...(row.manager_id ? { managerId: row.manager_id } : {}),
+      },
+      skipPasswordRequirement: true,
+    });
+
+    await query(
+      `UPDATE warehouses SET clerk_user_id = $1, updated_at = NOW() WHERE warehouse_id = $2`,
+      [clerkUser.id, id],
+    );
+
+    row.clerk_user_id = clerkUser.id;
+  } catch (error) {
+    console.error('[provisioning] Failed to create Clerk user for warehouse', { warehouseId: id, error });
+
+    await query('DELETE FROM warehouses WHERE warehouse_id = $1', [id]).catch((cleanupError) => {
+      console.warn('[provisioning] Failed to remove warehouse after Clerk error', {
+        warehouseId: id,
+        cleanupError,
+      });
+    });
+
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to create Clerk user for warehouse ${id}: ${message}`);
+  }
+
   await recordActivity({
     actor,
     activityType: 'warehouse_created',
     description: `Warehouse ${id} created`,
     targetId: id,
     targetType: 'warehouse',
-    metadata: { name: payload.name.trim() },
+    metadata: { name: payload.name.trim(), clerkUserId: row.clerk_user_id },
   });
 
   return {
@@ -640,6 +795,7 @@ export async function createWarehouse(
     status: row.status ?? 'active',
     warehouseType: row.warehouse_type,
     managerId: row.manager_id,
+    clerkUserId: row.clerk_user_id,
   };
 }
 
