@@ -76,6 +76,8 @@ const EcosystemTree: React.FC<EcosystemTreeProps> = ({
     setExpanded(next);
   };
 
+  const getRoleKey = (node: TreeNode) => (node.type ?? node.user.role).toLowerCase();
+
   const createBadge = (text: string, color: string) => {
     return (
       <span style={{
@@ -93,13 +95,14 @@ const EcosystemTree: React.FC<EcosystemTreeProps> = ({
 
   // Function to count all descendants of a specific type
   const countDescendants = (node: TreeNode, targetRole: string): number => {
+    const normalizedTarget = targetRole.toLowerCase();
     let count = 0;
-    if (node.user.role.toLowerCase() === targetRole.toLowerCase()) {
+    if (getRoleKey(node) === normalizedTarget) {
       count = 1;
     }
     if (node.children) {
       node.children.forEach(child => {
-        count += countDescendants(child, targetRole);
+        count += countDescendants(child, normalizedTarget);
       });
     }
     return count;
@@ -108,8 +111,9 @@ const EcosystemTree: React.FC<EcosystemTreeProps> = ({
   // Function to count direct children of a specific type
   const countDirectChildren = (node: TreeNode, targetRole: string): number => {
     if (!node.children) return 0;
+    const normalizedTarget = targetRole.toLowerCase();
     return node.children.filter(child =>
-      child.user.role.toLowerCase() === targetRole.toLowerCase()
+      getRoleKey(child) === normalizedTarget
     ).length;
   };
 
@@ -128,7 +132,8 @@ const EcosystemTree: React.FC<EcosystemTreeProps> = ({
       warehouse: '#ede9fe'
     };
 
-    const roleColor = typeColors[node.user.role.toLowerCase()] || '#f3f4f6';
+    const roleKey = getRoleKey(node);
+    const roleColor = roleColorMap[roleKey] || typeColors[roleKey] || '#f3f4f6';
 
     // Role-specific highlight colors (matching hub themes)
     const highlightColors: Record<string, { bg: string; border: string }> = {
@@ -140,11 +145,10 @@ const EcosystemTree: React.FC<EcosystemTreeProps> = ({
       warehouse: { bg: '#e9d5ff', border: '#8b5cf6' }    // Purple theme
     };
 
-    const userRole = node.user.role.toLowerCase();
-    const highlightStyle = highlightColors[userRole] || { bg: '#dbeafe', border: '#3b82f6' };
+    const highlightStyle = highlightColors[roleKey] || { bg: '#dbeafe', border: '#3b82f6' };
 
     // Calculate counts based on role
-    const role = node.user.role.toLowerCase();
+    const role = roleKey;
     const badges = [];
 
     if (role === 'manager') {

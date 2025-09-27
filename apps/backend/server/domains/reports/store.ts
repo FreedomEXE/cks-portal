@@ -61,7 +61,7 @@ async function getManagerReports(cksCode: string): Promise<HubReportsPayload> {
 async function getCustomerReports(cksCode: string): Promise<HubReportsPayload> {
   const reportsResult = await query<any>(
     `SELECT * FROM reports
-     WHERE UPPER(customer_id) = $1
+     WHERE (UPPER(customer_id) = $1 OR (UPPER(created_by_id) = $1 AND created_by_role = 'customer'))
      ORDER BY created_at DESC NULLS LAST`,
     [cksCode],
   );
@@ -90,7 +90,7 @@ async function getCustomerReports(cksCode: string): Promise<HubReportsPayload> {
 async function getCenterReports(cksCode: string): Promise<HubReportsPayload> {
   const reportsResult = await query<any>(
     `SELECT * FROM reports
-     WHERE UPPER(center_id) = $1
+     WHERE (UPPER(center_id) = $1 OR (UPPER(created_by_id) = $1 AND created_by_role = 'center'))
      ORDER BY created_at DESC NULLS LAST`,
     [cksCode],
   );
@@ -152,7 +152,7 @@ async function getCrewReports(cksCode: string): Promise<HubReportsPayload> {
   // Crew can only submit feedback, not reports
   const reportsResult = await query<any>(
     `SELECT * FROM reports
-     WHERE UPPER(crew_member_id) = $1
+     WHERE UPPER(created_by_id) = $1 AND created_by_role = 'crew'
      ORDER BY created_at DESC NULLS LAST`,
     [cksCode],
   );
@@ -163,7 +163,7 @@ async function getCrewReports(cksCode: string): Promise<HubReportsPayload> {
     category: row.severity ?? 'General',
     title: row.title ?? 'Untitled',
     description: row.description ?? '',
-    submittedBy: row.crew_member_id ?? 'Unknown',
+    submittedBy: row.created_by_id ?? 'Unknown',
     submittedDate: row.created_at,
     status: row.status ?? 'open',
     relatedService: row.service_id,

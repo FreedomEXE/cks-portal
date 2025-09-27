@@ -35,8 +35,11 @@ import {
   useHubOrders,
   useHubProfile,
   useHubReports,
+  useHubRoleScope,
   type HubOrderItem,
 } from '../shared/api/hub';
+
+import { buildEcosystemTree, DEFAULT_ROLE_COLOR_MAP } from '../shared/utils/ecosystem';
 
 interface CustomerHubProps {
   initialTab?: string;
@@ -177,6 +180,9 @@ export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubPro
     data: reportsData,
     isLoading: reportsLoading,
   } = useHubReports(normalizedCode);
+  const {
+    data: scopeData,
+  } = useHubRoleScope(normalizedCode);
 
   useEffect(() => {
     const style = document.createElement('style');
@@ -234,14 +240,25 @@ export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubPro
     accountStatus: dashboard?.accountStatus === 'assigned' ? 'Active' : (dashboard?.accountStatus ?? 'Unknown'),
   }), [dashboard]);
 
-  const ecosystemData = useMemo<TreeNode>(() => ({
-    user: {
-      id: normalizedCode ?? 'CUSTOMER',
-      role: 'Customer',
-      name: profile?.name ?? normalizedCode ?? 'Customer',
-    },
-    children: [],
-  }), [normalizedCode, profile]);
+  const customerScope = scopeData?.role === 'customer' ? scopeData : null;
+
+  const ecosystemTree = useMemo<TreeNode>(() => {
+    const fallbackId = normalizedCode ?? 'CUSTOMER';
+    const fallbackName = profile?.name ?? fallbackId;
+    if (!customerScope) {
+      return {
+      user: {
+        id: fallbackId,
+        role: 'Customer',
+        name: fallbackName,
+      },
+      type: 'customer',
+    };
+    }
+    return buildEcosystemTree(customerScope, { rootName: fallbackName });
+  }, [customerScope, normalizedCode, profile?.name]);
+
+  const ecosystemRootId = ecosystemTree.user.id;
 
   const { myServicesData, serviceHistoryData } = useMemo(() => {
     const my: Array<{ serviceId: string; serviceName: string; type: string; status: string; startDate: string }>
@@ -385,26 +402,19 @@ export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubPro
           ) : activeTab === 'ecosystem' ? (
             <PageWrapper headerSrOnly>
               <EcosystemTree
-                rootUser={{
-                  id: normalizedCode ?? 'CUSTOMER',
-                  role: 'Customer',
-                  name: profile?.name ?? normalizedCode ?? 'Customer',
-                }}
-                treeData={ecosystemData}
+                rootUser={ecosystemTree.user}
+                treeData={ecosystemTree}
                 onNodeClick={() => undefined}
-                expandedNodes={normalizedCode ? [normalizedCode] : []}
-                currentUserId={normalizedCode ?? undefined}
+                expandedNodes={ecosystemRootId ? [ecosystemRootId] : []}
+                currentUserId={ecosystemRootId}
                 title="Ecosystem"
                 subtitle="Your business network overview"
-                description="Ecosystem data will populate as relationships become available."
-                roleColorMap={{
-                  customer: '#fef9c3',
-                  center: '#ffedd5',
-                  crew: '#fee2e2',
-                }}
+                description="Click any row with an arrow to expand and explore your ecosystem connections."
+                roleColorMap={DEFAULT_ROLE_COLOR_MAP}
               />
             </PageWrapper>
           ) : activeTab === 'services' ? (
+
             <PageWrapper headerSrOnly>
               {ordersLoadMessage && (
                 <div style={{ marginBottom: 12, color: '#475569' }}>{ordersLoadMessage}</div>

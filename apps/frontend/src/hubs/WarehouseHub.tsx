@@ -245,7 +245,7 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
       const base = {
         deliveryId: order.orderId,
         itemName: order.title ?? order.orderId,
-        destination: order.recipient ?? 'Warehouse',
+        destination: order.destination ?? 'Warehouse',
         status: formatStatusLabel(order.status),
         scheduledDate: formatDisplayDate(order.requestedDate),
         completedDate: formatDisplayDate(order.expectedDate),

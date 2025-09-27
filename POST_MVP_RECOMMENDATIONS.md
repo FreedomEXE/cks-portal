@@ -509,6 +509,204 @@ console.log('[auth] Verified userId:', userId);
 - Document migration paths for existing code
 - Consider creating a dedicated "platform team" to handle these improvements
 
+## 18. Role-Based Logic Separation & Store Refactoring
+
+**Current State:**
+- Large monolithic store files (scope/store.ts at 1186 lines, provisioning/store.ts at 803 lines, assignments/store.ts at 712 lines)
+- Role-specific business logic duplicated across multiple functions
+- Each role has its own nearly-identical function (6x duplication for 6 roles)
+- Mixed concerns: domain logic, role rules, data access, and business validation all in single files
+
+**Problem Analysis:**
+The scope/store.ts explosion to 1186 lines occurred because:
+- Added 6 separate scope builder functions (getManagerRoleScope, getContractorRoleScope, etc.) ~150 lines each
+- Added 6 separate activity builder functions (getManagerActivities, getContractorActivities, etc.) ~100 lines each
+- Each function contains 80% identical code with minor query variations
+- No abstraction or shared logic between role implementations
+
+**Similar patterns in other stores:**
+- **provisioning/store.ts**: createManager, createContractor, createCustomer, createCenter, createCrew, createWarehouse
+- **assignments/store.ts**: assign/unassign functions for each role relationship combination
+- **archive/store.ts**: Likely to grow with role-specific archive rules
+
+**Architectural Debt Impact:**
+- Adding new features requires modifying 6+ places
+- Bug fixes must be applied to multiple duplicate functions
+- Testing burden multiplied by role count
+- Difficult to ensure consistency across roles
+- High cognitive load for developers
+
+### Recommended Refactoring Strategy
+
+#### Phase 1: Extract Role Strategies (Week 1-2)
+Create role-specific strategy files that define behavior, not implementation:
+
+```typescript
+// domains/scope/strategies/index.ts
+export interface RoleScopeStrategy {
+  includeRelationships: string[];
+  includeUpward: string[];  // Empty for most, ['center'] for crew
+  activityFilters: string[];
+  summaryMetrics: string[];
+}
+
+// domains/scope/strategies/contractor.strategy.ts
+export const contractorStrategy: RoleScopeStrategy = {
+  includeRelationships: ['customers', 'centers', 'crew'],
+  includeUpward: [],  // Contractors don't see managers
+  activityFilters: ['contractorId'],
+  summaryMetrics: ['customerCount', 'centerCount', 'crewCount', 'serviceCount']
+};
+
+// Single generic function replaces 6 role-specific ones
+async function getRoleScope(role: HubRole, cksCode: string) {
+  const strategy = strategies[role];
+  return buildScopeWithStrategy(cksCode, strategy);
+}
+```
+
+#### Phase 2: Separate Concerns (Week 3-4)
+
+```
+domains/
+├── scope/
+│   ├── store.ts                    # Generic scope operations (200 lines)
+│   ├── strategies/                 # Role-specific rules
+│   │   ├── index.ts               # Strategy interface
+│   │   ├── manager.strategy.ts    # Manager-specific rules (50 lines)
+│   │   ├── contractor.strategy.ts # Contractor rules (50 lines)
+│   │   └── ...                    # Other roles
+│   ├── queries/                    # SQL query builders
+│   │   └── scope.queries.ts       # Reusable query functions
+│   └── transformers/               # Data transformation
+│       └── scope.transformer.ts   # Format API responses
+│
+├── provisioning/
+│   ├── store.ts                    # Generic entity creation (150 lines)
+│   ├── validators/                 # Role-specific validation
+│   │   └── role-validators.ts
+│   └── templates/                  # Role creation templates
+│       └── role-templates.ts
+│
+└── permissions/                    # NEW - Centralized permissions
+    ├── policies/
+    │   ├── manager.policy.ts
+    │   ├── contractor.policy.ts
+    │   └── ...
+    └── rbac.ts                     # Role-based access control
+```
+
+#### Phase 3: Implement RBAC Layer (Month 2)
+
+Create single source of truth for permissions:
+
+```typescript
+// domains/permissions/rbac.ts
+export const permissions = {
+  manager: {
+    scope: {
+      view: ['contractors', 'customers', 'centers', 'crew'],
+      edit: ['contractors', 'customers', 'centers', 'crew']
+    },
+    reports: {
+      view: ['all'],
+      create: ['report', 'feedback']
+    }
+  },
+  contractor: {
+    scope: {
+      view: ['customers', 'centers', 'crew'],
+      edit: ['customers', 'centers']
+    },
+    reports: {
+      view: ['own', 'subordinate'],
+      create: ['feedback']
+    }
+  }
+  // ... other roles
+};
+
+// Use in any domain
+function canView(role: HubRole, resource: string): boolean {
+  return permissions[role]?.scope?.view?.includes(resource) ?? false;
+}
+```
+
+#### Phase 4: Query Builder Pattern (Month 2-3)
+
+Replace duplicate SQL with composable builders:
+
+```typescript
+// domains/shared/query-builder.ts
+class ScopeQueryBuilder {
+  private baseQuery: string;
+  private joins: string[] = [];
+  private conditions: string[] = [];
+
+  forRole(role: HubRole): this {
+    const strategy = strategies[role];
+    this.applyStrategy(strategy);
+    return this;
+  }
+
+  includeRelationship(type: string): this {
+    const joinMap = {
+      'customers': 'LEFT JOIN customers ON ...',
+      'centers': 'LEFT JOIN centers ON ...'
+    };
+    this.joins.push(joinMap[type]);
+    return this;
+  }
+
+  build(): string {
+    return `${this.baseQuery} ${this.joins.join(' ')} WHERE ${this.conditions.join(' AND ')}`;
+  }
+}
+
+// Usage - replaces 6 different functions
+const query = new ScopeQueryBuilder()
+  .forRole('contractor')
+  .includeRelationship('customers')
+  .includeRelationship('centers')
+  .build();
+```
+
+### Expected Outcomes
+
+**File size reduction:**
+- scope/store.ts: 1186 → ~200 lines (83% reduction)
+- provisioning/store.ts: 803 → ~150 lines (81% reduction)
+- assignments/store.ts: 712 → ~150 lines (79% reduction)
+
+**Development velocity improvements:**
+- Add new feature: Modify 1 strategy file instead of 6 functions
+- Fix bug: Single fix applies to all roles automatically
+- Add validation: One validator works for all roles
+- Test coverage: Test strategy + generic function, not 6x duplication
+
+**Code quality improvements:**
+- Single source of truth for role behaviors
+- Clear separation of concerns
+- Testable, composable units
+- Reduced cognitive load
+- Easier onboarding for new developers
+
+### Migration Strategy
+
+1. **Start with new features**: Implement new features using the pattern
+2. **Gradual refactoring**: Refactor one domain at a time
+3. **Maintain compatibility**: Keep old functions as wrappers during transition
+4. **Feature flag protection**: Use flags to switch between old/new implementations
+5. **Comprehensive testing**: Ensure behavior parity before removing old code
+
+### Success Metrics
+
+- Lines of code reduced by 70%+ in store files
+- Time to implement role-related features reduced by 50%
+- Bug rate in role logic reduced by 60%
+- Test coverage increased to 80%+
+- Developer satisfaction improved (measured via survey)
+
 ## Success Metrics
 
 - Reduced time to implement new features
