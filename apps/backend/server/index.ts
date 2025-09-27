@@ -1,4 +1,4 @@
-﻿import dotenv from "dotenv";
+import dotenv from "dotenv";
 import { resolve } from "node:path";
 
 dotenv.config({ path: resolve(__dirname, "../.env") });
@@ -213,7 +213,8 @@ export async function buildServer() {
       }
 
       const normalizedStatus = (hubAccount.status ?? '').trim().toLowerCase();
-      if (normalizedStatus && normalizedStatus !== 'active') {
+      const allowedStatuses = new Set(['', 'active', 'unassigned', 'pending']);
+      if (normalizedStatus && !allowedStatuses.has(normalizedStatus)) {
         return reply.code(403).send({ error: 'Inactive', status: hubAccount.status });
       }
 

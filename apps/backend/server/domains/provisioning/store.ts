@@ -38,8 +38,8 @@ export interface ContractorRecord {
   address: string | null;
   status: string;
   managerId: string | null;
+  clerkUserId: string | null;
 }
-
 export interface CustomerRecord {
   id: string;
   name: string;
@@ -264,17 +264,18 @@ export async function createContractor(
 
   const result = await query<{
     contractor_id: string;
-    company_name: string;
+    name: string;
     contact_person: string | null;
     email: string | null;
     phone: string | null;
     address: string | null;
     status: string;
     cks_manager: string | null;
+    clerk_user_id: string | null;
   }>(
     `INSERT INTO contractors (
       contractor_id,
-      company_name,
+      name,
       contact_person,
       email,
       phone,
@@ -283,7 +284,7 @@ export async function createContractor(
       created_at,
       updated_at
     ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
-    RETURNING contractor_id, company_name, contact_person, email, phone, address, status, cks_manager`,
+    RETURNING contractor_id, name, contact_person, email, phone, address, status, cks_manager, clerk_user_id`,
     [
       id,
       payload.name.trim(),
@@ -300,27 +301,68 @@ export async function createContractor(
     throw new Error('Failed to insert contractor record');
   }
 
+  const emailAddresses = row.email ? [row.email] : undefined;
+
+  try {
+    const clerkUser = await clerkClient.users.createUser({
+      username: id.toLowerCase(),
+      externalId: id,
+      firstName: row.contact_person ?? row.name,
+      emailAddress: emailAddresses,
+      publicMetadata: {
+        cksCode: id,
+        role: 'contractor',
+        ...(row.contact_person ? { mainContact: row.contact_person } : {}),
+        ...(row.phone ? { contactPhone: row.phone } : {}),
+      },
+      skipPasswordRequirement: true,
+    });
+
+    await query(
+      `UPDATE contractors SET clerk_user_id = $1, updated_at = NOW() WHERE contractor_id = $2`,
+      [clerkUser.id, id],
+    );
+
+    row.clerk_user_id = clerkUser.id;
+  } catch (error) {
+    console.error('[provisioning] Failed to create Clerk user for contractor', { contractorId: id, error });
+
+    await query('DELETE FROM contractors WHERE contractor_id = $1', [id]).catch((cleanupError) => {
+      console.warn('[provisioning] Failed to remove contractor after Clerk error', {
+        contractorId: id,
+        cleanupError,
+      });
+    });
+
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to create Clerk user for contractor ${id}: ${message}`);
+  }
+
   await recordActivity({
     actor,
     activityType: 'contractor_created',
     description: `Contractor ${id} created`,
     targetId: id,
     targetType: 'contractor',
-    metadata: { name: payload.name.trim() },
+    metadata: {
+      name: payload.name.trim(),
+      mainContact: payload.mainContact.trim(),
+      clerkUserId: row.clerk_user_id,
+    },
   });
 
   return {
     id,
-    name: row.company_name,
+    name: row.name,
     mainContact: row.contact_person,
     email: row.email,
     phone: row.phone,
     address: row.address,
     status: row.status,
     managerId: row.cks_manager,
+    clerkUserId: row.clerk_user_id,
   };
 }
-
 
 export async function createCustomer(
   input: unknown,
@@ -331,7 +373,7 @@ export async function createCustomer(
 
   const result = await query<{
     customer_id: string;
-    company_name: string;
+    name: string;
     main_contact: string | null;
     email: string | null;
     phone: string | null;
@@ -341,7 +383,7 @@ export async function createCustomer(
   }>(
     `INSERT INTO customers (
       customer_id,
-      company_name,
+      name,
       main_contact,
       email,
       phone,
@@ -351,7 +393,7 @@ export async function createCustomer(
       created_at,
       updated_at
     ) VALUES ($1, $2, $3, $4, $5, $6, $7, NULL, NOW(), NOW())
-    RETURNING customer_id, company_name, main_contact, email, phone, address, status, contractor_id`,
+    RETURNING customer_id, name, main_contact, email, phone, address, status, contractor_id`,
     [
       id,
       payload.name.trim(),
@@ -379,7 +421,7 @@ export async function createCustomer(
 
   return {
     id,
-    name: row.company_name,
+    name: row.name,
     mainContact: row.main_contact,
     email: row.email,
     phone: row.phone,
@@ -600,5 +642,6 @@ export async function createWarehouse(
     managerId: row.manager_id,
   };
 }
+
 
 

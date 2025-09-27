@@ -68,6 +68,14 @@ export interface HubOrderItem {
   nextActorRole: HubRole | null;
   rejectionReason: string | null;
   notes: string | null;
+  /** Legacy compatibility aliases for existing frontend hubs */
+  id?: string | null;
+  customerId?: string | null;
+  centerId?: string | null;
+  serviceId?: string | null;
+  assignedWarehouse?: string | null;
+  orderDate?: string | null;
+  completionDate?: string | null;
 }
 
 export interface HubOrdersPayload {
@@ -75,4 +83,6 @@ export interface HubOrdersPayload {
   cksCode: string;
   serviceOrders: HubOrderItem[];
   productOrders: HubOrderItem[];
+  orders: HubOrderItem[];
 }
+

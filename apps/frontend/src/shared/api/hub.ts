@@ -102,7 +102,9 @@ export interface HubOrderItem {
   orderType: 'service' | 'product';
   title: string | null;
   requestedBy: string | null;
+  requesterRole?: string | null;
   destination: string | null;
+  destinationRole?: string | null;
   requestedDate: string | null;
   expectedDate: string | null;
   status: string | null;
@@ -111,6 +113,14 @@ export interface HubOrderItem {
   centerId: string | null;
   assignedWarehouse: string | null;
   notes: string | null;
+  // Legacy aliases populated by backend for existing hubs
+  id?: string | null;
+  customerId?: string | null;
+  orderDate?: string | null;
+  completionDate?: string | null;
+  viewerStatus?: string | null;
+  approvalStages?: Array<{ role: string; status: string; userId: string | null; timestamp: string | null }>;
+  transformedId?: string | null;
 }
 
 export interface HubOrdersResponse {
@@ -118,6 +128,7 @@ export interface HubOrdersResponse {
   cksCode: string;
   serviceOrders: HubOrderItem[];
   productOrders: HubOrderItem[];
+  orders: HubOrderItem[];
 }
 
 export interface HubReportItem {
@@ -310,7 +321,13 @@ export function useHubOrders(cksCode?: string | null, options?: { status?: strin
   }
   const base = sectionPath('orders', cksCode);
   const key = base ? `${base}${query.toString() ? `?${query.toString()}` : ''}` : null;
-  const result = useHubSWR<HubOrdersResponse>(key);
+  const result = useHubSWR<HubOrdersResponse>(key, (value) => ({
+    ...value,
+    orders:
+      Array.isArray(value.orders) && value.orders.length > 0
+        ? value.orders
+        : [...(value.serviceOrders ?? []), ...(value.productOrders ?? [])],
+  }));
   return {
     data: result.data ?? null,
     isLoading: result.isLoading,
@@ -395,3 +412,4 @@ export async function fetchHubActivities(cksCode: string, init?: ApiFetchInit) {
   const response = await apiFetch<ApiResponse<HubActivitiesResponse>>(`/hub/activities/${encodeURIComponent(cksCode)}`, init);
   return response.data;
 }
+

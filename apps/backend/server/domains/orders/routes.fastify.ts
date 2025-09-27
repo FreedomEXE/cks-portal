@@ -121,6 +121,7 @@ export async function registerOrdersRoutes(server: FastifyInstance) {
         ...orders,
         serviceOrders,
         productOrders,
+        orders: [...serviceOrders, ...productOrders],
       },
     });
   });
@@ -237,3 +238,4 @@ export async function registerOrdersRoutes(server: FastifyInstance) {
     }
   });
 }
+

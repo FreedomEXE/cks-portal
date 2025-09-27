@@ -1,25 +1,6 @@
 /*-----------------------------------------------
   Property of CKS  Ac 2025
 -----------------------------------------------*/
-/**
- * File: ManagerHub.tsx
- *
- * Description:
- * Manager Hub orchestrator component
- *
- * Responsibilities:
- * - Orchestrate manager role hub interface
- * - Manage tab navigation and content rendering
- *
- * Role in system:
- * - Primary interface for manager users
- *
- * Notes:
- * Uses MyHubSection for navigation
- */
-/*-----------------------------------------------
-  Manifested by Freedom_EXE
------------------------------------------------*/
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -40,6 +21,27 @@ import {
 import { Button, DataTable, PageHeader, PageWrapper, Scrollbar, TabSection } from '@cks/ui';
 import MyHubSection from '../components/MyHubSection';
 import { useLogout } from '../hooks/useLogout';
+
+/**
+ * File: ManagerHub.tsx
+ *
+ * Description:
+ * Manager Hub orchestrator component
+ *
+ * Responsibilities:
+ * - Orchestrate manager role hub interface
+ * - Manage tab navigation and content rendering
+ *
+ * Role in system:
+ * - Primary interface for manager users
+ *
+ * Notes:
+ * Uses MyHubSection for navigation
+ */
+/*-----------------------------------------------
+  Manifested by Freedom_EXE
+-----------------------------------------------*/
+
 import {
   useHubReports,
   useHubRoleScope,
@@ -48,6 +50,7 @@ import {
   useHubProfile,
   useHubDashboard,
   type HubReportItem,
+  type HubOrderItem,
 } from '../shared/api/hub';
 
 interface ManagerHubProps {
@@ -74,6 +77,15 @@ type HubOrder = {
     timestamp?: string;
   }>;
   transformedId?: string;
+};
+
+type ManagerServiceEntry = {
+  id: string;
+  name: string | null;
+  status: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+  category: string | null;
 };
 
 const HUB_TABS = [
@@ -381,8 +393,53 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
   const customerEntries = managerScope?.relationships.customers ?? [];
   const centerEntries = managerScope?.relationships.centers ?? [];
   const crewEntries = managerScope?.relationships.crew ?? [];
-  const serviceEntries: Array<{ id?: string | null; name?: string | null; status?: string | null; createdAt?: string | null; updatedAt?: string | null; category?: string | null; }> = []; // Services will need a separate hub endpoint
-  const orderEntries = ordersData?.orders ?? [];
+  const serviceEntries = useMemo<ManagerServiceEntry[]>(() => {
+    if (!ordersData?.serviceOrders) {
+      return [];
+    }
+    const map = new Map<string, ManagerServiceEntry>();
+    ordersData.serviceOrders.forEach((order) => {
+      const serviceId = normalizeId(order.serviceId ?? order.transformedId ?? order.orderId ?? order.id ?? null);
+      if (!serviceId) {
+        return;
+      }
+      const existing = map.get(serviceId);
+      const status = order.status ?? null;
+      const createdAt = order.orderDate ?? order.requestedDate ?? null;
+      const updatedAt = order.completionDate ?? order.expectedDate ?? null;
+      const name = order.title ?? order.serviceId ?? serviceId;
+      if (existing) {
+        map.set(serviceId, {
+          ...existing,
+          name: existing.name ?? name,
+          status: status ?? existing.status,
+          createdAt: existing.createdAt ?? createdAt,
+          updatedAt: updatedAt ?? existing.updatedAt,
+        });
+      } else {
+        map.set(serviceId, {
+          id: serviceId,
+          name,
+          status,
+          createdAt,
+          updatedAt,
+          category: 'Service',
+        });
+      }
+    });
+    return Array.from(map.values());
+  }, [ordersData]);
+  const orderEntries = useMemo<HubOrderItem[]>(() => {
+    if (!ordersData) {
+      return [];
+    }
+    if (Array.isArray(ordersData.orders) && ordersData.orders.length > 0) {
+      return ordersData.orders;
+    }
+    const serviceOrders = ordersData.serviceOrders ?? [];
+    const productOrders = ordersData.productOrders ?? [];
+    return [...serviceOrders, ...productOrders];
+  }, [ordersData]);
 
   // Map hub activities to the Activity format expected by RecentActivity component
   const activityItems = useMemo(() => {
@@ -498,32 +555,15 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
   }, [serviceEntries]);
 
   // Hub orders are already filtered for this manager
-  const managerOrders = orderEntries;
-
   const managerServiceOrders = useMemo(
-    () => managerOrders.filter((order) => !!normalizeId(order.serviceId)),
-    [managerOrders],
+    () => orderEntries.filter((order) => order.orderType === 'service'),
+    [orderEntries],
   );
-
   const managerProductOrders = useMemo(
-    () => managerOrders.filter((order) => !normalizeId(order.serviceId)),
-    [managerOrders],
+    () => orderEntries.filter((order) => order.orderType === 'product'),
+    [orderEntries],
   );
-
-  const managerServices = useMemo(() => {
-    const unique = new Map<string, (typeof serviceEntries)[number]>();
-    managerServiceOrders.forEach((order) => {
-      const serviceId = normalizeId(order.serviceId);
-      if (!serviceId || unique.has(serviceId)) {
-        return;
-      }
-      const service = serviceById.get(serviceId);
-      if (service) {
-        unique.set(serviceId, service);
-      }
-    });
-    return Array.from(unique.values());
-  }, [managerServiceOrders, serviceById]);
+  const managerServices = serviceEntries;
 
   const myServicesData = useMemo(
     () =>
@@ -549,20 +589,21 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
           return status === 'pending' || status === 'in-progress' || status === 'approved';
         })
         .map((order) => {
-          const serviceId = normalizeId(order.serviceId);
+          const rawServiceId = order.serviceId ?? order.transformedId ?? order.orderId ?? order.id ?? 'Service';
+          const serviceId = normalizeId(rawServiceId);
           const service = serviceId ? serviceById.get(serviceId) : null;
-          const centerId = normalizeId(order.centerId);
+          const centerId = normalizeId(order.centerId ?? order.destination);
           return {
-            serviceId: order.serviceId ?? order.id,
-            serviceName: service?.name ?? (order.serviceId ?? 'Service'),
+            serviceId: rawServiceId,
+            serviceName: service?.name ?? order.title ?? rawServiceId,
             centerId: centerId ?? 'N/A',
             type: service?.category ?? 'Service',
-            startDate: formatDate(order.orderDate),
+            status: formatStatusLabel(order.status),
+            startDate: formatDate(order.orderDate ?? order.requestedDate),
           };
         }),
     [managerServiceOrders, serviceById],
   );
-
   const serviceHistoryData = useMemo(
     () =>
       managerServiceOrders
@@ -571,22 +612,22 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
           return status === 'delivered' || status === 'service-created' || status === 'cancelled' || status === 'rejected';
         })
         .map((order) => {
-          const serviceId = normalizeId(order.serviceId);
+          const rawServiceId = order.serviceId ?? order.transformedId ?? order.orderId ?? order.id ?? 'Service';
+          const serviceId = normalizeId(rawServiceId);
           const service = serviceId ? serviceById.get(serviceId) : null;
-          const centerId = normalizeId(order.centerId);
+          const centerId = normalizeId(order.centerId ?? order.destination);
           return {
-            serviceId: order.serviceId ?? order.id,
-            serviceName: service?.name ?? (order.serviceId ?? 'Service'),
+            serviceId: rawServiceId,
+            serviceName: service?.name ?? order.title ?? rawServiceId,
             centerId: centerId ?? 'N/A',
             type: service?.category ?? 'Service',
             status: formatStatusLabel(order.status),
-            startDate: formatDate(order.orderDate),
-            endDate: formatDate(order.completionDate),
+            startDate: formatDate(order.orderDate ?? order.requestedDate),
+            endDate: formatDate(order.completionDate ?? order.expectedDate),
           };
         }),
     [managerServiceOrders, serviceById],
   );
-
   const overviewData = useMemo(() => {
     if (dashboardData) {
       return {
@@ -631,56 +672,66 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
   const managerServiceOrderCards = useMemo<HubOrder[]>(
     () =>
       managerServiceOrders.map((order) => {
-        const serviceId = normalizeId(order.serviceId);
+        const canonicalOrderId = order.orderId ?? order.id ?? 'ORD-UNKNOWN';
+        const serviceId = normalizeId(order.serviceId ?? order.transformedId ?? canonicalOrderId);
         const service = serviceId ? serviceById.get(serviceId) : null;
-        const customerId = normalizeId(order.customerId);
-        const centerId = normalizeId(order.centerId);
+        const customerId = normalizeId(order.customerId ?? order.requestedBy);
+        const centerId = normalizeId(order.centerId ?? order.destination);
         const status = normalizeOrderStatus(order.status);
-        const requestedBy = customerId ? customerNameMap.get(customerId) ?? order.customerId ?? 'Customer' : order.customerId ?? 'Customer';
-        const destination = centerId ? centerNameMap.get(centerId) ?? centerId : undefined;
-        const deliveryDate = status === 'delivered' ? formatDate(order.completionDate) : undefined;
+        const requestedByLabel = customerId
+          ? customerNameMap.get(customerId) ?? order.customerId ?? order.requestedBy ?? 'Customer'
+          : order.customerId ?? order.requestedBy ?? 'Customer';
+        const destinationLabel = centerId ? centerNameMap.get(centerId) ?? centerId : undefined;
+        const requestedDate = order.requestedDate ?? order.orderDate ?? null;
+        const expectedDate = order.expectedDate ?? order.completionDate ?? null;
+        const deliveryDate = status === 'delivered' ? order.deliveryDate ?? expectedDate : undefined;
+        const serviceStartDate = status === 'service-created' ? requestedDate : undefined;
         return {
-          orderId: order.id,
+          orderId: canonicalOrderId,
           orderType: 'service',
-          title: service?.name ?? (order.serviceId ?? 'Service Order'),
-          requestedBy,
-          destination,
-          requestedDate: formatDate(order.orderDate),
-          expectedDate: formatDate(order.completionDate),
-          serviceStartDate: status === 'service-created' ? formatDate(order.orderDate) : undefined,
-          deliveryDate,
+          title: service?.name ?? order.title ?? order.serviceId ?? canonicalOrderId,
+          requestedBy: requestedByLabel,
+          destination: destinationLabel,
+          requestedDate: formatDate(requestedDate),
+          expectedDate: formatDate(expectedDate),
+          serviceStartDate: serviceStartDate ? formatDate(serviceStartDate) : undefined,
+          deliveryDate: deliveryDate ? formatDate(deliveryDate) : undefined,
           status,
           approvalStages: [],
+          transformedId: order.transformedId ?? order.serviceId ?? null,
         };
       }),
-    [customerNameMap, centerNameMap, managerServiceOrders, serviceById],
+    [centerNameMap, customerNameMap, managerServiceOrders, serviceById],
   );
-
   const managerProductOrderCards = useMemo<HubOrder[]>(
     () =>
       managerProductOrders.map((order) => {
-        const customerId = normalizeId(order.customerId);
-        const centerId = normalizeId(order.centerId);
+        const canonicalOrderId = order.orderId ?? order.id ?? 'ORD-UNKNOWN';
+        const customerId = normalizeId(order.customerId ?? order.requestedBy);
+        const centerId = normalizeId(order.centerId ?? order.destination);
         const status = normalizeOrderStatus(order.status);
-        const requestedBy = customerId ? customerNameMap.get(customerId) ?? order.customerId ?? 'Customer' : order.customerId ?? 'Customer';
-        const destination = centerId ? centerNameMap.get(centerId) ?? centerId : undefined;
-        const deliveryDate = status === 'delivered' ? formatDate(order.completionDate) : undefined;
+        const requestedByLabel = customerId
+          ? customerNameMap.get(customerId) ?? order.customerId ?? order.requestedBy ?? 'Customer'
+          : order.customerId ?? order.requestedBy ?? 'Customer';
+        const destinationLabel = centerId ? centerNameMap.get(centerId) ?? centerId : undefined;
+        const requestedDate = order.requestedDate ?? order.orderDate ?? null;
+        const expectedDate = order.expectedDate ?? order.completionDate ?? null;
+        const deliveryDate = status === 'delivered' ? order.deliveryDate ?? expectedDate : undefined;
         return {
-          orderId: order.id,
+          orderId: canonicalOrderId,
           orderType: 'product',
-          title: order.notes ?? `Product Order ${order.id}`,
-          requestedBy,
-          destination,
-          requestedDate: formatDate(order.orderDate),
-          expectedDate: formatDate(order.completionDate),
-          deliveryDate,
+          title: order.title ?? order.notes ?? `Product Order ${canonicalOrderId}`,
+          requestedBy: requestedByLabel,
+          destination: destinationLabel,
+          requestedDate: formatDate(requestedDate),
+          expectedDate: formatDate(expectedDate),
+          deliveryDate: deliveryDate ? formatDate(deliveryDate) : undefined,
           status,
           approvalStages: [],
         };
       }),
-    [customerNameMap, centerNameMap, managerProductOrders],
+    [centerNameMap, customerNameMap, managerProductOrders],
   );
-
   const centersByCustomerId = useMemo(() => {
     const map = new Map<string, (typeof managerCenters)[number][]>();
     managerCenters.forEach((center) => {
@@ -1013,4 +1064,6 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
     </div>
   );
 }
+
+
 

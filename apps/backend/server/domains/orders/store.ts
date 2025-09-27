@@ -75,6 +75,8 @@ function formatMoney(value: string | number | null | undefined): string | null {
 function mapLegacyOrder(row: LegacyOrderRow): HubOrderItem {
   const orderType = row.service_id ? 'service' : 'product';
   const status = normalizeStatus(row.status);
+  const requestedDate = toIso(row.order_date);
+  const expectedDate = toIso(row.completion_date);
 
   return {
     orderId: row.order_id,
@@ -84,8 +86,8 @@ function mapLegacyOrder(row: LegacyOrderRow): HubOrderItem {
     requesterRole: null,
     destination: row.center_id ?? null,
     destinationRole: row.center_id ? 'center' : null,
-    requestedDate: toIso(row.order_date),
-    expectedDate: toIso(row.completion_date),
+    requestedDate,
+    expectedDate,
     serviceStartDate: null,
     deliveryDate: null,
     status,
@@ -98,6 +100,13 @@ function mapLegacyOrder(row: LegacyOrderRow): HubOrderItem {
     nextActorRole: null,
     rejectionReason: null,
     notes: row.notes ?? null,
+    id: row.order_id,
+    customerId: row.customer_id ?? null,
+    centerId: row.center_id ?? null,
+    serviceId: row.service_id ?? null,
+    assignedWarehouse: row.assigned_warehouse ?? null,
+    orderDate: requestedDate,
+    completionDate: expectedDate,
   };
 }
 
@@ -129,6 +138,7 @@ async function getCustomerOrders(cksCode: string): Promise<HubOrdersPayload> {
     cksCode: normalized,
     serviceOrders,
     productOrders,
+    orders: [...serviceOrders, ...productOrders],
   };
 }
 
@@ -149,11 +159,15 @@ async function getManagerOrders(cksCode: string): Promise<HubOrdersPayload> {
     [normalized],
   );
 
+  const serviceOrders = orders.filter((order) => order.orderType === 'service');
+  const productOrders = orders.filter((order) => order.orderType === 'product');
+
   return {
     role: 'manager',
     cksCode: normalized,
-    serviceOrders: orders.filter((order) => order.orderType === 'service'),
-    productOrders: orders.filter((order) => order.orderType === 'product'),
+    serviceOrders,
+    productOrders,
+    orders: [...serviceOrders, ...productOrders],
   };
 }
 
@@ -174,11 +188,15 @@ async function getContractorOrders(cksCode: string): Promise<HubOrdersPayload> {
     [normalized],
   );
 
+  const serviceOrders = orders.filter((order) => order.orderType === 'service');
+  const productOrders = orders.filter((order) => order.orderType === 'product');
+
   return {
     role: 'contractor',
     cksCode: normalized,
-    serviceOrders: orders.filter((order) => order.orderType === 'service'),
-    productOrders: orders.filter((order) => order.orderType === 'product'),
+    serviceOrders,
+    productOrders,
+    orders: [...serviceOrders, ...productOrders],
   };
 }
 
@@ -197,11 +215,15 @@ async function getCenterOrders(cksCode: string): Promise<HubOrdersPayload> {
     [normalized],
   );
 
+  const serviceOrders = orders.filter((order) => order.orderType === 'service');
+  const productOrders = orders.filter((order) => order.orderType === 'product');
+
   return {
     role: 'center',
     cksCode: normalized,
-    serviceOrders: orders.filter((order) => order.orderType === 'service'),
-    productOrders: orders.filter((order) => order.orderType === 'product'),
+    serviceOrders,
+    productOrders,
+    orders: [...serviceOrders, ...productOrders],
   };
 }
 
@@ -223,6 +245,7 @@ async function getCrewOrders(cksCode: string): Promise<HubOrdersPayload> {
       cksCode: normalized,
       serviceOrders: [],
       productOrders: [],
+      orders: [],
     };
   }
 
@@ -235,11 +258,15 @@ async function getCrewOrders(cksCode: string): Promise<HubOrdersPayload> {
     [assignedCenter.toUpperCase()],
   );
 
+  const serviceOrders = orders.filter((order) => order.orderType === 'service');
+  const productOrders = orders.filter((order) => order.orderType === 'product');
+
   return {
     role: 'crew',
     cksCode: normalized,
-    serviceOrders: orders.filter((order) => order.orderType === 'service'),
-    productOrders: orders.filter((order) => order.orderType === 'product'),
+    serviceOrders,
+    productOrders,
+    orders: [...serviceOrders, ...productOrders],
   };
 }
 
@@ -258,11 +285,15 @@ async function getWarehouseOrders(cksCode: string): Promise<HubOrdersPayload> {
     [normalized],
   );
 
+  const serviceOrders = orders.filter((order) => order.orderType === 'service');
+  const productOrders = orders.filter((order) => order.orderType === 'product');
+
   return {
     role: 'warehouse',
     cksCode: normalized,
-    serviceOrders: orders.filter((order) => order.orderType === 'service'),
-    productOrders: orders.filter((order) => order.orderType === 'product'),
+    serviceOrders,
+    productOrders,
+    orders: [...serviceOrders, ...productOrders],
   };
 }
 

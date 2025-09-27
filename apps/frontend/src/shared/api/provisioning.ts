@@ -23,7 +23,6 @@ export interface ManagerRecord {
   status: string;
   clerkUserId: string | null;
 }
-
 export interface ContractorCreatePayload {
   name: string;
   mainContact: string;
@@ -41,8 +40,8 @@ export interface ContractorRecord {
   address: string | null;
   status: string;
   managerId: string | null;
+  clerkUserId: string | null;
 }
-
 export interface CustomerCreatePayload {
   name: string;
   mainContact: string;
