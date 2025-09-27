@@ -5,7 +5,6 @@ import type {
   HubActivityItem,
   HubRoleActivitiesPayload,
   HubRoleScopePayload,
-  ManagerRoleActivitiesPayload,
   ManagerRoleScopePayload,
   ManagerScopeCenter,
   ManagerScopeContractor,
@@ -195,7 +194,8 @@ async function getManagerRoleScope(cksCode: string): Promise<ManagerRoleScopePay
   ]);
 
   const contractors: ManagerScopeContractor[] = contractorRows.rows.map((row) => ({
-    contractorId: ensureId(row.contractor_id, 'CONTRACTOR'),
+    id: ensureId(row.contractor_id, 'CONTRACTOR'),
+    role: 'contractor',
     name: toNullableString(row.name),
     contactPerson: toNullableString(row.contact_person),
     email: toNullableString(row.email),
@@ -205,7 +205,8 @@ async function getManagerRoleScope(cksCode: string): Promise<ManagerRoleScopePay
   }));
 
   const customers: ManagerScopeCustomer[] = customerRows.rows.map((row) => ({
-    customerId: ensureId(row.customer_id, 'CUSTOMER'),
+    id: ensureId(row.customer_id, 'CUSTOMER'),
+    role: 'customer',
     contractorId: toNullableString(row.contractor_id ? normalizeIdentity(row.contractor_id) : null),
     name: toNullableString(row.name),
     mainContact: toNullableString(row.main_contact),
@@ -216,7 +217,8 @@ async function getManagerRoleScope(cksCode: string): Promise<ManagerRoleScopePay
   }));
 
   const centers: ManagerScopeCenter[] = centerRows.rows.map((row) => ({
-    centerId: ensureId(row.center_id, 'CENTER'),
+    id: ensureId(row.center_id, 'CENTER'),
+    role: 'center',
     contractorId: toNullableString(row.contractor_id ? normalizeIdentity(row.contractor_id) : null),
     customerId: toNullableString(row.customer_id ? normalizeIdentity(row.customer_id) : null),
     name: toNullableString(row.name),
@@ -228,7 +230,8 @@ async function getManagerRoleScope(cksCode: string): Promise<ManagerRoleScopePay
   }));
 
   const crew: ManagerScopeCrewMember[] = crewRows.rows.map((row) => ({
-    crewId: ensureId(row.crew_id, 'CREW'),
+    id: ensureId(row.crew_id, 'CREW'),
+    role: 'crew',
     assignedCenter: toNullableString(row.assigned_center ? normalizeIdentity(row.assigned_center) : null),
     name: toNullableString(row.name),
     email: toNullableString(row.email),
@@ -258,7 +261,7 @@ async function getManagerRoleScope(cksCode: string): Promise<ManagerRoleScopePay
 }
 
 
-async function getManagerActivities(cksCode: string): Promise<ManagerRoleActivitiesPayload | null> {
+async function getManagerActivities(cksCode: string): Promise<HubRoleActivitiesPayload | null> {
   const scope = await getManagerRoleScope(cksCode);
   if (!scope) {
     return null;
@@ -273,10 +276,20 @@ async function getManagerActivities(cksCode: string): Promise<ManagerRoleActivit
   };
 
   addId(scope.cksCode);
-  scope.relationships.contractors.forEach((contractor) => addId(contractor.contractorId));
-  scope.relationships.customers.forEach((customer) => addId(customer.customerId));
-  scope.relationships.centers.forEach((center) => addId(center.centerId));
-  scope.relationships.crew.forEach((member) => addId(member.crewId));
+  scope.relationships.contractors.forEach((contractor) => addId(contractor.id));
+  scope.relationships.customers.forEach((customer) => {
+    addId(customer.id);
+    addId(customer.contractorId);
+  });
+  scope.relationships.centers.forEach((center) => {
+    addId(center.id);
+    addId(center.customerId);
+    addId(center.contractorId);
+  });
+  scope.relationships.crew.forEach((member) => {
+    addId(member.id);
+    addId(member.assignedCenter);
+  });
 
   const idArray = Array.from(ids);
   if (!idArray.length) {
@@ -322,9 +335,4 @@ export async function getRoleScope(role: HubRole, cksCode: string): Promise<HubR
   }
   return null;
 }
-
-
-
-
-
 

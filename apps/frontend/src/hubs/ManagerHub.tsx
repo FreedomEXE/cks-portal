@@ -376,12 +376,12 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
   const { data: ordersData } = useHubOrders(managerCode);
 
   // Extract role-scoped entities from scope data
-  const managerEntries = scopeData?.scope?.managers ?? [];
-  const contractorEntries = scopeData?.scope?.contractors ?? [];
-  const customerEntries = scopeData?.scope?.customers ?? [];
-  const centerEntries = scopeData?.scope?.centers ?? [];
-  const crewEntries = scopeData?.scope?.crew ?? [];
-  const serviceEntries = []; // Services will need a separate hub endpoint
+  const managerScope = scopeData?.role === 'manager' ? scopeData : null;
+  const contractorEntries = managerScope?.relationships.contractors ?? [];
+  const customerEntries = managerScope?.relationships.customers ?? [];
+  const centerEntries = managerScope?.relationships.centers ?? [];
+  const crewEntries = managerScope?.relationships.crew ?? [];
+  const serviceEntries: Array<{ id?: string | null; name?: string | null; status?: string | null; createdAt?: string | null; updatedAt?: string | null; category?: string | null; }> = []; // Services will need a separate hub endpoint
   const orderEntries = ordersData?.orders ?? [];
 
   // Map hub activities to the Activity format expected by RecentActivity component
@@ -1013,5 +1013,4 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
     </div>
   );
 }
-
 

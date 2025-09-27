@@ -6,7 +6,7 @@ import { SignedIn, useAuth as useClerkAuth, useSignIn } from '@clerk/clerk-react
 import { FormEvent, useRef, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth as useBootstrapAuth } from '../hooks/useAuth';
-import logoSrc from '../assets/cks-logo.png';
+import logoSrc from '../assets/cks-portal-logo.svg';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -117,20 +117,29 @@ export default function Login() {
         <Navigate to="/hub" replace />
       </SignedIn>
 
-      <div className="fixed inset-0 bg-[#1f1f1f] text-white flex items-center justify-center">
-        <div className="w-full max-w-md -translate-y-8">
-          <div className="flex flex-col items-center text-center">
-            <img
-              src={logoSrc}
-              alt="CKS"
-              className="w-full h-auto mb-1 select-none invert px-6"
-              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
-            />
-          </div>
-          {error && (<div className="alert-error mb-2">{error}</div>)}
-          <form onSubmit={onSubmit} className="px-6 pt-0 pb-4 relative z-10">
-            <div className="mb-3 text-left">
-              <label className="block mb-1 text-white text-base md:text-lg">Username</label>
+      <div className="fixed inset-0 flex items-center justify-center p-4 overflow-auto">
+        {/* Diagonal split background */}
+        <div className="absolute inset-0 overflow-hidden">
+          <div className="absolute inset-0 bg-[#1a1a1a]"></div>
+          <div className="absolute inset-0" style={{
+            background: 'linear-gradient(135deg, #f5f5f0 0%, #f5f5f0 50%, #1a1a1a 50%, #1a1a1a 100%)'
+          }}></div>
+        </div>
+        <div className="w-full max-w-md my-auto relative z-10">
+          <div className="bg-[#1f1f1f] rounded-2xl shadow-2xl border border-gray-800 p-8">
+            <div className="flex flex-col items-center text-center mb-8">
+              <img
+                src={logoSrc}
+                alt="CKS"
+                className="w-full max-w-[280px] h-auto select-none"
+                style={{ filter: 'invert(1) brightness(0.9)' }}
+                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+              />
+            </div>
+            {error && (<div className="alert-error mb-4">{error}</div>)}
+            <form onSubmit={onSubmit} className="relative z-10">
+              <div className="mb-4 text-left">
+                <label className="block mb-2 text-gray-200 text-sm font-medium">Username</label>
               <input
                 className="w-full rounded-xl border border-gray-700 bg-[#111111] text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-300 focus:border-brand-500 placeholder-gray-400"
                 type="text"
@@ -139,9 +148,9 @@ export default function Login() {
                 onChange={(e) => setIdentifier(e.target.value)}
                 required
               />
-            </div>
-            <div className="mb-4 text-left">
-              <label className="block mb-1 text-white text-base md:text-lg">Password</label>
+              </div>
+              <div className="mb-5 text-left">
+                <label className="block mb-2 text-gray-200 text-sm font-medium">Password</label>
               <input
                 className="w-full rounded-xl border border-gray-700 bg-[#111111] text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-300 focus:border-brand-500 placeholder-gray-400"
                 type="password"
@@ -150,19 +159,22 @@ export default function Login() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
               />
+              </div>
+              <button type="submit" className="btn btn-primary w-full text-base py-3 mb-3" disabled={loading || !isLoaded}>
+                {loading ? 'Signing in...' : 'Sign in'}
+              </button>
+              <div className="flex items-center justify-center text-xs text-gray-400">
+                <a href="/forgot" className="hover:underline hover:text-gray-300 transition-colors">Forgot password?</a>
+              </div>
+            </form>
+
+            <div className="mt-6 pt-6 border-t border-gray-800">
+              <button onClick={signInWithGoogle} className="btn w-full bg-white hover:bg-gray-100 text-black text-base py-3 transition-colors" disabled={!isLoaded || loading}>
+                Continue with Google
+              </button>
+              <div className="mt-4 text-center text-xs text-gray-500">Secured by Clerk</div>
             </div>
-            <button type="submit" className="btn btn-primary w-full text-base md:text-lg py-3" disabled={loading || !isLoaded}>
-              {loading ? 'Signing in...' : 'Sign in'}
-            </button>
-            <div className="flex items-center justify-center mt-2 text-xs md:text-sm text-gray-400">
-              <a href="/forgot" className="hover:underline">Forgot password?</a>
-            </div>
-          </form>
-          <div className="my-1.5" />
-          <button onClick={signInWithGoogle} className="btn w-full bg-white text-black text-base md:text-lg py-2.5" disabled={!isLoaded || loading}>
-            Continue with Google
-          </button>
-          <div className="mt-2 text-center text-sm md:text-base text-gray-400">Secured by Clerk</div>
+          </div>
         </div>
       </div>
     </>

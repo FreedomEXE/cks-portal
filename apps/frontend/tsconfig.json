@@ -30,7 +30,8 @@
       "@cks/auth": ["../auth/src/index.ts"],
       "@cks/auth/*": ["../auth/src/*"],
       "@cks/ui": ["../packages/ui/src/index.ts"],
-      "@cks/ui/*": ["../packages/ui/src/*"],
+      "@cks/ui/styles/*": ["../packages/ui/dist/styles/*"],
+      "@cks/ui/assets/*": ["../packages/ui/dist/assets/*"],
       "@cks-domain/*": ["../packages/domain-widgets/src/*"]
     }
   },

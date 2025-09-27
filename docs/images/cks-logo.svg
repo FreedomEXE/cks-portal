@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg version="1.1" viewBox="0 0 1024 1024" width="1024" height="1024" xmlns="http://www.w3.org/2000/svg">
+<path transform="translate(225,399)" d="m0 0h99l11 4 8 7 4 6 1 8-118 1-12 4-9 6-6 10-2 6v63l4 6 6 3h102l8-4 3-7v-21l-9-10-14-14 6-7 7-7 7-1 14 14 7 6 6 9 2 6v30l-4 11-4 6-5 5-8 6-10 3h-114l-13-4-8-6-7-8-4-10-1-6v-60l4-16 7-13 11-12 10-7 11-5z" fill="#202121"/>
+<path transform="translate(777,396)" d="m0 0h16l18 3 11 4 10 7 6 7 5 10 2 14h-30l-5-10-9-6-7-2h-20l-9 4-4 5-1 2v9l5 6 15 5 31 6 12 4 10 6 5 4 6 9 3 9 1 12-3 14-7 11-9 8-12 6-16 4-13 1-16-1-16-4-12-6-11-10-7-14-1-13 23-2h7l3 10 7 8 8 4 5 1h21l9-3 5-4 3-7-1-9-4-6-12-5-36-7-16-6-10-7-6-9-3-11v-14l3-10 6-9 7-7 16-8 8-2z" fill="#202121"/>
+<path transform="translate(582,399)" d="m0 0h31l1 63 15-15 7-8 25-25 7-8 7-7h38l-2 4-13 13-7 8-16 16-7 8-13 13 6 9 10 14 28 38 15 20v2h-39l-13-19-12-16-11-16-7-10-4 2-11 12-3 3-1 44h-31z" fill="#202121"/>
+<path transform="translate(479,397)" d="m0 0h29l15 4 15 8 12 11 6 9 4 10-1 3-25 5-5-1-6-9-11-8-13-4h-13l-13 4-9 6-7 8-5 10-3 13v11l2 10 5 12 4 6 7 7 10 5 14 3 12-1 11-4 9-7 6-9 1-2 10 1 20 4-1 7-6 11-9 10-7 6-11 6-12 4-16 2-20-1-15-4-14-7-11-9-11-14-7-16-3-14v-23l4-16 8-16 9-11 10-8 15-8z" fill="#202121"/>
+<path transform="translate(652,587)" d="m0 0h6l10 14 1 4h2v-18h5v29h-5l-11-16-2-3-1 19h-5z" fill="#202121"/>
+<path transform="translate(696,586)" d="m0 0 8 1 6 5 1 3-3 1h-3v-2l-3-1h-8l-3 3-1 7 3 6 2 1h6l4-4-7-2v-3h14l-1 9-6 5-2 1h-10l-6-4-3-5v-11l4-6z" fill="#202121"/>
+<path transform="translate(516,586)" d="m0 0 7 1 7 6 2 5v7l-4 7-6 4h-9l-6-4-3-4-1-3v-7l4-8 5-3zm-2 6-5 5v8l2 4 4 2 7-1 4-5v-7l-5-6z" fill="#202121"/>
+<path transform="translate(746,587)" d="m0 0h15l5 3 1 2v8l-4 4h-2l7 10v2h-7l-6-10-3-1v11h-6zm6 5-1 4 1 5h7l3-4-1-4-2-1z" fill="#202121"/>
+<path transform="translate(230,587)" d="m0 0h14l5 3 2 3v6l-5 5v2l6 8v2h-7l-6-10-4-1v11h-6v-28zm5 5v9h7l3-2v-5l-2-2z" fill="#202121"/>
+<path transform="translate(571,587)" d="m0 0h15l5 3 1 2v8l-6 5 7 11h-7l-7-10-3-1v11h-5zm5 5v9h7l3-2v-5l-2-2z" fill="#202121"/>
+<path transform="translate(202,587)" d="m0 0h20v5l-14 1v4l12 1v5h-12v7h14v6h-20z" fill="#202121"/>
+<path transform="translate(719,587)" d="m0 0h20v5h-15v6h13v5l-12 1-1 6h15v6h-20z" fill="#202121"/>
+<path transform="translate(336,587)" d="m0 0h20l1 2-1 3h-14v6h13v5l-12 1-1 6h15v6h-20z" fill="#202121"/>
+<path transform="translate(182,586)" d="m0 0 9 2 3 4v3h-5l-2-2h-7l-1 4 11 3 5 5-1 7-3 3-3 1h-9l-5-3-2-5 1-1h5l2 3h7l1-4-13-5-2-3 1-7 4-4z" fill="#202121"/>
+<path transform="translate(372,586)" d="m0 0 7 1 5 5v3h-6l-1-2h-7l-1 4 11 3 4 3 1 5-2 5-5 3h-9l-5-3-2-5 1-1h5l2 3h7l1-4-11-4-4-5 1-7 4-3z" fill="#202121"/>
+<path transform="translate(850,586)" d="m0 0 7 1 4 4 1 4h-5l-4-3h-6v5l9 2 5 3 1 2v7l-4 4-2 1h-9l-5-3-2-5 5-1 3 3h7l-1-5-11-4-2-3v-6l5-5z" fill="#202121"/>
+<path transform="translate(416,587)" d="m0 0h6l5 12 6 16v1h-6l-2-4v-3h-12l-2 7h-6l3-10 7-18zm2 8-3 9h8l-3-9z" fill="#202121"/>
+<path transform="translate(316,586)" d="m0 0 6 1 7 6v4h-5l-4-4h-7l-3 1-1 4v7l4 5h6l6-4 4 1-1 4-4 4-3 1h-9l-5-3-4-5-1-2v-9l4-6 5-4z" fill="#202121"/>
+<path transform="translate(814,587)" d="m0 0h15l4 2 2 3v9l-4 4-11 2v8l-1 1h-5zm5 5v8l1 1h7l2-2v-5l-2-2z" fill="#202121"/>
+<path transform="translate(539,587)" d="m0 0h5l1 19 1 3 7 1 3-3 1-20h5v22l-2 4-5 3h-9l-5-3-2-3z" fill="#202121"/>
+<path transform="translate(255,587)" d="m0 0h6l4 9 4 11 8-20h6l-3 9-7 19-1 1h-6l-11-28z" fill="#202121"/>
+<path transform="translate(613,587)" d="m0 0h19v5h-14v7h12v5h-12v12h-5z" fill="#202121"/>
+<path transform="translate(771,587)" d="m0 0h24v5h-9v24h-6v-24h-9z" fill="#202121"/>
+<path transform="translate(475,587)" d="m0 0h6l6 10 3-3 4-7h6l-2 6-7 11-1 12h-5l-1-11-9-16z" fill="#202121"/>
+<path transform="translate(434,587)" d="m0 0h23v5h-9v24h-5l-1-2 1-22h-9z" fill="#202121"/>
+<path transform="translate(800,587)" d="m0 0h6v29h-6z" fill="#202121"/>
+<path transform="translate(289,587)" d="m0 0h6v29h-6z" fill="#202121"/>
+<path transform="translate(638,587)" d="m0 0h5v29h-5z" fill="#202121"/>
+</svg>
