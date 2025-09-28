@@ -446,6 +446,15 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
                     : 'Search service history'
                 }
                 onSearch={setServicesSearchQuery}
+                actionButton={
+                  <Button
+                    variant="primary"
+                    roleColor="#000000"
+                    onClick={() => navigate('/catalog')}
+                  >
+                    Browse CKS Catalog
+                  </Button>
+                }
                 primaryColor="#f97316"
               >
                 {servicesTab === 'active' && (
@@ -553,8 +562,8 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
                 userRole="center"
                 serviceOrders={serviceOrders}
                 productOrders={productOrders}
-                onCreateServiceOrder={() => navigate('/orders/new-service')}
-                onCreateProductOrder={() => navigate('/orders/new-product')}
+                onCreateServiceOrder={() => navigate('/catalog')}
+                onCreateProductOrder={() => navigate('/catalog')}
                 onOrderAction={() => undefined}
                 showServiceOrders={true}
                 showProductOrders={true}

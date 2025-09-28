@@ -12,6 +12,7 @@ export type OrderStatus =
 export type OrderViewerStatus =
   | 'pending'
   | 'in-progress'
+  | 'approved'
   | 'rejected'
   | 'cancelled'
   | 'delivered'
@@ -27,11 +28,11 @@ export interface OrderApprovalStage {
     | 'cancelled'
     | 'delivered'
     | 'service-created'
-    | 'requested';
+    | 'requested'
+    | 'waiting';
   userId: string | null;
   timestamp: string | null;
 }
-
 export interface HubOrderLineItem {
   id: string;
   code: string | null;
@@ -85,4 +86,6 @@ export interface HubOrdersPayload {
   productOrders: HubOrderItem[];
   orders: HubOrderItem[];
 }
+
+
 

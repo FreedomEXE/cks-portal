@@ -243,20 +243,33 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
   const ecosystemTree = useMemo<TreeNode>(() => {
     const fallbackId = normalizedCode ?? 'CREW';
     const fallbackName = profile?.name ?? normalizedCode ?? 'Crew';
+
     if (!crewScope) {
       return {
-      user: {
-        id: fallbackId,
-        role: 'Crew',
-        name: fallbackName,
-      },
-      type: 'crew',
-    };
+        user: {
+          id: fallbackId,
+          role: 'Crew',
+          name: fallbackName,
+        },
+        type: 'crew',
+      };
     }
+
     return buildEcosystemTree(crewScope, { rootName: fallbackName });
   }, [crewScope, normalizedCode, profile?.name]);
 
   const ecosystemRootId = ecosystemTree.user.id;
+  const ecosystemCurrentUserId = normalizedCode ?? ecosystemRootId;
+  const ecosystemExpandedNodes = useMemo(() => {
+    const nodes: string[] = [];
+    if (ecosystemRootId) {
+      nodes.push(ecosystemRootId);
+    }
+    if (normalizedCode && !nodes.includes(normalizedCode)) {
+      nodes.push(normalizedCode);
+    }
+    return nodes;
+  }, [ecosystemRootId, normalizedCode]);
 
   const { activeServicesData, serviceHistoryData } = useMemo(() => {
     const active: Array<{ serviceId: string; serviceName: string; type: string; status: string; startDate: string }>
@@ -395,8 +408,8 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
                 rootUser={ecosystemTree.user}
                 treeData={ecosystemTree}
                 onNodeClick={() => undefined}
-                expandedNodes={ecosystemRootId ? [ecosystemRootId] : []}
-                currentUserId={ecosystemRootId}
+                expandedNodes={ecosystemExpandedNodes}
+                currentUserId={ecosystemCurrentUserId}
                 title="Ecosystem"
                 subtitle="Your network overview"
                 description="Click any row with an arrow to expand and explore your crew ecosystem."
@@ -426,6 +439,15 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
                 }
                 searchPlaceholder="Search services"
                 onSearch={setServicesSearchQuery}
+                actionButton={
+                  <Button
+                    variant="primary"
+                    roleColor="#000000"
+                    onClick={() => navigate('/catalog')}
+                  >
+                    Browse CKS Catalog
+                  </Button>
+                }
                 primaryColor="#ef4444"
               >
                 {servicesTab === 'active' && (
@@ -532,8 +554,8 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
                 userRole="crew"
                 serviceOrders={serviceOrders}
                 productOrders={productOrders}
-                onCreateServiceOrder={() => navigate('/orders/new-service')}
-                onCreateProductOrder={() => navigate('/orders/new-product')}
+                onCreateServiceOrder={() => navigate('/catalog')}
+                onCreateProductOrder={() => navigate('/catalog')}
                 onOrderAction={() => undefined}
                 showServiceOrders={true}
                 showProductOrders={true}
@@ -566,3 +588,5 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
     </div>
   );
 }
+
+

@@ -199,6 +199,8 @@ const OrdersSection: React.FC<OrdersSectionProps> = ({
         if (order.orderType === 'product') {
           if (order.status === 'pending') {
             actions.push('Accept', 'Deny');
+          } else if (order.status === 'in-progress') {
+            actions.push('Mark Delivered');
           } else {
             actions.push('View Details');
           }
@@ -290,31 +292,31 @@ const OrdersSection: React.FC<OrdersSectionProps> = ({
   const getActionButtons = () => {
     const buttons = [];
 
-    // Request Service button - for contractor, customer, center, warehouse
-    if (onCreateServiceOrder && (userRole === 'contractor' || userRole === 'customer' || userRole === 'center' || userRole === 'warehouse')) {
+    // Request Service button - for contractor, customer, center (NOT warehouse per docs)
+    if (onCreateServiceOrder && (userRole === 'contractor' || userRole === 'customer' || userRole === 'center')) {
       buttons.push(
         <Button
           key="service"
           variant="primary"
-          roleColor={primaryColor}
+          roleColor="#14b8a6"  // Teal for services per CKS color codes
           onClick={onCreateServiceOrder}
         >
-          Request Service
+          Order Services
         </Button>
       );
     }
 
-    // Request Products button - for contractor, customer, center, crew, manager
+    // Request Products button - for contractor, customer, center, crew, manager (NOT warehouse per docs)
     if (onCreateProductOrder && !readOnlyProduct &&
         (userRole === 'contractor' || userRole === 'customer' || userRole === 'center' || userRole === 'crew' || userRole === 'manager')) {
       buttons.push(
         <Button
           key="product"
           variant="primary"
-          roleColor={primaryColor}
+          roleColor="#d946ef"  // Magenta for products per CKS color codes
           onClick={onCreateProductOrder}
         >
-          Request Products
+          Order Products
         </Button>
       );
     }

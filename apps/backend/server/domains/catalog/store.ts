@@ -1,4 +1,4 @@
-import { query } from '../../db/connection';
+import { query } from "../../db/connection";
 import type {
   CatalogFilters,
   CatalogItem,
@@ -7,12 +7,12 @@ import type {
   CatalogPage,
   CatalogProductDetails,
   CatalogServiceDetails,
-} from './types';
+} from "./types";
 
 interface CatalogItemRow {
   item_code: string;
   name: string;
-  item_type: 'product' | 'service';
+  item_type: "product" | "service";
   description: string | null;
   image_url: string | null;
   tags: string[] | null;
@@ -28,14 +28,18 @@ interface CatalogItemRow {
   duration_minutes: number | null;
   service_window: string | null;
   service_attributes: Record<string, unknown> | null;
+  category: string | null;
+  crew_required: number | null;
+  is_active: boolean | null;
 }
 
 function toPrice(row: CatalogItemRow): CatalogItemPrice | null {
   if (row.base_price === null || row.base_price === undefined) {
     return null;
   }
-  const amount = typeof row.base_price === 'string' ? row.base_price : row.base_price.toFixed(2);
-  const currency = row.currency ?? 'USD';
+  const numericAmount = typeof row.base_price === "string" ? Number(row.base_price) : row.base_price;
+  const amount = Number.isFinite(numericAmount) ? numericAmount.toFixed(2) : String(row.base_price);
+  const currency = row.currency ?? "USD";
   return {
     amount,
     currency,
@@ -44,7 +48,7 @@ function toPrice(row: CatalogItemRow): CatalogItemPrice | null {
 }
 
 function toProductDetails(row: CatalogItemRow): CatalogProductDetails | null {
-  if (row.item_type !== 'product') {
+  if (row.item_type !== "product") {
     return null;
   }
   return {
@@ -57,7 +61,7 @@ function toProductDetails(row: CatalogItemRow): CatalogProductDetails | null {
 }
 
 function toServiceDetails(row: CatalogItemRow): CatalogServiceDetails | null {
-  if (row.item_type !== 'service') {
+  if (row.item_type !== "service") {
     return null;
   }
   return {
@@ -68,7 +72,14 @@ function toServiceDetails(row: CatalogItemRow): CatalogServiceDetails | null {
 }
 
 function mapCatalogRow(row: CatalogItemRow): CatalogItem {
-  const tags = Array.isArray(row.tags) ? row.tags.filter((tag): tag is string => typeof tag === 'string') : [];
+  const tags = Array.isArray(row.tags)
+    ? row.tags.filter((tag): tag is string => typeof tag === "string")
+    : [];
+
+  if (row.category && !tags.includes(row.category)) {
+    tags.unshift(row.category);
+  }
+
   return {
     code: row.item_code,
     name: row.name,
@@ -107,7 +118,7 @@ function normalizeOffset(offset: number | undefined): number {
 }
 
 function buildWhere(filters: CatalogFilters) {
-  const where: string[] = ['i.is_active = TRUE'];
+  const where: string[] = ["i.is_active = TRUE"];
   const params: unknown[] = [];
 
   if (filters.type) {
@@ -135,9 +146,59 @@ function buildWhere(filters: CatalogFilters) {
     }
   }
 
-  const clause = where.length ? `WHERE ${where.join(' AND ')}` : '';
+  const clause = where.length ? `WHERE ${where.join(" AND ")}` : "";
   return { clause, params };
 }
+
+const CATALOG_UNION = `
+  SELECT
+    p.product_id AS item_code,
+    p.name,
+    'product'::text AS item_type,
+    p.description,
+    p.image_url,
+    p.tags,
+    p.unit_of_measure,
+    p.base_price,
+    p.currency,
+    p.metadata,
+    p.sku,
+    p.package_size,
+    p.lead_time_days,
+    p.reorder_point,
+    p.attributes AS product_attributes,
+    NULL::integer AS duration_minutes,
+    NULL::text AS service_window,
+    NULL::jsonb AS service_attributes,
+    p.category,
+    NULL::integer AS crew_required,
+    p.is_active
+  FROM catalog_products AS p
+  UNION ALL
+  SELECT
+    s.service_id AS item_code,
+    s.name,
+    'service'::text AS item_type,
+    s.description,
+    s.image_url,
+    s.tags,
+    s.unit_of_measure,
+    s.base_price,
+    s.currency,
+    s.metadata,
+    NULL::text AS sku,
+    NULL::text AS package_size,
+    NULL::integer AS lead_time_days,
+    NULL::integer AS reorder_point,
+    NULL::jsonb AS product_attributes,
+    s.duration_minutes,
+    s.service_window,
+    s.attributes AS service_attributes,
+    s.category,
+    s.crew_required,
+    s.is_active
+  FROM catalog_services AS s
+`;
 
 export async function fetchCatalogItems(filters: CatalogFilters): Promise<CatalogListResult> {
   const limit = normalizeLimit(filters.limit);
@@ -145,40 +206,43 @@ export async function fetchCatalogItems(filters: CatalogFilters): Promise<Catalo
   const { clause, params } = buildWhere(filters);
 
   const countResult = await query<{ count: string }>(
-    `SELECT COUNT(*)::text AS count
-     FROM catalog_items i
+    `WITH catalog_union AS (${CATALOG_UNION})
+     SELECT COUNT(*)::text AS count
+     FROM catalog_union i
      ${clause}`,
     params,
   );
-  const total = Number.parseInt(countResult.rows[0]?.count ?? '0', 10) || 0;
+  const total = Number.parseInt(countResult.rows[0]?.count ?? "0", 10) || 0;
 
   const limitPosition = params.length + 1;
   const offsetPosition = params.length + 2;
   const queryParams = [...params, limit, offset];
 
   const rowsResult = await query<CatalogItemRow>(
-    `SELECT
-        i.item_code,
-        i.name,
-        i.item_type,
-        i.description,
-        i.image_url,
-        i.tags,
-        i.unit_of_measure,
-        i.base_price,
-        i.currency,
-        i.metadata,
-        pd.sku,
-        pd.package_size,
-        pd.lead_time_days,
-        pd.reorder_point,
-        pd.attributes AS product_attributes,
-        sd.duration_minutes,
-        sd.service_window,
-        sd.attributes AS service_attributes
-     FROM catalog_items AS i
-     LEFT JOIN catalog_product_details AS pd ON pd.item_id = i.id
-     LEFT JOIN catalog_service_details AS sd ON sd.item_id = i.id
+    `WITH catalog_union AS (${CATALOG_UNION})
+     SELECT
+       i.item_code,
+       i.name,
+       i.item_type,
+       i.description,
+       i.image_url,
+       i.tags,
+       i.unit_of_measure,
+       i.base_price,
+       i.currency,
+       i.metadata,
+       i.sku,
+       i.package_size,
+       i.lead_time_days,
+       i.reorder_point,
+       i.product_attributes,
+       i.duration_minutes,
+       i.service_window,
+       i.service_attributes,
+       i.category,
+       i.crew_required,
+       i.is_active
+     FROM catalog_union AS i
      ${clause}
      ORDER BY i.name ASC
      LIMIT $${limitPosition}

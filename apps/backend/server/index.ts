@@ -22,8 +22,10 @@ import { registerProfileRoutes } from "./domains/profile/routes.fastify";
 import { registerDashboardRoutes } from "./domains/dashboard/routes.fastify";
 import { registerScopeRoutes } from "./domains/scope/routes.fastify";
 import { registerOrdersRoutes } from "./domains/orders/routes.fastify";
+import { registerCatalogRoutes } from "./domains/catalog/routes.fastify";
 import { reportsRoutes } from "./domains/reports/routes.fastify";
 import { registerInventoryRoutes } from "./domains/inventory/routes.fastify";
+import { initializeSequences } from "./db/init-sequences";
 
 type BootstrapResponse = {
   role: string;
@@ -253,6 +255,7 @@ export async function buildServer() {
   await registerDashboardRoutes(server);
   await registerScopeRoutes(server);
   await registerOrdersRoutes(server);
+  await registerCatalogRoutes(server);
   await registerInventoryRoutes(server);
   await server.register(reportsRoutes, { prefix: '/api' });
 
@@ -260,6 +263,9 @@ export async function buildServer() {
 }
 
 async function start() {
+  // Initialize database sequences and tables
+  await initializeSequences();
+
   const server = await buildServer();
   const port = Number(process.env.PORT ?? 4000);
   const host = process.env.HOST ?? "0.0.0.0";

@@ -34,10 +34,21 @@ import {
   useHubProfile,
   useHubReports,
   useHubInventory,
+  applyHubOrderAction,
   type HubOrderItem,
   type HubInventoryItem,
+  type OrderActionRequest,
+  type OrderActionType,
 } from '../shared/api/hub';
 
+const ACTION_LABEL_MAP: Record<string, OrderActionType> = {
+  Accept: 'accept',
+  Approve: 'accept',
+  Deny: 'reject',
+  Reject: 'reject',
+  'Mark Delivered': 'deliver',
+  'Create Service': 'create-service',
+};
 interface WarehouseHubProps {
   initialTab?: string;
 }
@@ -359,6 +370,43 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
     { id: 'status', title: 'Status', dataKey: 'accountStatus', color: 'purple' },
   ], []);
 
+  const handleOrderAction = async (orderId: string, actionLabel: string) => {
+    const mapped = ACTION_LABEL_MAP[actionLabel];
+    if (!mapped) {
+      return;
+    }
+    if (pendingAction && pendingAction.orderId === orderId && pendingAction.action === mapped) {
+      return;
+    }
+    const request: OrderActionRequest = {
+      action: mapped,
+    };
+    if (mapped === 'reject') {
+      const notes = window.prompt('Please share a short reason for rejecting this order.');
+      const trimmed = notes?.trim();
+      if (!trimmed) {
+        return;
+      }
+      request.notes = trimmed;
+    }
+    if (mapped === 'create-service') {
+      const transformedId = window.prompt('Enter a service tracking ID (optional). Leave blank to auto-generate.');
+      const trimmed = transformedId?.trim();
+      if (trimmed) {
+        request.transformedId = trimmed;
+      }
+    }
+    setPendingAction({ orderId, action: mapped });
+    try {
+      await applyHubOrderAction(orderId, request);
+      await refreshOrders();
+    } catch (error) {
+      console.error('Failed to update order', error);
+      window.alert('Unable to update the order. Please try again.');
+    } finally {
+      setPendingAction(null);
+    }
+  };
   const profileCardData = useMemo(() => ({
     name: profile?.name ?? '—',
     warehouseId: normalizedCode ?? '—',
@@ -761,9 +809,7 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
                 userRole="warehouse"
                 serviceOrders={serviceOrders}
                 productOrders={productOrders}
-                onCreateServiceOrder={() => navigate('/orders/new-service')}
-                onCreateProductOrder={() => navigate('/orders/new-product')}
-                onOrderAction={() => undefined}
+                onOrderAction={handleOrderAction}
                 showServiceOrders={true}
                 showProductOrders={true}
                 primaryColor="#8b5cf6"

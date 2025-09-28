@@ -556,8 +556,8 @@ export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubPro
                 userRole="customer"
                 serviceOrders={serviceOrders}
                 productOrders={productOrders}
-                onCreateServiceOrder={() => navigate('/orders/new-service')}
-                onCreateProductOrder={() => navigate('/orders/new-product')}
+                onCreateServiceOrder={() => navigate('/catalog')}
+                onCreateProductOrder={() => navigate('/catalog')}
                 onOrderAction={() => undefined}
                 showServiceOrders={true}
                 showProductOrders={true}

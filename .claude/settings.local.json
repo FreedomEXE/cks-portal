@@ -29,7 +29,16 @@
       "Bash(PORT=4000 pnpm dev:backend)",
       "Bash(npm run migrate:*)",
       "Bash(npm run:*)",
-      "Bash(awk:*)"
+      "Bash(awk:*)",
+      "Bash(find:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "mcp__postgres__query",
+      "Bash(cmd //c:*)",
+      "Bash(mkdir:*)",
+      "Bash(for file in C:/Users/User/Documents/GitHub/cks-portal/SESSION*.md)",
+      "Bash(do mv \"$file\" \"C:/Users/User/Documents/GitHub/cks-portal/docs/archive/sessions/\")",
+      "Bash(done)"
     ],
     "deny": [],
     "ask": []

@@ -5,6 +5,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { AuthenticatedApp, UnauthenticatedApp } from './App';
+import { CartProvider } from './contexts/CartContext';
 import './index.css';
 
 // Read the Clerk publishable key from Vite env. Do not hardcode or fall back to a dummy key.
@@ -23,14 +24,16 @@ const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
     <ClerkProvider publishableKey={PUBLISHABLE_KEY}>
-      <BrowserRouter>
-        <SignedIn>
-          <AuthenticatedApp />
-        </SignedIn>
-        <SignedOut>
-          <UnauthenticatedApp />
-        </SignedOut>
-      </BrowserRouter>
+      <CartProvider>
+        <BrowserRouter>
+          <SignedIn>
+            <AuthenticatedApp />
+          </SignedIn>
+          <SignedOut>
+            <UnauthenticatedApp />
+          </SignedOut>
+        </BrowserRouter>
+      </CartProvider>
     </ClerkProvider>
   </React.StrictMode>
 );

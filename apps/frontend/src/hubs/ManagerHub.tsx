@@ -49,9 +49,11 @@ import {
   useHubOrders,
   useHubProfile,
   useHubDashboard,
+  applyHubOrderAction,
   type HubReportItem,
   type HubOrderItem,
 } from '../shared/api/hub';
+import { useSWRConfig } from 'swr';
 
 interface ManagerHubProps {
   initialTab?: string;
@@ -885,9 +887,26 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
     setActivityFeed([]);
   }, []);
 
-  const handleOrderAction = useCallback((orderId: string, action: string) => {
-    console.log('[manager] order action', { orderId, action });
-  }, []);
+  const { mutate } = useSWRConfig();
+
+  const handleOrderAction = useCallback(async (orderId: string, action: string) => {
+    try {
+      // Apply the order action
+      await applyHubOrderAction({
+        orderId,
+        action: action as any,
+        actorCode: managerCode,
+        actorRole: 'manager',
+      });
+
+      // Refresh the orders list
+      mutate(`/hub/orders/${managerCode}`);
+
+      console.log('[manager] order action applied', { orderId, action });
+    } catch (error) {
+      console.error('[manager] failed to apply order action', error);
+    }
+  }, [managerCode, mutate]);
 
   const handleNodeClick = useCallback((userId: string) => {
     console.log('[manager] view ecosystem node', userId);
@@ -1031,7 +1050,7 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
                 userRole="manager"
                 serviceOrders={managerServiceOrderCards}
                 productOrders={managerProductOrderCards}
-                onCreateProductOrder={() => console.log('[manager] request products')}
+                onCreateProductOrder={() => navigate('/catalog')}
                 onOrderAction={handleOrderAction}
                 showServiceOrders
                 showProductOrders

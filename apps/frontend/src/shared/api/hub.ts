@@ -448,6 +448,7 @@ export function useHubProfile(cksCode?: string | null) {
     data: result.data ?? null,
     isLoading: result.isLoading,
     error: result.error,
+    mutate: result.mutate,
   };
 }
 
@@ -463,6 +464,7 @@ export function useHubDashboard(cksCode?: string | null) {
     data: result.data ?? null,
     isLoading: result.isLoading,
     error: result.error,
+    mutate: result.mutate,
   };
 }
 
@@ -492,6 +494,7 @@ export function useHubOrders(cksCode?: string | null, options?: { status?: strin
     data: result.data ?? null,
     isLoading: result.isLoading,
     error: result.error,
+    mutate: result.mutate,
   };
 }
 
@@ -515,6 +518,7 @@ export function useHubReports(cksCode?: string | null) {
     data: result.data ?? null,
     isLoading: result.isLoading,
     error: result.error,
+    mutate: result.mutate,
   };
 }
 
@@ -530,6 +534,7 @@ export function useHubInventory(cksCode?: string | null) {
     data: result.data ?? null,
     isLoading: result.isLoading,
     error: result.error,
+    mutate: result.mutate,
   };
 }
 
@@ -547,6 +552,7 @@ export function useHubRoleScope(cksCode?: string | null) {
     data: result.data ?? null,
     isLoading: result.isLoading,
     error: result.error,
+    mutate: result.mutate,
   };
 }
 
@@ -565,6 +571,7 @@ export function useHubActivities(cksCode?: string | null) {
     data: result.data ?? null,
     isLoading: result.isLoading,
     error: result.error,
+    mutate: result.mutate,
   };
 }
 
@@ -574,3 +581,46 @@ export async function fetchHubActivities(cksCode: string, init?: ApiFetchInit) {
 }
 
 
+export type OrderActionType = 'accept' | 'reject' | 'deliver' | 'cancel' | 'create-service';
+
+export interface CreateOrderItemRequest {
+  catalogCode: string;
+  quantity: number;
+  metadata?: Record<string, unknown> | null;
+}
+
+export interface CreateOrderRequest {
+  orderType: 'service' | 'product';
+  title?: string | null;
+  destination?: {
+    code: string | null;
+    role: HubRole | null;
+  } | null;
+  expectedDate?: string | null;
+  notes?: string | null;
+  metadata?: Record<string, unknown> | null;
+  participants?: Partial<Record<HubRole, string | readonly string[]>>;
+  items: readonly CreateOrderItemRequest[];
+}
+
+export async function createHubOrder(payload: CreateOrderRequest) {
+  const response = await apiFetch<ApiResponse<HubOrderItem>>('/orders', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+  return response.data;
+}
+
+export interface OrderActionRequest {
+  action: OrderActionType;
+  notes?: string | null;
+  transformedId?: string | null;
+}
+
+export async function applyHubOrderAction(orderId: string, payload: OrderActionRequest) {
+  const response = await apiFetch<ApiResponse<HubOrderItem>>(`/orders/${encodeURIComponent(orderId)}/actions`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+  return response.data;
+}
