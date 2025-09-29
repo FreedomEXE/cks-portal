@@ -9,9 +9,12 @@ import type {
   OrderViewerStatus,
 } from "./types";
 
-const FINAL_STATUSES = new Set<OrderStatus>(["rejected", "cancelled", "delivered", "service-created"]);
+const FINAL_STATUSES = new Set<OrderStatus>(["rejected", "cancelled", "delivered", "service_completed", "service-created"]);
 const HUB_ROLES: readonly HubRole[] = ["manager", "contractor", "customer", "center", "crew", "warehouse"];
 const HUB_ROLE_SET = new Set<string>(HUB_ROLES);
+const ACTOR_ROLES = new Set<HubRole>(['warehouse', 'manager', 'contractor', 'crew']);
+
+type ParticipationType = 'creator' | 'destination' | 'actor' | 'watcher';
 
 const ORDER_TYPE_MAP = new Map<string, "product" | "service">([
   ["product", "product"],
@@ -31,8 +34,8 @@ interface OrderRow {
   title: string | null;
   status: string;
   next_actor_role: string | null;
-  created_by: string;
-  created_by_role: string | null;
+  creator_id: string;
+  creator_role: string | null;
   customer_id: string | null;
   center_id: string | null;
   contractor_id: string | null;
@@ -125,18 +128,31 @@ export interface OrderActionInput {
 }
 
 function normalizeStatus(value: string | null | undefined): OrderStatus {
-  const normalized = (value ?? "").trim().toLowerCase();
+  const normalized = (value ?? "").trim().toLowerCase().replace(/_/g, '_');
   switch (normalized) {
-    case "pending":
-    case "in-progress":
-    case "approved":
-    case "rejected":
-    case "cancelled":
+    // New statuses
+    case "pending_warehouse":
+    case "awaiting_delivery":
     case "delivered":
+    case "pending_manager":
+    case "pending_contractor":
+    case "pending_crew":
+    case "service_in_progress":
+    case "service_completed":
+    case "cancelled":
+    case "rejected":
+      return normalized as OrderStatus;
+    // Legacy statuses (map to new ones)
+    case "pending":
+      return "pending_warehouse"; // Default to product flow for legacy
+    case "in-progress":
+      return "awaiting_delivery";
+    case "approved":
+      return "pending_contractor";
     case "service-created":
-      return normalized;
+      return "service_completed";
     default:
-      return "pending";
+      return "pending_warehouse";
   }
 }
 
@@ -201,16 +217,19 @@ function viewerStatusFrom(options: {
 }): OrderViewerStatus {
   const { status, nextActorRole, nextActorCode, viewerRole, viewerCode, creatorCode } = options;
 
-  if (FINAL_STATUSES.has(status)) {
-    return status as OrderViewerStatus;
-  }
+  // Terminal statuses map directly
+  if (status === 'cancelled') return 'cancelled';
+  if (status === 'rejected') return 'rejected';
+  if (status === 'delivered' || status === 'service_completed') return 'completed';
 
   const normalizedViewerCode = viewerCode ? viewerCode : null;
   const normalizedCreator = creatorCode ? creatorCode : null;
   const normalizedNextActorCode = nextActorCode ? nextActorCode : null;
 
+  // Check if viewer needs to act (they are the next actor)
+  const statusIsPending = status.startsWith('pending_') || status === 'awaiting_delivery';
   const needsToAct =
-    status === 'pending' &&
+    statusIsPending &&
     !!nextActorRole &&
     viewerRole === nextActorRole &&
     (!normalizedNextActorCode || normalizedNextActorCode === normalizedViewerCode);
@@ -219,6 +238,7 @@ function viewerStatusFrom(options: {
     return 'pending';
   }
 
+  // Check if viewer is the requester/creator
   const isRequester =
     !!normalizedCreator &&
     !!normalizedViewerCode &&
@@ -228,7 +248,8 @@ function viewerStatusFrom(options: {
     return 'in-progress';
   }
 
-  return status as OrderViewerStatus;
+  // For everyone else, show in-progress for active orders
+  return 'in-progress';
 }
 function deriveCreatorStageStatus(status: OrderStatus): OrderApprovalStage['status'] {
   switch (status) {
@@ -305,12 +326,12 @@ function buildApprovalStages(
   status: OrderStatus,
 ): OrderApprovalStage[] {
   const stages: OrderApprovalStage[] = [];
-  const creatorRole = normalizeRole(row.created_by_role) ?? 'center';
+  const creatorRole = normalizeRole(row.creator_role) ?? 'center';
   const creatorStatus = deriveCreatorStageStatus(status);
   stages.push({
     role: creatorRole,
     status: creatorStatus,
-    userId: normalizeCodeValue(row.created_by),
+    userId: normalizeCodeValue(row.creator_id),
     timestamp: toIso(row.requested_date),
   });
 
@@ -362,7 +383,7 @@ function mapOrderRow(
   items: OrderItemRow[],
   context?: { viewerRole?: HubRole | null; viewerCode?: string | null },
 ): HubOrderItem {
-  const creatorCode = normalizeCodeValue(row.created_by);
+  const creatorCode = normalizeCodeValue(row.creator_id);
   const orderType = parseOrderType(row.order_type);
   const status = normalizeStatus(row.status);
   const nextActorRole = normalizeRole(row.next_actor_role);
@@ -393,8 +414,8 @@ function mapOrderRow(
     orderId: row.order_id,
     orderType,
     title: row.title ?? (orderType === 'product' ? 'Product Order' : 'Service Order'),
-    requestedBy: creatorCode ?? row.created_by ?? null,
-    requesterRole: normalizeRole(row.created_by_role),
+    requestedBy: creatorCode ?? row.creator_id ?? null,
+    requesterRole: normalizeRole(row.creator_role),
     destination: normalizedDestination ?? normalizedCenter ?? null,
     destinationRole: normalizeRole(row.destination_role) ?? (row.center_id ? 'center' : null),
     requestedDate: toIso(row.requested_date ?? row.created_at),
@@ -470,8 +491,8 @@ async function fetchOrders(whereClause: string, params: readonly unknown[], cont
        title,
        status,
        next_actor_role,
-       created_by,
-       created_by_role,
+       creator_id,
+       creator_role,
        customer_id,
        center_id,
        contractor_id,
@@ -508,21 +529,23 @@ async function fetchOrders(whereClause: string, params: readonly unknown[], cont
 }
 
 function buildRoleFilter(role: HubRole, cksCode: string): { clause: string; params: unknown[] } {
+  // Eventually this should use order_participants table
+  // For now, using creator_id and legacy fields for compatibility
   switch (role) {
     case "customer":
-      return { clause: "created_by = $1 OR customer_id = $1", params: [cksCode] };
+      return { clause: "creator_id = $1 OR customer_id = $1", params: [cksCode] };
     case "center":
-      return { clause: "created_by = $1 OR center_id = $1", params: [cksCode] };
+      return { clause: "creator_id = $1 OR center_id = $1 OR destination = $1", params: [cksCode] };
     case "manager":
-      return { clause: "manager_id = $1 OR created_by = $1", params: [cksCode] };
+      return { clause: "manager_id = $1 OR creator_id = $1", params: [cksCode] };
     case "contractor":
-      return { clause: "contractor_id = $1 OR created_by = $1", params: [cksCode] };
+      return { clause: "contractor_id = $1 OR creator_id = $1", params: [cksCode] };
     case "crew":
-      return { clause: "crew_id = $1 OR created_by = $1", params: [cksCode] };
+      return { clause: "crew_id = $1 OR creator_id = $1", params: [cksCode] };
     case "warehouse":
       return { clause: "assigned_warehouse = $1 OR destination = $1", params: [cksCode] };
     default:
-      return { clause: "created_by = $1", params: [cksCode] };
+      return { clause: "creator_id = $1", params: [cksCode] };
   }
 }
 
@@ -539,18 +562,18 @@ async function ensureParticipant(options: {
   orderId: string;
   role: HubRole;
   code: string | null | undefined;
-  participationType: string;
+  participationType: ParticipationType;
 }): Promise<void> {
   const normalizedCode = normalizeCodeValue(options.code ?? null);
   if (!normalizedCode) {
     return;
   }
   await query(
-    `INSERT INTO order_participants (order_id, role, cks_code, participation_type)
+    `INSERT INTO order_participants (order_id, participant_id, participant_role, participation_type)
      VALUES ($1, $2, $3, $4)
-     ON CONFLICT (order_id, role, cks_code)
+     ON CONFLICT (order_id, participant_id, participant_role)
      DO UPDATE SET participation_type = EXCLUDED.participation_type`,
-    [options.orderId, options.role, normalizedCode, options.participationType]
+    [options.orderId, normalizedCode, options.role, options.participationType]
   );
 }
 
@@ -567,8 +590,9 @@ async function ensureParticipantList(
       continue;
     }
     const entries = Array.isArray(codes) ? codes : [codes];
+    const participationType: ParticipationType = ACTOR_ROLES.has(role) ? 'actor' : 'watcher';
     for (const code of entries) {
-      await ensureParticipant({ orderId, role, code, participationType: "viewer" });
+      await ensureParticipant({ orderId, role, code, participationType });
     }
   }
 }
@@ -739,6 +763,7 @@ export async function createOrder(input: CreateOrderInput): Promise<HubOrderItem
 
   let assignedWarehouse: string | null = null;
   let nextActorRole: HubRole | null = null;
+  let status: string;
 
   if (input.orderType === "product") {
     if (destinationRole === "warehouse" && destinationCode) {
@@ -748,9 +773,11 @@ export async function createOrder(input: CreateOrderInput): Promise<HubOrderItem
       assignedWarehouse = normalizeCodeValue(defaultWarehouse);
     }
     nextActorRole = "warehouse";
-  
+    status = "pending_warehouse";
+
   } else {
-    nextActorRole = destinationRole ?? "contractor";
+    nextActorRole = "manager";
+    status = "pending_manager";
   }
 
   const now = new Date();
@@ -759,47 +786,13 @@ export async function createOrder(input: CreateOrderInput): Promise<HubOrderItem
     throw new Error("Invalid expected date.");
   }
 
-  let customerId: string | null = creatorCode;
-  let centerId: string | null = null;
-  let contractorId: string | null = null;
-  let managerId: string | null = null;
-  let crewId: string | null = null;
-
-  switch (input.creator.role) {
-    case "customer":
-      customerId = creatorCode;
-      break;
-    case "center":
-      centerId = creatorCode;
-      break;
-    case "contractor":
-      contractorId = creatorCode;
-      break;
-    case "manager":
-      managerId = creatorCode;
-      break;
-    case "crew":
-      crewId = creatorCode;
-      break;
-    default:
-      break;
-  }
-
-  if (destinationRole === "center" && destinationCode) {
-    centerId = destinationCode;
-  }
-  if (destinationRole === "customer" && destinationCode) {
-    customerId = destinationCode;
-  }
-  if (destinationRole === "manager" && destinationCode) {
-    managerId = destinationCode;
-  }
-  if (destinationRole === "contractor" && destinationCode) {
-    contractorId = destinationCode;
-  }
-  if (destinationRole === "crew" && destinationCode) {
-    crewId = destinationCode;
-  }
+  // Legacy fields - keeping as null for now to avoid breaking existing queries
+  // These will be removed in a future migration
+  const customerId: string | null = null;
+  const centerId: string | null = null;
+  const contractorId: string | null = null;
+  const managerId: string | null = null;
+  const crewId: string | null = null;
 
   const metadataValue = input.metadata ? JSON.stringify(input.metadata) : null;
 
@@ -812,8 +805,8 @@ export async function createOrder(input: CreateOrderInput): Promise<HubOrderItem
          title,
          status,
          next_actor_role,
-         created_by,
-         created_by_role,
+         creator_id,
+         creator_role,
          customer_id,
          center_id,
          contractor_id,
@@ -838,7 +831,6 @@ export async function createOrder(input: CreateOrderInput): Promise<HubOrderItem
          $1,
          $2,
          $3,
-         'pending',
          $4,
          $5,
          $6,
@@ -852,21 +844,23 @@ export async function createOrder(input: CreateOrderInput): Promise<HubOrderItem
          $14,
          $15,
          $16,
+         $17,
          NULL,
          NULL,
          NULL,
          'USD',
          NULL,
          NULL,
-         $17,
-         COALESCE($18::jsonb, '{}'::jsonb),
-         $19,
-         $19
+         $18,
+         COALESCE($19::jsonb, '{}'::jsonb),
+         $20,
+         $20
        )`,
       [
         orderId,
         input.orderType,
         input.title ?? (input.orderType === "product" ? "Product Order" : "Service Order"),
+        status,
         nextActorRole ?? null,
         creatorCode,
         input.creator.role,
@@ -888,13 +882,28 @@ export async function createOrder(input: CreateOrderInput): Promise<HubOrderItem
 
     await insertOrderItems(orderId, input.orderType, input.items);
 
-    await ensureParticipant({ orderId, role: input.creator.role, code: creatorCode, participationType: "creator" });
-    if (nextActorRole) {
-      await ensureParticipant({ orderId, role: nextActorRole, code: assignedWarehouse ?? destinationCode ?? null, participationType: "assignee" });
-    }
+    // Add creator as participant
+    await ensureParticipant({ orderId, role: input.creator.role, code: creatorCode, participationType: 'creator' });
+
+    // Add destination as participant if specified
     if (destinationRole && destinationCode) {
-      await ensureParticipant({ orderId, role: destinationRole, code: destinationCode, participationType: "destination" });
+      await ensureParticipant({ orderId, role: destinationRole, code: destinationCode, participationType: 'destination' });
     }
+
+    // Add workflow-specific participants based on order type
+    if (input.orderType === "product") {
+      // Product orders always involve warehouse as an actor
+      if (assignedWarehouse) {
+        await ensureParticipant({ orderId, role: "warehouse", code: assignedWarehouse, participationType: 'actor' });
+      }
+    } else {
+      // Service orders involve manager, contractor, and crew as actors
+      // These will be populated as the workflow progresses
+      // For now, just add the immediate next actor (manager)
+      // The manager will be determined based on the creator's hierarchy
+    }
+
+    // Add any additional participants specified in the input
     await ensureParticipantList(orderId, input.participants);
 
     await query("COMMIT");
@@ -923,8 +932,8 @@ export async function applyOrderAction(input: OrderActionInput): Promise<HubOrde
        title,
        status,
        next_actor_role,
-       created_by,
-       created_by_role,
+       creator_id,
+       creator_role,
        customer_id,
        center_id,
        contractor_id,
@@ -957,7 +966,7 @@ export async function applyOrderAction(input: OrderActionInput): Promise<HubOrde
   }
 
   const actorCodeNormalized = normalizeCodeValue(input.actorCode);
-  const creatorCode = normalizeCodeValue(row.created_by);
+  const creatorCode = normalizeCodeValue(row.creator_id);
   const orderType = parseOrderType(row.order_type);
   const currentStatus = normalizeStatus(row.status);
   if (FINAL_STATUSES.has(currentStatus)) {
@@ -978,12 +987,21 @@ export async function applyOrderAction(input: OrderActionInput): Promise<HubOrde
         if (input.actorRole !== "warehouse") {
           throw new Error("Only warehouse users may accept product orders.");
         }
-        newStatus = "in-progress";
+        newStatus = "awaiting_delivery";
         nextActorRole = "warehouse";
         assignedWarehouseValue = actorCodeNormalized ?? assignedWarehouseValue;
       } else {
-        newStatus = "approved";
-        nextActorRole = "contractor";
+        // Service order acceptance by manager
+        if (input.actorRole === "manager") {
+          newStatus = "pending_contractor";
+          nextActorRole = "contractor";
+        } else if (input.actorRole === "contractor") {
+          newStatus = "pending_crew";
+          nextActorRole = "crew";
+        } else if (input.actorRole === "crew") {
+          newStatus = "service_in_progress";
+          nextActorRole = "crew";
+        }
       }
       break;
 
@@ -1005,9 +1023,22 @@ export async function applyOrderAction(input: OrderActionInput): Promise<HubOrde
       deliveryDate = new Date().toISOString();
       break;
 
+    case "complete":
+      if (orderType !== "service") {
+        throw new Error("Complete action applies only to service orders.");
+      }
+      newStatus = "service_completed";
+      nextActorRole = null;
+      serviceStartDate = new Date().toISOString();
+      break;
+
     case "cancel":
-      if (!actorCodeNormalized || !creatorCode || actorCodeNormalized !== creatorCode || currentStatus !== 'pending') {
-        throw new Error('Only the creator can cancel a pending order.');
+      if (!actorCodeNormalized || !creatorCode || actorCodeNormalized !== creatorCode) {
+        throw new Error('Only the creator can cancel an order.');
+      }
+      // Can only cancel orders that are not yet completed/delivered
+      if (FINAL_STATUSES.has(currentStatus)) {
+        throw new Error('Cannot cancel an order that is already completed.');
       }
       newStatus = 'cancelled';
       nextActorRole = null;
@@ -1069,6 +1100,14 @@ export async function applyOrderAction(input: OrderActionInput): Promise<HubOrde
 
   return fetchOrderById(input.orderId, { viewerRole: input.actorRole, viewerCode: actorCodeNormalized });
 }
+
+
+
+
+
+
+
+
 
 
 

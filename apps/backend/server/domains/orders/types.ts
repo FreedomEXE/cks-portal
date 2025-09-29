@@ -1,22 +1,31 @@
 import type { HubRole } from '../profile/types';
 
 export type OrderStatus =
+  // Product order statuses
+  | 'pending_warehouse'
+  | 'awaiting_delivery'
+  | 'delivered'
+  // Service order statuses
+  | 'pending_manager'
+  | 'pending_contractor'
+  | 'pending_crew'
+  | 'service_in_progress'
+  | 'service_completed'
+  // Common terminal statuses
+  | 'cancelled'
+  | 'rejected'
+  // Legacy statuses (to be removed)
   | 'pending'
   | 'in-progress'
   | 'approved'
-  | 'rejected'
-  | 'cancelled'
-  | 'delivered'
   | 'service-created';
 
 export type OrderViewerStatus =
   | 'pending'
   | 'in-progress'
-  | 'approved'
-  | 'rejected'
+  | 'completed'
   | 'cancelled'
-  | 'delivered'
-  | 'service-created';
+  | 'rejected';
 
 export interface OrderApprovalStage {
   role: string;

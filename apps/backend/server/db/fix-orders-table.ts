@@ -54,6 +54,17 @@ export async function fixOrdersTable() {
     await query(`
       CREATE INDEX IF NOT EXISTS idx_orders_customer ON orders(customer_id)
     `, []);
+
+    try {
+      await query(`
+        ALTER TABLE orders
+        ALTER COLUMN customer_id DROP NOT NULL
+      `);
+      console.log('Ensured orders.customer_id allows NULL values');
+    } catch (error) {
+      console.log('Could not alter customer_id nullability', error);
+    }
+
     await query(`
       CREATE INDEX IF NOT EXISTS idx_orders_warehouse ON orders(assigned_warehouse)
     `, []);
@@ -63,3 +74,4 @@ export async function fixOrdersTable() {
     console.error('Error fixing orders table:', error);
   }
 }
+

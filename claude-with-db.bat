@@ -1,0 +1,3 @@
+@echo off
+echo Starting Claude Code with PostgreSQL MCP access...
+claude --mcp-config claude-code.json %*

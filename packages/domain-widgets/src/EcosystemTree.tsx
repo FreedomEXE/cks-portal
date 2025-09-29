@@ -78,20 +78,21 @@ const EcosystemTree: React.FC<EcosystemTreeProps> = ({
 
   const getRoleKey = (node: TreeNode) => (node.type ?? node.user.role).toLowerCase();
 
-  const createBadge = (text: string, color: string) => {
-    return (
-      <span style={{
+  const createBadge = (key: string, text: string, color: string) => (
+    <span
+      key={key}
+      style={{
         fontSize: 11,
         padding: '2px 8px',
         borderRadius: 12,
         background: color,
         color: '#111827',
         fontWeight: 600
-      }}>
-        {text}
-      </span>
-    );
-  };
+      }}
+    >
+      {text}
+    </span>
+  );
 
   // Function to count all descendants of a specific type
   const countDescendants = (node: TreeNode, targetRole: string): number => {
@@ -158,31 +159,31 @@ const EcosystemTree: React.FC<EcosystemTreeProps> = ({
       const centerCount = countDescendants(node, 'center');
       const crewCount = countDescendants(node, 'crew');
 
-      if (contractorCount > 0) badges.push(createBadge(`${contractorCount} contractors`, '#dcfce7'));
-      if (customerCount > 0) badges.push(createBadge(`${customerCount} customers`, '#e0f2fe'));
-      if (centerCount > 0) badges.push(createBadge(`${centerCount} centers`, '#f3e8ff'));
-      if (crewCount > 0) badges.push(createBadge(`${crewCount} crew`, '#fef3c7'));
+      if (contractorCount > 0) badges.push(createBadge(`badge-${node.user.id}-contractors`, `${contractorCount} contractors`, '#dcfce7'));
+      if (customerCount > 0) badges.push(createBadge(`badge-${node.user.id}-customers`, `${customerCount} customers`, '#e0f2fe'));
+      if (centerCount > 0) badges.push(createBadge(`badge-${node.user.id}-centers`, `${centerCount} centers`, '#f3e8ff'));
+      if (crewCount > 0) badges.push(createBadge(`badge-${node.user.id}-crew`, `${crewCount} crew`, '#fef3c7'));
     } else if (role === 'contractor') {
       // Contractor shows: customers, centers, crew
       const customerCount = countDirectChildren(node, 'customer');
       const centerCount = countDescendants(node, 'center');
       const crewCount = countDescendants(node, 'crew');
 
-      if (customerCount > 0) badges.push(createBadge(`${customerCount} customers`, '#e0f2fe'));
-      if (centerCount > 0) badges.push(createBadge(`${centerCount} centers`, '#f3e8ff'));
-      if (crewCount > 0) badges.push(createBadge(`${crewCount} crew`, '#fef3c7'));
+      if (customerCount > 0) badges.push(createBadge(`badge-${node.user.id}-customers`, `${customerCount} customers`, '#e0f2fe'));
+      if (centerCount > 0) badges.push(createBadge(`badge-${node.user.id}-centers`, `${centerCount} centers`, '#f3e8ff'));
+      if (crewCount > 0) badges.push(createBadge(`badge-${node.user.id}-crew`, `${crewCount} crew`, '#fef3c7'));
     } else if (role === 'customer') {
       // Customer shows: centers, crew
       const centerCount = countDirectChildren(node, 'center');
       const crewCount = countDescendants(node, 'crew');
 
-      if (centerCount > 0) badges.push(createBadge(`${centerCount} centers`, '#f3e8ff'));
-      if (crewCount > 0) badges.push(createBadge(`${crewCount} crew`, '#fef3c7'));
+      if (centerCount > 0) badges.push(createBadge(`badge-${node.user.id}-centers`, `${centerCount} centers`, '#f3e8ff'));
+      if (crewCount > 0) badges.push(createBadge(`badge-${node.user.id}-crew`, `${crewCount} crew`, '#fef3c7'));
     } else if (role === 'center') {
       // Center shows: crew
       const crewCount = countDirectChildren(node, 'crew');
 
-      if (crewCount > 0) badges.push(createBadge(`${crewCount} crew`, '#fef3c7'));
+      if (crewCount > 0) badges.push(createBadge(`badge-${node.user.id}-crew`, `${crewCount} crew`, '#fef3c7'));
     }
 
     return (

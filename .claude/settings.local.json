@@ -38,7 +38,12 @@
       "Bash(mkdir:*)",
       "Bash(for file in C:/Users/User/Documents/GitHub/cks-portal/SESSION*.md)",
       "Bash(do mv \"$file\" \"C:/Users/User/Documents/GitHub/cks-portal/docs/archive/sessions/\")",
-      "Bash(done)"
+      "Bash(done)",
+      "Bash(PORT=4000 pnpm dev)",
+      "mcp__playwright__browser_install",
+      "WebFetch(domain:playwright.dev)",
+      "Bash(start http://localhost:5174)",
+      "Bash(dir C:UsersUserDocumentsGitHubcks-portalappsfrontendsrchubsWarehouseHub.tsx)"
     ],
     "deny": [],
     "ask": []
