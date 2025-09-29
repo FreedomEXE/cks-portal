@@ -297,8 +297,8 @@
 }
 
 .stage {
-  min-width: 100px;
-  padding: 8px 12px;
+  min-width: 140px;
+  padding: 12px 16px;
   border-radius: 6px;
   text-align: center;
   background: white;
@@ -329,6 +329,8 @@
 .pulsingStage {
   animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   position: relative;
+  min-width: 100px !important;
+  padding: 8px 12px !important;
 }
 
 .stageRole {

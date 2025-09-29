@@ -162,6 +162,7 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
   const [inventoryTab, setInventoryTab] = useState<'active' | 'archive'>('active');
   const [inventorySearchQuery, setInventorySearchQuery] = useState('');
   const [inventoryFilter, setInventoryFilter] = useState<string>('');
+  const [pendingAction, setPendingAction] = useState<{ orderId: string; action: OrderActionType } | null>(null);
 
   const { code: authCode } = useAuth();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
@@ -180,6 +181,7 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
     data: orders,
     isLoading: ordersLoading,
     error: ordersError,
+    mutate: refreshOrders,
   } = useHubOrders(normalizedCode);
   const { data: reportsData, isLoading: reportsLoading } = useHubReports(normalizedCode);
   const {

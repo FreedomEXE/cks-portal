@@ -131,12 +131,7 @@ export async function initializeSequences() {
     `, []);
     console.log('Created/verified warehouses table');
 
-    await query(`
-      INSERT INTO warehouses (warehouse_id, name)
-      VALUES ('WAR-001', 'Main Warehouse')
-      ON CONFLICT (warehouse_id) DO NOTHING
-    `, []);
-    console.log('Ensured default warehouse exists');
+    // No longer inserting a default warehouse - warehouses should be created through proper registration
 
     await seedCatalogData();
 

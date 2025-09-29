@@ -116,7 +116,7 @@ export interface CreateOrderInput {
   items: readonly CreateOrderItemInput[];
 }
 
-export type OrderActionType = "accept" | "reject" | "deliver" | "cancel" | "create-service";
+export type OrderActionType = "accept" | "reject" | "deliver" | "cancel" | "create-service" | "complete";
 
 export interface OrderActionInput {
   orderId: string;
@@ -632,10 +632,14 @@ async function fetchServices(codes: readonly string[]): Promise<Map<string, Cata
 }
 
 async function findDefaultWarehouse(): Promise<string | null> {
+  // Prefer warehouses with actual user data over dummy warehouses
   const result = await query<{ warehouse_id: string }>(
     `SELECT warehouse_id
      FROM warehouses
-     ORDER BY warehouse_id ASC
+     WHERE status = 'active'
+     ORDER BY
+       CASE WHEN clerk_user_id IS NOT NULL THEN 0 ELSE 1 END,
+       created_at ASC
      LIMIT 1`
   );
   return result.rows[0]?.warehouse_id ?? null;
