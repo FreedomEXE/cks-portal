@@ -138,7 +138,7 @@ export const serviceDirectoryEntrySchema = z.object({
 
 export const orderDirectoryEntrySchema = z.object({
   id: z.string(),
-  customerId: z.string(),
+  customerId: nullableString,
   centerId: nullableString,
   serviceId: nullableString,
   orderDate: isoDateString,
@@ -149,6 +149,9 @@ export const orderDirectoryEntrySchema = z.object({
   assignedWarehouse: nullableString,
   createdAt: isoDateString,
   updatedAt: isoDateString,
+  // Extra fields surfaced by backend for better display
+  createdBy: nullableString,
+  createdByRole: nullableString,
 });
 
 export const productDirectoryEntrySchema = z.object({
@@ -161,6 +164,8 @@ export const productDirectoryEntrySchema = z.object({
   status: nullableString,
   createdAt: isoDateString,
   updatedAt: isoDateString,
+  rawId: nullableString,
+  source: z.enum(['products', 'catalog']).optional(),
 });
 
 export const trainingDirectoryEntrySchema = z.object({

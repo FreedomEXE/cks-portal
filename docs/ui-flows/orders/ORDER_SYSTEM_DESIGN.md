@@ -13,6 +13,8 @@ Comprehensive order management system with catalog integration, role-based workf
 - **Status**: Canonical, immutable truth about order state
 - **ViewerStatus**: Persona-specific view (pending = action needed, in-progress = visibility)
 
+Note (2025-09-29): Admin Directory uses canonical `status` directly and a central policy to drive actions/labels. ViewerStatus remains for role-scoped hub UIs but will be reduced where it hides state transitions.
+
 ### Order Lifecycle
 ```
 Customer/Center → Contractor → Manager → Crew/Warehouse → Completion
@@ -95,6 +97,19 @@ END;
 $$ LANGUAGE plpgsql;
 
 CREATE SEQUENCE product_seq START 1;
+```
+
+### Archive Support (Orders)
+Orders support soft delete/restore/hard delete via archive fields on the base `orders` table and shared archive routes (`/api/archive/*`). Admin Directory lists exclude archived rows.
+
+```sql
+ALTER TABLE orders
+  ADD COLUMN IF NOT EXISTS archived_at TIMESTAMP,
+  ADD COLUMN IF NOT EXISTS archived_by VARCHAR(50),
+  ADD COLUMN IF NOT EXISTS archive_reason TEXT,
+  ADD COLUMN IF NOT EXISTS deletion_scheduled TIMESTAMP,
+  ADD COLUMN IF NOT EXISTS restored_at TIMESTAMP,
+  ADD COLUMN IF NOT EXISTS restored_by VARCHAR(50);
 ```
 
 #### Table: `catalog_services`

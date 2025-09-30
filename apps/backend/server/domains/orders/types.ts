@@ -1,4 +1,5 @@
 import type { HubRole } from '../profile/types';
+import type { OrderParticipant } from '@cks/policies';
 
 export type OrderStatus =
   // Product order statuses
@@ -86,6 +87,12 @@ export interface HubOrderItem {
   assignedWarehouse?: string | null;
   orderDate?: string | null;
   completionDate?: string | null;
+
+  /** New policy-based fields */
+  participants?: OrderParticipant[];
+  availableActions?: string[];
+  statusColor?: string;
+  statusLabel?: string;
 }
 
 export interface HubOrdersPayload {

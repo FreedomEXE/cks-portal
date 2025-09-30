@@ -24,6 +24,7 @@ interface Order {
   contractorId?: string;
   managerId?: string;
   transformedId?: string; // For archive tab to show transformation
+  availableActions?: string[]; // Actions from policy backend
 }
 
 interface OrdersSectionProps {
@@ -145,6 +146,12 @@ const OrdersSection: React.FC<OrdersSectionProps> = ({
   }, [activeOrderTab, serviceOrders, productOrders, allOrders, searchQuery]);
 
   const getOrderActions = (order: Order): string[] => {
+    // Use actions from backend policy if available
+    if (order.availableActions && order.availableActions.length > 0) {
+      return order.availableActions;
+    }
+
+    // Fallback to legacy logic if no policy actions available
     const actions: string[] = [];
 
     if (order.status === 'cancelled' || order.status === 'rejected' || order.status === 'delivered' || order.status === 'service-created') {

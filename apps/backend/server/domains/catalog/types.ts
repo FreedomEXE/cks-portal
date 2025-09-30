@@ -32,6 +32,8 @@ export interface CatalogItem {
   metadata: Record<string, unknown> | null;
   product?: CatalogProductDetails | null;
   service?: CatalogServiceDetails | null;
+  stockAvailable?: number | null;
+  stockOnHand?: number | null;
 }
 
 export interface CatalogFilters {

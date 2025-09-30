@@ -6,13 +6,25 @@ interface Entity {
   companyName?: string;
   fullName?: string;
   code?: string;
+  orderId?: string;
+  product_name?: string;
+  service_name?: string;
   [key: string]: any; // Allow additional properties if needed
+}
+
+export interface ActionItem {
+  label: string;
+  variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
+  onClick: () => void;
 }
 
 export interface ActionModalProps {
   isOpen: boolean;
   onClose: () => void;
   entity?: Entity;
+  title?: string;
+  actions?: ActionItem[];
+  // Legacy props for backward compatibility
   onSendInvite?: () => void;
   onEditProfile?: () => void;
   onPauseAccount?: () => void;
@@ -23,6 +35,8 @@ export default function ActionModal({
   isOpen,
   onClose,
   entity,
+  title,
+  actions,
   onSendInvite,
   onEditProfile,
   onPauseAccount,
@@ -47,7 +61,33 @@ export default function ActionModal({
     }
   };
 
-  const entityName = entity.name || entity.companyName || entity.fullName || entity.code || 'User';
+  const entityName = entity.name || entity.companyName || entity.fullName ||
+                     entity.code || entity.orderId || entity.product_name ||
+                     entity.service_name || 'Entity';
+
+  // Use custom actions if provided, otherwise fall back to legacy behavior
+  const modalActions = actions || [
+    ...(onSendInvite ? [{
+      label: 'Send Invite',
+      variant: 'secondary' as const,
+      onClick: onSendInvite
+    }] : []),
+    ...(onEditProfile ? [{
+      label: 'Edit User Profile',
+      variant: 'secondary' as const,
+      onClick: onEditProfile
+    }] : []),
+    ...(onPauseAccount ? [{
+      label: 'Pause Account',
+      variant: 'secondary' as const,
+      onClick: onPauseAccount
+    }] : []),
+    ...(onDeleteAccount ? [{
+      label: 'Delete User Account',
+      variant: 'danger' as const,
+      onClick: onDeleteAccount
+    }] : [])
+  ];
 
   return (
     <div
@@ -85,48 +125,21 @@ export default function ActionModal({
           fontWeight: 600,
           color: '#111827'
         }}>
-          Actions for {entityName}
+          {title || `Actions for ${entityName}`}
         </h3>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <Button
-            variant="secondary"
-            onClick={() => {
-              if (onSendInvite) onSendInvite();
-              onClose();
-            }}
-          >
-            Send Invite
-          </Button>
-
-          <Button
-            variant="secondary"
-            onClick={() => {
-              if (onEditProfile) onEditProfile();
-              onClose();
-            }}
-          >
-            Edit User Profile
-          </Button>
-
-          <Button
-            variant="secondary"
-            onClick={() => {
-              if (onPauseAccount) onPauseAccount();
-              onClose();
-            }}
-          >
-            Pause Account
-          </Button>
-
-          <Button
-            variant="danger"
-            onClick={() => {
-              if (onDeleteAccount) onDeleteAccount();
-              onClose();
-            }}
-          >
-            Delete User Account
-          </Button>
+          {modalActions.map((action, index) => (
+            <Button
+              key={index}
+              variant={action.variant || 'secondary'}
+              onClick={() => {
+                action.onClick();
+                onClose();
+              }}
+            >
+              {action.label}
+            </Button>
+          ))}
         </div>
 
         <div style={{

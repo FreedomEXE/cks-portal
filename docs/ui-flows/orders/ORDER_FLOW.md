@@ -293,5 +293,20 @@ Each tab displays:
 
 ---
 
-*Last Updated: 2025-09-28*
-*Version: 2.0 - Consolidated from multiple sources*
+*Last Updated: 2025-09-29*
+*Version: 2.1 - Progress update*
+
+## Progress Update (2025-09-29)
+
+- Canonical status usage: Frontend now reads canonical `status` values directly for Admin Directory views; role/viewer remapping is being phased out in favor of a central policy lookup.
+- Warehouse accept/deliver flow: Accept moves `pending_warehouse → awaiting_delivery`; the UI now shows the updated state and “Deliver” action as expected after refresh.
+- Admin Directory → Orders table mapping fixed:
+  - TYPE shows "One-Time" for now (recurring/ongoing orders planned post‑MVP).
+  - REQUESTED BY prefers `created_by` (fallback: `center_id` → `customer_id`).
+  - DESTINATION uses `destination` (center/customer) rather than `assigned_warehouse`.
+- Archive integration for orders:
+  - Orders now support soft delete (archive), restore, and hard delete.
+  - Directory lists exclude archived orders (`WHERE archived_at IS NULL`).
+  - Archive routes: `GET /api/archive/list`, `POST /api/archive/delete`, `POST /api/archive/restore`, `DELETE /api/archive/hard-delete`.
+- Directory consistency: Services, Products, Reports, and Feedback directory queries also exclude archived items.
+- Next up (post‑MVP): Add `is_recurring` + `recurrence` to orders to label TYPE as “Ongoing” where applicable; automation/generation to follow later.

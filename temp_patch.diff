@@ -1,0 +1,32 @@
+*** Begin Patch
+*** Update File: apps/backend/server/domains/directory/validators.ts
+@@
+-export const orderDirectoryEntrySchema = z.object({
+-  id: z.string(),
+-  customerId: z.string(),
+-  centerId: nullableString,
+-  serviceId: nullableString,
+-  orderDate: isoDateString,
+-  completionDate: isoDateString,
+-  totalAmount: nullableNumber,
+-  status: nullableString,
+-  notes: nullableString,
+-  assignedWarehouse: nullableString,
+-  createdAt: isoDateString,
+-  updatedAt: isoDateString,
+-});
++export const orderDirectoryEntrySchema = z.object({
++  id: z.string(),
++  customerId: nullableString,
++  centerId: nullableString,
++  serviceId: nullableString,
++  orderDate: isoDateString,
++  completionDate: isoDateString,
++  totalAmount: nullableNumber,
++  status: nullableString,
++  notes: nullableString,
++  assignedWarehouse: nullableString,
++  createdAt: isoDateString,
++  updatedAt: isoDateString,
++});
+*** End Patch

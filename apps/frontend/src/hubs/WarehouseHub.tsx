@@ -26,6 +26,7 @@ import {
 } from '@cks/domain-widgets';
 import { DataTable, PageHeader, PageWrapper, Scrollbar, TabSection } from '@cks/ui';
 import { useAuth } from '@cks/auth';
+import { getAllowedActions, getActionLabel } from '@cks/policies';
 
 import MyHubSection from '../components/MyHubSection';
 import {
@@ -229,11 +230,13 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
     if (!orders?.productOrders) {
       return [];
     }
-    return orders.productOrders.map((order) => ({
+    const mapped = orders.productOrders.map((order) => ({
       ...order,
       title: order.title ?? order.orderId,
       status: normalizeOrderStatus(order.status),
     }));
+    console.log('[WAREHOUSE] Product orders after mapping:', mapped);
+    return mapped;
   }, [orders]);
 
   const activities = useMemo(() => buildActivities(serviceOrders, productOrders), [serviceOrders, productOrders]);
@@ -373,16 +376,25 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
   ], []);
 
   const handleOrderAction = async (orderId: string, actionLabel: string) => {
+    console.log('[WAREHOUSE] Order action triggered:', { orderId, actionLabel });
+
     const mapped = ACTION_LABEL_MAP[actionLabel];
     if (!mapped) {
+      console.error('[WAREHOUSE] Unknown action label:', actionLabel);
       return;
     }
+
+    console.log('[WAREHOUSE] Mapped action:', mapped);
+
     if (pendingAction && pendingAction.orderId === orderId && pendingAction.action === mapped) {
+      console.log('[WAREHOUSE] Action already pending, skipping');
       return;
     }
+
     const request: OrderActionRequest = {
       action: mapped,
     };
+
     if (mapped === 'reject') {
       const notes = window.prompt('Please share a short reason for rejecting this order.');
       const trimmed = notes?.trim();
@@ -391,6 +403,7 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
       }
       request.notes = trimmed;
     }
+
     if (mapped === 'create-service') {
       const transformedId = window.prompt('Enter a service tracking ID (optional). Leave blank to auto-generate.');
       const trimmed = transformedId?.trim();
@@ -398,12 +411,25 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
         request.transformedId = trimmed;
       }
     }
+
     setPendingAction({ orderId, action: mapped });
+    console.log('[WAREHOUSE] Sending order action request:', request);
+
     try {
-      await applyHubOrderAction(orderId, request);
+      const result = await applyHubOrderAction(orderId, request);
+      console.log('[WAREHOUSE] Order action successful:', result);
+
+      // Show success message
+      const successMessage = mapped === 'accept' ? 'Order accepted successfully!' :
+                           mapped === 'deliver' ? 'Order marked as delivered!' :
+                           mapped === 'reject' ? 'Order rejected.' :
+                           'Order updated successfully!';
+      window.alert(successMessage);
+
       await refreshOrders();
+      console.log('[WAREHOUSE] Orders refreshed');
     } catch (error) {
-      console.error('Failed to update order', error);
+      console.error('[WAREHOUSE] Failed to update order:', error);
       window.alert('Unable to update the order. Please try again.');
     } finally {
       setPendingAction(null);

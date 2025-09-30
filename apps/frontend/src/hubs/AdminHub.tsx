@@ -1,4 +1,4 @@
-/*-----------------------------------------------
+﻿/*-----------------------------------------------
   Property of CKS  (c) 2025
 -----------------------------------------------*/
 /**
@@ -258,7 +258,10 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
       let entityId: string | null = null;
 
       // Check which tab we're in and extract the appropriate ID
-      if (directoryTab === 'managers' && entity.manager_id) {
+      if (directoryTab === 'orders' && entity.orderId) {
+        entityType = 'order';
+        entityId = entity.orderId;
+      } else if (directoryTab === 'managers' && entity.manager_id) {
         entityType = 'manager';
         entityId = entity.manager_id;
       } else if (directoryTab === 'contractors' && entity.contractor_id) {
@@ -281,7 +284,7 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
         entityId = entity.id;
       } else if (directoryTab === 'products' && entity.id) {
         entityType = 'product';
-        entityId = entity.id;
+        entityId = (entity as any).rawId || entity.id;
       } else if (entity.id) {
         // Fallback to generic id field and guess based on tab
         entityId = entity.id;
@@ -301,11 +304,11 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
       }
 
       const confirmDelete = confirm(
-        `Are you sure you want to archive ${entityType} ${entityId}?\n\n` +
-        `This will:\n` +
-        `- Move the ${entityType} to the archive\n` +
-        `- Unassign any children to the unassigned bucket\n` +
-        `- Schedule for permanent deletion in 30 days\n\n` +
+        `Are you sure you want to archive ${entityType} ${entityId}?` +
+        `This will:` +
+        `- Move the ${entityType} to the archive` +
+        `- Unassign any children to the unassigned bucket` +
+        `- Schedule for permanent deletion in 30 days` +
         `You can restore from the Archive section if needed.`
       );
 
@@ -335,6 +338,8 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
           mutate('/admin/directory/services');
         } else if (entityType === 'product') {
           mutate('/admin/directory/products');
+        } else if (entityType === 'order') {
+          mutate('/admin/directory/orders');
         }
 
         // Also refresh the archive list
@@ -342,7 +347,7 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
 
         // Show success message
         const message = `${entityType} ${entityId} has been archived.` +
-          (result.unassignedChildren ? `\n${result.unassignedChildren} children were moved to unassigned.` : '');
+          (result.unassignedChildren ? `${result.unassignedChildren} children were moved to unassigned.` : '');
 
         // Use a less intrusive notification (for now still using alert but no page refresh)
         setTimeout(() => {
@@ -505,14 +510,31 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
 
   const orderRows = useMemo(
     () =>
-      orders.map((order) => ({
-        id: order.id,
-        customerId: formatText(order.customerId),
-        centerId: formatText(order.centerId),
-        serviceId: formatText(order.serviceId),
-        status: formatText(order.status),
-        orderDate: formatDate(order.orderDate),
-      })),
+      orders.map((order) => {
+        const extra = order as any;
+        // Type label: default to One-Time until recurrence is modeled
+        const typeLabel = 'One-Time';
+        // Requested By: prefer createdBy, else centerId, else customerId
+        const requestedBy = (extra.createdBy && String(extra.createdBy).trim()) || order.centerId || order.customerId || null;
+        // Destination: prefer explicit destination, else centerId, else assignedWarehouse
+        const destination = extra.destination || order.centerId || ((extra.createdByRole === 'center' || extra.createdByRole === 'customer') ? extra.createdBy : null) || order.assignedWarehouse || null;
+
+        return {
+          id: order.id,
+          orderId: order.id,
+          orderType: typeLabel,
+          requestedBy: formatText(requestedBy),
+          destination: formatText(destination),
+          status: formatText(order.status),
+          orderDate: formatDate(order.orderDate),
+          completionDate: formatDate(order.completionDate),
+          // original fields for modal
+          customerId: formatText(order.customerId),
+          centerId: formatText(order.centerId),
+          serviceId: formatText(order.serviceId),
+          assignedWarehouse: formatText(order.assignedWarehouse),
+        };
+      }),
     [orders],
   );
 
@@ -520,10 +542,12 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
     () =>
       products.map((product) => ({
         id: product.id,
+        rawId: (product as any).rawId ?? null,
         name: formatText(product.name),
         category: formatText(product.category),
         status: formatText(product.status),
         updatedAt: formatDate(product.updatedAt),
+        source: (product as any).source ?? 'products',
       })),
     [products],
   );
@@ -697,11 +721,12 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
     orders: {
       columns: [
         { key: 'id', label: 'ORDER ID' },
-        { key: 'customerId', label: 'CUSTOMER' },
-        { key: 'centerId', label: 'CENTER' },
-        { key: 'serviceId', label: 'SERVICE' },
+        { key: 'orderType', label: 'TYPE' },
+        { key: 'requestedBy', label: 'REQUESTED BY' },
+        { key: 'destination', label: 'DESTINATION' },
         { key: 'status', label: 'STATUS', render: renderStatusBadge },
-        { key: 'orderDate', label: 'ORDER DATE' },
+        { key: 'orderDate', label: 'CREATED' },
+        { key: 'actions', label: 'ACTIONS', render: renderActions },
       ],
       data: orderRows,
       emptyMessage: 'No orders recorded.',
@@ -713,6 +738,7 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
         { key: 'category', label: 'CATEGORY' },
         { key: 'status', label: 'STATUS', render: renderStatusBadge },
         { key: 'updatedAt', label: 'UPDATED' },
+        { key: 'actions', label: 'ACTIONS', render: renderActions },
       ],
       data: productRows,
       emptyMessage: 'No products available.',
@@ -969,25 +995,144 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
         isOpen={showActionModal}
         onClose={handleModalClose}
         entity={selectedEntity ?? undefined}
-        onSendInvite={() => {
-          console.log('Send Invite clicked for:', selectedEntity);
-        }}
-        onEditProfile={() => {
-          console.log('Edit User Profile clicked for:', selectedEntity);
-        }}
-        onPauseAccount={() => {
-          console.log('Pause Account clicked for:', selectedEntity);
-        }}
-        onDeleteAccount={() => {
-          if (selectedEntity) {
-            handleDelete(selectedEntity);
+        title={(() => {
+          // Determine title based on entity type
+          if (directoryTab === 'orders') return 'Order Actions';
+          if (directoryTab === 'products') return 'Product Actions';
+          if (directoryTab === 'services') return 'Service Actions';
+          if (directoryTab === 'warehouses') return 'Warehouse Actions';
+          return undefined; // Use default title for users
+        })()}
+        actions={(() => {
+          // Different actions based on entity type
+          if (directoryTab === 'orders') {
+            return [
+              {
+                label: 'View Details',
+                variant: 'secondary' as const,
+                onClick: () => console.log('View order details:', selectedEntity),
+              },
+              {
+                label: 'Edit Order',
+                variant: 'secondary' as const,
+                onClick: () => console.log('Edit order:', selectedEntity),
+              },
+              {
+                label: 'Cancel Order',
+                variant: 'secondary' as const,
+                onClick: () => console.log('Cancel order:', selectedEntity),
+              },
+              {
+                label: 'Delete Order',
+                variant: 'danger' as const,
+                onClick: () => selectedEntity && handleDelete(selectedEntity),
+              },
+            ];
           }
-        }}
+          if (directoryTab === 'products') {
+            return [
+              {
+                label: 'View Product',
+                variant: 'secondary' as const,
+                onClick: () => console.log('View product:', selectedEntity),
+              },
+              {
+                label: 'Edit Product',
+                variant: 'secondary' as const,
+                onClick: () => console.log('Edit product:', selectedEntity),
+              },
+              {
+                label: 'Update Inventory',
+                variant: 'secondary' as const,
+                onClick: () => console.log('Update inventory:', selectedEntity),
+              },
+              {
+                label: 'Delete Product',
+                variant: 'danger' as const,
+                disabled: !!(selectedEntity && (selectedEntity as any).source === 'catalog'),
+                onClick: () => selectedEntity && handleDelete(selectedEntity),
+              },
+            ];
+          }
+          if (directoryTab === 'services') {
+            return [
+              {
+                label: 'View Service',
+                variant: 'secondary' as const,
+                onClick: () => console.log('View service:', selectedEntity),
+              },
+              {
+                label: 'Edit Service',
+                variant: 'secondary' as const,
+                onClick: () => console.log('Edit service:', selectedEntity),
+              },
+              {
+                label: 'Delete Service',
+                variant: 'danger' as const,
+                onClick: () => selectedEntity && handleDelete(selectedEntity),
+              },
+            ];
+          }
+          if (directoryTab === 'warehouses') {
+            return [
+              {
+                label: 'View Warehouse',
+                variant: 'secondary' as const,
+                onClick: () => console.log('View warehouse:', selectedEntity),
+              },
+              {
+                label: 'Edit Warehouse',
+                variant: 'secondary' as const,
+                onClick: () => console.log('Edit warehouse:', selectedEntity),
+              },
+              {
+                label: 'Manage Inventory',
+                variant: 'secondary' as const,
+                onClick: () => console.log('Manage inventory:', selectedEntity),
+              },
+              {
+                label: 'Delete Warehouse',
+                variant: 'danger' as const,
+                onClick: () => selectedEntity && handleDelete(selectedEntity),
+              },
+            ];
+          }
+
+          // Default user actions for managers, contractors, customers, crew, admins
+          return undefined; // This will use the legacy props below
+        })()}
+        // Legacy props for user entities
+        onSendInvite={
+          ['admins', 'managers', 'contractors', 'customers', 'crew'].includes(directoryTab)
+            ? () => console.log('Send Invite clicked for:', selectedEntity)
+            : undefined
+        }
+        onEditProfile={
+          ['admins', 'managers', 'contractors', 'customers', 'crew'].includes(directoryTab)
+            ? () => console.log('Edit User Profile clicked for:', selectedEntity)
+            : undefined
+        }
+        onPauseAccount={
+          ['admins', 'managers', 'contractors', 'customers', 'crew'].includes(directoryTab)
+            ? () => console.log('Pause Account clicked for:', selectedEntity)
+            : undefined
+        }
+        onDeleteAccount={
+          ['admins', 'managers', 'contractors', 'customers', 'crew'].includes(directoryTab)
+            ? () => selectedEntity && handleDelete(selectedEntity)
+            : undefined
+        }
       />
     </div>
   );
 
 }
+
+
+
+
+
+
 
 
 

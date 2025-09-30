@@ -12,7 +12,7 @@ async function getWarehouseInventory(cksCode: string): Promise<HubInventoryPaylo
     return null;
   }
 
-  // Get active inventory items
+  // Get active inventory items from inventory_items table
   const activeItemsResult = await query<{
     product_id: string;
     product_name: string;
@@ -22,40 +22,22 @@ async function getWarehouseInventory(cksCode: string): Promise<HubInventoryPaylo
     warehouse_id: string;
   }>(
     `SELECT
-      product_id,
-      product_name,
-      COALESCE(category, 'Equipment') as category,
-      COALESCE(stock_level, 0) as stock_level,
-      COALESCE(reorder_point, 10) as reorder_point,
-      COALESCE(warehouse_id, $1) as warehouse_id
-    FROM products
+      item_id as product_id,
+      item_name as product_name,
+      COALESCE(category, 'Cleaning Supplies') as category,
+      COALESCE(quantity_on_hand, 0) as stock_level,
+      COALESCE(min_stock_level, 10) as reorder_point,
+      warehouse_id
+    FROM inventory_items
     WHERE UPPER(warehouse_id) = $1
-      AND (archived_at IS NULL OR status = 'active')
-    ORDER BY product_name`,
+      AND status = 'active'
+    ORDER BY item_name`,
     [cksCode],
   );
 
-  // Get archived inventory items
-  const archivedItemsResult = await query<{
-    product_id: string;
-    product_name: string;
-    category: string;
-    archived_at: string;
-    archive_reason: string;
-  }>(
-    `SELECT
-      product_id,
-      product_name,
-      COALESCE(category, 'Equipment') as category,
-      archived_at,
-      archive_reason
-    FROM products
-    WHERE UPPER(warehouse_id) = $1
-      AND archived_at IS NOT NULL
-      AND (status IS NULL OR status != 'active')
-    ORDER BY archived_at DESC`,
-    [cksCode],
-  );
+  // Get archived inventory items - currently not supported in inventory_items table
+  // Return empty array for now
+  const archivedItemsResult = { rows: [] as any[] };
 
   const activeItems: InventoryItem[] = activeItemsResult.rows.map(row => ({
     productId: row.product_id,
@@ -68,18 +50,7 @@ async function getWarehouseInventory(cksCode: string): Promise<HubInventoryPaylo
     status: 'active' as const,
   }));
 
-  const archivedItems: InventoryItem[] = archivedItemsResult.rows.map(row => ({
-    productId: row.product_id,
-    name: row.product_name,
-    type: row.category,
-    onHand: 0,
-    min: 0,
-    location: cksCode,
-    isLow: false,
-    status: 'archived' as const,
-    archivedDate: row.archived_at,
-    reason: row.archive_reason,
-  }));
+  const archivedItems: InventoryItem[] = [];
 
   return {
     role: 'warehouse',

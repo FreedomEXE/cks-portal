@@ -4,7 +4,7 @@ import type { AuditContext } from '../provisioning';
 
 export interface ArchivedEntity {
   id: string;
-  entityType: 'manager' | 'contractor' | 'customer' | 'center' | 'crew' | 'warehouse' | 'service' | 'product';
+  entityType: 'manager' | 'contractor' | 'customer' | 'center' | 'crew' | 'warehouse' | 'service' | 'product' | 'order';
   name: string;
   archivedAt: Date;
   archivedBy: string;
@@ -18,14 +18,14 @@ export interface ArchivedEntity {
 }
 
 interface ArchiveOperation {
-  entityType: 'manager' | 'contractor' | 'customer' | 'center' | 'crew' | 'warehouse' | 'service' | 'product';
+  entityType: 'manager' | 'contractor' | 'customer' | 'center' | 'crew' | 'warehouse' | 'service' | 'product' | 'order';
   entityId: string;
   reason?: string;
   actor: AuditContext;
 }
 
 interface RestoreOperation {
-  entityType: 'manager' | 'contractor' | 'customer' | 'center' | 'crew' | 'warehouse' | 'service' | 'product';
+  entityType: 'manager' | 'contractor' | 'customer' | 'center' | 'crew' | 'warehouse' | 'service' | 'product' | 'order';
   entityId: string;
   actor: AuditContext;
 }
@@ -249,9 +249,9 @@ async function storeRelationships(entityType: string, entityId: string, actor: A
     }
 
     case 'product': {
-      // Products are standalone but we can track metadata
+      // Inventory items: optional metadata from catalog (best-effort)
       const result = await query(
-        `SELECT category FROM products WHERE product_id = $1`,
+        `SELECT cp.category FROM inventory_items ii LEFT JOIN catalog_products cp ON cp.product_id = ii.item_id WHERE ii.item_id = $1`,
         [entityId]
       );
       if (result.rows[0]?.category) {
@@ -261,6 +261,29 @@ async function storeRelationships(entityType: string, entityId: string, actor: A
            VALUES ($1, $2, $3, $4, $5::jsonb, $6)`,
           [entityType, entityId, 'metadata', 'category',
            JSON.stringify({ category: result.rows[0].category }), actorId]
+        );
+      }
+      break;
+    }
+
+    case 'order': {
+      // Orders have no children but we can track order metadata
+      const result = await query(
+        `SELECT creator_id, creator_role, order_type, status FROM orders WHERE order_id = $1`,
+        [entityId]
+      );
+      if (result.rows[0]) {
+        await query(
+          `INSERT INTO archive_relationships
+           (entity_type, entity_id, parent_type, parent_id, relationship_data, archived_by)
+           VALUES ($1, $2, $3, $4, $5::jsonb, $6)`,
+          [entityType, entityId, 'metadata', 'order_info',
+           JSON.stringify({
+             creator: result.rows[0].creator_id,
+             creator_role: result.rows[0].creator_role,
+             type: result.rows[0].order_type,
+             status: result.rows[0].status
+           }), actorId]
         );
       }
       break;
@@ -347,8 +370,12 @@ export async function archiveEntity(operation: ArchiveOperation): Promise<{ succ
       idColumn = 'service_id';
       break;
     case 'product':
-      tableName = 'products';
-      idColumn = 'product_id';
+      tableName = 'inventory_items';
+      idColumn = 'item_id';
+      break;
+    case 'order':
+      tableName = 'orders';
+      idColumn = 'order_id';
       break;
     default:
       tableName = `${operation.entityType}s`;
@@ -362,20 +389,74 @@ export async function archiveEntity(operation: ArchiveOperation): Promise<{ succ
   // Unassign children
   const unassignedChildren = await unassignChildren(operation.entityType, normalizedId);
 
+  // For products, accept either the given ID or a left-padded numeric variant (e.g., PRD-5 -> PRD-00000005)
+  let idParamList: string[] | null = null;
+  if (operation.entityType === 'product' && normalizedId) {
+    const m = normalizedId.match(/^(PRD)-(\d+)$/i);
+    if (m) {
+      const prefix = m[1].toUpperCase();
+      const digits = m[2];
+      const padded = `${prefix}-${digits.padStart(8, '0')}`;
+      idParamList = [normalizedId, padded];
+    }
+  }
+
   // Archive the entity
   const deletionScheduled = new Date();
   deletionScheduled.setDate(deletionScheduled.getDate() + 30); // Schedule for deletion in 30 days
 
-  await query(
-    `UPDATE ${tableName}
-     SET archived_at = NOW(),
-         archived_by = $1,
-         archive_reason = $2,
-         deletion_scheduled = $3,
-         updated_at = NOW()
-     WHERE ${idColumn} = $4`,
-    [actorId, operation.reason || 'Manual archive', deletionScheduled, normalizedId]
-  );
+  const updateResult = idParamList
+    ? await query(
+        `UPDATE ${tableName}
+         SET archived_at = NOW(),
+             archived_by = $1,
+             archive_reason = $2,
+             deletion_scheduled = $3,
+             updated_at = NOW()
+         WHERE ${idColumn} = $4 OR ${idColumn} = $5`,
+        [actorId, operation.reason || 'Manual archive', deletionScheduled, idParamList[0], idParamList[1]]
+      )
+    : await query(
+        `UPDATE ${tableName}
+         SET archived_at = NOW(),
+             archived_by = $1,
+             archive_reason = $2,
+             deletion_scheduled = $3,
+             updated_at = NOW()
+         WHERE ${idColumn} = $4`,
+        [actorId, operation.reason || 'Manual archive', deletionScheduled, normalizedId]
+      );
+
+  // Fallback: if archiving a product and no inventory_items updated, try products table
+  if ((!updateResult || (updateResult.rowCount ?? 0) === 0) && operation.entityType === 'product') {
+    const fallbackResult = idParamList
+      ? await query(
+          `UPDATE products
+           SET archived_at = NOW(),
+               archived_by = $1,
+               archive_reason = $2,
+               deletion_scheduled = $3,
+               updated_at = NOW()
+           WHERE product_id = $4 OR product_id = $5`,
+          [actorId, operation.reason || 'Manual archive', deletionScheduled, idParamList[0], idParamList[1]]
+        )
+      : await query(
+          `UPDATE products
+           SET archived_at = NOW(),
+               archived_by = $1,
+               archive_reason = $2,
+               deletion_scheduled = $3,
+               updated_at = NOW()
+           WHERE product_id = $4`,
+          [actorId, operation.reason || 'Manual archive', deletionScheduled, normalizedId]
+        );
+
+    if (!fallbackResult || (fallbackResult.rowCount ?? 0) === 0) {
+      throw new Error(`Archive failed: ${operation.entityType} ${normalizedId} not found or already archived`);
+    }
+  } else if (!updateResult || (updateResult.rowCount ?? 0) === 0) {
+    throw new Error(`Archive failed: ${operation.entityType} ${normalizedId} not found or already archived`);
+  }
 
   await recordActivity(
     `${operation.entityType}_archived`,
@@ -415,8 +496,12 @@ export async function restoreEntity(operation: RestoreOperation): Promise<{ succ
       idColumn = 'service_id';
       break;
     case 'product':
-      tableName = 'products';
-      idColumn = 'product_id';
+      tableName = 'inventory_items';
+      idColumn = 'item_id';
+      break;
+    case 'order':
+      tableName = 'orders';
+      idColumn = 'order_id';
       break;
     default:
       tableName = `${operation.entityType}s`;
@@ -458,7 +543,7 @@ export async function restoreEntity(operation: RestoreOperation): Promise<{ succ
 }
 
 export async function listArchivedEntities(
-  entityType?: 'manager' | 'contractor' | 'customer' | 'center' | 'crew' | 'warehouse' | 'service' | 'product',
+  entityType?: 'manager' | 'contractor' | 'customer' | 'center' | 'crew' | 'warehouse' | 'service' | 'product' | 'order',
   limit = 100
 ): Promise<ArchivedEntity[]> {
   let queryText: string;
@@ -485,10 +570,15 @@ export async function listArchivedEntities(
         idColumn = 'service_id';
         nameColumn = 'service_name';
         break;
-      case 'product':
-        tableName = 'products';
-        idColumn = 'product_id';
-        nameColumn = 'product_name';
+    case 'product':
+      tableName = 'inventory_items';
+      idColumn = 'item_id';
+      nameColumn = 'item_name';
+      break;
+      case 'order':
+        tableName = 'orders';
+        idColumn = 'order_id';
+        nameColumn = 'order_id';  // Orders don't have a name, use ID
         break;
       case 'manager':
         tableName = 'managers';
@@ -588,8 +678,18 @@ export async function hardDeleteEntity(
     throw new Error('Invalid entity ID');
   }
 
-  const tableName = operation.entityType === 'crew' ? 'crew' : `${operation.entityType}s`;
-  const idColumn = `${operation.entityType}_id`;
+  let tableName: string;
+  let idColumn: string;
+  if (operation.entityType === 'crew') {
+    tableName = 'crew';
+    idColumn = 'crew_id';
+  } else if (operation.entityType === 'product') {
+    tableName = 'inventory_items';
+    idColumn = 'item_id';
+  } else {
+    tableName = `${operation.entityType}s`;
+    idColumn = `${operation.entityType}_id`;
+  }
 
   // Check if entity is archived
   const checkResult = await query(
@@ -675,6 +775,11 @@ async function checkActiveChildren(entityType: string, entityId: string): Promis
       count = parseInt(result.rows[0].count || '0');
       break;
     }
+    case 'order': {
+      // Orders have no children
+      count = 0;
+      break;
+    }
   }
 
   return count;
@@ -690,7 +795,11 @@ export async function scheduledCleanup(): Promise<{ deleted: number }> {
     { table: 'contractors', idColumn: 'contractor_id', type: 'contractor' },
     { table: 'customers', idColumn: 'customer_id', type: 'customer' },
     { table: 'centers', idColumn: 'center_id', type: 'center' },
-    { table: 'crew', idColumn: 'crew_id', type: 'crew' }
+    { table: 'crew', idColumn: 'crew_id', type: 'crew' },
+    { table: 'warehouses', idColumn: 'warehouse_id', type: 'warehouse' },
+    { table: 'services', idColumn: 'service_id', type: 'service' },
+    { table: 'inventory_items', idColumn: 'item_id', type: 'product' },
+    { table: 'orders', idColumn: 'order_id', type: 'order' }
   ];
 
   for (const { table, idColumn, type } of tables) {

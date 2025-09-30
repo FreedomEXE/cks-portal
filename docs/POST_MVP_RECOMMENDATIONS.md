@@ -178,6 +178,38 @@ This document tracks architectural improvements and refactorings that should be 
 - Add CDN for static assets
 - Implement server-side rendering for public pages
 
+## 16. Warehouse-Scoped Catalog (Availability by Location)
+
+**Current State:**
+- Catalog items come from `catalog_products` and are shown only when there is at least one non-archived `inventory_items` row with stock. MVP assumes a single warehouse, so the catalog is effectively global.
+
+**Problem Post-MVP:**
+- Multi-warehouse deployments need centers/customers to see a catalog limited to their assigned warehouse(s).
+
+**Recommendations:**
+- Add a warehouse→center mapping:
+  - Simple: `centers.default_warehouse_id` (one-to-one)
+  - Flexible: `center_warehouses(center_id, warehouse_id)` (many-to-many)
+- Backend filter:
+  - Resolve allowed warehouses from the viewer (warehouse → own WHS; center → assigned WHS; contractor → union of their centers; manager/admin → unrestricted).
+  - In the catalog query, require:
+    `EXISTS (SELECT 1 FROM inventory_items ii
+             WHERE ii.item_id = p.product_id
+               AND ii.warehouse_id = ANY($allowedWarehouses)
+               AND ii.status = 'active'
+               AND ii.archived_at IS NULL
+               AND ii.quantity_on_hand > 0)`.
+- API surface:
+  - Keep endpoint unchanged; derive allowed warehouses server-side from auth/hub context.
+  - Optional `warehouse=` override for admins.
+- UI:
+  - No changes needed; same catalog view automatically scopes items.
+- Indexing:
+  - Add composite index `(warehouse_id, item_id, status, archived_at)` on `inventory_items`.
+
+**Why Post-MVP:**
+- MVP has a single warehouse; global availability suffices. Scoping adds mapping and auth logic that are easy to layer in later without UI changes.
+
 ## 13. Package Publishing Cleanup
 
 **Current State:**

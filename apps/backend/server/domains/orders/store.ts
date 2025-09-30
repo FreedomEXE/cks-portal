@@ -8,13 +8,31 @@ import type {
   OrderStatus,
   OrderViewerStatus,
 } from "./types";
+import {
+  getAllowedActions,
+  getVisibleStatuses,
+  getNextStatus,
+  canTransition,
+  isFinalStatus,
+  isCompletedStatus,
+  getActionLabel,
+  getStatusLabel,
+  getStatusColor
+} from '@cks/policies';
+import type {
+  OrderContext,
+  OrderParticipant,
+  OrderAction,
+  OrderType as PolicyOrderType
+} from '@cks/policies';
 
 const FINAL_STATUSES = new Set<OrderStatus>(["rejected", "cancelled", "delivered", "service_completed", "service-created"]);
 const HUB_ROLES: readonly HubRole[] = ["manager", "contractor", "customer", "center", "crew", "warehouse"];
 const HUB_ROLE_SET = new Set<string>(HUB_ROLES);
 const ACTOR_ROLES = new Set<HubRole>(['warehouse', 'manager', 'contractor', 'crew']);
 
-type ParticipationType = 'creator' | 'destination' | 'actor' | 'watcher';
+// Using OrderParticipant from @cks/policies instead
+// type ParticipationType = 'creator' | 'destination' | 'actor' | 'watcher';
 
 const ORDER_TYPE_MAP = new Map<string, "product" | "service">([
   ["product", "product"],
@@ -226,8 +244,45 @@ function viewerStatusFrom(options: {
   const normalizedCreator = creatorCode ? creatorCode : null;
   const normalizedNextActorCode = nextActorCode ? nextActorCode : null;
 
-  // Check if viewer needs to act (they are the next actor)
-  const statusIsPending = status.startsWith('pending_') || status === 'awaiting_delivery';
+  // Check if viewer is the creator
+  const isCreator = normalizedCreator && normalizedViewerCode && normalizedCreator === normalizedViewerCode;
+
+  // ACTION-BASED COLORS:
+  // - YELLOW (pending): User needs to take action
+  // - BLUE (in-progress): User is waiting/processing, no action needed
+
+  // Product order flow
+  if (status === 'pending_warehouse') {
+    if (viewerRole === 'warehouse') {
+      return 'pending'; // YELLOW - Warehouse needs to accept/reject
+    }
+    return 'in-progress'; // BLUE - Creator/others are waiting
+  }
+
+  if (status === 'awaiting_delivery') {
+    // Everyone sees blue - order is being processed
+    // Note: Warehouse can still deliver, but it's not urgent like pending
+    return 'in-progress';
+  }
+
+  // Service order flow
+  if (status === 'pending_manager' && viewerRole === 'manager') {
+    return 'pending'; // YELLOW - Manager needs to act
+  }
+  if (status === 'pending_contractor' && viewerRole === 'contractor') {
+    return 'pending'; // YELLOW - Contractor needs to act
+  }
+  if (status === 'pending_crew' && viewerRole === 'crew') {
+    return 'pending'; // YELLOW - Crew needs to act
+  }
+
+  // Service in progress - everyone sees blue
+  if (status === 'service_in_progress') {
+    return 'in-progress';
+  }
+
+  // Legacy status handling
+  const statusIsPending = status.startsWith('pending_');
   const needsToAct =
     statusIsPending &&
     !!nextActorRole &&
@@ -235,21 +290,11 @@ function viewerStatusFrom(options: {
     (!normalizedNextActorCode || normalizedNextActorCode === normalizedViewerCode);
 
   if (needsToAct) {
-    return 'pending';
+    return 'pending'; // YELLOW - Action required
   }
 
-  // Check if viewer is the requester/creator
-  const isRequester =
-    !!normalizedCreator &&
-    !!normalizedViewerCode &&
-    normalizedCreator === normalizedViewerCode;
-
-  if (isRequester) {
-    return 'in-progress';
-  }
-
-  // For everyone else, show in-progress for active orders
-  return 'in-progress';
+  // Default: show in-progress for all active orders
+  return 'in-progress'; // BLUE - No action needed
 }
 function deriveCreatorStageStatus(status: OrderStatus): OrderApprovalStage['status'] {
   switch (status) {
@@ -271,20 +316,40 @@ function deriveFulfillmentStageStatus(
   status: OrderStatus,
 ): OrderApprovalStage['status'] {
   switch (status) {
+    // Product order statuses
+    case 'pending_warehouse':
+      return 'pending';
+    case 'awaiting_delivery':
+      return 'accepted'; // Warehouse accepted, awaiting delivery
+    case 'delivered':
+      return 'delivered';
+
+    // Service order statuses
+    case 'pending_manager':
+    case 'pending_contractor':
+    case 'pending_crew':
+      return 'pending';
+    case 'service_in_progress':
+      return 'accepted';
+    case 'service_completed':
+      return 'delivered';
+
+    // Common statuses
+    case 'rejected':
+      return 'rejected';
+    case 'cancelled':
+      return 'cancelled';
+
+    // Legacy statuses
     case 'pending':
       return 'pending';
     case 'in-progress':
       return orderType === 'product' ? 'accepted' : 'waiting';
     case 'approved':
       return orderType === 'product' ? 'accepted' : 'approved';
-    case 'rejected':
-      return 'rejected';
-    case 'cancelled':
-      return 'cancelled';
-    case 'delivered':
-      return 'delivered';
     case 'service-created':
       return 'service-created';
+
     default:
       return 'pending';
   }
@@ -318,6 +383,80 @@ function coerceQuantity(value: number | string | null): number {
   }
   const parsed = Number(value);
   return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+function buildParticipants(row: OrderRow): OrderParticipant[] {
+  const participants: OrderParticipant[] = [];
+
+  // Creator
+  const creatorId = normalizeCodeValue(row.creator_id);
+  if (creatorId) {
+    participants.push({
+      userId: creatorId,
+      role: (normalizeRole(row.creator_role) ?? 'center') as HubRole,
+      participationType: 'creator'
+    });
+  }
+
+  // Destination
+  const destinationId = normalizeCodeValue(row.destination) || normalizeCodeValue(row.center_id) || normalizeCodeValue(row.customer_id);
+  if (destinationId) {
+    const destRole = normalizeRole(row.destination_role) || (row.center_id ? 'center' : 'customer');
+    if (destRole) {
+      participants.push({
+        userId: destinationId,
+        role: destRole,
+        participationType: 'destination'
+      });
+    }
+  }
+
+  // Assigned actors
+  if (row.assigned_warehouse) {
+    const warehouseId = normalizeCodeValue(row.assigned_warehouse);
+    if (warehouseId) {
+      participants.push({
+        userId: warehouseId,
+        role: 'warehouse',
+        participationType: 'actor'
+      });
+    }
+  }
+
+  if (row.manager_id) {
+    const managerId = normalizeCodeValue(row.manager_id);
+    if (managerId) {
+      participants.push({
+        userId: managerId,
+        role: 'manager',
+        participationType: 'actor'
+      });
+    }
+  }
+
+  if (row.contractor_id) {
+    const contractorId = normalizeCodeValue(row.contractor_id);
+    if (contractorId) {
+      participants.push({
+        userId: contractorId,
+        role: 'contractor',
+        participationType: 'actor'
+      });
+    }
+  }
+
+  if (row.crew_id) {
+    const crewId = normalizeCodeValue(row.crew_id);
+    if (crewId) {
+      participants.push({
+        userId: crewId,
+        role: 'crew',
+        participationType: 'actor'
+      });
+    }
+  }
+
+  return participants;
 }
 
 function buildApprovalStages(
@@ -394,6 +533,35 @@ function mapOrderRow(
   const normalizedCustomer = normalizeCodeValue(row.customer_id);
   const nextActorCode = determineNextActorCode(row, nextActorRole);
 
+  // Build participants list
+  const participants = buildParticipants(row);
+
+  // Determine available actions using policy
+  let availableActions: string[] = [];
+  if (viewerRole && viewerCode) {
+    const isCreator = creatorCode === viewerCode;
+    const isAssignedActor = participants.some(
+      p => p.participationType === 'actor' && p.userId === viewerCode && p.role === viewerRole
+    );
+
+    const policyContext: OrderContext = {
+      role: viewerRole,
+      userId: viewerCode,
+      orderType: orderType as PolicyOrderType,
+      status: status as any, // We'll handle the type conversion
+      participants,
+      isCreator,
+      isAssignedActor
+    };
+
+    try {
+      availableActions = getAllowedActions(policyContext).map(action => getActionLabel(action));
+    } catch (error) {
+      console.error('[POLICY] Error getting allowed actions:', error);
+      availableActions = [];
+    }
+  }
+
   const lineItems = items.map((item, index) => ({
     id: item.id ?? `${row.order_id}-${index + 1}`,
     code: item.catalog_item_code,
@@ -446,6 +614,11 @@ function mapOrderRow(
     assignedWarehouse: normalizeCodeValue(row.assigned_warehouse),
     orderDate: toIso(row.requested_date ?? row.created_at),
     completionDate: toIso(row.delivery_date ?? row.updated_at),
+    // Add new fields for policy-based approach
+    participants,
+    availableActions,
+    statusColor: getStatusColor(status as any),
+    statusLabel: getStatusLabel(status as any)
   };
 }
 
@@ -562,7 +735,7 @@ async function ensureParticipant(options: {
   orderId: string;
   role: HubRole;
   code: string | null | undefined;
-  participationType: ParticipationType;
+  participationType: 'creator' | 'destination' | 'actor' | 'watcher';
 }): Promise<void> {
   const normalizedCode = normalizeCodeValue(options.code ?? null);
   if (!normalizedCode) {
@@ -590,7 +763,7 @@ async function ensureParticipantList(
       continue;
     }
     const entries = Array.isArray(codes) ? codes : [codes];
-    const participationType: ParticipationType = ACTOR_ROLES.has(role) ? 'actor' : 'watcher';
+    const participationType: 'creator' | 'destination' | 'actor' | 'watcher' = ACTOR_ROLES.has(role) ? 'actor' : 'watcher';
     for (const code of entries) {
       await ensureParticipant({ orderId, role, code, participationType });
     }
@@ -653,13 +826,45 @@ async function insertOrderItems(
   const trimmedCodes = Array.from(new Set(items.map((item) => item.catalogCode.trim())));
   if (orderType === "product") {
     const products = await fetchProducts(trimmedCodes);
-    let line = 1;
-    for (const item of items) {
+
+    // Check inventory availability for all items first
+    const inventoryCheckPromises = items.map(async (item) => {
       const code = item.catalogCode.trim();
       const product = products.get(code);
       if (!product) {
         throw new Error(`Product ${item.catalogCode} not found in catalog.`);
       }
+
+      // Query inventory for this item across all warehouses
+      const inventoryResult = await query<{ warehouse_id: string; quantity_available: number }>(
+        `SELECT warehouse_id, quantity_available
+         FROM inventory_items
+         WHERE item_id = $1 AND status = 'active'
+         ORDER BY quantity_available DESC`,
+        [product.product_id]
+      );
+
+      // Calculate total available quantity across all warehouses
+      const totalAvailable = inventoryResult.rows.reduce((sum, row) => sum + (row.quantity_available || 0), 0);
+
+      // Log for debugging
+      console.log(`[INVENTORY CHECK] Product: ${product.name}, Code: ${product.product_id}, Requested: ${item.quantity}, Available: ${totalAvailable}`);
+
+      if (totalAvailable < item.quantity) {
+        const errorMsg = `Insufficient inventory for ${product.name}. Requested: ${item.quantity}, Available: ${totalAvailable}`;
+        console.error(`[INVENTORY ERROR] ${errorMsg}`);
+        throw new Error(errorMsg);
+      }
+
+      return { product, item, totalAvailable };
+    });
+
+    // Wait for all inventory checks to complete
+    const inventoryChecks = await Promise.all(inventoryCheckPromises);
+
+    // If all checks pass, insert the order items
+    let line = 1;
+    for (const { product, item } of inventoryChecks) {
       const metadata = JSON.stringify(item.metadata ?? product.metadata ?? {});
       await query(
         `INSERT INTO order_items (
@@ -973,39 +1178,63 @@ export async function applyOrderAction(input: OrderActionInput): Promise<HubOrde
   const creatorCode = normalizeCodeValue(row.creator_id);
   const orderType = parseOrderType(row.order_type);
   const currentStatus = normalizeStatus(row.status);
-  if (FINAL_STATUSES.has(currentStatus)) {
-    throw new Error(`Cannot modify order in ${currentStatus} state`);
+
+  // Build participants for policy context
+  const participants = buildParticipants(row);
+  const isCreator = creatorCode === actorCodeNormalized;
+  const isAssignedActor = participants.some(
+    p => p.participationType === 'actor' && p.userId === actorCodeNormalized && p.role === input.actorRole
+  );
+
+  // Use policy to validate the action
+  const policyContext: OrderContext = {
+    role: input.actorRole,
+    userId: actorCodeNormalized || '',
+    orderType: orderType as PolicyOrderType,
+    status: currentStatus as any,
+    participants,
+    isCreator,
+    isAssignedActor
+  };
+
+  const canPerformAction = canTransition(policyContext, input.action as OrderAction);
+  if (!canPerformAction.allowed) {
+    throw new Error(canPerformAction.reason || `Action ${input.action} not allowed`);
   }
 
-  let newStatus: OrderStatus = currentStatus;
-  let nextActorRole: HubRole | null = normalizeRole(row.next_actor_role);
+  // Get the next status from the policy
+  const newStatus = getNextStatus(orderType as PolicyOrderType, currentStatus as any, input.action as OrderAction);
+  if (!newStatus) {
+    throw new Error(`Invalid action ${input.action} for status ${currentStatus}`);
+  }
+
+  // Determine next actor role based on new status
+  let nextActorRole: HubRole | null = null;
+  if (newStatus === 'awaiting_delivery') {
+    nextActorRole = 'warehouse';
+  } else if (newStatus === 'pending_contractor') {
+    nextActorRole = 'contractor';
+  } else if (newStatus === 'pending_crew') {
+    nextActorRole = 'crew';
+  } else if (newStatus === 'service_in_progress') {
+    nextActorRole = 'crew';
+  } else if (newStatus === 'pending_manager') {
+    nextActorRole = 'manager';
+  } else if (newStatus === 'pending_warehouse') {
+    nextActorRole = 'warehouse';
+  }
+
   let deliveryDate: string | null = null;
   let serviceStartDate: string | null = null;
   let transformedId: string | null = null;
   let rejectionReason: string | null = row.rejection_reason ?? null;
   let assignedWarehouseValue: string | null = normalizeCodeValue(row.assigned_warehouse);
 
+  // Handle action-specific updates
   switch (input.action) {
     case "accept":
-      if (orderType === "product") {
-        if (input.actorRole !== "warehouse") {
-          throw new Error("Only warehouse users may accept product orders.");
-        }
-        newStatus = "awaiting_delivery";
-        nextActorRole = "warehouse";
+      if (orderType === "product" && currentStatus === "pending_warehouse") {
         assignedWarehouseValue = actorCodeNormalized ?? assignedWarehouseValue;
-      } else {
-        // Service order acceptance by manager
-        if (input.actorRole === "manager") {
-          newStatus = "pending_contractor";
-          nextActorRole = "contractor";
-        } else if (input.actorRole === "contractor") {
-          newStatus = "pending_crew";
-          nextActorRole = "crew";
-        } else if (input.actorRole === "crew") {
-          newStatus = "service_in_progress";
-          nextActorRole = "crew";
-        }
       }
       break;
 
@@ -1013,53 +1242,21 @@ export async function applyOrderAction(input: OrderActionInput): Promise<HubOrde
       if (!input.notes) {
         throw new Error("Rejection reason is required.");
       }
-      newStatus = "rejected";
-      nextActorRole = null;
       rejectionReason = input.notes;
       break;
 
     case "deliver":
-      if (orderType !== "product") {
-        throw new Error("Deliver action applies only to product orders.");
-      }
-      newStatus = "delivered";
-      nextActorRole = null;
       deliveryDate = new Date().toISOString();
       break;
 
     case "complete":
-      if (orderType !== "service") {
-        throw new Error("Complete action applies only to service orders.");
-      }
-      newStatus = "service_completed";
-      nextActorRole = null;
       serviceStartDate = new Date().toISOString();
-      break;
-
-    case "cancel":
-      if (!actorCodeNormalized || !creatorCode || actorCodeNormalized !== creatorCode) {
-        throw new Error('Only the creator can cancel an order.');
-      }
-      // Can only cancel orders that are not yet completed/delivered
-      if (FINAL_STATUSES.has(currentStatus)) {
-        throw new Error('Cannot cancel an order that is already completed.');
-      }
-      newStatus = 'cancelled';
-      nextActorRole = null;
       break;
 
     case "create-service":
-      if (orderType !== "service" || input.actorRole !== "manager") {
-        throw new Error("Only managers may convert service orders.");
-      }
-      newStatus = "service-created";
-      nextActorRole = null;
       transformedId = input.transformedId ?? `SVC-${Date.now()}`;
       serviceStartDate = new Date().toISOString();
       break;
-
-    default:
-      throw new Error(`Unknown action: ${input.action}`);
   }
 
   await query("BEGIN");
@@ -1095,6 +1292,33 @@ export async function applyOrderAction(input: OrderActionInput): Promise<HubOrde
       code: actorCodeNormalized,
       participationType: "actor",
     });
+
+    // If delivering a product order, decrease inventory
+    if (input.action === "deliver" && orderType === "product") {
+      // Get order items to know what quantities to decrease
+      const orderItemsResult = await query<{ catalog_item_code: string; quantity: number }>(
+        `SELECT catalog_item_code, quantity
+         FROM order_items
+         WHERE order_id = $1`,
+        [input.orderId]
+      );
+
+      // Get assigned warehouse for this order
+      const warehouseId = assignedWarehouseValue || row.assigned_warehouse;
+
+      // Decrease inventory for each item
+      for (const item of orderItemsResult.rows) {
+        await query(
+          `UPDATE inventory_items
+           SET quantity_on_hand = quantity_on_hand - $1,
+               quantity_reserved = GREATEST(0, quantity_reserved - $1),
+               last_shipped_date = NOW(),
+               updated_at = NOW()
+           WHERE warehouse_id = $2 AND item_id = $3`,
+          [item.quantity, warehouseId, item.catalog_item_code]
+        );
+      }
+    }
 
     await query("COMMIT");
   } catch (error) {

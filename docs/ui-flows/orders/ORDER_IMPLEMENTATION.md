@@ -201,3 +201,10 @@ pnpm lint
 
 *Last Updated: 2025-09-28*
 *Version: 1.0*
+
+## Progress Update (2025-09-29)
+
+- Archive support wired for orders (soft delete, restore, hard delete). Admin Directory lists exclude archived orders for Services, Products, Orders, Reports, and Feedback to match expected UX.
+- Admin Directory → Orders table mapping fixed: Requested By prefers `created_by` (fallback: `center_id` → `customer_id`), Destination uses `destination` (not `assigned_warehouse`), TYPE shows "One‑Time" for now.
+- Central policy module exists at `packages/policies/src/orderPolicy.ts`; UIs are migrating away from viewerStatus toward policy lookups for actions/labels.
+- Next (post‑MVP): add `is_recurring` + `recurrence` to orders to support TYPE="Ongoing"; scheduling/automation to follow later.

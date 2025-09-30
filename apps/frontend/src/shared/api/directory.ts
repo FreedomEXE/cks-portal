@@ -109,7 +109,7 @@ export interface Service {
 
 export interface Order {
   id: string;
-  customerId: string;
+  customerId: string | null;
   centerId: string | null;
   serviceId: string | null;
   orderDate: string | null;
@@ -120,6 +120,9 @@ export interface Order {
   assignedWarehouse: string | null;
   createdAt: string | null;
   updatedAt: string | null;
+  // Extra fields surfaced by backend for display
+  createdBy?: string | null;
+  createdByRole?: string | null;
 }
 
 export interface Product {
@@ -132,6 +135,8 @@ export interface Product {
   status: string | null;
   createdAt: string | null;
   updatedAt: string | null;
+  rawId?: string | null;
+  source?: 'products' | 'catalog';
 }
 
 export interface TrainingRecord {
@@ -327,7 +332,5 @@ export const useFeedback = feedbackResource.useResource;
 export const fetchFeedback = feedbackResource.fetchResource;
 export const useActivities = activitiesResource.useResource;
 export const fetchActivities = activitiesResource.fetchResource;
-
-
 
 

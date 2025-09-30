@@ -31,6 +31,8 @@ interface CatalogItemRow {
   category: string | null;
   crew_required: number | null;
   is_active: boolean | null;
+  stock_available: number | null;
+  stock_on_hand: number | null;
 }
 
 function toPrice(row: CatalogItemRow): CatalogItemPrice | null {
@@ -92,6 +94,8 @@ function mapCatalogRow(row: CatalogItemRow): CatalogItem {
     metadata: row.metadata ?? null,
     product: toProductDetails(row),
     service: toServiceDetails(row),
+    stockAvailable: row.stock_available ?? null,
+    stockOnHand: row.stock_on_hand ?? null,
   };
 }
 
@@ -172,8 +176,20 @@ const CATALOG_UNION = `
     NULL::jsonb AS service_attributes,
     p.category,
     NULL::integer AS crew_required,
-    p.is_active
+    p.is_active,
+    COALESCE(inv.total_available, 0) AS stock_available,
+    COALESCE(inv.total_on_hand, 0) AS stock_on_hand
   FROM catalog_products AS p
+  LEFT JOIN (
+    SELECT
+      item_id,
+      SUM(quantity_available) AS total_available,
+      SUM(quantity_on_hand) AS total_on_hand
+    FROM inventory_items
+    WHERE status = 'active' AND archived_at IS NULL
+    GROUP BY item_id
+  ) inv ON p.product_id = inv.item_id
+  WHERE inv.total_on_hand IS NOT NULL AND inv.total_on_hand > 0
   UNION ALL
   SELECT
     s.service_id AS item_code,
@@ -196,7 +212,9 @@ const CATALOG_UNION = `
     s.attributes AS service_attributes,
     s.category,
     s.crew_required,
-    s.is_active
+    s.is_active,
+    NULL::integer AS stock_available,
+    NULL::integer AS stock_on_hand
   FROM catalog_services AS s
 `;
 
@@ -241,7 +259,9 @@ export async function fetchCatalogItems(filters: CatalogFilters): Promise<Catalo
        i.service_attributes,
        i.category,
        i.crew_required,
-       i.is_active
+       i.is_active,
+       i.stock_available,
+       i.stock_on_hand
      FROM catalog_union AS i
      ${clause}
      ORDER BY i.name ASC

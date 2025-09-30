@@ -147,7 +147,7 @@ export interface ServiceDirectoryEntry {
 
 export interface OrderDirectoryEntry {
   id: string;
-  customerId: string;
+  customerId: string | null;
   centerId: string | null;
   serviceId: string | null;
   orderDate: string | null;
@@ -158,6 +158,9 @@ export interface OrderDirectoryEntry {
   assignedWarehouse: string | null;
   createdAt: string | null;
   updatedAt: string | null;
+  // Extra fields for better display in Admin Directory
+  createdBy?: string | null;
+  createdByRole?: string | null;
 }
 
 export interface ProductDirectoryEntry {
@@ -170,6 +173,8 @@ export interface ProductDirectoryEntry {
   status: string | null;
   createdAt: string | null;
   updatedAt: string | null;
+  rawId?: string | null;
+  source?: 'products' | 'catalog';
 }
 
 export interface TrainingDirectoryEntry {
@@ -254,8 +259,5 @@ export interface DirectoryResourceMap {
 }
 
 export type DirectoryResourceKey = keyof DirectoryResourceMap;
-
-
-
 
 

@@ -166,7 +166,12 @@ type ServiceRow = {
 
 type OrderRow = {
   order_id: string;
-  customer_id: string;
+  order_type: string | null;
+  created_by: string | null;
+  created_by_role: string | null;
+  creator_id?: string | null;
+  creator_role?: string | null;
+  customer_id: string | null;
   center_id: string | null;
   service_id: string | null;
   order_date: Date | null;
@@ -175,6 +180,8 @@ type OrderRow = {
   status: string | null;
   notes: string | null;
   assigned_warehouse: string | null;
+  destination: string | null;
+  destination_role: string | null;
   created_at: Date | null;
   updated_at: Date | null;
 };
@@ -411,7 +418,7 @@ async function listWarehouses(limit = DEFAULT_LIMIT): Promise<WarehouseDirectory
 }
 
 async function listServices(limit = DEFAULT_LIMIT): Promise<ServiceDirectoryEntry[]> {
-  const result = await query<ServiceRow>('SELECT service_id, service_name, category, description, pricing_model, requirements, status, created_at, updated_at FROM services ORDER BY service_id LIMIT $1', [limit]);
+  const result = await query<ServiceRow>('SELECT service_id, service_name, category, description, pricing_model, requirements, status, created_at, updated_at FROM services WHERE archived_at IS NULL ORDER BY service_id LIMIT $1', [limit]);
   return result.rows.map((row) => ({
     id: formatPrefixedId(row.service_id, 'SRV'),
     name: toNullableString(row.service_name),
@@ -426,30 +433,158 @@ async function listServices(limit = DEFAULT_LIMIT): Promise<ServiceDirectoryEntr
 }
 
 async function listOrders(limit = DEFAULT_LIMIT): Promise<OrderDirectoryEntry[]> {
-  const result = await query<OrderRow>('SELECT order_id, customer_id, center_id, service_id, order_date, completion_date, total_amount, status, notes, assigned_warehouse, created_at, updated_at FROM orders ORDER BY order_id LIMIT $1', [limit]);
+  const result = await query<OrderRow>(
+    `SELECT
+       order_id,
+       order_type,
+       created_by,
+       created_by_role,
+       creator_id,
+       creator_role,
+       customer_id,
+       center_id,
+       transformed_id AS service_id,
+       requested_date AS order_date,
+       delivery_date AS completion_date,
+       total_amount,
+       status,
+       notes,
+       assigned_warehouse,
+       destination,
+       destination_role,
+       created_at,
+       updated_at
+     FROM orders
+     WHERE archived_at IS NULL
+     ORDER BY order_id
+     LIMIT $1`,
+    [limit]
+  );
   if (!result || !result.rows) {
     return [];
   }
-  return result.rows.map((row) => ({
-    id: formatPrefixedId(row.order_id, 'ORD'),
-    customerId: formatPrefixedId(row.customer_id, 'CUS'),
-    centerId: toNullableString(row.center_id),
-    serviceId: toNullableString(row.service_id),
-    orderDate: toIso(row.order_date),
-    completionDate: toIso(row.completion_date),
-    totalAmount: toNullableNumber(row.total_amount),
-    status: toNullableString(row.status),
-    notes: toNullableString(row.notes),
-    assignedWarehouse: toNullableString(row.assigned_warehouse),
-    createdAt: toIso(row.created_at),
-    updatedAt: toIso(row.updated_at),
-  }));
+  return result.rows.map((row) => {
+    // Derive createdBy/Role when missing
+    const rawId = toNullableString(row.created_by) || toNullableString(row.creator_id);
+    let createdBy = rawId;
+    let createdByRole = toNullableString(row.created_by_role) || toNullableString(row.creator_role);
+    if (!createdBy) {
+      // Try to derive from order_id prefix like CEN-010-PO-023
+      const m = String(row.order_id || '').match(/^[A-Za-z]+-\d+/);
+      if (m) {
+        createdBy = m[0];
+      }
+    }
+    if (!createdByRole && createdBy) {
+      const prefix = createdBy.split('-')[0]?.toLowerCase();
+      const roleMap: Record<string, string> = { mgr: 'manager', con: 'contractor', cus: 'customer', cen: 'center', crw: 'crew', whs: 'warehouse' };
+      createdByRole = roleMap[prefix] || null;
+    }
+
+    return ({
+      id: formatPrefixedId(row.order_id, 'ORD'),
+      customerId: toNullableString(row.customer_id),
+      centerId: toNullableString(row.center_id),
+      serviceId: toNullableString(row.service_id),
+      orderDate: toIso(row.order_date),
+      completionDate: toIso(row.completion_date),
+      totalAmount: toNullableNumber(row.total_amount),
+      status: toNullableString(row.status),
+      notes: toNullableString(row.notes),
+      assignedWarehouse: toNullableString(row.assigned_warehouse),
+      createdAt: toIso(row.created_at),
+      updatedAt: toIso(row.updated_at),
+      // extra fields for UI consumption
+      createdBy: createdBy,
+      createdByRole: createdByRole,
+      destination: toNullableString(row.destination),
+      destinationRole: toNullableString(row.destination_role),
+      orderType: toNullableString(row.order_type),
+    });
+  });
 }
 
 async function listProducts(limit = DEFAULT_LIMIT): Promise<ProductDirectoryEntry[]> {
-  const result = await query<ProductRow>('SELECT product_id, product_name, category, description, price, unit, status, created_at, updated_at FROM products ORDER BY product_id LIMIT $1', [limit]);
-  return result.rows.map((row) => ({
+  // Primary: live inventory from inventory_items (joined to catalog for details)
+  try {
+    const inv = await query<{
+      product_id: string;
+      product_name: string;
+      category: string | null;
+      description: string | null;
+      price: number | string | null;
+      unit: string | null;
+      status: string | null;
+      created_at: Date | null;
+      updated_at: Date | null;
+    }>(
+      `SELECT
+         ii.item_id AS product_id,
+         ii.item_name AS product_name,
+         cp.category,
+         cp.description,
+         cp.base_price AS price,
+         cp.unit_of_measure AS unit,
+         'active' AS status,
+         NULL::timestamp AS created_at,
+         NULL::timestamp AS updated_at
+       FROM inventory_items ii
+       LEFT JOIN catalog_products cp ON cp.product_id = ii.item_id
+       WHERE ii.archived_at IS NULL
+       ORDER BY ii.item_id
+       LIMIT $1`,
+      [limit]
+    );
+    if (inv.rows && inv.rows.length > 0) {
+      return inv.rows.map((row) => ({
+        id: formatPrefixedId(row.product_id, 'PRD'),
+        rawId: toNullableString(row.product_id),
+        name: row.product_name,
+        category: toNullableString(row.category),
+        description: toNullableString(row.description),
+        price: toNullableNumber(row.price),
+        unit: toNullableString(row.unit),
+        status: toNullableString(row.status),
+        createdAt: toIso(row.created_at),
+        updatedAt: toIso(row.updated_at),
+        source: 'products' as const,
+      }));
+    }
+  } catch (error) {
+    // Fall through to catalog fallback
+  }
+
+  // Fallback: catalog products (view only)
+  const catalog = await query<{
+    product_id: string;
+    product_name: string;
+    category: string | null;
+    description: string | null;
+    price: number | string | null;
+    unit: string | null;
+    status: string | null;
+    created_at: Date | null;
+    updated_at: Date | null;
+  }>(
+    `SELECT
+       p.product_id,
+       p.name AS product_name,
+       p.category,
+       p.description,
+       p.base_price AS price,
+       p.unit_of_measure AS unit,
+       CASE WHEN p.is_active THEN 'active' ELSE 'inactive' END AS status,
+       p.created_at,
+       p.updated_at
+     FROM catalog_products p
+     WHERE p.is_active = TRUE
+     ORDER BY p.product_id
+     LIMIT $1`,
+    [limit]
+  );
+  return catalog.rows.map((row) => ({
     id: formatPrefixedId(row.product_id, 'PRD'),
+    rawId: toNullableString(row.product_id),
     name: row.product_name,
     category: toNullableString(row.category),
     description: toNullableString(row.description),
@@ -458,6 +593,7 @@ async function listProducts(limit = DEFAULT_LIMIT): Promise<ProductDirectoryEntr
     status: toNullableString(row.status),
     createdAt: toIso(row.created_at),
     updatedAt: toIso(row.updated_at),
+    source: 'catalog' as const,
   }));
 }
 
@@ -494,7 +630,7 @@ async function listProcedures(limit = DEFAULT_LIMIT): Promise<ProcedureDirectory
 }
 
 async function listReports(limit = DEFAULT_LIMIT): Promise<ReportDirectoryEntry[]> {
-  const result = await query<ReportRow>('SELECT report_id, type, severity, title, description, center_id, customer_id, status, created_by_role, created_by_id, created_at, updated_at, archived_at FROM reports ORDER BY report_id LIMIT $1', [limit]);
+  const result = await query<ReportRow>('SELECT report_id, type, severity, title, description, center_id, customer_id, status, created_by_role, created_by_id, created_at, updated_at, archived_at FROM reports WHERE archived_at IS NULL ORDER BY report_id LIMIT $1', [limit]);
   return result.rows.map((row) => ({
     id: formatPrefixedId(row.report_id, 'RPT'),
     type: row.type,
@@ -513,7 +649,7 @@ async function listReports(limit = DEFAULT_LIMIT): Promise<ReportDirectoryEntry[
 }
 
 async function listFeedback(limit = DEFAULT_LIMIT): Promise<FeedbackDirectoryEntry[]> {
-  const result = await query<FeedbackRow>('SELECT feedback_id, kind, title, message, center_id, customer_id, created_by_role, created_by_id, created_at, archived_at FROM feedback ORDER BY feedback_id LIMIT $1', [limit]);
+  const result = await query<FeedbackRow>('SELECT feedback_id, kind, title, message, center_id, customer_id, created_by_role, created_by_id, created_at, archived_at FROM feedback WHERE archived_at IS NULL ORDER BY feedback_id LIMIT $1', [limit]);
   return result.rows.map((row) => ({
     id: formatPrefixedId(row.feedback_id, 'FBK'),
     kind: row.kind,

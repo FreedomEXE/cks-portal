@@ -39,6 +39,30 @@
    - Only kill that specific PID
    - Never use wildcard or broad pattern matching for process names
 
+## Database Connection (Render/PostgreSQL)
+
+**IMPORTANT: When connecting to Render databases, SSL is REQUIRED!**
+
+### Direct Database Queries:
+```javascript
+// Always include SSL configuration for Render databases
+const { Client } = require('pg');
+const client = new Client({
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false  // Required for Render
+  }
+});
+```
+
+### Quick Database Check Script:
+- Use: `cd apps/backend && node scripts/check-inventory-tables.js`
+- Or create similar scripts with SSL enabled connection
+
+### Note on MCP Postgres Tool:
+- The mcp__postgres__query tool may not work with Render due to SSL requirements
+- Use Node.js scripts with pg client instead for reliable database access
+
 ## Other Important Notes
 
 ### Testing Commands

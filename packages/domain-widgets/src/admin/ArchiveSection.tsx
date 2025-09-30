@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 // Import the proper archive API client and types
 // Note: This import path needs to be adjusted based on your actual app structure
 // For now, we'll define the interface that the parent should pass
-export type EntityType = 'manager' | 'contractor' | 'customer' | 'center' | 'crew' | 'warehouse' | 'service' | 'product';
+export type EntityType = 'manager' | 'contractor' | 'customer' | 'center' | 'crew' | 'warehouse' | 'service' | 'product' | 'order';
 
 export interface ArchivedEntity {
   id: string;
@@ -37,6 +37,7 @@ const ARCHIVE_TABS = [
   { id: 'warehouse', label: 'Warehouses', color: '#8b5cf6', search: 'archived warehouses' },
   { id: 'service', label: 'Services', color: '#14b8a6', search: 'archived services' },
   { id: 'product', label: 'Products', color: '#d946ef', search: 'archived products' },
+  { id: 'order', label: 'Orders', color: '#06b6d4', search: 'archived orders' },
 ];
 
 const TAB_COLUMN_CONFIG = {
@@ -48,6 +49,7 @@ const TAB_COLUMN_CONFIG = {
   warehouse: { idLabel: 'WAREHOUSE ID', nameLabel: 'NAME' },
   service: { idLabel: 'SERVICE ID', nameLabel: 'SERVICE NAME' },
   product: { idLabel: 'PRODUCT ID', nameLabel: 'PRODUCT NAME' },
+  order: { idLabel: 'ORDER ID', nameLabel: 'ORDER' },
 };
 
 const BASE_COLUMNS = [
