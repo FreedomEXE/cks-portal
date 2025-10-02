@@ -25,6 +25,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { requireActiveRole } from '../../core/auth/guards';
 import { getHubInventory } from './service';
+import { updateInventoryQuantity } from './store';
 import type { HubRole } from '../profile/types';
 
 const paramsSchema = z.object({
@@ -53,5 +54,41 @@ export async function registerInventoryRoutes(server: FastifyInstance) {
     }
 
     reply.send({ data: inventory });
+  });
+
+  // POST /api/hub/inventory/update - Update inventory quantity (Admin only)
+  const updateBodySchema = z.object({
+    warehouseId: z.string().min(1),
+    itemId: z.string().min(1),
+    quantityChange: z.number(),
+    reason: z.string().optional(),
+  });
+
+  server.post('/api/hub/inventory/update', async (request, reply) => {
+    const account = await requireActiveRole(request, reply, {});
+    if (!account) {
+      return;
+    }
+
+    // Only admin can update inventory
+    const role = (account.role ?? '').trim().toLowerCase() as HubRole;
+    if (role !== 'admin') {
+      reply.code(403).send({ error: 'Only admins can update inventory' });
+      return;
+    }
+
+    const parsed = updateBodySchema.safeParse(request.body);
+    if (!parsed.success) {
+      reply.code(400).send({ error: 'Invalid request body', details: parsed.error });
+      return;
+    }
+
+    try {
+      await updateInventoryQuantity(parsed.data);
+      reply.send({ success: true, message: 'Inventory updated successfully' });
+    } catch (error) {
+      const err = error as Error;
+      reply.code(400).send({ error: err.message });
+    }
   });
 }

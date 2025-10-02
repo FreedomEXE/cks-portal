@@ -34,3 +34,7 @@ export { default as Scrollbar } from './Scrollbar';
 export * from './modals/ActionModal';
 export { default as ActionModal } from './modals/ActionModal';
 
+export { default as OrderDetailsModal } from './modals/OrderDetailsModal';
+
+export { default as EditOrderModal } from './modals/EditOrderModal';
+

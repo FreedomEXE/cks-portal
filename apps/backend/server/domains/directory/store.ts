@@ -452,6 +452,7 @@ async function listOrders(limit = DEFAULT_LIMIT): Promise<OrderDirectoryEntry[]>
        assigned_warehouse,
        destination,
        destination_role,
+       metadata,
        created_at,
        updated_at
      FROM orders
@@ -463,6 +464,49 @@ async function listOrders(limit = DEFAULT_LIMIT): Promise<OrderDirectoryEntry[]>
   if (!result || !result.rows) {
     return [];
   }
+
+  // Fetch order items for all orders
+  const orderIds = result.rows.map(row => row.order_id);
+  const itemsResult = await query<any>(
+    `SELECT
+       order_id,
+       line_number,
+       catalog_item_code,
+       name,
+       description,
+       item_type,
+       quantity,
+       unit_of_measure,
+       unit_price,
+       currency,
+       total_price,
+       metadata
+     FROM order_items
+     WHERE order_id = ANY($1::text[])
+     ORDER BY order_id, line_number`,
+    [orderIds]
+  );
+
+  // Map items by order_id
+  const itemsMap = new Map<string, any[]>();
+  for (const itemRow of itemsResult.rows) {
+    const items = itemsMap.get(itemRow.order_id) || [];
+    items.push({
+      id: `${itemRow.order_id}-${itemRow.line_number}`,
+      code: itemRow.catalog_item_code,
+      name: itemRow.name,
+      description: itemRow.description,
+      itemType: itemRow.item_type,
+      quantity: itemRow.quantity,
+      unitOfMeasure: itemRow.unit_of_measure,
+      unitPrice: itemRow.unit_price,
+      currency: itemRow.currency,
+      totalPrice: itemRow.total_price,
+      metadata: itemRow.metadata,
+    });
+    itemsMap.set(itemRow.order_id, items);
+  }
+
   return result.rows.map((row) => {
     // Derive createdBy/Role when missing
     const rawId = toNullableString(row.created_by) || toNullableString(row.creator_id);
@@ -500,6 +544,8 @@ async function listOrders(limit = DEFAULT_LIMIT): Promise<OrderDirectoryEntry[]>
       destination: toNullableString(row.destination),
       destinationRole: toNullableString(row.destination_role),
       orderType: toNullableString(row.order_type),
+      items: itemsMap.get(row.order_id) || [],
+      metadata: (row as any).metadata ?? null,
     });
   });
 }

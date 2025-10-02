@@ -1,5 +1,12 @@
 # CKS Order Flow Documentation
 
+> 2025-10-01 Update (Codex)
+>
+> - Creator stage is canonical and remains "requested" (green) in the workflow; only the fulfillment stage reflects final outcomes (cancelled, delivered, rejected).
+> - Status chip added to Order Details with color mapping: pending (yellow), in‑progress (blue), completed (green), cancelled/rejected (red).
+> - Product orders now use an Availability Window (days + time range, with timezone) displayed in Order Details; the previous Expected Delivery date is no longer shown in the modal.
+> - Creators always see "View Details" in actions alongside "Cancel" while the next actor has not accepted yet.
+
 ## Overview
 Single source of truth for all order workflows in the CKS Portal system, including service and product order lifecycles, approval stages, status logic, and visual states.
 

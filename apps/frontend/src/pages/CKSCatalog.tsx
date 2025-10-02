@@ -3,7 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { useCatalogItems, type CatalogItem } from "../shared/api/catalog";
 import { useCart } from "../contexts/CartContext";
 import { createHubOrder } from "../shared/api/hub";
-import { useAuth, useUser } from "@clerk/clerk-react";
+import { useAuth as useClerkAuth, useUser } from "@clerk/clerk-react";
+import { useAuth as useCksAuth } from "@cks/auth";
+import { useHubRoleScope } from "../shared/api/hub";
 
 type CatalogKind = "products" | "services";
 
@@ -188,10 +190,70 @@ function DateSelectorModal({
   );
 }
 
-function CartPanel({ onClose, onCheckout }: { onClose: () => void; onCheckout: () => void }) {
+type DestinationOption = { id: string; name: string | null; customerId?: string | null };
+
+function CartPanel({
+  onClose,
+  onCheckout,
+  role,
+  defaultDestination,
+  centers,
+  customers,
+}: {
+  onClose: () => void;
+  onCheckout: (
+    availability: { tz: string; days: string[]; window: { start: string; end: string } },
+    notes?: string | null,
+    destination?: { code: string; role: 'center' }
+  ) => void;
+  role: string | null;
+  defaultDestination: string | null;
+  centers: DestinationOption[];
+  customers: { id: string; name: string | null }[];
+}) {
   const cart = useCart();
 
   const totalItems = cart.getTotalItems();
+  const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  const [days, setDays] = useState<string[]>(['mon','tue','wed','thu','fri']);
+  const [start, setStart] = useState('09:00');
+  const [end, setEnd] = useState('17:00');
+  const [notes, setNotes] = useState<string>('');
+  const [selectedCustomer, setSelectedCustomer] = useState<string | null>(customers.length === 1 ? customers[0].id : null);
+  const [selectedCenter, setSelectedCenter] = useState<string | null>(defaultDestination ?? null);
+
+  useEffect(() => {
+    if (!selectedCenter && centers && centers.length === 1) {
+      setSelectedCenter(centers[0].id);
+    }
+  }, [centers, selectedCenter]);
+  const needsDestination = useMemo(() => {
+    const r = (role || '').trim().toLowerCase();
+    if (!r) {
+      // If role not yet resolved but we have centers, still show
+      return (centers?.length || 0) > 0;
+    }
+    if (r === 'center') return false; // Center orders auto-destination
+    if (r === 'customer') return true; // Always pick a center explicitly
+    if (r === 'crew') return true;     // Always show dropdown for consistency
+    if (r === 'contractor' || r === 'manager') return true;
+    // Fallback: if centers exist, show selector
+    return (centers?.length || 0) > 0;
+  }, [role, centers]);
+  const filteredCenters = useMemo(() => {
+    const r = (role || '').trim().toLowerCase();
+    if (r === 'contractor' || r === 'manager') {
+      if (selectedCustomer) {
+        return centers.filter((c) => (c.customerId || '').toUpperCase() === selectedCustomer.toUpperCase());
+      }
+      return centers;
+    }
+    return centers;
+  }, [centers, role, selectedCustomer]);
+
+  const toggleDay = (d: string) => {
+    setDays((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]));
+  };
 
   return (
     <div className="fixed right-0 top-0 h-full w-96 bg-white shadow-xl z-50 flex flex-col">
@@ -252,12 +314,101 @@ function CartPanel({ onClose, onCheckout }: { onClose: () => void; onCheckout: (
 
       {cart.items.length > 0 && (
         <div className="border-t p-4">
+          <div className="mb-4">
+            <div className="font-semibold mb-2">Availability Window</div>
+            <div className="text-xs text-gray-600 mb-2">Timezone: {browserTz}</div>
+            <div className="flex flex-wrap gap-2 mb-3">
+              {['mon','tue','wed','thu','fri','sat','sun'].map((d) => (
+                <button
+                  key={d}
+                  onClick={() => toggleDay(d)}
+                  className={`px-2 py-1 rounded border text-xs ${days.includes(d) ? 'bg-black text-white border-black' : 'bg-white text-gray-700 border-gray-300'}`}
+                >
+                  {d.toUpperCase()}
+                </button>
+              ))}
+              <button
+                onClick={() => setDays(['mon','tue','wed','thu','fri'])}
+                className="px-2 py-1 rounded border text-xs bg-gray-100 border-gray-300 text-gray-700"
+              >
+                Mon–Fri
+              </button>
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-gray-700">From</label>
+              <input type="time" value={start} onChange={(e) => setStart(e.target.value)} className="border rounded px-2 py-1 text-sm" />
+              <label className="text-sm text-gray-700">to</label>
+              <input type="time" value={end} onChange={(e) => setEnd(e.target.value)} className="border rounded px-2 py-1 text-sm" />
+            </div>
+          </div>
+          {/* Destination selection for non-center roles */}
+          {needsDestination && (
+            <div className="mb-4">
+              <div className="font-semibold mb-2">Destination</div>
+              {(role === 'contractor' || role === 'manager') && (
+                <div className="mb-2">
+                  <label className="block text-sm text-gray-700 mb-1">Customer</label>
+                  <select
+                    value={selectedCustomer || ''}
+                    onChange={(e) => {
+                      const v = e.target.value || null;
+                      setSelectedCustomer(v);
+                      setSelectedCenter(null);
+                    }}
+                    className="w-full border rounded px-3 py-2 text-sm"
+                  >
+                    <option value="">Select customer</option>
+                    {customers.map((c) => (
+                      <option key={c.id} value={c.id}>{`${c.id}${c.name ? ` - ${c.name}` : ''}`}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <div>
+                <label className="block text-sm text-gray-700 mb-1">Center</label>
+                <select
+                  value={selectedCenter || ''}
+                  onChange={(e) => setSelectedCenter(e.target.value || null)}
+                  className="w-full border rounded px-3 py-2 text-sm"
+                >
+                  <option value="">Select center</option>
+                  {filteredCenters.map((c) => (
+                    <option key={c.id} value={c.id}>{`${c.id}${c.name ? ` - ${c.name}` : ''}`}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
+
+          <div className="mb-4">
+            <div className="font-semibold mb-2">Special Instructions (optional)</div>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Add delivery details or special instructions..."
+              className="w-full border rounded px-3 py-2 text-sm"
+              rows={3}
+            />
+          </div>
           <div className="flex justify-between mb-4">
             <span className="font-semibold">Total Items:</span>
             <span className="font-semibold">{totalItems}</span>
           </div>
           <button
-            onClick={onCheckout}
+            onClick={() => {
+              const availability = { tz: browserTz, days, window: { start, end } };
+              let destination: { code: string; role: 'center' } | undefined = undefined;
+              const r = (role || '').trim().toLowerCase();
+              if (r && r !== 'center') {
+                const chosen = selectedCenter || defaultDestination || null;
+                if (!chosen) {
+                  alert('Please select a destination center.');
+                  return;
+                }
+                destination = { code: chosen, role: 'center' };
+              }
+              onCheckout(availability, notes, destination);
+            }}
             className="w-full bg-black text-white py-2 rounded-md hover:bg-neutral-800"
           >
             Request Products
@@ -280,8 +431,11 @@ export default function CKSCatalog() {
 
   const navigate = useNavigate();
   const cart = useCart();
-  const { getToken } = useAuth();
+  const { getToken } = useClerkAuth();
   const { user } = useUser();
+  const { role: authRole, code: authCode } = useCksAuth();
+  const normalizedCode = useMemo(() => (authCode ? authCode.trim().toUpperCase() : null), [authCode]);
+  const { data: scope } = useHubRoleScope(normalizedCode || undefined);
 
   useEffect(() => {
     const handle = setTimeout(() => setDebouncedQuery(query), 250);
@@ -334,7 +488,11 @@ export default function CKSCatalog() {
     }
   };
 
-  const handleCheckout = async () => {
+  const handleCheckout = async (
+    availability?: { tz: string; days: string[]; window: { start: string; end: string } },
+    notesInput?: string | null,
+    destination?: { code: string; role: 'center' }
+  ) => {
     if (cart.items.length === 0 || isSubmitting) return;
 
     setIsSubmitting(true);
@@ -342,6 +500,9 @@ export default function CKSCatalog() {
       await createHubOrder({
         orderType: "product",
         title: `Product Order - ${cart.items.length} items`,
+        notes: (notesInput && notesInput.trim().length > 0) ? notesInput.trim() : undefined,
+        destination: destination ? { code: destination.code, role: destination.role } : undefined,
+        metadata: availability ? { availability } : undefined,
         items: cart.items.map(item => ({
           catalogCode: item.catalogCode,
           quantity: item.quantity,
@@ -353,7 +514,19 @@ export default function CKSCatalog() {
       setShowCart(false);
     } catch (error) {
       console.error("Failed to create product order:", error);
-      alert("Failed to create product order. Please try again.");
+      let message = "Failed to create product order. Please try again.";
+      if (error instanceof Error && typeof error.message === 'string' && error.message.trim().length > 0) {
+        try {
+          const parsed = JSON.parse(error.message);
+          if (parsed && typeof parsed.error === 'string' && parsed.error.trim().length > 0) {
+            message = parsed.error;
+          }
+        } catch (_) {
+          // error.message might already be plain text
+          message = error.message;
+        }
+      }
+      alert(message);
     } finally {
       setIsSubmitting(false);
     }
@@ -433,7 +606,6 @@ export default function CKSCatalog() {
               <Card
                 key={item.code}
                 item={item}
-                onView={() => alert(`${item.type === "product" ? "Product" : "Service"}: ${item.name}\n\n${item.description || 'No description available.'}`)}
                 onAdd={() => item.type === "product" ? handleAddProduct(item) : handleAddService(item)}
                 isInCart={cart.isInCart(item.code)}
               />
@@ -446,6 +618,52 @@ export default function CKSCatalog() {
         <CartPanel
           onClose={() => setShowCart(false)}
           onCheckout={handleCheckout}
+          role={authRole}
+          defaultDestination={(() => {
+            const r = (authRole || '').toLowerCase();
+            // Crew: single center (if provided via scope)
+            if (r === 'crew') {
+              const center = (scope as any)?.relationships?.center;
+              return center?.id || null;
+            }
+            // Customer: if exactly one center, default
+            if (r === 'customer') {
+              const centers = (scope as any)?.relationships?.centers || [];
+              return centers.length === 1 ? centers[0].id : null;
+            }
+            return null;
+          })()}
+          customers={(() => {
+            const r = (authRole || '').toLowerCase();
+            if (r === 'contractor' || r === 'manager') {
+              return ((scope as any)?.relationships?.customers || []).map((c: any) => ({ id: c.id, name: c.name || c.id }));
+            }
+            if (r === 'customer') {
+              const customer = (scope as any)?.relationships?.customer;
+              return customer ? [{ id: customer.id, name: customer.name || customer.id }] : [];
+            }
+            return [];
+          })()}
+          centers={(() => {
+            const r = (authRole || '').toLowerCase();
+            if (r === 'manager') {
+              const list = (scope as any)?.relationships?.centers || [];
+              return list.map((x: any) => ({ id: x.id, name: x.name || x.id, customerId: x.customerId || null }));
+            }
+            if (r === 'contractor') {
+              const list = (scope as any)?.relationships?.centers || [];
+              return list.map((x: any) => ({ id: x.id, name: x.name || x.id, customerId: x.customerId || null }));
+            }
+            if (r === 'customer') {
+              const list = (scope as any)?.relationships?.centers || [];
+              return list.map((x: any) => ({ id: x.id, name: x.name || x.id }));
+            }
+            if (r === 'crew') {
+              const center = (scope as any)?.relationships?.center;
+              return center ? [{ id: center.id, name: center.name || center.id }] : [];
+            }
+            return [];
+          })()}
         />
       )}
 
@@ -459,3 +677,5 @@ export default function CKSCatalog() {
     </div>
   );
 }
+
+

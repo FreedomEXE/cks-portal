@@ -97,6 +97,20 @@ export type HubDashboardResponse =
   | CenterDashboardResponse
   | CrewDashboardResponse
   | WarehouseDashboardResponse;
+export interface HubOrderLineItem {
+  id: string;
+  code: string | null;
+  name: string;
+  description: string | null;
+  itemType: 'service' | 'product';
+  quantity: number;
+  unitOfMeasure: string | null;
+  unitPrice: string | null;
+  currency: string | null;
+  totalPrice: string | null;
+  metadata: Record<string, unknown> | null;
+}
+
 export interface HubOrderItem {
   orderId: string;
   orderType: 'service' | 'product';
@@ -113,6 +127,7 @@ export interface HubOrderItem {
   centerId: string | null;
   assignedWarehouse: string | null;
   notes: string | null;
+  items?: HubOrderLineItem[];
   // Legacy aliases populated by backend for existing hubs
   id?: string | null;
   customerId?: string | null;
@@ -121,6 +136,8 @@ export interface HubOrderItem {
   viewerStatus?: string | null;
   approvalStages?: Array<{ role: string; status: string; userId: string | null; timestamp: string | null }>;
   transformedId?: string | null;
+  metadata?: Record<string, unknown> | null;
+  archivedAt?: string | null;
 }
 
 export interface HubOrdersResponse {
@@ -620,6 +637,19 @@ export interface OrderActionRequest {
 export async function applyHubOrderAction(orderId: string, payload: OrderActionRequest) {
   const response = await apiFetch<ApiResponse<HubOrderItem>>(`/orders/${encodeURIComponent(orderId)}/actions`, {
     method: 'POST',
+    body: JSON.stringify(payload),
+  });
+  return response.data;
+}
+
+export interface UpdateOrderFieldsRequest {
+  expectedDate?: string;
+  notes?: string;
+}
+
+export async function updateOrderFields(orderId: string, payload: UpdateOrderFieldsRequest) {
+  const response = await apiFetch<ApiResponse<HubOrderItem>>(`/orders/${encodeURIComponent(orderId)}`, {
+    method: 'PATCH',
     body: JSON.stringify(payload),
   });
   return response.data;

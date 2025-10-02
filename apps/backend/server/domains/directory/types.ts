@@ -161,6 +161,23 @@ export interface OrderDirectoryEntry {
   // Extra fields for better display in Admin Directory
   createdBy?: string | null;
   createdByRole?: string | null;
+  destination?: string | null;
+  destinationRole?: string | null;
+  orderType?: string | null;
+  items?: Array<{
+    id: string;
+    code: string | null;
+    name: string;
+    description: string | null;
+    itemType: string;
+    quantity: number;
+    unitOfMeasure: string | null;
+    unitPrice: string | null;
+    currency: string | null;
+    totalPrice: string | null;
+    metadata: Record<string, unknown> | null;
+  }>;
+  metadata?: Record<string, unknown> | null;
 }
 
 export interface ProductDirectoryEntry {

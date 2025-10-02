@@ -12,13 +12,13 @@ interface OrderCardProps {
   orderId: string;
   orderType: 'service' | 'product';
   title: string;
-  requestedBy: string;
+  requestedBy?: string;
   destination?: string;  // Destination for the order
   requestedDate: string;
   expectedDate?: string;  // Requested date
   serviceStartDate?: string;  // Actual service start (for service-created)
   deliveryDate?: string;  // Actual delivery date (for delivered)
-  status: 'pending' | 'in-progress' | 'approved' | 'rejected' | 'cancelled' | 'delivered' | 'service-created';
+  status: 'pending' | 'in-progress' | 'approved' | 'rejected' | 'cancelled' | 'delivered' | 'service-created' | 'completed' | 'archived';
   approvalStages?: ApprovalStage[];
   onAction?: (action: string) => void;
   actions?: string[];
@@ -50,13 +50,25 @@ const OrderCard: React.FC<OrderCardProps> = ({
   transformedId
 }) => {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
+  const formatDateTime = (value?: string) => {
+    if (!value) return '—';
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return value;
+    const date = d.toLocaleDateString('en-CA'); // YYYY-MM-DD
+    const time = d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
+    return `${date} - ${time}`;
+  };
   const getStatusColor = (status: string, isPulsing: boolean = false, isLastStage: boolean = false) => {
     let baseClass = '';
     switch (status) {
       case 'approved':
       case 'delivered':
+      case 'completed':
       case 'service-created':
-      case 'requested':  // Crew requested shows as green (completed action)
+        baseClass = styles.statusGreen;
+        break;
+      case 'requested':
+        // Creator's canonical stage is a completed step in the flow
         baseClass = styles.statusGreen;
         break;
       case 'pending':
@@ -74,8 +86,8 @@ const OrderCard: React.FC<OrderCardProps> = ({
       default:
         baseClass = styles.statusGray;
     }
-    // Add pulsing class only for pending/accepted states (not waiting)
-    if (isPulsing && (status === 'pending' || status === 'accepted')) {
+    // Add pulsing class only for the current pending stage
+    if (isPulsing && status === 'pending') {
       return `${baseClass} ${styles.pulsingStage}`;
     }
     return baseClass;
@@ -104,7 +116,9 @@ const OrderCard: React.FC<OrderCardProps> = ({
         case 'in-progress': return '#dbeafe'; // Light blue
         case 'approved': return '#dcfce7'; // Light green
         case 'delivered': return '#dcfce7'; // Light green - same as approved
+        case 'completed': return '#dcfce7'; // Light green - completed status
         case 'service-created': return '#dcfce7'; // Light green - service created
+        case 'archived': return 'rgba(17, 24, 39, 0.08)'; // Black tinted highlight
         case 'rejected': return '#fee2e2'; // Light red
         case 'cancelled': return '#fee2e2'; // Light red - same as rejected
         default: return '#f9fafb';
@@ -232,10 +246,6 @@ const OrderCard: React.FC<OrderCardProps> = ({
             <div className={styles.orderDetailsSection}>
               <h4 className={styles.sectionTitle}>Order Details</h4>
               <div className={styles.detailsRow}>
-                <div className={styles.detailItem}>
-                  <span className={styles.detailLabel}>Requested By</span>
-                  <span className={styles.detailValue}>{requestedBy}</span>
-                </div>
                 {destination && (
                   <div className={styles.detailItem}>
                     <span className={styles.detailLabel}>Destination</span>
@@ -244,11 +254,17 @@ const OrderCard: React.FC<OrderCardProps> = ({
                 )}
                 <div className={styles.detailItem}>
                   <span className={styles.detailLabel}>Date Requested</span>
-                  <span className={styles.detailValue}>{requestedDate}</span>
+                  <span className={styles.detailValue}>{formatDateTime(requestedDate)}</span>
                 </div>
-                {expectedDate && (
+                {requestedBy && (
                   <div className={styles.detailItem}>
                     <span className={styles.detailLabel}>Requested By</span>
+                    <span className={styles.detailValue}>{requestedBy}</span>
+                  </div>
+                )}
+                {expectedDate && (
+                  <div className={styles.detailItem}>
+                    <span className={styles.detailLabel}>Requested</span>
                     <span className={styles.detailValue}>{expectedDate}</span>
                   </div>
                 )}
@@ -277,7 +293,7 @@ const OrderCard: React.FC<OrderCardProps> = ({
                       <div className={`${styles.stage} ${getStatusColor(stage.status, true, index === approvalStages.length - 1)}`}>
                         <div className={styles.stageRole}>{stage.role}</div>
                         <div className={styles.stageStatus}>
-                          {stage.status.replace('-', ' ')}
+                          {(stage as any).label || stage.status.replace('-', ' ')}
                         </div>
                         {stage.user && (
                           <div className={styles.stageUser}>{stage.user}</div>
@@ -342,20 +358,7 @@ const OrderCard: React.FC<OrderCardProps> = ({
         <h3 className={styles.title}>{title}</h3>
 
         <div className={styles.metadata}>
-          <div className={styles.metaItem}>
-            <span className={styles.metaLabel}>Requested by:</span>
-            <span className={styles.metaValue}>{requestedBy}</span>
-          </div>
-          <div className={styles.metaItem}>
-            <span className={styles.metaLabel}>Requested:</span>
-            <span className={styles.metaValue}>{requestedDate}</span>
-          </div>
-          {expectedDate && (
-            <div className={styles.metaItem}>
-              <span className={styles.metaLabel}>Requested:</span>
-              <span className={styles.metaValue}>{expectedDate}</span>
-            </div>
-          )}
+          {/* Date fields removed from card per product-order spec */}
           {serviceStartDate && status === 'service-created' && (
             <div className={styles.metaItem}>
               <span className={styles.metaLabel}>Service Start:</span>
@@ -376,9 +379,7 @@ const OrderCard: React.FC<OrderCardProps> = ({
             <div className={styles.workflowStages}>
               {approvalStages.map((stage, index) => {
                 // Find the first pending/accepted stage to apply pulsing (not waiting)
-                const firstPendingIndex = approvalStages.findIndex(s =>
-                  s.status === 'pending' || s.status === 'accepted'
-                );
+                const firstPendingIndex = approvalStages.findIndex(s => s.status === 'pending');
                 const shouldPulse = index === firstPendingIndex;
 
                 return (

@@ -4,6 +4,10 @@ import {
   applyOrderAction as storeApplyOrderAction,
   createOrder as storeCreateOrder,
   getHubOrders as storeGetHubOrders,
+  fetchOrderById as storeFetchOrderById,
+  archiveOrder as storeArchiveOrder,
+  restoreOrder as storeRestoreOrder,
+  hardDeleteOrder as storeHardDeleteOrder,
   type CreateOrderInput,
   type OrderActionInput,
   type OrderActionType,
@@ -13,12 +17,13 @@ const PRODUCT_ORDER_CREATORS = new Set<HubRole>(['manager', 'contractor', 'custo
 const SERVICE_ORDER_CREATORS = new Set<HubRole>(['contractor', 'customer', 'center']);
 
 const ROLE_ACTIONS: Record<HubRole, readonly OrderActionType[]> = {
+  admin: [], // Admin doesn't interact with orders directly
   manager: ['create-service', 'cancel'],
   contractor: ['cancel'],
   customer: ['cancel'],
   center: ['cancel'],
   crew: ['cancel'],
-  warehouse: ['accept', 'reject', 'deliver', 'cancel'],
+  warehouse: ['accept', 'reject', 'start-delivery', 'deliver', 'cancel'],
 };
 
 export type { CreateOrderInput, OrderActionInput, OrderActionType };
@@ -49,4 +54,20 @@ export async function applyOrderAction(input: OrderActionInput): Promise<HubOrde
     throw new Error('This role cannot perform the requested order action.');
   }
   return storeApplyOrderAction(input);
+}
+
+export async function getOrderById(orderId: string): Promise<HubOrderItem | null> {
+  return storeFetchOrderById(orderId, {});
+}
+
+export async function archiveOrder(orderId: string): Promise<HubOrderItem | null> {
+  return storeArchiveOrder(orderId);
+}
+
+export async function restoreOrder(orderId: string): Promise<HubOrderItem | null> {
+  return storeRestoreOrder(orderId);
+}
+
+export async function hardDeleteOrder(orderId: string): Promise<{ success: boolean }> {
+  return storeHardDeleteOrder(orderId);
 }

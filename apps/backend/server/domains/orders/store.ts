@@ -1,4 +1,4 @@
-import { query } from "../../db/connection";
+import { query, withTransaction } from "../../db/connection";
 import { normalizeIdentity } from "../identity";
 import type { HubRole } from "../profile/types";
 import type {
@@ -45,6 +45,7 @@ const PRODUCT_SEQUENCE = "order_product_sequence";
 const SERVICE_SEQUENCE = "order_service_sequence";
 const PRODUCT_PREFIX = "PO";
 const SERVICE_PREFIX = "SO";
+const DISABLE_INVENTORY_CHECK = process.env.CKS_DISABLE_INVENTORY_CHECK === 'true';
 
 interface OrderRow {
   order_id: string;
@@ -74,6 +75,7 @@ interface OrderRow {
   metadata: Record<string, unknown> | null;
   created_at: Date | string | null;
   updated_at: Date | string | null;
+  archived_at: Date | string | null;
 }
 
 interface OrderItemRow {
@@ -134,7 +136,7 @@ export interface CreateOrderInput {
   items: readonly CreateOrderItemInput[];
 }
 
-export type OrderActionType = "accept" | "reject" | "deliver" | "cancel" | "create-service" | "complete";
+export type OrderActionType = "accept" | "reject" | "start-delivery" | "deliver" | "cancel" | "create-service" | "complete";
 
 export interface OrderActionInput {
   orderId: string;
@@ -296,31 +298,27 @@ function viewerStatusFrom(options: {
   // Default: show in-progress for all active orders
   return 'in-progress'; // BLUE - No action needed
 }
-function deriveCreatorStageStatus(status: OrderStatus): OrderApprovalStage['status'] {
-  switch (status) {
-    case 'cancelled':
-      return 'cancelled';
-    case 'rejected':
-      return 'rejected';
-    case 'delivered':
-      return 'delivered';
-    case 'service-created':
-      return 'service-created';
-    default:
-      return 'requested';
-  }
+function deriveCreatorStageStatus(_status: OrderStatus): OrderApprovalStage['status'] {
+  // Keep the creator's canonical state stable as "requested" regardless of the final outcome.
+  // Final statuses (cancelled, rejected, delivered, etc.) should be reflected on the fulfillment stage only.
+  return 'requested';
 }
 
 function deriveFulfillmentStageStatus(
   orderType: 'product' | 'service',
   status: OrderStatus,
+  metadata?: Record<string, unknown> | null,
 ): OrderApprovalStage['status'] {
   switch (status) {
     // Product order statuses
     case 'pending_warehouse':
       return 'pending';
     case 'awaiting_delivery':
-      return 'accepted'; // Warehouse accepted, awaiting delivery
+      // Check if delivery has started via metadata
+      if (metadata && metadata.deliveryStarted === true) {
+        return 'accepted'; // Will show as "Out for Delivery"
+      }
+      return 'accepted'; // Will show as "Accepted"
     case 'delivered':
       return 'delivered';
 
@@ -476,7 +474,7 @@ function buildApprovalStages(
 
   const fallbackFulfillmentRole: HubRole = orderType === 'service' ? 'manager' : 'warehouse';
   const fulfillmentRole = normalizeRole(row.next_actor_role) ?? fallbackFulfillmentRole;
-  const fulfillmentStatus = deriveFulfillmentStageStatus(orderType, status);
+  const fulfillmentStatus = deriveFulfillmentStageStatus(orderType, status, row.metadata);
 
   let fulfillmentUserId: string | null = null;
   switch (fulfillmentRole) {
@@ -507,21 +505,32 @@ function buildApprovalStages(
       ? toIso(row.delivery_date ?? row.service_start_date ?? row.updated_at)
       : null;
 
+  // Determine custom label for awaiting_delivery status based on metadata
+  let fulfillmentLabel: string | null = null;
+  if (status === 'awaiting_delivery' && fulfillmentStatus === 'accepted') {
+    if (row.metadata && row.metadata.deliveryStarted === true) {
+      fulfillmentLabel = 'Out for Delivery';
+    } else {
+      fulfillmentLabel = 'Accepted';
+    }
+  }
+
   stages.push({
     role: fulfillmentRole,
     status: fulfillmentStatus,
     userId: fulfillmentUserId,
     timestamp: fulfillmentTimestamp,
+    label: fulfillmentLabel,
   });
 
   return stages;
 }
 
-function mapOrderRow(
+async function mapOrderRow(
   row: OrderRow,
   items: OrderItemRow[],
   context?: { viewerRole?: HubRole | null; viewerCode?: string | null },
-): HubOrderItem {
+): Promise<HubOrderItem> {
   const creatorCode = normalizeCodeValue(row.creator_id);
   const orderType = parseOrderType(row.order_type);
   const status = normalizeStatus(row.status);
@@ -578,27 +587,208 @@ function mapOrderRow(
 
   const approvalStages = buildApprovalStages(row, orderType, status);
 
+  // Enrich metadata with contact info for Warehouse and other hubs (fill missing fields)
+  console.log('[mapOrderRow] START - order_id:', row.order_id);
+  let enrichedMetadata = row.metadata ? { ...row.metadata } : {};
+  console.log('[mapOrderRow] enrichedMetadata:', JSON.stringify(enrichedMetadata, null, 2));
+  const existingContacts: any = (enrichedMetadata as any).contacts ?? {};
+  console.log('[mapOrderRow] existingContacts:', existingContacts);
+
+  const hasAllFields = (c: any | null | undefined) =>
+    !!c && c.name != null && c.address != null && c.phone != null && c.email != null;
+
+  // Helper to fetch contact info synchronously
+  const getContactFromCode = async (
+    code: string | null,
+  ): Promise<{ name: string | null; address: string | null; phone: string | null; email: string | null } | null> => {
+    console.log('[getContactFromCode] Input code:', code);
+    const normalized = normalizeCodeValue(code);
+    console.log('[getContactFromCode] Normalized:', normalized);
+    if (!normalized) return null;
+    const prefix = normalized.split('-')[0];
+    console.log('[getContactFromCode] Prefix:', prefix);
+    if (prefix === 'CEN') {
+      console.log('[getContactFromCode] Querying centers table for:', normalized);
+      let res = await query<{ name: string | null; main_contact: string | null; email: string | null; phone: string | null; address: string | null }>(
+        `SELECT name, main_contact, email, phone, address FROM centers WHERE UPPER(center_id) = $1 LIMIT 1`,
+        [normalized],
+      );
+      let r = res.rows[0];
+      // Fallback for zero-padding mismatches (e.g., CEN-010 vs CEN-10)
+      if (!r) {
+        const alt = normalized.replace(/^(\w+)-0*(\d+)$/, '$1-$2');
+        if (alt !== normalized) {
+          console.log('[getContactFromCode] Retrying centers lookup with alt code:', alt);
+          res = await query<{ name: string | null; main_contact: string | null; email: string | null; phone: string | null; address: string | null }>(
+            `SELECT name, main_contact, email, phone, address FROM centers WHERE UPPER(center_id) = $1 LIMIT 1`,
+            [alt],
+          );
+          r = res.rows[0];
+        }
+      }
+      console.log('[getContactFromCode] Centers query result:', r);
+      return r ? { name: r.name ?? normalized, address: r.address ?? null, phone: r.phone ?? null, email: r.email ?? null } : { name: normalized, address: null, phone: null, email: null };
+    }
+    if (prefix === 'CUS') {
+      console.log('[getContactFromCode] Querying customers table for:', normalized);
+      let res = await query<{ name: string | null; main_contact: string | null; email: string | null; phone: string | null; address: string | null }>(
+        `SELECT name, main_contact, email, phone, address FROM customers WHERE UPPER(customer_id) = $1 LIMIT 1`,
+        [normalized],
+      );
+      let r = res.rows[0];
+      if (!r) {
+        const alt = normalized.replace(/^(\w+)-0*(\d+)$/, '$1-$2');
+        if (alt !== normalized) {
+          console.log('[getContactFromCode] Retrying customers lookup with alt code:', alt);
+          res = await query<{ name: string | null; main_contact: string | null; email: string | null; phone: string | null; address: string | null }>(
+            `SELECT name, main_contact, email, phone, address FROM customers WHERE UPPER(customer_id) = $1 LIMIT 1`,
+            [alt],
+          );
+          r = res.rows[0];
+        }
+      }
+      console.log('[getContactFromCode] Customers query result:', r);
+      return r ? { name: r.name ?? normalized, address: r.address ?? null, phone: r.phone ?? null, email: r.email ?? null } : { name: normalized, address: null, phone: null, email: null };
+    }
+    if (prefix === 'CRW') {
+      console.log('[getContactFromCode] Querying crew table for:', normalized);
+      let res = await query<{ name: string | null; email: string | null; phone: string | null; address: string | null }>(
+        `SELECT name, email, phone, address FROM crew WHERE UPPER(crew_id) = $1 LIMIT 1`,
+        [normalized],
+      );
+      let r = res.rows[0];
+      if (!r) {
+        const alt = normalized.replace(/^(\w+)-0*(\d+)$/, '$1-$2');
+        if (alt !== normalized) {
+          console.log('[getContactFromCode] Retrying crew lookup with alt code:', alt);
+          res = await query<{ name: string | null; email: string | null; phone: string | null; address: string | null }>(
+            `SELECT name, email, phone, address FROM crew WHERE UPPER(crew_id) = $1 LIMIT 1`,
+            [alt],
+          );
+          r = res.rows[0];
+        }
+      }
+      console.log('[getContactFromCode] Crew query result:', r);
+      return r ? { name: r.name ?? normalized, address: r.address ?? null, phone: r.phone ?? null, email: r.email ?? null } : { name: normalized, address: null, phone: null, email: null };
+    }
+    if (prefix === 'MGR') {
+      console.log('[getContactFromCode] Querying managers table for:', normalized);
+      let res = await query<{ name: string | null; email: string | null; phone: string | null; address: string | null }>(
+        `SELECT name, email, phone, address FROM managers WHERE UPPER(manager_id) = $1 LIMIT 1`,
+        [normalized],
+      );
+      let r = res.rows[0];
+      if (!r) {
+        const alt = normalized.replace(/^(\w+)-0*(\d+)$/, '$1-$2');
+        if (alt !== normalized) {
+          console.log('[getContactFromCode] Retrying managers lookup with alt code:', alt);
+          res = await query<{ name: string | null; email: string | null; phone: string | null; address: string | null }>(
+            `SELECT name, email, phone, address FROM managers WHERE UPPER(manager_id) = $1 LIMIT 1`,
+            [alt],
+          );
+          r = res.rows[0];
+        }
+      }
+      console.log('[getContactFromCode] Managers query result:', r);
+      return r ? { name: r.name ?? normalized, address: r.address ?? null, phone: r.phone ?? null, email: r.email ?? null } : { name: normalized, address: null, phone: null, email: null };
+    }
+    if (prefix === 'CON') {
+      console.log('[getContactFromCode] Querying contractors table for:', normalized);
+      let res = await query<{ name: string | null; email: string | null; phone: string | null; address: string | null }>(
+        `SELECT name, email, phone, address FROM contractors WHERE UPPER(contractor_id) = $1 LIMIT 1`,
+        [normalized],
+      );
+      let r = res.rows[0];
+      if (!r) {
+        const alt = normalized.replace(/^(\w+)-0*(\d+)$/, '$1-$2');
+        if (alt !== normalized) {
+          console.log('[getContactFromCode] Retrying contractors lookup with alt code:', alt);
+          res = await query<{ name: string | null; email: string | null; phone: string | null; address: string | null }>(
+            `SELECT name, email, phone, address FROM contractors WHERE UPPER(contractor_id) = $1 LIMIT 1`,
+            [alt],
+          );
+          r = res.rows[0];
+        }
+      }
+      console.log('[getContactFromCode] Contractors query result:', r);
+      return r ? { name: r.name ?? normalized, address: r.address ?? null, phone: r.phone ?? null, email: r.email ?? null } : { name: normalized, address: null, phone: null, email: null };
+    }
+    console.log('[getContactFromCode] Unrecognized prefix, returning normalized name with nulls');
+    return { name: normalized, address: null, phone: null, email: null };
+  };
+
+  // Determine if we need to fetch/merge requestor and destination
+  const needRequestor = !hasAllFields(existingContacts.requestor);
+  const needDestination = !hasAllFields(existingContacts.destination);
+
+  // Fallback: only for center-created product orders with no explicit destination/center
+  const creatorRole = normalizeRole(row.creator_role);
+  const destinationFallbackCode = normalizedDestination ?? normalizedCenter ?? ((orderType === 'product' && creatorRole === 'center') ? creatorCode : null);
+
+  console.log('[mapOrderRow] needRequestor:', needRequestor, 'needDestination:', needDestination);
+  console.log('[mapOrderRow] creatorCode:', creatorCode);
+  console.log('[mapOrderRow] normalizedDestination:', normalizedDestination);
+  console.log('[mapOrderRow] normalizedCenter:', normalizedCenter);
+  console.log('[mapOrderRow] destinationFallbackCode:', destinationFallbackCode);
+
+  if (needRequestor || needDestination) {
+    const [requestorContact, destinationContact] = await Promise.all([
+      needRequestor ? getContactFromCode(creatorCode) : Promise.resolve(null),
+      needDestination ? getContactFromCode(destinationFallbackCode) : Promise.resolve(null),
+    ]);
+
+    console.log('[mapOrderRow] requestorContact returned:', requestorContact);
+    console.log('[mapOrderRow] destinationContact returned:', destinationContact);
+
+    const mergedRequestor = {
+      name:
+        (existingContacts.requestor?.name && !/^([A-Za-z]+)-\d+$/.test(String(existingContacts.requestor?.name)))
+          ? existingContacts.requestor?.name
+          : (requestorContact?.name ?? (creatorCode ?? null)),
+      address: existingContacts.requestor?.address ?? requestorContact?.address ?? null,
+      phone: existingContacts.requestor?.phone ?? requestorContact?.phone ?? null,
+      email: existingContacts.requestor?.email ?? requestorContact?.email ?? null,
+    };
+    const mergedDestination = {
+      name:
+        (existingContacts.destination?.name && !/^([A-Za-z]+)-\d+$/.test(String(existingContacts.destination?.name)))
+          ? existingContacts.destination?.name
+          : (destinationContact?.name ?? (destinationFallbackCode ?? null)),
+      address: existingContacts.destination?.address ?? destinationContact?.address ?? null,
+      phone: existingContacts.destination?.phone ?? destinationContact?.phone ?? null,
+      email: existingContacts.destination?.email ?? destinationContact?.email ?? null,
+    };
+
+    console.log('[mapOrderRow] mergedRequestor:', mergedRequestor);
+    console.log('[mapOrderRow] mergedDestination:', mergedDestination);
+
+    (enrichedMetadata as any).contacts = {
+      requestor: hasAllFields(existingContacts.requestor) ? existingContacts.requestor : mergedRequestor,
+      destination: hasAllFields(existingContacts.destination) ? existingContacts.destination : mergedDestination,
+    };
+  }
+
   return {
     orderId: row.order_id,
     orderType,
     title: row.title ?? (orderType === 'product' ? 'Product Order' : 'Service Order'),
     requestedBy: creatorCode ?? row.creator_id ?? null,
     requesterRole: normalizeRole(row.creator_role),
-    destination: normalizedDestination ?? normalizedCenter ?? null,
+    destination: destinationFallbackCode ?? null,
     destinationRole: normalizeRole(row.destination_role) ?? (row.center_id ? 'center' : null),
     requestedDate: toIso(row.requested_date ?? row.created_at),
     expectedDate: toIso(row.expected_date),
     serviceStartDate: toIso(row.service_start_date),
     deliveryDate: toIso(row.delivery_date),
     status,
-    viewerStatus: viewerStatusFrom({
+    viewerStatus: (row.archived_at ? 'archived' : viewerStatusFrom({
       status,
       nextActorRole,
       nextActorCode,
       viewerRole,
       viewerCode,
       creatorCode,
-    }),
+    } as any)),
     approvalStages,
     items: lineItems,
     totalAmount: formatMoney(row.total_amount),
@@ -614,11 +804,13 @@ function mapOrderRow(
     assignedWarehouse: normalizeCodeValue(row.assigned_warehouse),
     orderDate: toIso(row.requested_date ?? row.created_at),
     completionDate: toIso(row.delivery_date ?? row.updated_at),
+    archivedAt: toIso(row.archived_at),
     // Add new fields for policy-based approach
     participants,
     availableActions,
     statusColor: getStatusColor(status as any),
-    statusLabel: getStatusLabel(status as any)
+    statusLabel: getStatusLabel(status as any),
+    metadata: enrichedMetadata
   };
 }
 
@@ -685,7 +877,8 @@ async function fetchOrders(whereClause: string, params: readonly unknown[], cont
        notes,
        metadata,
        created_at,
-       updated_at
+       updated_at,
+       archived_at
      FROM orders
      WHERE ${whereClause}
      ORDER BY requested_date DESC NULLS LAST, created_at DESC NULLS LAST, order_id DESC`,
@@ -698,7 +891,7 @@ async function fetchOrders(whereClause: string, params: readonly unknown[], cont
 
   const orderIds = result.rows.map((row) => row.order_id);
   const itemsMap = await loadOrderItems(orderIds);
-  return result.rows.map((row) => mapOrderRow(row, itemsMap.get(row.order_id) ?? [], context));
+  return Promise.all(result.rows.map((row) => mapOrderRow(row, itemsMap.get(row.order_id) ?? [], context)));
 }
 
 function buildRoleFilter(role: HubRole, cksCode: string): { clause: string; params: unknown[] } {
@@ -710,7 +903,15 @@ function buildRoleFilter(role: HubRole, cksCode: string): { clause: string; para
     case "center":
       return { clause: "creator_id = $1 OR center_id = $1 OR destination = $1", params: [cksCode] };
     case "manager":
-      return { clause: "manager_id = $1 OR creator_id = $1", params: [cksCode] };
+      // Manager sees orders they created, orders assigned to them, and orders from their ecosystem
+      return {
+        clause: `manager_id = $1 OR creator_id = $1 OR
+                 customer_id IN (SELECT customer_id FROM customers WHERE cks_manager = $1) OR
+                 contractor_id IN (SELECT contractor_id FROM contractors WHERE cks_manager = $1) OR
+                 center_id IN (SELECT center_id FROM centers WHERE cks_manager = $1) OR
+                 crew_id IN (SELECT crew_id FROM crew WHERE cks_manager = $1)`,
+        params: [cksCode]
+      };
     case "contractor":
       return { clause: "contractor_id = $1 OR creator_id = $1", params: [cksCode] };
     case "crew":
@@ -731,17 +932,20 @@ async function getOrdersForRole(role: HubRole, cksCode: string): Promise<HubOrde
   return fetchOrders(clause, params, { viewerRole: role, viewerCode: normalized });
 }
 
-async function ensureParticipant(options: {
-  orderId: string;
-  role: HubRole;
-  code: string | null | undefined;
-  participationType: 'creator' | 'destination' | 'actor' | 'watcher';
-}): Promise<void> {
+async function ensureParticipant(
+  options: {
+    orderId: string;
+    role: HubRole;
+    code: string | null | undefined;
+    participationType: 'creator' | 'destination' | 'actor' | 'watcher';
+  },
+  q: (<T>(text: string, params?: readonly unknown[]) => Promise<any>) = query,
+): Promise<void> {
   const normalizedCode = normalizeCodeValue(options.code ?? null);
   if (!normalizedCode) {
     return;
   }
-  await query(
+  await q(
     `INSERT INTO order_participants (order_id, participant_id, participant_role, participation_type)
      VALUES ($1, $2, $3, $4)
      ON CONFLICT (order_id, participant_id, participant_role)
@@ -753,6 +957,7 @@ async function ensureParticipant(options: {
 async function ensureParticipantList(
   orderId: string,
   participants: Partial<Record<HubRole, string | readonly string[]>> | undefined,
+  q: (<T>(text: string, params?: readonly unknown[]) => Promise<any>) = query,
 ): Promise<void> {
   if (!participants) {
     return;
@@ -765,7 +970,7 @@ async function ensureParticipantList(
     const entries = Array.isArray(codes) ? codes : [codes];
     const participationType: 'creator' | 'destination' | 'actor' | 'watcher' = ACTOR_ROLES.has(role) ? 'actor' : 'watcher';
     for (const code of entries) {
-      await ensureParticipant({ orderId, role, code, participationType });
+      await ensureParticipant({ orderId, role, code, participationType }, q);
     }
   }
 }
@@ -822,9 +1027,50 @@ async function insertOrderItems(
   orderId: string,
   orderType: "product" | "service",
   items: readonly CreateOrderItemInput[],
+  q: (<T>(text: string, params?: readonly unknown[]) => Promise<any>) = query,
 ): Promise<void> {
   const trimmedCodes = Array.from(new Set(items.map((item) => item.catalogCode.trim())));
   if (orderType === "product") {
+    if (DISABLE_INVENTORY_CHECK) {
+      // Insert items without checking inventory (test mode)
+      let line = 1;
+      const products = await fetchProducts(trimmedCodes);
+      for (const item of items) {
+        const code = item.catalogCode.trim();
+        const product = products.get(code);
+        if (!product) {
+          throw new Error(`Product ${item.catalogCode} not found in catalog.`);
+        }
+        const metadata = JSON.stringify(item.metadata ?? product.metadata ?? {});
+        await q(
+          `INSERT INTO order_items (
+             order_id,
+             line_number,
+             catalog_item_code,
+             name,
+             item_type,
+             description,
+             quantity,
+             unit_of_measure,
+             unit_price,
+             currency,
+             total_price,
+             metadata
+           ) VALUES ($1, $2, $3, $4, 'product', $5, $6, $7, NULL, 'USD', NULL, $8::jsonb)` ,
+          [
+            orderId,
+            line++,
+            product.product_id,
+            product.name,
+            product.description ?? null,
+            item.quantity,
+            product.unit_of_measure ?? product.package_size ?? null,
+            metadata,
+          ]
+        );
+      }
+      return;
+    }
     const products = await fetchProducts(trimmedCodes);
 
     // Check inventory availability for all items first
@@ -836,7 +1082,7 @@ async function insertOrderItems(
       }
 
       // Query inventory for this item across all warehouses
-      const inventoryResult = await query<{ warehouse_id: string; quantity_available: number }>(
+      const inventoryResult = await q<{ warehouse_id: string; quantity_available: number }>(
         `SELECT warehouse_id, quantity_available
          FROM inventory_items
          WHERE item_id = $1 AND status = 'active'
@@ -845,7 +1091,8 @@ async function insertOrderItems(
       );
 
       // Calculate total available quantity across all warehouses
-      const totalAvailable = inventoryResult.rows.reduce((sum, row) => sum + (row.quantity_available || 0), 0);
+      const rowsAvail = (inventoryResult.rows as Array<{ warehouse_id: string; quantity_available: number }>);
+      const totalAvailable = rowsAvail.reduce((sum: number, row) => sum + (row.quantity_available || 0), 0);
 
       // Log for debugging
       console.log(`[INVENTORY CHECK] Product: ${product.name}, Code: ${product.product_id}, Requested: ${item.quantity}, Available: ${totalAvailable}`);
@@ -866,7 +1113,7 @@ async function insertOrderItems(
     let line = 1;
     for (const { product, item } of inventoryChecks) {
       const metadata = JSON.stringify(item.metadata ?? product.metadata ?? {});
-      await query(
+      await q(
         `INSERT INTO order_items (
            order_id,
            line_number,
@@ -905,7 +1152,7 @@ async function insertOrderItems(
       throw new Error(`Service ${item.catalogCode} not found in catalog.`);
     }
     const metadata = JSON.stringify(item.metadata ?? service.metadata ?? {});
-    await query(
+    await q(
       `INSERT INTO order_items (
          order_id,
          line_number,
@@ -967,14 +1214,21 @@ export async function createOrder(input: CreateOrderInput): Promise<HubOrderItem
   const seqNum = seqResult.rows[0]?.nextval ?? "1";
   const orderId = `${creatorCode}-${typePrefix}-${seqNum.padStart(3, "0")}`;
 
-  const destinationCode = normalizeCodeValue(input.destination?.code ?? null);
-  const destinationRole = input.destination?.role ?? null;
+  let destinationCode = normalizeCodeValue(input.destination?.code ?? null);
+  let destinationRole = input.destination?.role ?? null;
 
   let assignedWarehouse: string | null = null;
   let nextActorRole: HubRole | null = null;
   let status: string;
 
   if (input.orderType === "product") {
+    // Default: for center-created product orders with no explicit destination,
+    // deliver to the creator center.
+    if (!destinationCode && input.creator.role === "center") {
+      destinationCode = creatorCode;
+      destinationRole = "center";
+    }
+
     if (destinationRole === "warehouse" && destinationCode) {
       assignedWarehouse = destinationCode;
     } else {
@@ -995,19 +1249,65 @@ export async function createOrder(input: CreateOrderInput): Promise<HubOrderItem
     throw new Error("Invalid expected date.");
   }
 
-  // Legacy fields - keeping as null for now to avoid breaking existing queries
-  // These will be removed in a future migration
-  const customerId: string | null = null;
-  const centerId: string | null = null;
-  const contractorId: string | null = null;
-  const managerId: string | null = null;
-  const crewId: string | null = null;
+  // Populate entity ID columns based on creator role for ecosystem filtering
+  let customerId: string | null = null;
+  let centerId: string | null = null;
+  let contractorId: string | null = null;
+  let managerId: string | null = null;
+  let crewId: string | null = null;
 
-  const metadataValue = input.metadata ? JSON.stringify(input.metadata) : null;
+  switch (input.creator.role) {
+    case 'customer':
+      customerId = creatorCode;
+      break;
+    case 'center':
+      centerId = creatorCode;
+      break;
+    case 'contractor':
+      contractorId = creatorCode;
+      break;
+    case 'manager':
+      managerId = creatorCode;
+      break;
+    case 'crew':
+      crewId = creatorCode;
+      break;
+  }
 
-  await query("BEGIN");
-  try {
-    await query(
+  // Enrich metadata with basic contact info for requestor and destination (for Warehouse visibility)
+  async function loadContactForCode(code: string | null): Promise<{ name: string | null; address: string | null; phone: string | null; email: string | null } | null> {
+    const normalized = normalizeCodeValue(code);
+    if (!normalized) return null;
+    const prefix = normalized.split('-')[0];
+    if (prefix === 'CEN') {
+      const res = await query<{ name: string | null; main_contact: string | null; email: string | null; phone: string | null; address: string | null }>(
+        `SELECT name, main_contact, email, phone, address FROM centers WHERE UPPER(center_id) = $1 LIMIT 1`,
+        [normalized]
+      );
+      const row = res.rows[0];
+      return { name: row?.name ?? normalized, address: row?.address ?? null, phone: row?.phone ?? null, email: row?.email ?? null };
+    }
+    if (prefix === 'CUS') {
+      const res = await query<{ name: string | null; main_contact: string | null; email: string | null; phone: string | null; address: string | null }>(
+        `SELECT name, main_contact, email, phone, address FROM customers WHERE UPPER(customer_id) = $1 LIMIT 1`,
+        [normalized]
+      );
+      const row = res.rows[0];
+      return { name: row?.name ?? normalized, address: row?.address ?? null, phone: row?.phone ?? null, email: row?.email ?? null };
+    }
+    return { name: normalized, address: null, phone: null, email: null };
+  }
+
+  const creatorContact = await loadContactForCode(creatorCode);
+  const destinationContact = await loadContactForCode(destinationCode);
+  const metadataExpanded: Record<string, unknown> = {
+    ...(input.metadata ?? {}),
+    contacts: { requestor: creatorContact, destination: destinationContact },
+  };
+  const metadataValue = JSON.stringify(metadataExpanded);
+
+  await withTransaction(async (q) => {
+    await q(
       `INSERT INTO orders (
          order_id,
          order_type,
@@ -1088,38 +1388,16 @@ export async function createOrder(input: CreateOrderInput): Promise<HubOrderItem
         now,
       ]
     );
-
-    await insertOrderItems(orderId, input.orderType, input.items);
-
-    // Add creator as participant
-    await ensureParticipant({ orderId, role: input.creator.role, code: creatorCode, participationType: 'creator' });
-
-    // Add destination as participant if specified
+    await insertOrderItems(orderId, input.orderType, input.items, q);
+    await ensureParticipant({ orderId, role: input.creator.role, code: creatorCode, participationType: 'creator' }, q);
     if (destinationRole && destinationCode) {
-      await ensureParticipant({ orderId, role: destinationRole, code: destinationCode, participationType: 'destination' });
+      await ensureParticipant({ orderId, role: destinationRole, code: destinationCode, participationType: 'destination' }, q);
     }
-
-    // Add workflow-specific participants based on order type
-    if (input.orderType === "product") {
-      // Product orders always involve warehouse as an actor
-      if (assignedWarehouse) {
-        await ensureParticipant({ orderId, role: "warehouse", code: assignedWarehouse, participationType: 'actor' });
-      }
-    } else {
-      // Service orders involve manager, contractor, and crew as actors
-      // These will be populated as the workflow progresses
-      // For now, just add the immediate next actor (manager)
-      // The manager will be determined based on the creator's hierarchy
+    if (input.orderType === "product" && assignedWarehouse) {
+      await ensureParticipant({ orderId, role: "warehouse", code: assignedWarehouse, participationType: 'actor' }, q);
     }
-
-    // Add any additional participants specified in the input
-    await ensureParticipantList(orderId, input.participants);
-
-    await query("COMMIT");
-  } catch (error) {
-    await query("ROLLBACK");
-    throw error;
-  }
+    await ensureParticipantList(orderId, input.participants, q);
+  });
 
   const created = await fetchOrderById(orderId, { viewerRole: input.creator.role, viewerCode: creatorCode });
   if (!created) {
@@ -1128,7 +1406,7 @@ export async function createOrder(input: CreateOrderInput): Promise<HubOrderItem
   return created;
 }
 
-async function fetchOrderById(orderId: string, context?: { viewerRole?: HubRole | null; viewerCode?: string | null }): Promise<HubOrderItem | null> {
+export async function fetchOrderById(orderId: string, context?: { viewerRole?: HubRole | null; viewerCode?: string | null }): Promise<HubOrderItem | null> {
   const orders = await fetchOrders("order_id = $1", [orderId], context);
   return orders[0] ?? null;
 }
@@ -1245,6 +1523,12 @@ export async function applyOrderAction(input: OrderActionInput): Promise<HubOrde
       rejectionReason = input.notes;
       break;
 
+    case "start-delivery":
+      // Track that delivery has started in metadata
+      // This helps us show "Out for Delivery" vs "Accepted" in the workflow
+      // We'll update metadata in the query below
+      break;
+
     case "deliver":
       deliveryDate = new Date().toISOString();
       break;
@@ -1257,10 +1541,35 @@ export async function applyOrderAction(input: OrderActionInput): Promise<HubOrde
       transformedId = input.transformedId ?? `SVC-${Date.now()}`;
       serviceStartDate = new Date().toISOString();
       break;
+
+    case "cancel":
+      // Cancellation can happen at any stage
+      // No special processing needed, status will be set to 'cancelled'
+      break;
   }
 
   await query("BEGIN");
   try {
+    // Handle metadata update for certain actions
+    let metadataUpdate: Record<string, unknown> | null = null;
+    if (input.action === "start-delivery") {
+      const currentMetadata = row.metadata || {};
+      metadataUpdate = { ...currentMetadata, deliveryStarted: true };
+    } else if (input.action === "cancel") {
+      const currentMetadata = row.metadata || {};
+      metadataUpdate = {
+        ...currentMetadata,
+        cancellationReason: (input.notes ?? null) || currentMetadata['cancellationReason'] || null,
+        cancelledBy: input.actorRole,
+        cancelledAt: new Date().toISOString(),
+      } as Record<string, unknown>;
+    }
+
+    // Do not overwrite "notes" (special instructions) on cancel or reject.
+    const notesParam = (input.action === 'cancel' || input.action === 'reject')
+      ? null
+      : (input.notes ?? null);
+
     await query(
       `UPDATE orders
        SET status = $1,
@@ -1271,17 +1580,19 @@ export async function applyOrderAction(input: OrderActionInput): Promise<HubOrde
            service_start_date = COALESCE($6, service_start_date),
            transformed_id = COALESCE($7, transformed_id),
            assigned_warehouse = COALESCE($8, assigned_warehouse),
+           metadata = COALESCE($9::jsonb, metadata),
            updated_at = NOW()
-       WHERE order_id = $9`,
+       WHERE order_id = $10`,
       [
         newStatus,
         nextActorRole ?? null,
         rejectionReason,
-        input.notes ?? null,
+        notesParam,
         deliveryDate,
         serviceStartDate,
         transformedId,
         assignedWarehouseValue,
+        metadataUpdate ? JSON.stringify(metadataUpdate) : null,
         input.orderId,
       ]
     );
@@ -1329,20 +1640,75 @@ export async function applyOrderAction(input: OrderActionInput): Promise<HubOrde
   return fetchOrderById(input.orderId, { viewerRole: input.actorRole, viewerCode: actorCodeNormalized });
 }
 
+export async function updateOrderFields(
+  orderId: string,
+  fields: { expectedDate?: string; notes?: string }
+): Promise<HubOrderItem | null> {
+  // Build SQL update query dynamically based on provided fields
+  const updates: string[] = [];
+  const values: any[] = [];
+  let paramIndex = 1;
 
+  if (fields.expectedDate) {
+    updates.push(`expected_date = $${paramIndex}`);
+    values.push(fields.expectedDate);
+    paramIndex++;
+  }
 
+  if (fields.notes !== undefined) {
+    updates.push(`notes = $${paramIndex}`);
+    values.push(fields.notes || null);
+    paramIndex++;
+  }
 
+  if (updates.length === 0) {
+    // No fields to update
+    return fetchOrderById(orderId, {});
+  }
 
+  // Add updated_at timestamp
+  updates.push(`updated_at = NOW()`);
 
+  // Add order_id to values array
+  values.push(orderId.toUpperCase());
 
+  const updateQuery = `
+    UPDATE orders
+    SET ${updates.join(', ')}
+    WHERE UPPER(order_id) = $${paramIndex}
+  `;
 
+  await query(updateQuery, values);
 
+  // Return the updated order
+  return fetchOrderById(orderId, {});
+}
 
+export async function archiveOrder(orderId: string): Promise<HubOrderItem | null> {
+  await query(
+    `UPDATE orders SET archived_at = NOW(), updated_at = NOW() WHERE UPPER(order_id) = UPPER($1)`,
+    [orderId]
+  );
+  return fetchOrderById(orderId, {});
+}
 
+export async function restoreOrder(orderId: string): Promise<HubOrderItem | null> {
+  await query(
+    `UPDATE orders SET archived_at = NULL, updated_at = NOW() WHERE UPPER(order_id) = UPPER($1)`,
+    [orderId]
+  );
+  return fetchOrderById(orderId, {});
+}
 
-
-
-
-
-
-
+export async function hardDeleteOrder(orderId: string): Promise<{ success: boolean }> {
+  await query('BEGIN');
+  try {
+    await query(`DELETE FROM order_items WHERE order_id = $1`, [orderId]);
+    await query(`DELETE FROM orders WHERE order_id = $1`, [orderId]);
+    await query('COMMIT');
+    return { success: true };
+  } catch (err) {
+    await query('ROLLBACK');
+    throw err;
+  }
+}

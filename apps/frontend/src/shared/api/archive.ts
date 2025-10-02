@@ -73,7 +73,7 @@ class ArchiveAPI {
     reason?: string
   ): Promise<ArchiveResult> {
     try {
-      return await apiFetch<ArchiveResult>('/archive/delete', {
+      const result = await apiFetch<ArchiveResult>('/archive/delete', {
         method: 'POST',
         body: JSON.stringify({
           entityType,
@@ -81,6 +81,20 @@ class ArchiveAPI {
           reason
         })
       });
+      // Also flag the original order as archived for hub visibility
+      if (entityType === 'order') {
+        try {
+          await apiFetch(`/orders/${encodeURIComponent(entityId)}/archive`, {
+            method: 'POST',
+            headers: {
+              'x-cks-dev-role': 'admin',
+            },
+          });
+        } catch (e) {
+          console.warn('[archiveAPI.archiveEntity] Failed to flag order archived_at:', e);
+        }
+      }
+      return result;
     } catch (error) {
       throw new Error(error instanceof Error ? error.message : 'Failed to archive entity');
     }
@@ -91,13 +105,26 @@ class ArchiveAPI {
    */
   async restoreEntity(entityType: EntityType, entityId: string): Promise<ArchiveResult> {
     try {
-      return await apiFetch<ArchiveResult>('/archive/restore', {
+      const result = await apiFetch<ArchiveResult>('/archive/restore', {
         method: 'POST',
         body: JSON.stringify({
           entityType,
           entityId
         })
       });
+      if (entityType === 'order') {
+        try {
+          await apiFetch(`/orders/${encodeURIComponent(entityId)}/restore`, {
+            method: 'POST',
+            headers: {
+              'x-cks-dev-role': 'admin',
+            },
+          });
+        } catch (e) {
+          console.warn('[archiveAPI.restoreEntity] Failed to clear order archived_at:', e);
+        }
+      }
+      return result;
     } catch (error) {
       throw new Error(error instanceof Error ? error.message : 'Failed to restore entity');
     }
@@ -129,7 +156,7 @@ class ArchiveAPI {
     reason?: string
   ): Promise<ArchiveResult> {
     try {
-      return await apiFetch<ArchiveResult>('/archive/hard-delete', {
+      const result = await apiFetch<ArchiveResult>('/archive/hard-delete', {
         method: 'DELETE',
         body: JSON.stringify({
           entityType,
@@ -138,6 +165,19 @@ class ArchiveAPI {
           confirm: true
         })
       });
+      if (entityType === 'order') {
+        try {
+          await apiFetch(`/orders/${encodeURIComponent(entityId)}`, {
+            method: 'DELETE',
+            headers: {
+              'x-cks-dev-role': 'admin',
+            },
+          });
+        } catch (e) {
+          console.warn('[archiveAPI.hardDelete] Failed to delete order row:', e);
+        }
+      }
+      return result;
     } catch (error) {
       throw new Error(error instanceof Error ? error.message : 'Failed to permanently delete entity');
     }

@@ -26,7 +26,9 @@ export type OrderViewerStatus =
   | 'in-progress'
   | 'completed'
   | 'cancelled'
-  | 'rejected';
+  | 'rejected'
+  // Non-workflow overlay status for UI archive tab
+  | 'archived';
 
 export interface OrderApprovalStage {
   role: string;
@@ -42,6 +44,7 @@ export interface OrderApprovalStage {
     | 'waiting';
   userId: string | null;
   timestamp: string | null;
+  label?: string | null; // Optional custom display label
 }
 export interface HubOrderLineItem {
   id: string;
@@ -93,6 +96,8 @@ export interface HubOrderItem {
   availableActions?: string[];
   statusColor?: string;
   statusLabel?: string;
+  metadata?: Record<string, unknown> | null;
+  archivedAt?: string | null;
 }
 
 export interface HubOrdersPayload {

@@ -14,6 +14,7 @@ import type {
 // Which statuses each role can see
 const VISIBLE_STATUSES: Record<OrderType, Record<HubRole, OrderStatus[]>> = {
   product: {
+    admin: [], // Admin doesn't interact with orders directly
     warehouse: ['pending_warehouse', 'awaiting_delivery', 'delivered', 'rejected', 'cancelled'],
     center: ['pending_warehouse', 'awaiting_delivery', 'delivered', 'rejected', 'cancelled'],
     customer: ['pending_warehouse', 'awaiting_delivery', 'delivered', 'rejected', 'cancelled'],
@@ -22,6 +23,7 @@ const VISIBLE_STATUSES: Record<OrderType, Record<HubRole, OrderStatus[]>> = {
     crew: []
   },
   service: {
+    admin: [], // Admin doesn't interact with orders directly
     warehouse: [], // Warehouses don't handle service orders
     center: ['pending_manager', 'pending_contractor', 'pending_crew', 'service_in_progress', 'service_completed', 'rejected', 'cancelled'],
     customer: ['pending_manager', 'pending_contractor', 'pending_crew', 'service_in_progress', 'service_completed', 'rejected', 'cancelled'],
@@ -34,20 +36,34 @@ const VISIBLE_STATUSES: Record<OrderType, Record<HubRole, OrderStatus[]>> = {
 // What actions are available for each role at each status
 const ACTIONS_BY_STATUS: Record<OrderType, Record<HubRole, Partial<Record<OrderStatus, OrderAction[]>>>> = {
   product: {
+    admin: {}, // Admin doesn't interact with orders
     warehouse: {
       'pending_warehouse': ['accept', 'reject'],
-      'awaiting_delivery': ['deliver']
+      'awaiting_delivery': ['start-delivery', 'deliver']
     },
     center: {
       'pending_warehouse': ['cancel'],
-      'awaiting_delivery': [] // Can only watch
+      'awaiting_delivery': [] // Can only watch after warehouse accepts
     },
-    customer: {}, // Customers can only view
-    manager: {},
-    contractor: {},
-    crew: {}
+    customer: {
+      'pending_warehouse': ['cancel'],
+      'awaiting_delivery': [] // Can only watch after warehouse accepts
+    },
+    manager: {
+      'pending_warehouse': ['cancel'],
+      'awaiting_delivery': [] // Can only watch after warehouse accepts
+    },
+    contractor: {
+      'pending_warehouse': ['cancel'],
+      'awaiting_delivery': [] // Can only watch after warehouse accepts
+    },
+    crew: {
+      'pending_warehouse': ['cancel'],
+      'awaiting_delivery': [] // Can only watch after warehouse accepts
+    }
   },
   service: {
+    admin: {}, // Admin doesn't interact with orders
     warehouse: {},
     center: {
       'pending_manager': ['cancel'],
@@ -74,6 +90,7 @@ const TRANSITIONS: Record<OrderType, Record<OrderAction, OrderStatus>> = {
   product: {
     'accept': 'awaiting_delivery',
     'reject': 'rejected',
+    'start-delivery': 'awaiting_delivery', // Stays in awaiting_delivery, just tracks metadata
     'deliver': 'delivered',
     'cancel': 'cancelled',
     'complete': 'delivered', // Not used for products
@@ -82,6 +99,7 @@ const TRANSITIONS: Record<OrderType, Record<OrderAction, OrderStatus>> = {
   service: {
     'accept': 'pending_contractor', // Default, but depends on current status
     'reject': 'rejected',
+    'start-delivery': 'pending_manager', // Not used for services
     'deliver': 'service_completed', // Not used for services
     'complete': 'service_completed',
     'cancel': 'cancelled',
@@ -185,6 +203,7 @@ export function getActionLabel(action: OrderAction): string {
   const labels: Record<OrderAction, string> = {
     'accept': 'Accept',
     'reject': 'Reject',
+    'start-delivery': 'Start Delivery',
     'deliver': 'Mark Delivered',
     'complete': 'Complete',
     'cancel': 'Cancel',

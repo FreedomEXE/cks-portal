@@ -152,6 +152,36 @@ export const orderDirectoryEntrySchema = z.object({
   // Extra fields surfaced by backend for better display
   createdBy: nullableString,
   createdByRole: nullableString,
+  // Optional fields provided by store for richer Admin view
+  destination: nullableString,
+  destinationRole: nullableString,
+  orderType: nullableString,
+  items: z
+    .array(
+      z.object({
+        id: z.string(),
+        code: nullableString,
+        name: z.string(),
+        description: nullableString,
+        itemType: z.string(),
+        quantity: z.number().or(z.coerce.number()),
+        unitOfMeasure: nullableString,
+        unitPrice: nullableString,
+        currency: nullableString,
+        totalPrice: nullableString,
+        metadata: z
+          .record(z.string(), z.unknown())
+          .optional()
+          .nullable()
+          .transform((value) => (value == null ? null : value)),
+      }),
+    )
+    .optional(),
+  metadata: z
+    .record(z.string(), z.unknown())
+    .optional()
+    .nullable()
+    .transform((value) => (value == null ? null : value)),
 });
 
 export const productDirectoryEntrySchema = z.object({

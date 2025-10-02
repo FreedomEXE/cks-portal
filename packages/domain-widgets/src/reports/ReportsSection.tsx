@@ -69,8 +69,11 @@ const ReportsSection: React.FC<ReportsSectionProps> = ({
     let filtered = allReports;
 
     switch (activeTab) {
-      case 'my-reports':
-        filtered = allReports.filter(report => report.submittedBy === userId);
+      case 'reports':
+        filtered = reports; // Only show reports (issues/problems)
+        break;
+      case 'feedback':
+        filtered = feedback; // Only show feedback (suggestions/compliments)
         break;
       case 'all-reports':
         filtered = allReports.filter(report => report.status === 'open');
@@ -407,7 +410,7 @@ const ReportsSection: React.FC<ReportsSectionProps> = ({
             color: '#9ca3af',
             margin: '0 0 8px 0'
           }}>
-            No {activeTab === 'archive' ? 'archived' : activeTab === 'my-reports' ? 'submitted' : ''} reports found
+            No {activeTab === 'archive' ? 'archived' : activeTab === 'reports' ? 'reports' : activeTab === 'feedback' ? 'feedback' : ''} found
           </p>
           <p style={{
             fontSize: '14px',
@@ -438,7 +441,8 @@ const ReportsSection: React.FC<ReportsSectionProps> = ({
     <TabSection
       tabs={[
         { id: 'all-reports', label: 'All Reports', count: allReports.filter(r => r.status === 'open').length },
-        { id: 'my-reports', label: 'My Reports', count: allReports.filter(r => r.submittedBy === userId).length },
+        { id: 'reports', label: 'Reports', count: reports.length },
+        { id: 'feedback', label: 'Feedback', count: feedback.length },
         { id: 'create', label: 'Create' },
         { id: 'archive', label: 'Archive', count: allReports.filter(r => r.status === 'closed').length }
       ]}
@@ -446,7 +450,8 @@ const ReportsSection: React.FC<ReportsSectionProps> = ({
       onTabChange={setActiveTab}
       description={
         activeTab === 'create' ? 'Submit new reports or feedback to your ecosystem' :
-        activeTab === 'my-reports' ? 'Reports and feedback you have submitted' :
+        activeTab === 'reports' ? 'Issues and problems reported by your ecosystem' :
+        activeTab === 'feedback' ? 'Suggestions and compliments from your ecosystem' :
         activeTab === 'all-reports' ? 'All open reports and feedback in your ecosystem' :
         'Resolved and closed reports archive'
       }

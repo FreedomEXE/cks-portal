@@ -2,6 +2,7 @@ import useSWR from 'swr';
 import { useCallback } from 'react';
 import { useAuth as useClerkAuth } from '@clerk/clerk-react';
 import { apiFetch, type ApiFetchInit, type ApiResponse } from './client';
+import type { HubOrderItem } from './hub';
 
 export type AdminUser = {
   id: string;
@@ -56,5 +57,38 @@ export function useAdminUsers(filters: AdminUserFilters = {}) {
 
 export async function fetchAdminUsers(init?: ApiFetchInit): Promise<AdminUser[]> {
   const response = await apiFetch<ApiResponse<AdminUser[]>>('/admin/users', init);
+  return response.data;
+}
+
+export interface UpdateInventoryInput {
+  warehouseId: string;
+  itemId: string;
+  quantityChange: number;
+  reason?: string;
+}
+
+export interface UpdateInventoryResponse {
+  success: boolean;
+  message: string;
+}
+
+export async function updateInventory(
+  input: UpdateInventoryInput,
+  init?: ApiFetchInit
+): Promise<UpdateInventoryResponse> {
+  const response = await apiFetch<UpdateInventoryResponse>('/hub/inventory/update', {
+    ...init,
+    method: 'POST',
+    body: JSON.stringify(input),
+    headers: {
+      'Content-Type': 'application/json',
+      ...init?.headers,
+    },
+  });
+  return response;
+}
+
+export async function fetchAdminOrderById(orderId: string, init?: ApiFetchInit) {
+  const response = await apiFetch<ApiResponse<HubOrderItem>>(`/orders/${encodeURIComponent(orderId)}`, init);
   return response.data;
 }

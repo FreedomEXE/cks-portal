@@ -2,7 +2,7 @@
 
 export const POLICY_VERSION = '1.0.0';
 
-export type HubRole = 'warehouse' | 'center' | 'manager' | 'contractor' | 'crew' | 'customer';
+export type HubRole = 'admin' | 'warehouse' | 'center' | 'manager' | 'contractor' | 'crew' | 'customer';
 
 export type OrderType = 'product' | 'service';
 
@@ -29,6 +29,7 @@ export type OrderStatus = ProductOrderStatus | ServiceOrderStatus;
 export type OrderAction =
   | 'accept'
   | 'reject'
+  | 'start-delivery'
   | 'deliver'
   | 'complete'
   | 'cancel'

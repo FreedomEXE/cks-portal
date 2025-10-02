@@ -1,4 +1,4 @@
-export type HubRole = 'manager' | 'contractor' | 'customer' | 'center' | 'crew' | 'warehouse';
+export type HubRole = 'admin' | 'manager' | 'contractor' | 'customer' | 'center' | 'crew' | 'warehouse';
 
 export interface HubRelatedContact {
   id: string | null;

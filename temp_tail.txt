@@ -1,0 +1,300 @@
+      },
+    };
+
+    if (children.length > 0) {
+      root.children = children;
+    }
+
+    return root;
+  }, [
+    managerContractors,
+    managerCustomers,
+    managerCenters,
+    managerCustomerIdSet,
+    managerDisplayName,
+    managerRootId,
+    centersByCustomerId,
+    crewByCenterId,
+  ]);
+
+  const activityEmptyMessage = activitiesError
+    ? 'Failed to load activity feed.'
+    : activitiesLoading
+      ? 'Loading recent activity...'
+      : 'No recent manager activity';
+
+  const handleClearActivity = useCallback(() => {
+    setActivityFeed([]);
+  }, []);
+
+  const { mutate } = useSWRConfig();
+  const [selectedOrderForDetails, setSelectedOrderForDetails] = useState<HubOrderItem | null>(null);
+
+  const handleOrderAction = useCallback(async (orderId: string, action: string) => {
+    if (action === 'View Details') {
+      const target = ordersData?.orders?.find((o: any) => (o.orderId || o.id) === orderId) || null;
+      if (target) {
+        setSelectedOrderForDetails(target);
+      }
+      return;
+    }
+
+    if (action === 'Cancel') {
+      const confirmed = window.confirm('Are you sure you want to cancel this order?');
+      if (!confirmed) return;
+      const notes = window.prompt('Optional: provide a short reason for cancellation');
+      const payload: OrderActionRequest = {
+        action: 'cancel',
+        notes: notes?.trim() || null,
+      };
+      try {
+        await applyHubOrderAction(orderId, payload);
+        mutate(`/hub/orders/${managerCode}`);
+        console.log('[manager] order cancelled', { orderId });
+      } catch (error) {
+        console.error('[manager] failed to cancel order', error);
+      }
+      return;
+    }
+
+    try {
+      // Apply other order actions
+      const payload: OrderActionRequest = {
+        action: action as any,
+      };
+      await applyHubOrderAction(orderId, payload);
+
+      // Refresh the orders list
+      mutate(`/hub/orders/${managerCode}`);
+
+      console.log('[manager] order action applied', { orderId, action });
+    } catch (error) {
+      console.error('[manager] failed to apply order action', error);
+    }
+  }, [managerCode, mutate, ordersData]);
+
+  const handleNodeClick = useCallback((userId: string) => {
+    console.log('[manager] view ecosystem node', userId);
+  }, []);
+
+  return (
+    <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: '#f9fafb' }}>
+      <MyHubSection
+        hubName="Manager Hub"
+        tabs={HUB_TABS}
+        activeTab={activeTab}
+        onTabClick={setActiveTab}
+        onLogout={logout}
+      />
+
+      <Scrollbar style={{ flex: 1, padding: '0 24px' }} className="hub-content-scroll">
+        <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
+          {activeTab === 'dashboard' ? (
+            <PageWrapper title="Dashboard" showHeader={false}>
+              <PageHeader title="Overview" />
+              <OverviewSection cards={OVERVIEW_CARDS} data={overviewData} />
+
+              <PageHeader title="Recent Activity" />
+              <RecentActivity
+                activities={activityFeed}
+                onClear={handleClearActivity}
+                emptyMessage={activityEmptyMessage}
+              />
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 24 }}>
+                <NewsPreview color={MANAGER_PRIMARY_COLOR} onViewAll={() => console.log('[manager] view news')} />
+                <MemosPreview color={MANAGER_PRIMARY_COLOR} onViewAll={() => console.log('[manager] view memos')} />
+              </div>
+            </PageWrapper>
+          ) : activeTab === 'profile' ? (
+            <PageWrapper title="My Profile" showHeader headerSrOnly>
+              <ProfileInfoCard
+                role="manager"
+                profileData={managerProfileData}
+                accountManager={null}
+                primaryColor={MANAGER_PRIMARY_COLOR}
+                onUpdatePhoto={() => console.log('[manager] update photo')}
+              />
+            </PageWrapper>
+          ) : activeTab === 'ecosystem' ? (
+            <PageWrapper title="My Ecosystem" showHeader headerSrOnly>
+              <EcosystemTree
+                rootUser={{ id: managerRootId, role: 'Manager', name: managerDisplayName }}
+                treeData={ecosystemTree}
+                onNodeClick={handleNodeClick}
+                expandedNodes={[managerRootId]}
+                currentUserId={managerRootId}
+                title="My Ecosystem"
+                subtitle="Your Territory Overview"
+                description="Click any row with an arrow to expand and explore your territory ecosystem"
+                roleColorMap={{
+                  manager: '#e0f2fe',
+                  contractor: '#dcfce7',
+                  customer: '#fef9c3',
+                  center: '#ffedd5',
+                  crew: '#fee2e2',
+                }}
+              />
+            </PageWrapper>
+          ) : activeTab === 'services' ? (
+            <PageWrapper title="My Services" showHeader headerSrOnly>
+              <TabSection
+                tabs={[
+                  { id: 'my', label: 'My Services', count: myServicesData.length },
+                  { id: 'active', label: 'Active Services', count: activeServicesData.length },
+                  { id: 'history', label: 'Service History', count: serviceHistoryData.length },
+                ]}
+                activeTab={servicesTab}
+                onTabChange={(tabId) => {
+                  setServicesTab(tabId as 'my' | 'active' | 'history');
+                  setServicesSearchQuery('');
+                }}
+                description={
+                  servicesTab === 'my'
+                    ? 'Services you are certified in and qualified to train'
+                    : servicesTab === 'active'
+                      ? 'Services you currently manage'
+                      : 'Services you no longer manage'
+                }
+                onSearch={setServicesSearchQuery}
+                searchPlaceholder={
+                  servicesTab === 'history'
+                    ? 'Search service history...'
+                    : servicesTab === 'active'
+                      ? 'Search active services...'
+                      : 'Search services...'
+                }
+                actionButton={
+                  <Button
+                    variant="primary"
+                    roleColor="#000000"
+                    onClick={() => navigate('/catalog')}
+                  >
+                    Browse CKS Catalog
+                  </Button>
+                }
+                primaryColor={MANAGER_PRIMARY_COLOR}
+              >
+                {servicesTab === 'my' && (
+                  <DataTable
+                    columns={MY_SERVICES_COLUMNS}
+                    data={myServicesData}
+                    showSearch={false}
+                    externalSearchQuery={servicesSearchQuery}
+                    maxItems={10}
+                    onRowClick={(row: unknown) => console.log('[manager] view service', row)}
+                  />
+                )}
+
+                {servicesTab === 'active' && (
+                  <DataTable
+                    columns={ACTIVE_SERVICES_COLUMNS}
+                    data={activeServicesData}
+                    showSearch={false}
+                    externalSearchQuery={servicesSearchQuery}
+                    maxItems={10}
+                    onRowClick={(row: unknown) => console.log('[manager] view active service', row)}
+                  />
+                )}
+
+                {servicesTab === 'history' && (
+                  <DataTable
+                    columns={SERVICE_HISTORY_COLUMNS}
+                    data={serviceHistoryData}
+                    showSearch={false}
+                    externalSearchQuery={servicesSearchQuery}
+                    maxItems={10}
+                    onRowClick={(row: unknown) => console.log('[manager] view service history', row)}
+                  />
+                )}
+              </TabSection>
+            </PageWrapper>
+          ) : activeTab === 'orders' ? (
+            <PageWrapper title="Orders" showHeader headerSrOnly>
+              <OrdersSection
+                userRole="manager"
+                serviceOrders={managerServiceOrderCards}
+                productOrders={managerProductOrderCards}
+                onCreateProductOrder={() => navigate('/catalog')}
+                onOrderAction={handleOrderAction}
+                showServiceOrders
+                showProductOrders
+                primaryColor={MANAGER_PRIMARY_COLOR}
+              />
+            </PageWrapper>
+          ) : activeTab === 'support' ? (
+            <PageWrapper title="Support" headerSrOnly>
+              <SupportSection role="manager" primaryColor={MANAGER_PRIMARY_COLOR} />
+            </PageWrapper>
+          ) : activeTab === 'reports' ? (
+            <PageWrapper title="Reports" headerSrOnly>
+              <ReportsSection
+                role="manager"
+                userId={managerRootId}
+                primaryColor={MANAGER_PRIMARY_COLOR}
+                reports={managerReports}
+                feedback={managerFeedback}
+                isLoading={reportsLoading}
+              />
+            </PageWrapper>
+          ) : (
+            <PageWrapper title={activeTab} showHeader headerSrOnly>
+              <h2>Manager Hub - {activeTab}</h2>
+              <p>Content for {activeTab} will be implemented here.</p>
+            </PageWrapper>
+          )}
+        </div>
+      </Scrollbar>
+
+      {/* Order Details Modal */}
+      <OrderDetailsModal
+        isOpen={!!selectedOrderForDetails}
+        onClose={() => setSelectedOrderForDetails(null)}
+        order={selectedOrderForDetails ? {
+          orderId: selectedOrderForDetails.orderId,
+          orderType: selectedOrderForDetails.orderType,
+          title: selectedOrderForDetails.title || null,
+          requestedBy: selectedOrderForDetails.requestedBy || selectedOrderForDetails.centerId || selectedOrderForDetails.customerId || null,
+          destination: selectedOrderForDetails.destination || selectedOrderForDetails.centerId || null,
+          requestedDate: selectedOrderForDetails.requestedDate || null,
+          status: (selectedOrderForDetails as any).status || null,
+          notes: selectedOrderForDetails.notes || null,
+          items: selectedOrderForDetails.items || [],
+        } : null}
+        availability={(() => {
+          const meta = (selectedOrderForDetails as any)?.metadata as any;
+          const av = meta?.availability;
+          if (!av) return null;
+          const days = Array.isArray(av.days) ? av.days : [];
+          const window = av.window && av.window.start && av.window.end ? av.window : null;
+          return { tz: av.tz ?? null, days, window };
+        })()}
+        cancellationReason={(selectedOrderForDetails as any)?.metadata?.cancellationReason || null}
+        cancelledBy={(selectedOrderForDetails as any)?.metadata?.cancelledBy || null}
+        cancelledAt={(selectedOrderForDetails as any)?.metadata?.cancelledAt || null}
+        rejectionReason={(selectedOrderForDetails as any)?.rejectionReason || (selectedOrderForDetails as any)?.metadata?.rejectionReason || null}
+        requestorInfo={
+          selectedOrderForDetails
+            ? {
+                name: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const req = meta?.contacts?.requestor || {}; return (req.name || null); })(),
+                address: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const req = meta?.contacts?.requestor || {}; return (req.address || null); })(),
+                phone: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const req = meta?.contacts?.requestor || {}; return (req.phone || null); })(),
+                email: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const req = meta?.contacts?.requestor || {}; return (req.email || null); })(),
+              }
+            : null
+        }
+        destinationInfo={
+          selectedOrderForDetails
+            ? {
+                name: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const dest = meta?.contacts?.destination || {}; return (dest.name || null); })(),
+                address: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const dest = meta?.contacts?.destination || {}; return (dest.address || null); })(),
+                phone: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const dest = meta?.contacts?.destination || {}; return (dest.phone || null); })(),
+                email: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const dest = meta?.contacts?.destination || {}; return (dest.email || null); })(),
+              }
+            : null
+        }
+      />
+    </div>
+  );
+}
+

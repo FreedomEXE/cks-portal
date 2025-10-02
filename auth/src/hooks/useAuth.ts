@@ -370,10 +370,16 @@ export function useAuth(): AuthState {
     if (state.status !== 'ready' || !state.role) {
       return;
     }
-    if (location.pathname === '/hub') {
+    // Do not force-redirect away from allowed standalone pages like catalog
+    const allowedPaths = new Set(['/hub', '/catalog']);
+    if (allowedPaths.has(location.pathname)) {
       return;
     }
-    navigate('/hub', { replace: true });
+    // Only redirect when landing on root or unknown paths, not when user is
+    // navigating to a known top-level page.
+    if (location.pathname === '/' || location.pathname === '/login') {
+      navigate('/hub', { replace: true });
+    }
   }, [state.status, state.role, location.pathname, navigate]);
 
   useEffect(() => () => {

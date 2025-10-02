@@ -1,4 +1,4 @@
-﻿/*-----------------------------------------------
+/*-----------------------------------------------
   Property of CKS  (c) 2025
 -----------------------------------------------*/
 /**
@@ -25,14 +25,16 @@ import {
   ActionModal,
   Button,
   DataTable,
+  EditOrderModal,
   NavigationTab,
+  OrderDetailsModal,
   PageHeader,
   PageWrapper,
   Scrollbar,
   TabContainer,
 } from '@cks/ui';
 import type { ReactNode } from 'react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSWRConfig } from 'swr';
 
 import MyHubSection from '../components/MyHubSection';
@@ -42,7 +44,7 @@ import '../shared/api/test-archive'; // Temporary test import
 import AdminAssignSection from './components/AdminAssignSection';
 import AdminCreateSection from './components/AdminCreateSection';
 
-import { useAdminUsers } from '../shared/api/admin';
+import { useAdminUsers, updateInventory, fetchAdminOrderById } from '../shared/api/admin';
 import {
   useActivities,
   useCenters,
@@ -59,6 +61,14 @@ import {
   useTraining,
   useWarehouses,
 } from '../shared/api/directory';
+import {
+  applyHubOrderAction,
+  updateOrderFields,
+  useHubProfile,
+  type HubOrderItem,
+  type OrderActionRequest,
+  type UpdateOrderFieldsRequest,
+} from '../shared/api/hub';
 
 // Removed unused: const MILLIS_PER_DAY = 1000 * 60 * 60 * 24;
 
@@ -183,8 +193,45 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
   const [directoryTab, setDirectoryTab] = useState<string>('admins');
   const [showActionModal, setShowActionModal] = useState(false);
   const [selectedEntity, setSelectedEntity] = useState<Record<string, any> | null>(null);
+  const [selectedOrderForDetails, setSelectedOrderForDetails] = useState<HubOrderItem | null>(null);
+  const [selectedOrderForEdit, setSelectedOrderForEdit] = useState<HubOrderItem | null>(null);
   const logout = useLogout();
   const { mutate } = useSWRConfig();
+
+  // Helper function to normalize identity (same as in WarehouseHub)
+  const normalizeIdentity = (code: string | null | undefined): string | null => {
+    if (!code) return null;
+    const trimmed = code.trim().toUpperCase();
+    return trimmed.length > 0 ? trimmed : null;
+  };
+
+  // Fetch destination profile for order details (derive from directory order fields)
+  const rawDestinationCode = selectedOrderForDetails
+    ? (
+        (selectedOrderForDetails as any).destination ||
+        (selectedOrderForDetails as any).centerId ||
+        // If creator is a center/customer, use creator as destination fallback
+        ((['center', 'customer'].includes(((selectedOrderForDetails as any).createdByRole || '').toLowerCase()))
+          ? (selectedOrderForDetails as any).createdBy
+          : null) ||
+        (selectedOrderForDetails as any).customerId ||
+        (selectedOrderForDetails as any).assignedWarehouse ||
+        null
+      )
+    : null;
+  const { data: destinationProfile } = useHubProfile(rawDestinationCode ? normalizeIdentity(rawDestinationCode) : null);
+
+  // Fetch requestor profile for order details (derive from directory order fields)
+  const rawRequestorCode = selectedOrderForDetails
+    ? (
+        (selectedOrderForDetails as any).requestedBy ||
+        (selectedOrderForDetails as any).createdBy ||
+        (selectedOrderForDetails as any).centerId ||
+        (selectedOrderForDetails as any).customerId ||
+        null
+      )
+    : null;
+  const { data: requestorProfile } = useHubProfile(rawRequestorCode ? normalizeIdentity(rawRequestorCode) : null);
 
 
   const { data: adminUsers, isLoading: adminUsersLoading, error: adminUsersError } = useAdminUsers();
@@ -205,9 +252,115 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
 
   const [activityFeed, setActivityFeed] = useState<Activity[]>([]);
 
+  // Admin fallback profile resolver using directory data
+  const getDirectoryProfile = useCallback(
+    (code?: string | null): { name: string | null; address: string | null; phone: string | null; email: string | null } | null => {
+      if (!code) return null;
+      const id = normalizeIdentity(code);
+      if (!id) return null;
+      const prefix = id.split('-')[0];
+      if (prefix === 'CEN') {
+        const item = centers.find((x) => (x.id || '').toUpperCase() === id);
+        return item ? { name: item.name ?? item.id, address: item.address ?? null, phone: item.phone ?? null, email: item.email ?? null } : null;
+      }
+      if (prefix === 'CUS') {
+        const item = customers.find((x) => (x.id || '').toUpperCase() === id);
+        return item ? { name: item.name ?? item.id, address: item.address ?? null, phone: item.phone ?? null, email: item.email ?? null } : null;
+      }
+      if (prefix === 'WHS') {
+        const item = warehouses.find((x) => (x.id || '').toUpperCase() === id);
+        return item ? { name: item.name ?? item.id, address: item.address ?? null, phone: item.phone ?? null, email: item.email ?? null } : null;
+      }
+      if (prefix === 'MGR') {
+        const item = managers.find((x) => (x.id || '').toUpperCase() === id);
+        return item ? { name: item.name ?? item.id, address: item.address ?? null, phone: item.phone ?? null, email: item.email ?? null } : null;
+      }
+      if (prefix === 'CON') {
+        const item = contractors.find((x) => (x.id || '').toUpperCase() === id);
+        return item ? { name: item.name ?? item.id, address: item.address ?? null, phone: item.phone ?? null, email: item.email ?? null } : null;
+      }
+      if (prefix === 'CRW') {
+        const item = crew.find((x) => (x.id || '').toUpperCase() === id);
+        return item ? { name: item.name ?? item.id, address: item.address ?? null, phone: item.phone ?? null, email: item.email ?? null } : null;
+      }
+      return null;
+    },
+    [centers, customers, warehouses, managers, contractors, crew],
+  );
+
+  const destinationProfileFromDirectory = useMemo(() => getDirectoryProfile(rawDestinationCode), [getDirectoryProfile, rawDestinationCode]);
+  const requestorProfileFromDirectory = useMemo(() => getDirectoryProfile(rawRequestorCode), [getDirectoryProfile, rawRequestorCode]);
+
   useEffect(() => {
     setActivityFeed(activityItems);
   }, [activityItems]);
+
+  // Ensure Admin order details include items by fetching full order if missing.
+  // Prevent loops and ignore late responses if modal is closed.
+  const fullOrderCacheRef = useRef(new Map<string, any>());
+  const hydrationAttemptRef = useRef<{ orderId: string | null; attempted: boolean }>({ orderId: null, attempted: false });
+  useEffect(() => {
+    const current = selectedOrderForDetails as any;
+    const orderId: string | null = current?.orderId || current?.id || null;
+    if (!orderId || !current) {
+      hydrationAttemptRef.current = { orderId: null, attempted: false };
+      return;
+    }
+
+    let cancelled = false;
+
+    // Always try cached values first to enrich missing fields
+    const cached = fullOrderCacheRef.current.get(orderId);
+    if (cached) {
+      setSelectedOrderForDetails((prev) => {
+        if (!prev) return prev;
+        const prevId = (prev as any).orderId || (prev as any).id;
+        if (prevId !== orderId) return prev;
+        return {
+          ...(prev as any),
+          items: (cached as any).items ?? (prev as any).items ?? [],
+          notes: (cached as any).notes ?? (prev as any).notes ?? null,
+          expectedDate: (cached as any).expectedDate ?? (prev as any).expectedDate ?? null,
+          requestedDate: (cached as any).requestedDate ?? (prev as any).requestedDate ?? null,
+          metadata: (cached as any).metadata ?? (prev as any).metadata ?? null,
+        } as any;
+      });
+    }
+
+    // Avoid refetching multiple times per open
+    const attempted = hydrationAttemptRef.current;
+    if (attempted.orderId === orderId && attempted.attempted) {
+      return;
+    }
+    hydrationAttemptRef.current = { orderId, attempted: true };
+
+    (async () => {
+      try {
+        const full = await fetchAdminOrderById(orderId);
+        if (cancelled || !full) return;
+        fullOrderCacheRef.current.set(orderId, full as any);
+        setSelectedOrderForDetails((prev) => {
+          if (!prev) return prev;
+          const prevId = (prev as any).orderId || (prev as any).id;
+          if (prevId !== orderId) return prev;
+          return {
+            ...(prev as any),
+            items: (full as any).items ?? (prev as any).items ?? [],
+            notes: (full as any).notes ?? (prev as any).notes ?? null,
+            expectedDate: (full as any).expectedDate ?? (prev as any).expectedDate ?? null,
+            requestedDate: (full as any).requestedDate ?? (prev as any).requestedDate ?? null,
+            metadata: (full as any).metadata ?? (prev as any).metadata ?? null,
+          } as any;
+        });
+      } catch (e) {
+        console.warn('Failed to fetch full order for admin view:', e);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedOrderForDetails]);
 
   useEffect(() => {
     const style = document.createElement('style');
@@ -533,6 +686,8 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
           centerId: formatText(order.centerId),
           serviceId: formatText(order.serviceId),
           assignedWarehouse: formatText(order.assignedWarehouse),
+          // Store full order data for details modal
+          _fullOrder: order,
         };
       }),
     [orders],
@@ -1006,28 +1161,76 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
         actions={(() => {
           // Different actions based on entity type
           if (directoryTab === 'orders') {
-            return [
+            const row = selectedEntity as any;
+            const status = (row?.status || '').toString().trim().toLowerCase();
+            const finalStatuses = new Set(['delivered', 'cancelled', 'rejected', 'completed', 'service-created', 'service_created']);
+            const canEdit = !finalStatuses.has(status);
+            const actions: any[] = [
               {
                 label: 'View Details',
                 variant: 'secondary' as const,
-                onClick: () => console.log('View order details:', selectedEntity),
+                onClick: async () => {
+                  if (!selectedEntity) return;
+                  const fullOrder = (selectedEntity as any)._fullOrder as HubOrderItem;
+                  if (fullOrder) {
+                    setSelectedOrderForDetails(fullOrder);
+                  }
+                },
               },
-              {
+            ];
+            if (canEdit) {
+              actions.push({
                 label: 'Edit Order',
                 variant: 'secondary' as const,
-                onClick: () => console.log('Edit order:', selectedEntity),
-              },
+                onClick: () => {
+                  if (!selectedEntity) return;
+                  const fullOrder = (selectedEntity as any)._fullOrder as HubOrderItem;
+                  if (fullOrder) {
+                    setSelectedOrderForEdit(fullOrder);
+                  }
+                },
+              });
+            }
+            actions.push(
               {
                 label: 'Cancel Order',
                 variant: 'secondary' as const,
-                onClick: () => console.log('Cancel order:', selectedEntity),
+                onClick: async () => {
+                  if (!selectedEntity) return;
+                  const orderId = selectedEntity.orderId || selectedEntity.id;
+
+                  const confirmed = window.confirm(
+                    `Are you sure you want to cancel order ${orderId}? This action cannot be undone.`
+                  );
+
+                  if (!confirmed) return;
+
+                  const notes = window.prompt('Please provide a reason for cancellation (optional):');
+
+                  const payload: OrderActionRequest = {
+                    action: 'cancel',
+                    notes: notes?.trim() || null,
+                  };
+
+                  try {
+                    await applyHubOrderAction(orderId, payload);
+                    alert('Order cancelled successfully.');
+                    handleModalClose();
+                    // Refresh orders list
+                    mutate('/admin/directory/orders');
+                  } catch (error) {
+                    console.error('Failed to cancel order:', error);
+                    alert(`Failed to cancel order: ${error instanceof Error ? error.message : 'Unknown error'}`);
+                  }
+                },
               },
               {
                 label: 'Delete Order',
                 variant: 'danger' as const,
                 onClick: () => selectedEntity && handleDelete(selectedEntity),
               },
-            ];
+            );
+            return actions;
           }
           if (directoryTab === 'products') {
             return [
@@ -1044,7 +1247,37 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
               {
                 label: 'Update Inventory',
                 variant: 'secondary' as const,
-                onClick: () => console.log('Update inventory:', selectedEntity),
+                onClick: async () => {
+                  const warehouseId = prompt('Enter Warehouse ID (e.g., WHS-004):');
+                  if (!warehouseId) return;
+
+                  const quantityStr = prompt(`Enter quantity to ADD (+) or REMOVE (-) for ${selectedEntity?.name}:`);
+                  if (!quantityStr) return;
+
+                  const quantityChange = parseInt(quantityStr, 10);
+                  if (isNaN(quantityChange)) {
+                    alert('Invalid quantity. Please enter a number.');
+                    return;
+                  }
+
+                  const reason = prompt('Enter reason for adjustment (optional):') || undefined;
+
+                  try {
+                    await updateInventory({
+                      warehouseId,
+                      itemId: selectedEntity?.id || selectedEntity?.rawId || '',
+                      quantityChange,
+                      reason,
+                    });
+
+                    alert('Inventory updated successfully!');
+                    setSelectedEntity(null); // Close modal
+                    // Refresh data if needed
+                  } catch (error) {
+                    console.error('Failed to update inventory:', error);
+                    alert(`Failed to update inventory: ${error instanceof Error ? error.message : 'Unknown error'}`);
+                  }
+                },
               },
               {
                 label: 'Delete Product',
@@ -1123,24 +1356,165 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
             : undefined
         }
       />
+
+      <OrderDetailsModal
+        isOpen={!!selectedOrderForDetails}
+        onClose={() => setSelectedOrderForDetails(null)}
+        order={
+          selectedOrderForDetails
+            ? {
+                orderId: (selectedOrderForDetails as any).orderId || (selectedOrderForDetails as any).id,
+                orderType: ((selectedOrderForDetails as any).orderType === 'service' || (selectedOrderForDetails as any).serviceId)
+                  ? 'service'
+                  : 'product',
+                title: selectedOrderForDetails.title || null,
+                requestedBy:
+                  (selectedOrderForDetails as any).requestedBy ||
+                  (selectedOrderForDetails as any).createdBy ||
+                  (selectedOrderForDetails as any).centerId ||
+                  (selectedOrderForDetails as any).customerId ||
+                  null,
+                destination:
+                  (selectedOrderForDetails as any).destination ||
+                  (selectedOrderForDetails as any).centerId ||
+                  (selectedOrderForDetails as any).customerId ||
+                  null,
+                requestedDate: (selectedOrderForDetails as any).requestedDate || (selectedOrderForDetails as any).orderDate || null,
+                notes: selectedOrderForDetails.notes || null,
+                items: selectedOrderForDetails.items || [],
+                status: (selectedOrderForDetails as any).status || null,
+              }
+            : null
+        }
+        infoBanner={
+          (selectedOrderForDetails as any)?.archivedAt
+            ? 'This order has been archived by admin and is scheduled to be deleted from the system within 30 days.'
+            : null
+        }
+        availability={(() => {
+          const meta = (selectedOrderForDetails as any)?.metadata as any;
+          const av = meta?.availability;
+          if (!av) return null;
+          const days = Array.isArray(av.days) ? av.days : [];
+          const window = av.window && av.window.start && av.window.end ? av.window : null;
+          return { tz: av.tz ?? null, days, window };
+        })()}
+        cancellationReason={(() => {
+          const meta = (selectedOrderForDetails as any)?.metadata as any;
+          return meta?.cancellationReason || null;
+        })()}
+        cancelledBy={(() => {
+          const meta = (selectedOrderForDetails as any)?.metadata as any;
+          return meta?.cancelledBy || null;
+        })()}
+        cancelledAt={(() => {
+          const meta = (selectedOrderForDetails as any)?.metadata as any;
+          return meta?.cancelledAt || null;
+        })()}
+        rejectionReason={(() => {
+          const meta = (selectedOrderForDetails as any)?.metadata as any;
+          return (selectedOrderForDetails as any)?.rejectionReason || meta?.rejectionReason || null;
+        })()}
+        requestorInfo={
+          selectedOrderForDetails
+            ? {
+                name:
+                  (() => {
+                    const meta = (selectedOrderForDetails as any)?.metadata as any;
+                    const req = meta?.contacts?.requestor || {};
+                    return req.name || requestorProfile?.name || requestorProfileFromDirectory?.name || null;
+                  })(),
+                address:
+                  (() => {
+                    const meta = (selectedOrderForDetails as any)?.metadata as any;
+                    const req = meta?.contacts?.requestor || {};
+                    return req.address || requestorProfile?.address || requestorProfileFromDirectory?.address || null;
+                  })(),
+                phone:
+                  (() => {
+                    const meta = (selectedOrderForDetails as any)?.metadata as any;
+                    const req = meta?.contacts?.requestor || {};
+                    return req.phone || requestorProfile?.phone || requestorProfileFromDirectory?.phone || null;
+                  })(),
+                email:
+                  (() => {
+                    const meta = (selectedOrderForDetails as any)?.metadata as any;
+                    const req = meta?.contacts?.requestor || {};
+                    return req.email || requestorProfile?.email || requestorProfileFromDirectory?.email || null;
+                  })(),
+              }
+            : null
+        }
+        destinationInfo={
+          selectedOrderForDetails
+            ? {
+                name:
+                  (() => {
+                    const meta = (selectedOrderForDetails as any)?.metadata as any;
+                    const dest = meta?.contacts?.destination || {};
+                    return dest.name || destinationProfile?.name || destinationProfileFromDirectory?.name || null;
+                  })(),
+                address:
+                  (() => {
+                    const meta = (selectedOrderForDetails as any)?.metadata as any;
+                    const dest = meta?.contacts?.destination || {};
+                    return dest.address || destinationProfile?.address || destinationProfileFromDirectory?.address || null;
+                  })(),
+                phone:
+                  (() => {
+                    const meta = (selectedOrderForDetails as any)?.metadata as any;
+                    const dest = meta?.contacts?.destination || {};
+                    return dest.phone || destinationProfile?.phone || destinationProfileFromDirectory?.phone || null;
+                  })(),
+                email:
+                  (() => {
+                    const meta = (selectedOrderForDetails as any)?.metadata as any;
+                    const dest = meta?.contacts?.destination || {};
+                    return dest.email || destinationProfile?.email || destinationProfileFromDirectory?.email || null;
+                  })(),
+              }
+            : null
+        }
+      />
+
+      <EditOrderModal
+        isOpen={!!selectedOrderForEdit}
+        onClose={() => setSelectedOrderForEdit(null)}
+        currentNotes={selectedOrderForEdit?.notes || null}
+        orderId={(selectedOrderForEdit as any)?.orderId || (selectedOrderForEdit as any)?.id || ''}
+        onSubmit={async (payload) => {
+          if (!selectedOrderForEdit) return;
+          try {
+            const targetId = (selectedOrderForEdit as any)?.orderId || (selectedOrderForEdit as any)?.id;
+            if (!targetId) {
+              throw new Error('Missing order ID');
+            }
+            await updateOrderFields(targetId, payload);
+            alert('Order updated successfully!');
+            // Optimistically update the details modal if it's open for the same order
+            setSelectedOrderForDetails((prev) => {
+              if (!prev) return prev;
+              const prevId = (prev as any).orderId || (prev as any).id;
+              if (prevId !== targetId) return prev;
+              return {
+                ...(prev as any),
+                notes: payload.notes !== undefined ? (payload.notes || null) : (prev as any).notes ?? null,
+              } as any;
+            });
+            setSelectedOrderForEdit(null);
+            handleModalClose();
+            // Refresh orders list
+            mutate('/admin/directory/orders');
+          } catch (error) {
+            console.error('Failed to update order:', error);
+            alert(`Failed to update order: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          }
+        }}
+      />
     </div>
   );
 
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

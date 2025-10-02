@@ -18,7 +18,7 @@ import {
   type Activity,
   type ReportFeedback,
 } from '@cks/domain-widgets';
-import { Button, DataTable, PageHeader, PageWrapper, Scrollbar, TabSection } from '@cks/ui';
+import { Button, DataTable, OrderDetailsModal, PageHeader, PageWrapper, Scrollbar, TabSection } from '@cks/ui';
 import MyHubSection from '../components/MyHubSection';
 import { useLogout } from '../hooks/useLogout';
 
@@ -52,6 +52,7 @@ import {
   applyHubOrderAction,
   type HubReportItem,
   type HubOrderItem,
+  type OrderActionRequest,
 } from '../shared/api/hub';
 import { useSWRConfig } from 'swr';
 
@@ -435,12 +436,20 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
     if (!ordersData) {
       return [];
     }
+    let orders: any[] = [];
     if (Array.isArray(ordersData.orders) && ordersData.orders.length > 0) {
-      return ordersData.orders;
+      orders = ordersData.orders;
+    } else {
+      const serviceOrders = ordersData.serviceOrders ?? [];
+      const productOrders = ordersData.productOrders ?? [];
+      orders = [...serviceOrders, ...productOrders];
     }
-    const serviceOrders = ordersData.serviceOrders ?? [];
-    const productOrders = ordersData.productOrders ?? [];
-    return [...serviceOrders, ...productOrders];
+    // Use viewerStatus for display, keep actual status for filtering
+    return orders.map(order => ({
+      ...order,
+      status: order.viewerStatus as any,
+      actualStatus: order.status,
+    }));
   }, [ordersData]);
 
   // Map hub activities to the Activity format expected by RecentActivity component
@@ -679,7 +688,8 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
         const service = serviceId ? serviceById.get(serviceId) : null;
         const customerId = normalizeId(order.customerId ?? order.requestedBy);
         const centerId = normalizeId(order.centerId ?? order.destination);
-        const status = normalizeOrderStatus(order.status);
+        const status = normalizeOrderStatus(order.viewerStatus ?? order.status);
+        const actualStatus = order.status;
         const requestedByLabel = customerId
           ? customerNameMap.get(customerId) ?? order.customerId ?? order.requestedBy ?? 'Customer'
           : order.customerId ?? order.requestedBy ?? 'Customer';
@@ -699,6 +709,7 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
           serviceStartDate: serviceStartDate ? formatDate(serviceStartDate) : undefined,
           deliveryDate: deliveryDate ? formatDate(deliveryDate) : undefined,
           status,
+          actualStatus,
           approvalStages: [],
           transformedId: order.transformedId ?? order.serviceId ?? null,
         };
@@ -711,11 +722,21 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
         const canonicalOrderId = order.orderId ?? order.id ?? 'ORD-UNKNOWN';
         const customerId = normalizeId(order.customerId ?? order.requestedBy);
         const centerId = normalizeId(order.centerId ?? order.destination);
-        const status = normalizeOrderStatus(order.status);
-        const requestedByLabel = customerId
-          ? customerNameMap.get(customerId) ?? order.customerId ?? order.requestedBy ?? 'Customer'
-          : order.customerId ?? order.requestedBy ?? 'Customer';
-        const destinationLabel = centerId ? centerNameMap.get(centerId) ?? centerId : undefined;
+        const status = normalizeOrderStatus(order.viewerStatus ?? order.status);
+        const actualStatus = order.status;
+
+        // Format as "ID - Name"
+        const requestorCode = order.requestedBy || order.customerId || order.creatorId || customerId;
+        const requestorName = customerId ? customerNameMap.get(customerId) : null;
+        const requestedByLabel = requestorCode && requestorName
+          ? `${requestorCode} - ${requestorName}`
+          : requestorCode || requestorName || 'Unknown';
+
+        const destinationCode = order.destination || order.centerId || centerId;
+        const destinationName = centerId ? centerNameMap.get(centerId) : null;
+        const destinationLabel = destinationCode && destinationName
+          ? `${destinationCode} - ${destinationName}`
+          : destinationCode || destinationName || undefined;
         const requestedDate = order.requestedDate ?? order.orderDate ?? null;
         const expectedDate = order.expectedDate ?? order.completionDate ?? null;
         const deliveryDate = status === 'delivered' ? order.deliveryDate ?? expectedDate : undefined;
@@ -729,7 +750,9 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
           expectedDate: formatDate(expectedDate),
           deliveryDate: deliveryDate ? formatDate(deliveryDate) : undefined,
           status,
-          approvalStages: [],
+          actualStatus,
+          approvalStages: (order as any).approvalStages || [],
+          availableActions: (order as any).availableActions || [],
         };
       }),
     [centerNameMap, customerNameMap, managerProductOrders],
@@ -888,16 +911,41 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
   }, []);
 
   const { mutate } = useSWRConfig();
+  const [selectedOrderForDetails, setSelectedOrderForDetails] = useState<HubOrderItem | null>(null);
 
   const handleOrderAction = useCallback(async (orderId: string, action: string) => {
+    if (action === 'View Details') {
+      const target = ordersData?.orders?.find((o: any) => (o.orderId || o.id) === orderId) || null;
+      if (target) {
+        setSelectedOrderForDetails(target);
+      }
+      return;
+    }
+
+    if (action === 'Cancel') {
+      const confirmed = window.confirm('Are you sure you want to cancel this order?');
+      if (!confirmed) return;
+      const notes = window.prompt('Optional: provide a short reason for cancellation');
+      const payload: OrderActionRequest = {
+        action: 'cancel',
+        notes: notes?.trim() || null,
+      };
+      try {
+        await applyHubOrderAction(orderId, payload);
+        mutate(`/hub/orders/${managerCode}`);
+        console.log('[manager] order cancelled', { orderId });
+      } catch (error) {
+        console.error('[manager] failed to cancel order', error);
+      }
+      return;
+    }
+
     try {
-      // Apply the order action
-      await applyHubOrderAction({
-        orderId,
+      // Apply other order actions
+      const payload: OrderActionRequest = {
         action: action as any,
-        actorCode: managerCode,
-        actorRole: 'manager',
-      });
+      };
+      await applyHubOrderAction(orderId, payload);
 
       // Refresh the orders list
       mutate(`/hub/orders/${managerCode}`);
@@ -906,7 +954,7 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
     } catch (error) {
       console.error('[manager] failed to apply order action', error);
     }
-  }, [managerCode, mutate]);
+  }, [managerCode, mutate, ordersData]);
 
   const handleNodeClick = useCallback((userId: string) => {
     console.log('[manager] view ecosystem node', userId);
@@ -1080,9 +1128,56 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
           )}
         </div>
       </Scrollbar>
+
+      {/* Order Details Modal */}
+      <OrderDetailsModal
+        isOpen={!!selectedOrderForDetails}
+        onClose={() => setSelectedOrderForDetails(null)}
+        order={selectedOrderForDetails ? {
+          orderId: selectedOrderForDetails.orderId,
+          orderType: selectedOrderForDetails.orderType,
+          title: selectedOrderForDetails.title || null,
+          requestedBy: selectedOrderForDetails.requestedBy || selectedOrderForDetails.centerId || selectedOrderForDetails.customerId || null,
+          destination: selectedOrderForDetails.destination || selectedOrderForDetails.centerId || null,
+          requestedDate: selectedOrderForDetails.requestedDate || null,
+          status: (selectedOrderForDetails as any).status || null,
+          notes: selectedOrderForDetails.notes || null,
+          items: selectedOrderForDetails.items || [],
+        } : null}
+        availability={(() => {
+          const meta = (selectedOrderForDetails as any)?.metadata as any;
+          const av = meta?.availability;
+          if (!av) return null;
+          const days = Array.isArray(av.days) ? av.days : [];
+          const window = av.window && av.window.start && av.window.end ? av.window : null;
+          return { tz: av.tz ?? null, days, window };
+        })()}
+        cancellationReason={(selectedOrderForDetails as any)?.metadata?.cancellationReason || null}
+        cancelledBy={(selectedOrderForDetails as any)?.metadata?.cancelledBy || null}
+        cancelledAt={(selectedOrderForDetails as any)?.metadata?.cancelledAt || null}
+        rejectionReason={(selectedOrderForDetails as any)?.rejectionReason || (selectedOrderForDetails as any)?.metadata?.rejectionReason || null}
+        requestorInfo={
+          selectedOrderForDetails
+            ? {
+                name: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const req = meta?.contacts?.requestor || {}; return (req.name || null); })(),
+                address: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const req = meta?.contacts?.requestor || {}; return (req.address || null); })(),
+                phone: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const req = meta?.contacts?.requestor || {}; return (req.phone || null); })(),
+                email: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const req = meta?.contacts?.requestor || {}; return (req.email || null); })(),
+              }
+            : null
+        }
+        destinationInfo={
+          selectedOrderForDetails
+            ? {
+                name: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const dest = meta?.contacts?.destination || {}; return (dest.name || null); })(),
+                address: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const dest = meta?.contacts?.destination || {}; return (dest.address || null); })(),
+                phone: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const dest = meta?.contacts?.destination || {}; return (dest.phone || null); })(),
+                email: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const dest = meta?.contacts?.destination || {}; return (dest.email || null); })(),
+              }
+            : null
+        }
+      />
     </div>
   );
 }
-
-
 

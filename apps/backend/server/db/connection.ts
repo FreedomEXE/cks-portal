@@ -139,3 +139,36 @@ export async function query<T extends QueryResultRow = QueryResultRow>(
   }
 }
 
+// Execute a series of queries within a single transaction on the same client.
+export async function withTransaction<T>(
+  fn: (
+    q: <R extends QueryResultRow = QueryResultRow>(
+      text: string,
+      params?: readonly unknown[],
+    ) => Promise<QueryResult<R>>,
+  ) => Promise<T>,
+): Promise<T> {
+  const pool = await ensurePool();
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const txQuery = async <R extends QueryResultRow = QueryResultRow>(
+      text: string,
+      params: readonly unknown[] = [],
+    ): Promise<QueryResult<R>> => client.query<R>(text, params as any[]);
+
+    const result = await fn(txQuery);
+    await client.query('COMMIT');
+    return result;
+  } catch (error) {
+    try {
+      await client.query('ROLLBACK');
+    } catch (_) {
+      // ignore rollback errors
+    }
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+

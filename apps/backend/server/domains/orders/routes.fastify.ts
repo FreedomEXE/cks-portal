@@ -1,7 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { requireActiveRole } from '../../core/auth/guards';
-import { applyOrderAction, createOrder, getHubOrders, type CreateOrderInput, type OrderActionInput } from './service';
+import { requireActiveAdmin } from '../adminUsers/guards';
+import { applyOrderAction, createOrder, getHubOrders, getOrderById, archiveOrder as svcArchiveOrder, restoreOrder as svcRestoreOrder, hardDeleteOrder as svcHardDeleteOrder, type CreateOrderInput, type OrderActionInput } from './service';
 import type { HubRole } from '../profile/types';
 import type { HubOrderItem } from './types';
 
@@ -56,7 +57,7 @@ const actionParamsSchema = z.object({
 });
 
 const actionBodySchema = z.object({
-  action: z.enum(['accept', 'reject', 'deliver', 'cancel', 'create-service']),
+  action: z.enum(['accept', 'reject', 'start-delivery', 'deliver', 'cancel', 'create-service']),
   notes: z.string().trim().max(1000).optional(),
   transformedId: z.string().trim().min(1).optional(),
 });
@@ -81,6 +82,27 @@ function filterByStatus(items: HubOrderItem[], status?: string | null): HubOrder
 }
 
 export async function registerOrdersRoutes(server: FastifyInstance) {
+  // Admin-only: Get full order by ID (includes items and notes)
+  server.get('/api/orders/:orderId', async (request, reply) => {
+    const params = z.object({ orderId: z.string().min(1) }).safeParse(request.params);
+    if (!params.success) {
+      reply.code(400).send({ error: 'Invalid order identifier' });
+      return;
+    }
+
+    const admin = await requireActiveAdmin(request, reply);
+    if (!admin) {
+      return;
+    }
+
+    const order = await getOrderById(params.data.orderId);
+    if (!order) {
+      reply.code(404).send({ error: 'Order not found' });
+      return;
+    }
+
+    reply.send({ data: order });
+  });
   server.get('/api/hub/orders/:cksCode', async (request, reply) => {
     const paramsResult = paramsSchema.safeParse(request.params);
     if (!paramsResult.success) {
@@ -151,6 +173,20 @@ export async function registerOrdersRoutes(server: FastifyInstance) {
     }
 
     const body = bodyResult.data;
+
+    // Enforce destination selection for non-center roles on product orders
+    if (body.orderType === 'product' && role !== 'center') {
+      const destCode = body.destination?.code?.trim();
+      const destRole = body.destination?.role?.trim().toLowerCase();
+      if (!destCode || !destRole) {
+        reply.code(400).send({ error: 'Destination center is required for this role.' });
+        return;
+      }
+      if (destRole !== 'center') {
+        reply.code(400).send({ error: 'Destination must be a center for product orders.' });
+        return;
+      }
+    }
     const payload = {
       orderType: body.orderType,
       creator: {
@@ -237,5 +273,135 @@ export async function registerOrdersRoutes(server: FastifyInstance) {
       reply.code(400).send({ error: error instanceof Error ? error.message : 'Failed to update order' });
     }
   });
-}
 
+  // PATCH /api/orders/:orderId - Update order fields (admin only)
+  server.patch('/api/orders/:orderId', async (request, reply) => {
+    const paramsResult = actionParamsSchema.safeParse(request.params);
+    if (!paramsResult.success) {
+      reply.code(400).send({ error: 'Invalid order identifier' });
+      return;
+    }
+
+    const updateSchema = z.object({
+      expectedDate: z.string().trim().min(1).optional(),
+      notes: z.string().trim().max(1000).optional(),
+    });
+
+    const bodyResult = updateSchema.safeParse(request.body);
+    if (!bodyResult.success) {
+      reply.code(400).send({ error: 'Invalid update payload', details: bodyResult.error.flatten() });
+      return;
+    }
+
+    const account = await requireActiveAdmin(request, reply);
+    if (!account) {
+      return;
+    }
+
+    const { orderId } = paramsResult.data;
+    const body = bodyResult.data;
+
+    // Validate order exists and is editable
+    try {
+      const order = await getOrderById(orderId);
+      if (!order) {
+        reply.code(404).send({ error: 'Order not found' });
+        return;
+      }
+
+      const status = (order.status ?? '').toString().trim().toLowerCase();
+      const finalStatuses = new Set([
+        'delivered',
+        'cancelled',
+        'rejected',
+        'completed',
+        'service-created',
+        'service_created',
+        'service-completed',
+        'service_completed',
+      ]);
+      if (finalStatuses.has(status)) {
+        reply.code(400).send({ error: 'Order is not editable in its current status' });
+        return;
+      }
+
+      // Validate expected date is at least 24 hours in the future (if provided)
+      if (typeof body.expectedDate === 'string' && body.expectedDate.trim().length > 0) {
+        const parsed = new Date(body.expectedDate);
+        if (Number.isNaN(parsed.getTime())) {
+          reply.code(400).send({ error: 'Invalid expected date' });
+          return;
+        }
+        const min = new Date(Date.now() + 24 * 60 * 60 * 1000);
+        if (parsed.getTime() < min.getTime()) {
+          reply.code(400).send({ error: 'Expected delivery must be at least 24 hours from now' });
+          return;
+        }
+      }
+
+      const { updateOrderFields } = await import('./store');
+      const updated = await updateOrderFields(orderId, body);
+      if (!updated) {
+        reply.code(404).send({ error: 'Order not found' });
+        return;
+      }
+      reply.send({ data: updated });
+    } catch (error) {
+      request.log.error({ err: error }, 'Failed to update order');
+      reply.code(400).send({ error: error instanceof Error ? error.message : 'Failed to update order' });
+    }
+  });
+
+  // POST /api/orders/:orderId/archive - mark order as archived (admin only)
+  server.post('/api/orders/:orderId/archive', async (request, reply) => {
+    const params = actionParamsSchema.safeParse(request.params);
+    if (!params.success) {
+      reply.code(400).send({ error: 'Invalid order identifier' });
+      return;
+    }
+
+    const account = await requireActiveAdmin(request, reply);
+    if (!account) return;
+
+    try {
+      const result = await svcArchiveOrder(params.data.orderId);
+      reply.send({ data: result });
+    } catch (error) {
+      reply.code(400).send({ error: error instanceof Error ? error.message : 'Failed to archive order' });
+    }
+  });
+
+  // POST /api/orders/:orderId/restore - clear archive flag (admin only)
+  server.post('/api/orders/:orderId/restore', async (request, reply) => {
+    const params = actionParamsSchema.safeParse(request.params);
+    if (!params.success) {
+      reply.code(400).send({ error: 'Invalid order identifier' });
+      return;
+    }
+    const account = await requireActiveAdmin(request, reply);
+    if (!account) return;
+    try {
+      const result = await svcRestoreOrder(params.data.orderId);
+      reply.send({ data: result });
+    } catch (error) {
+      reply.code(400).send({ error: error instanceof Error ? error.message : 'Failed to restore order' });
+    }
+  });
+
+  // DELETE /api/orders/:orderId - permanently delete order (admin only)
+  server.delete('/api/orders/:orderId', async (request, reply) => {
+    const params = actionParamsSchema.safeParse(request.params);
+    if (!params.success) {
+      reply.code(400).send({ error: 'Invalid order identifier' });
+      return;
+    }
+    const account = await requireActiveAdmin(request, reply);
+    if (!account) return;
+    try {
+      const result = await svcHardDeleteOrder(params.data.orderId);
+      reply.send({ data: result });
+    } catch (error) {
+      reply.code(400).send({ error: error instanceof Error ? error.message : 'Failed to delete order' });
+    }
+  });
+}
