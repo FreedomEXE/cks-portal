@@ -8,6 +8,8 @@ import {
   archiveOrder as storeArchiveOrder,
   restoreOrder as storeRestoreOrder,
   hardDeleteOrder as storeHardDeleteOrder,
+  requestCrewAssignment as storeRequestCrewAssignment,
+  respondToCrewRequest as storeRespondToCrewRequest,
   type CreateOrderInput,
   type OrderActionInput,
   type OrderActionType,
@@ -70,4 +72,21 @@ export async function restoreOrder(orderId: string): Promise<HubOrderItem | null
 
 export async function hardDeleteOrder(orderId: string): Promise<{ success: boolean }> {
   return storeHardDeleteOrder(orderId);
+}
+
+export async function requestCrewAssignment(
+  orderId: string,
+  managerCode: string,
+  crewCodes: string[],
+  message?: string
+): Promise<HubOrderItem | null> {
+  return storeRequestCrewAssignment(orderId, managerCode, crewCodes, message);
+}
+
+export async function respondToCrewRequest(
+  orderId: string,
+  crewCode: string,
+  accept: boolean
+): Promise<HubOrderItem | null> {
+  return storeRespondToCrewRequest(orderId, crewCode, accept);
 }

@@ -38,3 +38,9 @@ export { default as OrderDetailsModal } from './modals/OrderDetailsModal';
 
 export { default as EditOrderModal } from './modals/EditOrderModal';
 
+export * from './modals/CrewSelectionModal';
+export { default as CrewSelectionModal } from './modals/CrewSelectionModal';
+
+export * from './modals/CreateServiceModal';
+export { default as CreateServiceModal } from './modals/CreateServiceModal';
+

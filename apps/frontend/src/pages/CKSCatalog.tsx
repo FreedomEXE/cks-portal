@@ -146,16 +146,19 @@ function DateSelectorModal({
         <form onSubmit={handleSubmit}>
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Expected Service Date
+              Availability Window
             </label>
             <input
-              type="date"
-              min={minDate}
+              type="text"
+              placeholder="e.g., Monday-Friday 9am-5pm, or Nov 15-20"
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black"
               required
             />
+            <p className="text-xs text-gray-500 mt-1">
+              Provide your general availability. The manager will set the exact schedule when creating the service.
+            </p>
           </div>
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-2">

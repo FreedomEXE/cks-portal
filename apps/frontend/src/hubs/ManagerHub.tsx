@@ -6,7 +6,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@cks/auth';
 import { EcosystemTree } from '@cks/domain-widgets';
-import type { TreeNode } from '@cks/domain-widgets';
 import {
   MemosPreview,
   NewsPreview,
@@ -19,7 +18,18 @@ import {
   type Activity,
   type ReportFeedback,
 } from '@cks/domain-widgets';
-import { Button, DataTable, OrderDetailsModal, PageHeader, PageWrapper, Scrollbar, TabSection } from '@cks/ui';
+import {
+  Button,
+  DataTable,
+  OrderDetailsModal,
+  PageHeader,
+  PageWrapper,
+  Scrollbar,
+  TabSection,
+  CrewSelectionModal,
+  CreateServiceModal,
+  type CreateServiceFormData
+} from '@cks/ui';
 import MyHubSection from '../components/MyHubSection';
 import { useLogout } from '../hooks/useLogout';
 
@@ -62,7 +72,22 @@ interface ManagerHubProps {
   initialTab?: string;
 }
 
-type OrderStatus = 'pending' | 'in-progress' | 'approved' | 'rejected' | 'cancelled' | 'delivered' | 'service-created';
+type OrderStatus =
+  | 'pending'
+  | 'in-progress'
+  | 'approved'
+  | 'rejected'
+  | 'cancelled'
+  | 'delivered'
+  | 'completed'
+  | 'archived'
+  | 'service-created'
+  | 'pending-customer'
+  | 'pending-contractor'
+  | 'pending-manager'
+  | 'manager-accepted'
+  | 'crew-requested'
+  | 'crew-assigned';
 
 type HubOrder = {
   orderId: string;
@@ -265,6 +290,12 @@ function normalizeOrderStatus(status: string | null | undefined): OrderStatus {
     case 'delivered':
     case 'completed':
     case 'archived':
+    case 'pending-customer':
+    case 'pending-contractor':
+    case 'pending-manager':
+    case 'manager-accepted':
+    case 'crew-requested':
+    case 'crew-assigned':
     case 'service-created':
       return normalized;
     case 'in-progress':
@@ -300,6 +331,12 @@ function getStatusBadgePalette(value: string): { background: string; color: stri
     case 'approved':
     case 'completed':
     case 'archived':
+    case 'pending-customer':
+    case 'pending-contractor':
+    case 'pending-manager':
+    case 'manager-accepted':
+    case 'crew-requested':
+    case 'crew-assigned':
     case 'service-created':
       return { background: '#dcfce7', color: '#16a34a' };
     case 'pending':
@@ -348,6 +385,11 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
   const [servicesTab, setServicesTab] = useState<'my' | 'active' | 'history'>('my');
   const [servicesSearchQuery, setServicesSearchQuery] = useState('');
   const [activityFeed, setActivityFeed] = useState<Activity[]>([]);
+
+  // Service order modal state
+  const [showCrewModal, setShowCrewModal] = useState(false);
+  const [showCreateServiceModal, setShowCreateServiceModal] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<HubOrderItem | null>(null);
 
   useEffect(() => {
     const style = document.createElement('style');
@@ -708,13 +750,13 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
       }),
     [managerProductOrders],
   );
-  const ecosystemTree = useMemo<TreeNode>(() => {
+  const ecosystemTree = useMemo(() => {
     if (managerScope) {
       return buildEcosystemTree(managerScope, { rootName: managerDisplayName });
     }
     return {
       user: { id: managerRootId, role: 'Manager', name: managerDisplayName },
-    } as TreeNode;
+    };
   }, [managerScope, managerDisplayName, managerRootId]);
 
   const activityEmptyMessage = activitiesError
@@ -757,6 +799,27 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
       return;
     }
 
+    // Handle service order manager actions
+    const order = ordersData?.orders?.find((o: any) => (o.orderId || o.id) === orderId);
+
+    if (action === 'Add Crew') {
+      setSelectedOrder(order || null);
+      setShowCrewModal(true);
+      return;
+    }
+
+    if (action === 'Create Service') {
+      setSelectedOrder(order || null);
+      setShowCreateServiceModal(true);
+      return;
+    }
+
+    // Add Training and Add Procedure are placeholders for now
+    if (action === 'Add Training' || action === 'Add Procedure') {
+      alert(`${action} functionality coming soon!`);
+      return;
+    }
+
     try {
       // Apply other order actions
       const payload: OrderActionRequest = {
@@ -776,6 +839,59 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
   const handleNodeClick = useCallback((userId: string) => {
     console.log('[manager] view ecosystem node', userId);
   }, []);
+
+  // Crew request handler
+  const handleCrewRequest = useCallback(async (selectedCrew: string[], message?: string) => {
+    if (!selectedOrder) return;
+
+    try {
+      const response = await fetch(`/api/orders/${selectedOrder.orderId}/crew-requests`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          crewCodes: selectedCrew,
+          message,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to request crew assignment');
+      }
+
+      mutate(`/hub/orders/${managerCode}`);
+      console.log('[manager] crew requested', { orderId: selectedOrder.orderId, crewCodes: selectedCrew });
+    } catch (error) {
+      console.error('[manager] failed to request crew', error);
+      alert('Failed to request crew assignment. Please try again.');
+    }
+  }, [selectedOrder, managerCode, mutate]);
+
+  // Create service handler
+  const handleCreateService = useCallback(async (data: CreateServiceFormData) => {
+    if (!selectedOrder) return;
+
+    try {
+      const payload: OrderActionRequest = {
+        action: 'create-service',
+        metadata: {
+          serviceType: data.serviceType,
+          startDate: data.startDate,
+          startTime: data.startTime,
+          endDate: data.endDate,
+          endTime: data.endTime,
+          notes: data.notes,
+        },
+      };
+
+      await applyHubOrderAction(selectedOrder.orderId, payload);
+      mutate(`/hub/orders/${managerCode}`);
+      console.log('[manager] service created', { orderId: selectedOrder.orderId });
+    } catch (error) {
+      console.error('[manager] failed to create service', error);
+      alert('Failed to create service. Please try again.');
+    }
+  }, [selectedOrder, managerCode, mutate]);
 
   return (
     <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: '#f9fafb' }}>
@@ -994,6 +1110,32 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
               }
             : null
         }
+      />
+
+      {/* Crew Selection Modal */}
+      <CrewSelectionModal
+        isOpen={showCrewModal}
+        onClose={() => {
+          setShowCrewModal(false);
+          setSelectedOrder(null);
+        }}
+        onSubmit={handleCrewRequest}
+        availableCrew={
+          // TODO: Fetch available crew from API
+          // For now, use mock data
+          []
+        }
+      />
+
+      {/* Create Service Modal */}
+      <CreateServiceModal
+        isOpen={showCreateServiceModal}
+        onClose={() => {
+          setShowCreateServiceModal(false);
+          setSelectedOrder(null);
+        }}
+        onSubmit={handleCreateService}
+        orderId={selectedOrder?.orderId}
       />
     </div>
   );

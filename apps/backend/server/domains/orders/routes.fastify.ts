@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { requireActiveRole } from '../../core/auth/guards';
 import { requireActiveAdmin } from '../adminUsers/guards';
-import { applyOrderAction, createOrder, getHubOrders, getOrderById, archiveOrder as svcArchiveOrder, restoreOrder as svcRestoreOrder, hardDeleteOrder as svcHardDeleteOrder, type CreateOrderInput, type OrderActionInput } from './service';
+import { applyOrderAction, createOrder, getHubOrders, getOrderById, archiveOrder as svcArchiveOrder, restoreOrder as svcRestoreOrder, hardDeleteOrder as svcHardDeleteOrder, requestCrewAssignment, respondToCrewRequest, type CreateOrderInput, type OrderActionInput } from './service';
 import type { HubRole } from '../profile/types';
 import type { HubOrderItem } from './types';
 
@@ -60,6 +60,7 @@ const actionBodySchema = z.object({
   action: z.enum(['accept', 'reject', 'start-delivery', 'deliver', 'cancel', 'create-service']),
   notes: z.string().trim().max(1000).optional(),
   transformedId: z.string().trim().min(1).optional(),
+  metadata: z.record(z.string(), z.any()).optional(), // For create-service action
 });
 
 function resolveHubRole(value: string | null | undefined): HubRole | null {
@@ -259,6 +260,7 @@ export async function registerOrdersRoutes(server: FastifyInstance) {
       action: body.action,
       notes: body.notes ?? null,
       transformedId: body.transformedId ?? null,
+      metadata: body.metadata ?? null,
     };
 
     try {
@@ -402,6 +404,104 @@ export async function registerOrdersRoutes(server: FastifyInstance) {
       reply.send({ data: result });
     } catch (error) {
       reply.code(400).send({ error: error instanceof Error ? error.message : 'Failed to delete order' });
+    }
+  });
+
+  // POST /api/orders/:orderId/crew-requests - Request crew assignment (manager only)
+  server.post('/api/orders/:orderId/crew-requests', async (request, reply) => {
+    const paramsResult = actionParamsSchema.safeParse(request.params);
+    if (!paramsResult.success) {
+      reply.code(400).send({ error: 'Invalid order identifier' });
+      return;
+    }
+
+    const bodySchema = z.object({
+      crewCodes: z.array(z.string().trim().min(1)).min(1),
+      message: z.string().trim().max(1000).optional(),
+    });
+
+    const bodyResult = bodySchema.safeParse(request.body);
+    if (!bodyResult.success) {
+      reply.code(400).send({ error: 'Invalid crew request payload', details: bodyResult.error.flatten() });
+      return;
+    }
+
+    const account = await requireActiveRole(request, reply, {});
+    if (!account) {
+      return;
+    }
+
+    const role = resolveHubRole(account.role ?? null);
+    if (role !== 'manager') {
+      reply.code(403).send({ error: 'Only managers can request crew assignment' });
+      return;
+    }
+
+    const managerCode = account.cksCode ?? null;
+    if (!managerCode) {
+      reply.code(400).send({ error: 'No CKS code associated with the current user' });
+      return;
+    }
+
+    try {
+      const order = await requestCrewAssignment(
+        paramsResult.data.orderId,
+        managerCode,
+        bodyResult.data.crewCodes,
+        bodyResult.data.message
+      );
+      reply.send({ data: order });
+    } catch (error) {
+      request.log.error({ err: error }, 'Failed to request crew assignment');
+      reply.code(400).send({ error: error instanceof Error ? error.message : 'Failed to request crew assignment' });
+    }
+  });
+
+  // POST /api/orders/:orderId/crew-response - Crew respond to assignment request (crew only)
+  server.post('/api/orders/:orderId/crew-response', async (request, reply) => {
+    const paramsResult = actionParamsSchema.safeParse(request.params);
+    if (!paramsResult.success) {
+      reply.code(400).send({ error: 'Invalid order identifier' });
+      return;
+    }
+
+    const bodySchema = z.object({
+      accept: z.boolean(),
+    });
+
+    const bodyResult = bodySchema.safeParse(request.body);
+    if (!bodyResult.success) {
+      reply.code(400).send({ error: 'Invalid crew response payload', details: bodyResult.error.flatten() });
+      return;
+    }
+
+    const account = await requireActiveRole(request, reply, {});
+    if (!account) {
+      return;
+    }
+
+    const role = resolveHubRole(account.role ?? null);
+    if (role !== 'crew') {
+      reply.code(403).send({ error: 'Only crew members can respond to crew requests' });
+      return;
+    }
+
+    const crewCode = account.cksCode ?? null;
+    if (!crewCode) {
+      reply.code(400).send({ error: 'No CKS code associated with the current user' });
+      return;
+    }
+
+    try {
+      const order = await respondToCrewRequest(
+        paramsResult.data.orderId,
+        crewCode,
+        bodyResult.data.accept
+      );
+      reply.send({ data: order });
+    } catch (error) {
+      request.log.error({ err: error }, 'Failed to respond to crew request');
+      reply.code(400).send({ error: error instanceof Error ? error.message : 'Failed to respond to crew request' });
     }
   });
 }

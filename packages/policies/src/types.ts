@@ -16,11 +16,13 @@ export type ProductOrderStatus =
 
 // Service order statuses
 export type ServiceOrderStatus =
-  | 'pending_manager'
+  | 'pending_customer'
   | 'pending_contractor'
-  | 'pending_crew'
-  | 'service_in_progress'
-  | 'service_completed'
+  | 'pending_manager'
+  | 'manager_accepted'
+  | 'crew_requested'
+  | 'crew_assigned'
+  | 'service_created'
   | 'rejected'
   | 'cancelled';
 

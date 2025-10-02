@@ -7,11 +7,13 @@ export type OrderStatus =
   | 'awaiting_delivery'
   | 'delivered'
   // Service order statuses
-  | 'pending_manager'
+  | 'pending_customer'
   | 'pending_contractor'
-  | 'pending_crew'
-  | 'service_in_progress'
-  | 'service_completed'
+  | 'pending_manager'
+  | 'manager_accepted'
+  | 'crew_requested'
+  | 'crew_assigned'
+  | 'service_created'
   // Common terminal statuses
   | 'cancelled'
   | 'rejected'
@@ -19,6 +21,9 @@ export type OrderStatus =
   | 'pending'
   | 'in-progress'
   | 'approved'
+  | 'pending_crew'
+  | 'service_in_progress'
+  | 'service_completed'
   | 'service-created';
 
 export type OrderViewerStatus =

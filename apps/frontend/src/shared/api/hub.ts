@@ -632,6 +632,7 @@ export interface OrderActionRequest {
   action: OrderActionType;
   notes?: string | null;
   transformedId?: string | null;
+  metadata?: Record<string, unknown> | null;
 }
 
 export async function applyHubOrderAction(orderId: string, payload: OrderActionRequest) {

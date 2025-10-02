@@ -26,7 +26,7 @@ import type {
   OrderType as PolicyOrderType
 } from '@cks/policies';
 
-const FINAL_STATUSES = new Set<OrderStatus>(["rejected", "cancelled", "delivered", "service_completed", "service-created"]);
+const FINAL_STATUSES = new Set<OrderStatus>(["rejected", "cancelled", "delivered", "service_created"]);
 const HUB_ROLES: readonly HubRole[] = ["manager", "contractor", "customer", "center", "crew", "warehouse"];
 const HUB_ROLE_SET = new Set<string>(HUB_ROLES);
 const ACTOR_ROLES = new Set<HubRole>(['warehouse', 'manager', 'contractor', 'crew']);
@@ -145,20 +145,25 @@ export interface OrderActionInput {
   action: OrderActionType;
   transformedId?: string | null;
   notes?: string | null;
+  metadata?: Record<string, unknown> | null; // For create-service action
 }
 
 function normalizeStatus(value: string | null | undefined): OrderStatus {
   const normalized = (value ?? "").trim().toLowerCase().replace(/_/g, '_');
   switch (normalized) {
-    // New statuses
+    // Product statuses
     case "pending_warehouse":
     case "awaiting_delivery":
     case "delivered":
-    case "pending_manager":
+    // Service statuses
+    case "pending_customer":
     case "pending_contractor":
-    case "pending_crew":
-    case "service_in_progress":
-    case "service_completed":
+    case "pending_manager":
+    case "manager_accepted":
+    case "crew_requested":
+    case "crew_assigned":
+    case "service_created":
+    // Common statuses
     case "cancelled":
     case "rejected":
       return normalized as OrderStatus;
@@ -169,8 +174,13 @@ function normalizeStatus(value: string | null | undefined): OrderStatus {
       return "awaiting_delivery";
     case "approved":
       return "pending_contractor";
+    case "pending_crew":
+      return "crew_requested";
+    case "service_in_progress":
+      return "service_created";
+    case "service_completed":
     case "service-created":
-      return "service_completed";
+      return "service_created";
     default:
       return "pending_warehouse";
   }
@@ -242,7 +252,7 @@ function viewerStatusFrom(options: {
   // Terminal statuses map directly
   if (status === 'cancelled') return 'cancelled';
   if (status === 'rejected') return 'rejected';
-  if (status === 'delivered' || status === 'service_completed') {
+  if (status === 'delivered' || status === 'service_created') {
     console.log(`[viewerStatusFrom] → Returning 'completed' for terminal status`);
     return 'completed';
   }
@@ -273,19 +283,25 @@ function viewerStatusFrom(options: {
   }
 
   // Service order flow
-  if (status === 'pending_manager' && viewerRole === 'manager') {
-    return 'pending'; // YELLOW - Manager needs to act
+  if (status === 'pending_customer' && viewerRole === 'customer') {
+    return 'pending'; // YELLOW - Customer needs to act
   }
   if (status === 'pending_contractor' && viewerRole === 'contractor') {
     return 'pending'; // YELLOW - Contractor needs to act
   }
-  if (status === 'pending_crew' && viewerRole === 'crew') {
-    return 'pending'; // YELLOW - Crew needs to act
+  if (status === 'pending_manager' && viewerRole === 'manager') {
+    return 'pending'; // YELLOW - Manager needs to act
+  }
+  if (status === 'manager_accepted' && viewerRole === 'manager') {
+    return 'pending'; // YELLOW - Manager needs to create service
+  }
+  if (status === 'crew_requested' && viewerRole === 'crew') {
+    return 'pending'; // YELLOW - Crew needs to accept/reject
   }
 
-  // Service in progress - everyone sees blue
-  if (status === 'service_in_progress') {
-    return 'in-progress';
+  // Service statuses where viewer is waiting
+  if (status === 'pending_customer' || status === 'pending_contractor' || status === 'pending_manager' || status === 'manager_accepted' || status === 'crew_requested' || status === 'crew_assigned') {
+    return 'in-progress'; // BLUE - Waiting for others
   }
 
   // Legacy status handling
@@ -328,13 +344,15 @@ function deriveFulfillmentStageStatus(
       return 'delivered';
 
     // Service order statuses
-    case 'pending_manager':
+    case 'pending_customer':
     case 'pending_contractor':
-    case 'pending_crew':
+    case 'pending_manager':
       return 'pending';
-    case 'service_in_progress':
+    case 'manager_accepted':
+    case 'crew_requested':
+    case 'crew_assigned':
       return 'accepted';
-    case 'service_completed':
+    case 'service_created':
       return 'delivered';
 
     // Common statuses
@@ -1340,8 +1358,33 @@ export async function createOrder(input: CreateOrderInput): Promise<HubOrderItem
     status = "pending_warehouse";
 
   } else {
-    nextActorRole = "manager";
-    status = "pending_manager";
+    // Service orders: initial status depends on creator role
+    // Center creates: pending_customer → pending_contractor → pending_manager → manager_accepted
+    // Customer creates: pending_contractor → pending_manager → manager_accepted
+    // Contractor creates: pending_manager → manager_accepted
+    // Manager creates: manager_accepted (no approval needed)
+    switch (input.creator.role) {
+      case 'center':
+        status = "pending_customer";
+        nextActorRole = "customer";
+        break;
+      case 'customer':
+        status = "pending_contractor";
+        nextActorRole = "contractor";
+        break;
+      case 'contractor':
+        status = "pending_manager";
+        nextActorRole = "manager";
+        break;
+      case 'manager':
+        status = "manager_accepted";
+        nextActorRole = "manager";
+        break;
+      default:
+        // Fallback for other roles (crew, warehouse, admin)
+        status = "pending_manager";
+        nextActorRole = "manager";
+    }
   }
 
   const now = new Date();
@@ -1591,16 +1634,20 @@ export async function applyOrderAction(input: OrderActionInput): Promise<HubOrde
   let nextActorRole: HubRole | null = null;
   if (newStatus === 'awaiting_delivery') {
     nextActorRole = 'warehouse';
-  } else if (newStatus === 'pending_contractor') {
-    nextActorRole = 'contractor';
-  } else if (newStatus === 'pending_crew') {
-    nextActorRole = 'crew';
-  } else if (newStatus === 'service_in_progress') {
-    nextActorRole = 'crew';
-  } else if (newStatus === 'pending_manager') {
-    nextActorRole = 'manager';
   } else if (newStatus === 'pending_warehouse') {
     nextActorRole = 'warehouse';
+  } else if (newStatus === 'pending_customer') {
+    nextActorRole = 'customer';
+  } else if (newStatus === 'pending_contractor') {
+    nextActorRole = 'contractor';
+  } else if (newStatus === 'pending_manager') {
+    nextActorRole = 'manager';
+  } else if (newStatus === 'manager_accepted') {
+    nextActorRole = 'manager';
+  } else if (newStatus === 'crew_requested') {
+    nextActorRole = 'crew';
+  } else if (newStatus === 'crew_assigned') {
+    nextActorRole = 'crew';
   }
 
   let deliveryDate: string | null = null;
@@ -1640,7 +1687,13 @@ export async function applyOrderAction(input: OrderActionInput): Promise<HubOrde
 
     case "create-service":
       transformedId = input.transformedId ?? `SVC-${Date.now()}`;
-      serviceStartDate = new Date().toISOString();
+      // Use the startDate from metadata if provided, otherwise use current time
+      if (input.metadata && typeof input.metadata.startDate === 'string' && typeof input.metadata.startTime === 'string') {
+        const startDateTime = new Date(`${input.metadata.startDate}T${input.metadata.startTime}`);
+        serviceStartDate = startDateTime.toISOString();
+      } else {
+        serviceStartDate = new Date().toISOString();
+      }
       break;
 
     case "cancel":
@@ -1664,6 +1717,19 @@ export async function applyOrderAction(input: OrderActionInput): Promise<HubOrde
         cancelledBy: input.actorRole,
         cancelledAt: new Date().toISOString(),
       } as Record<string, unknown>;
+    } else if (input.action === "create-service" && input.metadata) {
+      // Merge service metadata (type, dates, etc.) with existing metadata
+      const currentMetadata = row.metadata || {};
+      metadataUpdate = {
+        ...currentMetadata,
+        serviceType: input.metadata.serviceType,
+        serviceStartDate: input.metadata.startDate,
+        serviceStartTime: input.metadata.startTime,
+        serviceEndDate: input.metadata.endDate,
+        serviceEndTime: input.metadata.endTime,
+        serviceNotes: input.metadata.notes,
+        serviceCreatedAt: new Date().toISOString()
+      };
     }
 
     // Do not overwrite "notes" (special instructions) on cancel or reject.
@@ -1812,4 +1878,144 @@ export async function hardDeleteOrder(orderId: string): Promise<{ success: boole
     await query('ROLLBACK');
     throw err;
   }
+}
+
+// ============================================
+// CREW REQUEST FUNCTIONS
+// ============================================
+
+export interface CrewRequest {
+  crewCode: string;
+  crewName?: string;
+  status: 'pending' | 'accepted' | 'rejected';
+  message?: string;
+  requestedAt: string;
+  respondedAt?: string;
+}
+
+export async function requestCrewAssignment(
+  orderId: string,
+  managerCode: string,
+  crewCodes: string[],
+  message?: string
+): Promise<HubOrderItem | null> {
+  // Fetch current order
+  const orderResult = await query<OrderRow>(
+    `SELECT order_id, metadata, status FROM orders WHERE order_id = $1 LIMIT 1`,
+    [orderId]
+  );
+
+  const row = orderResult.rows[0];
+  if (!row) {
+    throw new Error(`Order ${orderId} not found`);
+  }
+
+  // Verify order is at manager_accepted status
+  const currentStatus = normalizeStatus(row.status);
+  if (currentStatus !== 'manager_accepted') {
+    throw new Error(`Crew can only be requested for orders at manager_accepted status. Current status: ${currentStatus}`);
+  }
+
+  // Build crew requests
+  const currentMetadata = row.metadata || {};
+  const existingCrewRequests: CrewRequest[] = (currentMetadata as any).crewRequests || [];
+  const newCrewRequests: CrewRequest[] = crewCodes.map(crewCode => ({
+    crewCode: normalizeCodeValue(crewCode) || crewCode,
+    status: 'pending' as const,
+    message,
+    requestedAt: new Date().toISOString()
+  }));
+
+  const updatedMetadata = {
+    ...currentMetadata,
+    crewRequests: [...existingCrewRequests, ...newCrewRequests]
+  };
+
+  // Update order metadata and transition to crew_requested status
+  await query(
+    `UPDATE orders
+     SET metadata = $1::jsonb,
+         status = 'crew_requested',
+         next_actor_role = 'crew',
+         updated_at = NOW()
+     WHERE order_id = $2`,
+    [JSON.stringify(updatedMetadata), orderId]
+  );
+
+  return fetchOrderById(orderId, { viewerRole: 'manager', viewerCode: managerCode });
+}
+
+export async function respondToCrewRequest(
+  orderId: string,
+  crewCode: string,
+  accept: boolean
+): Promise<HubOrderItem | null> {
+  // Fetch current order
+  const orderResult = await query<OrderRow>(
+    `SELECT order_id, metadata, status FROM orders WHERE order_id = $1 LIMIT 1`,
+    [orderId]
+  );
+
+  const row = orderResult.rows[0];
+  if (!row) {
+    throw new Error(`Order ${orderId} not found`);
+  }
+
+  const currentStatus = normalizeStatus(row.status);
+  if (currentStatus !== 'crew_requested') {
+    throw new Error(`Crew can only respond to requests at crew_requested status. Current status: ${currentStatus}`);
+  }
+
+  // Update crew request status in metadata
+  const currentMetadata = row.metadata || {};
+  const crewRequests: CrewRequest[] = (currentMetadata as any).crewRequests || [];
+  const normalizedCrewCode = normalizeCodeValue(crewCode);
+
+  const updatedCrewRequests = crewRequests.map(req => {
+    if (req.crewCode === normalizedCrewCode && req.status === 'pending') {
+      return {
+        ...req,
+        status: accept ? ('accepted' as const) : ('rejected' as const),
+        respondedAt: new Date().toISOString()
+      };
+    }
+    return req;
+  });
+
+  const updatedMetadata = {
+    ...currentMetadata,
+    crewRequests: updatedCrewRequests
+  };
+
+  // Check if we have at least one accepted crew
+  const hasAcceptedCrew = updatedCrewRequests.some(req => req.status === 'accepted');
+
+  // If crew accepted and we have at least one acceptance, transition to crew_assigned
+  // Otherwise stay at crew_requested
+  const newStatus = hasAcceptedCrew ? 'crew_assigned' : 'crew_requested';
+
+  // If transitioning to crew_assigned, assign the first accepted crew to crew_id field
+  let crewIdUpdate = '';
+  let crewIdValue: string | null = null;
+  if (newStatus === 'crew_assigned') {
+    const firstAcceptedCrew = updatedCrewRequests.find(req => req.status === 'accepted');
+    if (firstAcceptedCrew) {
+      crewIdUpdate = ', crew_id = $3';
+      crewIdValue = firstAcceptedCrew.crewCode;
+    }
+  }
+
+  await query(
+    `UPDATE orders
+     SET metadata = $1::jsonb,
+         status = $2,
+         updated_at = NOW()
+         ${crewIdUpdate}
+     WHERE order_id = ${crewIdValue ? '$4' : '$3'}`,
+    crewIdValue
+      ? [JSON.stringify(updatedMetadata), newStatus, crewIdValue, orderId]
+      : [JSON.stringify(updatedMetadata), newStatus, orderId]
+  );
+
+  return fetchOrderById(orderId, { viewerRole: 'crew', viewerCode: crewCode });
 }

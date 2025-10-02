@@ -25,11 +25,11 @@ const VISIBLE_STATUSES: Record<OrderType, Record<HubRole, OrderStatus[]>> = {
   service: {
     admin: [], // Admin doesn't interact with orders directly
     warehouse: [], // Warehouses don't handle service orders
-    center: ['pending_manager', 'pending_contractor', 'pending_crew', 'service_in_progress', 'service_completed', 'rejected', 'cancelled'],
-    customer: ['pending_manager', 'pending_contractor', 'pending_crew', 'service_in_progress', 'service_completed', 'rejected', 'cancelled'],
-    manager: ['pending_manager', 'pending_contractor', 'pending_crew', 'service_in_progress', 'service_completed', 'rejected', 'cancelled'],
-    contractor: ['pending_contractor', 'pending_crew', 'service_in_progress', 'service_completed', 'rejected', 'cancelled'],
-    crew: ['pending_crew', 'service_in_progress', 'service_completed', 'cancelled']
+    center: ['pending_customer', 'pending_contractor', 'pending_manager', 'manager_accepted', 'crew_requested', 'crew_assigned', 'service_created', 'rejected', 'cancelled'],
+    customer: ['pending_customer', 'pending_contractor', 'pending_manager', 'manager_accepted', 'crew_requested', 'crew_assigned', 'service_created', 'rejected', 'cancelled'],
+    manager: ['pending_customer', 'pending_contractor', 'pending_manager', 'manager_accepted', 'crew_requested', 'crew_assigned', 'service_created', 'rejected', 'cancelled'],
+    contractor: ['pending_contractor', 'pending_manager', 'manager_accepted', 'crew_requested', 'crew_assigned', 'service_created', 'rejected', 'cancelled'],
+    crew: ['crew_requested', 'crew_assigned', 'service_created', 'cancelled']
   }
 };
 
@@ -66,25 +66,34 @@ const ACTIONS_BY_STATUS: Record<OrderType, Record<HubRole, Partial<Record<OrderS
     admin: {}, // Admin doesn't interact with orders
     warehouse: {},
     center: {
-      'pending_manager': [], // Creator can cancel (handled by special case)
+      'pending_customer': [], // Creator can cancel (handled by special case)
       'pending_contractor': [], // Creator can cancel (handled by special case)
-      'pending_crew': [] // Creator can cancel (handled by special case)
+      'pending_manager': [], // Creator can cancel (handled by special case)
+      'manager_accepted': [] // Only manager can act here
     },
     customer: {
-      'pending_manager': [], // Creator can cancel (handled by special case)
+      'pending_customer': ['accept', 'reject'], // Customer approves center-created orders
       'pending_contractor': [], // Creator can cancel (handled by special case)
-      'pending_crew': [] // Creator can cancel (handled by special case)
+      'pending_manager': [], // Creator can cancel (handled by special case)
+      'manager_accepted': [] // Only manager can act here
     },
     manager: {
-      'pending_manager': ['accept', 'reject'],
-      'service_in_progress': ['complete']
+      'pending_customer': [], // Watch only
+      'pending_contractor': [], // Watch only
+      'pending_manager': ['accept', 'reject'], // Manager approves
+      'manager_accepted': ['create-service'], // Manager creates service (required)
+      'crew_requested': [], // Watch crew responses
+      'crew_assigned': [] // Watch only
     },
     contractor: {
-      'pending_contractor': ['accept', 'reject']
+      'pending_contractor': ['accept', 'reject'], // Contractor approves
+      'pending_manager': [], // Creator can cancel (handled by special case)
+      'manager_accepted': [] // Only manager can act here
     },
     crew: {
-      'pending_crew': ['accept', 'reject'],
-      'service_in_progress': ['complete']
+      'crew_requested': ['accept', 'reject'], // Crew accepts/rejects assignment
+      'crew_assigned': [], // Already assigned
+      'service_created': [] // Service completed
     }
   }
 };
@@ -101,25 +110,27 @@ const TRANSITIONS: Record<OrderType, Record<OrderAction, OrderStatus>> = {
     'create-service': 'delivered' // Not used for products
   },
   service: {
-    'accept': 'pending_contractor', // Default, but depends on current status
+    'accept': 'pending_contractor', // Default, but depends on current status (see SERVICE_ACCEPT_TRANSITIONS)
     'reject': 'rejected',
     'start-delivery': 'pending_manager', // Not used for services
-    'deliver': 'service_completed', // Not used for services
-    'complete': 'service_completed',
+    'deliver': 'service_created', // Not used for services
+    'complete': 'service_created',
     'cancel': 'cancelled',
-    'create-service': 'service_completed'
+    'create-service': 'service_created' // Manager creates service → terminal state
   }
 };
 
 // Special transition logic for service accepts (depends on current status)
 const SERVICE_ACCEPT_TRANSITIONS: Record<ServiceOrderStatus, ServiceOrderStatus> = {
-  'pending_manager': 'pending_contractor',
-  'pending_contractor': 'pending_crew',
-  'pending_crew': 'service_in_progress',
-  'service_in_progress': 'service_in_progress', // No-op
-  'service_completed': 'service_completed', // No-op
-  'rejected': 'rejected', // No-op
-  'cancelled': 'cancelled' // No-op
+  'pending_customer': 'pending_contractor',      // Customer accepts → Contractor
+  'pending_contractor': 'pending_manager',       // Contractor accepts → Manager
+  'pending_manager': 'manager_accepted',         // Manager accepts → Manager can add crew/training/procedures
+  'manager_accepted': 'manager_accepted',        // No-op (manager uses create-service action)
+  'crew_requested': 'crew_assigned',             // Crew accepts assignment
+  'crew_assigned': 'crew_assigned',              // No-op
+  'service_created': 'service_created',          // No-op
+  'rejected': 'rejected',                        // No-op
+  'cancelled': 'cancelled'                       // No-op
 };
 
 // ============================================
@@ -127,11 +138,11 @@ const SERVICE_ACCEPT_TRANSITIONS: Record<ServiceOrderStatus, ServiceOrderStatus>
 // ============================================
 
 export function isFinalStatus(status: OrderStatus): boolean {
-  return ['delivered', 'service_completed', 'rejected', 'cancelled'].includes(status);
+  return ['delivered', 'service_created', 'rejected', 'cancelled'].includes(status);
 }
 
 export function isCompletedStatus(status: OrderStatus): boolean {
-  return ['delivered', 'service_completed'].includes(status);
+  return ['delivered', 'service_created'].includes(status);
 }
 
 // ============================================
@@ -219,13 +230,15 @@ export function getActionLabel(action: OrderAction): string {
 export function getStatusLabel(status: OrderStatus): string {
   const labels: Record<OrderStatus, string> = {
     'pending_warehouse': 'Pending Warehouse',
-    'pending_manager': 'Pending Manager',
+    'pending_customer': 'Pending Customer',
     'pending_contractor': 'Pending Contractor',
-    'pending_crew': 'Pending Crew',
+    'pending_manager': 'Pending Manager',
+    'manager_accepted': 'Manager Accepted',
+    'crew_requested': 'Crew Requested',
+    'crew_assigned': 'Crew Assigned',
     'awaiting_delivery': 'Awaiting Delivery',
-    'service_in_progress': 'Service In Progress',
     'delivered': 'Completed',
-    'service_completed': 'Completed',
+    'service_created': 'Completed',
     'rejected': 'Rejected',
     'cancelled': 'Cancelled'
   };
@@ -237,7 +250,8 @@ export function getStatusColor(status: OrderStatus): string {
   if (status === 'rejected') return 'red';
   if (status === 'cancelled') return 'gray';
   if (status.startsWith('pending_')) return 'yellow';
-  if (status === 'awaiting_delivery' || status === 'service_in_progress') return 'blue';
+  if (status === 'awaiting_delivery') return 'blue';
+  if (status === 'manager_accepted' || status === 'crew_requested' || status === 'crew_assigned') return 'blue';
   return 'gray';
 }
 

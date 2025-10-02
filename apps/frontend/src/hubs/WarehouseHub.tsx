@@ -128,6 +128,12 @@ function normalizeOrderStatus(value?: string | null): HubOrderItem['status'] {
     case 'delivered':
     case 'completed':
     case 'archived':
+    case 'pending-customer':
+    case 'pending-contractor':
+    case 'pending-manager':
+    case 'manager-accepted':
+    case 'crew-requested':
+    case 'crew-assigned':
     case 'service-created':
       return normalized;
     default:
