@@ -86,8 +86,8 @@ const OrderCard: React.FC<OrderCardProps> = ({
       default:
         baseClass = styles.statusGray;
     }
-    // Add pulsing class only for the current pending stage
-    if (isPulsing && status === 'pending') {
+    // Add pulsing class for pending or accepted (in-progress) stages
+    if (isPulsing && (status === 'pending' || status === 'accepted')) {
       return `${baseClass} ${styles.pulsingStage}`;
     }
     return baseClass;
@@ -262,12 +262,6 @@ const OrderCard: React.FC<OrderCardProps> = ({
                     <span className={styles.detailValue}>{requestedBy}</span>
                   </div>
                 )}
-                {expectedDate && (
-                  <div className={styles.detailItem}>
-                    <span className={styles.detailLabel}>Requested</span>
-                    <span className={styles.detailValue}>{expectedDate}</span>
-                  </div>
-                )}
                 {serviceStartDate && status === 'service-created' && (
                   <div className={styles.detailItem}>
                     <span className={styles.detailLabel}>Service Started</span>
@@ -288,22 +282,28 @@ const OrderCard: React.FC<OrderCardProps> = ({
               <div className={styles.approvalWorkflow}>
                 <h4 className={styles.workflowTitle}>Approval Workflow</h4>
                 <div className={styles.workflowStages}>
-                  {approvalStages.map((stage, index) => (
-                    <div key={index} className={styles.stageContainer}>
-                      <div className={`${styles.stage} ${getStatusColor(stage.status, true, index === approvalStages.length - 1)}`}>
-                        <div className={styles.stageRole}>{stage.role}</div>
-                        <div className={styles.stageStatus}>
-                          {(stage as any).label || stage.status.replace('-', ' ')}
+                  {approvalStages.map((stage, index) => {
+                    // Pulse the first pending stage OR any accepted stage that's the last stage
+                    const firstPendingIndex = approvalStages.findIndex(s => s.status === 'pending');
+                    const shouldPulse = (index === firstPendingIndex) || (stage.status === 'accepted' && index === approvalStages.length - 1);
+
+                    return (
+                      <div key={index} className={styles.stageContainer}>
+                        <div className={`${styles.stage} ${getStatusColor(stage.status, shouldPulse, index === approvalStages.length - 1)}`}>
+                          <div className={styles.stageRole}>{stage.role}</div>
+                          <div className={styles.stageStatus}>
+                            {(stage as any).label || stage.status.replace('-', ' ')}
+                          </div>
+                          {stage.user && (
+                            <div className={styles.stageUser}>{stage.user}</div>
+                          )}
                         </div>
-                        {stage.user && (
-                          <div className={styles.stageUser}>{stage.user}</div>
+                        {index < approvalStages.length - 1 && (
+                          <div className={styles.stageArrow}>→</div>
                         )}
                       </div>
-                      {index < approvalStages.length - 1 && (
-                        <div className={styles.stageArrow}>→</div>
-                      )}
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -378,16 +378,16 @@ const OrderCard: React.FC<OrderCardProps> = ({
             <h4 className={styles.workflowTitle}>Approval Workflow</h4>
             <div className={styles.workflowStages}>
               {approvalStages.map((stage, index) => {
-                // Find the first pending/accepted stage to apply pulsing (not waiting)
+                // Pulse the first pending stage OR any accepted stage that's the last stage
                 const firstPendingIndex = approvalStages.findIndex(s => s.status === 'pending');
-                const shouldPulse = index === firstPendingIndex;
+                const shouldPulse = (index === firstPendingIndex) || (stage.status === 'accepted' && index === approvalStages.length - 1);
 
                 return (
                   <div key={index} className={styles.stageContainer}>
                     <div className={`${styles.stage} ${getStatusColor(stage.status, shouldPulse, index === approvalStages.length - 1)}`}>
                       <div className={styles.stageRole}>{stage.role}</div>
                       <div className={styles.stageStatus}>
-                        {stage.status.replace('-', ' ')}
+                        {(stage as any).label || stage.status.replace('-', ' ')}
                       </div>
                       {stage.user && (
                         <div className={styles.stageUser}>{stage.user}</div>

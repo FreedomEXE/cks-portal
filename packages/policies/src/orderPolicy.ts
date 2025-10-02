@@ -42,23 +42,23 @@ const ACTIONS_BY_STATUS: Record<OrderType, Record<HubRole, Partial<Record<OrderS
       'awaiting_delivery': ['start-delivery', 'deliver']
     },
     center: {
-      'pending_warehouse': ['cancel'],
+      'pending_warehouse': [], // Creator can cancel (handled by special case below)
       'awaiting_delivery': [] // Can only watch after warehouse accepts
     },
     customer: {
-      'pending_warehouse': ['cancel'],
+      'pending_warehouse': [], // Creator can cancel (handled by special case below)
       'awaiting_delivery': [] // Can only watch after warehouse accepts
     },
     manager: {
-      'pending_warehouse': ['cancel'],
+      'pending_warehouse': [], // Creator can cancel (handled by special case below)
       'awaiting_delivery': [] // Can only watch after warehouse accepts
     },
     contractor: {
-      'pending_warehouse': ['cancel'],
+      'pending_warehouse': [], // Creator can cancel (handled by special case below)
       'awaiting_delivery': [] // Can only watch after warehouse accepts
     },
     crew: {
-      'pending_warehouse': ['cancel'],
+      'pending_warehouse': [], // Creator can cancel (handled by special case below)
       'awaiting_delivery': [] // Can only watch after warehouse accepts
     }
   },
@@ -66,11 +66,15 @@ const ACTIONS_BY_STATUS: Record<OrderType, Record<HubRole, Partial<Record<OrderS
     admin: {}, // Admin doesn't interact with orders
     warehouse: {},
     center: {
-      'pending_manager': ['cancel'],
-      'pending_contractor': ['cancel'],
-      'pending_crew': ['cancel']
+      'pending_manager': [], // Creator can cancel (handled by special case)
+      'pending_contractor': [], // Creator can cancel (handled by special case)
+      'pending_crew': [] // Creator can cancel (handled by special case)
     },
-    customer: {},
+    customer: {
+      'pending_manager': [], // Creator can cancel (handled by special case)
+      'pending_contractor': [], // Creator can cancel (handled by special case)
+      'pending_crew': [] // Creator can cancel (handled by special case)
+    },
     manager: {
       'pending_manager': ['accept', 'reject'],
       'service_in_progress': ['complete']

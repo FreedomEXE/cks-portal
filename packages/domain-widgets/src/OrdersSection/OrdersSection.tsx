@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { Button, OrderCard, TabSection } from '@cks/ui';
 import styles from './OrdersSection.module.css';
 
@@ -29,6 +29,7 @@ interface Order {
 
 interface OrdersSectionProps {
   userRole: 'admin' | 'manager' | 'contractor' | 'customer' | 'center' | 'crew' | 'warehouse';
+  userCode?: string;  // User's CKS code (e.g., "CON-010", "MGR-012")
   serviceOrders?: Order[];
   productOrders?: Order[];
   onCreateServiceOrder?: () => void;
@@ -42,6 +43,7 @@ interface OrdersSectionProps {
 
 const OrdersSection: React.FC<OrdersSectionProps> = ({
   userRole,
+  userCode,
   serviceOrders = [],
   productOrders = [],
   onCreateServiceOrder,
@@ -54,9 +56,14 @@ const OrdersSection: React.FC<OrdersSectionProps> = ({
 }) => {
   // Determine initial tab based on what's available
   const getInitialTab = () => {
-    if (showServiceOrders) return 'service';
-    if (showProductOrders) return 'product';
-    return 'archive';
+    // Warehouse doesn't have "All Orders", so default to service/product
+    if (userRole === 'warehouse') {
+      if (showServiceOrders) return 'service';
+      if (showProductOrders) return 'product';
+      return 'archive';
+    }
+    // Everyone else defaults to "All Orders"
+    return 'all';
   };
 
   const [activeOrderTab, setActiveOrderTab] = useState(getInitialTab());
@@ -65,22 +72,49 @@ const OrdersSection: React.FC<OrdersSectionProps> = ({
   // Combine all orders for counting
   const allOrders = [...serviceOrders, ...productOrders];
 
+  // Helper to check if user is directly involved in an order
+  const isDirectlyInvolved = useCallback((order: Order): boolean => {
+    // Check if user is creator (requestedBy starts with userCode like "MGR-012" or "MGR-012 - Name")
+    if (userCode && order.requestedBy) {
+      if (order.requestedBy.startsWith(userCode)) {
+        return true;
+      }
+    }
+
+    // Warehouse is always involved in product orders (they're the fulfillment role)
+    if (userRole === 'warehouse' && order.orderType === 'product') {
+      return true;
+    }
+
+    // Check if user has actions beyond just "View Details"
+    const actions = order.availableActions || [];
+    const hasActions = actions.some(action => action !== 'View Details');
+    return hasActions;
+  }, [userCode, userRole]);
+
   // Count orders by type and status
-  const serviceOrdersCount = serviceOrders.filter(o =>
+  const allOrdersCount = allOrders.filter(o =>
     ['pending', 'in-progress', 'approved'].includes(o.status)  // Active orders
+  ).length;
+
+  // For type-specific tabs, count only directly involved orders
+  const serviceOrdersCount = serviceOrders.filter(o =>
+    ['pending', 'in-progress', 'approved'].includes(o.status) && isDirectlyInvolved(o)
   ).length;
 
   const productOrdersCount = productOrders.filter(o =>
-    ['pending', 'in-progress', 'approved'].includes(o.status)  // Active orders
+    ['pending', 'in-progress', 'approved'].includes(o.status) && isDirectlyInvolved(o)
   ).length;
 
   const archiveCount = allOrders.filter(o =>
-    ['cancelled', 'rejected', 'delivered', 'service-created'].includes(o.status)  // Only truly completed/terminated orders
+    ['cancelled', 'rejected', 'delivered', 'completed', 'archived', 'service-created'].includes(o.status)  // Only truly completed/terminated orders
   ).length;
 
   // Get tab description based on user role and active tab
   const getTabDescription = () => {
-    if (activeOrderTab === 'service') {
+    if (activeOrderTab === 'all') {
+      return 'All orders visible to you based on your role and permissions';
+    } else if (activeOrderTab === 'service') {
       switch (userRole) {
         case 'manager':
           return 'Service orders requiring your approval or assignment';
@@ -127,7 +161,7 @@ const OrdersSection: React.FC<OrdersSectionProps> = ({
 
     // Filter by tab status
     if (tabType === 'archive') {
-      return filtered.filter(o => ['cancelled', 'rejected', 'delivered', 'service-created'].includes(o.status));  // Only truly completed
+      return filtered.filter(o => ['cancelled', 'rejected', 'delivered', 'completed', 'archived', 'service-created'].includes(o.status));  // Only truly completed
     } else {
       // Non-archive tabs show active orders
       return filtered.filter(o => ['pending', 'in-progress', 'approved'].includes(o.status));
@@ -135,20 +169,37 @@ const OrdersSection: React.FC<OrdersSectionProps> = ({
   };
 
   const getDisplayOrders = useMemo(() => {
-    if (activeOrderTab === 'service') {
-      return filterOrders(serviceOrders, activeOrderTab);
+    if (activeOrderTab === 'all') {
+      // All Orders tab shows both product and service orders from entire ecosystem
+      return filterOrders(allOrders, activeOrderTab);
+    } else if (activeOrderTab === 'service') {
+      // Service Orders tab shows only orders where user is directly involved
+      const involved = serviceOrders.filter(isDirectlyInvolved);
+      return filterOrders(involved, activeOrderTab);
     } else if (activeOrderTab === 'product') {
-      return filterOrders(productOrders, activeOrderTab);
+      // Product Orders tab shows only orders where user is directly involved
+      const involved = productOrders.filter(isDirectlyInvolved);
+      return filterOrders(involved, activeOrderTab);
     } else {
       // Archive tab shows all completed/cancelled orders
       return filterOrders(allOrders, 'archive');
     }
-  }, [activeOrderTab, serviceOrders, productOrders, allOrders, searchQuery]);
+  }, [activeOrderTab, serviceOrders, productOrders, allOrders, searchQuery, userCode]);
 
   const getOrderActions = (order: Order): string[] => {
     // Use actions from backend policy if available
     if (order.availableActions && order.availableActions.length > 0) {
-      return order.availableActions;
+      // Filter out delivery actions for warehouse in Orders section (those belong in Deliveries section)
+      let actions = [...order.availableActions];
+      if (userRole === 'warehouse' && order.orderType === 'product') {
+        actions = actions.filter(action => action !== 'Start Delivery' && action !== 'Mark Delivered');
+      }
+
+      // Always ensure "View Details" is included
+      if (!actions.includes('View Details')) {
+        actions.push('View Details');
+      }
+      return actions;
     }
 
     // Fallback to legacy logic if no policy actions available
@@ -206,9 +257,8 @@ const OrdersSection: React.FC<OrdersSectionProps> = ({
         if (order.orderType === 'product') {
           if (order.status === 'pending') {
             actions.push('Accept', 'Deny');
-          } else if (order.status === 'in-progress') {
-            actions.push('Mark Delivered');
           } else {
+            // After accept, no actions in Orders section (delivery actions moved to Deliveries section)
             actions.push('View Details');
           }
         } else if (order.orderType === 'service' && order.status === 'pending') {
@@ -287,6 +337,12 @@ const OrdersSection: React.FC<OrdersSectionProps> = ({
 
   // Build tabs array based on what should be shown
   const orderTabs = [];
+
+  // Show "All Orders" tab first (except for warehouse)
+  if (userRole !== 'warehouse') {
+    orderTabs.push({ id: 'all', label: 'All Orders', count: allOrdersCount });
+  }
+
   if (showServiceOrders) {
     orderTabs.push({ id: 'service', label: 'Service Orders', count: serviceOrdersCount });
   }
@@ -342,7 +398,9 @@ const OrdersSection: React.FC<OrdersSectionProps> = ({
         }}
         description={getTabDescription()}
         searchPlaceholder={
-          activeOrderTab === 'archive'
+          activeOrderTab === 'all'
+            ? 'Search all orders...'
+            : activeOrderTab === 'archive'
             ? 'Search archived orders...'
             : `Search ${activeOrderTab} orders...`
         }

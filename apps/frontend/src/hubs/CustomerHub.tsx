@@ -26,7 +26,7 @@ import {
   type Activity,
   type TreeNode,
 } from '@cks/domain-widgets';
-import { Button, DataTable, PageHeader, PageWrapper, Scrollbar, TabSection } from '@cks/ui';
+import { Button, DataTable, OrderDetailsModal, PageHeader, PageWrapper, Scrollbar, TabSection } from '@cks/ui';
 import { useAuth } from '@cks/auth';
 
 import MyHubSection from '../components/MyHubSection';
@@ -123,6 +123,8 @@ function normalizeOrderStatus(value?: string | null): HubOrderItem['status'] {
     case 'rejected':
     case 'cancelled':
     case 'delivered':
+    case 'completed':
+    case 'archived':
     case 'service-created':
       return normalized;
     default:
@@ -157,6 +159,7 @@ export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubPro
   const [activeTab, setActiveTab] = useState(initialTab);
   const [servicesTab, setServicesTab] = useState<'my' | 'history'>('my');
   const [servicesSearchQuery, setServicesSearchQuery] = useState('');
+  const [selectedOrderForDetails, setSelectedOrderForDetails] = useState<HubOrderItem | null>(null);
 
   const { code: authCode } = useAuth();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
@@ -215,7 +218,7 @@ export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubPro
     return orders.serviceOrders.map((order) => ({
       ...order,
       title: order.title ?? order.serviceId ?? order.orderId,
-      status: normalizeOrderStatus(order.status),
+      status: normalizeOrderStatus(order.viewerStatus ?? order.status),
     }));
   }, [orders]);
 
@@ -226,7 +229,7 @@ export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubPro
     return orders.productOrders.map((order) => ({
       ...order,
       title: order.title ?? order.orderId,
-      status: normalizeOrderStatus(order.status),
+      status: normalizeOrderStatus(order.viewerStatus ?? order.status),
     }));
   }, [orders]);
 
@@ -554,11 +557,20 @@ export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubPro
               )}
               <OrdersSection
                 userRole="customer"
+                userCode={normalizedCode ?? undefined}
                 serviceOrders={serviceOrders}
                 productOrders={productOrders}
                 onCreateServiceOrder={() => navigate('/catalog')}
                 onCreateProductOrder={() => navigate('/catalog')}
-                onOrderAction={() => undefined}
+                onOrderAction={(orderId, action) => {
+                  if (action === 'View Details') {
+                    const target = orders?.orders?.find((o: any) => (o.orderId || o.id) === orderId) || null;
+                    if (target) {
+                      setSelectedOrderForDetails(target);
+                    }
+                    return;
+                  }
+                }}
                 showServiceOrders={true}
                 showProductOrders={true}
                 primaryColor="#eab308"
@@ -587,6 +599,55 @@ export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubPro
           )}
         </div>
       </Scrollbar>
+
+      {/* Order Details Modal */}
+      <OrderDetailsModal
+        isOpen={!!selectedOrderForDetails}
+        onClose={() => setSelectedOrderForDetails(null)}
+        order={selectedOrderForDetails ? {
+          orderId: selectedOrderForDetails.orderId,
+          orderType: selectedOrderForDetails.orderType,
+          title: selectedOrderForDetails.title || null,
+          requestedBy: selectedOrderForDetails.requestedBy || selectedOrderForDetails.centerId || selectedOrderForDetails.customerId || null,
+          destination: selectedOrderForDetails.destination || selectedOrderForDetails.centerId || null,
+          requestedDate: selectedOrderForDetails.requestedDate || null,
+          status: (selectedOrderForDetails as any).status || null,
+          notes: selectedOrderForDetails.notes || null,
+          items: selectedOrderForDetails.items || [],
+        } : null}
+        availability={(() => {
+          const meta = (selectedOrderForDetails as any)?.metadata as any;
+          const av = meta?.availability;
+          if (!av) return null;
+          const days = Array.isArray(av.days) ? av.days : [];
+          const window = av.window && av.window.start && av.window.end ? av.window : null;
+          return { tz: av.tz ?? null, days, window };
+        })()}
+        cancellationReason={(selectedOrderForDetails as any)?.metadata?.cancellationReason || null}
+        cancelledBy={(selectedOrderForDetails as any)?.metadata?.cancelledBy || null}
+        cancelledAt={(selectedOrderForDetails as any)?.metadata?.cancelledAt || null}
+        rejectionReason={(selectedOrderForDetails as any)?.rejectionReason || (selectedOrderForDetails as any)?.metadata?.rejectionReason || null}
+        requestorInfo={
+          selectedOrderForDetails
+            ? {
+                name: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const req = meta?.contacts?.requestor || {}; return (req.name || null); })(),
+                address: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const req = meta?.contacts?.requestor || {}; return (req.address || null); })(),
+                phone: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const req = meta?.contacts?.requestor || {}; return (req.phone || null); })(),
+                email: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const req = meta?.contacts?.requestor || {}; return (req.email || null); })(),
+              }
+            : null
+        }
+        destinationInfo={
+          selectedOrderForDetails
+            ? {
+                name: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const dest = meta?.contacts?.destination || {}; return (dest.name || null); })(),
+                address: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const dest = meta?.contacts?.destination || {}; return (dest.address || null); })(),
+                phone: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const dest = meta?.contacts?.destination || {}; return (dest.phone || null); })(),
+                email: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const dest = meta?.contacts?.destination || {}; return (dest.email || null); })(),
+              }
+            : null
+        }
+      />
     </div>
   );
 }

@@ -298,10 +298,116 @@ Each tab displays:
 4. **Type Safety**: Keep `OrderStatus`, `OrderViewerStatus`, and `ApprovalStage.status` as separate types
 5. **Archive Logic**: Orders with final states (delivered, service-created, rejected, cancelled) go to Archive tab
 
+## Warehouse Delivery Workflow
+
+### Product Order Delivery States
+
+#### Stage 1: Warehouse Accepts Order
+**Order State:**
+- Canonical Status: `pending_warehouse` → `awaiting_delivery`
+- Warehouse viewerStatus: `approved`
+- Creator viewerStatus: `in-progress`
+
+**Actions Available:**
+- Warehouse: Start Delivery, View Details
+
+**Workflow Display:**
+```
+Creator (✓ requested/green) → Warehouse (⏳ accepted/yellow PULSING)
+```
+
+#### Stage 2: Delivery Started
+**Order State:**
+- Canonical Status: `awaiting_delivery`
+- Metadata: `{ deliveryStarted: true }`
+- Warehouse viewerStatus: `approved`
+
+**Actions Available:**
+- Warehouse: Mark Delivered, View Details
+
+**Workflow Display:**
+```
+Creator (✓ requested/green) → Warehouse (🚚 out for delivery/yellow PULSING)
+```
+
+#### Stage 3: Delivered
+**Order State:**
+- Canonical Status: `delivered`
+- All viewerStatus: `completed`
+- deliveryDate: timestamp set
+- Inventory decreased automatically
+
+**Actions Available:**
+- All users: View Details only
+
+**Workflow Display:**
+```
+Creator (✓ requested/green) → Warehouse (✓ delivered/green)
+```
+
+### Deliveries Section UI (Warehouse Only)
+
+The Deliveries section in WarehouseHub provides dedicated delivery management separate from the Orders section.
+
+**Pending Deliveries Tab:**
+- Shows: Orders with canonical status `pending_warehouse` or `awaiting_delivery`
+- Action Buttons:
+  - Before delivery starts: "Start Delivery"
+  - After delivery starts: "Mark Delivered"
+- Columns: DELIVERY ID, ITEM, DESTINATION, STATUS, SCHEDULED DATE, ACTIONS
+
+**Completed Deliveries Tab:**
+- Shows: Orders with canonical status `delivered`
+- Read-only view with completion details
+- Columns: DELIVERY ID, ITEM, DESTINATION, STATUS, SCHEDULED DATE, COMPLETED DATE
+
+### Inventory Impact
+
+When marking order as delivered via "Mark Delivered" action:
+
+1. **Query Order Items**: Retrieve all items in order from `order_items` table
+2. **Get Warehouse**: Identify assigned warehouse from order
+3. **Decrease Inventory**: For each item at assigned warehouse:
+   - Decrease `quantity_on_hand` in `inventory_items` by order quantity
+   - Update occurs automatically in same transaction as status change
+4. **Update Order**:
+   - Set `deliveryDate` timestamp to current time
+   - Change canonical status to `delivered`
+   - Archive order for all users
+5. **Notify Users**: All users see order in Archive tab with "completed" viewer status
+
+### Orders vs Deliveries Separation
+
+**Orders Section (Warehouse):**
+- Shows pending product orders requiring accept/reject decision
+- Actions: Accept, Deny (for pending), View Details (for accepted)
+- NO delivery actions shown here
+
+**Deliveries Section (Warehouse):**
+- Shows accepted orders requiring delivery fulfillment
+- Actions: Start Delivery, Mark Delivered
+- Delivery workflow managed here exclusively
+
+This separation ensures warehouse users have clear action contexts:
+- Orders = Decision to accept/reject
+- Deliveries = Physical fulfillment process
+
 ---
 
-*Last Updated: 2025-09-29*
-*Version: 2.1 - Progress update*
+*Last Updated: 2025-10-02*
+*Version: 2.2 - Warehouse delivery workflow*
+
+## Progress Update (2025-10-02)
+
+- Warehouse delivery workflow complete: Start Delivery → Mark Delivered → Archive
+- Delivery actions (start-delivery, deliver) added to policy for warehouse role at awaiting_delivery status
+- Inventory automatically decreased when order marked as delivered
+- deliveryStarted metadata flag tracks delivery state for UI button display
+- Status normalization fixed across all 6 hub files to recognize 'completed' and 'archived' viewer statuses
+- Archive filtering updated to include 'completed' and 'archived' statuses
+- Orders section filters out delivery actions for warehouse product orders
+- Deliveries section uses canonical status for filtering, viewer status for display
+- Cross-user consistency: All users see delivered orders correctly in Archive with proper status
 
 ## Progress Update (2025-09-29)
 

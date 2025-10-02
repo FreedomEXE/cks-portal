@@ -51,7 +51,13 @@
       "Bash(PORT=4000 pnpm tsx watch -r dotenv/config server/index.ts)",
       "Bash(timeout:*)",
       "Bash(git checkout:*)",
-      "Read(//c/Users/User/AppData/Roaming/Code/User/History/**)"
+      "Read(//c/Users/User/AppData/Roaming/Code/User/History/**)",
+      "Bash(for file in CenterHub.tsx CustomerHub.tsx CrewHub.tsx WarehouseHub.tsx)",
+      "Bash(do echo \"=== $file ===\")",
+      "Bash(grep:*)",
+      "Bash(npx vite:*)",
+      "Bash(for file in CenterHub.tsx ContractorHub.tsx CrewHub.tsx CustomerHub.tsx ManagerHub.tsx)",
+      "Bash(do sed -i \"s/case ''service-created'':/case ''completed'':\\n    case ''archived'':\\n    case ''service-created'':/\" \"$file\")"
     ],
     "deny": [],
     "ask": []

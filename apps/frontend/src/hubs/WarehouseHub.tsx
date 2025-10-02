@@ -24,7 +24,7 @@ import {
   SupportSection,
   type Activity,
 } from '@cks/domain-widgets';
-import { DataTable, PageHeader, PageWrapper, Scrollbar, TabSection } from '@cks/ui';
+import { DataTable, OrderDetailsModal, PageHeader, PageWrapper, Scrollbar, TabSection } from '@cks/ui';
 import { useAuth } from '@cks/auth';
 import { getAllowedActions, getActionLabel } from '@cks/policies';
 
@@ -47,6 +47,7 @@ const ACTION_LABEL_MAP: Record<string, OrderActionType> = {
   Approve: 'accept',
   Deny: 'reject',
   Reject: 'reject',
+  'Start Delivery': 'start-delivery',
   'Mark Delivered': 'deliver',
   'Create Service': 'create-service',
 };
@@ -68,7 +69,8 @@ function normalizeStatusValue(value?: string | null) {
   if (!value) {
     return 'pending';
   }
-  return value.trim().toLowerCase().replace(/\s+/g, '-');
+  // Normalize both spaces and underscores to hyphens for consistent matching
+  return value.trim().toLowerCase().replace(/[\s_]+/g, '-');
 }
 
 
@@ -124,6 +126,8 @@ function normalizeOrderStatus(value?: string | null): HubOrderItem['status'] {
     case 'rejected':
     case 'cancelled':
     case 'delivered':
+    case 'completed':
+    case 'archived':
     case 'service-created':
       return normalized;
     default:
@@ -164,6 +168,7 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
   const [inventorySearchQuery, setInventorySearchQuery] = useState('');
   const [inventoryFilter, setInventoryFilter] = useState<string>('');
   const [pendingAction, setPendingAction] = useState<{ orderId: string; action: OrderActionType } | null>(null);
+  const [selectedOrderForDetails, setSelectedOrderForDetails] = useState<HubOrderItem | null>(null);
 
   const { code: authCode } = useAuth();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
@@ -222,7 +227,7 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
     return orders.serviceOrders.map((order) => ({
       ...order,
       title: order.title ?? order.serviceId ?? order.orderId,
-      status: normalizeOrderStatus(order.status),
+      status: normalizeOrderStatus(order.viewerStatus ?? order.status),
     }));
   }, [orders]);
 
@@ -233,7 +238,9 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
     const mapped = orders.productOrders.map((order) => ({
       ...order,
       title: order.title ?? order.orderId,
-      status: normalizeOrderStatus(order.status),
+      // Keep both: canonical status for deliveries filtering, viewer status for Orders section display
+      canonicalStatus: order.status,
+      status: normalizeOrderStatus(order.viewerStatus ?? order.status),
     }));
     console.log('[WAREHOUSE] Product orders after mapping:', mapped);
     return mapped;
@@ -251,29 +258,54 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
 
 
   const { pendingDeliveries, completedDeliveries } = useMemo(() => {
-    const pending: Array<{ deliveryId: string; itemName: string; destination: string; status: string; scheduledDate: string }>
-      = [];
-    const completed: Array<{ deliveryId: string; itemName: string; destination: string; status: string; scheduledDate: string; completedDate: string }>
-      = [];
+    const pending: Array<{
+      deliveryId: string;
+      itemName: string;
+      destination: string;
+      status: string;
+      scheduledDate: string;
+      order: HubOrderItem;
+      canonicalStatus: string;
+    }> = [];
+    const completed: Array<{
+      deliveryId: string;
+      itemName: string;
+      destination: string;
+      status: string;
+      scheduledDate: string;
+      completedDate: string;
+      order: HubOrderItem;
+    }> = [];
 
     productOrders.forEach((order) => {
-      const normalizedStatus = normalizeStatusValue(order.status);
+      // Use canonicalStatus from backend for filtering (delivered, awaiting_delivery, etc)
+      const canonical = (order as any).canonicalStatus ?? order.status;
+      const normalizedStatus = normalizeStatusValue(canonical);
+      console.log(`[DELIVERIES] Processing order ${order.orderId}: canonical="${canonical}", normalized="${normalizedStatus}"`);
+
       const base = {
         deliveryId: order.orderId,
         itemName: order.title ?? order.orderId,
         destination: order.destination ?? 'Warehouse',
-        status: formatStatusLabel(order.status),
+        status: formatStatusLabel(canonical),
         scheduledDate: formatDisplayDate(order.requestedDate),
-        completedDate: formatDisplayDate(order.expectedDate),
+        completedDate: formatDisplayDate(order.deliveryDate ?? order.expectedDate),
+        order: order,
+        canonicalStatus: canonical,
       };
 
-      if (normalizedStatus === 'delivered' || normalizedStatus === 'completed') {
+      if (normalizedStatus === 'delivered') {
+        console.log(`[DELIVERIES] → Adding to COMPLETED deliveries`);
         completed.push(base);
-      } else if (normalizedStatus === 'pending' || normalizedStatus === 'in-progress' || normalizedStatus === 'approved') {
+      } else if (normalizedStatus === 'pending-warehouse' || normalizedStatus === 'awaiting-delivery') {
+        console.log(`[DELIVERIES] → Adding to PENDING deliveries`);
         pending.push(base);
+      } else {
+        console.log(`[DELIVERIES] → NOT adding to deliveries (status: ${normalizedStatus})`);
       }
     });
 
+    console.log(`[DELIVERIES] Final counts: ${pending.length} pending, ${completed.length} completed`);
     return { pendingDeliveries: pending, completedDeliveries: completed };
   }, [productOrders]);
 
@@ -377,6 +409,14 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
 
   const handleOrderAction = async (orderId: string, actionLabel: string) => {
     console.log('[WAREHOUSE] Order action triggered:', { orderId, actionLabel });
+
+    if (actionLabel === 'View Details') {
+      const target = orders?.orders?.find((o: any) => (o.orderId || o.id) === orderId) || null;
+      if (target) {
+        setSelectedOrderForDetails(target);
+      }
+      return;
+    }
 
     const mapped = ACTION_LABEL_MAP[actionLabel];
     if (!mapped) {
@@ -643,6 +683,57 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
                         },
                       },
                       { key: 'scheduledDate', label: 'SCHEDULED DATE' },
+                      {
+                        key: 'actions',
+                        label: 'ACTIONS',
+                        render: (_value: string, row: any) => {
+                          const deliveryStarted = row.order?.metadata?.deliveryStarted === true;
+
+                          return (
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                              {!deliveryStarted ? (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleOrderAction(row.order.orderId, 'Start Delivery');
+                                  }}
+                                  style={{
+                                    padding: '6px 12px',
+                                    borderRadius: '4px',
+                                    fontSize: '12px',
+                                    fontWeight: 500,
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    backgroundColor: '#3b82f6',
+                                    color: 'white',
+                                  }}
+                                >
+                                  Start Delivery
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleOrderAction(row.order.orderId, 'Mark Delivered');
+                                  }}
+                                  style={{
+                                    padding: '6px 12px',
+                                    borderRadius: '4px',
+                                    fontSize: '12px',
+                                    fontWeight: 500,
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    backgroundColor: '#10b981',
+                                    color: 'white',
+                                  }}
+                                >
+                                  Mark Delivered
+                                </button>
+                              )}
+                            </div>
+                          );
+                        },
+                      },
                     ]}
                     data={pendingDeliveries.filter((row) => {
                       if (!deliveriesSearchQuery) {
@@ -835,6 +926,7 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
               )}
               <OrdersSection
                 userRole="warehouse"
+                userCode={normalizedCode ?? undefined}
                 serviceOrders={serviceOrders}
                 productOrders={productOrders}
                 onOrderAction={handleOrderAction}
@@ -866,6 +958,55 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
           )}
         </div>
       </Scrollbar>
+
+      {/* Order Details Modal */}
+      <OrderDetailsModal
+        isOpen={!!selectedOrderForDetails}
+        onClose={() => setSelectedOrderForDetails(null)}
+        order={selectedOrderForDetails ? {
+          orderId: selectedOrderForDetails.orderId,
+          orderType: selectedOrderForDetails.orderType,
+          title: selectedOrderForDetails.title || null,
+          requestedBy: selectedOrderForDetails.requestedBy || selectedOrderForDetails.centerId || selectedOrderForDetails.customerId || null,
+          destination: selectedOrderForDetails.destination || selectedOrderForDetails.centerId || null,
+          requestedDate: selectedOrderForDetails.requestedDate || null,
+          status: (selectedOrderForDetails as any).status || null,
+          notes: selectedOrderForDetails.notes || null,
+          items: selectedOrderForDetails.items || [],
+        } : null}
+        availability={(() => {
+          const meta = (selectedOrderForDetails as any)?.metadata as any;
+          const av = meta?.availability;
+          if (!av) return null;
+          const days = Array.isArray(av.days) ? av.days : [];
+          const window = av.window && av.window.start && av.window.end ? av.window : null;
+          return { tz: av.tz ?? null, days, window };
+        })()}
+        cancellationReason={(selectedOrderForDetails as any)?.metadata?.cancellationReason || null}
+        cancelledBy={(selectedOrderForDetails as any)?.metadata?.cancelledBy || null}
+        cancelledAt={(selectedOrderForDetails as any)?.metadata?.cancelledAt || null}
+        rejectionReason={(selectedOrderForDetails as any)?.rejectionReason || (selectedOrderForDetails as any)?.metadata?.rejectionReason || null}
+        requestorInfo={
+          selectedOrderForDetails
+            ? {
+                name: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const req = meta?.contacts?.requestor || {}; return (req.name || null); })(),
+                address: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const req = meta?.contacts?.requestor || {}; return (req.address || null); })(),
+                phone: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const req = meta?.contacts?.requestor || {}; return (req.phone || null); })(),
+                email: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const req = meta?.contacts?.requestor || {}; return (req.email || null); })(),
+              }
+            : null
+        }
+        destinationInfo={
+          selectedOrderForDetails
+            ? {
+                name: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const dest = meta?.contacts?.destination || {}; return (dest.name || null); })(),
+                address: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const dest = meta?.contacts?.destination || {}; return (dest.address || null); })(),
+                phone: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const dest = meta?.contacts?.destination || {}; return (dest.phone || null); })(),
+                email: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const dest = meta?.contacts?.destination || {}; return (dest.email || null); })(),
+              }
+            : null
+        }
+      />
     </div>
   );
 }

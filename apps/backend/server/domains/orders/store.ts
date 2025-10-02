@@ -237,10 +237,15 @@ function viewerStatusFrom(options: {
 }): OrderViewerStatus {
   const { status, nextActorRole, nextActorCode, viewerRole, viewerCode, creatorCode } = options;
 
+  console.log(`[viewerStatusFrom] Input: status="${status}", viewerRole="${viewerRole}", viewerCode="${viewerCode}"`);
+
   // Terminal statuses map directly
   if (status === 'cancelled') return 'cancelled';
   if (status === 'rejected') return 'rejected';
-  if (status === 'delivered' || status === 'service_completed') return 'completed';
+  if (status === 'delivered' || status === 'service_completed') {
+    console.log(`[viewerStatusFrom] → Returning 'completed' for terminal status`);
+    return 'completed';
+  }
 
   const normalizedViewerCode = viewerCode ? viewerCode : null;
   const normalizedCreator = creatorCode ? creatorCode : null;
@@ -509,10 +514,12 @@ function buildApprovalStages(
   let fulfillmentLabel: string | null = null;
   if (status === 'awaiting_delivery' && fulfillmentStatus === 'accepted') {
     if (row.metadata && row.metadata.deliveryStarted === true) {
-      fulfillmentLabel = 'Out for Delivery';
+      fulfillmentLabel = 'Delivery In Progress';
     } else {
-      fulfillmentLabel = 'Accepted';
+      fulfillmentLabel = 'Awaiting Delivery';
     }
+  } else if (status === 'delivered' && orderType === 'product') {
+    fulfillmentLabel = 'Completed Delivery';
   }
 
   stages.push({
@@ -563,8 +570,13 @@ async function mapOrderRow(
       isAssignedActor
     };
 
+    console.log(`[ACTIONS] Order ${row.order_id} for viewer ${viewerCode} (${viewerRole}): status="${status}", isCreator=${isCreator}`);
+
     try {
-      availableActions = getAllowedActions(policyContext).map(action => getActionLabel(action));
+      const policyActions = getAllowedActions(policyContext);
+      availableActions = policyActions.map(action => getActionLabel(action));
+      console.log(`[ACTIONS] → Policy returned ${policyActions.length} actions:`, policyActions);
+      console.log(`[ACTIONS] → Mapped to labels:`, availableActions);
     } catch (error) {
       console.error('[POLICY] Error getting allowed actions:', error);
       availableActions = [];
@@ -768,13 +780,24 @@ async function mapOrderRow(
     };
   }
 
+  // Format requestedBy and destination as "ID - Name"
+  const requestorName = (enrichedMetadata as any).contacts?.requestor?.name;
+  const requestedByFormatted = creatorCode && requestorName && requestorName !== creatorCode
+    ? `${creatorCode} - ${requestorName}`
+    : (creatorCode ?? row.creator_id ?? null);
+
+  const destinationName = (enrichedMetadata as any).contacts?.destination?.name;
+  const destinationFormatted = destinationFallbackCode && destinationName && destinationName !== destinationFallbackCode
+    ? `${destinationFallbackCode} - ${destinationName}`
+    : (destinationFallbackCode ?? null);
+
   return {
     orderId: row.order_id,
     orderType,
     title: row.title ?? (orderType === 'product' ? 'Product Order' : 'Service Order'),
-    requestedBy: creatorCode ?? row.creator_id ?? null,
+    requestedBy: requestedByFormatted,
     requesterRole: normalizeRole(row.creator_role),
-    destination: destinationFallbackCode ?? null,
+    destination: destinationFormatted,
     destinationRole: normalizeRole(row.destination_role) ?? (row.center_id ? 'center' : null),
     requestedDate: toIso(row.requested_date ?? row.created_at),
     expectedDate: toIso(row.expected_date),
@@ -895,28 +918,106 @@ async function fetchOrders(whereClause: string, params: readonly unknown[], cont
 }
 
 function buildRoleFilter(role: HubRole, cksCode: string): { clause: string; params: unknown[] } {
-  // Eventually this should use order_participants table
-  // For now, using creator_id and legacy fields for compatibility
+  // All users see orders from anyone in their ecosystem
+  // Ecosystem is defined by the manager who connects all entities
   switch (role) {
-    case "customer":
-      return { clause: "creator_id = $1 OR customer_id = $1", params: [cksCode] };
-    case "center":
-      return { clause: "creator_id = $1 OR center_id = $1 OR destination = $1", params: [cksCode] };
-    case "manager":
-      // Manager sees orders they created, orders assigned to them, and orders from their ecosystem
-      return {
-        clause: `manager_id = $1 OR creator_id = $1 OR
-                 customer_id IN (SELECT customer_id FROM customers WHERE cks_manager = $1) OR
-                 contractor_id IN (SELECT contractor_id FROM contractors WHERE cks_manager = $1) OR
-                 center_id IN (SELECT center_id FROM centers WHERE cks_manager = $1) OR
-                 crew_id IN (SELECT crew_id FROM crew WHERE cks_manager = $1)`,
-        params: [cksCode]
-      };
-    case "contractor":
-      return { clause: "contractor_id = $1 OR creator_id = $1", params: [cksCode] };
-    case "crew":
-      return { clause: "crew_id = $1 OR creator_id = $1", params: [cksCode] };
+    case "customer": {
+      // Customer sees all orders in their ecosystem (contractor's and manager's ecosystem)
+      const clause = `
+        creator_id = $1 OR customer_id = $1 OR
+        manager_id IN (SELECT cks_manager FROM customers WHERE customer_id = $1) OR
+        contractor_id IN (SELECT contractor_id FROM customers WHERE customer_id = $1) OR
+        customer_id IN (
+          SELECT customer_id FROM customers WHERE cks_manager IN (SELECT cks_manager FROM customers WHERE customer_id = $1)
+        ) OR
+        center_id IN (
+          SELECT center_id FROM centers WHERE cks_manager IN (SELECT cks_manager FROM customers WHERE customer_id = $1)
+        ) OR
+        contractor_id IN (
+          SELECT contractor_id FROM contractors WHERE cks_manager IN (SELECT cks_manager FROM customers WHERE customer_id = $1)
+        ) OR
+        crew_id IN (
+          SELECT crew_id FROM crew WHERE cks_manager IN (SELECT cks_manager FROM customers WHERE customer_id = $1)
+        )
+      `;
+      return { clause, params: [cksCode] };
+    }
+    case "center": {
+      // Center sees all orders in their ecosystem
+      const clause = `
+        creator_id = $1 OR center_id = $1 OR destination = $1 OR
+        manager_id IN (SELECT cks_manager FROM centers WHERE center_id = $1) OR
+        contractor_id IN (SELECT contractor_id FROM centers WHERE center_id = $1) OR
+        customer_id IN (SELECT customer_id FROM centers WHERE center_id = $1) OR
+        customer_id IN (
+          SELECT customer_id FROM customers WHERE cks_manager IN (SELECT cks_manager FROM centers WHERE center_id = $1)
+        ) OR
+        center_id IN (
+          SELECT center_id FROM centers WHERE cks_manager IN (SELECT cks_manager FROM centers WHERE center_id = $1)
+        ) OR
+        contractor_id IN (
+          SELECT contractor_id FROM contractors WHERE cks_manager IN (SELECT cks_manager FROM centers WHERE center_id = $1)
+        ) OR
+        crew_id IN (
+          SELECT crew_id FROM crew WHERE cks_manager IN (SELECT cks_manager FROM centers WHERE center_id = $1)
+        )
+      `;
+      return { clause, params: [cksCode] };
+    }
+    case "manager": {
+      // Manager sees ALL orders in their ecosystem (including other managers in same ecosystem if applicable)
+      const clause = `
+        manager_id = $1 OR creator_id = $1 OR
+        customer_id IN (SELECT customer_id FROM customers WHERE cks_manager = $1) OR
+        contractor_id IN (SELECT contractor_id FROM contractors WHERE cks_manager = $1) OR
+        center_id IN (SELECT center_id FROM centers WHERE cks_manager = $1) OR
+        crew_id IN (SELECT crew_id FROM crew WHERE cks_manager = $1)
+      `;
+      return { clause, params: [cksCode] };
+    }
+    case "contractor": {
+      // Contractor sees all orders in their ecosystem
+      const clause = `
+        contractor_id = $1 OR creator_id = $1 OR
+        manager_id IN (SELECT cks_manager FROM contractors WHERE contractor_id = $1) OR
+        customer_id IN (
+          SELECT customer_id FROM customers WHERE contractor_id = $1 OR cks_manager IN (SELECT cks_manager FROM contractors WHERE contractor_id = $1)
+        ) OR
+        center_id IN (
+          SELECT center_id FROM centers WHERE contractor_id = $1 OR cks_manager IN (SELECT cks_manager FROM contractors WHERE contractor_id = $1)
+        ) OR
+        contractor_id IN (
+          SELECT contractor_id FROM contractors WHERE cks_manager IN (SELECT cks_manager FROM contractors WHERE contractor_id = $1)
+        ) OR
+        crew_id IN (
+          SELECT crew_id FROM crew WHERE cks_manager IN (SELECT cks_manager FROM contractors WHERE contractor_id = $1)
+        )
+      `;
+      return { clause, params: [cksCode] };
+    }
+    case "crew": {
+      // Crew sees all orders in their ecosystem
+      // Crew connects to ecosystem via cks_manager
+      const clause = `
+        crew_id = $1 OR creator_id = $1 OR
+        manager_id IN (SELECT cks_manager FROM crew WHERE crew_id = $1) OR
+        customer_id IN (
+          SELECT customer_id FROM customers WHERE cks_manager IN (SELECT cks_manager FROM crew WHERE crew_id = $1)
+        ) OR
+        center_id IN (
+          SELECT center_id FROM centers WHERE cks_manager IN (SELECT cks_manager FROM crew WHERE crew_id = $1)
+        ) OR
+        contractor_id IN (
+          SELECT contractor_id FROM contractors WHERE cks_manager IN (SELECT cks_manager FROM crew WHERE crew_id = $1)
+        ) OR
+        crew_id IN (
+          SELECT crew_id FROM crew WHERE cks_manager IN (SELECT cks_manager FROM crew WHERE crew_id = $1)
+        )
+      `;
+      return { clause, params: [cksCode] };
+    }
     case "warehouse":
+      // Warehouse only sees orders assigned to them or destined for them
       return { clause: "assigned_warehouse = $1 OR destination = $1", params: [cksCode] };
     default:
       return { clause: "creator_id = $1", params: [cksCode] };

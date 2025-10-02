@@ -270,6 +270,8 @@ function normalizeOrderStatus(status: string | null | undefined): OrderStatus {
     case 'rejected':
     case 'cancelled':
     case 'delivered':
+    case 'completed':
+    case 'archived':
     case 'service-created':
       return normalized;
     case 'in-progress':
@@ -303,6 +305,8 @@ function getStatusBadgePalette(value: string): { background: string; color: stri
   switch (normalized) {
     case 'delivered':
     case 'approved':
+    case 'completed':
+    case 'archived':
     case 'service-created':
       return { background: '#dcfce7', color: '#16a34a' };
     case 'pending':
@@ -725,18 +729,7 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
         const status = normalizeOrderStatus(order.viewerStatus ?? order.status);
         const actualStatus = order.status;
 
-        // Format as "ID - Name"
-        const requestorCode = order.requestedBy || order.customerId || order.creatorId || customerId;
-        const requestorName = customerId ? customerNameMap.get(customerId) : null;
-        const requestedByLabel = requestorCode && requestorName
-          ? `${requestorCode} - ${requestorName}`
-          : requestorCode || requestorName || 'Unknown';
-
-        const destinationCode = order.destination || order.centerId || centerId;
-        const destinationName = centerId ? centerNameMap.get(centerId) : null;
-        const destinationLabel = destinationCode && destinationName
-          ? `${destinationCode} - ${destinationName}`
-          : destinationCode || destinationName || undefined;
+        // Backend now formats requestedBy and destination as "ID - Name"
         const requestedDate = order.requestedDate ?? order.orderDate ?? null;
         const expectedDate = order.expectedDate ?? order.completionDate ?? null;
         const deliveryDate = status === 'delivered' ? order.deliveryDate ?? expectedDate : undefined;
@@ -744,8 +737,8 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
           orderId: canonicalOrderId,
           orderType: 'product',
           title: order.title ?? order.notes ?? `Product Order ${canonicalOrderId}`,
-          requestedBy: requestedByLabel,
-          destination: destinationLabel,
+          requestedBy: order.requestedBy || 'Unknown',
+          destination: order.destination || undefined,
           requestedDate: formatDate(requestedDate),
           expectedDate: formatDate(expectedDate),
           deliveryDate: deliveryDate ? formatDate(deliveryDate) : undefined,
@@ -755,7 +748,7 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
           availableActions: (order as any).availableActions || [],
         };
       }),
-    [centerNameMap, customerNameMap, managerProductOrders],
+    [managerProductOrders],
   );
   const centersByCustomerId = useMemo(() => {
     const map = new Map<string, (typeof managerCenters)[number][]>();
@@ -1096,6 +1089,7 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
             <PageWrapper title="Orders" showHeader headerSrOnly>
               <OrdersSection
                 userRole="manager"
+                userCode={managerCode}
                 serviceOrders={managerServiceOrderCards}
                 productOrders={managerProductOrderCards}
                 onCreateProductOrder={() => navigate('/catalog')}

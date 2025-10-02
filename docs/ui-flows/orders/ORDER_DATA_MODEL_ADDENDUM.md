@@ -36,6 +36,45 @@ metadata: {
 ```
 
 These fields are additive and can be superseded by live profile lookups where authorized.
+
+## Delivery Metadata (2025-10-02)
+
+Warehouse delivery process tracks state using metadata flag to determine UI button display:
+
+```json
+metadata: {
+  deliveryStarted: boolean,  // Set to true when "Start Delivery" clicked
+  ...
+}
+```
+
+**Usage:**
+- `deliveryStarted: false` or undefined → Show "Start Delivery" button
+- `deliveryStarted: true` → Show "Mark Delivered" button
+
+**Delivery Actions:**
+
+1. **start-delivery** action:
+   - Sets `metadata.deliveryStarted = true`
+   - Keeps canonical status as `awaiting_delivery`
+   - No inventory changes
+   - Used to track delivery initiation
+
+2. **deliver** action:
+   - Sets `deliveryDate` field to completion timestamp
+   - Changes canonical status to `delivered`
+   - All users' viewerStatus becomes `completed`
+   - Order appears in Archive tab for all roles
+   - **Inventory automatically decreased:**
+     - Queries `order_items` table for all items in order
+     - Gets `assigned_warehouse` from order
+     - Decreases `inventory_items.quantity_on_hand` for each item at warehouse
+     - Amount = `order_items.quantity` per item
+
+**Policy Requirements:**
+- Warehouse role must have `['start-delivery', 'deliver']` actions at `awaiting_delivery` status
+- Defined in `packages/policies/src/orderPolicy.ts`
+
 ## Archive Support (Orders)
 
 Orders now support soft delete, restore, and hard delete using archive fields on the base `orders` table. Admin Directory queries exclude archived rows; archived orders are visible via the Archive UI.
