@@ -597,6 +597,9 @@ export async function listArchivedEntities(
         break;
     }
 
+    // For orders, also include order_type to support filtering by product/service
+    const orderTypeSelect = entityType === 'order' ? ', order_type' : '';
+
     queryText = `
       SELECT
         ${idColumn} as id,
@@ -606,6 +609,7 @@ export async function listArchivedEntities(
         archived_by,
         archive_reason,
         deletion_scheduled
+        ${orderTypeSelect}
       FROM ${tableName}
       WHERE archived_at IS NOT NULL
       ORDER BY archived_at DESC
@@ -639,7 +643,9 @@ export async function listArchivedEntities(
       archivedAt: row.archived_at,
       archivedBy: row.archived_by,
       archiveReason: row.archive_reason,
-      deletionScheduled: row.deletion_scheduled
+      deletionScheduled: row.deletion_scheduled,
+      // Include orderType for orders to support product/service filtering
+      ...(row.order_type && { orderType: row.order_type })
     }));
   } catch (error: any) {
     // If the error is about missing columns (for new tables without archive columns)

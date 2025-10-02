@@ -661,35 +661,77 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
     [services],
   );
 
-  const orderRows = useMemo(
+  const productOrderRows = useMemo(
     () =>
-      orders.map((order) => {
-        const extra = order as any;
-        // Type label: default to One-Time until recurrence is modeled
-        const typeLabel = 'One-Time';
-        // Requested By: prefer createdBy, else centerId, else customerId
-        const requestedBy = (extra.createdBy && String(extra.createdBy).trim()) || order.centerId || order.customerId || null;
-        // Destination: prefer explicit destination, else centerId, else assignedWarehouse
-        const destination = extra.destination || order.centerId || ((extra.createdByRole === 'center' || extra.createdByRole === 'customer') ? extra.createdBy : null) || order.assignedWarehouse || null;
+      orders
+        .filter((order) => {
+          const extra = order as any;
+          return extra.orderType === 'product';
+        })
+        .map((order) => {
+          const extra = order as any;
+          // Type label: default to One-Time until recurrence is modeled
+          const typeLabel = 'One-Time';
+          // Requested By: prefer createdBy, else centerId, else customerId
+          const requestedBy = (extra.createdBy && String(extra.createdBy).trim()) || order.centerId || order.customerId || null;
+          // Destination: prefer explicit destination, else centerId, else assignedWarehouse
+          const destination = extra.destination || order.centerId || ((extra.createdByRole === 'center' || extra.createdByRole === 'customer') ? extra.createdBy : null) || order.assignedWarehouse || null;
 
-        return {
-          id: order.id,
-          orderId: order.id,
-          orderType: typeLabel,
-          requestedBy: formatText(requestedBy),
-          destination: formatText(destination),
-          status: formatText(order.status),
-          orderDate: formatDate(order.orderDate),
-          completionDate: formatDate(order.completionDate),
-          // original fields for modal
-          customerId: formatText(order.customerId),
-          centerId: formatText(order.centerId),
-          serviceId: formatText(order.serviceId),
-          assignedWarehouse: formatText(order.assignedWarehouse),
-          // Store full order data for details modal
-          _fullOrder: order,
-        };
-      }),
+          return {
+            id: order.id,
+            orderId: order.id,
+            orderType: typeLabel,
+            requestedBy: formatText(requestedBy),
+            destination: formatText(destination),
+            status: formatText(order.status),
+            orderDate: formatDate(order.orderDate),
+            completionDate: formatDate(order.completionDate),
+            // original fields for modal
+            customerId: formatText(order.customerId),
+            centerId: formatText(order.centerId),
+            serviceId: formatText(order.serviceId),
+            assignedWarehouse: formatText(order.assignedWarehouse),
+            // Store full order data for details modal
+            _fullOrder: order,
+          };
+        }),
+    [orders],
+  );
+
+  const serviceOrderRows = useMemo(
+    () =>
+      orders
+        .filter((order) => {
+          const extra = order as any;
+          return extra.orderType === 'service';
+        })
+        .map((order) => {
+          const extra = order as any;
+          // Type label: default to One-Time until recurrence is modeled
+          const typeLabel = 'One-Time';
+          // Requested By: prefer createdBy, else centerId, else customerId
+          const requestedBy = (extra.createdBy && String(extra.createdBy).trim()) || order.centerId || order.customerId || null;
+          // Destination: prefer explicit destination, else centerId, else assignedWarehouse
+          const destination = extra.destination || order.centerId || ((extra.createdByRole === 'center' || extra.createdByRole === 'customer') ? extra.createdBy : null) || order.assignedWarehouse || null;
+
+          return {
+            id: order.id,
+            orderId: order.id,
+            orderType: typeLabel,
+            requestedBy: formatText(requestedBy),
+            destination: formatText(destination),
+            status: formatText(order.status),
+            orderDate: formatDate(order.orderDate),
+            completionDate: formatDate(order.completionDate),
+            // original fields for modal
+            customerId: formatText(order.customerId),
+            centerId: formatText(order.centerId),
+            serviceId: formatText(order.serviceId),
+            assignedWarehouse: formatText(order.assignedWarehouse),
+            // Store full order data for details modal
+            _fullOrder: order,
+          };
+        }),
     [orders],
   );
 
@@ -873,7 +915,7 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
       data: serviceRows,
       emptyMessage: 'No services in the catalog yet.',
     },
-    orders: {
+    productOrders: {
       columns: [
         { key: 'id', label: 'ORDER ID' },
         { key: 'orderType', label: 'TYPE' },
@@ -883,8 +925,21 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
         { key: 'orderDate', label: 'CREATED' },
         { key: 'actions', label: 'ACTIONS', render: renderActions },
       ],
-      data: orderRows,
-      emptyMessage: 'No orders recorded.',
+      data: productOrderRows,
+      emptyMessage: 'No product orders recorded.',
+    },
+    serviceOrders: {
+      columns: [
+        { key: 'id', label: 'ORDER ID' },
+        { key: 'orderType', label: 'TYPE' },
+        { key: 'requestedBy', label: 'REQUESTED BY' },
+        { key: 'destination', label: 'DESTINATION' },
+        { key: 'status', label: 'STATUS', render: renderStatusBadge },
+        { key: 'orderDate', label: 'CREATED' },
+        { key: 'actions', label: 'ACTIONS', render: renderActions },
+      ],
+      data: serviceOrderRows,
+      emptyMessage: 'No service orders recorded.',
     },
     products: {
       columns: [
@@ -954,7 +1009,8 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
     crewRows,
     warehouseRows,
     serviceRows,
-    orderRows,
+    productOrderRows,
+    serviceOrderRows,
     productRows,
     trainingRows,
     procedureRows,
@@ -1001,6 +1057,32 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
       return (
         <div style={{ color: '#dc2626', fontSize: 14 }}>
           Failed to load directory: {directoryError.message}
+        </div>
+      );
+    }
+    if (directoryTab === 'orders') {
+      return (
+        <div style={{ display: 'flex', gap: '4%' }}>
+          <div style={{ width: '48%' }}>
+            <DataTable
+              columns={(directoryConfig as any).productOrders.columns}
+              data={(directoryConfig as any).productOrders.data}
+              emptyMessage={(directoryConfig as any).productOrders.emptyMessage}
+              searchPlaceholder="Search product orders..."
+              maxItems={25}
+              showSearch
+            />
+          </div>
+          <div style={{ width: '48%' }}>
+            <DataTable
+              columns={(directoryConfig as any).serviceOrders.columns}
+              data={(directoryConfig as any).serviceOrders.data}
+              emptyMessage={(directoryConfig as any).serviceOrders.emptyMessage}
+              searchPlaceholder="Search service orders..."
+              maxItems={25}
+              showSearch
+            />
+          </div>
         </div>
       );
     }

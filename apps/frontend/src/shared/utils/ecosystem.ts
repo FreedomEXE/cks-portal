@@ -197,6 +197,23 @@ function groupCrewByCenter<T extends { assignedCenter: string | null }>(crew: T[
   return map;
 }
 
+function groupByContractor<T extends { contractorId: string | null }>(items: T[], knownContractorIds: Set<string>): Map<string, T[]> {
+  const map = new Map<string, T[]>();
+  items.forEach((item) => {
+    const contractorId = normalizeId(item.contractorId);
+    if (!contractorId || !knownContractorIds.has(contractorId)) {
+      return;
+    }
+    const existing = map.get(contractorId);
+    if (existing) {
+      existing.push(item);
+    } else {
+      map.set(contractorId, [item]);
+    }
+  });
+  return map;
+}
+
 function buildManagerChildren(scope: ManagerRoleScopeResponse): TreeNode[] {
   const relationships = scope.relationships as ManagerScopeRelationships;
   const contractors = toArray(relationships.contractors);
@@ -204,40 +221,91 @@ function buildManagerChildren(scope: ManagerRoleScopeResponse): TreeNode[] {
   const centers = toArray(relationships.centers);
   const crew = toArray(relationships.crew);
 
-  const contractorNodes = sortNodes(contractors.map((contractor: ManagerScopeContractor) => toTreeNode(contractor, 'CONTRACTOR')));
-
-  const centersByCustomer = groupCentersByCustomer(centers);
-  const crewByCenter = groupCrewByCenter(crew);
-
-  const customerNodes = customers.map((customer: ManagerScopeCustomer) => {
-    const customerId = normalizeId(customer.id);
-    const centerNodes = sortNodes(
-      (customerId ? centersByCustomer.get(customerId) ?? [] : []).map((center: ManagerScopeCenter) => {
-        const centerId = normalizeId(center.id);
-        const crewNodes = sortNodes(
-          (centerId ? crewByCenter.get(centerId) ?? [] : []).map((member: ManagerScopeCrewMember) => toTreeNode(member, 'CREW')),
-        );
-        return attachChildren(toTreeNode(center, 'CENTER'), crewNodes);
-      }),
-    );
-    return attachChildren(toTreeNode(customer, 'CUSTOMER'), centerNodes);
-  });
-
-  const sortedCustomers = sortNodes(customerNodes);
-
-  const knownCustomerIds = new Set(
-    customers
-      .map((customer: ManagerScopeCustomer) => normalizeId(customer.id))
+  const knownContractorIds = new Set(
+    contractors
+      .map((contractor: ManagerScopeContractor) => normalizeId(contractor.id))
       .filter((value): value is string => Boolean(value)),
   );
 
-  const orphanCenters = centers.filter((center: ManagerScopeCenter) => {
+  const centersByCustomer = groupCentersByCustomer(centers);
+  const crewByCenter = groupCrewByCenter(crew);
+  const customersByContractor = groupByContractor(customers, knownContractorIds);
+  const centersByContractor = groupByContractor(centers, knownContractorIds);
+
+  const contractorNodes = sortNodes(
+    contractors.map((contractor: ManagerScopeContractor) => {
+      const contractorId = normalizeId(contractor.id);
+
+      const customerNodes = sortNodes(
+        (contractorId ? customersByContractor.get(contractorId) ?? [] : []).map((customer: ManagerScopeCustomer) => {
+          const customerId = normalizeId(customer.id);
+          const centerNodes = sortNodes(
+            (customerId ? centersByCustomer.get(customerId) ?? [] : []).map((center: ManagerScopeCenter) => {
+              const centerId = normalizeId(center.id);
+              const crewNodes = sortNodes(
+                (centerId ? crewByCenter.get(centerId) ?? [] : []).map((member: ManagerScopeCrewMember) => toTreeNode(member, 'CREW')),
+              );
+              return attachChildren(toTreeNode(center, 'CENTER'), crewNodes);
+            }),
+          );
+          return attachChildren(toTreeNode(customer, 'CUSTOMER'), centerNodes);
+        }),
+      );
+
+      const assignedCustomerIds = new Set(
+        (contractorId ? customersByContractor.get(contractorId) ?? [] : []).map((customer) => normalizeId(customer.id)).filter((value): value is string => Boolean(value)),
+      );
+
+      const orphanCenters = sortNodes(
+        (contractorId ? centersByContractor.get(contractorId) ?? [] : []).filter((center) => {
+          const customerId = normalizeId(center.customerId);
+          return !customerId || !assignedCustomerIds.has(customerId);
+        }).map((center) => {
+          const centerId = normalizeId(center.id);
+          const crewNodes = sortNodes(
+            (centerId ? crewByCenter.get(centerId) ?? [] : []).map((member: ManagerScopeCrewMember) => toTreeNode(member, 'CREW')),
+          );
+          return attachChildren(toTreeNode(center, 'CENTER'), crewNodes);
+        }),
+      );
+
+      const contractorChildren = [...customerNodes, ...orphanCenters];
+      return attachChildren(toTreeNode(contractor, 'CONTRACTOR'), contractorChildren);
+    }),
+  );
+
+  const unassignedCustomers = customers.filter((customer: ManagerScopeCustomer) => {
+    const contractorId = normalizeId(customer.contractorId);
+    return !contractorId || !knownContractorIds.has(contractorId);
+  });
+
+  const unassignedCustomerNodes = sortNodes(
+    unassignedCustomers.map((customer) => {
+      const customerId = normalizeId(customer.id);
+      const centerNodes = sortNodes(
+        (customerId ? centersByCustomer.get(customerId) ?? [] : []).map((center: ManagerScopeCenter) => {
+          const centerId = normalizeId(center.id);
+          const crewNodes = sortNodes(
+            (centerId ? crewByCenter.get(centerId) ?? [] : []).map((member: ManagerScopeCrewMember) => toTreeNode(member, 'CREW')),
+          );
+          return attachChildren(toTreeNode(center, 'CENTER'), crewNodes);
+        }),
+      );
+      return attachChildren(toTreeNode(customer, 'CUSTOMER'), centerNodes);
+    }),
+  );
+
+  const centersWithoutCustomerOrContractor = centers.filter((center: ManagerScopeCenter) => {
     const customerId = normalizeId(center.customerId);
-    return !customerId || !knownCustomerIds.has(customerId);
+    if (customerId) {
+      return false;
+    }
+    const contractorId = normalizeId(center.contractorId);
+    return !contractorId || !knownContractorIds.has(contractorId);
   });
 
   const orphanCenterNodes = sortNodes(
-    orphanCenters.map((center: ManagerScopeCenter) => {
+    centersWithoutCustomerOrContractor.map((center: ManagerScopeCenter) => {
       const centerId = normalizeId(center.id);
       const crewNodes = sortNodes(
         (centerId ? crewByCenter.get(centerId) ?? [] : []).map((member: ManagerScopeCrewMember) => toTreeNode(member, 'CREW')),
@@ -246,7 +314,7 @@ function buildManagerChildren(scope: ManagerRoleScopeResponse): TreeNode[] {
     }),
   );
 
-  return [...contractorNodes, ...sortedCustomers, ...orphanCenterNodes];
+  return [...contractorNodes, ...unassignedCustomerNodes, ...orphanCenterNodes];
 }
 
 function buildContractorChildren(scope: ContractorRoleScopeResponse): TreeNode[] {

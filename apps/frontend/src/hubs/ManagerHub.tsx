@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@cks/auth';
 import { EcosystemTree } from '@cks/domain-widgets';
+import type { TreeNode } from '@cks/domain-widgets';
 import {
   MemosPreview,
   NewsPreview,
@@ -55,6 +56,7 @@ import {
   type OrderActionRequest,
 } from '../shared/api/hub';
 import { useSWRConfig } from 'swr';
+import { buildEcosystemTree } from '../shared/utils/ecosystem';
 
 interface ManagerHubProps {
   initialTab?: string;
@@ -232,16 +234,7 @@ function mapHubReportItem(item: HubReportItem, fallbackType: 'report' | 'feedbac
 }
 
 
-type EcosystemNode = {
-  user: {
-    id: string;
-    role: string;
-    name: string;
-  };
-  count?: number;
-  type?: string;
-  children?: EcosystemNode[];
-};
+// Tree node type is provided by domain-widgets
 
 function normalizeId(value: string | null | undefined): string | null {
   if (!value) {
@@ -347,9 +340,7 @@ function formatReportsTo(value: string | null | undefined): string | null {
     .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
-function createNodeSorter(a: EcosystemNode, b: EcosystemNode): number {
-  return a.user.name.localeCompare(b.user.name);
-}
+// Sorting is handled within the shared ecosystem builder where applicable
 
 export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps) {
   const navigate = useNavigate();
@@ -497,41 +488,8 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
   const managerContractors = contractorEntries;
   const managerCustomers = customerEntries;
 
-  const managerContractorIdSet = useMemo(() => {
-    const set = new Set<string>();
-    managerContractors.forEach((contractor) => {
-      const id = normalizeId(contractor.id);
-      if (id) {
-        set.add(id);
-      }
-    });
-    return set;
-  }, [managerContractors]);
-
-  const managerCustomerIdSet = useMemo(() => {
-    const set = new Set<string>();
-    managerCustomers.forEach((customer) => {
-      const id = normalizeId(customer.id);
-      if (id) {
-        set.add(id);
-      }
-    });
-    return set;
-  }, [managerCustomers]);
-
   // Hub scope data is already filtered for this manager
   const managerCenters = centerEntries;
-
-  const managerCenterIdSet = useMemo(() => {
-    const set = new Set<string>();
-    managerCenters.forEach((center) => {
-      const id = normalizeId(center.id);
-      if (id) {
-        set.add(id);
-      }
-    });
-    return set;
-  }, [managerCenters]);
 
   // Hub scope data is already filtered for this manager
   const managerCrew = crewEntries;
@@ -750,148 +708,14 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
       }),
     [managerProductOrders],
   );
-  const centersByCustomerId = useMemo(() => {
-    const map = new Map<string, (typeof managerCenters)[number][]>();
-    managerCenters.forEach((center) => {
-      const customerId = normalizeId(center.customerId);
-      if (!customerId) {
-        return;
-      }
-      const existing = map.get(customerId);
-      if (existing) {
-        existing.push(center);
-      } else {
-        map.set(customerId, [center]);
-      }
-    });
-    return map;
-  }, [managerCenters]);
-
-  const crewByCenterId = useMemo(() => {
-    const map = new Map<string, (typeof managerCrew)[number][]>();
-    managerCrew.forEach((member) => {
-      const centerId = normalizeId(member.assignedCenter);
-      if (!centerId) {
-        return;
-      }
-      const existing = map.get(centerId);
-      if (existing) {
-        existing.push(member);
-      } else {
-        map.set(centerId, [member]);
-      }
-    });
-    return map;
-  }, [managerCrew]);
-
-  const ecosystemTree = useMemo<EcosystemNode>(() => {
-    const children: EcosystemNode[] = [];
-
-    const contractorNodes = managerContractors
-      .map<EcosystemNode>((contractor) => ({
-        user: {
-          id: contractor.id ?? 'CONTRACTOR',
-          role: 'Contractor',
-          name: contractor.name ?? 'Contractor',
-        },
-      }))
-      .sort(createNodeSorter);
-
-    const customerNodes = managerCustomers
-      .map<EcosystemNode>((customer) => {
-        const customerId = normalizeId(customer.id);
-        const centersForCustomer = customerId ? centersByCustomerId.get(customerId) ?? [] : [];
-        const centerNodes = centersForCustomer
-          .map<EcosystemNode>((center) => {
-            const centerId = normalizeId(center.id);
-            const crewForCenter = centerId ? crewByCenterId.get(centerId) ?? [] : [];
-            const crewNodes = crewForCenter
-              .map<EcosystemNode>((member) => ({
-                user: {
-                  id: member.id ?? 'CREW',
-                  role: 'Crew',
-                  name: member.name ?? 'Crew Member',
-                },
-              }))
-              .sort(createNodeSorter);
-
-            return {
-              user: {
-                id: center.id ?? 'CENTER',
-                role: 'Center',
-                name: center.name ?? 'Service Center',
-              },
-              children: crewNodes.length > 0 ? crewNodes : undefined,
-            };
-          })
-          .sort(createNodeSorter);
-
-        return {
-          user: {
-            id: customer.id ?? 'CUSTOMER',
-            role: 'Customer',
-            name: customer.name ?? customer.mainContact ?? 'Customer',
-          },
-          children: centerNodes.length > 0 ? centerNodes : undefined,
-        };
-      })
-      .sort(createNodeSorter);
-
-    const orphanCenters = managerCenters.filter((center) => {
-      const customerId = normalizeId(center.customerId);
-      return !customerId || !managerCustomerIdSet.has(customerId);
-    });
-
-    const orphanCenterNodes = orphanCenters
-      .map<EcosystemNode>((center) => {
-        const centerId = normalizeId(center.id);
-        const crewForCenter = centerId ? crewByCenterId.get(centerId) ?? [] : [];
-        const crewNodes = crewForCenter
-          .map<EcosystemNode>((member) => ({
-            user: {
-              id: member.id ?? 'CREW',
-              role: 'Crew',
-              name: member.name ?? 'Crew Member',
-            },
-          }))
-          .sort(createNodeSorter);
-
-        return {
-          user: {
-            id: center.id ?? 'CENTER',
-            role: 'Center',
-            name: center.name ?? 'Service Center',
-          },
-          children: crewNodes.length > 0 ? crewNodes : undefined,
-        };
-      })
-      .sort(createNodeSorter);
-
-    children.push(...contractorNodes, ...customerNodes, ...orphanCenterNodes);
-
-    const root: EcosystemNode = {
-      user: {
-        id: managerRootId,
-        role: 'Manager',
-        name: managerDisplayName,
-      },
-    };
-
-    if (children.length > 0) {
-      root.children = children;
+  const ecosystemTree = useMemo<TreeNode>(() => {
+    if (managerScope) {
+      return buildEcosystemTree(managerScope, { rootName: managerDisplayName });
     }
-
-    return root;
-  }, [
-    managerContractors,
-    managerCustomers,
-    managerCenters,
-    managerCustomerIdSet,
-    managerDisplayName,
-    managerRootId,
-    centersByCustomerId,
-    crewByCenterId,
-  ]);
+    return {
+      user: { id: managerRootId, role: 'Manager', name: managerDisplayName },
+    } as TreeNode;
+  }, [managerScope, managerDisplayName, managerRootId]);
 
   const activityEmptyMessage = activitiesError
     ? 'Failed to load activity feed.'
@@ -1174,4 +998,3 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
     </div>
   );
 }
-

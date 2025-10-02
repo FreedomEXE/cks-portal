@@ -37,7 +37,8 @@ const ARCHIVE_TABS = [
   { id: 'warehouse', label: 'Warehouses', color: '#8b5cf6', search: 'archived warehouses' },
   { id: 'service', label: 'Services', color: '#14b8a6', search: 'archived services' },
   { id: 'product', label: 'Products', color: '#d946ef', search: 'archived products' },
-  { id: 'order', label: 'Orders', color: '#06b6d4', search: 'archived orders' },
+  { id: 'productOrder', label: 'Product Orders', color: '#6366f1', search: 'archived product orders' },
+  { id: 'serviceOrder', label: 'Service Orders', color: '#14b8a6', search: 'archived service orders' },
 ];
 
 const TAB_COLUMN_CONFIG = {
@@ -49,7 +50,8 @@ const TAB_COLUMN_CONFIG = {
   warehouse: { idLabel: 'WAREHOUSE ID', nameLabel: 'NAME' },
   service: { idLabel: 'SERVICE ID', nameLabel: 'SERVICE NAME' },
   product: { idLabel: 'PRODUCT ID', nameLabel: 'PRODUCT NAME' },
-  order: { idLabel: 'ORDER ID', nameLabel: 'ORDER' },
+  productOrder: { idLabel: 'ORDER ID', nameLabel: 'PRODUCT ORDER' },
+  serviceOrder: { idLabel: 'ORDER ID', nameLabel: 'SERVICE ORDER' },
 };
 
 const BASE_COLUMNS = [
@@ -120,10 +122,33 @@ export default function ArchiveSection({ archiveAPI }: ArchiveSectionProps) {
       console.log('[ArchiveSection] archiveAPI prop:', !!archiveAPI);
       console.log('[ArchiveSection] Using fallback?:', api === archiveAPI ? 'NO - using injected API' : 'YES - using fallback');
 
-      const data = await api.listArchived(activeTab as EntityType);
+      // For order tabs, we need to fetch 'order' type and filter by orderType
+      let entityType: EntityType = activeTab as EntityType;
+      let orderTypeFilter: 'product' | 'service' | null = null;
+
+      if (activeTab === 'productOrder') {
+        entityType = 'order';
+        orderTypeFilter = 'product';
+      } else if (activeTab === 'serviceOrder') {
+        entityType = 'order';
+        orderTypeFilter = 'service';
+      }
+
+      const data = await api.listArchived(entityType);
       console.log('[ArchiveSection] Data received:', data);
       console.log('[ArchiveSection] Data length:', data?.length);
-      setArchivedData(data);
+
+      // Filter by order type if needed
+      let filteredData = data;
+      if (orderTypeFilter) {
+        filteredData = data.filter((item: any) => {
+          // Check if the archived entity has orderType metadata
+          return item.orderType === orderTypeFilter;
+        });
+        console.log('[ArchiveSection] Filtered to', orderTypeFilter, 'orders:', filteredData.length);
+      }
+
+      setArchivedData(filteredData);
     } catch (err) {
       console.error('[ArchiveSection] Error loading data:', err);
       setError(err instanceof Error ? err.message : 'Failed to load archived data');
@@ -146,12 +171,17 @@ export default function ArchiveSection({ archiveAPI }: ArchiveSectionProps) {
   const handleRestore = async () => {
     if (!selectedEntity) return;
 
+    // Determine the actual entityType for API call (productOrder/serviceOrder -> order)
+    const actualEntityType = (activeTab === 'productOrder' || activeTab === 'serviceOrder')
+      ? 'order'
+      : selectedEntity.entityType;
+
     if (!confirm(`Restore ${selectedEntity.entityType} ${selectedEntity.id}? It will be moved to the unassigned bucket.`)) {
       return;
     }
 
     try {
-      await api.restoreEntity(selectedEntity.entityType, selectedEntity.id);
+      await api.restoreEntity(actualEntityType, selectedEntity.id);
       await loadArchivedData(); // Reload the list
       alert(`${selectedEntity.entityType} ${selectedEntity.id} has been restored to the unassigned bucket.`);
       handleModalClose();
@@ -162,6 +192,11 @@ export default function ArchiveSection({ archiveAPI }: ArchiveSectionProps) {
 
   const handleHardDelete = async () => {
     if (!selectedEntity) return;
+
+    // Determine the actual entityType for API call (productOrder/serviceOrder -> order)
+    const actualEntityType = (activeTab === 'productOrder' || activeTab === 'serviceOrder')
+      ? 'order'
+      : selectedEntity.entityType;
 
     const confirmMessage = `⚠️ PERMANENT DELETION WARNING ⚠️\n\n` +
       `This will permanently delete ${selectedEntity.entityType} ${selectedEntity.id}.\n` +
@@ -174,7 +209,7 @@ export default function ArchiveSection({ archiveAPI }: ArchiveSectionProps) {
     }
 
     try {
-      await api.hardDelete(selectedEntity.entityType, selectedEntity.id, 'Manual permanent deletion');
+      await api.hardDelete(actualEntityType, selectedEntity.id, 'Manual permanent deletion');
       await loadArchivedData(); // Reload the list
       alert(`${selectedEntity.entityType} ${selectedEntity.id} has been permanently deleted.`);
       handleModalClose();
@@ -377,8 +412,13 @@ export default function ArchiveSection({ archiveAPI }: ArchiveSectionProps) {
                 onClick={async () => {
                   if (selectedEntity) {
                     try {
+                      // Determine the actual entityType for API call (productOrder/serviceOrder -> order)
+                      const actualEntityType = (activeTab === 'productOrder' || activeTab === 'serviceOrder')
+                        ? 'order'
+                        : selectedEntity.entityType;
+
                       const relationships = await api.getRelationships(
-                        selectedEntity.entityType,
+                        actualEntityType,
                         selectedEntity.id
                       );
                       console.log('Relationships:', relationships);

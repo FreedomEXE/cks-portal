@@ -39,6 +39,7 @@ import {
   useHubRoleScope,
   type HubOrderItem,
 } from '../shared/api/hub';
+import { buildEcosystemTree } from '../shared/utils/ecosystem';
 
 interface ContractorHubProps {
   initialTab?: string;
@@ -370,39 +371,7 @@ export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHu
     return map;
   }, [scopeCenters]);
 
-  const centersByCustomerId = useMemo(() => {
-    const map = new Map<string, typeof scopeCenters>();
-    scopeCenters.forEach((center) => {
-      const customerId = normalizeId(center.customerId);
-      if (!customerId) {
-        return;
-      }
-      const existing = map.get(customerId);
-      if (existing) {
-        existing.push(center);
-      } else {
-        map.set(customerId, [center]);
-      }
-    });
-    return map;
-  }, [scopeCenters]);
-
-  const crewByCenterId = useMemo(() => {
-    const map = new Map<string, typeof scopeCrew>();
-    scopeCrew.forEach((member) => {
-      const centerId = normalizeId(member.assignedCenter);
-      if (!centerId) {
-        return;
-      }
-      const existing = map.get(centerId);
-      if (existing) {
-        existing.push(member);
-      } else {
-        map.set(centerId, [member]);
-      }
-    });
-    return map;
-  }, [scopeCrew]);
+  // Ecosystem grouping is handled by the shared builder; no local maps needed
 
   const fallbackActivities = useMemo(
     () => buildActivities(serviceOrders, productOrders),
@@ -457,133 +426,13 @@ export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHu
   }, []);
 
   const ecosystemData = useMemo<TreeNode>(() => {
-    const children: TreeNode[] = [];
-
-    if (managerReference) {
-      children.push({
-        user: {
-          id: managerReference.id ?? 'MANAGER',
-          role: 'Manager',
-          name: managerReference.name ?? 'Account Manager',
-        },
-      });
+    if (scopeData) {
+      return buildEcosystemTree(scopeData, { rootName: profile?.name ?? contractorCode ?? 'Contractor' });
     }
-
-    const customerNodes = scopeCustomers
-      .map<TreeNode>((customer) => {
-        const customerId = normalizeId(customer.id);
-        const centers = customerId ? centersByCustomerId.get(customerId) ?? [] : [];
-        const centerNodes = centers
-          .map<TreeNode>((center) => {
-            const centerId = normalizeId(center.id);
-            const crew = centerId ? crewByCenterId.get(centerId) ?? [] : [];
-            const crewNodes = crew
-              .map<TreeNode>((member) => ({
-                user: {
-                  id: member.id ?? 'CREW',
-                  role: 'Crew',
-                  name: member.name ?? 'Crew Member',
-                },
-              }))
-              .sort(createNodeSorter);
-            return {
-              user: {
-                id: center.id ?? 'CENTER',
-                role: 'Center',
-                name: center.name ?? 'Service Center',
-              },
-              children: crewNodes.length > 0 ? crewNodes : undefined,
-            };
-          })
-          .sort(createNodeSorter);
-
-        return {
-          user: {
-            id: customer.id ?? 'CUSTOMER',
-            role: 'Customer',
-            name: customer.name ?? customer.mainContact ?? 'Customer',
-          },
-          children: centerNodes.length > 0 ? centerNodes : undefined,
-        };
-      })
-      .sort(createNodeSorter);
-
-    const orphanCenters = scopeCenters.filter((center) => {
-      const customerId = normalizeId(center.customerId);
-      return !customerId || !centersByCustomerId.has(customerId);
-    });
-
-    const orphanCenterNodes = orphanCenters
-      .map<TreeNode>((center) => {
-        const centerId = normalizeId(center.id);
-        const crew = centerId ? crewByCenterId.get(centerId) ?? [] : [];
-        const crewNodes = crew
-          .map<TreeNode>((member) => ({
-            user: {
-              id: member.id ?? 'CREW',
-              role: 'Crew',
-              name: member.name ?? 'Crew Member',
-            },
-          }))
-          .sort(createNodeSorter);
-        return {
-          user: {
-            id: center.id ?? 'CENTER',
-            role: 'Center',
-            name: center.name ?? 'Service Center',
-          },
-          children: crewNodes.length > 0 ? crewNodes : undefined,
-        };
-      })
-      .sort(createNodeSorter);
-
-    const crewWithoutCenterNodes = scopeCrew
-      .filter((member) => !normalizeId(member.assignedCenter))
-      .map<TreeNode>((member) => ({
-        user: {
-          id: member.id ?? 'CREW',
-          role: 'Crew',
-          name: member.name ?? 'Crew Member',
-        },
-      }))
-      .sort(createNodeSorter);
-
-    children.push(...customerNodes, ...orphanCenterNodes);
-
-    if (crewWithoutCenterNodes.length > 0) {
-      children.push({
-        user: {
-          id: 'CREW-UNASSIGNED',
-          role: 'Crew',
-          name: 'Unassigned Crew',
-        },
-        children: crewWithoutCenterNodes,
-      });
-    }
-
-    const root: TreeNode = {
-      user: {
-        id: contractorCode ?? 'CONTRACTOR',
-        role: 'Contractor',
-        name: profile?.name ?? contractorCode ?? 'Contractor',
-      },
-    };
-
-    if (children.length > 0) {
-      root.children = children;
-    }
-
-    return root;
-  }, [
-    managerReference,
-    scopeCustomers,
-    scopeCenters,
-    scopeCrew,
-    centersByCustomerId,
-    crewByCenterId,
-    normalizedCode,
-    profile,
-  ]);
+    return {
+      user: { id: contractorCode ?? 'CONTRACTOR', role: 'Contractor', name: profile?.name ?? contractorCode ?? 'Contractor' },
+    } as TreeNode;
+  }, [scopeData, profile, contractorCode]);
 
   const { myServicesData, serviceHistoryData } = useMemo(() => {
     const active: Array<{ serviceId: string; serviceName: string; centerId: string; type: string; status: string; startDate: string }> = [];
@@ -1020,9 +869,6 @@ export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHu
     </div>
   );
 }
-
-
-
 
 
 
