@@ -30,7 +30,9 @@ import {
   CreateServiceModal,
   type CreateServiceFormData
 } from '@cks/ui';
+import { ServiceDetailsModal } from '@cks/ui';
 import MyHubSection from '../components/MyHubSection';
+import { useServices as useDirectoryServices } from '../shared/api/directory';
 import { useLogout } from '../hooks/useLogout';
 
 /**
@@ -107,6 +109,7 @@ type HubOrder = {
     timestamp?: string;
   }>;
   transformedId?: string;
+  availableActions?: string[];
 };
 
 type ManagerServiceEntry = {
@@ -151,6 +154,31 @@ const ACTIVE_SERVICES_COLUMNS = [
   { key: 'centerId', label: 'CENTER ID' },
   { key: 'type', label: 'TYPE' },
   { key: 'startDate', label: 'START DATE' },
+  {
+    key: 'actions',
+    label: 'ACTIONS',
+    render: (_: any, row: any) => {
+            const started = !!row.metadata?.serviceStartedAt;
+      const completed = !!row.metadata?.serviceCompletedAt;
+      const verified = !!row.metadata?.serviceVerifiedAt;
+      return (
+        <div style={{ display: 'flex', gap: 8 }}>
+          {!started && !completed && (
+            <Button size="sm" onClick={row.onStart}>Start</Button>
+          )}
+          {started && !completed && (
+            <Button size="sm" variant="primary" onClick={row.onComplete}>Complete</Button>
+          )}
+          {completed && !verified && (
+            <Button size="sm" variant="primary" onClick={row.onVerify}>Verify</Button>
+          )}
+          {completed && verified && (
+            <span style={{ fontSize: 12, color: '#16a34a' }}>Verified</span>
+          )}
+        </div>
+      );
+    }
+  }
 ];
 
 const SERVICE_HISTORY_COLUMNS = [
@@ -303,10 +331,7 @@ function normalizeOrderStatus(status: string | null | undefined): OrderStatus {
     case 'processing':
     case 'scheduled':
       return 'in-progress';
-    case 'completed':
-      return 'delivered';
     case 'closed':
-    case 'archived':
       return 'cancelled';
     default:
       return 'pending';
@@ -390,6 +415,9 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
   const [showCrewModal, setShowCrewModal] = useState(false);
   const [showCreateServiceModal, setShowCreateServiceModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<HubOrderItem | null>(null);
+  const [showServiceDetails, setShowServiceDetails] = useState(false);
+  const [serviceDetails, setServiceDetails] = useState<any>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
     const style = document.createElement('style');
@@ -426,6 +454,7 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
   const { data: scopeData } = useHubRoleScope(managerCode);
   const { data: activitiesData, isLoading: activitiesLoading, error: activitiesError } = useHubActivities(managerCode);
   const { data: ordersData } = useHubOrders(managerCode);
+  const { mutate } = useSWRConfig();
 
   // Extract role-scoped entities from scope data
   const managerScope = scopeData?.role === 'manager' ? scopeData : null;
@@ -439,9 +468,10 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
     }
     const map = new Map<string, ManagerServiceEntry>();
     ordersData.serviceOrders.forEach((order) => {
-      const serviceId = normalizeId(order.serviceId ?? order.transformedId ?? order.orderId ?? order.id ?? null);
+      // Only include once a Service exists (serviceId or transformedId)
+      const serviceId = normalizeId(order.serviceId ?? order.transformedId ?? null);
       if (!serviceId) {
-        return;
+        return; // Skip untransformed service orders
       }
       const existing = map.get(serviceId);
       const status = order.status ?? null;
@@ -578,36 +608,59 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
     () => orderEntries.filter((order) => order.orderType === 'product'),
     [orderEntries],
   );
-  const managerServices = serviceEntries;
+  // Catalog services list for My Services tab
+  const { data: catalogServices } = useDirectoryServices();
 
   const myServicesData = useMemo(
     () =>
-      managerServices.map((service) => {
-        const status = service.status?.toLowerCase() ?? 'unknown';
-        const certified = status === 'active' || status === 'approved' ? 'Yes' : status === 'unknown' ? 'Unknown' : 'No';
-        return {
-          serviceId: service.id ?? 'SRV-???',
-          serviceName: service.name ?? 'Service',
-          certified,
-          certificationDate: formatDate(service.createdAt),
-          expires: formatDate(service.updatedAt),
-        };
-      }),
-    [managerServices],
+      (catalogServices || []).map((service: any) => ({
+        serviceId: service.id ?? 'CAT-SRV',
+        serviceName: service.name ?? 'Service',
+        certified: 'Yes',
+        certificationDate: formatDate(service.createdAt ?? null),
+        expires: formatDate(service.updatedAt ?? null),
+      })),
+    [catalogServices],
   );
 
   const activeServicesData = useMemo(
     () =>
       managerServiceOrders
         .filter((order) => {
+          // Only include transformed services
+          if (!(order as any).serviceId && !(order as any).transformedId) {
+            return false;
+          }
           const status = normalizeOrderStatus(order.status);
           return status === 'pending' || status === 'in-progress' || status === 'approved';
         })
         .map((order) => {
-          const rawServiceId = order.serviceId ?? order.transformedId ?? order.orderId ?? order.id ?? 'Service';
+          const rawServiceId = (order as any).serviceId ?? (order as any).transformedId ?? 'Service';
           const serviceId = normalizeId(rawServiceId);
           const service = serviceId ? serviceById.get(serviceId) : null;
           const centerId = normalizeId(order.centerId ?? order.destination);
+          const meta: any = (order as any).metadata || {};
+          const onStart = async () => {
+            try {
+              const { applyServiceAction } = await import('../shared/api/hub');
+              await applyServiceAction(rawServiceId, 'start');
+              mutate(`/hub/orders/${managerCode}`);
+            } catch (err) {
+              console.error('[manager] failed to start service', err);
+              alert(err instanceof Error ? err.message : 'Failed to start service');
+            }
+          };
+          
+          const onVerify = async () => {
+            try {
+              const { applyServiceAction } = await import('../shared/api/hub');
+              await applyServiceAction(rawServiceId, 'verify');
+              mutate(`/hub/orders/${managerCode}`);
+            } catch (err) {
+              console.error('[manager] failed to verify service', err);
+              alert(err instanceof Error ? err.message : 'Failed to verify service');
+            }
+          };
           return {
             serviceId: rawServiceId,
             serviceName: service?.name ?? order.title ?? rawServiceId,
@@ -615,19 +668,26 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
             type: service?.category ?? 'Service',
             status: formatStatusLabel(order.status),
             startDate: formatDate(order.orderDate ?? order.requestedDate),
+            metadata: meta,
+            onStart,
+            onComplete, 
+            onVerify, 
           };
         }),
-    [managerServiceOrders, serviceById],
+    [managerServiceOrders, serviceById, managerCode, mutate],
   );
   const serviceHistoryData = useMemo(
     () =>
       managerServiceOrders
         .filter((order) => {
+          if (!(order as any).serviceId && !(order as any).transformedId) {
+            return false;
+          }
           const status = normalizeOrderStatus(order.status);
           return status === 'delivered' || status === 'service-created' || status === 'cancelled' || status === 'rejected';
         })
         .map((order) => {
-          const rawServiceId = order.serviceId ?? order.transformedId ?? order.orderId ?? order.id ?? 'Service';
+          const rawServiceId = (order as any).serviceId ?? (order as any).transformedId ?? 'Service';
           const serviceId = normalizeId(rawServiceId);
           const service = serviceId ? serviceById.get(serviceId) : null;
           const centerId = normalizeId(order.centerId ?? order.destination);
@@ -688,7 +748,8 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
     () =>
       managerServiceOrders.map((order) => {
         const canonicalOrderId = order.orderId ?? order.id ?? 'ORD-UNKNOWN';
-        const serviceId = normalizeId(order.serviceId ?? order.transformedId ?? canonicalOrderId);
+        // Only treat as a service when transformed
+        const serviceId = normalizeId(order.serviceId ?? order.transformedId ?? null);
         const service = serviceId ? serviceById.get(serviceId) : null;
         const customerId = normalizeId(order.customerId ?? order.requestedBy);
         const centerId = normalizeId(order.centerId ?? order.destination);
@@ -714,8 +775,9 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
           deliveryDate: deliveryDate ? formatDate(deliveryDate) : undefined,
           status,
           actualStatus,
-          approvalStages: [],
+          approvalStages: (order as any).approvalStages || [],
           transformedId: order.transformedId ?? order.serviceId ?? null,
+          availableActions: (order as any).availableActions || [],
         };
       }),
     [centerNameMap, customerNameMap, managerServiceOrders, serviceById],
@@ -769,7 +831,6 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
     setActivityFeed([]);
   }, []);
 
-  const { mutate } = useSWRConfig();
   const [selectedOrderForDetails, setSelectedOrderForDetails] = useState<HubOrderItem | null>(null);
 
   const handleOrderAction = useCallback(async (orderId: string, action: string) => {
@@ -787,7 +848,7 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
       const notes = window.prompt('Optional: provide a short reason for cancellation');
       const payload: OrderActionRequest = {
         action: 'cancel',
-        notes: notes?.trim() || null,
+        ...(notes && notes.trim().length > 0 ? { notes: notes.trim() } : {}),
       };
       try {
         await applyHubOrderAction(orderId, payload);
@@ -801,6 +862,53 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
 
     // Handle service order manager actions
     const order = ordersData?.orders?.find((o: any) => (o.orderId || o.id) === orderId);
+
+    if (action === 'Accept') {
+      const target = ordersData?.orders?.find((o: any) => (o.orderId || o.id) === orderId) as any;
+      const nextRole = (target?.nextActorRole || '').toLowerCase();
+      if (nextRole && nextRole !== 'manager') {
+        setNotice(`This order is now pending ${nextRole}. Refreshing...`);
+        setTimeout(() => setNotice(null), 2000);
+        mutate(`/hub/orders/${managerCode}`);
+        return;
+      }
+      try {
+        const payload: OrderActionRequest = { action: 'accept' };
+        await applyHubOrderAction(orderId, payload);
+        setNotice('Success'); setTimeout(() => setNotice(null), 1200); mutate(`/hub/orders/${managerCode}`);
+        console.log('[manager] accepted order', { orderId });
+      } catch (err) {
+        console.error('[manager] failed to accept order', err);
+        alert(err instanceof Error ? err.message : 'Failed to accept order');
+      }
+      return;
+    }
+
+    if (action === 'Reject') {
+      const reason = window.prompt('Please provide a short reason for rejection (required)')?.trim() || '';
+      if (!reason) {
+        alert('Rejection requires a short reason.');
+        return;
+      }
+      try {
+        const payload: OrderActionRequest = { action: 'reject', notes: reason };
+        const target = ordersData?.orders?.find((o: any) => (o.orderId || o.id) === orderId) as any;
+        const nextRole = (target?.nextActorRole || '').toLowerCase();
+        if (nextRole && nextRole !== 'manager') {
+          setNotice(`This order is now pending ${nextRole}. Refreshing...`);
+          setTimeout(() => setNotice(null), 2000);
+          mutate(`/hub/orders/${managerCode}`);
+          return;
+        }
+        await applyHubOrderAction(orderId, payload);
+        setNotice('Success'); setTimeout(() => setNotice(null), 1200); mutate(`/hub/orders/${managerCode}`);
+        console.log('[manager] rejected order', { orderId });
+      } catch (err) {
+        console.error('[manager] failed to reject order', err);
+        alert(err instanceof Error ? err.message : 'Failed to reject order');
+      }
+      return;
+    }
 
     if (action === 'Add Crew') {
       setSelectedOrder(order || null);
@@ -1009,7 +1117,18 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
                     showSearch={false}
                     externalSearchQuery={servicesSearchQuery}
                     maxItems={10}
-                    onRowClick={(row: unknown) => console.log('[manager] view active service', row)}
+                    onRowClick={async (row: any) => {
+                      try {
+                        const res = await fetch(`/api/services/${encodeURIComponent(row.serviceId)}`, { credentials: 'include' });
+                        const payload = await res.json();
+                        if (payload && payload.data) {
+                          setServiceDetails(payload.data);
+                          setShowServiceDetails(true);
+                        }
+                      } catch (err) {
+                        console.error('[manager] failed to load service details', err);
+                      }
+                    }}
                   />
                 )}
 
@@ -1027,6 +1146,9 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
             </PageWrapper>
           ) : activeTab === 'orders' ? (
             <PageWrapper title="Orders" showHeader headerSrOnly>
+              {notice && (
+                <div style={{ marginBottom: 12, padding: '8px 12px', background: '#ecfeff', color: '#0369a1', border: '1px solid #bae6fd', borderRadius: 6 }}>{notice}</div>
+              )}
               <OrdersSection
                 userRole="manager"
                 userCode={managerCode}
@@ -1137,6 +1259,35 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
         onSubmit={handleCreateService}
         orderId={selectedOrder?.orderId}
       />
+
+      <ServiceDetailsModal
+        isOpen={showServiceDetails}
+        onClose={() => setShowServiceDetails(false)}
+        service={serviceDetails ? { serviceId: serviceDetails.serviceId, title: serviceDetails.title, centerId: serviceDetails.centerId, metadata: serviceDetails.metadata } : null}
+        editable
+        availableCrew={crewEntries.map((c: any) => ({ code: c.id, name: c.name || c.id }))}
+        onSave={async (updates) => {
+          try {
+            if (!serviceDetails?.serviceId) return;
+            await fetch(`/api/services/${encodeURIComponent(serviceDetails.serviceId)}`, {
+              method: 'PATCH',
+              credentials: 'include',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(updates),
+            });
+            setShowServiceDetails(false);
+            setServiceDetails(null);
+            mutate(`/hub/orders/${managerCode}`);
+          } catch (err) {
+            console.error('[manager] failed to update service', err);
+          }
+        }}
+      />
     </div>
   );
 }
+
+
+
+
+

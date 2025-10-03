@@ -22,6 +22,7 @@ import { registerProfileRoutes } from "./domains/profile/routes.fastify";
 import { registerDashboardRoutes } from "./domains/dashboard/routes.fastify";
 import { registerScopeRoutes } from "./domains/scope/routes.fastify";
 import { registerOrdersRoutes } from "./domains/orders/routes.fastify";
+import { registerServicesRoutes } from "./domains/services/routes.fastify";
 import { registerCatalogRoutes } from "./domains/catalog/routes.fastify";
 import { reportsRoutes } from "./domains/reports/routes.fastify";
 import { registerInventoryRoutes } from "./domains/inventory/routes.fastify";
@@ -255,6 +256,7 @@ export async function buildServer() {
   await registerDashboardRoutes(server);
   await registerScopeRoutes(server);
   await registerOrdersRoutes(server);
+  await registerServicesRoutes(server);
   await registerCatalogRoutes(server);
   await registerInventoryRoutes(server);
   await server.register(reportsRoutes, { prefix: '/api' });

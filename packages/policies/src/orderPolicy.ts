@@ -162,9 +162,29 @@ export function getAllowedActions(ctx: OrderContext): OrderAction[] {
   // Get role-specific actions for this status
   const actions = ACTIONS_BY_STATUS[ctx.orderType]?.[ctx.role]?.[ctx.status] ?? [];
 
-  // Special case: creators can cancel their own pending orders
-  if (ctx.isCreator && ctx.status.startsWith('pending_')) {
-    if (!actions.includes('cancel')) {
+  // Service flow: staged cancel rights follow the last actor who has acted.
+  // - pending_customer: creator can cancel
+  // - pending_contractor: customer (who accepted) can cancel
+  // - pending_manager: contractor (who accepted) can cancel
+  // - manager_accepted: manager can cancel (optional)
+  if (ctx.orderType === 'service' && ctx.participants) {
+    const hasRoleUser = (role: HubRole) => ctx.participants!.some(p => p.role === role && p.userId === ctx.userId);
+    let canCancel = false;
+    switch (ctx.status) {
+      case 'pending_customer':
+        canCancel = ctx.isCreator === true || hasRoleUser('center') || hasRoleUser('customer');
+        break;
+      case 'pending_contractor':
+        canCancel = hasRoleUser('customer');
+        break;
+      case 'pending_manager':
+        canCancel = hasRoleUser('contractor');
+        break;
+      case 'manager_accepted':
+        canCancel = hasRoleUser('manager');
+        break;
+    }
+    if (canCancel && !actions.includes('cancel')) {
       return [...actions, 'cancel'];
     }
   }

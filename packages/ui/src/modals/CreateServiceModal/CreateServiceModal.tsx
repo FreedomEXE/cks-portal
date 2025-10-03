@@ -62,14 +62,7 @@ export default function CreateServiceModal({
   };
 
   const handleSubmit = () => {
-    if (!startDate || !startTime) {
-      return; // Validation: start date/time required
-    }
-
-    if (serviceType === 'one-time' && (!endDate || !endTime)) {
-      return; // Validation: end date/time required for one-time services
-    }
-
+    // Start/end can be set later when work begins/completes
     onSubmit({
       serviceType,
       startDate,
@@ -82,9 +75,7 @@ export default function CreateServiceModal({
   };
 
   const isFormValid = () => {
-    if (!startDate || !startTime) return false;
-    if (serviceType === 'one-time' && (!endDate || !endTime)) return false;
-    return true;
+    return true; // No strict validation; manager can set start/end later
   };
 
   return (
@@ -225,7 +216,7 @@ export default function CreateServiceModal({
             color: '#374151',
             marginBottom: '8px'
           }}>
-            Start Date & Time *
+            Start Date & Time (optional)
           </label>
           <div style={{ display: 'flex', gap: '12px' }}>
             <input

@@ -19,6 +19,9 @@ interface OrderCardProps {
   serviceStartDate?: string;  // Actual service start (for service-created)
   deliveryDate?: string;  // Actual delivery date (for delivered)
   status: 'pending' | 'in-progress' | 'approved' | 'rejected' | 'cancelled' | 'delivered' | 'service-created' | 'completed' | 'archived';
+  // Optional override for the label text shown on the status badge.
+  // Useful to display "Waiting" while keeping the blue "in-progress" styling.
+  statusText?: string;
   approvalStages?: ApprovalStage[];
   onAction?: (action: string) => void;
   actions?: string[];
@@ -40,6 +43,7 @@ const OrderCard: React.FC<OrderCardProps> = ({
   serviceStartDate,
   deliveryDate,
   status,
+  statusText,
   approvalStages = [],
   onAction,
   actions = [],
@@ -214,7 +218,7 @@ const OrderCard: React.FC<OrderCardProps> = ({
 
             {/* Status Badge */}
             <span className={`${styles.statusBadge} ${getStatusColor(status)}`}>
-              {status.replace('-', ' ').toUpperCase()}
+              {(statusText || status).replace('-', ' ').toUpperCase()}
             </span>
           </div>
         </div>

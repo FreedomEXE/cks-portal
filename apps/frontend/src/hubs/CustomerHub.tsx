@@ -28,6 +28,7 @@ import {
 } from '@cks/domain-widgets';
 import { Button, DataTable, OrderDetailsModal, PageHeader, PageWrapper, Scrollbar, TabSection } from '@cks/ui';
 import { useAuth } from '@cks/auth';
+import { useSWRConfig } from 'swr';
 
 import MyHubSection from '../components/MyHubSection';
 import {
@@ -36,7 +37,9 @@ import {
   useHubProfile,
   useHubReports,
   useHubRoleScope,
+  applyHubOrderAction,
   type HubOrderItem,
+  type OrderActionRequest,
 } from '../shared/api/hub';
 
 import { buildEcosystemTree, DEFAULT_ROLE_COLOR_MAP } from '../shared/utils/ecosystem';
@@ -192,6 +195,8 @@ export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubPro
   const {
     data: scopeData,
   } = useHubRoleScope(normalizedCode);
+  const { mutate } = useSWRConfig();
+  const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
     const style = document.createElement('style');
@@ -276,6 +281,10 @@ export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubPro
       = [];
 
     serviceOrders.forEach((order) => {
+      // Only include after service is created
+      if (!(order as any).serviceId && !(order as any).transformedId) {
+        return;
+      }
       const normalizedStatus = normalizeStatusValue(order.status);
       const base = {
         serviceId: order.serviceId ?? order.orderId,
@@ -561,6 +570,9 @@ export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubPro
               {ordersErrorMessage && (
                 <div style={{ marginBottom: 12, color: '#dc2626' }}>{ordersErrorMessage}</div>
               )}
+              {notice && (
+                <div style={{ marginBottom: 12, padding: '8px 12px', background: '#ecfeff', color: '#0369a1', border: '1px solid #bae6fd', borderRadius: 6 }}>{notice}</div>
+              )}
               <OrdersSection
                 userRole="customer"
                 userCode={normalizedCode ?? undefined}
@@ -576,6 +588,43 @@ export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubPro
                     }
                     return;
                   }
+                  const target = orders?.orders?.find((o: any) => (o.orderId || o.id) === orderId) as any;
+                  const label = (action || '').toLowerCase();
+                  let act: OrderActionRequest['action'] | null = null;
+                  if (label.includes('cancel')) act = 'cancel';
+                  if (label.includes('accept') && !act) act = 'accept';
+                  if ((label.includes('reject') || label.includes('deny')) && !act) act = 'reject';
+                  if (!act) return;
+                  const nextRole = (target?.nextActorRole || '').toLowerCase();
+                  if ((act === 'accept' || act === 'reject') && nextRole && nextRole !== 'customer') {
+                    setNotice(`This order is now pending ${nextRole}. Refreshing...`);
+                    setTimeout(() => setNotice(null), 2000);
+                    mutate(`/hub/orders/${normalizedCode}`);
+                    return;
+                  }
+                  let notes: string | null = null;
+                  if (act === 'cancel') {
+                    notes = window.prompt('Optional: reason for cancellation?')?.trim() || null;
+                  } else if (act === 'reject') {
+                    const reason = window.prompt('Please provide a short reason for rejection (required)')?.trim() || '';
+                    if (!reason) {
+                      alert('Rejection requires a short reason.');
+                      return;
+                    }
+                    notes = reason;
+                  }
+                  let payload: OrderActionRequest = { action: act } as OrderActionRequest;
+                  if (typeof notes === 'string' && notes.trim().length > 0) {
+                    payload.notes = notes;
+                  }
+                  applyHubOrderAction(orderId, payload)
+                    .then(() => { setNotice('Success'); setTimeout(() => setNotice(null), 1200); mutate(`/hub/orders/${normalizedCode}`); })
+                    .catch((err) => {
+                      console.error('[customer] failed to apply action', err);
+                      const msg = err instanceof Error ? err.message : 'Failed to apply action';
+                      setNotice(msg);
+                      setTimeout(() => setNotice(null), 2200);
+                    });
                 }}
                 showServiceOrders={true}
                 showProductOrders={true}
@@ -657,7 +706,3 @@ export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubPro
     </div>
   );
 }
-
-
-
-

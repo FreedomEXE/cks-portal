@@ -43,4 +43,6 @@ export { default as CrewSelectionModal } from './modals/CrewSelectionModal';
 
 export * from './modals/CreateServiceModal';
 export { default as CreateServiceModal } from './modals/CreateServiceModal';
+export * from './modals/ServiceDetailsModal/ServiceDetailsModal';
+export { default as ServiceDetailsModal } from './modals/ServiceDetailsModal/ServiceDetailsModal';
 

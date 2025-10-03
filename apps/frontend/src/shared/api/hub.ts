@@ -655,3 +655,13 @@ export async function updateOrderFields(orderId: string, payload: UpdateOrderFie
   });
   return response.data;
 }
+
+export type ServiceAction = 'start' | 'complete' | 'verify';
+
+export async function applyServiceAction(serviceId: string, action: ServiceAction, notes?: string) {
+  const response = await apiFetch<ApiResponse<any>>(`/services/${encodeURIComponent(serviceId)}/actions`, {
+    method: 'POST',
+    body: JSON.stringify({ action, ...(notes && notes.trim().length ? { notes } : {}) }),
+  });
+  return response.data;
+}

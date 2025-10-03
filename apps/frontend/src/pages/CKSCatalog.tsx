@@ -119,24 +119,55 @@ function Card({
 function DateSelectorModal({
   item,
   onClose,
-  onConfirm
+  onConfirm,
+  role,
+  defaultDestination,
+  customers,
+  centers,
 }: {
   item: CatalogItem;
   onClose: () => void;
-  onConfirm: (date: string) => void;
+  onConfirm: (
+    availability: { tz: string; days: string[]; window: { start: string; end: string } },
+    notes?: string | null,
+    destination?: { code: string; role: 'center' } | undefined,
+  ) => void;
+  role: string | null;
+  defaultDestination: string | null;
+  customers: DestinationOption[];
+  centers: DestinationOption[];
 }) {
-  const [selectedDate, setSelectedDate] = useState("");
-  const [notes, setNotes] = useState("");
+  const [days, setDays] = useState<string[]>([]);
+  const [start, setStart] = useState<string>('09:00');
+  const [end, setEnd] = useState<string>('17:00');
+  const [notes, setNotes] = useState('');
+  const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  const [selectedCustomer, setSelectedCustomer] = useState<string | null>(null);
+  const [selectedCenter, setSelectedCenter] = useState<string | null>(defaultDestination);
+  // Hide destination picker if we already have a clear default (center role or inferred)
+  const needsDestination = !defaultDestination && (role || '').toLowerCase() !== 'center';
 
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const minDate = tomorrow.toISOString().split('T')[0];
+  const toggleDay = (d: string) => {
+    setDays((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]));
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (selectedDate) {
-      onConfirm(selectedDate);
+    if (!start || !end || days.length === 0) {
+      alert('Please select at least one day and a time range.');
+      return;
     }
+    let destination: { code: string; role: 'center' } | undefined = undefined;
+    const r = (role || '').trim().toLowerCase();
+    if (needsDestination) {
+      const chosen = selectedCenter || defaultDestination || null;
+      if (!chosen) {
+        alert('Please select a destination center.');
+        return;
+      }
+      destination = { code: chosen, role: 'center' };
+    }
+    onConfirm({ tz: browserTz, days, window: { start, end } }, notes?.trim() ? notes.trim() : undefined, destination);
   };
 
   return (
@@ -145,47 +176,75 @@ function DateSelectorModal({
         <h2 className="text-lg font-semibold mb-4">Schedule Service: {item.name}</h2>
         <form onSubmit={handleSubmit}>
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Availability Window
-            </label>
-            <input
-              type="text"
-              placeholder="e.g., Monday-Friday 9am-5pm, or Nov 15-20"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black"
-              required
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              Provide your general availability. The manager will set the exact schedule when creating the service.
-            </p>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Availability Window</label>
+            <div className="flex flex-wrap gap-2 mb-3">
+              {['mon','tue','wed','thu','fri','sat','sun'].map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => toggleDay(d)}
+                  className={`px-2 py-1 rounded border text-xs ${days.includes(d) ? 'bg-black text-white border-black' : 'bg-white text-gray-700 border-gray-300'}`}
+                >
+                  {d.toUpperCase()}
+                </button>
+              ))}
+              <button type="button" onClick={() => setDays(['mon','tue','wed','thu','fri'])} className="px-2 py-1 rounded border text-xs bg-gray-100 border-gray-300 text-gray-700">Mon–Fri</button>
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-gray-700">From</label>
+              <input type="time" value={start} onChange={(e) => setStart(e.target.value)} className="border rounded px-2 py-1 text-sm" />
+              <label className="text-sm text-gray-700">to</label>
+              <input type="time" value={end} onChange={(e) => setEnd(e.target.value)} className="border rounded px-2 py-1 text-sm" />
+              <span className="ml-2 text-xs text-gray-500">{browserTz}</span>
+            </div>
+            <p className="text-xs text-gray-500 mt-1">Provide your general availability. The manager will set the exact schedule when creating the service.</p>
           </div>
+          {needsDestination && (
+            <div className="mb-4">
+              <div className="font-semibold mb-2">Destination</div>
+              {(role === 'contractor' || role === 'manager') && (
+                <div className="mb-2">
+                  <label className="block text-sm text-gray-700 mb-1">Customer</label>
+                  <select
+                    value={selectedCustomer || ''}
+                    onChange={(e) => {
+                      const v = e.target.value || null;
+                      setSelectedCustomer(v);
+                      setSelectedCenter(null);
+                    }}
+                    className="w-full border rounded px-3 py-2 text-sm"
+                  >
+                    <option value="">Select customer</option>
+                    {customers.map((c) => (
+                      <option key={c.id} value={c.id}>{`${c.id}${c.name ? ` - ${c.name}` : ''}`}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <div>
+                <label className="block text-sm text-gray-700 mb-1">Center</label>
+                <select
+                  value={selectedCenter || ''}
+                  onChange={(e) => setSelectedCenter(e.target.value || null)}
+                  className="w-full border rounded px-3 py-2 text-sm"
+                >
+                  <option value="">Select center</option>
+                  {centers
+                    .filter((c) => !selectedCustomer || c.customerId === selectedCustomer)
+                    .map((c) => (
+                      <option key={c.id} value={c.id}>{`${c.id}${c.name ? ` - ${c.name}` : ''}`}</option>
+                    ))}
+                </select>
+              </div>
+            </div>
+          )}
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Notes (Optional)
-            </label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black"
-              rows={3}
-              placeholder="Any special requirements..."
-            />
+            <label className="block text-sm font-medium text-gray-700 mb-2">Notes (Optional)</label>
+            <textarea value={notes} onChange={(e) => setNotes(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black" rows={3} placeholder="Buzz 8008, come to back door..." />
           </div>
           <div className="flex gap-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="flex-1 px-4 py-2 bg-black text-white rounded-md hover:bg-neutral-800"
-            >
-              Request Service
-            </button>
+            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50">Cancel</button>
+            <button type="submit" className="flex-1 px-4 py-2 bg-black text-white rounded-md hover:bg-neutral-800">Request Service</button>
           </div>
         </form>
       </div>
@@ -466,7 +525,11 @@ export default function CKSCatalog() {
     setSelectedService(item);
   };
 
-  const handleServiceConfirm = async (date: string) => {
+  const handleServiceConfirm = async (
+    availability: { tz: string; days: string[]; window: { start: string; end: string } },
+    notes?: string | null,
+    destination?: { code: string; role: 'center' }
+  ) => {
     if (!selectedService || isSubmitting) return;
 
     setIsSubmitting(true);
@@ -474,7 +537,9 @@ export default function CKSCatalog() {
       await createHubOrder({
         orderType: "service",
         title: selectedService.name,
-        expectedDate: date,
+        notes: notes || undefined,
+        destination: destination ? { code: destination.code, role: destination.role } : undefined,
+        metadata: { availability },
         items: [{
           catalogCode: selectedService.code,
           quantity: 1,
@@ -485,7 +550,18 @@ export default function CKSCatalog() {
       setSelectedService(null);
     } catch (error) {
       console.error("Failed to create service order:", error);
-      alert("Failed to create service order. Please try again.");
+      let message = "Failed to create service order. Please try again.";
+      if (error instanceof Error && typeof error.message === 'string' && error.message.trim().length > 0) {
+        try {
+          const parsed = JSON.parse(error.message);
+          if (parsed && typeof parsed.error === 'string' && parsed.error.trim().length > 0) {
+            message = parsed.error;
+          }
+        } catch (_) {
+          message = error.message;
+        }
+      }
+      alert(message);
     } finally {
       setIsSubmitting(false);
     }
@@ -675,6 +751,61 @@ export default function CKSCatalog() {
           item={selectedService}
           onClose={() => setSelectedService(null)}
           onConfirm={handleServiceConfirm}
+          role={authRole}
+          defaultDestination={(() => {
+            const r = (authRole || '').toLowerCase();
+            // Prefer explicit role
+            if (r === 'center') return normalizedCode;
+            if (r === 'crew') {
+              const center = (scope as any)?.relationships?.center;
+              return center?.id || null;
+            }
+            // Fallback: infer from code prefix (CEN-xxx)
+            if (normalizedCode && /^CEN-\d+$/i.test(normalizedCode)) {
+              return normalizedCode;
+            }
+            // Fallback: scope may expose a single center relationship
+            const rel = (scope as any)?.relationships;
+            if (rel?.center?.id) return rel.center.id;
+            if (Array.isArray(rel?.centers) && rel.centers.length === 1) return rel.centers[0].id;
+            return null;
+          })()}
+          customers={(() => {
+            const r = (authRole || '').toLowerCase();
+            if (r === 'contractor' || r === 'manager') {
+              return ((scope as any)?.relationships?.customers || []).map((c: any) => ({ id: c.id, name: c.name || c.id }));
+            }
+            if (r === 'customer') {
+              const customer = (scope as any)?.relationships?.customer;
+              return customer ? [{ id: customer.id, name: customer.name || customer.id }] : [];
+            }
+            // Fallback: provide customers list if available
+            const rel = (scope as any)?.relationships;
+            if (Array.isArray(rel?.customers) && rel.customers.length > 0) {
+              return rel.customers.map((c: any) => ({ id: c.id, name: c.name || c.id }));
+            }
+            return [];
+          })()}
+          centers={(() => {
+            const r = (authRole || '').toLowerCase();
+            if (r === 'manager' || r === 'contractor') {
+              const list = (scope as any)?.relationships?.centers || [];
+              return list.map((x: any) => ({ id: x.id, name: x.name || x.id, customerId: x.customerId || null }));
+            }
+            if (r === 'customer') {
+              const list = (scope as any)?.relationships?.centers || [];
+              return list.map((x: any) => ({ id: x.id, name: x.name || x.id }));
+            }
+            if (r === 'center') {
+              const center = (scope as any)?.relationships?.center || (scope as any)?.relationships?.centers?.[0];
+              return center ? [{ id: center.id, name: center.name || center.id }] : [];
+            }
+            // Fallbacks when role not resolved
+            const rel = (scope as any)?.relationships;
+            if (rel?.center?.id) return [{ id: rel.center.id, name: rel.center.name || rel.center.id }];
+            if (Array.isArray(rel?.centers) && rel.centers.length > 0) return rel.centers.map((x: any) => ({ id: x.id, name: x.name || x.id, customerId: x.customerId || null }));
+            return [];
+          })()}
         />
       )}
     </div>

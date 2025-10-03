@@ -89,7 +89,17 @@ const OrdersSection: React.FC<OrdersSectionProps> = ({
     // Check if user has actions beyond just "View Details"
     const actions = order.availableActions || [];
     const hasActions = actions.some(action => action !== 'View Details');
-    return hasActions;
+    if (hasActions) return true;
+
+    // If listed in approval workflow chain, treat as involved ("waiting")
+    if (Array.isArray(order.approvalStages) && order.approvalStages.length > 0) {
+      const rolesInFlow = new Set(order.approvalStages.map((s) => (s.role || '').toLowerCase()));
+      if (rolesInFlow.has(userRole.toLowerCase())) {
+        return true;
+      }
+    }
+
+    return false;
   }, [userCode, userRole]);
 
   // Count orders by type and status
@@ -191,8 +201,27 @@ const OrdersSection: React.FC<OrdersSectionProps> = ({
     if (order.availableActions && order.availableActions.length > 0) {
       // Filter out delivery actions for warehouse in Orders section (those belong in Deliveries section)
       let actions = [...order.availableActions];
+      // Safety guard: only the next pending actor should see Accept/Reject
+      const nextPendingRole = order.approvalStages?.find(s => s.status === 'pending')?.role?.toLowerCase();
+      if (nextPendingRole && nextPendingRole !== userRole.toLowerCase()) {
+        actions = actions.filter(a => {
+          const l = a.toLowerCase();
+          return !(l === 'accept' || l === 'reject' || l === 'approve' || l === 'deny');
+        });
+      }
       if (userRole === 'warehouse' && order.orderType === 'product') {
         actions = actions.filter(action => action !== 'Start Delivery' && action !== 'Mark Delivered');
+      }
+
+      // Post-accept manager tools: if manager has approved and service not created yet,
+      // expose helper actions even if policy doesn't enumerate them (UI-only helpers).
+      if (userRole === 'manager' && order.orderType === 'service') {
+        const mgrStage = order.approvalStages?.find(s => (s.role || '').toLowerCase() === 'manager');
+        if (mgrStage && mgrStage.status === 'approved' && order.status !== 'service-created') {
+          if (!actions.includes('Add Crew')) actions.push('Add Crew');
+          if (!actions.includes('Add Procedure')) actions.push('Add Procedure');
+          if (!actions.includes('Add Training')) actions.push('Add Training');
+        }
       }
 
       // Always ensure "View Details" is included
@@ -311,7 +340,16 @@ const OrdersSection: React.FC<OrdersSectionProps> = ({
 
     return (
       <div>
-        {orders.map((order) => (
+        {orders.map((order) => {
+          // Compute a friendlier label for users who are waiting (future actor)
+          let statusText: string | undefined = undefined;
+          if (order.status === 'in-progress' && Array.isArray(order.approvalStages) && order.approvalStages.length > 0) {
+            const stageForRole = order.approvalStages.find(s => (s.role || '').toLowerCase() === userRole.toLowerCase());
+            if (stageForRole && stageForRole.status === 'waiting') {
+              statusText = 'waiting';
+            }
+          }
+          return (
           <OrderCard
             key={order.orderId}
             orderId={order.orderId}
@@ -322,6 +360,7 @@ const OrdersSection: React.FC<OrdersSectionProps> = ({
             requestedDate={order.requestedDate}
             expectedDate={order.expectedDate}
             status={order.status}
+            statusText={statusText}
             approvalStages={order.approvalStages}
             actions={getOrderActions(order)}
             onAction={(action) => onOrderAction?.(order.orderId, action)}
@@ -330,7 +369,8 @@ const OrdersSection: React.FC<OrdersSectionProps> = ({
             defaultExpanded={false}
             transformedId={activeOrderTab === 'archive' ? order.transformedId : undefined}
           />
-        ))}
+          );
+        })}
       </div>
     );
   };
@@ -419,4 +459,3 @@ const OrdersSection: React.FC<OrdersSectionProps> = ({
 };
 
 export default OrdersSection;
-

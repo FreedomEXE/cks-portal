@@ -244,8 +244,10 @@ function viewerStatusFrom(options: {
   viewerRole: HubRole | null;
   viewerCode: string | null;
   creatorCode: string | null;
+  creatorRole?: HubRole | null;
+  approvals?: readonly HubRole[];
 }): OrderViewerStatus {
-  const { status, nextActorRole, nextActorCode, viewerRole, viewerCode, creatorCode } = options;
+  const { status, nextActorRole, nextActorCode, viewerRole, viewerCode, creatorCode, creatorRole, approvals } = options;
 
   console.log(`[viewerStatusFrom] Input: status="${status}", viewerRole="${viewerRole}", viewerCode="${viewerCode}"`);
 
@@ -282,26 +284,28 @@ function viewerStatusFrom(options: {
     return 'in-progress';
   }
 
-  // Service order flow
-  if (status === 'pending_customer' && viewerRole === 'customer') {
-    return 'pending'; // YELLOW - Customer needs to act
-  }
-  if (status === 'pending_contractor' && viewerRole === 'contractor') {
-    return 'pending'; // YELLOW - Contractor needs to act
-  }
-  if (status === 'pending_manager' && viewerRole === 'manager') {
-    return 'pending'; // YELLOW - Manager needs to act
-  }
-  if (status === 'manager_accepted' && viewerRole === 'manager') {
-    return 'pending'; // YELLOW - Manager needs to create service
-  }
-  if (status === 'crew_requested' && viewerRole === 'crew') {
-    return 'pending'; // YELLOW - Crew needs to accept/reject
-  }
+  // Service order flow (derive next actor from approvals when provided)
+  const serviceRolesByCreator: Record<HubRole, HubRole[]> = {
+    center: ['customer', 'contractor', 'manager'],
+    customer: ['contractor', 'manager'],
+    contractor: ['manager'],
+    manager: ['manager'],
+    warehouse: ['manager'],
+    admin: ['manager'],
+    crew: ['manager']
+  };
 
-  // Service statuses where viewer is waiting
-  if (status === 'pending_customer' || status === 'pending_contractor' || status === 'pending_manager' || status === 'manager_accepted' || status === 'crew_requested' || status === 'crew_assigned') {
-    return 'in-progress'; // BLUE - Waiting for others
+  if (creatorRole) {
+    const chain = serviceRolesByCreator[creatorRole] || ['manager'];
+    const approvalsList = (approvals ?? []).filter((r): r is HubRole => !!r) as HubRole[];
+    const pendingIdx = Math.min(approvalsList.length, chain.length - 1);
+    const computedNextRole = chain[pendingIdx] ?? nextActorRole;
+
+    if (viewerRole && computedNextRole && viewerRole === computedNextRole) {
+      return 'pending';
+    }
+    // For all other service statuses where viewer isn't the next actor
+    return 'in-progress';
   }
 
   // Legacy status handling
@@ -484,59 +488,99 @@ function buildApprovalStages(
   row: OrderRow,
   orderType: 'product' | 'service',
   status: OrderStatus,
+  approvals?: readonly HubRole[]
 ): OrderApprovalStage[] {
   const stages: OrderApprovalStage[] = [];
   const creatorRole = normalizeRole(row.creator_role) ?? 'center';
-  const creatorStatus = deriveCreatorStageStatus(status);
+  const creatorUserId = normalizeCodeValue(row.creator_id);
+
+  // Always add creator stage as "requested" (green)
   stages.push({
     role: creatorRole,
-    status: creatorStatus,
-    userId: normalizeCodeValue(row.creator_id),
+    status: 'requested',
+    userId: creatorUserId,
     timestamp: toIso(row.requested_date),
   });
 
-  const fallbackFulfillmentRole: HubRole = orderType === 'service' ? 'manager' : 'warehouse';
-  const fulfillmentRole = normalizeRole(row.next_actor_role) ?? fallbackFulfillmentRole;
-  const fulfillmentStatus = deriveFulfillmentStageStatus(orderType, status, row.metadata);
+  if (orderType === 'service') {
+    // Build the service approval chain
+    const chain: HubRole[] = [];
+    if (creatorRole === 'center') {
+      chain.push('customer', 'contractor', 'manager');
+    } else if (creatorRole === 'customer') {
+      chain.push('contractor', 'manager');
+    } else if (creatorRole === 'contractor') {
+      chain.push('manager');
+    } else if (creatorRole === 'manager') {
+      chain.push('manager');
+    }
 
-  let fulfillmentUserId: string | null = null;
-  switch (fulfillmentRole) {
-    case 'warehouse':
-      fulfillmentUserId = normalizeCodeValue(row.assigned_warehouse);
-      break;
-    case 'manager':
-      fulfillmentUserId = normalizeCodeValue(row.manager_id);
-      break;
-    case 'contractor':
-      fulfillmentUserId = normalizeCodeValue(row.contractor_id);
-      break;
-    case 'crew':
-      fulfillmentUserId = normalizeCodeValue(row.crew_id);
-      break;
-    case 'customer':
-      fulfillmentUserId = normalizeCodeValue(row.customer_id) ?? null;
-      break;
-    case 'center':
-      fulfillmentUserId = normalizeCodeValue(row.center_id) ?? null;
-      break;
-    default:
-      fulfillmentUserId = null;
+    const roleToUserId = (role: HubRole): string | null => {
+      switch (role) {
+        case 'customer':
+          return normalizeCodeValue(row.customer_id) ?? null;
+        case 'contractor':
+          return normalizeCodeValue(row.contractor_id) ?? null;
+        case 'manager':
+          return normalizeCodeValue(row.manager_id) ?? null;
+        case 'center':
+          return normalizeCodeValue(row.center_id) ?? null;
+        default:
+          return null;
+      }
+    };
+
+    // Determine which role is currently pending using approvals if provided
+    const approvalsList = (approvals ?? []).filter((r): r is HubRole => !!r) as HubRole[];
+    let pendingIndex = Math.min(approvalsList.length, Math.max(chain.length - 1, 0));
+
+    // For each role in the chain, compute its stage status
+    for (let i = 0; i < chain.length; i++) {
+      const role = chain[i];
+      let stageStatus: OrderApprovalStage['status'];
+
+      if (status === 'service_created') {
+        stageStatus = role === 'manager' ? 'service-created' : 'approved';
+      } else if (status === 'manager_accepted' || status === 'crew_requested' || status === 'crew_assigned') {
+        // Manager has accepted; all prior roles are approved
+        stageStatus = role === 'manager' ? 'approved' : 'approved';
+      } else if (pendingIndex === i) {
+        stageStatus = 'pending';
+      } else if (pendingIndex > i && pendingIndex !== -1) {
+        // Past actors appear as approved (green)
+        // Only mark approved if explicitly approved in approvals list
+        stageStatus = approvalsList.includes(role) ? 'approved' : 'waiting';
+      } else {
+        // Future actors show as waiting (yellow, no pulse)
+        stageStatus = 'waiting';
+      }
+
+      stages.push({
+        role,
+        status: stageStatus,
+        userId: roleToUserId(role),
+        timestamp: null,
+      });
+    }
+
+    return stages;
   }
 
+  // Product orders: creator + single fulfillment stage (warehouse)
+  const fulfillmentRole: HubRole = 'warehouse';
+  const fulfillmentStatus = deriveFulfillmentStageStatus(orderType, status, row.metadata);
+  const fulfillmentUserId = normalizeCodeValue(row.assigned_warehouse);
   const fulfillmentTimestamp =
     FINAL_STATUSES.has(status) || fulfillmentStatus === 'accepted' || fulfillmentStatus === 'approved'
-      ? toIso(row.delivery_date ?? row.service_start_date ?? row.updated_at)
+      ? toIso(row.delivery_date ?? row.updated_at)
       : null;
 
-  // Determine custom label for awaiting_delivery status based on metadata
   let fulfillmentLabel: string | null = null;
   if (status === 'awaiting_delivery' && fulfillmentStatus === 'accepted') {
-    if (row.metadata && row.metadata.deliveryStarted === true) {
-      fulfillmentLabel = 'Delivery In Progress';
-    } else {
-      fulfillmentLabel = 'Awaiting Delivery';
-    }
-  } else if (status === 'delivered' && orderType === 'product') {
+    fulfillmentLabel = row.metadata && (row.metadata as any).deliveryStarted === true
+      ? 'Delivery In Progress'
+      : 'Awaiting Delivery';
+  } else if (status === 'delivered') {
     fulfillmentLabel = 'Completed Delivery';
   }
 
@@ -570,6 +614,19 @@ async function mapOrderRow(
   // Build participants list
   const participants = buildParticipants(row);
 
+  // Build approvals list from metadata
+  const approvalsRoles: HubRole[] = (() => {
+    const meta = (row.metadata || {}) as any;
+    const arr: string[] = Array.isArray(meta.approvals) ? meta.approvals : [];
+    const norm = arr.map((r) => (normalizeRole(r) || r)).filter(Boolean) as HubRole[];
+    return norm;
+  })();
+
+  // Keep canonical DB status authoritative for policy and UI. Approvals only
+  // annotate visuals but do not override who is pending.
+  const effectiveStatus = status;
+  const creatorRole = normalizeRole(row.creator_role) ?? 'center';
+
   // Determine available actions using policy
   let availableActions: string[] = [];
   if (viewerRole && viewerCode) {
@@ -582,7 +639,7 @@ async function mapOrderRow(
       role: viewerRole,
       userId: viewerCode,
       orderType: orderType as PolicyOrderType,
-      status: status as any, // We'll handle the type conversion
+      status: (status as any),
       participants,
       isCreator,
       isAssignedActor
@@ -615,7 +672,7 @@ async function mapOrderRow(
     metadata: item.metadata ?? null,
   }));
 
-  const approvalStages = buildApprovalStages(row, orderType, status);
+  const approvalStages = buildApprovalStages(row, orderType, status, approvalsRoles);
 
   // Enrich metadata with contact info for Warehouse and other hubs (fill missing fields)
   console.log('[mapOrderRow] START - order_id:', row.order_id);
@@ -752,8 +809,8 @@ async function mapOrderRow(
   const needDestination = !hasAllFields(existingContacts.destination);
 
   // Fallback: only for center-created product orders with no explicit destination/center
-  const creatorRole = normalizeRole(row.creator_role);
-  const destinationFallbackCode = normalizedDestination ?? normalizedCenter ?? ((orderType === 'product' && creatorRole === 'center') ? creatorCode : null);
+  const creatorRoleForFallback = normalizeRole(row.creator_role);
+  const destinationFallbackCode = normalizedDestination ?? normalizedCenter ?? ((orderType === 'product' && creatorRoleForFallback === 'center') ? creatorCode : null);
 
   console.log('[mapOrderRow] needRequestor:', needRequestor, 'needDestination:', needDestination);
   console.log('[mapOrderRow] creatorCode:', creatorCode);
@@ -823,12 +880,14 @@ async function mapOrderRow(
     deliveryDate: toIso(row.delivery_date),
     status,
     viewerStatus: (row.archived_at ? 'archived' : viewerStatusFrom({
-      status,
+      status: status,
       nextActorRole,
       nextActorCode,
       viewerRole,
       viewerCode,
       creatorCode,
+      creatorRole,
+      approvals: approvalsRoles,
     } as any)),
     approvalStages,
     items: lineItems,
@@ -1014,22 +1073,38 @@ function buildRoleFilter(role: HubRole, cksCode: string): { clause: string; para
       return { clause, params: [cksCode] };
     }
     case "crew": {
-      // Crew sees all orders in their ecosystem
-      // Crew connects to ecosystem via cks_manager
+      // Product vs Service visibility differs for crew:
+      // - PRODUCT: Crew can see ALL product orders in their ecosystem (via their manager's network)
+      // - SERVICE: Crew only sees orders they are directly involved in (creator, crew_id, or participant)
       const clause = `
-        crew_id = $1 OR creator_id = $1 OR
-        manager_id IN (SELECT cks_manager FROM crew WHERE crew_id = $1) OR
-        customer_id IN (
-          SELECT customer_id FROM customers WHERE cks_manager IN (SELECT cks_manager FROM crew WHERE crew_id = $1)
-        ) OR
-        center_id IN (
-          SELECT center_id FROM centers WHERE cks_manager IN (SELECT cks_manager FROM crew WHERE crew_id = $1)
-        ) OR
-        contractor_id IN (
-          SELECT contractor_id FROM contractors WHERE cks_manager IN (SELECT cks_manager FROM crew WHERE crew_id = $1)
-        ) OR
-        crew_id IN (
-          SELECT crew_id FROM crew WHERE cks_manager IN (SELECT cks_manager FROM crew WHERE crew_id = $1)
+        (
+          order_type = 'product' AND (
+            creator_id = $1
+            OR manager_id IN (SELECT cks_manager FROM crew WHERE crew_id = $1)
+            OR customer_id IN (
+              SELECT customer_id FROM customers WHERE cks_manager IN (SELECT cks_manager FROM crew WHERE crew_id = $1)
+            )
+            OR center_id IN (
+              SELECT center_id FROM centers WHERE cks_manager IN (SELECT cks_manager FROM crew WHERE crew_id = $1)
+            )
+            OR contractor_id IN (
+              SELECT contractor_id FROM contractors WHERE cks_manager IN (SELECT cks_manager FROM crew WHERE crew_id = $1)
+            )
+            OR crew_id IN (
+              SELECT crew_id FROM crew WHERE cks_manager IN (SELECT cks_manager FROM crew WHERE crew_id = $1)
+            )
+          )
+        )
+        OR (
+          order_type = 'service' AND (
+            creator_id = $1
+            OR crew_id = $1
+            OR order_id IN (
+              SELECT op.order_id
+              FROM order_participants op
+              WHERE op.participant_id = $1 AND op.participant_role = 'crew'
+            )
+          )
         )
       `;
       return { clause, params: [cksCode] };
@@ -1662,6 +1737,23 @@ export async function applyOrderAction(input: OrderActionInput): Promise<HubOrde
       if (orderType === "product" && currentStatus === "pending_warehouse") {
         assignedWarehouseValue = actorCodeNormalized ?? assignedWarehouseValue;
       }
+      // Track service approvals in metadata
+      if (orderType === 'service') {
+        const currentMetadata = row.metadata || {};
+        const approvalsArr: string[] = Array.isArray((currentMetadata as any).approvals)
+          ? ((currentMetadata as any).approvals as string[])
+          : [];
+        const roleTag = input.actorRole;
+        if (!approvalsArr.includes(roleTag)) {
+          const merged = { ...(currentMetadata as any), approvals: [...approvalsArr, roleTag] };
+          // Prepare metadata update merge
+          // Merge with any other pending metadataUpdate
+          // We'll set in the UPDATE below via metadataUpdate variable
+          // but since we also handle other branches, just set here if not already set
+          // Combine later when building metadataUpdate below
+          (row as any).__metadata_accept_merge = merged;
+        }
+      }
       break;
 
     case "reject":
@@ -1686,13 +1778,22 @@ export async function applyOrderAction(input: OrderActionInput): Promise<HubOrde
       break;
 
     case "create-service":
-      transformedId = input.transformedId ?? `SVC-${Date.now()}`;
-      // Use the startDate from metadata if provided, otherwise use current time
-      if (input.metadata && typeof input.metadata.startDate === 'string' && typeof input.metadata.startTime === 'string') {
-        const startDateTime = new Date(`${input.metadata.startDate}T${input.metadata.startTime}`);
-        serviceStartDate = startDateTime.toISOString();
-      } else {
-        serviceStartDate = new Date().toISOString();
+      {
+        // Generate per-center sequential service ID: <CENTER>-SRV-XXX
+        const centerCode = normalizeCodeValue(row.center_id) || normalizeCodeValue(row.destination) || null;
+        if (!centerCode) {
+          throw new Error('Unable to determine center for service ID generation.');
+        }
+        const seqQuery = await query<{ next: string }>(
+          `SELECT LPAD((COALESCE(MAX(CAST(SPLIT_PART(transformed_id, '-SRV-', 2) AS INTEGER)), 0) + 1)::text, 3, '0') AS next
+           FROM orders
+           WHERE transformed_id LIKE $1`,
+          [`${centerCode}-SRV-%`]
+        );
+        const nextSeq = seqQuery.rows[0]?.next ?? '001';
+        transformedId = `${centerCode}-SRV-${nextSeq}`;
+        // Do not set actual start/end here; those are set when work starts/completes
+        serviceStartDate = null;
       }
       break;
 
@@ -1730,6 +1831,12 @@ export async function applyOrderAction(input: OrderActionInput): Promise<HubOrde
         serviceNotes: input.metadata.notes,
         serviceCreatedAt: new Date().toISOString()
       };
+    }
+
+    // Merge acceptance metadata if present
+    const acceptMerge: Record<string, unknown> | undefined = (row as any).__metadata_accept_merge;
+    if (acceptMerge) {
+      metadataUpdate = { ...(row.metadata || {}), ...(metadataUpdate || {}), ...acceptMerge } as Record<string, unknown>;
     }
 
     // Do not overwrite "notes" (special instructions) on cancel or reject.
@@ -1910,10 +2017,11 @@ export async function requestCrewAssignment(
     throw new Error(`Order ${orderId} not found`);
   }
 
-  // Verify order is at manager_accepted status
+  // Verify order is at a status where manager can request crew
   const currentStatus = normalizeStatus(row.status);
-  if (currentStatus !== 'manager_accepted') {
-    throw new Error(`Crew can only be requested for orders at manager_accepted status. Current status: ${currentStatus}`);
+  const ALLOWED_STATUSES = new Set(['manager_accepted', 'crew_requested', 'crew_assigned']);
+  if (!ALLOWED_STATUSES.has(currentStatus)) {
+    throw new Error(`Crew can only be requested at manager_accepted/crew_requested/crew_assigned. Current status: ${currentStatus}`);
   }
 
   // Build crew requests
@@ -1941,6 +2049,11 @@ export async function requestCrewAssignment(
      WHERE order_id = $2`,
     [JSON.stringify(updatedMetadata), orderId]
   );
+
+  // Ensure each requested crew member is a participant so they can see/respond
+  for (const code of crewCodes) {
+    await ensureParticipant({ orderId, role: 'crew', code, participationType: 'actor' });
+  }
 
   return fetchOrderById(orderId, { viewerRole: 'manager', viewerCode: managerCode });
 }
@@ -2016,6 +2129,15 @@ export async function respondToCrewRequest(
       ? [JSON.stringify(updatedMetadata), newStatus, crewIdValue, orderId]
       : [JSON.stringify(updatedMetadata), newStatus, orderId]
   );
+
+  // If the crew rejected, remove them from participants so the order no longer appears in their view
+  if (!accept) {
+    await query(
+      `DELETE FROM order_participants
+       WHERE order_id = $1 AND participant_id = $2 AND participant_role = 'crew'`,
+      [orderId, normalizedCrewCode]
+    );
+  }
 
   return fetchOrderById(orderId, { viewerRole: 'crew', viewerCode: crewCode });
 }

@@ -36,7 +36,9 @@ import {
   useHubProfile,
   useHubReports,
   useHubRoleScope,
+  applyHubOrderAction,
   type HubOrderItem,
+  type OrderActionRequest,
 } from '../shared/api/hub';
 
 import { buildEcosystemTree, DEFAULT_ROLE_COLOR_MAP } from '../shared/utils/ecosystem';
@@ -287,6 +289,9 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
       = [];
 
     serviceOrders.forEach((order) => {
+      if (!(order as any).serviceId && !(order as any).transformedId) {
+        return;
+      }
       const normalizedStatus = normalizeStatusValue(order.status);
       const base = {
         serviceId: order.serviceId ?? order.orderId,
@@ -574,6 +579,18 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
                     }
                     return;
                   }
+                  const label = (action || '').toLowerCase();
+                  let act: OrderActionRequest['action'] | null = null;
+                  if (label.includes('cancel')) act = 'cancel';
+                  if (label.includes('accept') && !act) act = 'accept';
+                  if (label.includes('reject') || label.includes('deny')) act = 'reject';
+                  if (!act) return;
+                  const notes = act === 'cancel' ? (window.prompt('Optional: reason for cancellation?')?.trim() || null) : null;
+                  let payload: OrderActionRequest = { action: act } as OrderActionRequest;
+                  if (typeof notes === 'string' && notes.trim().length > 0) {
+                    payload.notes = notes;
+                  }
+                  applyHubOrderAction(orderId, payload).catch((err) => console.error('[crew] failed to apply action', err));
                 }}
                 showServiceOrders={true}
                 showProductOrders={true}
@@ -655,5 +672,3 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
     </div>
   );
 }
-
-

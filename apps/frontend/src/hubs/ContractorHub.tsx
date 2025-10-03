@@ -27,6 +27,7 @@ import {
   type TreeNode,
 } from '@cks/domain-widgets';
 import { Button, DataTable, OrderDetailsModal, PageHeader, PageWrapper, Scrollbar, TabSection } from '@cks/ui';
+import { useSWRConfig } from 'swr';
 import { useAuth } from '@cks/auth';
 
 import MyHubSection from '../components/MyHubSection';
@@ -37,7 +38,9 @@ import {
   useHubProfile,
   useHubReports,
   useHubRoleScope,
+  applyHubOrderAction,
   type HubOrderItem,
+  type OrderActionRequest,
 } from '../shared/api/hub';
 import { buildEcosystemTree } from '../shared/utils/ecosystem';
 
@@ -227,6 +230,8 @@ export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHu
     isLoading: ordersLoading,
     error: ordersError,
   } = useHubOrders(normalizedCode);
+  const { mutate } = useSWRConfig();
+  const [notice, setNotice] = useState<string | null>(null);
   const {
     data: reportsData,
     isLoading: reportsLoading,
@@ -445,13 +450,17 @@ export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHu
     const history: Array<{ serviceId: string; serviceName: string; centerId: string; type: string; status: string; startDate: string; endDate: string }> = [];
 
     serviceOrders.forEach((order) => {
+      // Only include after service is created
+      if (!(order as any).serviceId && !(order as any).transformedId) {
+        return;
+      }
       const serviceKey = normalizeId(order.serviceId ?? order.transformedId ?? order.orderId ?? order.id ?? null);
       const service = serviceKey ? serviceById.get(serviceKey) : null;
       const centerId = normalizeId(order.centerId ?? order.destination);
       const normalizedStatus = normalizeStatusValue(order.status);
       const base = {
-        serviceId: order.serviceId ?? order.orderId ?? order.id ?? 'SERVICE',
-        serviceName: service?.name ?? order.title ?? order.serviceId ?? order.orderId ?? 'Service',
+        serviceId: (order as any).serviceId ?? (order as any).transformedId ?? 'SERVICE',
+        serviceName: service?.name ?? order.title ?? ((order as any).serviceId ?? (order as any).transformedId) ?? 'Service',
         centerId: centerId ? centerNameMap.get(centerId) ?? centerId : EMPTY_VALUE,
         type: service?.category ?? (order.orderType === 'product' ? 'Product' : 'Service'),
         status: formatStatusLabel(order.status),
@@ -779,6 +788,9 @@ export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHu
               {ordersErrorMessage && (
                 <div style={{ marginBottom: 12, color: '#dc2626' }}>{ordersErrorMessage}</div>
               )}
+              {notice && (
+                <div style={{ marginBottom: 12, padding: '8px 12px', background: '#ecfeff', color: '#0369a1', border: '1px solid #bae6fd', borderRadius: 6 }}>{notice}</div>
+              )}
               <OrdersSection
                 userRole="contractor"
                 userCode={contractorCode}
@@ -794,6 +806,43 @@ export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHu
                     }
                     return;
                   }
+                  const target = orders?.orders?.find((o: any) => (o.orderId || o.id) === orderId) as any;
+                  const label = (action || '').toLowerCase();
+                  let act: OrderActionRequest['action'] | null = null;
+                  if (label.includes('cancel')) act = 'cancel';
+                  if (label.includes('accept') && !act) act = 'accept';
+                  if ((label.includes('reject') || label.includes('deny')) && !act) act = 'reject';
+                  if (!act) return;
+                  const nextRole = (target?.nextActorRole || '').toLowerCase();
+                  if ((act === 'accept' || act === 'reject') && nextRole && nextRole !== 'contractor') {
+                    setNotice(`This order is now pending ${nextRole}. Refreshing...`);
+                    setTimeout(() => setNotice(null), 2000);
+                    mutate(`/hub/orders/${contractorCode}`);
+                    return;
+                  }
+                  let notes: string | null = null;
+                  if (act === 'cancel') {
+                    notes = window.prompt('Optional: reason for cancellation?')?.trim() || null;
+                  } else if (act === 'reject') {
+                    const reason = window.prompt('Please provide a short reason for rejection (required)')?.trim() || '';
+                    if (!reason) {
+                      alert('Rejection requires a short reason.');
+                      return;
+                    }
+                    notes = reason;
+                  }
+                  let payload: OrderActionRequest = { action: act } as OrderActionRequest;
+                  if (typeof notes === 'string' && notes.trim().length > 0) {
+                    payload.notes = notes;
+                  }
+                  applyHubOrderAction(orderId, payload)
+                    .then(() => { setNotice('Success'); setTimeout(() => setNotice(null), 1200); mutate(`/hub/orders/${contractorCode}`); })
+                    .catch((err) => {
+                      console.error('[contractor] failed to apply action', err);
+                      const msg = err instanceof Error ? err.message : 'Failed to apply action';
+                      setNotice(msg);
+                      setTimeout(() => setNotice(null), 2200);
+                    });
                 }}
                 showServiceOrders={true}
                 showProductOrders={true}
@@ -875,12 +924,6 @@ export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHu
     </div>
   );
 }
-
-
-
-
-
-
 
 
 

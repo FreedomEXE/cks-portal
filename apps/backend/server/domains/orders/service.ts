@@ -19,12 +19,12 @@ const PRODUCT_ORDER_CREATORS = new Set<HubRole>(['manager', 'contractor', 'custo
 const SERVICE_ORDER_CREATORS = new Set<HubRole>(['contractor', 'customer', 'center']);
 
 const ROLE_ACTIONS: Record<HubRole, readonly OrderActionType[]> = {
-  admin: [], // Admin doesn't interact with orders directly
-  manager: ['create-service', 'cancel'],
-  contractor: ['cancel'],
-  customer: ['cancel'],
+  admin: [], // Admin doesn't interact with orders directly via this endpoint
+  manager: ['accept', 'reject', 'create-service', 'cancel'],
+  contractor: ['accept', 'reject', 'cancel'],
+  customer: ['accept', 'reject', 'cancel'],
   center: ['cancel'],
-  crew: ['cancel'],
+  crew: ['accept', 'reject', 'cancel'],
   warehouse: ['accept', 'reject', 'start-delivery', 'deliver', 'cancel'],
 };
 
