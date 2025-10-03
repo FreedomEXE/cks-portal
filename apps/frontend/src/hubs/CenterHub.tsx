@@ -290,7 +290,9 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
         endDate: formatDisplayDate(order.expectedDate),
       };
 
-      if (HISTORY_STATUSES.has(normalizedStatus)) {
+      // Only show cancelled/rejected services in history
+      // Active services (delivered/service-created) should remain in Active Services until explicitly completed
+      if (normalizedStatus === 'cancelled' || normalizedStatus === 'rejected') {
         history.push({
           serviceId: base.serviceId,
           serviceName: base.serviceName,
@@ -300,6 +302,7 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
           endDate: base.endDate,
         });
       } else {
+        // Include active service statuses: pending approval stages, in-progress work, AND created services that are active
         active.push({
           serviceId: base.serviceId,
           serviceName: base.serviceName,

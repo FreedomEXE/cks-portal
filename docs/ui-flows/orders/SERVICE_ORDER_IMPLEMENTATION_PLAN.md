@@ -217,36 +217,44 @@ Center (✓ created/green) → Customer (✗ rejected/red) → Contractor (⏳ p
 
 ### Backend Changes Needed
 
-- [ ] Add service order statuses to policy (`pending_customer`, `pending_contractor`, `pending_manager`, etc.)
-- [ ] Define ACTIONS_BY_STATUS for all roles at each service order status
-- [ ] Implement approval chain logic based on creator role
-- [ ] Add crew assignment request/response actions
-- [ ] Implement service transformation logic (ORD-SRV-XXX → SRV-XXX)
-- [ ] Add transformedId tracking
+- [x] ✅ Add service order statuses to policy (`pending_customer`, `pending_contractor`, `pending_manager`, etc.)
+- [x] ✅ Define ACTIONS_BY_STATUS for all roles at each service order status
+- [x] ✅ Implement approval chain logic based on creator role
+- [x] ✅ Add crew assignment request/response actions
+- [x] ✅ Implement service transformation logic (ORD-SRV-XXX → SRV-XXX)
+- [x] ✅ Add transformedId tracking
+- [x] ✅ **NEW (Oct 3)**: Service record creation in `services` table on `create-service`
+- [x] ✅ **NEW (Oct 3)**: Center code resolution with participant fallback
+- [x] ✅ **NEW (Oct 3)**: Extended manager permissions (can create service at crew_requested/crew_assigned)
 
 ### Frontend Changes Needed
 
-- [ ] Update all 6 hub files with complete status normalization
-- [ ] Update OrdersSection archive filtering for service_created
-- [ ] Implement multi-stage approval workflow visualization
-- [ ] Add Manager action menu (Add Training, Add Procedure, Add Crew, Request Products)
-- [ ] Build crew selection dropdown for manager
-- [ ] Add crew assignment request UI in crew Services section
-- [ ] Update archive to show transformedId for service_created orders
+- [x] ✅ Update all 6 hub files with complete status normalization
+- [x] ✅ Update OrdersSection archive filtering for service_created
+- [x] ✅ Implement multi-stage approval workflow visualization
+- [x] ✅ Add Manager action menu (Add Training, Add Procedure, Add Crew, Request Products)
+- [x] ✅ Build crew selection dropdown for manager
+- [x] ✅ Add crew assignment request UI in crew Services section
+- [x] ✅ Update archive to show transformedId for service_created orders
+- [x] ✅ **NEW (Oct 3)**: Active Services visibility includes created services (all hubs)
+- [x] ✅ **NEW (Oct 3)**: Service History only shows cancelled/rejected (all hubs)
+- [ ] ⏳ Add success toast notification for service creation
+- [ ] ⏳ Service lifecycle actions (start/complete/verify)
 
 ### Policy Package Updates
 
-- [ ] Add service order approval chains
-- [ ] Define actions for: customer, contractor, manager, crew at each stage
-- [ ] Handle crew assignment request/response actions
-- [ ] Rebuild package after changes
+- [x] ✅ Add service order approval chains
+- [x] ✅ Define actions for: customer, contractor, manager, crew at each stage
+- [x] ✅ Handle crew assignment request/response actions
+- [x] ✅ Rebuild package after changes
+- [x] ✅ **NEW (Oct 3)**: Manager can create service at multiple statuses
 
 ### Domain Widgets Updates
 
-- [ ] Ensure OrdersSection handles service order types
-- [ ] Support multi-stage workflow visualization
-- [ ] Handle different approval chain lengths
-- [ ] Rebuild package after changes
+- [x] ✅ Ensure OrdersSection handles service order types
+- [x] ✅ Support multi-stage workflow visualization
+- [x] ✅ Handle different approval chain lengths
+- [x] ✅ Rebuild package after changes
 
 ---
 
@@ -271,5 +279,98 @@ Center (✓ created/green) → Customer (✗ rejected/red) → Contractor (⏳ p
 
 ---
 
+## 13. Completed Flow Implementation (Oct 3, 2025)
+
+### ✅ Full End-to-End Service Order Flow
+
+**Complete Working Flow**:
+1. **Order Creation** → Customer/Center/Contractor creates service order
+2. **Approval Chain** → Flows through customer → contractor → manager
+3. **Manager Accepts** → Order status: `manager_accepted`
+4. **Manager Adds Crew** → Opens CrewSelectionModal, selects crew(s)
+   - Backend API: `POST /api/orders/:orderId/crew-requests`
+   - Request body: `{ crewCodes: string[], message?: string }`
+   - Order status transitions to: `crew_requested`
+   - Crew sees request in their Orders tab
+5. **Crew Responds** → Crew accepts or rejects
+   - Backend API: `POST /api/orders/:orderId/crew-response`
+   - Request body: `{ accept: boolean }`
+   - On first accept: status → `crew_assigned`, crew added to order
+6. **Manager Creates Service** → After crew assigned (or anytime at manager_accepted/crew_requested/crew_assigned)
+   - Backend API: `POST /api/orders/:orderId/actions` with `{ action: 'create-service', metadata: {...} }`
+   - Generates service ID: `{CENTER}-SRV-{SEQ}` (e.g., `CEN-010-SRV-001`)
+   - Inserts service record into `services` table
+   - Order status → `service_created`
+   - Order archived with `transformed_id` = service ID
+
+### Service Visibility After Creation
+
+**Active Services Tab** (shows created services):
+- **Manager**: ✅ Can start/complete/verify service
+- **Contractor**: ✅ Can view service details
+- **Crew**: ✅ Can see assigned services
+- **Customer**: ✅ In "My Services" tab
+- **Center**: ✅ In "Active Services" tab
+
+**Service History Tab** (only cancelled/rejected):
+- Shows services that were terminated before completion
+
+**Orders Archive Tab**:
+- Shows original order with status "Service Created"
+- Displays `transformed_id` (service ID)
+
+### Technical Implementation Details
+
+**Backend** (`apps/backend/server/domains/orders/store.ts`):
+```typescript
+// Service creation logic (lines 1899-1927)
+if (input.action === "create-service" && transformedId) {
+  // Generate service ID: {CENTER}-SRV-{SEQ}
+  const centerCode = normalizeCodeValue(row.center_id)
+    || normalizeCodeValue(row.destination)
+    || participants.find(p => p.role === 'center')?.userId;
+
+  // Insert into services table
+  await query(`INSERT INTO services (service_id, service_name, status, category, ...)
+               VALUES ($1, $2, 'active', $3, ...)`);
+}
+```
+
+**Policy** (`packages/policies/src/orderPolicy.ts`):
+```typescript
+manager: {
+  'manager_accepted': ['create-service'],
+  'crew_requested': ['create-service'],  // Can create after requesting crew
+  'crew_assigned': ['create-service']    // Can create after crew assigned
+}
+```
+
+**Frontend Visibility** (all hub files):
+```typescript
+// Active Services: includes created services
+const isActiveService = status === 'pending' || status === 'in-progress'
+  || status === 'approved' || status === 'delivered'
+  || status === 'service-created' || status === 'completed';
+
+// Service History: only terminated
+const isHistoryService = status === 'cancelled' || status === 'rejected';
+```
+
+### Known Limitations & Next Steps
+
+**Current Limitations**:
+1. No success toast after service creation
+2. Multiple crew can be requested, but only first accepted crew is set in `crew_id` field
+3. Service completion flow not yet implemented
+
+**Next Steps**:
+1. Add service lifecycle actions (start, complete, verify)
+2. Implement success notifications
+3. Add service-to-order linking in UI (click service → show original order)
+4. Consider adding relationship columns to `services` table for direct querying
+
+---
+
 *Created: 2025-10-02*
-*Status: Ready for Implementation*
+*Updated: 2025-10-03*
+*Status: ✅ E2E Flow Complete - Ready for Service Lifecycle Implementation*

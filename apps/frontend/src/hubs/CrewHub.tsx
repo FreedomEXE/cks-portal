@@ -306,9 +306,12 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
         endDate: formatDisplayDate(order.expectedDate),
       };
 
-      if (HISTORY_STATUSES.has(normalizedStatus)) {
+      // Only show cancelled/rejected services in history
+      // Active services (delivered/service-created) should remain in Active Services until explicitly completed
+      if (normalizedStatus === 'cancelled' || normalizedStatus === 'rejected') {
         history.push(base);
       } else {
+        // Include active service statuses: pending approval stages, in-progress work, AND created services that are active
         active.push(base);
       }
     });

@@ -1761,9 +1761,19 @@ export async function applyOrderAction(input: OrderActionInput): Promise<HubOrde
     case "create-service":
       {
         // Generate per-center sequential service ID: <CENTER>-SRV-XXX
-        const centerCode = normalizeCodeValue(row.center_id) || normalizeCodeValue(row.destination) || null;
+        // Try to get center from: center_id, destination, or participants
+        let centerCode = normalizeCodeValue(row.center_id) || normalizeCodeValue(row.destination) || null;
+
+        // If still no center, look for center in participants
         if (!centerCode) {
-          throw new Error('Unable to determine center for service ID generation.');
+          const centerParticipant = participants.find(p => p.role === 'center');
+          if (centerParticipant) {
+            centerCode = centerParticipant.userId;
+          }
+        }
+
+        if (!centerCode) {
+          throw new Error('Unable to determine center for service ID generation. Order must be associated with a center.');
         }
         const seqQuery = await query<{ next: string }>(
           `SELECT LPAD((COALESCE(MAX(CAST(SPLIT_PART(transformed_id, '-SRV-', 2) AS INTEGER)), 0) + 1)::text, 3, '0') AS next
@@ -1884,6 +1894,36 @@ export async function applyOrderAction(input: OrderActionInput): Promise<HubOrde
           [item.quantity, warehouseId, item.catalog_item_code]
         );
       }
+    }
+
+    // If creating a service, insert into services table
+    if (input.action === "create-service" && transformedId) {
+      const serviceMetadata = metadataUpdate || row.metadata || {};
+      const serviceType = (serviceMetadata as any).serviceType || 'one-time';
+      const serviceName = row.title || transformedId;
+
+      await query(
+        `INSERT INTO services (
+          service_id,
+          service_name,
+          status,
+          category,
+          created_at,
+          updated_at
+        ) VALUES ($1, $2, $3, $4, NOW(), NOW())
+        ON CONFLICT (service_id) DO UPDATE SET
+          service_name = EXCLUDED.service_name,
+          status = EXCLUDED.status,
+          updated_at = NOW()`,
+        [
+          transformedId,
+          serviceName,
+          'active', // New services start as active
+          serviceType // Use serviceType from metadata
+        ]
+      );
+
+      console.log(`[create-service] Created service ${transformedId} for order ${input.orderId}`);
     }
 
     await query("COMMIT");

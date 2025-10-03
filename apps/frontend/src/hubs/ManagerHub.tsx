@@ -626,12 +626,13 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
     () =>
       managerServiceOrders
         .filter((order) => {
-          // Only include transformed services
+          // Only include transformed services (orders that have been converted to services)
           if (!(order as any).serviceId && !(order as any).transformedId) {
             return false;
           }
           const status = normalizeOrderStatus(order.status);
-          return status === 'pending' || status === 'in-progress' || status === 'approved';
+          // Include active service statuses: pending approval stages, in-progress work, AND created services that are active
+          return status === 'pending' || status === 'in-progress' || status === 'approved' || status === 'delivered' || status === 'service-created' || status === 'completed';
         })
         .map((order) => {
           const rawServiceId = (order as any).serviceId ?? (order as any).transformedId ?? 'Service';
@@ -683,7 +684,9 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
             return false;
           }
           const status = normalizeOrderStatus(order.status);
-          return status === 'delivered' || status === 'service-created' || status === 'cancelled' || status === 'rejected';
+          // Only show cancelled/rejected services in history
+          // Active services (delivered/service-created) should remain in Active Services until explicitly completed
+          return status === 'cancelled' || status === 'rejected';
         })
         .map((order) => {
           const rawServiceId = (order as any).serviceId ?? (order as any).transformedId ?? 'Service';

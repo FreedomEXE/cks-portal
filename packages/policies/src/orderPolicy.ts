@@ -82,8 +82,8 @@ const ACTIONS_BY_STATUS: Record<OrderType, Record<HubRole, Partial<Record<OrderS
       'pending_contractor': [], // Watch only
       'pending_manager': ['accept', 'reject'], // Manager approves
       'manager_accepted': ['create-service'], // Manager creates service (required)
-      'crew_requested': [], // Watch crew responses
-      'crew_assigned': [] // Watch only
+      'crew_requested': ['create-service'], // Manager can create service after requesting crew
+      'crew_assigned': ['create-service'] // Manager can create service after crew is assigned
     },
     contractor: {
       'pending_contractor': ['accept', 'reject'], // Contractor approves
