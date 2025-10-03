@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { requireActiveRole } from '../../core/auth/guards';
 import { applyServiceAction, getServiceById, updateServiceMetadata } from './service';
+import { query } from '../../db/connection';
 
 export async function registerServicesRoutes(server: FastifyInstance) {
   const paramsSchema = z.object({ serviceId: z.string().min(1) });
@@ -84,6 +85,55 @@ export async function registerServicesRoutes(server: FastifyInstance) {
       reply.send({ data });
     } catch (err: any) {
       reply.code(400).send({ error: err?.message || 'Failed to update service' });
+    }
+  });
+
+  // Return certified services for a given user (per-individual certifications)
+  server.get('/api/certified-services', async (request, reply) => {
+    const schema = z.object({
+      userId: z.string().min(1),
+      role: z.enum(['manager', 'crew', 'warehouse']),
+      limit: z.coerce.number().int().min(1).max(500).optional(),
+    });
+    const parsed = schema.safeParse(request.query);
+    if (!parsed.success) {
+      reply.code(400).send({ error: 'Invalid query' });
+      return;
+    }
+
+    // Require an active session; owning checks can be tightened later if needed
+    const account = await requireActiveRole(request, reply, {});
+    if (!account) return;
+
+    const { role, limit } = parsed.data;
+    const userId = parsed.data.userId.trim().toUpperCase();
+    try {
+      const result = await query<{
+        service_id: string;
+        name: string;
+        category: string | null;
+        is_active: boolean | null;
+        updated_at: Date | null;
+      }>(
+        `SELECT s.service_id, s.name, s.category, s.is_active, s.updated_at
+         FROM service_certifications c
+         JOIN catalog_services s ON s.service_id = c.service_id
+         WHERE c.user_id = $1 AND c.role = $2 AND c.archived_at IS NULL
+         ORDER BY s.name
+         LIMIT $3`,
+        [userId, role, limit ?? 250],
+      );
+      const data = result.rows.map((r) => ({
+        serviceId: r.service_id,
+        name: r.name,
+        category: r.category,
+        status: r.is_active ? 'active' : 'inactive',
+        updatedAt: r.updated_at ? r.updated_at.toISOString() : null,
+      }));
+      reply.send({ data });
+    } catch (error) {
+      request.log.error({ err: error, userId, role }, 'certified-services failed');
+      reply.code(500).send({ error: 'Failed to load certified services' });
     }
   });
 }

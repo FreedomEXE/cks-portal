@@ -454,6 +454,15 @@ export async function archiveEntity(operation: ArchiveOperation): Promise<{ succ
     if (!fallbackResult || (fallbackResult.rowCount ?? 0) === 0) {
       throw new Error(`Archive failed: ${operation.entityType} ${normalizedId} not found or already archived`);
     }
+  } else if ((!updateResult || (updateResult.rowCount ?? 0) === 0) && operation.entityType === 'service') {
+    // Fallback for services: deactivate in catalog_services
+    await query(
+      `UPDATE catalog_services
+       SET is_active = FALSE,
+           updated_at = NOW()
+       WHERE service_id = $1`,
+      [normalizedId]
+    );
   } else if (!updateResult || (updateResult.rowCount ?? 0) === 0) {
     throw new Error(`Archive failed: ${operation.entityType} ${normalizedId} not found or already archived`);
   }
@@ -510,7 +519,7 @@ export async function restoreEntity(operation: RestoreOperation): Promise<{ succ
   }
 
   // Restore the entity (it goes to unassigned bucket)
-  await query(
+  const restoreResult = await query(
     `UPDATE ${tableName}
      SET archived_at = NULL,
          archived_by = NULL,
@@ -522,6 +531,17 @@ export async function restoreEntity(operation: RestoreOperation): Promise<{ succ
      WHERE ${idColumn} = $2`,
     [actorId, normalizedId]
   );
+
+  // Fallback for services: reactivate in catalog_services if legacy services row not found
+  if ((!restoreResult || (restoreResult.rowCount ?? 0) === 0) && operation.entityType === 'service') {
+    await query(
+      `UPDATE catalog_services
+       SET is_active = TRUE,
+           updated_at = NOW()
+       WHERE service_id = $1`,
+      [normalizedId]
+    );
+  }
 
   // Mark relationships as potentially restorable
   await query(

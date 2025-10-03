@@ -189,7 +189,7 @@ const CATALOG_UNION = `
     WHERE status = 'active' AND archived_at IS NULL
     GROUP BY item_id
   ) inv ON p.product_id = inv.item_id
-  WHERE inv.total_on_hand IS NOT NULL AND inv.total_on_hand > 0
+  WHERE p.is_active = TRUE AND inv.total_on_hand IS NOT NULL AND inv.total_on_hand > 0
   UNION ALL
   SELECT
     s.service_id AS item_code,
@@ -216,6 +216,7 @@ const CATALOG_UNION = `
     NULL::integer AS stock_available,
     NULL::integer AS stock_on_hand
   FROM catalog_services AS s
+  WHERE s.is_active = TRUE
 `;
 
 export async function fetchCatalogItems(filters: CatalogFilters): Promise<CatalogListResult> {

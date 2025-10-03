@@ -178,6 +178,38 @@ This document tracks architectural improvements and refactorings that should be 
 - Add CDN for static assets
 - Implement server-side rendering for public pages
 
+## 13. Certification Via Training (Managers, Crew, Warehouses)
+
+Problem with ad‑hoc assignment
+- Manually “assigning” a service to a user as a proxy for certification does not scale and lacks auditability/skills validation.
+- For MVP we paused this; treat any current assignment data as temporary.
+
+Proposed model
+- Certification is earned by completing training modules/tests tied to a service (and optionally, role + level).
+- Entities:
+  - `training_modules(module_id, service_id, role, version, prerequisites, pass_score, expires_after_days, metadata)`
+  - `training_enrollments(user_id, module_id, status[pending|in_progress|passed|failed], score, started_at, completed_at, assessor_id, evidence, metadata)`
+  - `service_certifications(user_id, service_id, role, issued_at, expires_at, source_enrollment_id, revoked_at, metadata)`
+- “My Services” lists services for which the user holds an active (non‑expired) certification.
+
+Workflow
+- Admin (or org admin/manager later) assigns/enrolls users into modules.
+- User completes curriculum/tests; automatic or assessor verification records result.
+- Passing creates/renews `service_certifications` with `expires_at` (optional) and links back to enrollment.
+- Revocation/expiry removes the service from “My Services.”
+
+Governance & UX
+- Versioned modules allow re‑certification when content changes.
+- Role‑specific tracks (manager vs crew) with different pass criteria.
+- Admin override (issue/revoke) with reason and audit event.
+
+Migration/Transition
+- If any ad‑hoc `service_certifications` exist from MVP, migrate them to stub `training_enrollments` with an issued certification and short expiry; backfill via real training over time.
+
+Impacted surfaces
+- Manager/Crew/Warehouse Hubs: “My Services” fed by active certifications (not global role flags).
+- Admin: manage training modules, view enrollments, approve/verifications, report on status/expiry.
+
 ## 16. Warehouse-Scoped Catalog (Availability by Location)
 
 **Current State:**

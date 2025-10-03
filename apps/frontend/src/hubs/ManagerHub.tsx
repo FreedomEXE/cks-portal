@@ -32,7 +32,7 @@ import {
 } from '@cks/ui';
 import { ServiceDetailsModal } from '@cks/ui';
 import MyHubSection from '../components/MyHubSection';
-import { useServices as useDirectoryServices } from '../shared/api/directory';
+import { useCatalogItems } from '../shared/api/catalog';
 import { useLogout } from '../hooks/useLogout';
 
 /**
@@ -608,20 +608,19 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
     () => orderEntries.filter((order) => order.orderType === 'product'),
     [orderEntries],
   );
-  // Catalog services list for My Services tab
-  const { data: catalogServices } = useDirectoryServices();
+  // Catalog services list for My Services tab (MVP: show all services to managers)
+  const { data: catalogData } = useCatalogItems({ type: 'service', pageSize: 500 });
 
-  const myServicesData = useMemo(
-    () =>
-      (catalogServices || []).map((service: any) => ({
-        serviceId: service.id ?? 'CAT-SRV',
-        serviceName: service.name ?? 'Service',
-        certified: 'Yes',
-        certificationDate: formatDate(service.createdAt ?? null),
-        expires: formatDate(service.updatedAt ?? null),
-      })),
-    [catalogServices],
-  );
+  const myServicesData = useMemo(() => {
+    const items = catalogData?.items || [];
+    return items.map((service: any) => ({
+      serviceId: service.code ?? 'CAT-SRV',
+      serviceName: service.name ?? 'Service',
+      certified: 'Yes',
+      certificationDate: null,
+      expires: null,
+    }));
+  }, [catalogData]);
 
   const activeServicesData = useMemo(
     () =>
@@ -953,21 +952,18 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
     if (!selectedOrder) return;
 
     try {
-      const response = await fetch(`/api/orders/${selectedOrder.orderId}/crew-requests`, {
+      const { apiFetch } = await import('../shared/api/client');
+      await apiFetch(`/orders/${selectedOrder.orderId}/crew-requests`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify({
           crewCodes: selectedCrew,
           message,
         }),
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to request crew assignment');
-      }
-
       mutate(`/hub/orders/${managerCode}`);
+      setShowCrewModal(false);
+      setSelectedOrder(null);
       console.log('[manager] crew requested', { orderId: selectedOrder.orderId, crewCodes: selectedCrew });
     } catch (error) {
       console.error('[manager] failed to request crew', error);
@@ -1242,10 +1238,7 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
           setSelectedOrder(null);
         }}
         onSubmit={handleCrewRequest}
-        availableCrew={
-          // TODO: Fetch available crew from API
-          // For now, use mock data
-          []
+        availableCrew={crewEntries.map((c: any) => ({ code: c.id, name: c.name || c.id }))
         }
       />
 

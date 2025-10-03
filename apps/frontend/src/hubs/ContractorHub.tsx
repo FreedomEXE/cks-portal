@@ -43,6 +43,7 @@ import {
   type OrderActionRequest,
 } from '../shared/api/hub';
 import { buildEcosystemTree } from '../shared/utils/ecosystem';
+import { useCatalogItems } from '../shared/api/catalog';
 
 interface ContractorHubProps {
   initialTab?: string;
@@ -207,7 +208,7 @@ function buildActivities(serviceOrders: HubOrderItem[], productOrders: HubOrderI
 export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHubProps) {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState(initialTab);
-  const [servicesTab, setServicesTab] = useState<'my' | 'history'>('my');
+  const [servicesTab, setServicesTab] = useState<'my' | 'active' | 'history'>('my');
   const [servicesSearchQuery, setServicesSearchQuery] = useState('');
   const [activityFeed, setActivityFeed] = useState<Activity[]>([]);
   const [selectedOrderForDetails, setSelectedOrderForDetails] = useState<HubOrderItem | null>(null);
@@ -445,7 +446,7 @@ export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHu
     } as TreeNode;
   }, [scopeData, profile, contractorCode]);
 
-  const { myServicesData, serviceHistoryData } = useMemo(() => {
+  const { activeServicesData, serviceHistoryData } = useMemo(() => {
     const active: Array<{ serviceId: string; serviceName: string; centerId: string; type: string; status: string; startDate: string }> = [];
     const history: Array<{ serviceId: string; serviceName: string; centerId: string; type: string; status: string; startDate: string; endDate: string }> = [];
 
@@ -482,14 +483,25 @@ export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHu
       }
     });
 
-    return { myServicesData: active, serviceHistoryData: history };
+    return { activeServicesData: active, serviceHistoryData: history };
   }, [serviceOrders, serviceById, centerNameMap]);
+
+  // Catalog-backed "My Services" list (MVP): show all catalog services to contractors
+  const { data: catalogData } = useCatalogItems({ type: 'service', pageSize: 500 });
+  const myCatalogServices = useMemo(() => {
+    const items = catalogData?.items || [];
+    return items.map((svc: any) => ({
+      serviceId: svc.code ?? 'CAT-SRV',
+      serviceName: svc.name ?? 'Service',
+      category: (svc.tags && svc.tags[0]) || null,
+    }));
+  }, [catalogData]);
 
   const tabs = useMemo(() => [
     { id: 'dashboard', label: 'Dashboard', path: '/contractor/dashboard' },
     { id: 'profile', label: 'My Profile', path: '/contractor/profile' },
     { id: 'ecosystem', label: 'My Ecosystem', path: '/contractor/ecosystem' },
-    { id: 'services', label: 'My Services', path: '/contractor/services' },
+    { id: 'services', label: 'Services', path: '/contractor/services' },
     { id: 'orders', label: 'Orders', path: '/contractor/orders' },
     { id: 'reports', label: 'Reports', path: '/contractor/reports' },
     { id: 'support', label: 'Support', path: '/contractor/support' },
@@ -659,20 +671,25 @@ export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHu
               )}
               <TabSection
                 tabs={[
-                  { id: 'my', label: 'My Services', count: myServicesData.length },
+                  { id: 'my', label: 'My Services', count: myCatalogServices.length },
+                  { id: 'active', label: 'Active Services', count: activeServicesData.length },
                   { id: 'history', label: 'Service History', count: serviceHistoryData.length },
                 ]}
                 activeTab={servicesTab}
-                onTabChange={(tab) => setServicesTab(tab as 'my' | 'history')}
+                onTabChange={(tab) => setServicesTab(tab as 'my' | 'active' | 'history')}
                 description={
                   servicesTab === 'my'
-                    ? 'CKS services currently provided at centers'
-                    : 'Services archive'
+                    ? 'Services you offer through CKS'
+                    : servicesTab === 'active'
+                      ? 'Current active services managed by CKS'
+                      : 'Completed services archive'
                 }
                 searchPlaceholder={
                   servicesTab === 'my'
-                    ? 'Search by Service ID or name'
-                    : 'Search service history'
+                    ? 'Search catalog services'
+                    : servicesTab === 'active'
+                      ? 'Search active services'
+                      : 'Search service history'
                 }
                 onSearch={setServicesSearchQuery}
                 actionButton={
@@ -691,32 +708,9 @@ export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHu
                     columns={[
                       { key: 'serviceId', label: 'SERVICE ID', clickable: true },
                       { key: 'serviceName', label: 'SERVICE NAME' },
-                      { key: 'centerId', label: 'CENTER' },
-                      { key: 'type', label: 'TYPE' },
-                      {
-                        key: 'status',
-                        label: 'STATUS',
-                        render: (value: string) => {
-                          const palette = getStatusBadgePalette(value);
-                          return (
-                            <span
-                              style={{
-                                padding: '4px 12px',
-                                borderRadius: '4px',
-                                fontSize: '12px',
-                                fontWeight: 500,
-                                backgroundColor: palette.background,
-                                color: palette.color,
-                              }}
-                            >
-                              {value ?? EMPTY_VALUE}
-                            </span>
-                          );
-                        },
-                      },
-                      { key: 'startDate', label: 'START DATE' },
+                      { key: 'category', label: 'CATEGORY' },
                     ]}
-                    data={myServicesData.filter((row) => {
+                    data={myCatalogServices.filter((row) => {
                       if (!servicesSearchQuery) {
                         return true;
                       }
@@ -732,7 +726,7 @@ export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHu
                   />
                 )}
 
-                {servicesTab === 'history' && (
+                {servicesTab === 'active' && (
                   <DataTable
                     columns={[
                       { key: 'serviceId', label: 'SERVICE ID', clickable: true },
@@ -761,6 +755,33 @@ export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHu
                         },
                       },
                       { key: 'startDate', label: 'START DATE' },
+                    ]}
+                    data={activeServicesData.filter((row) => {
+                      if (!servicesSearchQuery) {
+                        return true;
+                      }
+                      const query = servicesSearchQuery.toLowerCase();
+                      return (
+                        row.serviceId.toLowerCase().includes(query) ||
+                        row.serviceName.toLowerCase().includes(query) ||
+                        row.centerId.toLowerCase().includes(query)
+                      );
+                    })}
+                    showSearch={false}
+                    maxItems={10}
+                    onRowClick={() => undefined}
+                  />
+                )}
+
+                {servicesTab === 'history' && (
+                  <DataTable
+                    columns={[
+                      { key: 'serviceId', label: 'SERVICE ID', clickable: true },
+                      { key: 'serviceName', label: 'SERVICE NAME' },
+                      { key: 'centerId', label: 'CENTER' },
+                      { key: 'type', label: 'TYPE' },
+                      { key: 'status', label: 'STATUS' },
+                      { key: 'startDate', label: 'START DATE' },
                       { key: 'endDate', label: 'END DATE' },
                     ]}
                     data={serviceHistoryData.filter((row) => {
@@ -770,7 +791,8 @@ export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHu
                       const query = servicesSearchQuery.toLowerCase();
                       return (
                         row.serviceId.toLowerCase().includes(query) ||
-                        row.serviceName.toLowerCase().includes(query)
+                        row.serviceName.toLowerCase().includes(query) ||
+                        row.centerId.toLowerCase().includes(query)
                       );
                     })}
                     showSearch={false}
@@ -924,10 +946,6 @@ export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHu
     </div>
   );
 }
-
-
-
-
 
 
 

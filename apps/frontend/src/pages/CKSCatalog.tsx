@@ -144,8 +144,17 @@ function DateSelectorModal({
   const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
   const [selectedCustomer, setSelectedCustomer] = useState<string | null>(null);
   const [selectedCenter, setSelectedCenter] = useState<string | null>(defaultDestination);
-  // Hide destination picker if we already have a clear default (center role or inferred)
-  const needsDestination = !defaultDestination && (role || '').toLowerCase() !== 'center';
+
+  // Match CheckoutModal logic: always show for contractors, managers, customers, crew
+  const needsDestination = useMemo(() => {
+    const r = (role || '').trim().toLowerCase();
+    if (!r) return (centers?.length || 0) > 0;
+    if (r === 'center') return false; // Center orders auto-destination
+    if (r === 'customer') return true;
+    if (r === 'crew') return true;
+    if (r === 'contractor' || r === 'manager') return true;
+    return (centers?.length || 0) > 0;
+  }, [role, centers]);
 
   const toggleDay = (d: string) => {
     setDays((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]));

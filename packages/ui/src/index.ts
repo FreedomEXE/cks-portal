@@ -46,3 +46,9 @@ export { default as CreateServiceModal } from './modals/CreateServiceModal';
 export * from './modals/ServiceDetailsModal/ServiceDetailsModal';
 export { default as ServiceDetailsModal } from './modals/ServiceDetailsModal/ServiceDetailsModal';
 
+export * from './modals/CatalogServiceModal/CatalogServiceModal';
+export { default as CatalogServiceModal } from './modals/CatalogServiceModal/CatalogServiceModal';
+
+export * from './modals/AssignServiceModal/AssignServiceModal';
+export { default as AssignServiceModal } from './modals/AssignServiceModal/AssignServiceModal';
+

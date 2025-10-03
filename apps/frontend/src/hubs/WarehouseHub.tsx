@@ -27,6 +27,7 @@ import {
 import { DataTable, OrderDetailsModal, PageHeader, PageWrapper, Scrollbar, TabSection } from '@cks/ui';
 import { useAuth } from '@cks/auth';
 import { getAllowedActions, getActionLabel } from '@cks/policies';
+import { useServices as useDirectoryServices } from '../shared/api/directory';
 
 import MyHubSection from '../components/MyHubSection';
 import {
@@ -166,7 +167,7 @@ function buildActivities(serviceOrders: HubOrderItem[], productOrders: HubOrderI
 export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubProps) {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState(initialTab);
-  const [servicesTab, setServicesTab] = useState<'active' | 'history'>('active');
+  const [servicesTab, setServicesTab] = useState<'my' | 'active' | 'history'>('active');
   const [servicesSearchQuery, setServicesSearchQuery] = useState('');
   const [deliveriesTab, setDeliveriesTab] = useState<'pending' | 'completed'>('pending');
   const [deliveriesSearchQuery, setDeliveriesSearchQuery] = useState('');
@@ -393,6 +394,16 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
 
     return { activeServicesData: active, serviceHistoryData: history };
   }, [serviceOrders]);
+
+  // MVP: Leave Warehouse My Services blank (no warehouse-specific services yet)
+  // Ensure table fields align with Manager Hub My Services
+  const myCertifiedServices: Array<{
+    serviceId: string;
+    serviceName: string;
+    certified: string | null;
+    certificationDate: string | null;
+    expires: string | null;
+  }> = [];
 
   const tabs = useMemo(() => [
     { id: 'dashboard', label: 'Dashboard', path: '/warehouse/dashboard' },
@@ -816,20 +827,38 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
               )}
               <TabSection
                 tabs={[
+                  { id: 'my', label: 'My Services', count: 0 },
                   { id: 'active', label: 'Active Services', count: activeServicesData.length },
                   { id: 'history', label: 'Service History', count: serviceHistoryData.length },
                 ]}
                 activeTab={servicesTab}
-                onTabChange={(tab) => setServicesTab(tab as 'active' | 'history')}
+                onTabChange={(tab) => setServicesTab(tab as 'my' | 'active' | 'history')}
                 description={
-                  servicesTab === 'active'
-                    ? 'Active warehouse services'
-                    : 'Completed services archive'
+                  servicesTab === 'my'
+                    ? 'Warehouse-specific services you are certified to offer'
+                    : servicesTab === 'active'
+                      ? 'Active services that you are managing'
+                      : 'Completed services archive'
                 }
                 searchPlaceholder="Search services"
                 onSearch={setServicesSearchQuery}
                 primaryColor="#8b5cf6"
               >
+                {servicesTab === 'my' && (
+                  <DataTable
+                    columns={[
+                      { key: 'serviceId', label: 'SERVICE ID', clickable: true },
+                      { key: 'serviceName', label: 'SERVICE NAME' },
+                      { key: 'certified', label: 'CERTIFIED' },
+                      { key: 'certificationDate', label: 'CERTIFICATION DATE' },
+                      { key: 'expires', label: 'EXPIRES' },
+                    ]}
+                    data={[]}
+                    showSearch={false}
+                    maxItems={10}
+                    onRowClick={() => undefined}
+                  />
+                )}
                 {servicesTab === 'active' && (
                   <DataTable
                     columns={[
@@ -1016,5 +1045,3 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
     </div>
   );
 }
-
-

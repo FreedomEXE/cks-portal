@@ -995,54 +995,21 @@ async function fetchOrders(whereClause: string, params: readonly unknown[], cont
 }
 
 function buildRoleFilter(role: HubRole, cksCode: string): { clause: string; params: unknown[] } {
-  // All users see orders from anyone in their ecosystem
-  // Ecosystem is defined by the manager who connects all entities
+  // Direct visibility only: users see orders where they are directly referenced in the order
+  // No ecosystem-wide joins - only show orders this specific entity is involved in
   switch (role) {
     case "customer": {
-      // Customer sees all orders in their ecosystem (contractor's and manager's ecosystem)
-      const clause = `
-        creator_id = $1 OR customer_id = $1 OR
-        manager_id IN (SELECT cks_manager FROM customers WHERE customer_id = $1) OR
-        contractor_id IN (SELECT contractor_id FROM customers WHERE customer_id = $1) OR
-        customer_id IN (
-          SELECT customer_id FROM customers WHERE cks_manager IN (SELECT cks_manager FROM customers WHERE customer_id = $1)
-        ) OR
-        center_id IN (
-          SELECT center_id FROM centers WHERE cks_manager IN (SELECT cks_manager FROM customers WHERE customer_id = $1)
-        ) OR
-        contractor_id IN (
-          SELECT contractor_id FROM contractors WHERE cks_manager IN (SELECT cks_manager FROM customers WHERE customer_id = $1)
-        ) OR
-        crew_id IN (
-          SELECT crew_id FROM crew WHERE cks_manager IN (SELECT cks_manager FROM customers WHERE customer_id = $1)
-        )
-      `;
+      // Customer sees only orders where they are directly referenced
+      const clause = `creator_id = $1 OR customer_id = $1`;
       return { clause, params: [cksCode] };
     }
     case "center": {
-      // Center sees all orders in their ecosystem
-      const clause = `
-        creator_id = $1 OR center_id = $1 OR destination = $1 OR
-        manager_id IN (SELECT cks_manager FROM centers WHERE center_id = $1) OR
-        contractor_id IN (SELECT contractor_id FROM centers WHERE center_id = $1) OR
-        customer_id IN (SELECT customer_id FROM centers WHERE center_id = $1) OR
-        customer_id IN (
-          SELECT customer_id FROM customers WHERE cks_manager IN (SELECT cks_manager FROM centers WHERE center_id = $1)
-        ) OR
-        center_id IN (
-          SELECT center_id FROM centers WHERE cks_manager IN (SELECT cks_manager FROM centers WHERE center_id = $1)
-        ) OR
-        contractor_id IN (
-          SELECT contractor_id FROM contractors WHERE cks_manager IN (SELECT cks_manager FROM centers WHERE center_id = $1)
-        ) OR
-        crew_id IN (
-          SELECT crew_id FROM crew WHERE cks_manager IN (SELECT cks_manager FROM centers WHERE center_id = $1)
-        )
-      `;
+      // Center sees only orders where they are directly referenced
+      const clause = `creator_id = $1 OR center_id = $1 OR destination = $1`;
       return { clause, params: [cksCode] };
     }
     case "manager": {
-      // Manager sees ALL orders in their ecosystem (including other managers in same ecosystem if applicable)
+      // Manager sees ALL orders in their ecosystem (they manage multiple entities)
       const clause = `
         manager_id = $1 OR creator_id = $1 OR
         customer_id IN (SELECT customer_id FROM customers WHERE cks_manager = $1) OR
@@ -1053,33 +1020,19 @@ function buildRoleFilter(role: HubRole, cksCode: string): { clause: string; para
       return { clause, params: [cksCode] };
     }
     case "contractor": {
-      // Contractor sees all orders in their ecosystem
-      const clause = `
-        contractor_id = $1 OR creator_id = $1 OR
-        manager_id IN (SELECT cks_manager FROM contractors WHERE contractor_id = $1) OR
-        customer_id IN (
-          SELECT customer_id FROM customers WHERE contractor_id = $1 OR cks_manager IN (SELECT cks_manager FROM contractors WHERE contractor_id = $1)
-        ) OR
-        center_id IN (
-          SELECT center_id FROM centers WHERE contractor_id = $1 OR cks_manager IN (SELECT cks_manager FROM contractors WHERE contractor_id = $1)
-        ) OR
-        contractor_id IN (
-          SELECT contractor_id FROM contractors WHERE cks_manager IN (SELECT cks_manager FROM contractors WHERE contractor_id = $1)
-        ) OR
-        crew_id IN (
-          SELECT crew_id FROM crew WHERE cks_manager IN (SELECT cks_manager FROM contractors WHERE contractor_id = $1)
-        )
-      `;
+      // Contractor sees only orders where they are directly referenced
+      const clause = `creator_id = $1 OR contractor_id = $1`;
       return { clause, params: [cksCode] };
     }
     case "crew": {
       // Product vs Service visibility differs for crew:
-      // - PRODUCT: Crew can see ALL product orders in their ecosystem (via their manager's network)
+      // - PRODUCT: Crew can see product orders in their manager's ecosystem
       // - SERVICE: Crew only sees orders they are directly involved in (creator, crew_id, or participant)
       const clause = `
         (
           order_type = 'product' AND (
             creator_id = $1
+            OR crew_id = $1
             OR manager_id IN (SELECT cks_manager FROM crew WHERE crew_id = $1)
             OR customer_id IN (
               SELECT customer_id FROM customers WHERE cks_manager IN (SELECT cks_manager FROM crew WHERE crew_id = $1)
@@ -1089,9 +1042,6 @@ function buildRoleFilter(role: HubRole, cksCode: string): { clause: string; para
             )
             OR contractor_id IN (
               SELECT contractor_id FROM contractors WHERE cks_manager IN (SELECT cks_manager FROM crew WHERE crew_id = $1)
-            )
-            OR crew_id IN (
-              SELECT crew_id FROM crew WHERE cks_manager IN (SELECT cks_manager FROM crew WHERE crew_id = $1)
             )
           )
         )
@@ -1143,7 +1093,11 @@ async function ensureParticipant(
     `INSERT INTO order_participants (order_id, participant_id, participant_role, participation_type)
      VALUES ($1, $2, $3, $4)
      ON CONFLICT (order_id, participant_id, participant_role)
-     DO UPDATE SET participation_type = EXCLUDED.participation_type`,
+     DO UPDATE SET participation_type =
+       CASE
+         WHEN order_participants.participation_type = 'creator' THEN 'creator'
+         ELSE EXCLUDED.participation_type
+       END`,
     [options.orderId, normalizedCode, options.role, options.participationType]
   );
 }
@@ -1493,6 +1447,29 @@ export async function createOrder(input: CreateOrderInput): Promise<HubOrderItem
       break;
   }
 
+  // For both service AND product orders, populate managerId and other entity IDs from destination center
+  // This ensures destination-specific visibility (only involved parties see the order)
+  if (destinationCode && destinationRole === "center") {
+    const centerResult = await query<{ cks_manager: string | null; customer_id: string | null }>(
+      `SELECT cks_manager, customer_id FROM centers WHERE UPPER(center_id) = $1 LIMIT 1`,
+      [destinationCode]
+    );
+    const centerRow = centerResult.rows[0];
+
+    // Set manager from destination center if not already set
+    if (!managerId && centerRow?.cks_manager) {
+      managerId = normalizeCodeValue(centerRow.cks_manager);
+    }
+
+    // Set center_id and customer_id from destination for direct visibility
+    if (!centerId) {
+      centerId = destinationCode;
+    }
+    if (!customerId && centerRow?.customer_id) {
+      customerId = normalizeCodeValue(centerRow.customer_id);
+    }
+  }
+
   // Enrich metadata with basic contact info for requestor and destination (for Warehouse visibility)
   async function loadContactForCode(code: string | null): Promise<{ name: string | null; address: string | null; phone: string | null; email: string | null } | null> {
     const normalized = normalizeCodeValue(code);
@@ -1614,6 +1591,10 @@ export async function createOrder(input: CreateOrderInput): Promise<HubOrderItem
     }
     if (input.orderType === "product" && assignedWarehouse) {
       await ensureParticipant({ orderId, role: "warehouse", code: assignedWarehouse, participationType: 'actor' }, q);
+    }
+    // For service orders, add manager as actor participant for approval workflow
+    if (input.orderType === "service" && managerId && managerId !== creatorCode) {
+      await ensureParticipant({ orderId, role: "manager", code: managerId, participationType: 'actor' }, q);
     }
     await ensureParticipantList(orderId, input.participants, q);
   });

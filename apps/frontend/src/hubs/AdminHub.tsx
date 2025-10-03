@@ -32,6 +32,7 @@ import {
   PageWrapper,
   Scrollbar,
   TabContainer,
+  CatalogServiceModal,
 } from '@cks/ui';
 import type { ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -193,6 +194,11 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
   const [directoryTab, setDirectoryTab] = useState<string>('admins');
   const [showActionModal, setShowActionModal] = useState(false);
   const [selectedEntity, setSelectedEntity] = useState<Record<string, any> | null>(null);
+  const [showServiceCatalogModal, setShowServiceCatalogModal] = useState(false);
+  const [selectedServiceCatalog, setSelectedServiceCatalog] = useState<{ serviceId: string; name: string | null; category: string | null; status?: string | null; description?: string | null; metadata?: any } | null>(null);
+  const [serviceAssignSelected, setServiceAssignSelected] = useState<{ managers: string[]; crew: string[]; warehouses: string[] } | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  // merged assign flow into CatalogServiceModal
   const [selectedOrderForDetails, setSelectedOrderForDetails] = useState<HubOrderItem | null>(null);
   const [selectedOrderForEdit, setSelectedOrderForEdit] = useState<HubOrderItem | null>(null);
   const logout = useLogout();
@@ -657,6 +663,8 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
         category: formatText(service.category),
         status: formatText(service.status),
         updatedAt: formatDate(service.updatedAt),
+        metadata: (service as any).metadata ?? null,
+        description: (service as any).description ?? null,
       })),
     [services],
   );
@@ -911,6 +919,7 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
         { key: 'category', label: 'CATEGORY' },
         { key: 'status', label: 'STATUS', render: renderStatusBadge },
         { key: 'updatedAt', label: 'UPDATED' },
+        { key: 'actions', label: 'ACTIONS', render: renderActions },
       ],
       data: serviceRows,
       emptyMessage: 'No services in the catalog yet.',
@@ -1374,7 +1383,18 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
               {
                 label: 'View Service',
                 variant: 'secondary' as const,
-                onClick: () => console.log('View service:', selectedEntity),
+                onClick: () => {
+                  if (!selectedEntity) return;
+                  setSelectedServiceCatalog({
+                    serviceId: selectedEntity.id,
+                    name: selectedEntity.name ?? null,
+                    category: selectedEntity.category ?? null,
+                    status: selectedEntity.status ?? null,
+                    description: selectedEntity.description ?? null,
+                    metadata: (selectedEntity as any).metadata ?? null,
+                  });
+                  setShowServiceCatalogModal(true);
+                },
               },
               {
                 label: 'Edit Service',
@@ -1438,6 +1458,68 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
             : undefined
         }
       />
+
+      <CatalogServiceModal
+        isOpen={showServiceCatalogModal}
+        onClose={() => { setShowServiceCatalogModal(false); setSelectedServiceCatalog(null); setServiceAssignSelected(null); }}
+        service={selectedServiceCatalog}
+        showCertifications={false}
+        peopleManagers={(managers || []).map((m) => ({ code: m.id, name: m.name || m.id }))}
+        peopleCrew={(crew || []).map((c) => ({ code: c.id, name: c.name || c.id }))}
+        peopleWarehouses={(warehouses || []).map((w) => ({ code: w.id, name: w.name || w.id }))}
+        selectedAssignments={serviceAssignSelected || undefined}
+        onSave={async (updates) => {
+          if (!selectedServiceCatalog) return;
+          try {
+            const { updateCatalogService } = await import('../shared/api/admin');
+            const serviceId = selectedServiceCatalog.serviceId;
+            await updateCatalogService(serviceId, { metadata: { certifications: updates.certifications, visibility: updates.visibility } });
+
+            if (updates.assignments && serviceAssignSelected) {
+              const { patchServiceAssignments } = await import('../shared/api/admin');
+              const diff = (prev: string[], now: string[]) => {
+                const p = new Set(prev);
+                const n = new Set(now);
+                const add = Array.from(n).filter((x) => !p.has(x));
+                const remove = Array.from(p).filter((x) => !n.has(x));
+                return { add, remove };
+              };
+              const dMgr = diff(serviceAssignSelected.managers, updates.assignments.managers);
+              const dCrw = diff(serviceAssignSelected.crew, updates.assignments.crew);
+              const dWhs = diff(serviceAssignSelected.warehouses, updates.assignments.warehouses);
+              if (dMgr.add.length || dMgr.remove.length) await patchServiceAssignments(serviceId, { role: 'manager', add: dMgr.add, remove: dMgr.remove });
+              if (dCrw.add.length || dCrw.remove.length) await patchServiceAssignments(serviceId, { role: 'crew', add: dCrw.add, remove: dCrw.remove });
+              if (dWhs.add.length || dWhs.remove.length) await patchServiceAssignments(serviceId, { role: 'warehouse', add: dWhs.add, remove: dWhs.remove });
+
+              // Revalidate certified-services caches for affected users so their My Services update immediately
+              const revalidate = (role: 'manager' | 'crew' | 'warehouse', ids: string[]) => {
+                ids.forEach((uid) => mutate(`/certified-services?userId=${encodeURIComponent(uid)}&role=${role}`));
+              };
+              revalidate('manager', [...dMgr.add, ...dMgr.remove]);
+              revalidate('crew', [...dCrw.add, ...dCrw.remove]);
+              revalidate('warehouse', [...dWhs.add, ...dWhs.remove]);
+            }
+
+            setShowServiceCatalogModal(false);
+            setSelectedServiceCatalog(null);
+            setServiceAssignSelected(null);
+            mutate('/admin/directory/services');
+            setToast('Assignments updated');
+            setTimeout(() => setToast(null), 1800);
+          } catch (error) {
+            console.error('[admin] update catalog service failed', error);
+            alert(error instanceof Error ? error.message : 'Failed to update catalog service');
+          }
+        }}
+      />
+
+      {toast && (
+        <div style={{ position: 'fixed', top: 16, right: 16, background: '#ecfeff', color: '#0369a1', border: '1px solid #bae6fd', borderRadius: 8, padding: '10px 14px', zIndex: 1100, boxShadow: '0 8px 18px rgba(0,0,0,0.08)' }}>
+          {toast}
+        </div>
+      )}
+
+      {/* merged assign flow into CatalogServiceModal */}
 
       <OrderDetailsModal
         isOpen={!!selectedOrderForDetails}
@@ -1597,20 +1679,6 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
   );
 
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

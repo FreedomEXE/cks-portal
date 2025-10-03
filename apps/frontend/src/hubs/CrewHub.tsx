@@ -28,6 +28,8 @@ import {
 } from '@cks/domain-widgets';
 import { Button, DataTable, OrderDetailsModal, PageHeader, PageWrapper, Scrollbar, TabSection } from '@cks/ui';
 import { useAuth } from '@cks/auth';
+import { useCatalogItems } from '../shared/api/catalog';
+import { useServices as useDirectoryServices } from '../shared/api/directory';
 
 import MyHubSection from '../components/MyHubSection';
 import {
@@ -40,6 +42,7 @@ import {
   type HubOrderItem,
   type OrderActionRequest,
 } from '../shared/api/hub';
+import { useSWRConfig } from 'swr';
 
 import { buildEcosystemTree, DEFAULT_ROLE_COLOR_MAP } from '../shared/utils/ecosystem';
 
@@ -165,12 +168,13 @@ function buildActivities(serviceOrders: HubOrderItem[], productOrders: HubOrderI
 export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState(initialTab);
-  const [servicesTab, setServicesTab] = useState<'active' | 'history'>('active');
+  const [servicesTab, setServicesTab] = useState<'my' | 'active' | 'history'>('active');
   const [servicesSearchQuery, setServicesSearchQuery] = useState('');
   const [selectedOrderForDetails, setSelectedOrderForDetails] = useState<HubOrderItem | null>(null);
 
   const { code: authCode } = useAuth();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
+  const { mutate } = useSWRConfig();
 
   const {
     data: profile,
@@ -361,6 +365,20 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
   const dashboardErrorMessage = dashboardError ? 'Unable to load dashboard metrics. Showing cached values if available.' : null;
   const ordersErrorMessage = ordersError ? 'Unable to load order data. Showing cached values if available.' : null;
 
+  // Catalog-backed My Services (MVP): show all services to crew via catalog endpoint
+  const { data: catalogData } = useCatalogItems({ type: 'service', pageSize: 500 });
+  const myCatalogServices = useMemo(() => {
+    const items = catalogData?.items || [];
+    return items.map((svc: any) => ({
+      serviceId: svc.code ?? 'CAT-SRV',
+      serviceName: svc.name ?? 'Service',
+      // Align fields with Manager Hub My Services table
+      certified: 'Yes',
+      certificationDate: null as string | null,
+      expires: null as string | null,
+    }));
+  }, [catalogData]);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#f8fafc' }}>
       <MyHubSection
@@ -441,15 +459,18 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
               )}
               <TabSection
                 tabs={[
+                  { id: 'my', label: 'My Services', count: myCatalogServices.length },
                   { id: 'active', label: 'Active Services', count: activeServicesData.length },
                   { id: 'history', label: 'Service History', count: serviceHistoryData.length },
                 ]}
                 activeTab={servicesTab}
-                onTabChange={(tab) => setServicesTab(tab as 'active' | 'history')}
+                onTabChange={(tab) => setServicesTab(tab as 'my' | 'active' | 'history')}
                 description={
-                  servicesTab === 'active'
-                    ? 'Active services'
-                    : 'Completed services archive'
+                  servicesTab === 'my'
+                    ? 'Services you are trained and certified to work on'
+                    : servicesTab === 'active'
+                      ? 'Active services you are currently working on'
+                      : 'Services you no longer work on'
                 }
                 searchPlaceholder="Search services"
                 onSearch={setServicesSearchQuery}
@@ -464,6 +485,26 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
                 }
                 primaryColor="#ef4444"
               >
+                {servicesTab === 'my' && (
+                  <DataTable
+                    columns={[
+                      { key: 'serviceId', label: 'SERVICE ID', clickable: false },
+                      { key: 'serviceName', label: 'SERVICE NAME' },
+                      { key: 'certified', label: 'CERTIFIED' },
+                      { key: 'certificationDate', label: 'CERTIFICATION DATE' },
+                      { key: 'expires', label: 'EXPIRES' },
+                    ]}
+                    data={myCatalogServices.filter((row) => {
+                      if (!servicesSearchQuery) return true;
+                      const q = servicesSearchQuery.toLowerCase();
+                      return row.serviceId.toLowerCase().includes(q) || row.serviceName.toLowerCase().includes(q);
+                    })}
+                    showSearch={false}
+                    maxItems={10}
+                    onRowClick={() => undefined}
+                  />
+                )}
+
                 {servicesTab === 'active' && (
                   <DataTable
                     columns={[
@@ -571,7 +612,7 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
                 productOrders={productOrders}
                 onCreateServiceOrder={() => navigate('/catalog')}
                 onCreateProductOrder={() => navigate('/catalog')}
-                onOrderAction={(orderId, action) => {
+                onOrderAction={async (orderId, action) => {
                   if (action === 'View Details') {
                     const target = orders?.orders?.find((o: any) => (o.orderId || o.id) === orderId) || null;
                     if (target) {
@@ -585,12 +626,31 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
                   if (label.includes('accept') && !act) act = 'accept';
                   if (label.includes('reject') || label.includes('deny')) act = 'reject';
                   if (!act) return;
-                  const notes = act === 'cancel' ? (window.prompt('Optional: reason for cancellation?')?.trim() || null) : null;
-                  let payload: OrderActionRequest = { action: act } as OrderActionRequest;
-                  if (typeof notes === 'string' && notes.trim().length > 0) {
-                    payload.notes = notes;
+
+                  try {
+                    // For crew assignment responses (accept/reject crew invites)
+                    if (act === 'accept' || act === 'reject') {
+                      const { apiFetch } = await import('../shared/api/client');
+                      await apiFetch(`/orders/${orderId}/crew-response`, {
+                        method: 'POST',
+                        body: JSON.stringify({ accept: act === 'accept' }),
+                      });
+                      mutate(`/hub/orders/${normalizedCode}`);
+                      console.log('[crew] responded to crew invite', { orderId, accept: act === 'accept' });
+                    } else {
+                      // Regular order actions (cancel, etc.)
+                      const notes = act === 'cancel' ? (window.prompt('Optional: reason for cancellation?')?.trim() || null) : null;
+                      let payload: OrderActionRequest = { action: act } as OrderActionRequest;
+                      if (typeof notes === 'string' && notes.trim().length > 0) {
+                        payload.notes = notes;
+                      }
+                      await applyHubOrderAction(orderId, payload);
+                      mutate(`/hub/orders/${normalizedCode}`);
+                    }
+                  } catch (err) {
+                    console.error('[crew] failed to apply action', err);
+                    alert('Failed to process action. Please try again.');
                   }
-                  applyHubOrderAction(orderId, payload).catch((err) => console.error('[crew] failed to apply action', err));
                 }}
                 showServiceOrders={true}
                 showProductOrders={true}

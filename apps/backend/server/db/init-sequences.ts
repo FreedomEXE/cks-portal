@@ -121,6 +121,34 @@ export async function initializeSequences() {
     `, []);
     console.log('Created/verified catalog_services table');
 
+    // Service certifications (per individual)
+    await query(`
+      CREATE TABLE IF NOT EXISTS service_certifications (
+        id BIGSERIAL PRIMARY KEY,
+        service_id VARCHAR(32) NOT NULL REFERENCES catalog_services(service_id) ON DELETE CASCADE,
+        user_id VARCHAR(64) NOT NULL,
+        role TEXT NOT NULL CHECK (role IN ('manager','crew','warehouse')),
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        archived_at TIMESTAMPTZ,
+        UNIQUE(service_id, user_id, role)
+      )
+    `, []);
+    console.log('Created/verified service_certifications table');
+
+    // Contractor offerings (which services a contractor offers)
+    await query(`
+      CREATE TABLE IF NOT EXISTS contractor_service_offerings (
+        id BIGSERIAL PRIMARY KEY,
+        contractor_id VARCHAR(64) NOT NULL,
+        service_id VARCHAR(32) NOT NULL REFERENCES catalog_services(service_id) ON DELETE CASCADE,
+        active BOOLEAN NOT NULL DEFAULT TRUE,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        archived_at TIMESTAMPTZ,
+        UNIQUE(contractor_id, service_id)
+      )
+    `, []);
+    console.log('Created/verified contractor_service_offerings table');
+
     await query(`
       CREATE TABLE IF NOT EXISTS warehouses (
         warehouse_id VARCHAR(50) PRIMARY KEY,

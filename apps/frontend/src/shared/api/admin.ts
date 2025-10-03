@@ -92,3 +92,38 @@ export async function fetchAdminOrderById(orderId: string, init?: ApiFetchInit) 
   const response = await apiFetch<ApiResponse<HubOrderItem>>(`/orders/${encodeURIComponent(orderId)}`, init);
   return response.data;
 }
+
+// Update catalog service fields/metadata (admin only)
+export async function updateCatalogService(
+  serviceId: string,
+  payload: {
+    name?: string;
+    category?: string;
+    description?: string;
+    tags?: string[];
+    isActive?: boolean;
+    metadata?: Record<string, unknown>;
+  },
+  init?: ApiFetchInit,
+) {
+  return apiFetch<{ success: boolean }>(`/admin/catalog/services/${encodeURIComponent(serviceId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+    headers: { 'Content-Type': 'application/json', ...(init?.headers || {}) },
+    ...init,
+  });
+}
+
+export async function fetchServiceCertifications(serviceId: string, init?: ApiFetchInit): Promise<{ managers: string[]; crew: string[]; warehouses: string[] }>{
+  const res = await apiFetch<{ success: boolean; data: { managers: string[]; crew: string[]; warehouses: string[] } }>(`/admin/catalog/services/${encodeURIComponent(serviceId)}/certifications`, init);
+  return res.data;
+}
+
+export async function patchServiceAssignments(serviceId: string, payload: { role: 'manager'|'crew'|'warehouse'; add: string[]; remove: string[] }, init?: ApiFetchInit) {
+  return apiFetch<{ success: boolean }>(`/admin/catalog/services/${encodeURIComponent(serviceId)}/assign`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+    headers: { 'Content-Type': 'application/json', ...(init?.headers || {}) },
+    ...init,
+  });
+}

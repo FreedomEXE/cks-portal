@@ -665,3 +665,15 @@ export async function applyServiceAction(serviceId: string, action: ServiceActio
   });
   return response.data;
 }
+export interface CertifiedServiceItem {
+  serviceId: string;
+  name: string;
+  category: string | null;
+  status: string | null;
+  updatedAt: string | null;
+}
+
+export function useCertifiedServices(userId: string | null | undefined, role: 'manager' | 'crew' | 'warehouse') {
+  const key = userId ? `/certified-services?userId=${encodeURIComponent(userId)}&role=${role}` : null;
+  return useHubSWR<CertifiedServiceItem[]>(key);
+}
