@@ -1470,6 +1470,34 @@ export async function createOrder(input: CreateOrderInput): Promise<HubOrderItem
     }
   }
 
+  // If center created the order (no destination), populate customer, contractor, and manager from the center's relationships
+  if (input.creator.role === 'center' && centerId && !customerId && !managerId) {
+    const centerResult = await query<{ cks_manager: string | null; customer_id: string | null }>(
+      `SELECT cks_manager, customer_id FROM centers WHERE UPPER(center_id) = $1 LIMIT 1`,
+      [centerId]
+    );
+    const centerRow = centerResult.rows[0];
+
+    if (!customerId && centerRow?.customer_id) {
+      customerId = normalizeCodeValue(centerRow.customer_id);
+    }
+    if (!managerId && centerRow?.cks_manager) {
+      managerId = normalizeCodeValue(centerRow.cks_manager);
+    }
+
+    // Get contractor from the customer record
+    if (customerId && !contractorId) {
+      const customerResult = await query<{ contractor_id: string | null }>(
+        `SELECT contractor_id FROM customers WHERE UPPER(customer_id) = $1 LIMIT 1`,
+        [customerId]
+      );
+      const customerRow = customerResult.rows[0];
+      if (customerRow?.contractor_id) {
+        contractorId = normalizeCodeValue(customerRow.contractor_id);
+      }
+    }
+  }
+
   // Enrich metadata with basic contact info for requestor and destination (for Warehouse visibility)
   async function loadContactForCode(code: string | null): Promise<{ name: string | null; address: string | null; phone: string | null; email: string | null } | null> {
     const normalized = normalizeCodeValue(code);

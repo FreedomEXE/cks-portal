@@ -651,6 +651,17 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
             }
           };
           
+          const onComplete = async () => {
+            try {
+              const { applyServiceAction } = await import('../shared/api/hub');
+              await applyServiceAction(rawServiceId, 'complete');
+              mutate(`/hub/orders/${managerCode}`);
+            } catch (err) {
+              console.error('[manager] failed to complete service', err);
+              alert(err instanceof Error ? err.message : 'Failed to complete service');
+            }
+          };
+
           const onVerify = async () => {
             try {
               const { applyServiceAction } = await import('../shared/api/hub');

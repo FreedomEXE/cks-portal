@@ -276,7 +276,9 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
       = [];
 
     serviceOrders.forEach((order) => {
-      if (!(order as any).serviceId && !(order as any).transformedId) {
+      // Check for service ID or transformed ID (handles both camelCase and snake_case)
+      const hasServiceId = (order as any).serviceId || (order as any).transformedId || (order as any).transformed_id;
+      if (!hasServiceId) {
         return;
       }
       const normalizedStatus = normalizeStatusValue(order.status);
