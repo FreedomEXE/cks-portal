@@ -845,6 +845,336 @@ apps/frontend/
 - Easier testing strategy
 - Improved discoverability
 
+## 20. Organization Layer for Multi-Tenancy
+
+**Current State:**
+- Manager-based hierarchy provides ecosystem isolation
+- Each manager manages multiple contractors with isolated data
+- Data isolation achieved through SQL filters based on relationships
+- No concept of "organization" at the data layer
+
+**Why Not MVP:**
+- Current system handles single-company (CKS) with multiple managers perfectly
+- SQL filters properly isolate contractor ecosystems under same manager
+- No immediate need for cross-company separation
+- Would require major refactor (add `org_id` to all tables, update all queries)
+
+**When You Would Need It:**
+1. **Multi-company SaaS** - Serving multiple companies (Company-A shouldn't see Company-B's data)
+2. **Franchise Model** - Each franchise is an org with multiple managers
+3. **White-label** - Selling to different organizations that need complete separation
+4. **Multiple CKS Divisions** - If CKS expands to multiple independent business units
+
+**Proposed Architecture:**
+```
+Organization (ORG-001: "CKS Northeast")
+├── Manager MGR-001
+│   ├── Contractor CON-001 (isolated ecosystem)
+│   └── Contractor CON-002 (isolated ecosystem)
+└── Manager MGR-002
+    ├── Contractor CON-003 (isolated ecosystem)
+    └── Contractor CON-004 (isolated ecosystem)
+
+Organization (ORG-002: "CKS Southwest")
+└── Manager MGR-003
+    └── Contractor CON-005
+```
+
+**Implementation Requirements:**
+- Add `org_id` column to: users, managers, contractors, customers, centers, crew, warehouses, orders, inventory
+- Update all SQL queries to include `org_id` filter
+- Simplify visibility filters (single `org_id` check vs. complex joins)
+- Add org selection/switching in admin panel
+- Implement org-level configuration and settings
+- Add org-aware auth guards
+
+**Benefits:**
+- Cleaner data isolation (simple `WHERE org_id = $1` vs. nested joins)
+- True multi-tenancy support
+- Organization-level analytics and reporting
+- Easier white-labeling and customization per org
+- Support for multi-manager organizations
+
+**Migration Path:**
+1. Add `org_id` column to all tables (default to 'CKS-001' for existing data)
+2. Update auth system to track active org
+3. Refactor all SQL queries to include org filter
+4. Add org management UI to admin panel
+5. Implement org-level settings and configuration
+6. Test data isolation thoroughly
+
+**Success Metrics:**
+- Complete data isolation between orgs (verified through testing)
+- Query performance maintained or improved
+- Simplified codebase (reduced complexity in filters)
+- Support for unlimited organizations without code changes
+
+## 21. Admin Hub: Ecosystem Visualization
+
+**Current State:**
+- Admin hub shows all entities in flat lists (managers, contractors, customers, centers, crew, warehouses)
+- No visual representation of ecosystem hierarchies
+- Difficult to understand relationships between entities at a glance
+- No way to see which contractor's ecosystem a customer/center belongs to
+
+**Problem:**
+- Admins can't quickly identify which entities belong to which ecosystem
+- Troubleshooting relationship issues requires checking multiple tables
+- No overview of ecosystem health or completeness
+- Cannot easily see orphaned entities or missing relationships
+
+**Proposed Feature: Ecosystem View**
+
+### Visual Hierarchy Display:
+```
+📊 Ecosystems Dashboard
+
+Manager: John Smith (MGR-001)
+├─ 🏢 Contractor: ABC Services (CON-001)
+│  ├─ 👤 Customer: ACME Corp (CUS-001)
+│  │  ├─ 🏪 Center: ACME Downtown (CEN-001) [5 crew]
+│  │  └─ 🏪 Center: ACME Uptown (CEN-002) [3 crew]
+│  └─ 👤 Customer: Tech Industries (CUS-002)
+│     └─ 🏪 Center: Tech HQ (CEN-003) [8 crew]
+│
+└─ 🏢 Contractor: XYZ Solutions (CON-002)
+   ├─ 👤 Customer: BuildCo (CUS-003)
+   │  └─ 🏪 Center: BuildCo Warehouse (CEN-004) [2 crew]
+   └─ 👤 Customer: RetailMart (CUS-004)
+      ├─ 🏪 Center: RetailMart Store 1 (CEN-005) [4 crew]
+      └─ 🏪 Center: RetailMart Store 2 (CEN-006) [4 crew]
+
+Manager: Sarah Johnson (MGR-002)
+└─ 🏢 Contractor: DEF Logistics (CON-003)
+   └─ 👤 Customer: ShipFast (CUS-005)
+      └─ 🏪 Center: Distribution Hub (CEN-007) [12 crew]
+
+⚠️ Orphaned Entities:
+- 👤 Customer: Unassigned LLC (CUS-999) - No contractor
+- 🏪 Center: Test Location (CEN-998) - No customer
+- 👷 Crew: John Doe (CRW-999) - No assigned center
+```
+
+### Features:
+1. **Tree View** - Collapsible hierarchy showing manager → contractor → customer → center → crew
+2. **Entity Counts** - Show counts at each level (e.g., "5 crew members")
+3. **Health Indicators** - Icons showing incomplete setups (missing manager, no crew assigned, etc.)
+4. **Quick Actions** - Click any entity to view details or edit
+5. **Filtering** - Filter by manager, contractor, status (active/inactive)
+6. **Search** - Search across all entities in the tree
+7. **Orphaned Entity Detection** - Highlight entities with missing relationships
+
+### Implementation:
+```typescript
+// New endpoint: GET /api/admin/ecosystems
+{
+  "ecosystems": [
+    {
+      "manager": { "id": "MGR-001", "name": "John Smith", ... },
+      "contractors": [
+        {
+          "contractor": { "id": "CON-001", "name": "ABC Services", ... },
+          "customers": [
+            {
+              "customer": { "id": "CUS-001", "name": "ACME Corp", ... },
+              "centers": [
+                {
+                  "center": { "id": "CEN-001", "name": "ACME Downtown", ... },
+                  "crewCount": 5,
+                  "activeOrders": 3
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "stats": {
+        "contractorCount": 2,
+        "customerCount": 4,
+        "centerCount": 6,
+        "crewCount": 38
+      }
+    }
+  ],
+  "orphaned": {
+    "customers": [...],
+    "centers": [...],
+    "crew": [...]
+  }
+}
+```
+
+### UI Components:
+- `EcosystemTree` - Recursive tree component
+- `EcosystemCard` - Collapsible card for each manager's ecosystem
+- `EntityNode` - Individual entity display with icon and quick actions
+- `OrphanedEntitiesPanel` - Warning panel for entities with missing relationships
+
+### Benefits:
+- **Visual Clarity** - See entire ecosystem structure at a glance
+- **Quick Troubleshooting** - Identify relationship issues immediately
+- **Better Data Quality** - Orphaned entity detection helps clean up data
+- **Ecosystem Health Monitoring** - See which ecosystems are complete vs. incomplete
+- **Faster Navigation** - Jump to any entity in context
+
+**Priority:** Medium (Post-MVP Month 2-3)
+
+**Effort:** 1-2 weeks
+- Backend: 2-3 days (new endpoint, recursive query)
+- Frontend: 5-7 days (tree component, UI design, interactions)
+- Testing: 2-3 days
+
+## 22. Inventory Management & Tracking System
+
+**Current State:**
+- Warehouse Hub only shows Product Inventory and Archive sections
+- No visibility into which users have which inventory
+- No "My Products" section for users to see their assigned/received products
+- Limited inventory tracking beyond warehouse stock levels
+
+**Problem:**
+- Cannot track product distribution across users/roles/locations
+- No audit trail for who has what inventory at any given time
+- Users cannot easily see what products they have received or are assigned to them
+- Warehouse and admin lack comprehensive inventory allocation views
+
+**Proposed Solution:**
+
+### Phase 1: User Inventory Tracking
+- Create `user_inventory` or `inventory_allocations` table to track product assignments
+  - Links orders to final recipients (center, customer, crew, contractor)
+  - Tracks: product_id, user_id, role, quantity, allocated_at, source_order_id, status (allocated/in_use/returned/consumed)
+  - Supports inventory lifecycle: allocated → in_use → consumed/returned
+
+### Phase 2: "My Products" Section (All User Hubs)
+- Add "My Products" widget next to "My Services" in all relevant hubs
+- Shows products currently assigned/allocated to the user based on:
+  - Delivered orders where they were the recipient
+  - Direct allocations from inventory management
+  - Products in-use vs. available vs. consumed
+- Filterable by product type, status, date range
+- Action buttons: Mark as Consumed, Request Return, Report Issue
+
+### Phase 3: Warehouse Inventory Management Section
+- Add "Inventory Management" tab to Warehouse Hub
+- Features:
+  - View all products across all users/locations
+  - Filter by: user role, location, product type, allocation status
+  - Bulk allocation/deallocation actions
+  - Allocation history and audit trail
+  - Low stock alerts per user/location
+  - Reallocation workflows (move inventory between users)
+
+### Phase 4: Admin Inventory Dashboard
+- Add comprehensive inventory tracking to Admin Hub
+- Views:
+  - System-wide inventory distribution map
+  - Per-user inventory levels and history
+  - Per-location stock levels
+  - Allocation patterns and analytics
+  - Inventory reconciliation tools
+- Export capabilities for audit/compliance
+
+### Technical Implementation
+
+**Database Schema:**
+```sql
+CREATE TABLE inventory_allocations (
+  allocation_id UUID PRIMARY KEY,
+  product_id VARCHAR(50) REFERENCES products(product_id),
+  allocated_to_id VARCHAR(50), -- CKS code (CEN-xxx, CUS-xxx, etc.)
+  allocated_to_role hub_role,
+  quantity INTEGER,
+  unit VARCHAR(50),
+  allocated_at TIMESTAMPTZ,
+  allocated_by VARCHAR(50), -- Who allocated it
+  source_order_id VARCHAR(50) REFERENCES orders(order_id),
+  source_type VARCHAR(20), -- 'order', 'manual', 'transfer'
+  status VARCHAR(20), -- 'allocated', 'in_use', 'consumed', 'returned'
+  status_changed_at TIMESTAMPTZ,
+  notes TEXT,
+  metadata JSONB
+);
+
+CREATE TABLE inventory_transactions (
+  transaction_id UUID PRIMARY KEY,
+  allocation_id UUID REFERENCES inventory_allocations(allocation_id),
+  transaction_type VARCHAR(20), -- 'allocate', 'consume', 'return', 'transfer'
+  from_user_id VARCHAR(50),
+  to_user_id VARCHAR(50),
+  quantity INTEGER,
+  timestamp TIMESTAMPTZ,
+  actor_id VARCHAR(50), -- Who performed the transaction
+  notes TEXT
+);
+```
+
+**Backend APIs:**
+- `GET /inventory/allocations/:userId` - Get user's allocated inventory
+- `GET /inventory/allocations` - Admin/warehouse view of all allocations
+- `POST /inventory/allocate` - Allocate inventory to user (warehouse/admin)
+- `POST /inventory/deallocate` - Remove allocation
+- `PATCH /inventory/allocations/:id/status` - Update status (consume, return)
+- `POST /inventory/transfer` - Transfer inventory between users
+- `GET /inventory/history/:userId` - Get allocation/transaction history
+
+**Frontend Components:**
+- `MyProductsWidget` - User-facing inventory view
+- `InventoryManagementSection` - Warehouse hub inventory management
+- `InventoryAllocationModal` - Admin/warehouse allocation interface
+- `InventoryHistoryModal` - View allocation/transaction history
+- `ProductTransferModal` - Transfer inventory between users
+
+### Use Cases
+
+1. **Order Fulfillment Integration**
+   - When order is delivered, automatically create inventory allocation
+   - Link allocation to source order for audit trail
+   - Recipient sees product in "My Products" immediately
+
+2. **Inventory Redistribution**
+   - Warehouse can view all allocated inventory across users
+   - Transfer products from one crew to another
+   - Reallocate unused inventory back to warehouse stock
+
+3. **Consumption Tracking**
+   - Users mark products as "consumed" when used
+   - Consumption data feeds into analytics/reorder predictions
+   - Track which products are most consumed by role/location
+
+4. **Returns & Reconciliation**
+   - Users can request product returns
+   - Warehouse approves returns and updates allocations
+   - Admin runs reconciliation reports comparing allocations vs. physical stock
+
+5. **Audit & Compliance**
+   - Full transaction history for every product
+   - Export allocation reports for accounting/compliance
+   - Track product movement across entire ecosystem
+
+### Integration Points
+
+- **Orders Domain**: Auto-allocate on delivery
+- **Activity Log**: Track all allocation/consumption events
+- **Analytics**: Consumption patterns, reorder predictions
+- **Notifications**: Low stock alerts, allocation confirmations
+
+**Priority:** Medium-High (Post-MVP Month 1-2)
+
+**Effort:** 3-4 weeks
+- Backend: 1 week (schema, APIs, order integration)
+- Frontend: 2 weeks (My Products widget, Warehouse management, Admin dashboard)
+- Testing: 1 week (E2E flows, data integrity, performance)
+
+**Benefits:**
+- Complete inventory lifecycle tracking
+- Improved accountability (who has what)
+- Better stock management and reordering decisions
+- Audit trail for compliance/invoicing
+- Enhanced user experience (users see their products)
+
+---
+
 ## Success Metrics
 
 - Reduced time to implement new features

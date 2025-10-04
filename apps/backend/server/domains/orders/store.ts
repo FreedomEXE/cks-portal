@@ -568,7 +568,7 @@ function buildApprovalStages(
 
   // Product orders: creator + single fulfillment stage (warehouse)
   const fulfillmentRole: HubRole = 'warehouse';
-  const fulfillmentStatus = deriveFulfillmentStageStatus(orderType, status, row.metadata);
+  let fulfillmentStatus = deriveFulfillmentStageStatus(orderType, status, row.metadata);
   const fulfillmentUserId = normalizeCodeValue(row.assigned_warehouse);
   const fulfillmentTimestamp =
     FINAL_STATUSES.has(status) || fulfillmentStatus === 'accepted' || fulfillmentStatus === 'approved'
@@ -576,7 +576,34 @@ function buildApprovalStages(
       : null;
 
   let fulfillmentLabel: string | null = null;
-  if (status === 'awaiting_delivery' && fulfillmentStatus === 'accepted') {
+
+  // Check if order was cancelled by someone - update their stage to show "cancelled"
+  if (status === 'cancelled') {
+    const meta = (row.metadata || {}) as any;
+    const arr: string[] = Array.isArray(meta.approvals) ? meta.approvals : [];
+
+    // Look for role:cancelled tag
+    const cancelledTag = arr.find((a: string) => typeof a === 'string' && a.includes(':cancelled'));
+    if (cancelledTag) {
+      const cancellerRole = cancelledTag.split(':')[0] as HubRole;
+
+      // Find if this was the creator or the warehouse
+      if (cancellerRole === creatorRole) {
+        // Creator cancelled - show creator as cancelled, warehouse as pending
+        stages[0].status = 'cancelled';
+        fulfillmentStatus = 'pending';
+      } else if (cancellerRole === 'warehouse') {
+        // Warehouse cancelled - show warehouse as cancelled
+        fulfillmentStatus = 'cancelled';
+      }
+    } else {
+      // Fallback: no cancel tag, just show based on status
+      fulfillmentStatus = 'cancelled';
+    }
+  } else if (status === 'rejected') {
+    // Similar logic for rejections
+    fulfillmentStatus = 'rejected';
+  } else if (status === 'awaiting_delivery' && fulfillmentStatus === 'accepted') {
     fulfillmentLabel = row.metadata && (row.metadata as any).deliveryStarted === true
       ? 'Delivery In Progress'
       : 'Awaiting Delivery';
@@ -999,13 +1026,22 @@ function buildRoleFilter(role: HubRole, cksCode: string): { clause: string; para
   // No ecosystem-wide joins - only show orders this specific entity is involved in
   switch (role) {
     case "customer": {
-      // Customer sees only orders where they are directly referenced
-      const clause = `creator_id = $1 OR customer_id = $1`;
+      // Customer sees orders they created, where they're referenced, or from their centers
+      const clause = `
+        creator_id = $1
+        OR customer_id = $1
+        OR center_id IN (SELECT center_id FROM centers WHERE customer_id = $1)
+      `;
       return { clause, params: [cksCode] };
     }
     case "center": {
-      // Center sees only orders where they are directly referenced
-      const clause = `creator_id = $1 OR center_id = $1 OR destination = $1`;
+      // Center sees orders they created, are referenced in, or from their parent customer
+      const clause = `
+        creator_id = $1
+        OR center_id = $1
+        OR destination = $1
+        OR customer_id IN (SELECT customer_id FROM centers WHERE center_id = $1)
+      `;
       return { clause, params: [cksCode] };
     }
     case "manager": {
@@ -1020,8 +1056,14 @@ function buildRoleFilter(role: HubRole, cksCode: string): { clause: string; para
       return { clause, params: [cksCode] };
     }
     case "contractor": {
-      // Contractor sees only orders where they are directly referenced
-      const clause = `creator_id = $1 OR contractor_id = $1`;
+      // Contractor sees orders they created, are referenced in, or from their ecosystem
+      // For manager-created orders, only show if the order is for their customers/centers
+      const clause = `
+        creator_id = $1
+        OR contractor_id = $1
+        OR customer_id IN (SELECT customer_id FROM customers WHERE contractor_id = $1)
+        OR center_id IN (SELECT center_id FROM centers WHERE customer_id IN (SELECT customer_id FROM customers WHERE contractor_id = $1))
+      `;
       return { clause, params: [cksCode] };
     }
     case "crew": {
@@ -1498,6 +1540,47 @@ export async function createOrder(input: CreateOrderInput): Promise<HubOrderItem
     }
   }
 
+  // If crew created the order, populate relationships from the crew's assigned center
+  if (input.creator.role === 'crew' && !centerId && !customerId && !contractorId && !managerId) {
+    const crewResult = await query<{ assigned_center: string | null; cks_manager: string | null }>(
+      `SELECT assigned_center, cks_manager FROM crew WHERE UPPER(crew_id) = $1 LIMIT 1`,
+      [normalizeCodeValue(input.creator.code)]
+    );
+    const crewRow = crewResult.rows[0];
+
+    if (crewRow?.assigned_center) {
+      centerId = normalizeCodeValue(crewRow.assigned_center);
+    }
+    if (!managerId && crewRow?.cks_manager) {
+      managerId = normalizeCodeValue(crewRow.cks_manager);
+    }
+
+    // Get customer and contractor from the center
+    if (centerId) {
+      const centerResult = await query<{ customer_id: string | null }>(
+        `SELECT customer_id FROM centers WHERE UPPER(center_id) = $1 LIMIT 1`,
+        [centerId]
+      );
+      const centerRow = centerResult.rows[0];
+
+      if (centerRow?.customer_id) {
+        customerId = normalizeCodeValue(centerRow.customer_id);
+      }
+
+      // Get contractor from the customer record
+      if (customerId) {
+        const customerResult = await query<{ contractor_id: string | null }>(
+          `SELECT contractor_id FROM customers WHERE UPPER(customer_id) = $1 LIMIT 1`,
+          [customerId]
+        );
+        const customerRow = customerResult.rows[0];
+        if (customerRow?.contractor_id) {
+          contractorId = normalizeCodeValue(customerRow.contractor_id);
+        }
+      }
+    }
+  }
+
   // Enrich metadata with basic contact info for requestor and destination (for Warehouse visibility)
   async function loadContactForCode(code: string | null): Promise<{ name: string | null; address: string | null; phone: string | null; email: string | null } | null> {
     const normalized = normalizeCodeValue(code);
@@ -1817,8 +1900,18 @@ export async function applyOrderAction(input: OrderActionInput): Promise<HubOrde
       break;
 
     case "cancel":
-      // Cancellation can happen at any stage
-      // No special processing needed, status will be set to 'cancelled'
+      // Track cancellation in approvals metadata for workflow display
+      if (orderType === 'service' || orderType === 'product') {
+        const currentMetadata = row.metadata || {};
+        const approvalsArr: string[] = Array.isArray((currentMetadata as any).approvals)
+          ? ((currentMetadata as any).approvals as string[])
+          : [];
+        const cancelTag = `${input.actorRole}:cancelled`;
+        if (!approvalsArr.includes(cancelTag)) {
+          const merged = { ...(currentMetadata as any), approvals: [...approvalsArr, cancelTag] };
+          (row as any).__metadata_cancel_merge = merged;
+        }
+      }
       break;
   }
 
@@ -1856,6 +1949,12 @@ export async function applyOrderAction(input: OrderActionInput): Promise<HubOrde
     const acceptMerge: Record<string, unknown> | undefined = (row as any).__metadata_accept_merge;
     if (acceptMerge) {
       metadataUpdate = { ...(row.metadata || {}), ...(metadataUpdate || {}), ...acceptMerge } as Record<string, unknown>;
+    }
+
+    // Merge cancellation metadata if present
+    const cancelMerge: Record<string, unknown> | undefined = (row as any).__metadata_cancel_merge;
+    if (cancelMerge) {
+      metadataUpdate = { ...(row.metadata || {}), ...(metadataUpdate || {}), ...cancelMerge } as Record<string, unknown>;
     }
 
     // Do not overwrite "notes" (special instructions) on cancel or reject.

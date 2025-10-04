@@ -26,15 +26,15 @@ Systematic verification of order functionality across all user roles and scenari
 
 ---
 
-## 2. Order Visibility (Who Sees What Orders)
+## 2. Order Visibility (Who Sees What Orders) ✅ COMPLETED
 
 ### 2.1 Product Orders
-- [ ] **Warehouse** sees: All product orders in pending_warehouse, awaiting_delivery, delivered, rejected, cancelled
-- [ ] **Center** sees: Their own orders + orders destined to them
-- [ ] **Customer** sees: Their own orders
-- [ ] **Contractor** sees: Their own orders
-- [ ] **Manager** sees: Their own orders + all orders from their ecosystem (customers, contractors, centers, crew under their management)
-- [ ] **Crew** sees: Their own orders
+- [x] **Warehouse** sees: All product orders in pending_warehouse, awaiting_delivery, delivered, rejected, cancelled
+- [x] **Center** sees: Their own orders + orders destined to them + orders from parent customer
+- [x] **Customer** sees: Their own orders + orders from their centers
+- [x] **Contractor** sees: Their own orders + all orders from their ecosystem (customers + centers)
+- [x] **Manager** sees: Their own orders + all orders from their ecosystem (customers, contractors, centers, crew under their management)
+- [x] **Crew** sees: Their own orders
 - [x] **Admin** sees: All orders created by all users (VERIFIED)
 
 ### 2.2 Service Orders
@@ -219,31 +219,36 @@ Systematic verification of order functionality across all user roles and scenari
 
 ---
 
-## 9. Cancel Functionality
+## 9. Cancel Functionality ✅ COMPLETED
 
 ### 9.1 UI Elements
-- [ ] Cancel button appears when allowed by policy
-- [ ] Cancel shows confirmation dialog
-- [ ] Cancel asks for optional reason
-- [ ] Cancel sends correct payload to backend
-- [ ] Cancel refreshes order list after success
-- [ ] Cancel shows error if fails
+- [x] Cancel button appears when allowed by policy
+- [x] Cancel shows confirmation dialog
+- [x] Cancel asks for required reason (window.prompt)
+- [x] Cancel sends correct payload to backend
+- [x] Cancel refreshes order list after success
+- [x] Cancel shows error if fails
 
 ### 9.2 Per Hub Cancel Handler
-- [ ] **CenterHub**: Has cancel handler with confirmation
-- [ ] **CustomerHub**: Has cancel handler with confirmation
-- [ ] **ContractorHub**: Has cancel handler with confirmation
-- [ ] **ManagerHub**: Has cancel handler with confirmation
-- [ ] **CrewHub**: Has cancel handler with confirmation
-- [ ] **WarehouseHub**: N/A (warehouse doesn't cancel, only rejects)
+- [x] **CenterHub**: Has cancel handler with confirmation
+- [x] **CustomerHub**: Has cancel handler with confirmation
+- [x] **ContractorHub**: Has cancel handler with confirmation
+- [x] **ManagerHub**: Has cancel handler with confirmation
+- [x] **CrewHub**: Has cancel handler with confirmation
+- [x] **WarehouseHub**: Has cancel handler in Deliveries section (before/during delivery)
 
 ### 9.3 Backend Cancel Processing
-- [ ] Accepts 'cancel' action via POST /orders/:id/actions
-- [ ] Validates user has permission to cancel
-- [ ] Transitions status to 'cancelled'
-- [ ] Stores cancellation reason in metadata
-- [ ] Stores cancelled_by and cancelled_at
-- [ ] Returns updated order
+- [x] Accepts 'cancel' action via POST /orders/:id/actions
+- [x] Validates user has permission to cancel
+- [x] Transitions status to 'cancelled'
+- [x] Stores cancellation reason in request.notes
+- [x] Adds role:cancelled tag to metadata.approvals array
+- [x] Returns updated order
+
+### 9.4 Cancellation Permissions ✅ TESTED
+- [x] **Product Orders - Creator Cancel**: Can cancel at `pending_warehouse` (before warehouse accepts)
+- [x] **Product Orders - Warehouse Cancel**: Can cancel at `awaiting_delivery` (before/during delivery)
+- [x] **Approval Workflow Display**: Shows correct canceller (creator vs warehouse) based on metadata tags
 
 ---
 
@@ -288,20 +293,31 @@ Systematic verification of order functionality across all user roles and scenari
 
 ---
 
-## 12. Current Known Issues
+## 12. Session 2025-10-04 Updates ✅
 
-### 12.1 Manager Hub
-- [ ] **ISSUE**: Manager cannot cancel orders they create, even at pending_warehouse
-  - **Expected**: Manager should see Cancel button at pending_warehouse for their own orders
-  - **Policy Status**: Policy allows cancel for manager at pending_warehouse (line 53-55 in orderPolicy.ts)
-  - **Hub Status**: ManagerHub has cancel handler added
-  - **Next Step**: Test if cancel button appears and works
+### 12.1 Product Order Cancellation - COMPLETED
+- [x] **Creator Cancel**: All roles (center, customer, contractor, manager, crew) can cancel at `pending_warehouse`
+- [x] **Warehouse Cancel**: Warehouse can cancel at `awaiting_delivery` (before/during delivery)
+- [x] **Cancellation Reason**: Required via window.prompt for both creator and warehouse
+- [x] **Approval Workflow**: Shows correct canceller (creator vs warehouse) based on metadata tags
+- [x] **Cancel Button Placement**: Warehouse cancel in Deliveries section (next to Start Delivery/Mark Delivered)
 
-### 12.2 To Investigate
-- [ ] Verify all hubs use `viewerStatus` for status display
-- [ ] Verify all hubs pass metadata.contacts to OrderDetailsModal
-- [ ] Verify backend enrichment runs for all order fetches
-- [ ] Verify entity columns populated correctly on create
+### 12.2 Ecosystem Visibility - COMPLETED
+- [x] **Contractor Visibility**: Sees all orders from their ecosystem (manager, customer, center, crew)
+- [x] **Customer Visibility**: Sees their own orders + orders from their centers
+- [x] **Center Visibility**: Sees their own orders + orders from their parent customer
+- [x] **Relationship Population**: Crew-created orders populate contractor_id via chain (crew → center → customer → contractor)
+- [x] **Multi-Contractor Isolation**: Proper data isolation between different contractor ecosystems
+
+### 12.3 Fixes Applied
+- [x] buildRoleFilter updated for all roles (apps/backend/server/domains/orders/store.ts:1024-1067)
+- [x] buildApprovalStages shows correct canceller (apps/backend/server/domains/orders/store.ts:580-623)
+- [x] Cancel metadata tracking with role:cancelled tags (apps/backend/server/domains/orders/store.ts:1860-1916)
+- [x] Warehouse deliveries filter fixed (only awaiting_delivery) (apps/frontend/src/hubs/WarehouseHub.tsx:308)
+- [x] Cancel button with reason prompt (apps/frontend/src/hubs/WarehouseHub.tsx:428, 732-789)
+
+### 12.4 All Known Issues - RESOLVED ✅
+No outstanding issues. Product order flow fully functional and tested.
 
 ---
 
@@ -354,6 +370,22 @@ Use this section to mark completed tests:
 
 ---
 
-**Last Updated**: 2025-10-01
-**Version**: 1.0
-**Status**: Initial checklist created
+## Next Steps
+
+### Service Order Testing (Next Session)
+- [ ] Test service order E2E flow (create → approve → assign → create service)
+- [ ] Implement service lifecycle actions (start-service, complete-service)
+- [ ] Create service details modal
+- [ ] Verify service visibility across all roles
+- [ ] Test service cancellation workflow
+
+### Activity/Audit Log (PRE-MVP Priority)
+- [ ] Implement activity_log table and domain
+- [ ] Add logging to all order/service/inventory actions
+- [ ] Update Recent Activity widget
+
+---
+
+**Last Updated**: 2025-10-04
+**Version**: 1.1
+**Status**: Product orders complete, service orders next

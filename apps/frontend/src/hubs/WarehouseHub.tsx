@@ -51,6 +51,7 @@ const ACTION_LABEL_MAP: Record<string, OrderActionType> = {
   'Start Delivery': 'start-delivery',
   'Mark Delivered': 'deliver',
   'Create Service': 'create-service',
+  Cancel: 'cancel',
 };
 interface WarehouseHubProps {
   initialTab?: string;
@@ -304,7 +305,7 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
       if (normalizedStatus === 'delivered') {
         console.log(`[DELIVERIES] → Adding to COMPLETED deliveries`);
         completed.push(base);
-      } else if (normalizedStatus === 'pending-warehouse' || normalizedStatus === 'awaiting-delivery') {
+      } else if (normalizedStatus === 'awaiting-delivery') {
         console.log(`[DELIVERIES] → Adding to PENDING deliveries`);
         pending.push(base);
       } else {
@@ -424,8 +425,8 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
     { id: 'status', title: 'Status', dataKey: 'accountStatus', color: 'purple' },
   ], []);
 
-  const handleOrderAction = async (orderId: string, actionLabel: string) => {
-    console.log('[WAREHOUSE] Order action triggered:', { orderId, actionLabel });
+  const handleOrderAction = async (orderId: string, actionLabel: string, providedReason?: string) => {
+    console.log('[WAREHOUSE] Order action triggered:', { orderId, actionLabel, providedReason });
 
     if (actionLabel === 'View Details') {
       const target = orders?.orders?.find((o: any) => (o.orderId || o.id) === orderId) || null;
@@ -459,6 +460,10 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
         return;
       }
       request.notes = trimmed;
+    }
+
+    if (mapped === 'cancel' && providedReason) {
+      request.notes = providedReason;
     }
 
     if (mapped === 'create-service') {
@@ -709,43 +714,89 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
                           return (
                             <div style={{ display: 'flex', gap: '8px' }}>
                               {!deliveryStarted ? (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleOrderAction(row.order.orderId, 'Start Delivery');
-                                  }}
-                                  style={{
-                                    padding: '6px 12px',
-                                    borderRadius: '4px',
-                                    fontSize: '12px',
-                                    fontWeight: 500,
-                                    border: 'none',
-                                    cursor: 'pointer',
-                                    backgroundColor: '#3b82f6',
-                                    color: 'white',
-                                  }}
-                                >
-                                  Start Delivery
-                                </button>
+                                <>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleOrderAction(row.order.orderId, 'Start Delivery');
+                                    }}
+                                    style={{
+                                      padding: '6px 12px',
+                                      borderRadius: '4px',
+                                      fontSize: '12px',
+                                      fontWeight: 500,
+                                      border: 'none',
+                                      cursor: 'pointer',
+                                      backgroundColor: '#3b82f6',
+                                      color: 'white',
+                                    }}
+                                  >
+                                    Start Delivery
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const reason = window.prompt('Please provide a reason for cancellation:');
+                                      if (reason && reason.trim()) {
+                                        handleOrderAction(row.order.orderId, 'Cancel', reason.trim());
+                                      }
+                                    }}
+                                    style={{
+                                      padding: '6px 12px',
+                                      borderRadius: '4px',
+                                      fontSize: '12px',
+                                      fontWeight: 500,
+                                      border: 'none',
+                                      cursor: 'pointer',
+                                      backgroundColor: '#ef4444',
+                                      color: 'white',
+                                    }}
+                                  >
+                                    Cancel
+                                  </button>
+                                </>
                               ) : (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleOrderAction(row.order.orderId, 'Mark Delivered');
-                                  }}
-                                  style={{
-                                    padding: '6px 12px',
-                                    borderRadius: '4px',
-                                    fontSize: '12px',
-                                    fontWeight: 500,
-                                    border: 'none',
-                                    cursor: 'pointer',
-                                    backgroundColor: '#10b981',
-                                    color: 'white',
-                                  }}
-                                >
-                                  Mark Delivered
-                                </button>
+                                <>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleOrderAction(row.order.orderId, 'Mark Delivered');
+                                    }}
+                                    style={{
+                                      padding: '6px 12px',
+                                      borderRadius: '4px',
+                                      fontSize: '12px',
+                                      fontWeight: 500,
+                                      border: 'none',
+                                      cursor: 'pointer',
+                                      backgroundColor: '#10b981',
+                                      color: 'white',
+                                    }}
+                                  >
+                                    Mark Delivered
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const reason = window.prompt('Please provide a reason for cancellation:');
+                                      if (reason && reason.trim()) {
+                                        handleOrderAction(row.order.orderId, 'Cancel', reason.trim());
+                                      }
+                                    }}
+                                    style={{
+                                      padding: '6px 12px',
+                                      borderRadius: '4px',
+                                      fontSize: '12px',
+                                      fontWeight: 500,
+                                      border: 'none',
+                                      cursor: 'pointer',
+                                      backgroundColor: '#ef4444',
+                                      color: 'white',
+                                    }}
+                                  >
+                                    Cancel
+                                  </button>
+                                </>
                               )}
                             </div>
                           );

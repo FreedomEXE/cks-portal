@@ -13,14 +13,21 @@ This document tracks the implementation status to deliver the service order flow
 - Create Service does NOT set actual start/end times; those come later when work starts/completes.
 - Orders move to Archive (`service_created`) and Services show in “My Services”.
 
-## Done
+## Done ✅
 
 - Backend: create‑service now generates `transformedId` as `<center>-SRV-###` by scanning existing IDs per center and incrementing.
 - Backend: Accept/Reject wiring for customer/contractor/manager corrected; actions validated against canonical status (no overrides).
 - Frontend: Manager actions wired (Accept, Reject, Cancel) with reason prompts and refresh.
-- Frontend: Post‑accept menu shows (Add Crew / Add Procedure / Add Training) even if policy doesn’t enumerate them (UI helpers) and ‘Create Service’ shows via policy at `manager_accepted`.
+- Frontend: Post‑accept menu shows (Add Crew / Add Procedure / Add Training) even if policy doesn't enumerate them (UI helpers) and 'Create Service' shows via policy at `manager_accepted`.
 - Frontend: CreateServiceModal relaxed (start/end optional, notes optional). Start/end will be captured later.
 - Frontend: OrdersSection hides Accept/Reject unless viewer is the pending actor.
+
+### Session 2025-10-04 Additions ✅
+- Product Order Cancellation E2E complete (creator + warehouse cancel with reasons)
+- Ecosystem visibility fixed for all roles (contractor, customer, center)
+- Approval workflow display shows correct canceller (creator vs warehouse)
+- Warehouse deliveries section properly filtered (only awaiting_delivery orders)
+- All product order flows tested and verified across all user roles
 
 ## Next (P1)
 
@@ -45,10 +52,12 @@ This document tracks the implementation status to deliver the service order flow
 
 ## Acceptance Criteria
 
-- Manager Accept at `pending_manager` shows post‑accept menu and no longer shows Accept.
-- Create Service generates `CEN-XXX-SRV-###` and archives the order as `service_created`.
-- My Services shows the SRV id; SO ids do not appear.
-- (P1) Manager (or crew) can Start Service and Complete Service; Start/End timestamps recorded accordingly.
+- [x] Manager Accept at `pending_manager` shows post‑accept menu and no longer shows Accept.
+- [x] Create Service generates `CEN-XXX-SRV-###` and archives the order as `service_created`.
+- [x] My Services shows the SRV id; SO ids do not appear.
+- [ ] (P1 - NEXT SESSION) Manager (or crew) can Start Service and Complete Service; Start/End timestamps recorded accordingly.
+- [ ] (P1 - NEXT SESSION) Service Details Modal shows service info with manager edit controls and crew view-only mode.
+- [ ] (P0 - PRE-MVP) Activity/Audit Log captures all service lifecycle events for compliance/invoicing.
 
 ## Notes
 

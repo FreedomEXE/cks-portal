@@ -162,6 +162,20 @@ export function getAllowedActions(ctx: OrderContext): OrderAction[] {
   // Get role-specific actions for this status
   const actions = ACTIONS_BY_STATUS[ctx.orderType]?.[ctx.role]?.[ctx.status] ?? [];
 
+  // Product flow: creator can cancel before warehouse accepts
+  if (ctx.orderType === 'product' && ctx.status === 'pending_warehouse') {
+    if (ctx.isCreator === true && !actions.includes('cancel')) {
+      return [...actions, 'cancel'];
+    }
+  }
+
+  // Product flow: warehouse can cancel after accepting but before delivery starts
+  if (ctx.orderType === 'product' && ctx.status === 'awaiting_delivery' && ctx.role === 'warehouse') {
+    if (!actions.includes('cancel')) {
+      return [...actions, 'cancel'];
+    }
+  }
+
   // Service flow: staged cancel rights follow the last actor who has acted.
   // - pending_customer: creator can cancel
   // - pending_contractor: customer (who accepted) can cancel
