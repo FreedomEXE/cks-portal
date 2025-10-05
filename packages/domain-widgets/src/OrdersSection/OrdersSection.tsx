@@ -12,7 +12,7 @@ interface Order {
   expectedDate?: string;  // Date requested by customer/center
   serviceStartDate?: string;  // Actual date set by Manager when creating service
   deliveryDate?: string;  // Actual date when product was delivered
-  status: 'pending' | 'in-progress' | 'approved' | 'rejected' | 'cancelled' | 'delivered' | 'service-created';
+  status: 'pending' | 'in-progress' | 'approved' | 'rejected' | 'cancelled' | 'delivered' | 'service-created' | 'crew-requested' | 'crew-assigned' | 'manager-accepted';
   approvalStages?: Array<{
     role: string;
     status: 'pending' | 'approved' | 'rejected' | 'waiting' | 'accepted' | 'requested' | 'delivered';
@@ -104,12 +104,12 @@ const OrdersSection: React.FC<OrdersSectionProps> = ({
 
   // Count orders by type and status
   const allOrdersCount = allOrders.filter(o =>
-    ['pending', 'in-progress', 'approved'].includes(o.status)  // Active orders
+    ['pending', 'in-progress', 'approved', 'crew-requested'].includes(o.status)  // Active orders
   ).length;
 
   // For type-specific tabs, count only directly involved orders
   const serviceOrdersCount = serviceOrders.filter(o =>
-    ['pending', 'in-progress', 'approved'].includes(o.status) && isDirectlyInvolved(o)
+    ['pending', 'in-progress', 'approved', 'crew-requested'].includes(o.status) && isDirectlyInvolved(o)
   ).length;
 
   const productOrdersCount = productOrders.filter(o =>
@@ -174,7 +174,7 @@ const OrdersSection: React.FC<OrdersSectionProps> = ({
       return filtered.filter(o => ['cancelled', 'rejected', 'delivered', 'completed', 'archived', 'service-created'].includes(o.status));  // Only truly completed
     } else {
       // Non-archive tabs show active orders
-      return filtered.filter(o => ['pending', 'in-progress', 'approved'].includes(o.status));
+      return filtered.filter(o => ['pending', 'in-progress', 'approved', 'crew-requested', 'crew-assigned', 'manager-accepted'].includes(o.status));
     }
   };
 

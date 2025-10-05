@@ -26,9 +26,6 @@ import {
   PageWrapper,
   Scrollbar,
   TabSection,
-  CrewSelectionModal,
-  CreateServiceModal,
-  type CreateServiceFormData
 } from '@cks/ui';
 import { ServiceDetailsModal } from '@cks/ui';
 import MyHubSection from '../components/MyHubSection';
@@ -126,6 +123,8 @@ const HUB_TABS = [
   { id: 'profile', label: 'My Profile', path: '/manager/profile' },
   { id: 'ecosystem', label: 'My Ecosystem', path: '/manager/ecosystem' },
   { id: 'services', label: 'My Services', path: '/manager/services' },
+  { id: 'procedures', label: 'Procedures', path: '/manager/procedures' },
+  { id: 'training', label: 'Training', path: '/manager/training' },
   { id: 'orders', label: 'Orders', path: '/manager/orders' },
   { id: 'reports', label: 'Reports', path: '/manager/reports' },
   { id: 'support', label: 'Support', path: '/manager/support' },
@@ -158,24 +157,10 @@ const ACTIVE_SERVICES_COLUMNS = [
     key: 'actions',
     label: 'ACTIONS',
     render: (_: any, row: any) => {
-            const started = !!row.metadata?.serviceStartedAt;
-      const completed = !!row.metadata?.serviceCompletedAt;
-      const verified = !!row.metadata?.serviceVerifiedAt;
       return (
-        <div style={{ display: 'flex', gap: 8 }}>
-          {!started && !completed && (
-            <Button size="sm" onClick={row.onStart}>Start</Button>
-          )}
-          {started && !completed && (
-            <Button size="sm" variant="primary" onClick={row.onComplete}>Complete</Button>
-          )}
-          {completed && !verified && (
-            <Button size="sm" variant="primary" onClick={row.onVerify}>Verify</Button>
-          )}
-          {completed && verified && (
-            <span style={{ fontSize: 12, color: '#16a34a' }}>Verified</span>
-          )}
-        </div>
+        <Button size="sm" onClick={row.onViewDetails}>
+          View Details
+        </Button>
       );
     }
   }
@@ -411,10 +396,7 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
   const [servicesSearchQuery, setServicesSearchQuery] = useState('');
   const [activityFeed, setActivityFeed] = useState<Activity[]>([]);
 
-  // Service order modal state
-  const [showCrewModal, setShowCrewModal] = useState(false);
-  const [showCreateServiceModal, setShowCreateServiceModal] = useState(false);
-  const [selectedOrder, setSelectedOrder] = useState<HubOrderItem | null>(null);
+  // Service modal state (for Active Services section)
   const [showServiceDetails, setShowServiceDetails] = useState(false);
   const [serviceDetails, setServiceDetails] = useState<any>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -672,17 +654,32 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
               alert(err instanceof Error ? err.message : 'Failed to verify service');
             }
           };
+          const onViewDetails = async () => {
+            try {
+              const { apiFetch } = await import('../shared/api/client');
+              const res = await apiFetch(`/services/${encodeURIComponent(rawServiceId)}`);
+              if (res && res.data) {
+                setServiceDetails(res.data);
+                setShowServiceDetails(true);
+              }
+            } catch (err) {
+              console.error('[manager] failed to load service details', err);
+              alert('Failed to load service details. Please try again.');
+            }
+          };
+
           return {
             serviceId: rawServiceId,
             serviceName: service?.name ?? order.title ?? rawServiceId,
             centerId: centerId ?? 'N/A',
-            type: service?.category ?? 'Service',
+            type: meta.serviceType === 'ongoing' ? 'Ongoing' : 'One-Time',
             status: formatStatusLabel(order.status),
             startDate: formatDate(order.orderDate ?? order.requestedDate),
             metadata: meta,
             onStart,
-            onComplete, 
-            onVerify, 
+            onComplete,
+            onVerify,
+            onViewDetails,
           };
         }),
     [managerServiceOrders, serviceById, managerCode, mutate],
@@ -923,23 +920,8 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
       return;
     }
 
-    if (action === 'Add Crew') {
-      setSelectedOrder(order || null);
-      setShowCrewModal(true);
-      return;
-    }
-
-    if (action === 'Create Service') {
-      setSelectedOrder(order || null);
-      setShowCreateServiceModal(true);
-      return;
-    }
-
-    // Add Training and Add Procedure are placeholders for now
-    if (action === 'Add Training' || action === 'Add Procedure') {
-      alert(`${action} functionality coming soon!`);
-      return;
-    }
+    // Note: Add Crew, Create Service, Add Training, Add Procedure are now managed from Active Services section
+    // These actions are no longer available on orders after policy update
 
     try {
       // Apply other order actions
@@ -961,55 +943,9 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
     console.log('[manager] view ecosystem node', userId);
   }, []);
 
-  // Crew request handler
-  const handleCrewRequest = useCallback(async (selectedCrew: string[], message?: string) => {
-    if (!selectedOrder) return;
-
-    try {
-      const { apiFetch } = await import('../shared/api/client');
-      await apiFetch(`/orders/${selectedOrder.orderId}/crew-requests`, {
-        method: 'POST',
-        body: JSON.stringify({
-          crewCodes: selectedCrew,
-          message,
-        }),
-      });
-
-      mutate(`/hub/orders/${managerCode}`);
-      setShowCrewModal(false);
-      setSelectedOrder(null);
-      console.log('[manager] crew requested', { orderId: selectedOrder.orderId, crewCodes: selectedCrew });
-    } catch (error) {
-      console.error('[manager] failed to request crew', error);
-      alert('Failed to request crew assignment. Please try again.');
-    }
-  }, [selectedOrder, managerCode, mutate]);
-
-  // Create service handler
-  const handleCreateService = useCallback(async (data: CreateServiceFormData) => {
-    if (!selectedOrder) return;
-
-    try {
-      const payload: OrderActionRequest = {
-        action: 'create-service',
-        metadata: {
-          serviceType: data.serviceType,
-          startDate: data.startDate,
-          startTime: data.startTime,
-          endDate: data.endDate,
-          endTime: data.endTime,
-          notes: data.notes,
-        },
-      };
-
-      await applyHubOrderAction(selectedOrder.orderId, payload);
-      mutate(`/hub/orders/${managerCode}`);
-      console.log('[manager] service created', { orderId: selectedOrder.orderId });
-    } catch (error) {
-      console.error('[manager] failed to create service', error);
-      alert('Failed to create service. Please try again.');
-    }
-  }, [selectedOrder, managerCode, mutate]);
+  // Note: Crew request and service creation handlers removed
+  // Services are now auto-created on manager accept
+  // Crew, procedures, training are managed from Active Services section
 
   return (
     <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: '#f9fafb' }}>
@@ -1171,6 +1107,70 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
                 primaryColor={MANAGER_PRIMARY_COLOR}
               />
             </PageWrapper>
+          ) : activeTab === 'procedures' ? (
+            <PageWrapper title="Procedures" showHeader headerSrOnly>
+              <div style={{ padding: 24, textAlign: 'center' }}>
+                <h2 style={{ margin: 0, fontSize: 24, fontWeight: 600, marginBottom: 12 }}>Procedure Library</h2>
+                <p style={{ color: '#6b7280', fontSize: 16, marginBottom: 24 }}>
+                  Create, manage, and link standard operating procedures to services.
+                </p>
+                <div style={{
+                  maxWidth: 600,
+                  margin: '0 auto',
+                  padding: 32,
+                  backgroundColor: '#fef3c7',
+                  borderRadius: 12,
+                  border: '2px dashed #f59e0b'
+                }}>
+                  <h3 style={{ marginTop: 0, fontSize: 18, fontWeight: 600, color: '#92400e' }}>
+                    Coming Post-MVP
+                  </h3>
+                  <p style={{ color: '#92400e', marginBottom: 16, fontSize: 14 }}>
+                    Full procedure management system with:
+                  </p>
+                  <ul style={{ textAlign: 'left', color: '#92400e', fontSize: 14, maxWidth: 400, margin: '0 auto' }}>
+                    <li>Drag-and-drop procedure builder</li>
+                    <li>Task breakdowns with checklists</li>
+                    <li>Crew assignments per task</li>
+                    <li>Reusable procedure templates</li>
+                    <li>Version control and approval workflows</li>
+                    <li>File attachments and rich media support</li>
+                  </ul>
+                </div>
+              </div>
+            </PageWrapper>
+          ) : activeTab === 'training' ? (
+            <PageWrapper title="Training" showHeader headerSrOnly>
+              <div style={{ padding: 24, textAlign: 'center' }}>
+                <h2 style={{ margin: 0, fontSize: 24, fontWeight: 600, marginBottom: 12 }}>Training Library</h2>
+                <p style={{ color: '#6b7280', fontSize: 16, marginBottom: 24 }}>
+                  Manage training materials, certifications, and crew completion tracking.
+                </p>
+                <div style={{
+                  maxWidth: 600,
+                  margin: '0 auto',
+                  padding: 32,
+                  backgroundColor: '#fef3c7',
+                  borderRadius: 12,
+                  border: '2px dashed #f59e0b'
+                }}>
+                  <h3 style={{ marginTop: 0, fontSize: 18, fontWeight: 600, color: '#92400e' }}>
+                    Coming Post-MVP
+                  </h3>
+                  <p style={{ color: '#92400e', marginBottom: 16, fontSize: 14 }}>
+                    Full training management system with:
+                  </p>
+                  <ul style={{ textAlign: 'left', color: '#92400e', fontSize: 14, maxWidth: 400, margin: '0 auto' }}>
+                    <li>Video uploads and streaming</li>
+                    <li>PDF attachments and documents</li>
+                    <li>Certification tracking with expiration dates</li>
+                    <li>Crew completion status and progress</li>
+                    <li>Quiz and assessment tools</li>
+                    <li>Training history and compliance reporting</li>
+                  </ul>
+                </div>
+              </div>
+            </PageWrapper>
           ) : activeTab === 'support' ? (
             <PageWrapper title="Support" headerSrOnly>
               <SupportSection role="manager" primaryColor={MANAGER_PRIMARY_COLOR} />
@@ -1244,35 +1244,15 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
         }
       />
 
-      {/* Crew Selection Modal */}
-      <CrewSelectionModal
-        isOpen={showCrewModal}
-        onClose={() => {
-          setShowCrewModal(false);
-          setSelectedOrder(null);
-        }}
-        onSubmit={handleCrewRequest}
-        availableCrew={crewEntries.map((c: any) => ({ code: c.id, name: c.name || c.id }))
-        }
-      />
-
-      {/* Create Service Modal */}
-      <CreateServiceModal
-        isOpen={showCreateServiceModal}
-        onClose={() => {
-          setShowCreateServiceModal(false);
-          setSelectedOrder(null);
-        }}
-        onSubmit={handleCreateService}
-        orderId={selectedOrder?.orderId}
-      />
-
+      {/* Service Details Modal - for Active Services section */}
       <ServiceDetailsModal
         isOpen={showServiceDetails}
-        onClose={() => setShowServiceDetails(false)}
+        onClose={() => { setShowServiceDetails(false); setServiceDetails(null); }}
         service={serviceDetails ? { serviceId: serviceDetails.serviceId, title: serviceDetails.title, centerId: serviceDetails.centerId, metadata: serviceDetails.metadata } : null}
         editable
         availableCrew={crewEntries.map((c: any) => ({ code: c.id, name: c.name || c.id }))}
+        serviceStatus={serviceDetails?.metadata?.serviceStatus || 'created'}
+        serviceType={serviceDetails?.metadata?.serviceType || 'one-time'}
         onSave={async (updates) => {
           try {
             if (!serviceDetails?.serviceId) return;
@@ -1287,6 +1267,60 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
             mutate(`/hub/orders/${managerCode}`);
           } catch (err) {
             console.error('[manager] failed to update service', err);
+          }
+        }}
+        onSendCrewRequest={async (crewCodes: string[]) => {
+          try {
+            if (!serviceDetails?.orderId) return;
+            const res = await fetch(`/api/orders/${encodeURIComponent(serviceDetails.orderId)}/crew-requests`, {
+              method: 'POST',
+              credentials: 'include',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ crewCodes }),
+            });
+            if (!res.ok) {
+              const errorData = await res.json().catch(() => ({}));
+              throw new Error(errorData.error || 'Failed to send crew requests');
+            }
+            mutate(`/hub/orders/${managerCode}`);
+          } catch (err) {
+            console.error('[manager] failed to send crew request', err);
+            throw err;
+          }
+        }}
+        onStartService={async () => {
+          try {
+            if (!serviceDetails?.serviceId) return;
+            const { applyServiceAction } = await import('../shared/api/hub');
+            await applyServiceAction(serviceDetails.serviceId, 'start');
+            mutate(`/hub/orders/${managerCode}`);
+          } catch (err) {
+            console.error('[manager] failed to start service', err);
+            alert(err instanceof Error ? err.message : 'Failed to start service');
+          }
+        }}
+        onCompleteService={async () => {
+          try {
+            if (!serviceDetails?.serviceId) return;
+            const { applyServiceAction } = await import('../shared/api/hub');
+            await applyServiceAction(serviceDetails.serviceId, 'complete');
+            mutate(`/hub/orders/${managerCode}`);
+          } catch (err) {
+            console.error('[manager] failed to complete service', err);
+            alert(err instanceof Error ? err.message : 'Failed to complete service');
+          }
+        }}
+        onCancelService={async () => {
+          try {
+            if (!serviceDetails?.serviceId) return;
+            const reason = window.prompt('Please provide a reason for cancellation:');
+            if (!reason) return;
+            const { applyServiceAction } = await import('../shared/api/hub');
+            await applyServiceAction(serviceDetails.serviceId, 'cancel');
+            mutate(`/hub/orders/${managerCode}`);
+          } catch (err) {
+            console.error('[manager] failed to cancel service', err);
+            alert(err instanceof Error ? err.message : 'Failed to cancel service');
           }
         }}
       />

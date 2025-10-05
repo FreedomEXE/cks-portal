@@ -1845,6 +1845,42 @@ export async function applyOrderAction(input: OrderActionInput): Promise<HubOrde
           // Combine later when building metadataUpdate below
           (row as any).__metadata_accept_merge = merged;
         }
+
+        // Auto-create service when manager accepts
+        if (input.actorRole === 'manager' && currentStatus === 'pending_manager') {
+          // Generate per-center sequential service ID: <CENTER>-SRV-XXX
+          // Try to get center from: center_id, destination, or participants
+          let centerCode = normalizeCodeValue(row.center_id) || normalizeCodeValue(row.destination) || null;
+
+          // If still no center, look for center in participants
+          if (!centerCode) {
+            const centerParticipant = participants.find(p => p.role === 'center');
+            if (centerParticipant) {
+              centerCode = centerParticipant.userId;
+            }
+          }
+
+          if (!centerCode) {
+            throw new Error('Unable to determine center for service creation. Order must be associated with a center.');
+          }
+
+          const seqQuery = await query<{ next: string }>(
+            `SELECT LPAD((COALESCE(MAX(CAST(SPLIT_PART(transformed_id, '-SRV-', 2) AS INTEGER)), 0) + 1)::text, 3, '0') AS next
+             FROM orders
+             WHERE transformed_id LIKE $1`,
+            [`${centerCode}-SRV-%`]
+          );
+          const nextSeq = seqQuery.rows[0]?.next ?? '001';
+          transformedId = `${centerCode}-SRV-${nextSeq}`;
+
+          // Mark service as created in metadata
+          const acceptMergedMetadata = (row as any).__metadata_accept_merge || currentMetadata;
+          (row as any).__metadata_accept_merge = {
+            ...acceptMergedMetadata,
+            serviceCreatedAt: new Date().toISOString(),
+            serviceStatus: 'created'
+          };
+        }
       }
       break;
 
@@ -2024,7 +2060,8 @@ export async function applyOrderAction(input: OrderActionInput): Promise<HubOrde
     }
 
     // If creating a service, insert into services table
-    if (input.action === "create-service" && transformedId) {
+    // This happens either via explicit create-service action OR auto-create on manager accept
+    if ((input.action === "create-service" || (input.action === "accept" && input.actorRole === 'manager' && orderType === 'service')) && transformedId) {
       const serviceMetadata = metadataUpdate || row.metadata || {};
       const serviceType = (serviceMetadata as any).serviceType || 'one-time';
       const serviceName = row.title || transformedId;
@@ -2045,12 +2082,12 @@ export async function applyOrderAction(input: OrderActionInput): Promise<HubOrde
         [
           transformedId,
           serviceName,
-          'active', // New services start as active
+          'created', // New services start as created (not started yet)
           serviceType // Use serviceType from metadata
         ]
       );
 
-      console.log(`[create-service] Created service ${transformedId} for order ${input.orderId}`);
+      console.log(`[auto-create-service] Created service ${transformedId} for order ${input.orderId}`);
     }
 
     await query("COMMIT");

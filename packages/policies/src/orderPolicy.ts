@@ -80,10 +80,10 @@ const ACTIONS_BY_STATUS: Record<OrderType, Record<HubRole, Partial<Record<OrderS
     manager: {
       'pending_customer': [], // Watch only
       'pending_contractor': [], // Watch only
-      'pending_manager': ['accept', 'reject'], // Manager approves
-      'manager_accepted': ['create-service'], // Manager creates service (required)
-      'crew_requested': ['create-service'], // Manager can create service after requesting crew
-      'crew_assigned': ['create-service'] // Manager can create service after crew is assigned
+      'pending_manager': ['accept', 'reject'], // Manager approves (auto-creates service)
+      'manager_accepted': [], // Legacy state - no longer used
+      'crew_requested': [], // Legacy state - no longer used
+      'crew_assigned': [] // Legacy state - no longer used
     },
     contractor: {
       'pending_contractor': ['accept', 'reject'], // Contractor approves
@@ -124,8 +124,8 @@ const TRANSITIONS: Record<OrderType, Record<OrderAction, OrderStatus>> = {
 const SERVICE_ACCEPT_TRANSITIONS: Record<ServiceOrderStatus, ServiceOrderStatus> = {
   'pending_customer': 'pending_contractor',      // Customer accepts → Contractor
   'pending_contractor': 'pending_manager',       // Contractor accepts → Manager
-  'pending_manager': 'manager_accepted',         // Manager accepts → Manager can add crew/training/procedures
-  'manager_accepted': 'manager_accepted',        // No-op (manager uses create-service action)
+  'pending_manager': 'service_created',          // Manager accepts → Service auto-created, order archived
+  'manager_accepted': 'service_created',         // Legacy: Manager creates service manually
   'crew_requested': 'crew_assigned',             // Crew accepts assignment
   'crew_assigned': 'crew_assigned',              // No-op
   'service_created': 'service_created',          // No-op

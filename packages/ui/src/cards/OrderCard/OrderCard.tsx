@@ -18,7 +18,7 @@ interface OrderCardProps {
   expectedDate?: string;  // Requested date
   serviceStartDate?: string;  // Actual service start (for service-created)
   deliveryDate?: string;  // Actual delivery date (for delivered)
-  status: 'pending' | 'in-progress' | 'approved' | 'rejected' | 'cancelled' | 'delivered' | 'service-created' | 'completed' | 'archived';
+  status: 'pending' | 'in-progress' | 'approved' | 'rejected' | 'cancelled' | 'delivered' | 'service-created' | 'completed' | 'archived' | 'crew-requested' | 'crew-assigned' | 'manager-accepted';
   // Optional override for the label text shown on the status badge.
   // Useful to display "Waiting" while keeping the blue "in-progress" styling.
   statusText?: string;
@@ -69,6 +69,7 @@ const OrderCard: React.FC<OrderCardProps> = ({
       case 'delivered':
       case 'completed':
       case 'service-created':
+      case 'crew-assigned':
         baseClass = styles.statusGreen;
         break;
       case 'requested':
@@ -78,6 +79,8 @@ const OrderCard: React.FC<OrderCardProps> = ({
       case 'pending':
       case 'waiting':
       case 'accepted':  // Accepted but not delivered - shows as yellow
+      case 'crew-requested':
+      case 'manager-accepted':
         baseClass = styles.statusYellow;
         break;
       case 'rejected':
@@ -122,6 +125,9 @@ const OrderCard: React.FC<OrderCardProps> = ({
         case 'delivered': return '#dcfce7'; // Light green - same as approved
         case 'completed': return '#dcfce7'; // Light green - completed status
         case 'service-created': return '#dcfce7'; // Light green - service created
+        case 'crew-assigned': return '#dcfce7'; // Light green - crew assigned
+        case 'crew-requested': return '#fef3c7'; // Light yellow - crew request pending
+        case 'manager-accepted': return '#fef3c7'; // Light yellow - manager accepted
         case 'archived': return 'rgba(17, 24, 39, 0.08)'; // Black tinted highlight
         case 'rejected': return '#fee2e2'; // Light red
         case 'cancelled': return '#fee2e2'; // Light red - same as rejected

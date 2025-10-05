@@ -7,7 +7,7 @@ import { query } from '../../db/connection';
 export async function registerServicesRoutes(server: FastifyInstance) {
   const paramsSchema = z.object({ serviceId: z.string().min(1) });
   const bodySchema = z.object({
-    action: z.enum(['start', 'complete', 'verify']),
+    action: z.enum(['start', 'complete', 'verify', 'cancel']),
     notes: z.string().trim().max(1000).optional(),
   });
 
@@ -77,6 +77,7 @@ export async function registerServicesRoutes(server: FastifyInstance) {
         crew: Array.isArray(body.crew) ? body.crew : undefined,
         procedures: Array.isArray(body.procedures) ? body.procedures : undefined,
         training: Array.isArray(body.training) ? body.training : undefined,
+        notes: typeof body.notes === 'string' ? body.notes : undefined,
       });
       if (!data) {
         reply.code(404).send({ error: 'Service not found' });
