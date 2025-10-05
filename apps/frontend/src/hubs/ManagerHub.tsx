@@ -22,6 +22,9 @@ import {
   Button,
   DataTable,
   OrderDetailsModal,
+  ProductOrderModal,
+  ServiceOrderModal,
+  ServiceViewModal,
   PageHeader,
   PageWrapper,
   Scrollbar,
@@ -395,6 +398,7 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
   const [servicesTab, setServicesTab] = useState<'my' | 'active' | 'history'>('my');
   const [servicesSearchQuery, setServicesSearchQuery] = useState('');
   const [activityFeed, setActivityFeed] = useState<Activity[]>([]);
+  const [toast, setToast] = useState<string | null>(null);
 
   // Service modal state (for Active Services section)
   const [showServiceDetails, setShowServiceDetails] = useState(false);
@@ -612,9 +616,15 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
           if (!(order as any).serviceId && !(order as any).transformedId) {
             return false;
           }
+          const meta: any = (order as any).metadata || {};
+          const svcStatus = (meta?.serviceStatus || '').toLowerCase().replace(/\s+/g, '_');
+          if (svcStatus) {
+            // Treat created/in_progress as active; completed/cancelled go to history
+            return svcStatus === 'created' || svcStatus === 'in_progress';
+          }
           const status = normalizeOrderStatus(order.status);
-          // Include active service statuses: pending approval stages, in-progress work, AND created services that are active
-          return status === 'pending' || status === 'in-progress' || status === 'approved' || status === 'delivered' || status === 'service-created' || status === 'completed';
+          // Fallback on order status for active list when serviceStatus isn't set yet
+          return status === 'pending' || status === 'in-progress' || status === 'approved' || status === 'delivered' || status === 'service-created';
         })
         .map((order) => {
           const rawServiceId = (order as any).serviceId ?? (order as any).transformedId ?? 'Service';
@@ -627,6 +637,8 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
               const { applyServiceAction } = await import('../shared/api/hub');
               await applyServiceAction(rawServiceId, 'start');
               mutate(`/hub/orders/${managerCode}`);
+              setToast('Service started');
+              setTimeout(() => setToast(null), 1800);
             } catch (err) {
               console.error('[manager] failed to start service', err);
               alert(err instanceof Error ? err.message : 'Failed to start service');
@@ -638,6 +650,8 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
               const { applyServiceAction } = await import('../shared/api/hub');
               await applyServiceAction(rawServiceId, 'complete');
               mutate(`/hub/orders/${managerCode}`);
+              setToast('Service completed');
+              setTimeout(() => setToast(null), 1800);
             } catch (err) {
               console.error('[manager] failed to complete service', err);
               alert(err instanceof Error ? err.message : 'Failed to complete service');
@@ -673,7 +687,8 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
             serviceName: service?.name ?? order.title ?? rawServiceId,
             centerId: centerId ?? 'N/A',
             type: meta.serviceType === 'ongoing' ? 'Ongoing' : 'One-Time',
-            status: formatStatusLabel(order.status),
+            // Prefer live service status from metadata if present, fallback to order status
+            status: formatStatusLabel((meta && meta.serviceStatus) || order.status),
             startDate: formatDate(order.orderDate ?? order.requestedDate),
             metadata: meta,
             onStart,
@@ -691,24 +706,28 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
           if (!(order as any).serviceId && !(order as any).transformedId) {
             return false;
           }
+          const meta: any = (order as any).metadata || {};
+          const svcStatus = (meta?.serviceStatus || '').toLowerCase().replace(/\s+/g, '_');
+          if (svcStatus) {
+            return svcStatus === 'completed' || svcStatus === 'cancelled';
+          }
           const status = normalizeOrderStatus(order.status);
-          // Only show cancelled/rejected services in history
-          // Active services (delivered/service-created) should remain in Active Services until explicitly completed
-          return status === 'cancelled' || status === 'rejected';
+          return status === 'cancelled' || status === 'rejected' || status === 'completed';
         })
         .map((order) => {
           const rawServiceId = (order as any).serviceId ?? (order as any).transformedId ?? 'Service';
           const serviceId = normalizeId(rawServiceId);
           const service = serviceId ? serviceById.get(serviceId) : null;
           const centerId = normalizeId(order.centerId ?? order.destination);
+          const meta: any = (order as any).metadata || {};
           return {
             serviceId: rawServiceId,
             serviceName: service?.name ?? order.title ?? rawServiceId,
             centerId: centerId ?? 'N/A',
             type: service?.category ?? 'Service',
-            status: formatStatusLabel(order.status),
+            status: formatStatusLabel((meta && meta.serviceStatus) || order.status),
             startDate: formatDate(order.orderDate ?? order.requestedDate),
-            endDate: formatDate(order.completionDate ?? order.expectedDate),
+            endDate: formatDate((meta && (meta.serviceCompletedAt as string | null)) || order.completionDate || order.expectedDate),
           };
         }),
     [managerServiceOrders, serviceById],
@@ -1065,10 +1084,10 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
                     maxItems={10}
                     onRowClick={async (row: any) => {
                       try {
-                        const res = await fetch(`/api/services/${encodeURIComponent(row.serviceId)}`, { credentials: 'include' });
-                        const payload = await res.json();
-                        if (payload && payload.data) {
-                          setServiceDetails(payload.data);
+                        const { apiFetch } = await import('../shared/api/client');
+                        const payload = await apiFetch(`/services/${encodeURIComponent(row.serviceId)}`);
+                        if (payload && (payload as any).data) {
+                          setServiceDetails((payload as any).data);
                           setShowServiceDetails(true);
                         }
                       } catch (err) {
@@ -1196,53 +1215,110 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
       </Scrollbar>
 
       {/* Order Details Modal */}
-      <OrderDetailsModal
-        isOpen={!!selectedOrderForDetails}
-        onClose={() => setSelectedOrderForDetails(null)}
-        order={selectedOrderForDetails ? {
-          orderId: selectedOrderForDetails.orderId,
-          orderType: selectedOrderForDetails.orderType,
-          title: selectedOrderForDetails.title || null,
-          requestedBy: selectedOrderForDetails.requestedBy || selectedOrderForDetails.centerId || selectedOrderForDetails.customerId || null,
-          destination: selectedOrderForDetails.destination || selectedOrderForDetails.centerId || null,
-          requestedDate: selectedOrderForDetails.requestedDate || null,
-          status: (selectedOrderForDetails as any).status || null,
-          notes: selectedOrderForDetails.notes || null,
-          items: selectedOrderForDetails.items || [],
-        } : null}
-        availability={(() => {
+      {/* Conditional Modal Rendering based on orderType and status */}
+      {(() => {
+        const orderType = selectedOrderForDetails?.orderType || 'product';
+        const status = ((selectedOrderForDetails as any)?.status || '').toLowerCase();
+        const isServiceCreated = status === 'service_created' || status === 'service-created';
+
+        const commonOrder = selectedOrderForDetails
+          ? {
+              orderId: selectedOrderForDetails.orderId,
+              title: selectedOrderForDetails.title || null,
+              requestedBy: selectedOrderForDetails.requestedBy || selectedOrderForDetails.centerId || selectedOrderForDetails.customerId || null,
+              destination: selectedOrderForDetails.destination || selectedOrderForDetails.centerId || null,
+              requestedDate: selectedOrderForDetails.requestedDate || null,
+              notes: selectedOrderForDetails.notes || null,
+              status: (selectedOrderForDetails as any).status || null,
+            }
+          : null;
+
+        const commonAvailability = (() => {
           const meta = (selectedOrderForDetails as any)?.metadata as any;
           const av = meta?.availability;
           if (!av) return null;
           const days = Array.isArray(av.days) ? av.days : [];
           const window = av.window && av.window.start && av.window.end ? av.window : null;
           return { tz: av.tz ?? null, days, window };
-        })()}
-        cancellationReason={(selectedOrderForDetails as any)?.metadata?.cancellationReason || null}
-        cancelledBy={(selectedOrderForDetails as any)?.metadata?.cancelledBy || null}
-        cancelledAt={(selectedOrderForDetails as any)?.metadata?.cancelledAt || null}
-        rejectionReason={(selectedOrderForDetails as any)?.rejectionReason || (selectedOrderForDetails as any)?.metadata?.rejectionReason || null}
-        requestorInfo={
-          selectedOrderForDetails
-            ? {
-                name: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const req = meta?.contacts?.requestor || {}; return (req.name || null); })(),
-                address: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const req = meta?.contacts?.requestor || {}; return (req.address || null); })(),
-                phone: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const req = meta?.contacts?.requestor || {}; return (req.phone || null); })(),
-                email: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const req = meta?.contacts?.requestor || {}; return (req.email || null); })(),
-              }
-            : null
+        })();
+
+        const commonCancellation = {
+          cancellationReason: (selectedOrderForDetails as any)?.metadata?.cancellationReason || null,
+          cancelledBy: (selectedOrderForDetails as any)?.metadata?.cancelledBy || null,
+          cancelledAt: (selectedOrderForDetails as any)?.metadata?.cancelledAt || null,
+        };
+
+        const commonRejection = (selectedOrderForDetails as any)?.rejectionReason || (selectedOrderForDetails as any)?.metadata?.rejectionReason || null;
+
+        const commonRequestorInfo = selectedOrderForDetails
+          ? {
+              name: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const req = meta?.contacts?.requestor || {}; return (req.name || null); })(),
+              address: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const req = meta?.contacts?.requestor || {}; return (req.address || null); })(),
+              phone: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const req = meta?.contacts?.requestor || {}; return (req.phone || null); })(),
+              email: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const req = meta?.contacts?.requestor || {}; return (req.email || null); })(),
+            }
+          : null;
+
+        const commonDestinationInfo = selectedOrderForDetails
+          ? {
+              name: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const dest = meta?.contacts?.destination || {}; return (dest.name || null); })(),
+              address: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const dest = meta?.contacts?.destination || {}; return (dest.address || null); })(),
+              phone: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const dest = meta?.contacts?.destination || {}; return (dest.phone || null); })(),
+              email: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const dest = meta?.contacts?.destination || {}; return (dest.email || null); })(),
+            }
+          : null;
+
+        // Choose the appropriate modal
+        if (isServiceCreated && orderType === 'service') {
+          return null; // TODO: Wire ServiceViewModal with service data
+        } else if (orderType === 'service') {
+          return (
+            <ServiceOrderModal
+              isOpen={!!selectedOrderForDetails}
+              onClose={() => setSelectedOrderForDetails(null)}
+              order={commonOrder}
+              availability={commonAvailability}
+              cancellationReason={commonCancellation.cancellationReason}
+              cancelledBy={commonCancellation.cancelledBy}
+              cancelledAt={commonCancellation.cancelledAt}
+              rejectionReason={commonRejection}
+              requestorInfo={commonRequestorInfo}
+              destinationInfo={commonDestinationInfo}
+            />
+          );
+        } else if (orderType === 'product') {
+          const items = selectedOrderForDetails?.items || [];
+          return (
+            <ProductOrderModal
+              isOpen={!!selectedOrderForDetails}
+              onClose={() => setSelectedOrderForDetails(null)}
+              order={commonOrder ? { ...commonOrder, items } : null}
+              availability={commonAvailability}
+              cancellationReason={commonCancellation.cancellationReason}
+              cancelledBy={commonCancellation.cancelledBy}
+              cancelledAt={commonCancellation.cancelledAt}
+              rejectionReason={commonRejection}
+              requestorInfo={commonRequestorInfo}
+              destinationInfo={commonDestinationInfo}
+            />
+          );
+        } else {
+          return (
+            <OrderDetailsModal
+              isOpen={!!selectedOrderForDetails}
+              onClose={() => setSelectedOrderForDetails(null)}
+              order={commonOrder ? { ...commonOrder, orderType, items: selectedOrderForDetails?.items || [] } : null}
+              availability={commonAvailability}
+              cancellationReason={commonCancellation.cancellationReason}
+              cancelledBy={commonCancellation.cancelledBy}
+              cancelledAt={commonCancellation.cancelledAt}
+              rejectionReason={commonRejection}
+              requestorInfo={commonRequestorInfo}
+              destinationInfo={commonDestinationInfo}
+            />
+          );
         }
-        destinationInfo={
-          selectedOrderForDetails
-            ? {
-                name: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const dest = meta?.contacts?.destination || {}; return (dest.name || null); })(),
-                address: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const dest = meta?.contacts?.destination || {}; return (dest.address || null); })(),
-                phone: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const dest = meta?.contacts?.destination || {}; return (dest.phone || null); })(),
-                email: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const dest = meta?.contacts?.destination || {}; return (dest.email || null); })(),
-              }
-            : null
-        }
-      />
+      })()}
 
       {/* Service Details Modal - for Active Services section */}
       <ServiceDetailsModal
@@ -1253,12 +1329,28 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
         availableCrew={crewEntries.map((c: any) => ({ code: c.id, name: c.name || c.id }))}
         serviceStatus={serviceDetails?.metadata?.serviceStatus || 'created'}
         serviceType={serviceDetails?.metadata?.serviceType || 'one-time'}
+        onSendCrewRequest={async (crewCodes: string[]) => {
+          try {
+            if (!serviceDetails?.serviceId) return;
+            const { apiFetch } = await import('../shared/api/client');
+            await apiFetch(`/services/${encodeURIComponent(serviceDetails.serviceId)}/crew-requests`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ crewCodes }),
+            });
+            mutate(`/hub/orders/${managerCode}`);
+          } catch (err) {
+            console.error('[manager] failed to send crew request', err);
+            alert('Failed to send crew requests. Please try again.');
+            throw err;
+          }
+        }}
         onSave={async (updates) => {
           try {
             if (!serviceDetails?.serviceId) return;
-            await fetch(`/api/services/${encodeURIComponent(serviceDetails.serviceId)}`, {
+            const { apiFetch } = await import('../shared/api/client');
+            await apiFetch(`/services/${encodeURIComponent(serviceDetails.serviceId)}`, {
               method: 'PATCH',
-              credentials: 'include',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(updates),
             });
@@ -1269,31 +1361,14 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
             console.error('[manager] failed to update service', err);
           }
         }}
-        onSendCrewRequest={async (crewCodes: string[]) => {
-          try {
-            if (!serviceDetails?.orderId) return;
-            const res = await fetch(`/api/orders/${encodeURIComponent(serviceDetails.orderId)}/crew-requests`, {
-              method: 'POST',
-              credentials: 'include',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ crewCodes }),
-            });
-            if (!res.ok) {
-              const errorData = await res.json().catch(() => ({}));
-              throw new Error(errorData.error || 'Failed to send crew requests');
-            }
-            mutate(`/hub/orders/${managerCode}`);
-          } catch (err) {
-            console.error('[manager] failed to send crew request', err);
-            throw err;
-          }
-        }}
         onStartService={async () => {
           try {
             if (!serviceDetails?.serviceId) return;
             const { applyServiceAction } = await import('../shared/api/hub');
             await applyServiceAction(serviceDetails.serviceId, 'start');
             mutate(`/hub/orders/${managerCode}`);
+            setToast('Service started');
+            setTimeout(() => setToast(null), 1800);
           } catch (err) {
             console.error('[manager] failed to start service', err);
             alert(err instanceof Error ? err.message : 'Failed to start service');
@@ -1305,6 +1380,8 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
             const { applyServiceAction } = await import('../shared/api/hub');
             await applyServiceAction(serviceDetails.serviceId, 'complete');
             mutate(`/hub/orders/${managerCode}`);
+            setToast('Service completed');
+            setTimeout(() => setToast(null), 1800);
           } catch (err) {
             console.error('[manager] failed to complete service', err);
             alert(err instanceof Error ? err.message : 'Failed to complete service');
@@ -1324,6 +1401,24 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
           }
         }}
       />
+
+      {toast && (
+        <div style={{
+          position: 'fixed',
+          right: 16,
+          bottom: 16,
+          background: '#10b981',
+          color: '#fff',
+          padding: '10px 14px',
+          borderRadius: 8,
+          boxShadow: '0 4px 14px rgba(0,0,0,0.15)',
+          zIndex: 9999,
+          fontSize: 14,
+          fontWeight: 600,
+        }}>
+          {toast}
+        </div>
+      )}
     </div>
   );
 }

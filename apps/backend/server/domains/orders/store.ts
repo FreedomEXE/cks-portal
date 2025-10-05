@@ -2204,6 +2204,7 @@ export async function requestCrewAssignment(
 
   // Verify order is at a status where manager can request crew
   const currentStatus = normalizeStatus(row.status);
+  // Only allow requesting crew before service is created
   const ALLOWED_STATUSES = new Set(['manager_accepted', 'crew_requested', 'crew_assigned']);
   if (!ALLOWED_STATUSES.has(currentStatus)) {
     throw new Error(`Crew can only be requested at manager_accepted/crew_requested/crew_assigned. Current status: ${currentStatus}`);
@@ -2224,7 +2225,7 @@ export async function requestCrewAssignment(
     crewRequests: [...existingCrewRequests, ...newCrewRequests]
   };
 
-  // Update order metadata and transition to crew_requested status
+  // Update order metadata and move into crew_requested so invites can be actioned before creation
   await query(
     `UPDATE orders
      SET metadata = $1::jsonb,

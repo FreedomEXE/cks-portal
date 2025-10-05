@@ -52,3 +52,12 @@ export { default as CatalogServiceModal } from './modals/CatalogServiceModal/Cat
 export * from './modals/AssignServiceModal/AssignServiceModal';
 export { default as AssignServiceModal } from './modals/AssignServiceModal/AssignServiceModal';
 
+export * from './modals/ServiceViewModal/ServiceViewModal';
+export { default as ServiceViewModal } from './modals/ServiceViewModal/ServiceViewModal';
+
+export * from './modals/ProductOrderModal/ProductOrderModal';
+export { default as ProductOrderModal } from './modals/ProductOrderModal/ProductOrderModal';
+
+export * from './modals/ServiceOrderModal/ServiceOrderModal';
+export { default as ServiceOrderModal } from './modals/ServiceOrderModal/ServiceOrderModal';
+

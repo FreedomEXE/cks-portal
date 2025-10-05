@@ -374,3 +374,12 @@ const isHistoryService = status === 'cancelled' || status === 'rejected';
 *Created: 2025-10-02*
 *Updated: 2025-10-03*
 *Status: ✅ E2E Flow Complete - Ready for Service Lifecycle Implementation*
+\n## Addendum (2025-10-05) — Service-Level Crew Management
+\n- Orders workflow remains unchanged: once a manager runs Create Service, the service order stays `service_created` (completed/transformed) and should not revert to pending/in-progress for post-creation staffing.
+- New service endpoints enable post‑creation staffing without touching order status:
+  - `POST /api/services/:serviceId/crew-requests` (manager): append invites to `orders.metadata.crewRequests` and add invited crew as order participants so they can see the service.
+  - `POST /api/services/:serviceId/crew-response` (crew): `{ accept: boolean }` to accept/reject; updates metadata and participation.
+- Frontend wiring:
+  - Manager Hub → ServiceDetailsModal uses the service `crew-requests` endpoint.
+  - Crew Hub → Active Services shows Accept/Reject when a pending invite exists for that crew and calls the service `crew-response` endpoint.
+- UI classification now prefers `orders.metadata.serviceStatus` for Active vs History lists (created/in_progress active, completed/cancelled history).

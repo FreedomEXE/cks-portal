@@ -26,7 +26,7 @@ import {
   type Activity,
   type TreeNode,
 } from '@cks/domain-widgets';
-import { Button, DataTable, OrderDetailsModal, PageHeader, PageWrapper, Scrollbar, TabSection } from '@cks/ui';
+import { Button, DataTable, OrderDetailsModal, ProductOrderModal, ServiceOrderModal, ServiceViewModal, PageHeader, PageWrapper, Scrollbar, TabSection } from '@cks/ui';
 import { useAuth } from '@cks/auth';
 
 import MyHubSection from '../components/MyHubSection';
@@ -168,6 +168,7 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
   const [servicesTab, setServicesTab] = useState<'active' | 'history'>('active');
   const [servicesSearchQuery, setServicesSearchQuery] = useState('');
   const [selectedOrderForDetails, setSelectedOrderForDetails] = useState<HubOrderItem | null>(null);
+  const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
 
   const { code: authCode } = useAuth();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
@@ -282,19 +283,25 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
         return;
       }
       const normalizedStatus = normalizeStatusValue(order.status);
+      const metadata = (order as any).metadata || {};
+      const svcStatus = normalizeStatusValue((metadata as any).serviceStatus);
+      const serviceType = metadata.serviceType === 'recurring' ? 'Ongoing' : 'One-Time';
+      const serviceStatus = svcStatus ? formatStatusLabel(svcStatus) : (normalizedStatus === 'service-created' || normalizedStatus === 'service_created' ? 'Active' : formatStatusLabel(order.status));
+      const managedBy = metadata.managerId ? `${metadata.managerId}${metadata.managerName ? ' - ' + metadata.managerName : ''}` : '—';
+      const actualStartDate = metadata.actualStartDate || metadata.serviceStartDate;
+
       const base = {
         serviceId: order.serviceId ?? order.orderId,
         serviceName: order.title ?? order.serviceId ?? order.orderId,
-        crewAssigned: getMetadataString(order as any, 'crewAssigned') ?? '—',
-        type: order.orderType === 'service' ? 'Service' : 'Product',
-        status: formatStatusLabel(order.status),
-        startDate: formatDisplayDate(order.requestedDate),
+        type: serviceType,
+        status: serviceStatus,
+        managedBy: managedBy,
+        startDate: actualStartDate ? formatDisplayDate(actualStartDate) : '—',
         endDate: formatDisplayDate(order.expectedDate),
       };
 
-      // Only show cancelled/rejected services in history
-      // Active services (delivered/service-created) should remain in Active Services until explicitly completed
-      if (normalizedStatus === 'cancelled' || normalizedStatus === 'rejected') {
+      // Completed/cancelled services go to history for centers
+      if (svcStatus === 'completed' || svcStatus === 'cancelled' || normalizedStatus === 'cancelled' || normalizedStatus === 'rejected') {
         history.push({
           serviceId: base.serviceId,
           serviceName: base.serviceName,
@@ -308,9 +315,9 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
         active.push({
           serviceId: base.serviceId,
           serviceName: base.serviceName,
-          crewAssigned: base.crewAssigned,
           type: base.type,
           status: base.status,
+          managedBy: base.managedBy,
           startDate: base.startDate,
         });
       }
@@ -481,7 +488,6 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
                     columns={[
                       { key: 'serviceId', label: 'SERVICE ID', clickable: true },
                       { key: 'serviceName', label: 'SERVICE NAME' },
-                      { key: 'crewAssigned', label: 'CREW ASSIGNED' },
                       { key: 'type', label: 'TYPE' },
                       {
                         key: 'status',
@@ -504,6 +510,7 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
                           );
                         },
                       },
+                      { key: 'managedBy', label: 'MANAGED BY' },
                       { key: 'startDate', label: 'START DATE' },
                     ]}
                     data={activeServicesData.filter((row) => {
@@ -518,7 +525,7 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
                     })}
                     showSearch={false}
                     maxItems={10}
-                    onRowClick={() => undefined}
+                    onRowClick={(row) => setSelectedServiceId(row.serviceId)}
                   />
                 )}
 
@@ -564,7 +571,7 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
                     })}
                     showSearch={false}
                     maxItems={10}
-                    onRowClick={() => undefined}
+                    onRowClick={(row) => setSelectedServiceId(row.serviceId)}
                   />
                 )}
               </TabSection>
@@ -640,53 +647,143 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
       </Scrollbar>
 
       {/* Order Details Modal */}
-      <OrderDetailsModal
-        isOpen={!!selectedOrderForDetails}
-        onClose={() => setSelectedOrderForDetails(null)}
-        order={selectedOrderForDetails ? {
-          orderId: selectedOrderForDetails.orderId,
-          orderType: selectedOrderForDetails.orderType,
-          title: selectedOrderForDetails.title || null,
-          requestedBy: selectedOrderForDetails.requestedBy || selectedOrderForDetails.centerId || selectedOrderForDetails.customerId || null,
-          destination: selectedOrderForDetails.destination || selectedOrderForDetails.centerId || null,
-          requestedDate: selectedOrderForDetails.requestedDate || null,
-          status: (selectedOrderForDetails as any).status || null,
-          notes: selectedOrderForDetails.notes || null,
-          items: selectedOrderForDetails.items || [],
-        } : null}
-        availability={(() => {
+      {/* Conditional Modal Rendering based on orderType and status */}
+      {(() => {
+        const orderType = selectedOrderForDetails?.orderType || 'product';
+        const status = ((selectedOrderForDetails as any)?.status || '').toLowerCase();
+        const isServiceCreated = status === 'service_created' || status === 'service-created';
+
+        const commonOrder = selectedOrderForDetails
+          ? {
+              orderId: selectedOrderForDetails.orderId,
+              title: selectedOrderForDetails.title || null,
+              requestedBy: selectedOrderForDetails.requestedBy || selectedOrderForDetails.centerId || selectedOrderForDetails.customerId || null,
+              destination: selectedOrderForDetails.destination || selectedOrderForDetails.centerId || null,
+              requestedDate: selectedOrderForDetails.requestedDate || null,
+              notes: selectedOrderForDetails.notes || null,
+              status: (selectedOrderForDetails as any).status || null,
+            }
+          : null;
+
+        const commonAvailability = (() => {
           const meta = (selectedOrderForDetails as any)?.metadata as any;
           const av = meta?.availability;
           if (!av) return null;
           const days = Array.isArray(av.days) ? av.days : [];
           const window = av.window && av.window.start && av.window.end ? av.window : null;
           return { tz: av.tz ?? null, days, window };
-        })()}
-        cancellationReason={(selectedOrderForDetails as any)?.metadata?.cancellationReason || null}
-        cancelledBy={(selectedOrderForDetails as any)?.metadata?.cancelledBy || null}
-        cancelledAt={(selectedOrderForDetails as any)?.metadata?.cancelledAt || null}
-        rejectionReason={(selectedOrderForDetails as any)?.rejectionReason || (selectedOrderForDetails as any)?.metadata?.rejectionReason || null}
-        requestorInfo={
-          selectedOrderForDetails
-            ? {
-                name: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const req = meta?.contacts?.requestor || {}; return (req.name || null); })(),
-                address: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const req = meta?.contacts?.requestor || {}; return (req.address || null); })(),
-                phone: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const req = meta?.contacts?.requestor || {}; return (req.phone || null); })(),
-                email: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const req = meta?.contacts?.requestor || {}; return (req.email || null); })(),
-              }
-            : null
+        })();
+
+        const commonCancellation = {
+          cancellationReason: (selectedOrderForDetails as any)?.metadata?.cancellationReason || null,
+          cancelledBy: (selectedOrderForDetails as any)?.metadata?.cancelledBy || null,
+          cancelledAt: (selectedOrderForDetails as any)?.metadata?.cancelledAt || null,
+        };
+
+        const commonRejection = (selectedOrderForDetails as any)?.rejectionReason || (selectedOrderForDetails as any)?.metadata?.rejectionReason || null;
+
+        const commonRequestorInfo = selectedOrderForDetails
+          ? {
+              name: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const req = meta?.contacts?.requestor || {}; return (req.name || null); })(),
+              address: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const req = meta?.contacts?.requestor || {}; return (req.address || null); })(),
+              phone: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const req = meta?.contacts?.requestor || {}; return (req.phone || null); })(),
+              email: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const req = meta?.contacts?.requestor || {}; return (req.email || null); })(),
+            }
+          : null;
+
+        const commonDestinationInfo = selectedOrderForDetails
+          ? {
+              name: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const dest = meta?.contacts?.destination || {}; return (dest.name || null); })(),
+              address: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const dest = meta?.contacts?.destination || {}; return (dest.address || null); })(),
+              phone: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const dest = meta?.contacts?.destination || {}; return (dest.phone || null); })(),
+              email: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const dest = meta?.contacts?.destination || {}; return (dest.email || null); })(),
+            }
+          : null;
+
+        if (isServiceCreated && orderType === 'service') {
+          return null; // TODO: Wire ServiceViewModal
+        } else if (orderType === 'service') {
+          return (
+            <ServiceOrderModal
+              isOpen={!!selectedOrderForDetails}
+              onClose={() => setSelectedOrderForDetails(null)}
+              order={commonOrder}
+              availability={commonAvailability}
+              cancellationReason={commonCancellation.cancellationReason}
+              cancelledBy={commonCancellation.cancelledBy}
+              cancelledAt={commonCancellation.cancelledAt}
+              rejectionReason={commonRejection}
+              requestorInfo={commonRequestorInfo}
+              destinationInfo={commonDestinationInfo}
+            />
+          );
+        } else if (orderType === 'product') {
+          const items = selectedOrderForDetails?.items || [];
+          return (
+            <ProductOrderModal
+              isOpen={!!selectedOrderForDetails}
+              onClose={() => setSelectedOrderForDetails(null)}
+              order={commonOrder ? { ...commonOrder, items } : null}
+              availability={commonAvailability}
+              cancellationReason={commonCancellation.cancellationReason}
+              cancelledBy={commonCancellation.cancelledBy}
+              cancelledAt={commonCancellation.cancelledAt}
+              rejectionReason={commonRejection}
+              requestorInfo={commonRequestorInfo}
+              destinationInfo={commonDestinationInfo}
+            />
+          );
+        } else {
+          return (
+            <OrderDetailsModal
+              isOpen={!!selectedOrderForDetails}
+              onClose={() => setSelectedOrderForDetails(null)}
+              order={commonOrder ? { ...commonOrder, orderType, items: selectedOrderForDetails?.items || [] } : null}
+              availability={commonAvailability}
+              cancellationReason={commonCancellation.cancellationReason}
+              cancelledBy={commonCancellation.cancelledBy}
+              cancelledAt={commonCancellation.cancelledAt}
+              rejectionReason={commonRejection}
+              requestorInfo={commonRequestorInfo}
+              destinationInfo={commonDestinationInfo}
+            />
+          );
         }
-        destinationInfo={
-          selectedOrderForDetails
-            ? {
-                name: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const dest = meta?.contacts?.destination || {}; return (dest.name || null); })(),
-                address: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const dest = meta?.contacts?.destination || {}; return (dest.address || null); })(),
-                phone: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const dest = meta?.contacts?.destination || {}; return (dest.phone || null); })(),
-                email: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const dest = meta?.contacts?.destination || {}; return (dest.email || null); })(),
-              }
-            : null
-        }
-      />
+      })()}
+
+      {/* Service View Modal */}
+      {(() => {
+        const selectedOrder = orders?.orders?.find((o: any) =>
+          (o.serviceId === selectedServiceId || o.transformedId === selectedServiceId || o.orderId === selectedServiceId)
+        );
+
+        if (!selectedOrder || !selectedServiceId) return null;
+
+        const metadata = (selectedOrder as any)?.metadata || {};
+        const serviceData = {
+          serviceId: selectedServiceId,
+          serviceName: selectedOrder.title || selectedServiceId,
+          serviceType: metadata.serviceType === 'recurring' ? 'recurring' as const : 'one-time' as const,
+          serviceStatus: metadata.serviceStatus || selectedOrder.status || 'Active',
+          centerId: selectedOrder.centerId || selectedOrder.destination || null,
+          centerName: metadata.centerName || null,
+          managerId: metadata.managerId || null,
+          managerName: metadata.managerName || null,
+          startDate: metadata.actualStartDate || metadata.serviceStartDate || selectedOrder.requestedDate || null,
+          crew: metadata.crew || [],
+          procedures: metadata.procedures || [],
+          training: metadata.training || [],
+          notes: selectedOrder.notes || metadata.notes || null,
+        };
+
+        return (
+          <ServiceViewModal
+            isOpen={!!selectedServiceId}
+            onClose={() => setSelectedServiceId(null)}
+            service={serviceData}
+          />
+        );
+      })()}
     </div>
   );
 }

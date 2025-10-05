@@ -1,6 +1,7 @@
 import { query } from '../../db/connection';
 import type { HubRole } from '../profile/types';
 import { normalizeIdentity } from '../identity';
+import { z } from 'zod';
 
 export async function applyServiceAction(input: {
   serviceId: string;
@@ -32,17 +33,20 @@ export async function applyServiceAction(input: {
   if (input.action === 'start') {
     (meta as any).serviceStartedAt = nowIso;
     (meta as any).serviceStartNotes = input.notes || (meta as any).serviceStartNotes || null;
+    (meta as any).serviceStatus = 'in_progress';
     newServiceStatus = 'in_progress';
     actualStartTime = nowIso;
   } else if (input.action === 'complete') {
     (meta as any).serviceCompletedAt = nowIso;
     (meta as any).serviceCompleteNotes = input.notes || (meta as any).serviceCompleteNotes || null;
+    (meta as any).serviceStatus = 'completed';
     newServiceStatus = 'completed';
     actualEndTime = nowIso;
   } else if (input.action === 'cancel') {
     (meta as any).serviceCancelledAt = nowIso;
     (meta as any).serviceCancellationReason = input.notes || (meta as any).serviceCancellationReason || null;
     (meta as any).serviceCancelledBy = input.actorCode || null;
+    (meta as any).serviceStatus = 'cancelled';
     newServiceStatus = 'cancelled';
   } else if (input.action === 'verify') {
     (meta as any).serviceVerifiedAt = nowIso;
@@ -51,7 +55,7 @@ export async function applyServiceAction(input: {
     // Verify doesn't change service status
   }
 
-  // Update order metadata
+  // Update order metadata (persist service status/timestamps)
   await query(
     `UPDATE orders SET metadata = $1::jsonb, updated_at = NOW() WHERE order_id = $2`,
     [JSON.stringify(meta), row.order_id]
@@ -161,4 +165,115 @@ export async function updateServiceMetadata(input: {
     );
   }
   return { ...service, metadata: meta };
+}
+
+export async function addServiceCrewRequests(input: {
+  serviceId: string;
+  managerCode: string;
+  crewCodes: string[];
+  message?: string | null;
+}) {
+  const service = await getServiceById(input.serviceId);
+  if (!service) throw new Error('Service not found');
+
+  const orderId = service.orderId;
+  const result = await query<{ metadata: any }>(
+    `SELECT metadata FROM orders WHERE order_id = $1 LIMIT 1`,
+    [orderId]
+  );
+  if (!result.rowCount) throw new Error('Order not found for service');
+  const currentMetadata = (result.rows[0].metadata || {}) as any;
+
+  const crewRequests: Array<{ crewCode: string; status: 'pending' | 'accepted' | 'rejected'; message?: string; requestedAt: string; respondedAt?: string }>
+    = Array.isArray(currentMetadata.crewRequests) ? currentMetadata.crewRequests : [];
+
+  const newRequests = input.crewCodes.map((code) => ({
+    crewCode: normalizeIdentity(code || '') || (code || '').toUpperCase(),
+    status: 'pending' as const,
+    message: input.message ?? undefined,
+    requestedAt: new Date().toISOString(),
+  }));
+
+  const updatedMetadata = {
+    ...currentMetadata,
+    crewRequests: [...crewRequests, ...newRequests],
+  } as Record<string, unknown>;
+
+  await query(
+    `UPDATE orders SET metadata = $1::jsonb, updated_at = NOW() WHERE order_id = $2`,
+    [JSON.stringify(updatedMetadata), orderId]
+  );
+
+  // Ensure participants for requested crew so they can see the service
+  for (const code of input.crewCodes) {
+    const id = normalizeIdentity(code || '') || (code || '').toUpperCase();
+    if (!id) continue;
+    await query(
+      `INSERT INTO order_participants (order_id, participant_id, participant_role, participation_type)
+       VALUES ($1, $2, 'crew', 'actor')
+       ON CONFLICT (order_id, participant_id, participant_role)
+       DO UPDATE SET participation_type = EXCLUDED.participation_type`,
+      [orderId, id]
+    );
+  }
+
+  return { ...service, metadata: updatedMetadata };
+}
+
+export async function respondToServiceCrewRequest(input: {
+  serviceId: string;
+  crewCode: string;
+  accept: boolean;
+}) {
+  const service = await getServiceById(input.serviceId);
+  if (!service) throw new Error('Service not found');
+  const orderId = service.orderId;
+
+  // Load metadata
+  const res = await query<{ metadata: any }>(
+    `SELECT metadata FROM orders WHERE order_id = $1 LIMIT 1`,
+    [orderId]
+  );
+  if (!res.rowCount) throw new Error('Order not found for service');
+  const currentMetadata = (res.rows[0].metadata || {}) as any;
+  const crewRequests: Array<{ crewCode: string; status: 'pending'|'accepted'|'rejected'; message?: string; requestedAt: string; respondedAt?: string }>
+    = Array.isArray(currentMetadata.crewRequests) ? currentMetadata.crewRequests : [];
+
+  const code = normalizeIdentity(input.crewCode || '') || (input.crewCode || '').toUpperCase();
+  let found = false;
+  const updated = crewRequests.map((req) => {
+    if (req.crewCode === code && req.status === 'pending') {
+      found = true;
+      return { ...req, status: input.accept ? 'accepted' : 'rejected', respondedAt: new Date().toISOString() };
+    }
+    return req;
+  });
+  if (!found) {
+    throw new Error('No pending crew request found for this user');
+  }
+
+  const updatedMetadata = { ...currentMetadata, crewRequests: updated } as Record<string, unknown>;
+  await query(
+    `UPDATE orders SET metadata = $1::jsonb, updated_at = NOW() WHERE order_id = $2`,
+    [JSON.stringify(updatedMetadata), orderId]
+  );
+
+  if (!input.accept) {
+    // Remove from participants so it disappears from their view
+    await query(
+      `DELETE FROM order_participants WHERE order_id = $1 AND participant_id = $2 AND participant_role = 'crew'`,
+      [orderId, code]
+    );
+  } else {
+    // Ensure participant entry exists/updated as actor
+    await query(
+      `INSERT INTO order_participants (order_id, participant_id, participant_role, participation_type)
+       VALUES ($1, $2, 'crew', 'actor')
+       ON CONFLICT (order_id, participant_id, participant_role)
+       DO UPDATE SET participation_type = EXCLUDED.participation_type`,
+      [orderId, code]
+    );
+  }
+
+  return { ...service, metadata: updatedMetadata };
 }

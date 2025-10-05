@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { requireActiveRole } from '../../core/auth/guards';
-import { applyServiceAction, getServiceById, updateServiceMetadata } from './service';
+import { applyServiceAction, getServiceById, updateServiceMetadata, addServiceCrewRequests } from './service';
 import { query } from '../../db/connection';
 
 export async function registerServicesRoutes(server: FastifyInstance) {
@@ -86,6 +86,84 @@ export async function registerServicesRoutes(server: FastifyInstance) {
       reply.send({ data });
     } catch (err: any) {
       reply.code(400).send({ error: err?.message || 'Failed to update service' });
+    }
+  });
+
+  // POST /api/services/:serviceId/crew-requests - Request crew for an existing service (manager only)
+  server.post('/api/services/:serviceId/crew-requests', async (request, reply) => {
+    const params = paramsSchema.safeParse(request.params);
+    if (!params.success) {
+      reply.code(400).send({ error: 'Invalid service identifier' });
+      return;
+    }
+    const bodySchema = z.object({
+      crewCodes: z.array(z.string().trim().min(1)).min(1),
+      message: z.string().trim().max(1000).optional(),
+    });
+    const body = bodySchema.safeParse(request.body);
+    if (!body.success) {
+      reply.code(400).send({ error: 'Invalid crew request payload', details: body.error.flatten() });
+      return;
+    }
+    const account = await requireActiveRole(request, reply, {});
+    if (!account) return;
+    if ((account.role || '').toLowerCase() !== 'manager') {
+      reply.code(403).send({ error: 'Only managers can request crew for a service' });
+      return;
+    }
+    const managerCode = account.cksCode ?? null;
+    if (!managerCode) {
+      reply.code(400).send({ error: 'No CKS code associated with the current user' });
+      return;
+    }
+    try {
+      const result = await addServiceCrewRequests({
+        serviceId: params.data.serviceId,
+        managerCode,
+        crewCodes: body.data.crewCodes,
+        message: body.data.message ?? null,
+      });
+      reply.send({ data: result });
+    } catch (error) {
+      request.log.error({ err: error }, 'Failed to request crew for service');
+      reply.code(400).send({ error: error instanceof Error ? error.message : 'Failed to request crew for service' });
+    }
+  });
+
+  // POST /api/services/:serviceId/crew-response - Crew respond to a service invite
+  server.post('/api/services/:serviceId/crew-response', async (request, reply) => {
+    const params = paramsSchema.safeParse(request.params);
+    if (!params.success) {
+      reply.code(400).send({ error: 'Invalid service identifier' });
+      return;
+    }
+    const bodySchema = z.object({ accept: z.boolean() });
+    const body = bodySchema.safeParse(request.body);
+    if (!body.success) {
+      reply.code(400).send({ error: 'Invalid crew response payload', details: body.error.flatten() });
+      return;
+    }
+    const account = await requireActiveRole(request, reply, {});
+    if (!account) return;
+    if ((account.role || '').toLowerCase() !== 'crew') {
+      reply.code(403).send({ error: 'Only crew members can respond to service invites' });
+      return;
+    }
+    const crewCode = account.cksCode ?? null;
+    if (!crewCode) {
+      reply.code(400).send({ error: 'No CKS code associated with the current user' });
+      return;
+    }
+    try {
+      const result = await (await import('./service')).respondToServiceCrewRequest({
+        serviceId: params.data.serviceId,
+        crewCode,
+        accept: body.data.accept,
+      });
+      reply.send({ data: result });
+    } catch (error) {
+      request.log.error({ err: error }, 'Failed to respond to service invite');
+      reply.code(400).send({ error: error instanceof Error ? error.message : 'Failed to respond to service invite' });
     }
   });
 

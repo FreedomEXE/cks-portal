@@ -296,13 +296,13 @@ export default function ServiceDetailsModal({
               )}
 
               {/* Add Crew Section */}
-              {editable && !showCrewPicker && (
+              {editable && !!onSendCrewRequest && !showCrewPicker && (
                 <div style={{ marginBottom: 16 }}>
                   <Button size="sm" onClick={() => setShowCrewPicker(true)}>Request Crew</Button>
                 </div>
               )}
 
-              {showCrewPicker && (
+              {showCrewPicker && !!onSendCrewRequest && (
                 <div style={{ marginTop: 16, padding: 16, backgroundColor: '#f9fafb', borderRadius: 8, border: '1px solid #e5e7eb' }}>
                   <h4 style={{ marginTop: 0, fontSize: 14, marginBottom: 12 }}>Select crew members to request:</h4>
                   <div style={{ border: '1px solid #e5e7eb', borderRadius: 6, padding: 12, maxHeight: 240, overflowY: 'auto', backgroundColor: '#fff' }}>
