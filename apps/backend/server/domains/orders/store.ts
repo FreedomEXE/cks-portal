@@ -623,7 +623,7 @@ function buildApprovalStages(
 }
 
 async function mapOrderRow(
-  row: OrderRow,
+  row: OrderRow & { service_managed_by?: string | null; service_actual_start_time?: Date | null },
   items: OrderItemRow[],
   context?: { viewerRole?: HubRole | null; viewerCode?: string | null },
 ): Promise<HubOrderItem> {
@@ -704,6 +704,13 @@ async function mapOrderRow(
   // Enrich metadata with contact info for Warehouse and other hubs (fill missing fields)
   console.log('[mapOrderRow] START - order_id:', row.order_id);
   let enrichedMetadata = row.metadata ? { ...row.metadata } : {};
+
+  // Add service data from services table if available
+  if (row.service_managed_by || row.service_actual_start_time) {
+    (enrichedMetadata as any).serviceManagedBy = row.service_managed_by || null;
+    (enrichedMetadata as any).serviceActualStartTime = row.service_actual_start_time ? new Date(row.service_actual_start_time).toISOString() : null;
+  }
+
   console.log('[mapOrderRow] enrichedMetadata:', JSON.stringify(enrichedMetadata, null, 2));
   const existingContacts: any = (enrichedMetadata as any).contacts ?? {};
   console.log('[mapOrderRow] existingContacts:', existingContacts);
@@ -976,39 +983,42 @@ async function loadOrderItems(orderIds: readonly string[]): Promise<Map<string, 
 }
 
 async function fetchOrders(whereClause: string, params: readonly unknown[], context?: { viewerRole?: HubRole | null; viewerCode?: string | null }): Promise<HubOrderItem[]> {
-  const result = await query<OrderRow>(
+  const result = await query<OrderRow & { service_managed_by?: string | null; service_actual_start_time?: Date | null }>(
     `SELECT
-       order_id,
-       order_type,
-       title,
-       status,
-       next_actor_role,
-       creator_id,
-       creator_role,
-       customer_id,
-       center_id,
-       contractor_id,
-       manager_id,
-       crew_id,
-       assigned_warehouse,
-       destination,
-       destination_role,
-       requested_date,
-       expected_date,
-       service_start_date,
-       delivery_date,
-       total_amount,
-       currency,
-       transformed_id,
-       rejection_reason,
-       notes,
-       metadata,
-       created_at,
-       updated_at,
-       archived_at
-     FROM orders
+       o.order_id,
+       o.order_type,
+       o.title,
+       o.status,
+       o.next_actor_role,
+       o.creator_id,
+       o.creator_role,
+       o.customer_id,
+       o.center_id,
+       o.contractor_id,
+       o.manager_id,
+       o.crew_id,
+       o.assigned_warehouse,
+       o.destination,
+       o.destination_role,
+       o.requested_date,
+       o.expected_date,
+       o.service_start_date,
+       o.delivery_date,
+       o.total_amount,
+       o.currency,
+       o.transformed_id,
+       o.rejection_reason,
+       o.notes,
+       o.metadata,
+       o.created_at,
+       o.updated_at,
+       o.archived_at,
+       s.managed_by AS service_managed_by,
+       s.actual_start_time AS service_actual_start_time
+     FROM orders o
+     LEFT JOIN services s ON o.transformed_id = s.service_id
      WHERE ${whereClause}
-     ORDER BY requested_date DESC NULLS LAST, created_at DESC NULLS LAST, order_id DESC`,
+     ORDER BY o.requested_date DESC NULLS LAST, o.created_at DESC NULLS LAST, o.order_id DESC`,
     params
   );
 

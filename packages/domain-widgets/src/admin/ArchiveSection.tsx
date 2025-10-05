@@ -1,4 +1,4 @@
-import { DataTable, NavigationTab, PageWrapper, TabContainer } from '@cks/ui';
+import { Button, DataTable, NavigationTab, PageWrapper, TabContainer } from '@cks/ui';
 import { useEffect, useMemo, useState } from 'react';
 
 // Import the proper archive API client and types
@@ -26,6 +26,7 @@ export interface ArchiveAPI {
 // Props interface to receive the API client
 export interface ArchiveSectionProps {
   archiveAPI?: ArchiveAPI;
+  onViewOrderDetails?: (orderId: string, orderType: 'product' | 'service') => void;
 }
 
 const ARCHIVE_TABS = [
@@ -35,23 +36,23 @@ const ARCHIVE_TABS = [
   { id: 'center', label: 'Centers', color: '#f97316', search: 'archived centers' },
   { id: 'crew', label: 'Crew', color: '#ef4444', search: 'archived crew' },
   { id: 'warehouse', label: 'Warehouses', color: '#8b5cf6', search: 'archived warehouses' },
-  { id: 'service', label: 'Services', color: '#14b8a6', search: 'archived services' },
+  { id: 'services', label: 'Services', color: '#14b8a6', search: 'archived services', hasDropdown: true },
   { id: 'product', label: 'Products', color: '#d946ef', search: 'archived products' },
-  { id: 'productOrder', label: 'Product Orders', color: '#6366f1', search: 'archived product orders' },
-  { id: 'serviceOrder', label: 'Service Orders', color: '#14b8a6', search: 'archived service orders' },
+  { id: 'orders', label: 'Orders', color: '#6366f1', search: 'archived orders', hasDropdown: true },
 ];
 
-const TAB_COLUMN_CONFIG = {
+const TAB_COLUMN_CONFIG: Record<string, { idLabel: string; nameLabel: string }> = {
   manager: { idLabel: 'MANAGER ID', nameLabel: 'MANAGER NAME' },
   contractor: { idLabel: 'CONTRACTOR ID', nameLabel: 'NAME' },
   customer: { idLabel: 'CUSTOMER ID', nameLabel: 'NAME' },
   center: { idLabel: 'CENTER ID', nameLabel: 'NAME' },
   crew: { idLabel: 'CREW ID', nameLabel: 'CREW NAME' },
   warehouse: { idLabel: 'WAREHOUSE ID', nameLabel: 'NAME' },
-  service: { idLabel: 'SERVICE ID', nameLabel: 'SERVICE NAME' },
+  'catalog-services': { idLabel: 'SERVICE ID', nameLabel: 'CATALOG SERVICE' },
+  'active-services': { idLabel: 'SERVICE ID', nameLabel: 'ACTIVE SERVICE' },
   product: { idLabel: 'PRODUCT ID', nameLabel: 'PRODUCT NAME' },
-  productOrder: { idLabel: 'ORDER ID', nameLabel: 'PRODUCT ORDER' },
-  serviceOrder: { idLabel: 'ORDER ID', nameLabel: 'SERVICE ORDER' },
+  'product-orders': { idLabel: 'ORDER ID', nameLabel: 'PRODUCT ORDER' },
+  'service-orders': { idLabel: 'ORDER ID', nameLabel: 'SERVICE ORDER' },
 };
 
 const BASE_COLUMNS = [
@@ -84,13 +85,15 @@ function formatDate(dateString?: string): string {
   });
 }
 
-export default function ArchiveSection({ archiveAPI }: ArchiveSectionProps) {
+export default function ArchiveSection({ archiveAPI, onViewOrderDetails }: ArchiveSectionProps) {
   console.log('[ArchiveSection] Component rendering with archiveAPI:', !!archiveAPI);
   console.log('[ArchiveSection] archiveAPI methods:', archiveAPI ? Object.getOwnPropertyNames(Object.getPrototypeOf(archiveAPI)) : 'No API');
   console.log('[ArchiveSection] archiveAPI type:', typeof archiveAPI);
   console.log('[ArchiveSection] archiveAPI full object:', archiveAPI);
 
   const [activeTab, setActiveTab] = useState('manager');
+  const [servicesSubTab, setServicesSubTab] = useState<string>('catalog-services');
+  const [ordersSubTab, setOrdersSubTab] = useState<string>('product-orders');
   const [archivedData, setArchivedData] = useState<ArchivedEntity[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -111,41 +114,58 @@ export default function ArchiveSection({ archiveAPI }: ArchiveSectionProps) {
 
   useEffect(() => {
     loadArchivedData();
-  }, [activeTab]);
+  }, [activeTab, servicesSubTab, ordersSubTab]);
 
   const loadArchivedData = async () => {
     setLoading(true);
     setError(null);
     try {
-      console.log('[ArchiveSection] Loading data for tab:', activeTab);
-      console.log('[ArchiveSection] API available:', !!api);
-      console.log('[ArchiveSection] archiveAPI prop:', !!archiveAPI);
-      console.log('[ArchiveSection] Using fallback?:', api === archiveAPI ? 'NO - using injected API' : 'YES - using fallback');
+      // Get effective tab considering sub-tabs
+      const effectiveTab = (() => {
+        if (activeTab === 'services') return servicesSubTab;
+        if (activeTab === 'orders') return ordersSubTab;
+        return activeTab;
+      })();
 
-      // For order tabs, we need to fetch 'order' type and filter by orderType
+      console.log('[ArchiveSection] Loading data for tab:', activeTab, 'effective:', effectiveTab);
+      console.log('[ArchiveSection] API available:', !!api);
+
+      // Determine entity type and filter
       let entityType: EntityType = activeTab as EntityType;
       let orderTypeFilter: 'product' | 'service' | null = null;
 
-      if (activeTab === 'productOrder') {
+      if (effectiveTab === 'product-orders') {
         entityType = 'order';
         orderTypeFilter = 'product';
-      } else if (activeTab === 'serviceOrder') {
+      } else if (effectiveTab === 'service-orders') {
         entityType = 'order';
         orderTypeFilter = 'service';
+      } else if (effectiveTab === 'catalog-services' || effectiveTab === 'active-services') {
+        entityType = 'service';
       }
 
       const data = await api.listArchived(entityType);
-      console.log('[ArchiveSection] Data received:', data);
-      console.log('[ArchiveSection] Data length:', data?.length);
+      console.log('[ArchiveSection] Data received:', data?.length, 'items');
 
-      // Filter by order type if needed
+      // Filter by order type or service type if needed
       let filteredData = data;
       if (orderTypeFilter) {
         filteredData = data.filter((item: any) => {
-          // Check if the archived entity has orderType metadata
           return item.orderType === orderTypeFilter;
         });
         console.log('[ArchiveSection] Filtered to', orderTypeFilter, 'orders:', filteredData.length);
+      } else if (effectiveTab === 'catalog-services') {
+        // Filter for catalog services (srv-001 pattern)
+        filteredData = data.filter((item: any) => {
+          return item.id && /^srv-\d+$/i.test(item.id);
+        });
+        console.log('[ArchiveSection] Filtered to catalog services:', filteredData.length);
+      } else if (effectiveTab === 'active-services') {
+        // Filter for active services (cen-001-srv-001 pattern)
+        filteredData = data.filter((item: any) => {
+          return item.id && /^[a-z]{3}-\d+-srv-\d+$/i.test(item.id);
+        });
+        console.log('[ArchiveSection] Filtered to active services:', filteredData.length);
       }
 
       setArchivedData(filteredData);
@@ -171,10 +191,19 @@ export default function ArchiveSection({ archiveAPI }: ArchiveSectionProps) {
   const handleRestore = async () => {
     if (!selectedEntity) return;
 
-    // Determine the actual entityType for API call (productOrder/serviceOrder -> order)
-    const actualEntityType = (activeTab === 'productOrder' || activeTab === 'serviceOrder')
-      ? 'order'
-      : selectedEntity.entityType;
+    // Get effective tab
+    const effectiveTab = (() => {
+      if (activeTab === 'services') return servicesSubTab;
+      if (activeTab === 'orders') return ordersSubTab;
+      return activeTab;
+    })();
+
+    // Determine the actual entityType for API call
+    const actualEntityType = (() => {
+      if (effectiveTab === 'product-orders' || effectiveTab === 'service-orders') return 'order';
+      if (effectiveTab === 'catalog-services' || effectiveTab === 'active-services') return 'service';
+      return selectedEntity.entityType;
+    })();
 
     if (!confirm(`Restore ${selectedEntity.entityType} ${selectedEntity.id}? It will be moved to the unassigned bucket.`)) {
       return;
@@ -193,10 +222,19 @@ export default function ArchiveSection({ archiveAPI }: ArchiveSectionProps) {
   const handleHardDelete = async () => {
     if (!selectedEntity) return;
 
-    // Determine the actual entityType for API call (productOrder/serviceOrder -> order)
-    const actualEntityType = (activeTab === 'productOrder' || activeTab === 'serviceOrder')
-      ? 'order'
-      : selectedEntity.entityType;
+    // Get effective tab
+    const effectiveTab = (() => {
+      if (activeTab === 'services') return servicesSubTab;
+      if (activeTab === 'orders') return ordersSubTab;
+      return activeTab;
+    })();
+
+    // Determine the actual entityType for API call
+    const actualEntityType = (() => {
+      if (effectiveTab === 'product-orders' || effectiveTab === 'service-orders') return 'order';
+      if (effectiveTab === 'catalog-services' || effectiveTab === 'active-services') return 'service';
+      return selectedEntity.entityType;
+    })();
 
     const confirmMessage = `⚠️ PERMANENT DELETION WARNING ⚠️\n\n` +
       `This will permanently delete ${selectedEntity.entityType} ${selectedEntity.id}.\n` +
@@ -219,7 +257,14 @@ export default function ArchiveSection({ archiveAPI }: ArchiveSectionProps) {
   };
 
   const config = useMemo(() => {
-    const columns = buildColumns(activeTab);
+    // Get effective tab considering sub-tabs
+    const effectiveTab = (() => {
+      if (activeTab === 'services') return servicesSubTab;
+      if (activeTab === 'orders') return ordersSubTab;
+      return activeTab;
+    })();
+
+    const columns = buildColumns(effectiveTab);
     const tab = ARCHIVE_TABS.find((item) => item.id === activeTab) ?? ARCHIVE_TABS[0];
 
     // Transform data for display
@@ -264,7 +309,7 @@ export default function ArchiveSection({ archiveAPI }: ArchiveSectionProps) {
       searchPlaceholder: `Search ${tab.search}...`,
       emptyMessage: loading ? 'Loading...' : error ? `Error: ${error}` : 'No archived records found.',
     };
-  }, [activeTab, archivedData, searchTerm, loading, error]);
+  }, [activeTab, servicesSubTab, ordersSubTab, archivedData, searchTerm, loading, error]);
 
   return (
     <PageWrapper title="Archive" showHeader={false}>
@@ -281,6 +326,44 @@ export default function ArchiveSection({ archiveAPI }: ArchiveSectionProps) {
       </TabContainer>
 
       <div style={{ marginTop: 24 }}>
+        {/* Sub-tab dropdowns for Services and Orders */}
+        {activeTab === 'services' && (
+          <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
+            <Button
+              variant={servicesSubTab === 'catalog-services' ? 'primary' : 'secondary'}
+              size="small"
+              onClick={() => setServicesSubTab('catalog-services')}
+            >
+              Catalog Services
+            </Button>
+            <Button
+              variant={servicesSubTab === 'active-services' ? 'primary' : 'secondary'}
+              size="small"
+              onClick={() => setServicesSubTab('active-services')}
+            >
+              Active Services
+            </Button>
+          </div>
+        )}
+        {activeTab === 'orders' && (
+          <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
+            <Button
+              variant={ordersSubTab === 'product-orders' ? 'primary' : 'secondary'}
+              size="small"
+              onClick={() => setOrdersSubTab('product-orders')}
+            >
+              Product Orders
+            </Button>
+            <Button
+              variant={ordersSubTab === 'service-orders' ? 'primary' : 'secondary'}
+              size="small"
+              onClick={() => setOrdersSubTab('service-orders')}
+            >
+              Service Orders
+            </Button>
+          </div>
+        )}
+
         <div style={{ marginBottom: 16, display: 'flex', gap: '12px', alignItems: 'center' }}>
           <input
             type="text"
@@ -392,6 +475,29 @@ export default function ArchiveSection({ archiveAPI }: ArchiveSectionProps) {
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {/* View Details button for orders */}
+              {selectedEntity.entityType === 'order' && onViewOrderDetails && (
+                <button
+                  onClick={() => {
+                    const orderType = (selectedEntity as any).orderType === 'service' ? 'service' : 'product';
+                    onViewOrderDetails(selectedEntity.id, orderType);
+                    handleModalClose();
+                  }}
+                  style={{
+                    padding: '12px 20px',
+                    backgroundColor: '#6366f1',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: 500
+                  }}
+                >
+                  📄 View Order Details
+                </button>
+              )}
+
               <button
                 onClick={handleRestore}
                 style={{
@@ -412,10 +518,19 @@ export default function ArchiveSection({ archiveAPI }: ArchiveSectionProps) {
                 onClick={async () => {
                   if (selectedEntity) {
                     try {
-                      // Determine the actual entityType for API call (productOrder/serviceOrder -> order)
-                      const actualEntityType = (activeTab === 'productOrder' || activeTab === 'serviceOrder')
-                        ? 'order'
-                        : selectedEntity.entityType;
+                      // Get effective tab
+                      const effectiveTab = (() => {
+                        if (activeTab === 'services') return servicesSubTab;
+                        if (activeTab === 'orders') return ordersSubTab;
+                        return activeTab;
+                      })();
+
+                      // Determine the actual entityType for API call
+                      const actualEntityType = (() => {
+                        if (effectiveTab === 'product-orders' || effectiveTab === 'service-orders') return 'order';
+                        if (effectiveTab === 'catalog-services' || effectiveTab === 'active-services') return 'service';
+                        return selectedEntity.entityType;
+                      })();
 
                       const relationships = await api.getRelationships(
                         actualEntityType,

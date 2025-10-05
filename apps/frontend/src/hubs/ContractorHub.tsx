@@ -768,6 +768,22 @@ export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHu
                       },
                       { key: 'managedBy', label: 'MANAGED BY' },
                       { key: 'startDate', label: 'START DATE' },
+                      {
+                        key: 'actions',
+                        label: 'ACTIONS',
+                        render: (_: any, row: any) => (
+                          <Button
+                            size="sm"
+                            roleColor="#22c55e"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedServiceId(row.serviceId);
+                            }}
+                          >
+                            View Details
+                          </Button>
+                        ),
+                      },
                     ]}
                     data={activeServicesData.filter((row) => {
                       if (!servicesSearchQuery) {
@@ -782,7 +798,6 @@ export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHu
                     })}
                     showSearch={false}
                     maxItems={10}
-                    onRowClick={(row) => setSelectedServiceId(row.serviceId)}
                   />
                 )}
 
@@ -962,9 +977,7 @@ export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHu
             }
           : null;
 
-        if (isServiceCreated && orderType === 'service') {
-          return null; // TODO: Wire ServiceViewModal
-        } else if (orderType === 'service') {
+        if (orderType === 'service') {
           return (
             <ServiceOrderModal
               isOpen={!!selectedOrderForDetails}

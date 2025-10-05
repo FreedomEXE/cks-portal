@@ -938,6 +938,22 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
                         },
                       },
                       { key: 'startDate', label: 'START DATE' },
+                      {
+                        key: 'actions',
+                        label: 'ACTIONS',
+                        render: (_: any, row: any) => (
+                          <Button
+                            size="sm"
+                            roleColor="#8b5cf6"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedServiceId(row.serviceId);
+                            }}
+                          >
+                            View Details
+                          </Button>
+                        ),
+                      },
                     ]}
                     data={activeServicesData.filter((row) => {
                       if (!servicesSearchQuery) {
@@ -951,7 +967,6 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
                     })}
                     showSearch={false}
                     maxItems={10}
-                    onRowClick={() => undefined}
                   />
                 )}
 
@@ -1099,9 +1114,7 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
             }
           : null;
 
-        if (isServiceCreated && orderType === 'service') {
-          return null; // TODO: Wire ServiceViewModal
-        } else if (orderType === 'service') {
+        if (orderType === 'service') {
           return (
             <ServiceOrderModal
               isOpen={!!selectedOrderForDetails}

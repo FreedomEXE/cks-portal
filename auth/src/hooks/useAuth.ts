@@ -43,6 +43,8 @@ const SIGNED_OUT_STATE: InternalAuthState = {
 const DEV_PROXY_BASE = '/api';
 const RAW_API_BASE = import.meta.env.VITE_API_URL || DEV_PROXY_BASE;
 const API_BASE = RAW_API_BASE.replace(/\/+$/, '');
+const MAX_BOOTSTRAP_RETRIES = Number(import.meta.env.VITE_BOOTSTRAP_MAX_RETRIES ?? 8);
+const BOOTSTRAP_RETRY_BASE_MS = Number(import.meta.env.VITE_BOOTSTRAP_RETRY_BASE_MS ?? 250);
 
 function sanitize(value: unknown): string | null {
   if (typeof value !== 'string') {
@@ -126,6 +128,7 @@ export function useAuth(): AuthState {
   const { isLoaded: authLoaded, isSignedIn, getToken } = useClerkAuth();
   const { user, isLoaded: userLoaded } = useUser();
   const navigate = useNavigate();
+  const bootstrapRetriesRef = useRef(0);
   const location = useLocation();
   const abortRef = useRef<AbortController | null>(null);
   const fetchingRef = useRef(false);
@@ -226,7 +229,27 @@ export function useAuth(): AuthState {
             error: null,
           });
           return;
-        }        throw new Error(`Bootstrap failed with status ${response.status}`);
+        }
+        if (
+          response.status === 502 ||
+          response.status === 503 ||
+          response.status === 504 ||
+          response.status === 521 ||
+          response.status === 522 ||
+          response.status === 523 ||
+          response.status === 524
+        ) {
+          if (bootstrapRetriesRef.current < MAX_BOOTSTRAP_RETRIES) {
+            const delay = Math.min(5000, BOOTSTRAP_RETRY_BASE_MS * 2 ** bootstrapRetriesRef.current);
+            bootstrapRetriesRef.current += 1;
+            setTimeout(() => {
+              void refresh();
+            }, delay);
+            setState((current) => ({ ...current, status: 'loading' }));
+            return;
+          }
+        }
+        throw new Error(`Bootstrap failed with status ${response.status}`);
       }
 
       const data = await response.json();
@@ -270,6 +293,7 @@ export function useAuth(): AuthState {
         ownerFirstName: resolvedOwnerFirstName,
       };
       lastResolvedRef.current = snapshot;
+      bootstrapRetriesRef.current = 0;
       setState({
         status: 'ready',
         role: snapshot.role,
@@ -301,27 +325,40 @@ export function useAuth(): AuthState {
           error: null,
         });
       } else {
-        const error = err instanceof Error ? err : new Error('Failed to bootstrap user role');
-        if (cached) {
-          setState({
-            status: 'ready',
-            role: cached.role,
-            code: cached.code,
-            fullName: cached.fullName,
-            firstName: cached.firstName,
-            ownerFirstName: cached.ownerFirstName,
+        if (bootstrapRetriesRef.current < MAX_BOOTSTRAP_RETRIES) {
+          const delay = Math.min(5000, BOOTSTRAP_RETRY_BASE_MS * 2 ** bootstrapRetriesRef.current);
+          bootstrapRetriesRef.current += 1;
+          setTimeout(() => {
+            void refresh();
+          }, delay);
+          setState((current) => ({
+            ...current,
+            status: 'loading',
             error: null,
-          });
+          }));
         } else {
-          setState({
-            status: 'error',
-            role: null,
-            code: null,
-            fullName: null,
-            firstName: null,
-            ownerFirstName: null,
-            error,
-          });
+          const error = err instanceof Error ? err : new Error('Failed to bootstrap user role');
+          if (cached) {
+            setState({
+              status: 'ready',
+              role: cached.role,
+              code: cached.code,
+              fullName: cached.fullName,
+              firstName: cached.firstName,
+              ownerFirstName: cached.ownerFirstName,
+              error: null,
+            });
+          } else {
+            setState({
+              status: 'error',
+              role: null,
+              code: null,
+              fullName: null,
+              firstName: null,
+              ownerFirstName: null,
+              error,
+            });
+          }
         }
       }
     } finally {

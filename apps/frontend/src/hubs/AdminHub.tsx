@@ -164,7 +164,7 @@ const HUB_TABS = [
   { id: 'support', label: 'Support', path: '/support' },
 ];
 
-const DIRECTORY_TABS: Array<{ id: string; label: string; color: string }> = [
+const DIRECTORY_TABS: Array<{ id: string; label: string; color: string; hasDropdown?: boolean; dropdownOptions?: Array<{ id: string; label: string }> }> = [
   { id: 'admins', label: 'Admins', color: '#0f172a' },
   { id: 'managers', label: 'Managers', color: '#2563eb' },
   { id: 'contractors', label: 'Contractors', color: '#10b981' },
@@ -172,9 +172,27 @@ const DIRECTORY_TABS: Array<{ id: string; label: string; color: string }> = [
   { id: 'centers', label: 'Centers', color: '#f97316' },
   { id: 'crew', label: 'Crew', color: '#ef4444' },
   { id: 'warehouses', label: 'Warehouses', color: '#8b5cf6' },
-  { id: 'services', label: 'Services', color: '#14b8a6' },
-  { id: 'orders', label: 'Orders', color: '#6366f1' },
+  {
+    id: 'services',
+    label: 'Services',
+    color: '#14b8a6',
+    hasDropdown: true,
+    dropdownOptions: [
+      { id: 'catalog-services', label: 'Catalog Services' },
+      { id: 'active-services', label: 'Active Services' },
+    ]
+  },
   { id: 'products', label: 'Products', color: '#d946ef' },
+  {
+    id: 'orders',
+    label: 'Orders',
+    color: '#6366f1',
+    hasDropdown: true,
+    dropdownOptions: [
+      { id: 'product-orders', label: 'Product Orders' },
+      { id: 'service-orders', label: 'Service Orders' },
+    ]
+  },
   { id: 'training', label: 'Training & Procedures', color: '#ec4899' },
   { id: 'reports', label: 'Reports & Feedback', color: '#92400e' },
 ];
@@ -195,6 +213,8 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
   ];
   const [activeTab, setActiveTab] = useState(initialTab);
   const [directoryTab, setDirectoryTab] = useState<string>('admins');
+  const [servicesSubTab, setServicesSubTab] = useState<string>('catalog-services');
+  const [ordersSubTab, setOrdersSubTab] = useState<string>('product-orders');
   const [showActionModal, setShowActionModal] = useState(false);
   const [selectedEntity, setSelectedEntity] = useState<Record<string, any> | null>(null);
   const [showServiceCatalogModal, setShowServiceCatalogModal] = useState(false);
@@ -415,12 +435,19 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
 
   const handleDelete = useCallback(
     async (entity: Record<string, any>) => {
-      // Determine entity type based on the active directory tab
+      // Determine entity type based on the active directory tab and sub-tabs
       let entityType: EntityType | null = null;
       let entityId: string | null = null;
 
+      // Get effective tab (considering sub-tabs)
+      const effectiveTab = (() => {
+        if (directoryTab === 'services') return servicesSubTab;
+        if (directoryTab === 'orders') return ordersSubTab;
+        return directoryTab;
+      })();
+
       // Check which tab we're in and extract the appropriate ID
-      if (directoryTab === 'orders' && entity.orderId) {
+      if ((effectiveTab === 'product-orders' || effectiveTab === 'service-orders') && entity.orderId) {
         entityType = 'order';
         entityId = entity.orderId;
       } else if (directoryTab === 'managers' && entity.manager_id) {
@@ -441,7 +468,7 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
       } else if (directoryTab === 'warehouses' && entity.id) {
         entityType = 'warehouse';
         entityId = entity.id;
-      } else if (directoryTab === 'services' && entity.id) {
+      } else if ((effectiveTab === 'catalog-services' || effectiveTab === 'active-services') && entity.id) {
         entityType = 'service';
         entityId = entity.id;
       } else if (directoryTab === 'products' && entity.id) {
@@ -456,7 +483,7 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
         else if (directoryTab === 'centers') entityType = 'center';
         else if (directoryTab === 'crew') entityType = 'crew';
         else if (directoryTab === 'warehouses') entityType = 'warehouse';
-        else if (directoryTab === 'services') entityType = 'service';
+        else if (effectiveTab === 'catalog-services' || effectiveTab === 'active-services') entityType = 'service';
         else if (directoryTab === 'products') entityType = 'product';
       }
 
@@ -520,7 +547,7 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
         alert(`Failed to archive ${entityType}: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     },
-    [handleModalClose, directoryTab, mutate],
+    [handleModalClose, directoryTab, servicesSubTab, ordersSubTab, mutate],
   );
 
 
@@ -915,7 +942,7 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
       data: warehouseRows,
       emptyMessage: 'No warehouses found.',
     },
-    services: {
+    'catalog-services': {
       columns: [
         { key: 'id', label: 'SERVICE ID' },
         { key: 'name', label: 'NAME' },
@@ -925,9 +952,29 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
         { key: 'actions', label: 'ACTIONS', render: renderActions },
       ],
       data: serviceRows,
-      emptyMessage: 'No services in the catalog yet.',
+      emptyMessage: 'No catalog services found.',
     },
-    productOrders: {
+    'active-services': {
+      columns: [
+        { key: 'id', label: 'SERVICE ID' },
+        { key: 'name', label: 'SERVICE NAME' },
+        { key: 'requestedBy', label: 'REQUESTED BY' },
+        { key: 'destination', label: 'LOCATION' },
+        { key: 'status', label: 'STATUS', render: renderStatusBadge },
+        { key: 'orderDate', label: 'CREATED' },
+        { key: 'actions', label: 'ACTIONS', render: renderActions },
+      ],
+      data: serviceOrderRows.filter(order => {
+        // Filter for transformed service orders (active services)
+        return order.serviceId && order.serviceId.match(/^[a-z]{3}-\d+-srv-\d+$/i);
+      }).map(order => ({
+        ...order,
+        id: order.serviceId || order.id,
+        name: order.title || 'Service',
+      })),
+      emptyMessage: 'No active services found.',
+    },
+    'product-orders': {
       columns: [
         { key: 'id', label: 'ORDER ID' },
         { key: 'orderType', label: 'TYPE' },
@@ -940,7 +987,7 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
       data: productOrderRows,
       emptyMessage: 'No product orders recorded.',
     },
-    serviceOrders: {
+    'service-orders': {
       columns: [
         { key: 'id', label: 'ORDER ID' },
         { key: 'orderType', label: 'TYPE' },
@@ -1072,32 +1119,82 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
         </div>
       );
     }
-    if (directoryTab === 'orders') {
+
+    // Handle Services dropdown
+    if (directoryTab === 'services') {
+      const activeSubTab = servicesSubTab;
+      const section = (directoryConfig as any)[activeSubTab];
+      if (!section) {
+        return <div style={{ color: '#64748b', fontSize: 14 }}>No data available.</div>;
+      }
       return (
-        <div style={{ display: 'flex', gap: '4%' }}>
-          <div style={{ width: '48%' }}>
-            <DataTable
-              columns={(directoryConfig as any).productOrders.columns}
-              data={(directoryConfig as any).productOrders.data}
-              emptyMessage={(directoryConfig as any).productOrders.emptyMessage}
-              searchPlaceholder="Search product orders..."
-              maxItems={25}
-              showSearch
-            />
+        <>
+          <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
+            <Button
+              variant={servicesSubTab === 'catalog-services' ? 'primary' : 'secondary'}
+              size="small"
+              onClick={() => setServicesSubTab('catalog-services')}
+            >
+              Catalog Services
+            </Button>
+            <Button
+              variant={servicesSubTab === 'active-services' ? 'primary' : 'secondary'}
+              size="small"
+              onClick={() => setServicesSubTab('active-services')}
+            >
+              Active Services
+            </Button>
           </div>
-          <div style={{ width: '48%' }}>
-            <DataTable
-              columns={(directoryConfig as any).serviceOrders.columns}
-              data={(directoryConfig as any).serviceOrders.data}
-              emptyMessage={(directoryConfig as any).serviceOrders.emptyMessage}
-              searchPlaceholder="Search service orders..."
-              maxItems={25}
-              showSearch
-            />
-          </div>
-        </div>
+          <DataTable
+            columns={section.columns}
+            data={section.data}
+            emptyMessage={section.emptyMessage}
+            searchPlaceholder={`Search ${servicesSubTab === 'catalog-services' ? 'catalog services' : 'active services'}...`}
+            maxItems={25}
+            showSearch
+          />
+        </>
       );
     }
+
+    // Handle Orders dropdown
+    if (directoryTab === 'orders') {
+      const activeSubTab = ordersSubTab;
+      const section = (directoryConfig as any)[activeSubTab];
+      if (!section) {
+        return <div style={{ color: '#64748b', fontSize: 14 }}>No data available.</div>;
+      }
+      return (
+        <>
+          <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
+            <Button
+              variant={ordersSubTab === 'product-orders' ? 'primary' : 'secondary'}
+              size="small"
+              onClick={() => setOrdersSubTab('product-orders')}
+            >
+              Product Orders
+            </Button>
+            <Button
+              variant={ordersSubTab === 'service-orders' ? 'primary' : 'secondary'}
+              size="small"
+              onClick={() => setOrdersSubTab('service-orders')}
+            >
+              Service Orders
+            </Button>
+          </div>
+          <DataTable
+            columns={section.columns}
+            data={section.data}
+            emptyMessage={section.emptyMessage}
+            searchPlaceholder={`Search ${ordersSubTab === 'product-orders' ? 'product orders' : 'service orders'}...`}
+            maxItems={25}
+            showSearch
+          />
+        </>
+      );
+    }
+
+    // Handle Training & Procedures (side-by-side)
     if (directoryTab === 'training') {
       return (
         <div style={{ display: 'flex', gap: '4%' }}>
@@ -1124,6 +1221,8 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
         </div>
       );
     }
+
+    // Handle Reports & Feedback (side-by-side)
     if (directoryTab === 'reports') {
       return (
         <div style={{ display: 'flex', gap: '4%' }}>
@@ -1150,6 +1249,8 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
         </div>
       );
     }
+
+    // Default handling for other tabs
     const section = (directoryConfig as any)[directoryTab];
     if (!section) {
       return <div style={{ color: '#64748b', fontSize: 14 }}>No data available.</div>;
@@ -1226,7 +1327,21 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
           ) : activeTab === 'assign' ? (
             <AdminAssignSection />
           ) : activeTab === 'archive' ? (
-            <ArchiveSection archiveAPI={archiveAPI} />
+            <ArchiveSection
+              archiveAPI={archiveAPI}
+              onViewOrderDetails={async (orderId: string, orderType: 'product' | 'service') => {
+                try {
+                  // Fetch the full archived order
+                  const fullOrder = await fetchAdminOrderById(orderId);
+                  if (fullOrder) {
+                    setSelectedOrderForDetails(fullOrder as any);
+                  }
+                } catch (error) {
+                  console.error('Failed to fetch archived order:', error);
+                  alert('Failed to load order details');
+                }
+              }}
+            />
           ) : activeTab === 'support' ? (
             <PageWrapper title="Support" headerSrOnly>
               <AdminSupportSection primaryColor="#6366f1" />
@@ -1245,10 +1360,12 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
         onClose={handleModalClose}
         entity={selectedEntity ?? undefined}
         title={(() => {
-          // Determine title based on entity type
+          // Determine title based on entity type (considering sub-tabs)
           if (directoryTab === 'orders') return 'Order Actions';
           if (directoryTab === 'products') return 'Product Actions';
-          if (directoryTab === 'services') return 'Service Actions';
+          if (directoryTab === 'services') {
+            return servicesSubTab === 'catalog-services' ? 'Catalog Service Actions' : 'Active Service Actions';
+          }
           if (directoryTab === 'warehouses') return 'Warehouse Actions';
           return undefined; // Use default title for users
         })()}
@@ -1266,8 +1383,12 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
                 onClick: async () => {
                   if (!selectedEntity) return;
                   const fullOrder = (selectedEntity as any)._fullOrder as HubOrderItem;
+                  console.log('[AdminHub] View Details clicked:', { selectedEntity, fullOrder });
                   if (fullOrder) {
                     setSelectedOrderForDetails(fullOrder);
+                    handleModalClose(); // Close the action modal so the order modal can show
+                  } else {
+                    console.error('[AdminHub] No _fullOrder found on selectedEntity');
                   }
                 },
               },
@@ -1639,10 +1760,7 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
           : null;
 
         // Choose the appropriate modal
-        if (isServiceCreated && orderType === 'service') {
-          // Use ServiceViewModal for created services
-          return null; // TODO: Wire ServiceViewModal with service data
-        } else if (orderType === 'service') {
+        if (orderType === 'service') {
           // Use ServiceOrderModal for service orders
           return (
             <ServiceOrderModal

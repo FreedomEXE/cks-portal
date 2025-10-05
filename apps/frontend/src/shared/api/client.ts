@@ -1,8 +1,13 @@
 import { useAuth as useClerkAuth } from '@clerk/clerk-react';
 import { useCallback } from 'react';
 
-const RAW_API_BASE = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:3000/api';
-export const API_BASE = RAW_API_BASE.replace(/\/+$/, '');
+// Prefer Vite dev proxy by default. Allow override via env.
+const DEV_PROXY_BASE = '/api';
+const RAW_API_BASE =
+  (import.meta as any).env?.VITE_API_URL ||
+  (import.meta as any).env?.VITE_API_BASE_URL ||
+  DEV_PROXY_BASE;
+export const API_BASE = String(RAW_API_BASE).replace(/\/+$/, '');
 declare global {
   interface Window {
     __cksDevAuth?: (options?: { role?: string | null; code?: string | null }) => void;
@@ -17,10 +22,10 @@ export type ApiFetchInit = RequestInit & {
 };
 
 export async function apiFetch<T>(path: string, init?: ApiFetchInit): Promise<T> {
-  const url = API_BASE + path;
   const { getToken: providedGetToken, headers: initHeaders, ...restInit } = (init ?? {}) as ApiFetchInit;
   const headers = new Headers(initHeaders as HeadersInit | undefined);
   const normalizedPath = path.startsWith('/') ? path : '/' + path;
+  const url = API_BASE + normalizedPath;
   const isAdminApiRequest = normalizedPath === '/admin' || normalizedPath.startsWith('/admin/');
   const shouldApplyDevOverride = DEV_AUTH_ENABLED && typeof window !== 'undefined' && !isAdminApiRequest;
 

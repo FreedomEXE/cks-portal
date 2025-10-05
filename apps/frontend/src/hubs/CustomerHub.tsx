@@ -510,6 +510,22 @@ export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubPro
                       },
                       { key: 'managedBy', label: 'MANAGED BY' },
                       { key: 'startDate', label: 'START DATE' },
+                      {
+                        key: 'actions',
+                        label: 'ACTIONS',
+                        render: (_: any, row: any) => (
+                          <Button
+                            size="sm"
+                            roleColor="#eab308"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedServiceId(row.serviceId);
+                            }}
+                          >
+                            View Details
+                          </Button>
+                        ),
+                      },
                     ]}
                     data={myServicesData.filter((row) => {
                       if (!servicesSearchQuery) {
@@ -523,7 +539,6 @@ export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubPro
                     })}
                     showSearch={false}
                     maxItems={10}
-                    onRowClick={(row) => setSelectedServiceId(row.serviceId)}
                   />
                 )}
 
@@ -722,9 +737,7 @@ export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubPro
             }
           : null;
 
-        if (isServiceCreated && orderType === 'service') {
-          return null; // TODO: Wire ServiceViewModal
-        } else if (orderType === 'service') {
+        if (orderType === 'service') {
           return (
             <ServiceOrderModal
               isOpen={!!selectedOrderForDetails}

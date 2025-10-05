@@ -155,15 +155,52 @@ const ACTIVE_SERVICES_COLUMNS = [
   { key: 'serviceName', label: 'SERVICE NAME' },
   { key: 'centerId', label: 'CENTER ID' },
   { key: 'type', label: 'TYPE' },
+  {
+    key: 'status',
+    label: 'STATUS',
+    render: (value: string) => {
+      const palette = getStatusBadgePalette(value);
+      return (
+        <span
+          style={{
+            padding: '4px 12px',
+            borderRadius: '4px',
+            fontSize: '12px',
+            fontWeight: 500,
+            backgroundColor: palette.background,
+            color: palette.color,
+          }}
+        >
+          {value ?? '—'}
+        </span>
+      );
+    },
+  },
   { key: 'startDate', label: 'START DATE' },
   {
     key: 'actions',
     label: 'ACTIONS',
     render: (_: any, row: any) => {
+      const status = (row.status || '').toLowerCase();
+      const isCreated = status === 'created';
+      const isInProgress = status === 'in progress' || status === 'in_progress' || status === 'active';
+
       return (
-        <Button size="sm" onClick={row.onViewDetails}>
-          View Details
-        </Button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {isCreated && (
+            <Button size="sm" variant="primary" onClick={row.onStart}>
+              Start Service
+            </Button>
+          )}
+          {isInProgress && (
+            <Button size="sm" variant="primary" onClick={row.onComplete}>
+              Complete
+            </Button>
+          )}
+          <Button size="sm" onClick={row.onViewDetails}>
+            View Details
+          </Button>
+        </div>
       );
     }
   }
@@ -328,8 +365,8 @@ function normalizeOrderStatus(status: string | null | undefined): OrderStatus {
 
 function formatStatusLabel(status: string | null | undefined): string {
   const normalized = normalizeOrderStatus(status);
-  if (normalized === 'in-progress') {
-    return 'In Progress';
+  if (normalized === 'in-progress' || normalized === 'in_progress') {
+    return 'Active';
   }
   if (normalized === 'service-created') {
     return 'Service Created';
@@ -353,8 +390,10 @@ function getStatusBadgePalette(value: string): { background: string; color: stri
     case 'service-created':
       return { background: '#dcfce7', color: '#16a34a' };
     case 'pending':
-    case 'in-progress':
       return { background: '#fef9c3', color: '#b45309' };
+    case 'in-progress':
+    case 'in_progress':
+      return { background: '#dbeafe', color: '#1d4ed8' }; // Blue for active services
     case 'rejected':
     case 'cancelled':
       return { background: '#fee2e2', color: '#dc2626' };
@@ -864,9 +903,18 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
 
   const handleOrderAction = useCallback(async (orderId: string, action: string) => {
     if (action === 'View Details') {
-      const target = ordersData?.orders?.find((o: any) => (o.orderId || o.id) === orderId) || null;
+      // Search in all orders including archived/completed ones
+      let target = ordersData?.orders?.find((o: any) => (o.orderId || o.id) === orderId) || null;
+
+      // If not found in main orders list, search in service/product order cards (includes archived)
+      if (!target) {
+        target = [...managerServiceOrderCards, ...managerProductOrderCards].find((o: any) => (o.orderId || o.id) === orderId) || null;
+      }
+
       if (target) {
         setSelectedOrderForDetails(target);
+      } else {
+        console.error('[ManagerHub] Order not found for View Details:', orderId);
       }
       return;
     }
@@ -1269,9 +1317,7 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
           : null;
 
         // Choose the appropriate modal
-        if (isServiceCreated && orderType === 'service') {
-          return null; // TODO: Wire ServiceViewModal with service data
-        } else if (orderType === 'service') {
+        if (orderType === 'service') {
           return (
             <ServiceOrderModal
               isOpen={!!selectedOrderForDetails}

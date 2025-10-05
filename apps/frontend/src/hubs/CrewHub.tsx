@@ -571,7 +571,18 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
                               </div>
                             );
                           }
-                          return <span style={{ color: '#94a3b8' }}>-</span>;
+                          return (
+                            <Button
+                              size="sm"
+                              roleColor="#ef4444"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedServiceId(row.serviceId);
+                              }}
+                            >
+                              View Details
+                            </Button>
+                          );
                         }
                       }
                     ]}
@@ -776,9 +787,7 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
             }
           : null;
 
-        if (isServiceCreated && orderType === 'service') {
-          return null; // TODO: Wire ServiceViewModal
-        } else if (orderType === 'service') {
+        if (orderType === 'service') {
           return (
             <ServiceOrderModal
               isOpen={!!selectedOrderForDetails}

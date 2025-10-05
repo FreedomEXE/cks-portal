@@ -33,6 +33,7 @@ export async function applyServiceAction(input: {
   if (input.action === 'start') {
     (meta as any).serviceStartedAt = nowIso;
     (meta as any).serviceStartNotes = input.notes || (meta as any).serviceStartNotes || null;
+    (meta as any).serviceStartedBy = input.actorCode || null;
     (meta as any).serviceStatus = 'in_progress';
     newServiceStatus = 'in_progress';
     actualStartTime = nowIso;
@@ -68,9 +69,10 @@ export async function applyServiceAction(input: {
         `UPDATE services
          SET status = $1,
              actual_start_time = $3,
+             managed_by = $4,
              updated_at = NOW()
          WHERE service_id = $2`,
-        [newServiceStatus, serviceId, actualStartTime]
+        [newServiceStatus, serviceId, actualStartTime, input.actorCode || null]
       );
     } else if (actualEndTime) {
       await query(
