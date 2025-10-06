@@ -1389,6 +1389,27 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
         availableCrew={crewEntries.map((c: any) => ({ code: c.id, name: c.name || c.id }))}
         serviceStatus={serviceDetails?.metadata?.serviceStatus || 'created'}
         serviceType={serviceDetails?.metadata?.serviceType || 'one-time'}
+        productOrders={(() => {
+          if (!serviceDetails?.serviceId) return [];
+          // Filter product orders linked to this service
+          return managerProductOrders
+            .filter((order) => {
+              const meta = (order as any).metadata || {};
+              return meta.serviceId === serviceDetails.serviceId;
+            })
+            .map((order) => {
+              const items = (order as any).items || [];
+              const productName = items.length > 0 ? items.map((i: any) => i.name).join(', ') : 'Product Order';
+              const totalQty = items.reduce((sum: number, i: any) => sum + (i.quantity || 0), 0);
+              return {
+                orderId: order.orderId,
+                productName,
+                quantity: totalQty,
+                status: order.status || 'pending',
+                requestedDate: order.requestedDate || order.orderDate || null,
+              };
+            });
+        })()}
         onSendCrewRequest={async (crewCodes: string[]) => {
           try {
             if (!serviceDetails?.serviceId) return;

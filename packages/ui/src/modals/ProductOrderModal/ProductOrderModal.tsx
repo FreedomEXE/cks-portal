@@ -133,6 +133,28 @@ const ProductOrderModal: React.FC<ProductOrderModalProps> = ({
 
         {/* Content */}
         <div className={styles.content}>
+          {/* Service Information (if linked to a service) */}
+          {order.metadata && (order.metadata as any).serviceId && (
+            <section className={styles.section}>
+              <h3 className={styles.sectionTitle}>Linked Service</h3>
+              <div className={styles.grid}>
+                <div className={styles.field}>
+                  <label className={styles.label}>Service ID</label>
+                  <p className={styles.value}>{(order.metadata as any).serviceId}</p>
+                </div>
+                {(order.metadata as any).serviceName && (
+                  <div className={styles.field}>
+                    <label className={styles.label}>Service Name</label>
+                    <p className={styles.value}>{(order.metadata as any).serviceName}</p>
+                  </div>
+                )}
+              </div>
+              <p style={{ fontSize: '13px', color: '#6b7280', marginTop: '8px' }}>
+                This product order is linked to a specific service
+              </p>
+            </section>
+          )}
+
           {/* Order Information */}
           <section className={styles.section}>
             <h3 className={styles.sectionTitle}>Order Information</h3>

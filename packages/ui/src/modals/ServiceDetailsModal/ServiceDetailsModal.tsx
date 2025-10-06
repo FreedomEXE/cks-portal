@@ -21,6 +21,7 @@ export interface ServiceDetailsModalProps {
   onCancelService?: () => void;
   serviceStatus?: string; // 'created', 'in_progress', 'completed', 'cancelled'
   serviceType?: string; // 'one-time', 'ongoing'
+  productOrders?: Array<{ orderId: string; productName: string; quantity: number; status: string; requestedDate?: string }>;
 }
 
 export default function ServiceDetailsModal({
@@ -35,7 +36,8 @@ export default function ServiceDetailsModal({
   onCompleteService,
   onCancelService,
   serviceStatus = 'created',
-  serviceType = 'one-time'
+  serviceType = 'one-time',
+  productOrders = []
 }: ServiceDetailsModalProps) {
   const [activeTab, setActiveTab] = useState<'overview' | 'crew' | 'products' | 'procedures' | 'training' | 'notes'>('overview');
   const [crewSelected, setCrewSelected] = useState<string[]>([]);
@@ -371,16 +373,56 @@ export default function ServiceDetailsModal({
               </p>
 
               <div style={{ marginTop: 16, marginBottom: 16 }}>
-                <Button size="sm" onClick={() => window.open('/catalog', '_blank')}>
+                <Button size="sm" onClick={() => window.open('/catalog?mode=products', '_blank')}>
                   Request Products
                 </Button>
               </div>
 
-              <p style={{ color: '#9ca3af', fontStyle: 'italic', marginTop: 16 }}>No products ordered for this service yet.</p>
-
-              <div style={{ marginTop: 24, padding: 12, backgroundColor: '#fef3c7', borderRadius: 6, fontSize: 13, color: '#92400e' }}>
-                <strong>Coming Soon:</strong> View products ordered for this service, track delivery status, and manage inventory assignments to crew members.
-              </div>
+              {productOrders && productOrders.length > 0 ? (
+                <div style={{ marginTop: 16 }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid #e5e7eb', textAlign: 'left' }}>
+                        <th style={{ padding: '8px 0', color: '#6b7280', fontWeight: 600 }}>Order ID</th>
+                        <th style={{ padding: '8px 0', color: '#6b7280', fontWeight: 600 }}>Product</th>
+                        <th style={{ padding: '8px 0', color: '#6b7280', fontWeight: 600 }}>Quantity</th>
+                        <th style={{ padding: '8px 0', color: '#6b7280', fontWeight: 600 }}>Status</th>
+                        <th style={{ padding: '8px 0', color: '#6b7280', fontWeight: 600 }}>Date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {productOrders.map((order, idx) => (
+                        <tr key={order.orderId || idx} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                          <td style={{ padding: '12px 0', color: '#111827', fontFamily: 'monospace', fontSize: 13 }}>{order.orderId}</td>
+                          <td style={{ padding: '12px 0', color: '#111827' }}>{order.productName}</td>
+                          <td style={{ padding: '12px 0', color: '#111827' }}>{order.quantity}</td>
+                          <td style={{ padding: '12px 0' }}>
+                            <span style={{
+                              padding: '2px 8px',
+                              borderRadius: 4,
+                              fontSize: 12,
+                              fontWeight: 500,
+                              backgroundColor: order.status.toLowerCase() === 'delivered' ? '#dcfce7' :
+                                              order.status.toLowerCase() === 'pending' ? '#fef3c7' : '#dbeafe',
+                              color: order.status.toLowerCase() === 'delivered' ? '#166534' :
+                                     order.status.toLowerCase() === 'pending' ? '#92400e' : '#1e3a8a'
+                            }}>
+                              {order.status}
+                            </span>
+                          </td>
+                          <td style={{ padding: '12px 0', color: '#6b7280', fontSize: 13 }}>
+                            {order.requestedDate ? new Date(order.requestedDate).toLocaleDateString() : '—'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p style={{ color: '#9ca3af', fontStyle: 'italic', marginTop: 16 }}>
+                  No products ordered for this service yet.
+                </p>
+              )}
             </div>
           )}
 

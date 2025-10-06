@@ -263,6 +263,15 @@ function DateSelectorModal({
 
 type DestinationOption = { id: string; name: string | null; customerId?: string | null };
 
+type ServiceOption = {
+  id: string;
+  name: string | null;
+  centerId?: string | null;
+  centerName?: string | null;
+  customerId?: string | null;
+  contractorId?: string | null;
+};
+
 function CartPanel({
   onClose,
   onCheckout,
@@ -270,17 +279,22 @@ function CartPanel({
   defaultDestination,
   centers,
   customers,
+  services,
+  contractors,
 }: {
   onClose: () => void;
   onCheckout: (
     availability: { tz: string; days: string[]; window: { start: string; end: string } },
     notes?: string | null,
-    destination?: { code: string; role: 'center' }
+    destination?: { code: string; role: 'center' },
+    serviceId?: string | null
   ) => void;
   role: string | null;
   defaultDestination: string | null;
   centers: DestinationOption[];
-  customers: { id: string; name: string | null }[];
+  customers: { id: string; name: string | null; contractorId?: string | null }[];
+  services: ServiceOption[];
+  contractors?: { id: string; name: string | null }[];
 }) {
   const cart = useCart();
 
@@ -290,37 +304,67 @@ function CartPanel({
   const [start, setStart] = useState('09:00');
   const [end, setEnd] = useState('17:00');
   const [notes, setNotes] = useState<string>('');
+  const [selectedContractor, setSelectedContractor] = useState<string | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<string | null>(customers.length === 1 ? customers[0].id : null);
   const [selectedCenter, setSelectedCenter] = useState<string | null>(defaultDestination ?? null);
+  const [selectedService, setSelectedService] = useState<string | null>(null);
 
   useEffect(() => {
     if (!selectedCenter && centers && centers.length === 1) {
       setSelectedCenter(centers[0].id);
     }
   }, [centers, selectedCenter]);
+
+  // Auto-fill when service is selected
+  useEffect(() => {
+    if (selectedService) {
+      const service = services.find(s => s.id === selectedService);
+      if (service) {
+        // Auto-fill contractor (for managers)
+        if (service.contractorId && role === 'manager') {
+          setSelectedContractor(service.contractorId);
+        }
+        // Auto-fill customer (for contractor/manager roles)
+        if (service.customerId && (role === 'contractor' || role === 'manager')) {
+          setSelectedCustomer(service.customerId);
+        }
+        // Auto-fill center
+        if (service.centerId) {
+          setSelectedCenter(service.centerId);
+        }
+      }
+    }
+  }, [selectedService, services, role]);
+  // Cascading filtered lists
+  const filteredCustomers = useMemo(() => {
+    const r = (role || '').trim().toLowerCase();
+    if (r === 'manager') {
+      if (selectedContractor) {
+        return customers.filter((c) => (c.contractorId || '').toUpperCase() === selectedContractor.toUpperCase());
+      }
+      return customers;
+    }
+    return customers;
+  }, [customers, role, selectedContractor]);
+
+  const filteredCenters = useMemo(() => {
+    if (selectedCustomer) {
+      return centers.filter((c) => (c.customerId || '').toUpperCase() === selectedCustomer.toUpperCase());
+    }
+    return centers;
+  }, [centers, selectedCustomer]);
+
   const needsDestination = useMemo(() => {
     const r = (role || '').trim().toLowerCase();
     if (!r) {
-      // If role not yet resolved but we have centers, still show
       return (centers?.length || 0) > 0;
     }
     if (r === 'center') return false; // Center orders auto-destination
-    if (r === 'customer') return true; // Always pick a center explicitly
-    if (r === 'crew') return true;     // Always show dropdown for consistency
+    if (r === 'customer') return true;
+    if (r === 'crew') return true;
     if (r === 'contractor' || r === 'manager') return true;
-    // Fallback: if centers exist, show selector
     return (centers?.length || 0) > 0;
   }, [role, centers]);
-  const filteredCenters = useMemo(() => {
-    const r = (role || '').trim().toLowerCase();
-    if (r === 'contractor' || r === 'manager') {
-      if (selectedCustomer) {
-        return centers.filter((c) => (c.customerId || '').toUpperCase() === selectedCustomer.toUpperCase());
-      }
-      return centers;
-    }
-    return centers;
-  }, [centers, role, selectedCustomer]);
 
   const toggleDay = (d: string) => {
     setDays((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]));
@@ -412,42 +456,176 @@ function CartPanel({
               <input type="time" value={end} onChange={(e) => setEnd(e.target.value)} className="border rounded px-2 py-1 text-sm" />
             </div>
           </div>
-          {/* Destination selection for non-center roles */}
+          {/* Service selection (optional) */}
+          {services.length > 0 && (
+            <div className="mb-4">
+              <div className="font-semibold mb-2">Service (Optional)</div>
+              <select
+                value={selectedService || ''}
+                onChange={(e) => {
+                  const v = e.target.value || null;
+                  setSelectedService(v);
+                  // If cleared, don't reset customer/center - user might want to keep them
+                }}
+                className="w-full border rounded px-3 py-2 text-sm"
+              >
+                <option value="">Select service (or order for center in general)</option>
+                {services.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {`${s.id}${s.name ? ` - ${s.name}` : ''}${s.centerName ? ` (${s.centerName})` : ''}`}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500 mt-1">
+                Select a service to link this order, or leave blank for a general center order
+              </p>
+            </div>
+          )}
+
+          {/* Smart Cascading Destination Selector */}
           {needsDestination && (
             <div className="mb-4">
               <div className="font-semibold mb-2">Destination</div>
-              {(role === 'contractor' || role === 'manager') && (
-                <div className="mb-2">
-                  <label className="block text-sm text-gray-700 mb-1">Customer</label>
+
+              {/* Manager: Contractor → Customer → Center (Progressive Disclosure) */}
+              {role === 'manager' && (
+                <>
+                  <div className="mb-2">
+                    <label className="block text-sm text-gray-700 mb-1">Contractor</label>
+                    <select
+                      value={selectedContractor || ''}
+                      onChange={(e) => {
+                        const v = e.target.value || null;
+                        setSelectedContractor(v);
+                        setSelectedCustomer(null);
+                        setSelectedCenter(null);
+                      }}
+                      disabled={!!selectedService}
+                      className="w-full border rounded px-3 py-2 text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    >
+                      <option value="">Select contractor</option>
+                      {contractors && contractors.map((c) => (
+                        <option key={c.id} value={c.id}>{`${c.id}${c.name ? ` - ${c.name}` : ''}`}</option>
+                      ))}
+                    </select>
+                    {selectedService && (
+                      <p className="text-xs text-gray-500 mt-1">Auto-filled from selected service</p>
+                    )}
+                  </div>
+                  {/* Only show Customer after Contractor is selected */}
+                  {(selectedContractor || selectedService) && (
+                    <div className="mb-2">
+                      <label className="block text-sm text-gray-700 mb-1">Customer</label>
+                      <select
+                        value={selectedCustomer || ''}
+                        onChange={(e) => {
+                          const v = e.target.value || null;
+                          setSelectedCustomer(v);
+                          setSelectedCenter(null);
+                        }}
+                        disabled={!!selectedService}
+                        className="w-full border rounded px-3 py-2 text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      >
+                        <option value="">Select customer</option>
+                        {filteredCustomers.map((c) => (
+                          <option key={c.id} value={c.id}>{`${c.id}${c.name ? ` - ${c.name}` : ''}`}</option>
+                        ))}
+                      </select>
+                      {selectedService && (
+                        <p className="text-xs text-gray-500 mt-1">Auto-filled from selected service</p>
+                      )}
+                    </div>
+                  )}
+                  {/* Only show Center after Customer is selected */}
+                  {(selectedCustomer || selectedService) && (
+                    <div>
+                      <label className="block text-sm text-gray-700 mb-1">Center</label>
+                      <select
+                        value={selectedCenter || ''}
+                        onChange={(e) => setSelectedCenter(e.target.value || null)}
+                        disabled={!!selectedService}
+                        className="w-full border rounded px-3 py-2 text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      >
+                        <option value="">Select center</option>
+                        {filteredCenters.map((c) => (
+                          <option key={c.id} value={c.id}>{`${c.id}${c.name ? ` - ${c.name}` : ''}`}</option>
+                        ))}
+                      </select>
+                      {selectedService && (
+                        <p className="text-xs text-gray-500 mt-1">Auto-filled from selected service</p>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Contractor: Customer → Center (Progressive Disclosure) */}
+              {role === 'contractor' && (
+                <>
+                  <div className="mb-2">
+                    <label className="block text-sm text-gray-700 mb-1">Customer</label>
+                    <select
+                      value={selectedCustomer || ''}
+                      onChange={(e) => {
+                        const v = e.target.value || null;
+                        setSelectedCustomer(v);
+                        setSelectedCenter(null);
+                      }}
+                      disabled={!!selectedService}
+                      className="w-full border rounded px-3 py-2 text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    >
+                      <option value="">Select customer</option>
+                      {customers.map((c) => (
+                        <option key={c.id} value={c.id}>{`${c.id}${c.name ? ` - ${c.name}` : ''}`}</option>
+                      ))}
+                    </select>
+                    {selectedService && (
+                      <p className="text-xs text-gray-500 mt-1">Auto-filled from selected service</p>
+                    )}
+                  </div>
+                  {/* Only show Center after Customer is selected */}
+                  {(selectedCustomer || selectedService) && (
+                    <div>
+                      <label className="block text-sm text-gray-700 mb-1">Center</label>
+                      <select
+                        value={selectedCenter || ''}
+                        onChange={(e) => setSelectedCenter(e.target.value || null)}
+                        disabled={!!selectedService}
+                        className="w-full border rounded px-3 py-2 text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      >
+                        <option value="">Select center</option>
+                        {filteredCenters.map((c) => (
+                          <option key={c.id} value={c.id}>{`${c.id}${c.name ? ` - ${c.name}` : ''}`}</option>
+                        ))}
+                      </select>
+                      {selectedService && (
+                        <p className="text-xs text-gray-500 mt-1">Auto-filled from selected service</p>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Customer/Crew: Just Center */}
+              {(role === 'customer' || role === 'crew') && (
+                <div>
+                  <label className="block text-sm text-gray-700 mb-1">Center</label>
                   <select
-                    value={selectedCustomer || ''}
-                    onChange={(e) => {
-                      const v = e.target.value || null;
-                      setSelectedCustomer(v);
-                      setSelectedCenter(null);
-                    }}
-                    className="w-full border rounded px-3 py-2 text-sm"
+                    value={selectedCenter || ''}
+                    onChange={(e) => setSelectedCenter(e.target.value || null)}
+                    disabled={!!selectedService}
+                    className="w-full border rounded px-3 py-2 text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
                   >
-                    <option value="">Select customer</option>
-                    {customers.map((c) => (
+                    <option value="">Select center</option>
+                    {centers.map((c) => (
                       <option key={c.id} value={c.id}>{`${c.id}${c.name ? ` - ${c.name}` : ''}`}</option>
                     ))}
                   </select>
+                  {selectedService && (
+                    <p className="text-xs text-gray-500 mt-1">Auto-filled from selected service</p>
+                  )}
                 </div>
               )}
-              <div>
-                <label className="block text-sm text-gray-700 mb-1">Center</label>
-                <select
-                  value={selectedCenter || ''}
-                  onChange={(e) => setSelectedCenter(e.target.value || null)}
-                  className="w-full border rounded px-3 py-2 text-sm"
-                >
-                  <option value="">Select center</option>
-                  {filteredCenters.map((c) => (
-                    <option key={c.id} value={c.id}>{`${c.id}${c.name ? ` - ${c.name}` : ''}`}</option>
-                  ))}
-                </select>
-              </div>
             </div>
           )}
 
@@ -478,7 +656,7 @@ function CartPanel({
                 }
                 destination = { code: chosen, role: 'center' };
               }
-              onCheckout(availability, notes, destination);
+              onCheckout(availability, notes, destination, selectedService);
             }}
             className="w-full bg-black text-white py-2 rounded-md hover:bg-neutral-800"
           >
@@ -493,25 +671,78 @@ function CartPanel({
 const PAGE_SIZE = 24;
 
 export default function CKSCatalog() {
-  const [kind, setKind] = useState<CatalogKind>("products");
+  const navigate = useNavigate();
+  const cart = useCart();
+  const { getToken } = useClerkAuth();
+  const { user } = useUser();
+  const { role: authRole, code: authCode} = useCksAuth();
+  const normalizedCode = useMemo(() => (authCode ? authCode.trim().toUpperCase() : null), [authCode]);
+  const { data: scope } = useHubRoleScope(normalizedCode || undefined);
+
+  // Read mode from URL params: ?mode=products or ?mode=services
+  const [searchParams] = useState(() => new URLSearchParams(window.location.search));
+  const catalogMode = useMemo(() => {
+    const mode = searchParams.get('mode');
+    if (mode === 'products' || mode === 'services') return mode;
+    return null; // null = full catalog (both tabs visible)
+  }, [searchParams]);
+
+  const [kind, setKind] = useState<CatalogKind>(catalogMode === 'services' ? 'services' : 'products');
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [showCart, setShowCart] = useState(false);
   const [selectedService, setSelectedService] = useState<CatalogItem | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const navigate = useNavigate();
-  const cart = useCart();
-  const { getToken } = useClerkAuth();
-  const { user } = useUser();
-  const { role: authRole, code: authCode } = useCksAuth();
-  const normalizedCode = useMemo(() => (authCode ? authCode.trim().toUpperCase() : null), [authCode]);
-  const { data: scope } = useHubRoleScope(normalizedCode || undefined);
+  const [managerServices, setManagerServices] = useState<ServiceOption[]>([]);
 
   useEffect(() => {
     const handle = setTimeout(() => setDebouncedQuery(query), 250);
     return () => clearTimeout(handle);
   }, [query]);
+
+  // Fetch active services for managers/contractors when cart is opened
+  useEffect(() => {
+    if (!showCart || !authRole || !normalizedCode) return;
+    const r = authRole.toLowerCase();
+    if (r !== 'manager' && r !== 'contractor') return;
+
+    // Fetch orders and derive active services
+    (async () => {
+      try {
+        const { fetchHubOrders } = await import('../shared/api/hub');
+        const ordersData = await fetchHubOrders(normalizedCode);
+        const serviceOrders = ordersData.serviceOrders || [];
+
+        // Extract active services from transformed orders
+        const activeServices = serviceOrders
+          .filter((order) => {
+            const serviceId = (order as any).serviceId || (order as any).transformedId;
+            if (!serviceId) return false;
+            const meta = (order as any).metadata || {};
+            const svcStatus = (meta.serviceStatus || '').toLowerCase();
+            return svcStatus === 'created' || svcStatus === 'in_progress' || svcStatus === 'in-progress';
+          })
+          .map((order) => {
+            const serviceId = (order as any).serviceId || (order as any).transformedId;
+            const meta = (order as any).metadata || {};
+            const centerId = order.centerId || order.destination || null;
+
+            return {
+              id: serviceId,
+              name: order.title || null,
+              centerId: centerId,
+              centerName: meta.centerName || null,
+              customerId: meta.customerId || order.customerId || null,
+              contractorId: meta.contractorId || null,
+            };
+          });
+
+        setManagerServices(activeServices);
+      } catch (err) {
+        console.error('Failed to fetch services for manager/contractor', err);
+      }
+    })();
+  }, [showCart, authRole, normalizedCode]);
 
   const params = useMemo(
     () => ({
@@ -579,7 +810,8 @@ export default function CKSCatalog() {
   const handleCheckout = async (
     availability?: { tz: string; days: string[]; window: { start: string; end: string } },
     notesInput?: string | null,
-    destination?: { code: string; role: 'center' }
+    destination?: { code: string; role: 'center' },
+    serviceId?: string | null
   ) => {
     if (cart.items.length === 0 || isSubmitting) return;
 
@@ -590,7 +822,7 @@ export default function CKSCatalog() {
         title: `Product Order - ${cart.items.length} items`,
         notes: (notesInput && notesInput.trim().length > 0) ? notesInput.trim() : undefined,
         destination: destination ? { code: destination.code, role: destination.role } : undefined,
-        metadata: availability ? { availability } : undefined,
+        metadata: availability ? { availability, ...(serviceId ? { serviceId } : {}) } : (serviceId ? { serviceId } : undefined),
         items: cart.items.map(item => ({
           catalogCode: item.catalogCode,
           quantity: item.quantity,
@@ -652,12 +884,23 @@ export default function CKSCatalog() {
           </div>
           <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
             <div className="flex items-center gap-2">
-              <TabButton active={kind === "products"} onClick={() => setKind("products")}>
-                Products
-              </TabButton>
-              <TabButton active={kind === "services"} onClick={() => setKind("services")}>
-                Services
-              </TabButton>
+              {/* Only show tabs if not in filtered mode */}
+              {!catalogMode && (
+                <>
+                  <TabButton active={kind === "products"} onClick={() => setKind("products")}>
+                    Products
+                  </TabButton>
+                  <TabButton active={kind === "services"} onClick={() => setKind("services")}>
+                    Services
+                  </TabButton>
+                </>
+              )}
+              {/* Show current view label when in filtered mode */}
+              {catalogMode && (
+                <div className="px-4 py-2 text-sm font-semibold text-gray-900">
+                  {catalogMode === 'products' ? 'Products' : 'Services'}
+                </div>
+              )}
               {kind === "products" && cartItemCount > 0 && (
                 <button
                   onClick={() => setShowCart(true)}
@@ -724,11 +967,25 @@ export default function CKSCatalog() {
           customers={(() => {
             const r = (authRole || '').toLowerCase();
             if (r === 'contractor' || r === 'manager') {
-              return ((scope as any)?.relationships?.customers || []).map((c: any) => ({ id: c.id, name: c.name || c.id }));
+              return ((scope as any)?.relationships?.customers || []).map((c: any) => ({
+                id: c.id,
+                name: c.name || c.id,
+                contractorId: c.contractorId || null
+              }));
             }
             if (r === 'customer') {
               const customer = (scope as any)?.relationships?.customer;
               return customer ? [{ id: customer.id, name: customer.name || customer.id }] : [];
+            }
+            return [];
+          })()}
+          contractors={(() => {
+            const r = (authRole || '').toLowerCase();
+            if (r === 'manager') {
+              return ((scope as any)?.relationships?.contractors || []).map((c: any) => ({
+                id: c.id,
+                name: c.name || c.id
+              }));
             }
             return [];
           })()}
@@ -750,6 +1007,40 @@ export default function CKSCatalog() {
               const center = (scope as any)?.relationships?.center;
               return center ? [{ id: center.id, name: center.name || center.id }] : [];
             }
+            return [];
+          })()}
+          services={(() => {
+            const r = (authRole || '').toLowerCase();
+            const relationships = (scope as any)?.relationships || {};
+
+            // For manager/contractor, use fetched services from orders
+            if (r === 'manager' || r === 'contractor') {
+              return managerServices;
+            }
+
+            // For customer/center/crew, use services from scope
+            if (r === 'customer' || r === 'center' || r === 'crew') {
+              const servicesList = relationships.services || [];
+              // Filter to active services only (not completed/archived)
+              return servicesList
+                .filter((s: any) => {
+                  const status = (s.status || '').toLowerCase();
+                  return status !== 'completed' && status !== 'archived' && status !== 'cancelled';
+                })
+                .map((s: any) => {
+                  // Extract metadata for auto-fill
+                  const metadata = s.metadata || {};
+                  return {
+                    id: s.id,
+                    name: s.name || null,
+                    centerId: metadata.centerId || null,
+                    centerName: metadata.centerName || null,
+                    customerId: metadata.customerId || null,
+                    contractorId: metadata.contractorId || null,
+                  };
+                });
+            }
+
             return [];
           })()}
         />
