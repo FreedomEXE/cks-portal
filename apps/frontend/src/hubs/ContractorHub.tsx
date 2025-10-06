@@ -474,7 +474,7 @@ export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHu
         type: serviceType,
         status: serviceStatus,
         managedBy: managedBy,
-        startDate: actualStartDate ? formatDisplayDate(actualStartDate) : '—',
+        startDate: svcStatus === 'created' ? 'Pending' : (actualStartDate ? formatDisplayDate(actualStartDate) : '—'),
         endDate: formatDisplayDate(order.expectedDate ?? order.completionDate),
       };
 

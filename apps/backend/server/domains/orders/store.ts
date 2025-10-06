@@ -2076,6 +2076,30 @@ export async function applyOrderAction(input: OrderActionInput): Promise<HubOrde
       const serviceType = (serviceMetadata as any).serviceType || 'one-time';
       const serviceName = row.title || transformedId;
 
+      // Store manager info in metadata when service is created
+      if (input.actorRole === 'manager' && input.actorCode) {
+        // Get manager name from managers table
+        const managerResult = await query<{ name: string }>(
+          `SELECT name FROM managers WHERE manager_id = $1 LIMIT 1`,
+          [input.actorCode]
+        );
+        const managerName = managerResult.rows[0]?.name || null;
+
+        // Update metadata with manager info and initial service status
+        const updatedMetadata = {
+          ...(metadataUpdate || row.metadata || {}),
+          managerId: input.actorCode,
+          managerName: managerName,
+          serviceStatus: 'created', // Initial status when service is created
+        };
+
+        // Update the order metadata with manager info
+        await query(
+          `UPDATE orders SET metadata = $1::jsonb, updated_at = NOW() WHERE order_id = $2`,
+          [JSON.stringify(updatedMetadata), input.orderId]
+        );
+      }
+
       await query(
         `INSERT INTO services (
           service_id,

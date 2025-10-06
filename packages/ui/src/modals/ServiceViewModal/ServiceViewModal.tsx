@@ -42,6 +42,14 @@ const ServiceViewModal: React.FC<ServiceViewModalProps> = ({
     });
   };
 
+  const getStartDateDisplay = () => {
+    const normalizedStatus = (service.serviceStatus || '').toLowerCase().replace(/\s+/g, '_');
+    if (normalizedStatus === 'created') {
+      return 'Pending';
+    }
+    return formatDate(service.startDate);
+  };
+
   return (
     <>
       <div className={styles.overlay} onClick={onClose} />
@@ -90,7 +98,7 @@ const ServiceViewModal: React.FC<ServiceViewModalProps> = ({
               </div>
               <div className={styles.field}>
                 <label className={styles.label}>Start Date</label>
-                <div className={styles.value}>{formatDate(service.startDate)}</div>
+                <div className={styles.value}>{getStartDateDisplay()}</div>
               </div>
             </div>
           </section>

@@ -721,6 +721,8 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
             }
           };
 
+          const svcStatus = (meta?.serviceStatus || '').toLowerCase().replace(/\s+/g, '_');
+          const actualStartDate = meta.actualStartDate || meta.serviceStartDate;
           return {
             serviceId: rawServiceId,
             serviceName: service?.name ?? order.title ?? rawServiceId,
@@ -728,7 +730,7 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
             type: meta.serviceType === 'ongoing' ? 'Ongoing' : 'One-Time',
             // Prefer live service status from metadata if present, fallback to order status
             status: formatStatusLabel((meta && meta.serviceStatus) || order.status),
-            startDate: formatDate(order.orderDate ?? order.requestedDate),
+            startDate: svcStatus === 'created' ? 'Pending' : (actualStartDate ? formatDate(actualStartDate) : formatDate(order.orderDate ?? order.requestedDate)),
             metadata: meta,
             onStart,
             onComplete,
@@ -823,10 +825,14 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
         const centerId = normalizeId(order.centerId ?? order.destination);
         const status = normalizeOrderStatus(order.viewerStatus ?? order.status);
         const actualStatus = order.status;
-        const requestedByLabel = customerId
-          ? customerNameMap.get(customerId) ?? order.customerId ?? order.requestedBy ?? 'Customer'
-          : order.customerId ?? order.requestedBy ?? 'Customer';
-        const destinationLabel = centerId ? centerNameMap.get(centerId) ?? centerId : undefined;
+        const customerName = customerId ? customerNameMap.get(customerId) : null;
+        const requestedByLabel = customerId && customerName
+          ? `${customerId} - ${customerName}`
+          : customerId || order.customerId || order.requestedBy || 'Customer';
+        const centerName = centerId ? centerNameMap.get(centerId) : null;
+        const destinationLabel = centerId && centerName
+          ? `${centerId} - ${centerName}`
+          : centerId || order.destination;
         const requestedDate = order.requestedDate ?? order.orderDate ?? null;
         const expectedDate = order.expectedDate ?? order.completionDate ?? null;
         const deliveryDate = status === 'delivered' ? order.deliveryDate ?? expectedDate : undefined;
@@ -859,7 +865,15 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
         const status = normalizeOrderStatus(order.viewerStatus ?? order.status);
         const actualStatus = order.status;
 
-        // Backend now formats requestedBy and destination as "ID - Name"
+        const customerName = customerId ? customerNameMap.get(customerId) : null;
+        const requestedByLabel = customerId && customerName
+          ? `${customerId} - ${customerName}`
+          : customerId || order.customerId || order.requestedBy || 'Unknown';
+        const centerName = centerId ? centerNameMap.get(centerId) : null;
+        const destinationLabel = centerId && centerName
+          ? `${centerId} - ${centerName}`
+          : centerId || order.destination;
+
         const requestedDate = order.requestedDate ?? order.orderDate ?? null;
         const expectedDate = order.expectedDate ?? order.completionDate ?? null;
         const deliveryDate = status === 'delivered' ? order.deliveryDate ?? expectedDate : undefined;
@@ -867,8 +881,8 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
           orderId: canonicalOrderId,
           orderType: 'product',
           title: order.title ?? order.notes ?? `Product Order ${canonicalOrderId}`,
-          requestedBy: order.requestedBy || 'Unknown',
-          destination: order.destination || undefined,
+          requestedBy: requestedByLabel,
+          destination: destinationLabel,
           requestedDate: formatDate(requestedDate),
           expectedDate: formatDate(expectedDate),
           deliveryDate: deliveryDate ? formatDate(deliveryDate) : undefined,
@@ -878,7 +892,7 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
           availableActions: (order as any).availableActions || [],
         };
       }),
-    [managerProductOrders],
+    [centerNameMap, customerNameMap, managerProductOrders],
   );
   const ecosystemTree = useMemo(() => {
     if (managerScope) {

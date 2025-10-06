@@ -225,12 +225,39 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
     if (!orders?.serviceOrders) {
       return [];
     }
-    return orders.serviceOrders.map((order) => ({
-      ...order,
-      title: order.title ?? order.serviceId ?? order.orderId,
-      status: normalizeOrderStatus(order.viewerStatus ?? order.status),
-    }));
-  }, [orders]);
+    return orders.serviceOrders.map((order) => {
+      // Check if this service has a pending crew request for this crew member
+      const meta: any = (order as any).metadata || {};
+      const crewReqs: any[] = Array.isArray(meta.crewRequests) ? meta.crewRequests : [];
+      const pendingForMe = !!normalizedCode && crewReqs.some(r =>
+        (r.crewCode || '').toUpperCase() === normalizedCode && r.status === 'pending'
+      );
+
+      // If there's a pending crew request, add approval workflow stages and override status
+      let approvalStages = (order as any).approvalStages || [];
+      let orderStatus = normalizeOrderStatus(order.viewerStatus ?? order.status);
+      let availableActions = (order as any).availableActions || [];
+
+      if (pendingForMe) {
+        approvalStages = [
+          { role: 'manager', status: 'approved', label: 'Manager Created' },
+          { role: 'crew', status: 'pending', label: 'Crew Pending' }
+        ];
+        // Override status to 'crew-requested' so it appears in active tabs, not archive
+        orderStatus = 'crew-requested';
+        // Add Accept/Reject actions for crew response
+        availableActions = ['Accept', 'Reject', 'View Details'];
+      }
+
+      return {
+        ...order,
+        title: order.title ?? order.serviceId ?? order.orderId,
+        status: orderStatus,
+        approvalStages,
+        availableActions,
+      };
+    });
+  }, [orders, normalizedCode]);
 
   const productOrders = useMemo<HubOrderItem[]>(() => {
     if (!orders?.productOrders) {
@@ -299,35 +326,23 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
       const normalizedStatus = normalizeStatusValue(order.status);
       const meta: any = (order as any).metadata || {};
       const svcStatus = normalizeStatusValue(meta?.serviceStatus as string | null);
+      const actualStartDate = meta.actualStartDate || meta.serviceStartDate;
       const base: any = {
         serviceId: order.serviceId ?? order.orderId,
         serviceName: order.title ?? order.serviceId ?? order.orderId,
         type: order.orderType === 'service' ? 'Service' : 'Product',
         status: svcStatus ? formatStatusLabel(svcStatus) : formatStatusLabel(order.status),
-        startDate: formatDisplayDate(order.requestedDate),
+        startDate: svcStatus === 'created' ? 'Pending' : (actualStartDate ? formatDisplayDate(actualStartDate) : formatDisplayDate(order.requestedDate)),
         endDate: formatDisplayDate(order.expectedDate),
       };
 
       const m = (order as any).metadata || {};
       const crewReqs: any[] = Array.isArray(m.crewRequests) ? m.crewRequests : [];
       const pendingForMe = !!normalizedCode && crewReqs.some(r => (r.crewCode || '').toUpperCase() === normalizedCode && r.status === 'pending');
-      const svcId = (order as any).serviceId || (order as any).transformedId;
-      if (pendingForMe && svcId) {
-        base.canRespond = true;
-        base.onAccept = async () => {
-          const { apiFetch } = await import('../shared/api/client');
-          await apiFetch(`/services/${encodeURIComponent(svcId)}/crew-response`, {
-            method: 'POST',
-            body: JSON.stringify({ accept: true }),
-          });
-        };
-        base.onReject = async () => {
-          const { apiFetch } = await import('../shared/api/client');
-          await apiFetch(`/services/${encodeURIComponent(svcId)}/crew-response`, {
-            method: 'POST',
-            body: JSON.stringify({ accept: false }),
-          });
-        };
+
+      // If there's a pending crew request for this crew, it should appear in Service Orders tab, not here
+      if (pendingForMe) {
+        return; // Skip this service in Active Services
       }
 
       // Completed/cancelled services go to history for crew too

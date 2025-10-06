@@ -296,7 +296,7 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
         type: serviceType,
         status: serviceStatus,
         managedBy: managedBy,
-        startDate: actualStartDate ? formatDisplayDate(actualStartDate) : '—',
+        startDate: svcStatus === 'created' ? 'Pending' : (actualStartDate ? formatDisplayDate(actualStartDate) : '—'),
         endDate: formatDisplayDate(order.expectedDate),
       };
 

@@ -301,7 +301,7 @@ export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubPro
         type: serviceType,
         status: serviceStatus,
         managedBy: managedBy,
-        startDate: actualStartDate ? formatDisplayDate(actualStartDate) : '—',
+        startDate: svcStatus === 'created' ? 'Pending' : (actualStartDate ? formatDisplayDate(actualStartDate) : '—'),
         endDate: formatDisplayDate(order.expectedDate),
       };
 
