@@ -32,6 +32,7 @@ export async function applyServiceAction(input: {
 
   if (input.action === 'start') {
     (meta as any).serviceStartedAt = nowIso;
+    (meta as any).actualStartDate = nowIso; // For frontend display
     (meta as any).serviceStartNotes = input.notes || (meta as any).serviceStartNotes || null;
     (meta as any).serviceStartedBy = input.actorCode || null;
     (meta as any).serviceStatus = 'in_progress';

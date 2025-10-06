@@ -169,9 +169,30 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
   const [servicesSearchQuery, setServicesSearchQuery] = useState('');
   const [selectedOrderForDetails, setSelectedOrderForDetails] = useState<HubOrderItem | null>(null);
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
+  const [fetchedServiceDetails, setFetchedServiceDetails] = useState<any>(null);
 
   const { code: authCode } = useAuth();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
+
+  // Fetch fresh service details when modal is opened
+  useEffect(() => {
+    if (!selectedServiceId) {
+      setFetchedServiceDetails(null);
+      return;
+    }
+
+    (async () => {
+      try {
+        const { apiFetch } = await import('../shared/api/client');
+        const res = await apiFetch(`/services/${encodeURIComponent(selectedServiceId)}`);
+        if (res && res.data) {
+          setFetchedServiceDetails(res.data);
+        }
+      } catch (err) {
+        console.error('[center] failed to load service details', err);
+      }
+    })();
+  }, [selectedServiceId]);
 
   const {
     data: profile,
@@ -766,27 +787,43 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
 
       {/* Service View Modal */}
       {(() => {
-        const selectedOrder = orders?.orders?.find((o: any) =>
-          (o.serviceId === selectedServiceId || o.transformedId === selectedServiceId || o.orderId === selectedServiceId)
-        );
+        if (!selectedServiceId || !fetchedServiceDetails) return null;
 
-        if (!selectedOrder || !selectedServiceId) return null;
+        // Get product orders for this service
+        const serviceProductOrders = (orders?.orders || [])
+          .filter((order: any) => {
+            if (order.orderType !== 'product') return false;
+            const orderMeta = order.metadata || {};
+            return orderMeta.serviceId === selectedServiceId;
+          })
+          .map((order: any) => {
+            const items = order.items || [];
+            const productName = items.length > 0 ? items.map((i: any) => i.name).join(', ') : 'Product Order';
+            const totalQty = items.reduce((sum: number, i: any) => sum + (i.quantity || 0), 0);
+            return {
+              orderId: order.orderId,
+              productName,
+              quantity: totalQty,
+              status: order.status || 'pending',
+            };
+          });
 
-        const metadata = (selectedOrder as any)?.metadata || {};
+        const metadata = fetchedServiceDetails.metadata || {};
         const serviceData = {
-          serviceId: selectedServiceId,
-          serviceName: selectedOrder.title || selectedServiceId,
+          serviceId: fetchedServiceDetails.serviceId,
+          serviceName: fetchedServiceDetails.title || fetchedServiceDetails.serviceId,
           serviceType: metadata.serviceType === 'recurring' ? 'recurring' as const : 'one-time' as const,
-          serviceStatus: metadata.serviceStatus || selectedOrder.status || 'Active',
-          centerId: selectedOrder.centerId || selectedOrder.destination || null,
+          serviceStatus: metadata.serviceStatus || fetchedServiceDetails.status || 'Active',
+          centerId: fetchedServiceDetails.centerId || null,
           centerName: metadata.centerName || null,
           managerId: metadata.managerId || null,
           managerName: metadata.managerName || null,
-          startDate: metadata.actualStartDate || metadata.serviceStartDate || selectedOrder.requestedDate || null,
+          startDate: metadata.actualStartDate || metadata.serviceStartDate || null,
           crew: metadata.crew || [],
           procedures: metadata.procedures || [],
           training: metadata.training || [],
-          notes: selectedOrder.notes || metadata.notes || null,
+          notes: fetchedServiceDetails.notes || metadata.notes || null,
+          products: serviceProductOrders,
         };
 
         return (
@@ -794,6 +831,7 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
             isOpen={!!selectedServiceId}
             onClose={() => setSelectedServiceId(null)}
             service={serviceData}
+            showProductsSection={true}
           />
         );
       })()}

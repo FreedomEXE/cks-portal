@@ -394,8 +394,23 @@ This separation ensures warehouse users have clear action contexts:
 
 ---
 
-*Last Updated: 2025-10-02*
-*Version: 2.2 - Warehouse delivery workflow*
+*Last Updated: 2025-10-06*
+*Version: 2.3 - Service-product linking and catalog UX improvements*
+
+## Progress Update (2025-10-06)
+
+- **Service-to-Product Order Linking**: Product orders can now be linked to services via `metadata.serviceId`
+- **Products Section in ServiceViewModal**: New section displays all product orders linked to a service
+- **Progressive Disclosure UX**: Cascading destination selectors in CKS Catalog now reveal one dropdown at a time based on selections
+  - Manager: Contractor → Customer (after contractor selected) → Center (after customer selected)
+  - Contractor: Customer → Center (after customer selected)
+  - Customer/Crew: Just Center (no cascading)
+- **Context-Aware Catalog Views**: Catalog supports URL parameter filtering
+  - `?mode=products`: Shows only Products tab (used by "Request Products" buttons)
+  - `?mode=services`: Shows only Services tab (future use)
+  - No parameter: Full catalog with both tabs (used by "Browse Catalog" buttons)
+- **Fresh Service Data Fetching**: Service modals now fetch from `/services/:serviceId` endpoint when opened (applied to CustomerHub, CrewHub, ContractorHub, CenterHub)
+- **Known Issues**: Crew assignments and start dates not displaying correctly in service view modals for non-manager users - investigation ongoing
 
 ## Progress Update (2025-10-02)
 

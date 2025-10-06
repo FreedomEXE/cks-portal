@@ -372,9 +372,44 @@ const isHistoryService = status === 'cancelled' || status === 'rejected';
 ---
 
 *Created: 2025-10-02*
-*Updated: 2025-10-03*
-*Status: ✅ E2E Flow Complete - Ready for Service Lifecycle Implementation*
-\n## Addendum (2025-10-05) — Service-Level Crew Management
+*Updated: 2025-10-06*
+*Status: ✅ E2E Flow Complete - Service Lifecycle Implementation In Progress*
+
+## Addendum (2025-10-06) — Service-to-Product Order Linking & UX Improvements
+
+### Service-to-Product Order Linking
+- Product orders can now be linked to services via `metadata.serviceId` field
+- ServiceViewModal now includes "Products" section showing all linked product orders
+- Products section displays: Order ID, product name, total quantity, status
+- "Request Products" button in ServiceViewModal (for managers) opens catalog in products-only mode
+- Implementation applied to: CustomerHub, CrewHub, ContractorHub, CenterHub
+
+### Fresh Service Data Fetching
+- Service modals now fetch fresh data from `/services/:serviceId` endpoint when opened
+- Replaces previous approach of using stale data from order list cache
+- Pattern: `useEffect` hook triggers API call based on `selectedServiceId` state
+- Ensures users always see current service data (crew, status, dates, etc.)
+
+### UX Improvements
+1. **Progressive Disclosure for Cascading Selectors**:
+   - Manager: Contractor → Customer (after selection) → Center (after selection)
+   - Contractor: Customer → Center (after selection)
+   - Customer/Crew: Just Center (no cascading)
+   - Cleaner UI with conditional rendering instead of disabled dropdowns
+
+2. **Context-Aware Catalog Views**:
+   - `?mode=products`: Products-only view (hides Services tab)
+   - `?mode=services`: Services-only view (hides Products tab)
+   - No parameter: Full catalog with both tabs
+   - "Request Products" buttons → products-only mode
+   - "Browse CKS Catalog" buttons → full catalog mode
+
+### Known Issues & Next Steps
+- **Current Blocker**: Crew assignments and start dates not displaying correctly in service view modals for non-manager users
+- **Investigation Needed**: Verify `/services/:serviceId` endpoint returns correct metadata structure
+- **Next Step**: Debug backend data flow to ensure `metadata.crew` and `metadata.actualStartDate` are populated correctly
+
+## Addendum (2025-10-05) — Service-Level Crew Management
 \n- Orders workflow remains unchanged: once a manager runs Create Service, the service order stays `service_created` (completed/transformed) and should not revert to pending/in-progress for post-creation staffing.
 - New service endpoints enable post‑creation staffing without touching order status:
   - `POST /api/services/:serviceId/crew-requests` (manager): append invites to `orders.metadata.crewRequests` and add invited crew as order participants so they can see the service.
