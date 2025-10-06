@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import Button from '../../buttons/Button';
+import { ModalRoot } from '../ModalRoot';
 
 export interface CrewMember {
   code: string;
@@ -25,17 +26,6 @@ export default function CrewSelectionModal({
   const [message, setMessage] = useState('');
 
   React.useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
-        onClose();
-      }
-    };
-
-    document.addEventListener('keydown', handleEscape);
-    return () => document.removeEventListener('keydown', handleEscape);
-  }, [isOpen, onClose]);
-
-  React.useEffect(() => {
     // Reset state when modal opens
     if (isOpen) {
       setSelectedCrewCodes([]);
@@ -44,12 +34,6 @@ export default function CrewSelectionModal({
   }, [isOpen]);
 
   if (!isOpen) return null;
-
-  const handleBackdropClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
-      onClose();
-    }
-  };
 
   const handleToggleCrew = (crewCode: string) => {
     setSelectedCrewCodes(prev => {
@@ -70,24 +54,7 @@ export default function CrewSelectionModal({
   };
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="crew-selection-modal-title"
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1000
-      }}
-      onClick={handleBackdropClick}
-    >
+    <ModalRoot isOpen={isOpen} onClose={onClose}>
       <div
         style={{
           backgroundColor: 'white',
@@ -99,7 +66,6 @@ export default function CrewSelectionModal({
           overflow: 'auto',
           boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)'
         }}
-        onClick={(e) => e.stopPropagation()}
       >
         <h3 id="crew-selection-modal-title" style={{
           marginTop: 0,
@@ -263,6 +229,6 @@ export default function CrewSelectionModal({
           </Button>
         </div>
       </div>
-    </div>
+    </ModalRoot>
   );
 }

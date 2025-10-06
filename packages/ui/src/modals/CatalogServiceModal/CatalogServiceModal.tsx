@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import Button from '../../buttons/Button';
+import { ModalRoot } from '../ModalRoot';
 
 export type RoleKey = 'manager' | 'contractor' | 'crew' | 'warehouse';
 type Entry = { code: string; name: string };
@@ -63,10 +64,6 @@ export default function CatalogServiceModal({ isOpen, onClose, service, onSave, 
 
   if (!isOpen || !service) return null;
 
-  const handleBackdropClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) onClose();
-  };
-
   const toggle = (group: 'cert' | 'vis', key: RoleKey) => {
     if (group === 'cert') setCert((prev) => ({ ...prev, [key]: !prev[key] }));
     else setVis((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -81,8 +78,8 @@ export default function CatalogServiceModal({ isOpen, onClose, service, onSave, 
   };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }} onClick={handleBackdropClick}>
-      <div style={{ backgroundColor: '#fff', borderRadius: 8, padding: 20, width: 640 }} onClick={(e) => e.stopPropagation()}>
+    <ModalRoot isOpen={isOpen} onClose={onClose}>
+      <div style={{ backgroundColor: '#fff', borderRadius: 8, padding: 20, width: 640 }}>
         <h3 style={{ marginTop: 0 }}>Service Catalog Entry</h3>
         <div style={{ color: '#475569', marginBottom: 12 }}>Service ID: <strong>{service.serviceId}</strong></div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
@@ -178,6 +175,6 @@ export default function CatalogServiceModal({ isOpen, onClose, service, onSave, 
           <Button variant="primary" onClick={handleSave}>Save</Button>
         </div>
       </div>
-    </div>
+    </ModalRoot>
   );
 }

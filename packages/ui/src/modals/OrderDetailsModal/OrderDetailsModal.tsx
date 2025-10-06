@@ -1,5 +1,6 @@
 import React from 'react';
 import styles from './OrderDetailsModal.module.css';
+import { ModalRoot } from '../ModalRoot';
 
 interface OrderLineItem {
   id: string;
@@ -23,6 +24,7 @@ interface OrderDetailsModalProps {
     notes: string | null;
     status?: string | null;
     items?: OrderLineItem[];
+    serviceId?: string | null;
   } | null;
   requestorInfo?: {
     name: string | null;
@@ -61,7 +63,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
   cancelledAt,
   rejectionReason,
 }) => {
-  if (!isOpen || !order) return null;
+  if (!order) return null;
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return '‚Äî';
@@ -84,10 +86,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
   };
 
   return (
-    <>
-      {/* Backdrop */}
-      <div className={styles.backdrop} onClick={onClose} />
-
+    <ModalRoot isOpen={isOpen} onClose={onClose}>
       {/* Modal */}
       <div className={styles.modal}>
         {/* Header */}
@@ -175,6 +174,30 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
             </div>
           </section>
 
+          {/* Related Service Section - only for product orders linked to a service */}
+          {order.orderType === 'product' && order.serviceId && (
+            <section className={styles.section}>
+              <h3 className={styles.sectionTitle}>Related Service</h3>
+              <div className={styles.grid}>
+                <div className={styles.field}>
+                  <label className={styles.label}>Service ID</label>
+                  <p className={styles.value} style={{ color: '#2563eb', fontWeight: 500 }}>{order.serviceId}</p>
+                </div>
+              </div>
+              <div style={{
+                marginTop: 12,
+                padding: '10px 12px',
+                background: '#eff6ff',
+                border: '1px solid #bfdbfe',
+                borderRadius: 6,
+                fontSize: 13,
+                color: '#1e40af',
+              }}>
+                ‚ÑπÔ∏è This product order was created for service <strong>{order.serviceId}</strong>
+              </div>
+            </section>
+          )}
+
           {/* Requestor Information Section */}
           {requestorInfo && (
             <section className={styles.section}>
@@ -182,7 +205,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
               <div className={styles.grid}>
                 <div className={styles.field}>
                   <label className={styles.label}>Name</label>
-                  <p className={styles.value}>{order.requestedBy && requestorInfo?.name ? (order.requestedBy + ' - ' + requestorInfo.name) : (order.requestedBy || requestorInfo?.name || 'ó')}</p>
+                  <p className={styles.value}>{order.requestedBy && requestorInfo?.name ? (order.requestedBy + ' - ' + requestorInfo.name) : (order.requestedBy || requestorInfo?.name || 'ÔøΩ')}</p>
                 </div>
                 <div className={styles.field}>
                   <label className={styles.label}>Address</label>
@@ -207,7 +230,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
               <div className={styles.grid}>
                 <div className={styles.field}>
                   <label className={styles.label}>Destination</label>
-                  <p className={styles.value}>{order.destination && destinationInfo?.name ? (order.destination + ' - ' + destinationInfo.name) : (order.destination || destinationInfo?.name || 'ó')}</p>
+                  <p className={styles.value}>{order.destination && destinationInfo?.name ? (order.destination + ' - ' + destinationInfo.name) : (order.destination || destinationInfo?.name || 'ÔøΩ')}</p>
                 </div>
                 <div className={styles.field}>
                   <label className={styles.label}>Address</label>
@@ -298,11 +321,13 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
           </button>
         </div>
       </div>
-    </>
+    </ModalRoot>
   );
 };
 
 export default OrderDetailsModal;
+
+
 
 
 

@@ -1,6 +1,7 @@
 import React from 'react';
 import Button from '../../buttons/Button/Button';
 import styles from './ServiceViewModal.module.css';
+import { ModalRoot } from '../ModalRoot';
 
 export interface ServiceViewData {
   serviceId: string;
@@ -34,7 +35,7 @@ const ServiceViewModal: React.FC<ServiceViewModalProps> = ({
   onRequestProducts,
   showProductsSection = false,
 }) => {
-  if (!isOpen || !service) return null;
+  if (!service) return null;
 
   const formatDate = (dateStr?: string | null) => {
     if (!dateStr) return '—';
@@ -56,8 +57,7 @@ const ServiceViewModal: React.FC<ServiceViewModalProps> = ({
   };
 
   return (
-    <>
-      <div className={styles.overlay} onClick={onClose} />
+    <ModalRoot isOpen={isOpen} onClose={onClose}>
       <div className={styles.modal}>
         <div className={styles.header}>
           <div>
@@ -239,7 +239,7 @@ const ServiceViewModal: React.FC<ServiceViewModalProps> = ({
           </Button>
         </div>
       </div>
-    </>
+    </ModalRoot>
   );
 };
 

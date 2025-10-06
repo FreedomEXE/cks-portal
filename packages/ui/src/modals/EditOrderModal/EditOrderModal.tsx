@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import styles from './EditOrderModal.module.css';
+import { ModalRoot } from '../ModalRoot';
 
 interface EditOrderModalProps {
   isOpen: boolean;
@@ -49,11 +50,7 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
   };
 
   return (
-    <>
-      {/* Backdrop */}
-      <div className={styles.backdrop} onClick={onClose} />
-
-      {/* Modal */}
+    <ModalRoot isOpen={isOpen} onClose={onClose}>
       <div className={styles.modal}>
         {/* Header */}
         <div className={styles.header}>
@@ -111,7 +108,7 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
           </div>
         </form>
       </div>
-    </>
+    </ModalRoot>
   );
 };
 

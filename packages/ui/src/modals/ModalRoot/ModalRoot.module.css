@@ -1,0 +1,119 @@
+.root {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000; /* behind grid and content */
+  background: rgba(0, 0, 0, 0.48);
+  opacity: 1;
+  transition: opacity var(--cks-modal-duration, 220ms) var(--cks-modal-ease, cubic-bezier(0.2, 0, 0, 1));
+}
+
+@supports ((-webkit-backdrop-filter: blur(4px)) or (backdrop-filter: blur(4px))) {
+  .overlay {
+    background: rgba(17, 24, 39, 0.40);
+    -webkit-backdrop-filter: blur(6px) saturate(1.1);
+    backdrop-filter: blur(6px) saturate(1.1);
+  }
+}
+
+.overlay[data-state='entering'] { opacity: 0; }
+.overlay[data-state='entered'] { opacity: 1; }
+.overlay[data-state='exiting'] { opacity: 0; }
+
+.grid {
+  position: fixed;
+  inset: 0;
+  z-index: 1001; /* above overlay, below content */
+  pointer-events: none;
+  opacity: 1;
+  transition: opacity var(--cks-modal-duration, 220ms) var(--cks-modal-ease, cubic-bezier(0.2, 0, 0, 1));
+}
+
+.grid[data-state='entering'] { opacity: 0; }
+.grid[data-state='entered'] { opacity: 1; }
+.grid[data-state='exiting'] { opacity: 0; }
+
+.gridLayer {
+  position: absolute;
+  inset: 0;
+  will-change: transform, opacity;
+}
+
+/* Tile/grid parameters */
+.gridLayer {
+  --tile: 12px;
+  --color-a: rgba(255, 255, 255, 0.040);
+  --color-b: rgba(255, 255, 255, 0.025);
+}
+
+/* Layer A: base grid */
+.layerA {
+  background-image:
+    repeating-linear-gradient(0deg, var(--color-a) 0 1px, transparent 1px var(--tile)),
+    repeating-linear-gradient(90deg, var(--color-a) 0 1px, transparent 1px var(--tile));
+  background-size: var(--tile) var(--tile), var(--tile) var(--tile);
+  animation:
+    driftA 36s linear infinite,
+    jitter 800ms steps(6) infinite alternate;
+}
+
+/* Layer B: half-tile offset, lighter */
+.layerB {
+  background-image:
+    repeating-linear-gradient(0deg, var(--color-b) 0 1px, transparent 1px var(--tile)),
+    repeating-linear-gradient(90deg, var(--color-b) 0 1px, transparent 1px var(--tile));
+  background-size: var(--tile) var(--tile), var(--tile) var(--tile);
+  background-position: calc(var(--tile) / 2) calc(var(--tile) / 2), calc(var(--tile) / 2) calc(var(--tile) / 2);
+  animation:
+    driftB 36s linear infinite,
+    jitter 700ms steps(5) infinite alternate;
+}
+
+@keyframes driftA {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(-40px, -40px, 0); }
+}
+
+@keyframes driftB {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(40px, 40px, 0); }
+}
+
+@keyframes jitter {
+  from { opacity: 1; }
+  to { opacity: 0.98; }
+}
+
+.content {
+  position: fixed;
+  inset: 0;
+  z-index: 1002; /* above overlay and grid */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 1;
+  transition: opacity var(--cks-modal-duration, 220ms) var(--cks-modal-ease, cubic-bezier(0.2, 0, 0, 1));
+  pointer-events: none; /* allow inner box to capture events */
+}
+
+.content[data-state='entering'] { opacity: 0; }
+.content[data-state='entered'] { opacity: 1; }
+.content[data-state='exiting'] { opacity: 0; }
+
+.box {
+  pointer-events: auto; /* actual modal content area */
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overlay, .grid, .content {
+    transition: none;
+  }
+  .layerA, .layerB {
+    animation: none;
+  }
+}

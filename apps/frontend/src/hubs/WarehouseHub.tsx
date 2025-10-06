@@ -1076,6 +1076,7 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
               requestedDate: selectedOrderForDetails.requestedDate || null,
               notes: selectedOrderForDetails.notes || null,
               status: (selectedOrderForDetails as any).status || null,
+              serviceId: ((selectedOrderForDetails as any)?.metadata?.serviceId) || null,
             }
           : null;
 

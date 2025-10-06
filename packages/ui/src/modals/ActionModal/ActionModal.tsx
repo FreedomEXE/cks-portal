@@ -1,5 +1,6 @@
 import React from 'react';
 import Button from '../../buttons/Button';
+import { ModalRoot } from '../ModalRoot';
 
 interface Entity {
   name?: string;
@@ -42,24 +43,7 @@ export default function ActionModal({
   onPauseAccount,
   onDeleteAccount
 }: ActionModalProps) {
-  React.useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
-        onClose();
-      }
-    };
-
-    document.addEventListener('keydown', handleEscape);
-    return () => document.removeEventListener('keydown', handleEscape);
-  }, [isOpen, onClose]);
-
-  if (!isOpen || !entity) return null;
-
-  const handleBackdropClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
-      onClose();
-    }
-  };
+  if (!entity) return null;
 
   const entityName = entity.name || entity.companyName || entity.fullName ||
                      entity.code || entity.orderId || entity.product_name ||
@@ -90,23 +74,7 @@ export default function ActionModal({
   ];
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="action-modal-title"
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1000
-      }}
-      onClick={handleBackdropClick}    >
+    <ModalRoot isOpen={isOpen} onClose={onClose}>
       <div
         style={{
           backgroundColor: 'white',
@@ -116,7 +84,6 @@ export default function ActionModal({
           maxWidth: '400px',
           boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)'
         }}
-        onClick={(e) => e.stopPropagation()}
       >
         <h3 id="action-modal-title" style={{
           marginTop: 0,
@@ -155,6 +122,6 @@ export default function ActionModal({
           </Button>
         </div>
       </div>
-    </div>
+    </ModalRoot>
   );
 }

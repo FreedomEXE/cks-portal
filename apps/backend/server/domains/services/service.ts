@@ -108,18 +108,60 @@ export async function applyServiceAction(input: {
 export async function getServiceById(serviceIdRaw: string) {
   const serviceId = (serviceIdRaw || '').trim().toUpperCase();
   if (!serviceId) return null;
-  const result = await query<{ order_id: string; transformed_id: string | null; metadata: any; center_id: string | null; title: string | null }>(
-    `SELECT order_id, transformed_id, metadata, center_id, title FROM orders WHERE transformed_id = $1 LIMIT 1`,
+  const result = await query<{
+    order_id: string;
+    transformed_id: string | null;
+    metadata: any;
+    center_id: string | null;
+    title: string | null;
+    notes: string | null;
+    status: string | null;
+  }>(
+    `SELECT order_id, transformed_id, metadata, center_id, title, notes, status FROM orders WHERE transformed_id = $1 LIMIT 1`,
     [serviceId]
   );
   const row = result.rows[0];
   if (!row) return null;
+
+  // Enrich metadata with crew names
+  const metadata = row.metadata || {};
+  let crewCodes: string[] = Array.isArray((metadata as any).crew) ? (metadata as any).crew : [];
+
+  // If no crew array but there are accepted crewRequests, build crew array from those
+  if (crewCodes.length === 0 && Array.isArray((metadata as any).crewRequests)) {
+    const acceptedCrews = (metadata as any).crewRequests
+      .filter((req: any) => req.status === 'accepted' && req.crewCode)
+      .map((req: any) => req.crewCode);
+    crewCodes = acceptedCrews;
+  }
+
+  if (crewCodes.length > 0) {
+    // Fetch crew names from database
+    const crewResult = await query<{ crew_id: string; name: string }>(
+      `SELECT crew_id, name FROM crew WHERE crew_id = ANY($1::text[]) AND archived_at IS NULL`,
+      [crewCodes]
+    );
+
+    // Build crew array with code and name
+    const enrichedCrew = crewCodes.map(code => {
+      const crewRow = crewResult.rows.find(r => r.crew_id === code);
+      return {
+        code: code,
+        name: crewRow?.name || code
+      };
+    });
+
+    (metadata as any).crew = enrichedCrew;
+  }
+
   return {
     orderId: row.order_id,
     serviceId: row.transformed_id,
     centerId: row.center_id,
     title: row.title,
-    metadata: row.metadata || {},
+    notes: row.notes,
+    status: row.status,
+    metadata,
   };
 }
 
@@ -256,6 +298,15 @@ export async function respondToServiceCrewRequest(input: {
   }
 
   const updatedMetadata = { ...currentMetadata, crewRequests: updated } as Record<string, unknown>;
+
+  // If accepting, add crew code to metadata.crew array for display
+  if (input.accept) {
+    const currentCrew: string[] = Array.isArray((updatedMetadata as any).crew) ? (updatedMetadata as any).crew : [];
+    if (!currentCrew.includes(code)) {
+      (updatedMetadata as any).crew = [...currentCrew, code];
+    }
+  }
+
   await query(
     `UPDATE orders SET metadata = $1::jsonb, updated_at = NOW() WHERE order_id = $2`,
     [JSON.stringify(updatedMetadata), orderId]

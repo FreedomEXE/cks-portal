@@ -1,5 +1,6 @@
 import React from 'react';
 import styles from './ServiceOrderModal.module.css';
+import { ModalRoot } from '../ModalRoot';
 
 export interface ServiceOrderModalProps {
   isOpen: boolean;
@@ -87,8 +88,7 @@ const ServiceOrderModal: React.FC<ServiceOrderModalProps> = ({
   const statusColors = getStatusColor(order.status);
 
   return (
-    <>
-      <div className={styles.backdrop} onClick={onClose} />
+    <ModalRoot isOpen={isOpen} onClose={onClose}>
       <div className={styles.modal}>
         {/* Header */}
         <div className={styles.header}>
@@ -245,7 +245,7 @@ const ServiceOrderModal: React.FC<ServiceOrderModalProps> = ({
           </button>
         </div>
       </div>
-    </>
+    </ModalRoot>
   );
 };
 

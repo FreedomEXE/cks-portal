@@ -6,7 +6,36 @@
   .card,
   .ui-card {
     @apply border border-gray-200 rounded-xl bg-white shadow-lg;
+}
+
+/* Modal background transform and motion tokens */
+:root {
+  --cks-modal-ease: cubic-bezier(0.2, 0, 0, 1);
+  --cks-modal-duration: 220ms;
+  --cks-modal-duration-exit: 180ms;
+}
+
+/* Smooth background transform when a modal is open */
+#root {
+  transition:
+    transform var(--cks-modal-duration) var(--cks-modal-ease),
+    filter var(--cks-modal-duration) var(--cks-modal-ease);
+}
+
+body.modal-open #root {
+  transform: scale(0.985);
+  filter: saturate(0.95);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #root {
+    transition: none;
   }
+  body.modal-open #root {
+    transform: none;
+    filter: none;
+  }
+}
 
   .btn {
     @apply inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none;

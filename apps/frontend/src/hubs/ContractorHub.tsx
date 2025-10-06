@@ -867,8 +867,8 @@ export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHu
                 userCode={contractorCode}
                 serviceOrders={serviceOrders}
                 productOrders={productOrders}
-                onCreateServiceOrder={() => navigate('/catalog')}
-                onCreateProductOrder={() => navigate('/catalog')}
+                onCreateServiceOrder={() => navigate('/catalog?mode=services')}
+                onCreateProductOrder={() => navigate('/catalog?mode=products')}
                 onOrderAction={(orderId, action) => {
                   if (action === 'View Details') {
                     const target = orders?.orders?.find((o: any) => (o.orderId || o.id) === orderId) || null;
@@ -960,6 +960,7 @@ export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHu
               requestedDate: selectedOrderForDetails.requestedDate || null,
               notes: selectedOrderForDetails.notes || null,
               status: (selectedOrderForDetails as any).status || null,
+              serviceId: ((selectedOrderForDetails as any)?.metadata?.serviceId) || null,
             }
           : null;
 

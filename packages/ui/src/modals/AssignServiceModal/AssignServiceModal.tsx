@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Button from '../../buttons/Button';
+import { ModalRoot } from '../ModalRoot';
 
 type Entry = { id: string; name: string };
 
@@ -51,8 +52,8 @@ export default function AssignServiceModal({ isOpen, onClose, serviceId, manager
   };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div style={{ background: '#fff', borderRadius: 8, padding: 16, width: 800 }} onClick={(e) => e.stopPropagation()}>
+    <ModalRoot isOpen={isOpen} onClose={onClose}>
+      <div style={{ background: '#fff', borderRadius: 8, padding: 16, width: 800 }}>
         <h3 style={{ marginTop: 0 }}>Assign Service</h3>
         <div style={{ color: '#64748b', marginBottom: 8 }}>Service: <strong>{serviceId}</strong></div>
         <input placeholder="Search people by id or name" value={search} onChange={(e) => setSearch(e.target.value)} style={{ width: '100%', padding: 8, border: '1px solid #e5e7eb', borderRadius: 6, marginBottom: 12 }} />
@@ -92,7 +93,7 @@ export default function AssignServiceModal({ isOpen, onClose, serviceId, manager
           <Button variant="primary" onClick={submit}>Save</Button>
         </div>
       </div>
-    </div>
+    </ModalRoot>
   );
 }
 

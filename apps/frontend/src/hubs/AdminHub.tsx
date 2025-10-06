@@ -1669,6 +1669,7 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
               requestedDate: (selectedOrderForDetails as any).requestedDate || (selectedOrderForDetails as any).orderDate || null,
               notes: selectedOrderForDetails.notes || null,
               status: (selectedOrderForDetails as any).status || null,
+              serviceId: ((selectedOrderForDetails as any)?.metadata?.serviceId) || null,
             }
           : null;
 

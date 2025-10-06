@@ -1181,7 +1181,7 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
                 userCode={managerCode}
                 serviceOrders={managerServiceOrderCards}
                 productOrders={managerProductOrderCards}
-                onCreateProductOrder={() => navigate('/catalog')}
+                onCreateProductOrder={() => navigate('/catalog?mode=products')}
                 onOrderAction={handleOrderAction}
                 showServiceOrders
                 showProductOrders
@@ -1292,6 +1292,7 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
               requestedDate: selectedOrderForDetails.requestedDate || null,
               notes: selectedOrderForDetails.notes || null,
               status: (selectedOrderForDetails as any).status || null,
+              serviceId: ((selectedOrderForDetails as any)?.metadata?.serviceId) || null,
             }
           : null;
 

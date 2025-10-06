@@ -1,5 +1,6 @@
 import React from 'react';
 import styles from './ProductOrderModal.module.css';
+import { ModalRoot } from '../ModalRoot';
 
 interface ProductLineItem {
   id: string;
@@ -22,6 +23,7 @@ export interface ProductOrderModalProps {
     notes: string | null;
     status?: string | null;
     items?: ProductLineItem[];
+    serviceId?: string | null;
   } | null;
   requestorInfo?: {
     name: string | null;
@@ -97,8 +99,7 @@ const ProductOrderModal: React.FC<ProductOrderModalProps> = ({
   const statusColors = getStatusColor(order.status);
 
   return (
-    <>
-      <div className={styles.backdrop} onClick={onClose} />
+    <ModalRoot isOpen={isOpen} onClose={onClose}>
       <div className={styles.modal}>
         {/* Header */}
         <div className={styles.header}>
@@ -134,20 +135,25 @@ const ProductOrderModal: React.FC<ProductOrderModalProps> = ({
         {/* Content */}
         <div className={styles.content}>
           {/* Service Information (if linked to a service) */}
-          {order.metadata && (order.metadata as any).serviceId && (
+          {order.serviceId && (
             <section className={styles.section}>
-              <h3 className={styles.sectionTitle}>Linked Service</h3>
+              <h3 className={styles.sectionTitle}>Related Service</h3>
               <div className={styles.grid}>
                 <div className={styles.field}>
                   <label className={styles.label}>Service ID</label>
-                  <p className={styles.value}>{(order.metadata as any).serviceId}</p>
+                  <p className={styles.value} style={{ color: '#2563eb', fontWeight: 500 }}>{order.serviceId}</p>
                 </div>
-                {(order.metadata as any).serviceName && (
-                  <div className={styles.field}>
-                    <label className={styles.label}>Service Name</label>
-                    <p className={styles.value}>{(order.metadata as any).serviceName}</p>
-                  </div>
-                )}
+              </div>
+              <div style={{
+                marginTop: 12,
+                padding: '10px 12px',
+                background: '#eff6ff',
+                border: '1px solid #bfdbfe',
+                borderRadius: 6,
+                fontSize: 13,
+                color: '#1e40af',
+              }}>
+                ℹ️ This product order was created for service <strong>{order.serviceId}</strong>
               </div>
               <p style={{ fontSize: '13px', color: '#6b7280', marginTop: '8px' }}>
                 This product order is linked to a specific service
@@ -302,7 +308,7 @@ const ProductOrderModal: React.FC<ProductOrderModalProps> = ({
           </button>
         </div>
       </div>
-    </>
+    </ModalRoot>
   );
 };
 

@@ -58,7 +58,8 @@
       "Bash(npx vite:*)",
       "Bash(for file in CenterHub.tsx ContractorHub.tsx CrewHub.tsx CustomerHub.tsx ManagerHub.tsx)",
       "Bash(do sed -i \"s/case ''service-created'':/case ''completed'':\\n    case ''archived'':\\n    case ''service-created'':/\" \"$file\")",
-      "WebSearch"
+      "WebSearch",
+      "Bash(for:*)"
     ],
     "deny": [],
     "ask": []

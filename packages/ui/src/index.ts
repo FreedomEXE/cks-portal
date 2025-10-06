@@ -61,3 +61,5 @@ export { default as ProductOrderModal } from './modals/ProductOrderModal/Product
 export * from './modals/ServiceOrderModal/ServiceOrderModal';
 export { default as ServiceOrderModal } from './modals/ServiceOrderModal/ServiceOrderModal';
 
+export * from './modals/ModalRoot';
+export { default as ModalRoot } from './modals/ModalRoot';

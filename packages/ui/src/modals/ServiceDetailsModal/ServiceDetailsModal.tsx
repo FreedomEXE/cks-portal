@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import Button from '../../buttons/Button';
+import { ModalRoot } from '../ModalRoot';
 
 export interface ServiceDetails {
   serviceId: string;
@@ -71,10 +72,6 @@ export default function ServiceDetailsModal({
 
   if (!isOpen || !service) return null;
 
-  const handleBackdropClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) onClose();
-  };
-
   const handleSave = () => {
     if (!onSave) return;
     const procedures = proceduresInput.split('\n').map(s => s.trim()).filter(Boolean).map(name => ({ name }));
@@ -128,8 +125,8 @@ export default function ServiceDetailsModal({
   );
 
   return (
-    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }} onClick={handleBackdropClick}>
-      <div style={{ backgroundColor: '#fff', borderRadius: 12, padding: 0, width: 700, maxHeight: '90vh', display: 'flex', flexDirection: 'column' }} onClick={(e) => e.stopPropagation()}>
+    <ModalRoot isOpen={isOpen} onClose={onClose}>
+      <div style={{ backgroundColor: '#fff', borderRadius: 12, padding: 0, width: 700, maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
 
         {/* Header */}
         <div style={{ padding: 24, borderBottom: '1px solid #e5e7eb' }}>
@@ -545,6 +542,6 @@ export default function ServiceDetailsModal({
           {editable && <Button variant="primary" onClick={handleSave}>Save Changes</Button>}
         </div>
       </div>
-    </div>
+    </ModalRoot>
   );
 }
