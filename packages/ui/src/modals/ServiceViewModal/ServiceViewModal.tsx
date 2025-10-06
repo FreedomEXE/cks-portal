@@ -16,18 +16,23 @@ export interface ServiceViewData {
   procedures?: Array<{ id: string; name: string; description?: string }>;
   training?: Array<{ id: string; name: string; description?: string }>;
   notes?: string | null;
+  products?: Array<{ orderId: string; productName: string; quantity: number; status: string }>;
 }
 
 export interface ServiceViewModalProps {
   isOpen: boolean;
   onClose: () => void;
   service: ServiceViewData | null;
+  onRequestProducts?: () => void;
+  showProductsSection?: boolean;
 }
 
 const ServiceViewModal: React.FC<ServiceViewModalProps> = ({
   isOpen,
   onClose,
   service,
+  onRequestProducts,
+  showProductsSection = false,
 }) => {
   if (!isOpen || !service) return null;
 
@@ -188,6 +193,36 @@ const ServiceViewModal: React.FC<ServiceViewModalProps> = ({
               <div className={styles.emptyState}>No training requirements specified</div>
             )}
           </section>
+
+          {/* Products */}
+          {showProductsSection && (
+            <section className={styles.section}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <h3 className={styles.sectionTitle} style={{ margin: 0 }}>Products</h3>
+                {onRequestProducts && (
+                  <Button variant="primary" size="sm" onClick={onRequestProducts}>
+                    Request Products
+                  </Button>
+                )}
+              </div>
+              {service.products && service.products.length > 0 ? (
+                <div className={styles.list}>
+                  {service.products.map((product) => (
+                    <div key={product.orderId} className={styles.listItem}>
+                      <div>
+                        <div className={styles.listItemName}>{product.productName}</div>
+                        <div className={styles.listItemDescription}>
+                          Order: {product.orderId} • Qty: {product.quantity} • Status: {product.status}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className={styles.emptyState}>No products ordered for this service yet</div>
+              )}
+            </section>
+          )}
 
           {/* Notes */}
           {service.notes && (

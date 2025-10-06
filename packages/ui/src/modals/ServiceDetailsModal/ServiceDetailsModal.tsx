@@ -37,7 +37,7 @@ export default function ServiceDetailsModal({
   serviceStatus = 'created',
   serviceType = 'one-time'
 }: ServiceDetailsModalProps) {
-  const [activeTab, setActiveTab] = useState<'overview' | 'crew' | 'procedures' | 'training' | 'notes'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'crew' | 'products' | 'procedures' | 'training' | 'notes'>('overview');
   const [crewSelected, setCrewSelected] = useState<string[]>([]);
   const [pendingCrewRequests, setPendingCrewRequests] = useState<string[]>([]);
   const [proceduresInput, setProceduresInput] = useState('');
@@ -175,6 +175,7 @@ export default function ServiceDetailsModal({
         <div style={{ borderBottom: '1px solid #e5e7eb', display: 'flex', gap: 8, paddingLeft: 24 }}>
           <TabButton tab="overview" label="Overview" />
           <TabButton tab="crew" label="Crew" />
+          <TabButton tab="products" label="Products" />
           <TabButton tab="procedures" label="Procedures" />
           <TabButton tab="training" label="Training" />
           <TabButton tab="notes" label="Notes" />
@@ -360,6 +361,26 @@ export default function ServiceDetailsModal({
               {crewSelected.length === 0 && pendingCrewRequests.length === 0 && !showCrewPicker && (
                 <p style={{ color: '#9ca3af', fontStyle: 'italic', marginTop: 16 }}>No crew assigned or requested yet.</p>
               )}
+            </div>
+          )}
+
+          {activeTab === 'products' && (
+            <div>
+              <p style={{ color: '#6b7280', marginTop: 0, fontSize: 14 }}>
+                Products and supplies ordered for this service.
+              </p>
+
+              <div style={{ marginTop: 16, marginBottom: 16 }}>
+                <Button size="sm" onClick={() => window.open('/catalog', '_blank')}>
+                  Request Products
+                </Button>
+              </div>
+
+              <p style={{ color: '#9ca3af', fontStyle: 'italic', marginTop: 16 }}>No products ordered for this service yet.</p>
+
+              <div style={{ marginTop: 24, padding: 12, backgroundColor: '#fef3c7', borderRadius: 6, fontSize: 13, color: '#92400e' }}>
+                <strong>Coming Soon:</strong> View products ordered for this service, track delivery status, and manage inventory assignments to crew members.
+              </div>
             </div>
           )}
 

@@ -171,6 +171,7 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
   const [servicesTab, setServicesTab] = useState<'my' | 'active' | 'history'>('active');
   const [servicesSearchQuery, setServicesSearchQuery] = useState('');
   const [selectedOrderForDetails, setSelectedOrderForDetails] = useState<HubOrderItem | null>(null);
+  const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
 
   const { code: authCode } = useAuth();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
@@ -698,12 +699,28 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
                     // For crew assignment responses (accept/reject crew invites)
                     if (act === 'accept' || act === 'reject') {
                       const { apiFetch } = await import('../shared/api/client');
-                      await apiFetch(`/orders/${orderId}/crew-response`, {
-                        method: 'POST',
-                        body: JSON.stringify({ accept: act === 'accept' }),
-                      });
+
+                      // Find the order to get serviceId/transformedId
+                      const targetOrder = orders?.orders?.find((o: any) => (o.orderId || o.id) === orderId);
+                      const serviceId = (targetOrder as any)?.serviceId || (targetOrder as any)?.transformedId;
+
+                      if (serviceId) {
+                        // Post-creation crew request: use service endpoint
+                        await apiFetch(`/services/${encodeURIComponent(serviceId)}/crew-response`, {
+                          method: 'POST',
+                          body: JSON.stringify({ accept: act === 'accept' }),
+                        });
+                        console.log('[crew] responded to service crew invite', { serviceId, accept: act === 'accept' });
+                      } else {
+                        // Pre-creation crew request (during order approval): use order endpoint
+                        await apiFetch(`/orders/${orderId}/crew-response`, {
+                          method: 'POST',
+                          body: JSON.stringify({ accept: act === 'accept' }),
+                        });
+                        console.log('[crew] responded to order crew invite', { orderId, accept: act === 'accept' });
+                      }
+
                       mutate(`/hub/orders/${normalizedCode}`);
-                      console.log('[crew] responded to crew invite', { orderId, accept: act === 'accept' });
                     } else {
                       // Regular order actions (cancel, etc.)
                       const notes = act === 'cancel' ? (window.prompt('Optional: reason for cancellation?')?.trim() || null) : null;
@@ -849,6 +866,39 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
             />
           );
         }
+      })()}
+
+      {/* Service View Modal */}
+      {(() => {
+        const selectedOrder = serviceOrders.find(o =>
+          (o.serviceId === selectedServiceId || o.transformedId === selectedServiceId)
+        );
+        if (!selectedOrder || !selectedServiceId) return null;
+
+        const metadata = (selectedOrder as any)?.metadata || {};
+        const serviceData = {
+          serviceId: selectedServiceId,
+          serviceName: selectedOrder.title || selectedServiceId,
+          serviceType: metadata.serviceType === 'recurring' ? 'recurring' as const : 'one-time' as const,
+          serviceStatus: metadata.serviceStatus || selectedOrder.status || 'Active',
+          centerId: selectedOrder.centerId || selectedOrder.destination || null,
+          centerName: metadata.centerName || null,
+          managerId: metadata.managerId || null,
+          managerName: metadata.managerName || null,
+          startDate: metadata.actualStartDate || metadata.serviceStartDate || selectedOrder.requestedDate || null,
+          crew: metadata.crew || [],
+          procedures: metadata.procedures || [],
+          training: metadata.training || [],
+          notes: selectedOrder.notes || metadata.notes || null,
+        };
+
+        return (
+          <ServiceViewModal
+            isOpen={!!selectedServiceId}
+            onClose={() => setSelectedServiceId(null)}
+            service={serviceData}
+          />
+        );
       })()}
     </div>
   );
