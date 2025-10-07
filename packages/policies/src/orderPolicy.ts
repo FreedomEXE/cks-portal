@@ -24,11 +24,11 @@ const VISIBLE_STATUSES: Record<OrderType, Record<HubRole, OrderStatus[]>> = {
   },
   service: {
     admin: [], // Admin doesn't interact with orders directly
-    warehouse: [], // Warehouses don't handle service orders
-    center: ['pending_customer', 'pending_contractor', 'pending_manager', 'manager_accepted', 'crew_requested', 'crew_assigned', 'service_created', 'rejected', 'cancelled'],
-    customer: ['pending_customer', 'pending_contractor', 'pending_manager', 'manager_accepted', 'crew_requested', 'crew_assigned', 'service_created', 'rejected', 'cancelled'],
-    manager: ['pending_customer', 'pending_contractor', 'pending_manager', 'manager_accepted', 'crew_requested', 'crew_assigned', 'service_created', 'rejected', 'cancelled'],
-    contractor: ['pending_contractor', 'pending_manager', 'manager_accepted', 'crew_requested', 'crew_assigned', 'service_created', 'rejected', 'cancelled'],
+    warehouse: ['pending_warehouse', 'warehouse_accepted', 'service_created', 'rejected', 'cancelled'], // Warehouses handle warehouse-managed services
+    center: ['pending_customer', 'pending_contractor', 'pending_manager', 'pending_warehouse', 'manager_accepted', 'warehouse_accepted', 'crew_requested', 'crew_assigned', 'service_created', 'rejected', 'cancelled'],
+    customer: ['pending_customer', 'pending_contractor', 'pending_manager', 'pending_warehouse', 'manager_accepted', 'warehouse_accepted', 'crew_requested', 'crew_assigned', 'service_created', 'rejected', 'cancelled'],
+    manager: ['pending_customer', 'pending_contractor', 'pending_manager', 'manager_accepted', 'crew_requested', 'crew_assigned', 'service_created', 'rejected', 'cancelled'], // Managers DON'T see warehouse service statuses
+    contractor: ['pending_contractor', 'pending_manager', 'pending_warehouse', 'manager_accepted', 'warehouse_accepted', 'crew_requested', 'crew_assigned', 'service_created', 'rejected', 'cancelled'],
     crew: ['crew_requested', 'crew_assigned', 'service_created', 'cancelled']
   }
 };
@@ -64,18 +64,25 @@ const ACTIONS_BY_STATUS: Record<OrderType, Record<HubRole, Partial<Record<OrderS
   },
   service: {
     admin: {}, // Admin doesn't interact with orders
-    warehouse: {},
+    warehouse: {
+      'pending_warehouse': ['accept', 'reject'], // Warehouse approves warehouse-managed services
+      'warehouse_accepted': [] // Service already accepted/created
+    },
     center: {
       'pending_customer': [], // Creator can cancel (handled by special case)
       'pending_contractor': [], // Creator can cancel (handled by special case)
       'pending_manager': [], // Creator can cancel (handled by special case)
-      'manager_accepted': [] // Only manager can act here
+      'pending_warehouse': [], // Creator can cancel (handled by special case)
+      'manager_accepted': [], // Only manager can act here
+      'warehouse_accepted': [] // Only warehouse can act here
     },
     customer: {
       'pending_customer': ['accept', 'reject'], // Customer approves center-created orders
       'pending_contractor': [], // Creator can cancel (handled by special case)
       'pending_manager': [], // Creator can cancel (handled by special case)
-      'manager_accepted': [] // Only manager can act here
+      'pending_warehouse': [], // Creator can cancel (handled by special case)
+      'manager_accepted': [], // Only manager can act here
+      'warehouse_accepted': [] // Only warehouse can act here
     },
     manager: {
       'pending_customer': [], // Watch only
@@ -88,7 +95,9 @@ const ACTIONS_BY_STATUS: Record<OrderType, Record<HubRole, Partial<Record<OrderS
     contractor: {
       'pending_contractor': ['accept', 'reject'], // Contractor approves
       'pending_manager': [], // Creator can cancel (handled by special case)
-      'manager_accepted': [] // Only manager can act here
+      'pending_warehouse': [], // Creator can cancel (handled by special case)
+      'manager_accepted': [], // Only manager can act here
+      'warehouse_accepted': [] // Only warehouse can act here
     },
     crew: {
       'crew_requested': ['accept', 'reject'], // Crew accepts/rejects assignment
@@ -121,11 +130,15 @@ const TRANSITIONS: Record<OrderType, Record<OrderAction, OrderStatus>> = {
 };
 
 // Special transition logic for service accepts (depends on current status)
+// NOTE: pending_contractor can go to either pending_manager OR pending_warehouse
+// This is determined at runtime based on the service's managed_by field
 const SERVICE_ACCEPT_TRANSITIONS: Record<ServiceOrderStatus, ServiceOrderStatus> = {
   'pending_customer': 'pending_contractor',      // Customer accepts → Contractor
-  'pending_contractor': 'pending_manager',       // Contractor accepts → Manager
+  'pending_contractor': 'pending_manager',       // Contractor accepts → Manager (default, or warehouse if managed_by=warehouse)
   'pending_manager': 'service_created',          // Manager accepts → Service auto-created, order archived
+  'pending_warehouse': 'service_created',        // Warehouse accepts → Service auto-created, order archived
   'manager_accepted': 'service_created',         // Legacy: Manager creates service manually
+  'warehouse_accepted': 'service_created',       // Legacy: Warehouse creates service manually
   'crew_requested': 'crew_assigned',             // Crew accepts assignment
   'crew_assigned': 'crew_assigned',              // No-op
   'service_created': 'service_created',          // No-op
@@ -268,6 +281,7 @@ export function getStatusLabel(status: OrderStatus): string {
     'pending_contractor': 'Pending Contractor',
     'pending_manager': 'Pending Manager',
     'manager_accepted': 'Manager Accepted',
+    'warehouse_accepted': 'Warehouse Accepted',
     'crew_requested': 'Crew Requested',
     'crew_assigned': 'Crew Assigned',
     'awaiting_delivery': 'Awaiting Delivery',

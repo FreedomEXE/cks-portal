@@ -12,11 +12,16 @@ export interface ServiceViewData {
   centerName?: string | null;
   managerId?: string | null;
   managerName?: string | null;
+  warehouseId?: string | null;
+  warehouseName?: string | null;
+  managedBy?: 'manager' | 'warehouse' | null;
   startDate?: string | null;
   crew?: Array<{ code: string; name: string }>;
   procedures?: Array<{ id: string; name: string; description?: string }>;
   training?: Array<{ id: string; name: string; description?: string }>;
   notes?: string | null;
+  serviceStartNotes?: string | null;
+  serviceCompleteNotes?: string | null;
   products?: Array<{ orderId: string; productName: string; quantity: number; status: string }>;
 }
 
@@ -26,6 +31,10 @@ export interface ServiceViewModalProps {
   service: ServiceViewData | null;
   onRequestProducts?: () => void;
   showProductsSection?: boolean;
+  onStartService?: () => void;
+  onCompleteService?: () => void;
+  onCancelService?: () => void;
+  onAddNotes?: () => void;
 }
 
 const ServiceViewModal: React.FC<ServiceViewModalProps> = ({
@@ -34,8 +43,18 @@ const ServiceViewModal: React.FC<ServiceViewModalProps> = ({
   service,
   onRequestProducts,
   showProductsSection = false,
+  onStartService,
+  onCompleteService,
+  onCancelService,
+  onAddNotes,
 }) => {
   if (!service) return null;
+
+  const isWarehouseService = service.managedBy === 'warehouse';
+  const normalizedStatus = (service.serviceStatus || '').toLowerCase().replace(/\s+/g, '_');
+  const isCreated = normalizedStatus === 'created';
+  const isInProgress = normalizedStatus === 'in_progress' || normalizedStatus === 'in progress' || normalizedStatus === 'active';
+  const isCompleted = normalizedStatus === 'completed';
 
   const formatDate = (dateStr?: string | null) => {
     if (!dateStr) return '—';
@@ -108,9 +127,9 @@ const ServiceViewModal: React.FC<ServiceViewModalProps> = ({
             </div>
           </section>
 
-          {/* Location & Management */}
+          {/* Service Location */}
           <section className={styles.section}>
-            <h3 className={styles.sectionTitle}>Location & Management</h3>
+            <h3 className={styles.sectionTitle}>Service Location</h3>
             <div className={styles.grid}>
               {service.centerId && (
                 <div className={styles.field}>
@@ -123,79 +142,140 @@ const ServiceViewModal: React.FC<ServiceViewModalProps> = ({
               <div className={styles.field}>
                 <label className={styles.label}>Managed By</label>
                 <div className={styles.value}>
-                  {service.managerId
-                    ? `${service.managerId}${service.managerName ? ' - ' + service.managerName : ''}`
-                    : '—'}
+                  {isWarehouseService
+                    ? service.warehouseId
+                      ? `${service.warehouseId}${service.warehouseName ? ' - ' + service.warehouseName : ''}`
+                      : '—'
+                    : service.managerId
+                      ? `${service.managerId}${service.managerName ? ' - ' + service.managerName : ''}`
+                      : '—'}
                 </div>
               </div>
             </div>
           </section>
 
-          {/* Assigned Crew */}
-          <section className={styles.section}>
-            <h3 className={styles.sectionTitle}>Assigned Crew</h3>
-            {service.crew && service.crew.length > 0 ? (
-              <div className={styles.list}>
-                {service.crew.map((crewMember) => (
-                  <div key={crewMember.code} className={styles.listItem}>
-                    <span className={styles.listItemCode}>{crewMember.code}</span>
-                    <span className={styles.listItemName}>{crewMember.name}</span>
+          {/* Manager-only sections: Crew, Procedures, Training */}
+          {!isWarehouseService && (
+            <>
+              {/* Assigned Crew */}
+              <section className={styles.section}>
+                <h3 className={styles.sectionTitle}>Assigned Crew</h3>
+                {service.crew && service.crew.length > 0 ? (
+                  <div className={styles.list}>
+                    {service.crew.map((crewMember) => (
+                      <div key={crewMember.code} className={styles.listItem}>
+                        <span className={styles.listItemCode}>{crewMember.code}</span>
+                        <span className={styles.listItemName}>{crewMember.name}</span>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className={styles.emptyState}>No crew assigned yet</div>
-            )}
-          </section>
+                ) : (
+                  <div className={styles.emptyState}>No crew assigned yet</div>
+                )}
+              </section>
 
-          {/* Procedures */}
-          <section className={styles.section}>
-            <h3 className={styles.sectionTitle}>Procedures</h3>
-            {service.procedures && service.procedures.length > 0 ? (
-              <div className={styles.list}>
-                {service.procedures.map((procedure) => (
-                  <div key={procedure.id} className={styles.listItem}>
-                    <div>
-                      <div className={styles.listItemName}>{procedure.name}</div>
-                      {procedure.description && (
-                        <div className={styles.listItemDescription}>
-                          {procedure.description}
+              {/* Procedures */}
+              <section className={styles.section}>
+                <h3 className={styles.sectionTitle}>Procedures</h3>
+                {service.procedures && service.procedures.length > 0 ? (
+                  <div className={styles.list}>
+                    {service.procedures.map((procedure) => (
+                      <div key={procedure.id} className={styles.listItem}>
+                        <div>
+                          <div className={styles.listItemName}>{procedure.name}</div>
+                          {procedure.description && (
+                            <div className={styles.listItemDescription}>
+                              {procedure.description}
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className={styles.emptyState}>No procedures specified</div>
-            )}
-          </section>
+                ) : (
+                  <div className={styles.emptyState}>No procedures specified</div>
+                )}
+              </section>
 
-          {/* Training */}
-          <section className={styles.section}>
-            <h3 className={styles.sectionTitle}>Training Requirements</h3>
-            {service.training && service.training.length > 0 ? (
-              <div className={styles.list}>
-                {service.training.map((item) => (
-                  <div key={item.id} className={styles.listItem}>
-                    <div>
-                      <div className={styles.listItemName}>{item.name}</div>
-                      {item.description && (
-                        <div className={styles.listItemDescription}>
-                          {item.description}
+              {/* Training */}
+              <section className={styles.section}>
+                <h3 className={styles.sectionTitle}>Training Requirements</h3>
+                {service.training && service.training.length > 0 ? (
+                  <div className={styles.list}>
+                    {service.training.map((item) => (
+                      <div key={item.id} className={styles.listItem}>
+                        <div>
+                          <div className={styles.listItemName}>{item.name}</div>
+                          {item.description && (
+                            <div className={styles.listItemDescription}>
+                              {item.description}
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className={styles.emptyState}>No training requirements specified</div>
-            )}
-          </section>
+                ) : (
+                  <div className={styles.emptyState}>No training requirements specified</div>
+                )}
+              </section>
+            </>
+          )}
 
-          {/* Products */}
-          {showProductsSection && (
+          {/* Warehouse Service Notes - Only for warehouse services */}
+          {isWarehouseService && (
+            <section className={styles.section}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <h3 className={styles.sectionTitle} style={{ margin: 0 }}>Service Notes</h3>
+                {onAddNotes && !isCompleted && (
+                  <Button variant="primary" size="sm" onClick={onAddNotes}>
+                    + Add Notes
+                  </Button>
+                )}
+              </div>
+
+              {service.serviceStartNotes && (
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    color: '#374151',
+                    marginBottom: '8px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>
+                    Start Notes
+                  </label>
+                  <div className={styles.notes}>{service.serviceStartNotes}</div>
+                </div>
+              )}
+
+              {service.serviceCompleteNotes && (
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    color: '#374151',
+                    marginBottom: '8px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>
+                    Completion Notes
+                  </label>
+                  <div className={styles.notes}>{service.serviceCompleteNotes}</div>
+                </div>
+              )}
+
+              {!service.serviceStartNotes && !service.serviceCompleteNotes && (
+                <div className={styles.emptyState}>No notes added yet</div>
+              )}
+            </section>
+          )}
+
+          {/* Products - Only for manager services */}
+          {!isWarehouseService && showProductsSection && (
             <section className={styles.section}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                 <h3 className={styles.sectionTitle} style={{ margin: 0 }}>Products</h3>
@@ -224,8 +304,8 @@ const ServiceViewModal: React.FC<ServiceViewModalProps> = ({
             </section>
           )}
 
-          {/* Notes */}
-          {service.notes && (
+          {/* General Notes - Only for manager services */}
+          {!isWarehouseService && service.notes && (
             <section className={styles.section}>
               <h3 className={styles.sectionTitle}>Notes</h3>
               <div className={styles.notes}>{service.notes}</div>
@@ -234,6 +314,21 @@ const ServiceViewModal: React.FC<ServiceViewModalProps> = ({
         </div>
 
         <div className={styles.footer}>
+          {isWarehouseService && isCreated && onStartService && (
+            <Button variant="primary" onClick={onStartService}>
+              Start Service
+            </Button>
+          )}
+          {isWarehouseService && isInProgress && onCompleteService && (
+            <Button variant="primary" onClick={onCompleteService}>
+              Complete Service
+            </Button>
+          )}
+          {isWarehouseService && (isCreated || isInProgress) && onCancelService && (
+            <Button variant="secondary" onClick={onCancelService}>
+              Cancel Service
+            </Button>
+          )}
           <Button variant="secondary" onClick={onClose}>
             Close
           </Button>

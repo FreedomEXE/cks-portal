@@ -55,6 +55,9 @@ export { default as AssignServiceModal } from './modals/AssignServiceModal/Assig
 export * from './modals/ServiceViewModal/ServiceViewModal';
 export { default as ServiceViewModal } from './modals/ServiceViewModal/ServiceViewModal';
 
+export * from './modals/WarehouseServiceModal';
+export { default as WarehouseServiceModal } from './modals/WarehouseServiceModal';
+
 export * from './modals/ProductOrderModal/ProductOrderModal';
 export { default as ProductOrderModal } from './modals/ProductOrderModal/ProductOrderModal';
 

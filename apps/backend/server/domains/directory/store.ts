@@ -426,11 +426,12 @@ async function listServices(limit = DEFAULT_LIMIT): Promise<ServiceDirectoryEntr
       category: string | null;
       description: string | null;
       is_active: boolean | null;
+      managed_by: string | null;
       created_at: Date | null;
       updated_at: Date | null;
       metadata: any | null;
     }>(
-      `SELECT service_id, name, category, description, is_active, metadata, created_at, updated_at
+      `SELECT service_id, name, category, description, is_active, managed_by, metadata, created_at, updated_at
        FROM catalog_services
        WHERE is_active = TRUE
        ORDER BY service_id
@@ -443,14 +444,16 @@ async function listServices(limit = DEFAULT_LIMIT): Promise<ServiceDirectoryEntr
       category: toNullableString(row.category),
       description: toNullableString(row.description),
       pricingModel: null,
+      managedBy: toNullableString(row.managed_by),
       status: row.is_active ? 'active' : 'inactive',
       createdAt: toIso(row.created_at),
       updatedAt: toIso(row.updated_at),
       // extra for admin UI
       metadata: row.metadata ?? null,
     }));
-  } catch (_err) {
+  } catch (err) {
     // Fallback to legacy services table if catalog not available
+    console.error('[directory] Failed to query catalog_services, falling back to legacy services table:', err);
   }
 
   const result = await query<ServiceRow>(
@@ -463,6 +466,7 @@ async function listServices(limit = DEFAULT_LIMIT): Promise<ServiceDirectoryEntr
     category: toNullableString(row.category),
     description: toNullableString(row.description),
     pricingModel: toNullableString(row.pricing_model),
+    managedBy: null, // Legacy services don't have managedBy
     status: toNullableString(row.status),
     createdAt: toIso(row.created_at),
     updatedAt: toIso(row.updated_at),

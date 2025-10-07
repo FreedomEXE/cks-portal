@@ -7,7 +7,7 @@ export async function applyServiceAction(input: {
   serviceId: string;
   actorRole: HubRole | null;
   actorCode: string | null;
-  action: 'start' | 'complete' | 'verify' | 'cancel';
+  action: 'start' | 'complete' | 'verify' | 'cancel' | 'update-notes';
   notes?: string | null;
 }) {
   const serviceId = (input.serviceId || '').trim().toUpperCase();
@@ -55,6 +55,20 @@ export async function applyServiceAction(input: {
     (meta as any).serviceVerifiedBy = input.actorCode || null;
     (meta as any).serviceVerifyNotes = input.notes || (meta as any).serviceVerifyNotes || null;
     // Verify doesn't change service status
+  } else if (input.action === 'update-notes') {
+    // Allow warehouse to add/update notes at any point
+    const currentStatus = (meta as any).serviceStatus;
+    if (input.notes) {
+      if (currentStatus === 'created' || !currentStatus) {
+        // Service hasn't started yet - add as pre-service notes
+        (meta as any).servicePreNotes = input.notes;
+      } else if (currentStatus === 'in_progress') {
+        // Service in progress - append to ongoing notes
+        const existingNotes = (meta as any).serviceOngoingNotes || '';
+        (meta as any).serviceOngoingNotes = existingNotes ? `${existingNotes}\n\n[${nowIso}]\n${input.notes}` : `[${nowIso}]\n${input.notes}`;
+      }
+    }
+    // update-notes doesn't change service status
   }
 
   // Update order metadata (persist service status/timestamps)

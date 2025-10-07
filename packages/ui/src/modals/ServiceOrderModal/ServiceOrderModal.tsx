@@ -13,6 +13,9 @@ export interface ServiceOrderModalProps {
     requestedDate: string | null;
     notes: string | null;
     status?: string | null;
+    managedBy?: string | null;
+    managedById?: string | null;
+    managedByName?: string | null;
   } | null;
   requestorInfo?: {
     name: string | null;
@@ -133,6 +136,18 @@ const ServiceOrderModal: React.FC<ServiceOrderModalProps> = ({
                   <p className={styles.value}>{order.title}</p>
                 </div>
               )}
+              <div className={styles.field}>
+                <label className={styles.label}>Managed By</label>
+                <p className={styles.value}>
+                  {order.managedById && order.managedByName
+                    ? `${order.managedById} - ${order.managedByName}`
+                    : order.managedBy === 'warehouse'
+                      ? 'Warehouse'
+                      : order.managedBy === 'manager'
+                        ? 'Manager'
+                        : '—'}
+                </p>
+              </div>
               <div className={styles.field}>
                 <label className={styles.label}>Availability Window</label>
                 <p className={styles.value}>

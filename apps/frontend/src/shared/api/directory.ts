@@ -102,6 +102,7 @@ export interface Service {
   description: string | null;
   pricingModel: string | null;
   requirements: string | null;
+  managedBy: string | null;
   status: string | null;
   createdAt: string | null;
   updatedAt: string | null;

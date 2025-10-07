@@ -11,6 +11,7 @@ export type OrderStatus =
   | 'pending_contractor'
   | 'pending_manager'
   | 'manager_accepted'
+  | 'warehouse_accepted'
   | 'crew_requested'
   | 'crew_assigned'
   | 'service_created'

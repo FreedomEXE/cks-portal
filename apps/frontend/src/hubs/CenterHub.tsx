@@ -308,8 +308,12 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
       const svcStatus = normalizeStatusValue((metadata as any).serviceStatus);
       const serviceType = metadata.serviceType === 'recurring' ? 'Ongoing' : 'One-Time';
       const serviceStatus = svcStatus ? formatStatusLabel(svcStatus) : (normalizedStatus === 'service-created' || normalizedStatus === 'service_created' ? 'Active' : formatStatusLabel(order.status));
-      const managedBy = metadata.managerId ? `${metadata.managerId}${metadata.managerName ? ' - ' + metadata.managerName : ''}` : '—';
-      const actualStartDate = metadata.actualStartDate || metadata.serviceStartDate;
+      const managedBy = metadata.warehouseId
+        ? `${metadata.warehouseId}${metadata.warehouseName ? ' - ' + metadata.warehouseName : ''}`
+        : metadata.managerId
+          ? `${metadata.managerId}${metadata.managerName ? ' - ' + metadata.managerName : ''}`
+          : '—';
+      const actualStartDate = metadata.serviceActualStartTime || metadata.actualStartDate || metadata.serviceStartDate;
 
       const base = {
         serviceId: order.serviceId ?? order.orderId,
@@ -699,6 +703,7 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
               notes: selectedOrderForDetails.notes || null,
               status: (selectedOrderForDetails as any).status || null,
               serviceId: ((selectedOrderForDetails as any)?.metadata?.serviceId) || null,
+              managedBy: ((selectedOrderForDetails as any)?.metadata?.serviceManagedBy) || null,
             }
           : null;
 
@@ -819,11 +824,16 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
           centerName: metadata.centerName || null,
           managerId: metadata.managerId || null,
           managerName: metadata.managerName || null,
+          warehouseId: metadata.warehouseId || null,
+          warehouseName: metadata.warehouseName || null,
+          managedBy: metadata.serviceManagedBy || null,
           startDate: metadata.actualStartDate || metadata.serviceStartDate || null,
           crew: metadata.crew || [],
           procedures: metadata.procedures || [],
           training: metadata.training || [],
           notes: fetchedServiceDetails.notes || metadata.notes || null,
+          serviceStartNotes: metadata.serviceStartNotes || null,
+          serviceCompleteNotes: metadata.serviceCompleteNotes || null,
           products: serviceProductOrders,
         };
 

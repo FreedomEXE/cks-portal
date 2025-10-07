@@ -26,7 +26,7 @@ import type {
   OrderType as PolicyOrderType
 } from '@cks/policies';
 
-const FINAL_STATUSES = new Set<OrderStatus>(["rejected", "cancelled", "delivered", "service_created"]);
+const FINAL_STATUSES = new Set<OrderStatus>(["rejected", "cancelled", "delivered"]);
 const HUB_ROLES: readonly HubRole[] = ["manager", "contractor", "customer", "center", "crew", "warehouse"];
 const HUB_ROLE_SET = new Set<string>(HUB_ROLES);
 const ACTOR_ROLES = new Set<HubRole>(['warehouse', 'manager', 'contractor', 'crew']);
@@ -76,6 +76,8 @@ interface OrderRow {
   created_at: Date | string | null;
   updated_at: Date | string | null;
   archived_at: Date | string | null;
+  service_managed_by?: string | null;
+  service_actual_start_time?: Date | string | null;
 }
 
 interface OrderItemRow {
@@ -503,16 +505,22 @@ function buildApprovalStages(
   });
 
   if (orderType === 'service') {
+    // Determine if this is a warehouse-managed or manager-managed service
+    const serviceManagedBy = row.service_managed_by || 'manager';
+    const finalActor: HubRole = serviceManagedBy === 'warehouse' ? 'warehouse' : 'manager';
+
     // Build the service approval chain
     const chain: HubRole[] = [];
     if (creatorRole === 'center') {
-      chain.push('customer', 'contractor', 'manager');
+      chain.push('customer', 'contractor', finalActor);
     } else if (creatorRole === 'customer') {
-      chain.push('contractor', 'manager');
+      chain.push('contractor', finalActor);
     } else if (creatorRole === 'contractor') {
-      chain.push('manager');
+      chain.push(finalActor);
     } else if (creatorRole === 'manager') {
       chain.push('manager');
+    } else if (creatorRole === 'warehouse') {
+      chain.push('warehouse');
     }
 
     const roleToUserId = (role: HubRole): string | null => {
@@ -523,6 +531,8 @@ function buildApprovalStages(
           return normalizeCodeValue(row.contractor_id) ?? null;
         case 'manager':
           return normalizeCodeValue(row.manager_id) ?? null;
+        case 'warehouse':
+          return normalizeCodeValue(row.assigned_warehouse) ?? null;
         case 'center':
           return normalizeCodeValue(row.center_id) ?? null;
         default:
@@ -540,10 +550,13 @@ function buildApprovalStages(
       let stageStatus: OrderApprovalStage['status'];
 
       if (status === 'service_created') {
-        stageStatus = role === 'manager' ? 'service-created' : 'approved';
+        stageStatus = (role === 'manager' || role === 'warehouse') ? 'service-created' : 'approved';
       } else if (status === 'manager_accepted' || status === 'crew_requested' || status === 'crew_assigned') {
         // Manager has accepted; all prior roles are approved
         stageStatus = role === 'manager' ? 'approved' : 'approved';
+      } else if (status === 'warehouse_accepted') {
+        // Warehouse has accepted; all prior roles are approved
+        stageStatus = role === 'warehouse' ? 'approved' : 'approved';
       } else if (pendingIndex === i) {
         stageStatus = 'pending';
       } else if (pendingIndex > i && pendingIndex !== -1) {
@@ -705,9 +718,10 @@ async function mapOrderRow(
   console.log('[mapOrderRow] START - order_id:', row.order_id);
   let enrichedMetadata = row.metadata ? { ...row.metadata } : {};
 
-  // Add service data from services table if available
-  if (row.service_managed_by || row.service_actual_start_time) {
-    (enrichedMetadata as any).serviceManagedBy = row.service_managed_by || null;
+  // Add service data from services table if available, or preserve from order metadata
+  // Priority: services table > order metadata
+  if (row.service_managed_by || row.service_actual_start_time || (enrichedMetadata as any).serviceManagedBy) {
+    (enrichedMetadata as any).serviceManagedBy = row.service_managed_by || (enrichedMetadata as any).serviceManagedBy || null;
     (enrichedMetadata as any).serviceActualStartTime = row.service_actual_start_time ? new Date(row.service_actual_start_time).toISOString() : null;
   }
 
@@ -1013,10 +1027,17 @@ async function fetchOrders(whereClause: string, params: readonly unknown[], cont
        o.created_at,
        o.updated_at,
        o.archived_at,
-       s.managed_by AS service_managed_by,
+       COALESCE(s.managed_by, cs.managed_by) AS service_managed_by,
        s.actual_start_time AS service_actual_start_time
      FROM orders o
      LEFT JOIN services s ON o.transformed_id = s.service_id
+     LEFT JOIN LATERAL (
+       SELECT oi.catalog_item_code
+       FROM order_items oi
+       WHERE oi.order_id = o.order_id AND oi.item_type = 'service'
+       LIMIT 1
+     ) oi ON TRUE
+     LEFT JOIN catalog_services cs ON oi.catalog_item_code = cs.service_id
      WHERE ${whereClause}
      ORDER BY o.requested_date DESC NULLS LAST, o.created_at DESC NULLS LAST, o.order_id DESC`,
     params
@@ -1420,8 +1441,10 @@ export async function createOrder(input: CreateOrderInput): Promise<HubOrderItem
   let assignedWarehouse: string | null = null;
   let nextActorRole: HubRole | null = null;
   let status: string;
+  let serviceManagedBy: string | null = 'manager'; // Declare outside block for later use
+  const orderType = input.orderType; // Cache for use in metadata
 
-  if (input.orderType === "product") {
+  if (orderType === "product") {
     // Default: for center-created product orders with no explicit destination,
     // deliver to the creator center.
     if (!destinationCode && input.creator.role === "center") {
@@ -1439,11 +1462,33 @@ export async function createOrder(input: CreateOrderInput): Promise<HubOrderItem
     status = "pending_warehouse";
 
   } else {
+    // Service orders: check if service is warehouse-managed or manager-managed
+    // Fetch the first service item to determine managed_by
+    const firstServiceCode = input.items[0]?.catalogCode;
+
+    if (firstServiceCode) {
+      const serviceCheck = await query<{ managed_by: string | null }>(
+        'SELECT managed_by FROM catalog_services WHERE service_id = $1',
+        [firstServiceCode]
+      );
+      serviceManagedBy = serviceCheck.rows[0]?.managed_by ?? 'manager';
+    }
+
     // Service orders: initial status depends on creator role
-    // Center creates: pending_customer → pending_contractor → pending_manager → manager_accepted
-    // Customer creates: pending_contractor → pending_manager → manager_accepted
-    // Contractor creates: pending_manager → manager_accepted
-    // Manager creates: manager_accepted (no approval needed)
+    // For manager services:
+    //   Center → pending_customer → pending_contractor → pending_manager → manager_accepted
+    //   Customer → pending_contractor → pending_manager → manager_accepted
+    //   Contractor → pending_manager → manager_accepted
+    //   Manager → manager_accepted
+    // For warehouse services:
+    //   Center → pending_customer → pending_contractor → pending_warehouse → warehouse_accepted
+    //   Customer → pending_contractor → pending_warehouse → warehouse_accepted
+    //   Contractor → pending_warehouse → warehouse_accepted
+    //   Warehouse → warehouse_accepted
+    const finalActor = serviceManagedBy === 'warehouse' ? 'warehouse' : 'manager';
+    const finalStatus = serviceManagedBy === 'warehouse' ? 'warehouse_accepted' : 'manager_accepted';
+    const pendingFinalStatus = serviceManagedBy === 'warehouse' ? 'pending_warehouse' : 'pending_manager';
+
     switch (input.creator.role) {
       case 'center':
         status = "pending_customer";
@@ -1454,17 +1499,19 @@ export async function createOrder(input: CreateOrderInput): Promise<HubOrderItem
         nextActorRole = "contractor";
         break;
       case 'contractor':
-        status = "pending_manager";
-        nextActorRole = "manager";
+        status = pendingFinalStatus;
+        nextActorRole = finalActor;
         break;
       case 'manager':
-        status = "manager_accepted";
-        nextActorRole = "manager";
+      case 'warehouse':
+        // If creator is manager or warehouse, skip approvals
+        status = finalStatus;
+        nextActorRole = finalActor;
         break;
       default:
-        // Fallback for other roles (crew, warehouse, admin)
-        status = "pending_manager";
-        nextActorRole = "manager";
+        // Fallback for other roles (crew, admin)
+        status = pendingFinalStatus;
+        nextActorRole = finalActor;
     }
   }
 
@@ -1591,6 +1638,13 @@ export async function createOrder(input: CreateOrderInput): Promise<HubOrderItem
     }
   }
 
+  // For warehouse-managed service orders, assign default warehouse (same as product orders)
+  // TODO: Post-MVP - Add warehouse_id column to centers table for flexible warehouse assignment
+  if (orderType === 'service' && serviceManagedBy === 'warehouse' && !assignedWarehouse) {
+    const defaultWarehouse = await findDefaultWarehouse();
+    assignedWarehouse = normalizeCodeValue(defaultWarehouse);
+  }
+
   // Enrich metadata with basic contact info for requestor and destination (for Warehouse visibility)
   async function loadContactForCode(code: string | null): Promise<{ name: string | null; address: string | null; phone: string | null; email: string | null } | null> {
     const normalized = normalizeCodeValue(code);
@@ -1621,6 +1675,12 @@ export async function createOrder(input: CreateOrderInput): Promise<HubOrderItem
     ...(input.metadata ?? {}),
     contacts: { requestor: creatorContact, destination: destinationContact },
   };
+
+  // Add serviceManagedBy to metadata for service orders
+  if (orderType === 'service' && serviceManagedBy) {
+    metadataExpanded.serviceManagedBy = serviceManagedBy;
+  }
+
   const metadataValue = JSON.stringify(metadataExpanded);
 
   await withTransaction(async (q) => {
@@ -1802,9 +1862,33 @@ export async function applyOrderAction(input: OrderActionInput): Promise<HubOrde
   }
 
   // Get the next status from the policy
-  const newStatus = getNextStatus(orderType as PolicyOrderType, currentStatus as any, input.action as OrderAction);
+  let newStatus = getNextStatus(orderType as PolicyOrderType, currentStatus as any, input.action as OrderAction);
   if (!newStatus) {
     throw new Error(`Invalid action ${input.action} for status ${currentStatus}`);
+  }
+
+  // OVERRIDE: For service orders, check if service is warehouse-managed
+  // If contractor is accepting a warehouse service, route to warehouse instead of manager
+  if (orderType === 'service' && input.action === 'accept' && currentStatus === 'pending_contractor') {
+    // Fetch the first service item to check managed_by
+    const itemsResult = await query<{ catalog_item_code: string }>(
+      'SELECT catalog_item_code FROM order_items WHERE order_id = $1 LIMIT 1',
+      [input.orderId]
+    );
+    const firstServiceCode = itemsResult.rows[0]?.catalog_item_code;
+
+    if (firstServiceCode) {
+      const serviceCheck = await query<{ managed_by: string | null }>(
+        'SELECT managed_by FROM catalog_services WHERE service_id = $1',
+        [firstServiceCode]
+      );
+      const serviceManagedBy = serviceCheck.rows[0]?.managed_by;
+
+      // If warehouse-managed, route to warehouse instead of manager
+      if (serviceManagedBy === 'warehouse') {
+        newStatus = 'pending_warehouse';
+      }
+    }
   }
 
   // Determine next actor role based on new status
@@ -1812,6 +1896,8 @@ export async function applyOrderAction(input: OrderActionInput): Promise<HubOrde
   if (newStatus === 'awaiting_delivery') {
     nextActorRole = 'warehouse';
   } else if (newStatus === 'pending_warehouse') {
+    nextActorRole = 'warehouse';
+  } else if (newStatus === 'warehouse_accepted') {
     nextActorRole = 'warehouse';
   } else if (newStatus === 'pending_customer') {
     nextActorRole = 'customer';
@@ -1856,8 +1942,9 @@ export async function applyOrderAction(input: OrderActionInput): Promise<HubOrde
           (row as any).__metadata_accept_merge = merged;
         }
 
-        // Auto-create service when manager accepts
-        if (input.actorRole === 'manager' && currentStatus === 'pending_manager') {
+        // Auto-create service when manager OR warehouse accepts
+        if ((input.actorRole === 'manager' && currentStatus === 'pending_manager') ||
+            (input.actorRole === 'warehouse' && currentStatus === 'pending_warehouse')) {
           // Generate per-center sequential service ID: <CENTER>-SRV-XXX
           // Try to get center from: center_id, destination, or participants
           let centerCode = normalizeCodeValue(row.center_id) || normalizeCodeValue(row.destination) || null;
@@ -2070,30 +2157,41 @@ export async function applyOrderAction(input: OrderActionInput): Promise<HubOrde
     }
 
     // If creating a service, insert into services table
-    // This happens either via explicit create-service action OR auto-create on manager accept
-    if ((input.action === "create-service" || (input.action === "accept" && input.actorRole === 'manager' && orderType === 'service')) && transformedId) {
+    // This happens either via explicit create-service action OR auto-create on manager/warehouse accept
+    const shouldCreateService = (
+      input.action === "create-service" ||
+      (input.action === "accept" && input.actorRole === 'manager' && orderType === 'service') ||
+      (input.action === "accept" && input.actorRole === 'warehouse' && orderType === 'service')
+    );
+
+    if (shouldCreateService && transformedId) {
       const serviceMetadata = metadataUpdate || row.metadata || {};
       const serviceType = (serviceMetadata as any).serviceType || 'one-time';
       const serviceName = row.title || transformedId;
 
-      // Store manager info in metadata when service is created
-      if (input.actorRole === 'manager' && input.actorCode) {
-        // Get manager name from managers table
-        const managerResult = await query<{ name: string }>(
-          `SELECT name FROM managers WHERE manager_id = $1 LIMIT 1`,
+      // Store manager or warehouse info in metadata when service is created
+      if ((input.actorRole === 'manager' || input.actorRole === 'warehouse') && input.actorCode) {
+        // Get actor name from appropriate table
+        const tableName = input.actorRole === 'manager' ? 'managers' : 'warehouses';
+        const idColumn = input.actorRole === 'manager' ? 'manager_id' : 'warehouse_id';
+        const actorResult = await query<{ name: string }>(
+          `SELECT name FROM ${tableName} WHERE ${idColumn} = $1 LIMIT 1`,
           [input.actorCode]
         );
-        const managerName = managerResult.rows[0]?.name || null;
+        const actorName = actorResult.rows[0]?.name || null;
 
-        // Update metadata with manager info and initial service status
+        // Update metadata with actor info and initial service status
+        const actorIdKey = input.actorRole === 'manager' ? 'managerId' : 'warehouseId';
+        const actorNameKey = input.actorRole === 'manager' ? 'managerName' : 'warehouseName';
         const updatedMetadata = {
           ...(metadataUpdate || row.metadata || {}),
-          managerId: input.actorCode,
-          managerName: managerName,
+          [actorIdKey]: input.actorCode,
+          [actorNameKey]: actorName,
           serviceStatus: 'created', // Initial status when service is created
+          managedBy: input.actorRole === 'warehouse' ? 'warehouse' : 'manager',
         };
 
-        // Update the order metadata with manager info
+        // Update the order metadata with actor info
         await query(
           `UPDATE orders SET metadata = $1::jsonb, updated_at = NOW() WHERE order_id = $2`,
           [JSON.stringify(updatedMetadata), input.orderId]

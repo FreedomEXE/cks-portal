@@ -30,6 +30,7 @@ interface CatalogItemRow {
   service_attributes: Record<string, unknown> | null;
   category: string | null;
   crew_required: number | null;
+  managed_by: string | null;
   is_active: boolean | null;
   stock_available: number | null;
   stock_on_hand: number | null;
@@ -94,6 +95,7 @@ function mapCatalogRow(row: CatalogItemRow): CatalogItem {
     metadata: row.metadata ?? null,
     product: toProductDetails(row),
     service: toServiceDetails(row),
+    managedBy: row.managed_by ?? null,
     stockAvailable: row.stock_available ?? null,
     stockOnHand: row.stock_on_hand ?? null,
   };
@@ -176,6 +178,7 @@ const CATALOG_UNION = `
     NULL::jsonb AS service_attributes,
     p.category,
     NULL::integer AS crew_required,
+    NULL::text AS managed_by,
     p.is_active,
     COALESCE(inv.total_available, 0) AS stock_available,
     COALESCE(inv.total_on_hand, 0) AS stock_on_hand
@@ -212,6 +215,7 @@ const CATALOG_UNION = `
     s.attributes AS service_attributes,
     s.category,
     s.crew_required,
+    s.managed_by,
     s.is_active,
     NULL::integer AS stock_available,
     NULL::integer AS stock_on_hand
@@ -260,6 +264,7 @@ export async function fetchCatalogItems(filters: CatalogFilters): Promise<Catalo
        i.service_attributes,
        i.category,
        i.crew_required,
+       i.managed_by,
        i.is_active,
        i.stock_available,
        i.stock_on_hand

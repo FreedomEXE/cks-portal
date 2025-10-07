@@ -841,11 +841,16 @@ export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubPro
           centerName: metadata.centerName || null,
           managerId: metadata.managerId || null,
           managerName: metadata.managerName || null,
+          warehouseId: metadata.warehouseId || null,
+          warehouseName: metadata.warehouseName || null,
+          managedBy: metadata.serviceManagedBy || null,
           startDate: metadata.actualStartDate || metadata.serviceStartDate || null,
           crew: metadata.crew || [],
           procedures: metadata.procedures || [],
           training: metadata.training || [],
           notes: fetchedServiceDetails.notes || metadata.notes || null,
+          serviceStartNotes: metadata.serviceStartNotes || null,
+          serviceCompleteNotes: metadata.serviceCompleteNotes || null,
           products: serviceProductOrders,
         };
 

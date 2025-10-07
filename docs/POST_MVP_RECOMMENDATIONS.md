@@ -1177,8 +1177,113 @@ CREATE TABLE inventory_transactions (
 
 ## Success Metrics
 
+## 23. Real‑Time Updates Layer (Convex vs SSE)
+
+### Why Post‑MVP
+- MVP functions with REST + periodic polling; real‑time is a UX boost, not a blocker.
+- Reduces manual refresh and enables live dashboards for orders/deliveries/badges.
+- Keep Postgres as the source of truth; add a reactive read layer only.
+
+### Approach A — Convex Overlay (Read‑Model Only)
+- Keep all writes authoritative in Postgres; mirror a minimal denormalized subset to Convex (e.g., active deliveries by hub, order status counts).
+- On successful DB commits in Fastify, call a Convex mutation using a service token to update the mirrored documents.
+- Frontend consumes via `convex/react` live queries behind a feature flag.
+- Env/flags: `VITE_USE_CONVEX=true`, `VITE_CONVEX_URL`, server `CONVEX_SERVICE_TOKEN` (stored in Render secrets).
+- Pros: fast to ship, strong DX, built‑in real‑time; Cons: vendor + dual‑write, separate logs/metrics.
+
+### Approach B — Native SSE/WebSockets on Fastify
+- Start with SSE for one‑way notifications; add `@fastify/websocket` if bi‑directional flows are needed later.
+- Use Redis pub/sub for fan‑out when horizontally scaling on Render (see stub at `apps/backend/server/core/cache/redis.ts`).
+- Topics to emit: `orders.statusChanged`, `deliveries.updated`, `badges.updated`.
+- Pros: single platform, no dual‑write; Cons: own delivery/retry/fan‑out logic and ops.
+
+### Acceptance Criteria
+- Users see dashboard/order/delivery updates within ~2 seconds without manual refresh.
+- Postgres remains the single source of truth; no correctness drift.
+- Feature flag can toggle real‑time off to fall back to polling without code changes.
+- Basic observability in place: event publish counts, delivery latency, error/retry rates.
+
+### Rollout Plan
+- Phase 1: Add feature flag and implement one live panel (Warehouse Hub → Pending/Completed Deliveries).
+- Phase 2: Extend to order status counters and hub badges; instrument metrics.
+- Phase 3: Scale out (Redis pub/sub or Convex index tuning), add backoff/reconnect UX.
+
+### Notes
+- Do not replatform core data to Convex; treat it strictly as a reactive read model.
+- For Convex, set CORS to allow Render domains; protect the service token with least privilege.
+- For SSE/WebSockets, ensure multi‑instance safety on Render via Redis pub/sub; document reconnect/backoff.
+
+**Priority:** Medium (Post‑MVP Month 1–2)
+
 - Reduced time to implement new features
 - Decreased bug rate in production
 - Improved system observability (MTTR reduction)
 - Better developer experience (measured via surveys)
 - Reduced technical debt (tracked via code quality metrics)
+
+## 24. Multi-Warehouse Support for Service Orders
+
+### Current Implementation (MVP)
+All warehouse service orders are assigned to the **default warehouse** (same behavior as product orders). This works fine for single-warehouse operations.
+
+**Location:** `apps/backend/server/domains/orders/store.ts` (lines ~1640-1645)
+
+```typescript
+// Current: Always use default warehouse
+if (orderType === 'service' && serviceManagedBy === 'warehouse' && !assignedWarehouse) {
+  const defaultWarehouse = await findDefaultWarehouse();
+  assignedWarehouse = normalizeCodeValue(defaultWarehouse);
+}
+```
+
+### Future Enhancement (Post-MVP)
+When expanding to multiple warehouses, implement flexible warehouse assignment per center.
+
+#### Database Schema Change
+Add `warehouse_id` column to the `centers` table:
+
+```sql
+ALTER TABLE centers
+ADD COLUMN warehouse_id VARCHAR(50) REFERENCES warehouses(id);
+```
+
+#### Implementation
+```typescript
+// Future: Use center's assigned warehouse, fallback to default
+if (orderType === 'service' && serviceManagedBy === 'warehouse' && !assignedWarehouse && centerId) {
+  const centerWarehouseResult = await query<{ warehouse_id: string | null }>(
+    'SELECT warehouse_id FROM centers WHERE UPPER(center_id) = $1 LIMIT 1',
+    [centerId]
+  );
+  const warehouseId = normalizeCodeValue(centerWarehouseResult.rows[0]?.warehouse_id);
+  if (warehouseId) {
+    assignedWarehouse = warehouseId;
+  } else {
+    // Fallback to default warehouse if center has no warehouse assigned
+    const defaultWarehouse = await findDefaultWarehouse();
+    assignedWarehouse = normalizeCodeValue(defaultWarehouse);
+  }
+}
+```
+
+#### Benefits
+- Each center can be assigned to a specific warehouse
+- Orders automatically route to the correct warehouse based on the center
+- Better geographic/operational distribution
+- Scalable for multi-warehouse operations
+- Load balancing across warehouses
+
+#### Timeline
+Implement when:
+- Operating with 2+ warehouses
+- Geographic distribution becomes important
+- Need warehouse load balancing
+- Expanding to multiple regions/territories
+
+**Priority:** Low (6+ months post-MVP, only when multi-warehouse need arises)
+
+**Effort:** 1-2 days
+- Database migration: 1 hour
+- Code change: 2 hours
+- Testing: 4-6 hours
+- Admin UI for warehouse assignment: 1 day

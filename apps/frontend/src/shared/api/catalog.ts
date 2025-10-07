@@ -35,6 +35,7 @@ export interface CatalogItem {
   metadata: Record<string, unknown> | null;
   product?: CatalogProductDetails | null;
   service?: CatalogServiceDetails | null;
+  managedBy?: string | null;
 }
 
 export interface CatalogPage {

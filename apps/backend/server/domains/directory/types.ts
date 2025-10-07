@@ -141,6 +141,7 @@ export interface ServiceDirectoryEntry {
   category: string | null;
   description: string | null;
   pricingModel: string | null;
+  managedBy: string | null;
   createdAt: string | null;
   updatedAt: string | null;
 }

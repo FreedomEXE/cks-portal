@@ -7,7 +7,7 @@ import { query } from '../../db/connection';
 export async function registerServicesRoutes(server: FastifyInstance) {
   const paramsSchema = z.object({ serviceId: z.string().min(1) });
   const bodySchema = z.object({
-    action: z.enum(['start', 'complete', 'verify', 'cancel']),
+    action: z.enum(['start', 'complete', 'verify', 'cancel', 'update-notes']),
     notes: z.string().trim().max(1000).optional(),
   });
 

@@ -131,6 +131,7 @@ export const serviceDirectoryEntrySchema = z.object({
   description: nullableString,
   pricingModel: nullableString,
   requirements: nullableString,
+  managedBy: nullableString,
   status: nullableString,
   createdAt: isoDateString,
   updatedAt: isoDateString,

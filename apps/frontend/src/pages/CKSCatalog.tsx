@@ -61,8 +61,43 @@ function Card({
 }) {
   const subtitle = item.type === "product" ? formatProductInfo(item) : formatDuration(item);
 
+  // Determine card styling based on type and managedBy
+  const getCardStyle = () => {
+    if (item.type === 'product') {
+      return {
+        bg: 'bg-green-50',
+        border: 'border-green-200',
+        badge: null
+      };
+    }
+    if (item.type === 'service') {
+      if (item.managedBy === 'warehouse') {
+        return {
+          bg: 'bg-purple-50',
+          border: 'border-purple-200',
+          badge: { text: 'Warehouse Service', color: 'bg-purple-100 text-purple-700 border-purple-300' }
+        };
+      }
+      if (item.managedBy === 'manager') {
+        return {
+          bg: 'bg-blue-50',
+          border: 'border-blue-200',
+          badge: { text: 'Manager Service', color: 'bg-blue-100 text-blue-700 border-blue-300' }
+        };
+      }
+    }
+    // Default fallback
+    return {
+      bg: 'bg-white',
+      border: 'border-gray-200',
+      badge: null
+    };
+  };
+
+  const cardStyle = getCardStyle();
+
   return (
-    <div className="group bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+    <div className={`group ${cardStyle.bg} rounded-xl border ${cardStyle.border} shadow-sm overflow-hidden hover:shadow-md transition-shadow`}>
       <div className="aspect-[4/3] w-full bg-gray-100 overflow-hidden">
         {item.imageUrl ? (
           <img
@@ -82,6 +117,11 @@ function Card({
               <span className="text-xs text-gray-700 font-mono bg-yellow-100 px-2 py-1 rounded font-semibold">{item.code}</span>
             </div>
             {subtitle && <p className="text-sm text-gray-500 mt-0.5">{subtitle}</p>}
+            {cardStyle.badge && (
+              <span className={`inline-block text-xs px-2 py-1 rounded border mt-2 font-medium ${cardStyle.badge.color}`}>
+                {cardStyle.badge.text}
+              </span>
+            )}
           </div>
           <div className="flex gap-2">
             <button

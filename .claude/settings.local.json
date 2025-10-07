@@ -59,7 +59,10 @@
       "Bash(for file in CenterHub.tsx ContractorHub.tsx CrewHub.tsx CustomerHub.tsx ManagerHub.tsx)",
       "Bash(do sed -i \"s/case ''service-created'':/case ''completed'':\\n    case ''archived'':\\n    case ''service-created'':/\" \"$file\")",
       "WebSearch",
-      "Bash(for:*)"
+      "Bash(for:*)",
+      "Bash(xargs:*)",
+      "Bash(cat:*)",
+      "Bash(cmd /c \"for /f \"\"tokens=5\"\" %a in (''netstat -ano ^| findstr :4000'') do taskkill /PID %a /F\")"
     ],
     "deny": [],
     "ask": []

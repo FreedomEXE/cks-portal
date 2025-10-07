@@ -20,6 +20,8 @@ export type ServiceOrderStatus =
   | 'pending_contractor'
   | 'pending_manager'
   | 'manager_accepted'
+  | 'pending_warehouse'
+  | 'warehouse_accepted'
   | 'crew_requested'
   | 'crew_assigned'
   | 'service_created'

@@ -24,10 +24,11 @@ import {
   SupportSection,
   type Activity,
 } from '@cks/domain-widgets';
-import { DataTable, OrderDetailsModal, ProductOrderModal, ServiceOrderModal, ServiceViewModal, PageHeader, PageWrapper, Scrollbar, TabSection } from '@cks/ui';
+import { Button, DataTable, OrderDetailsModal, ProductOrderModal, ServiceOrderModal, ServiceViewModal, PageHeader, PageWrapper, Scrollbar, TabSection } from '@cks/ui';
 import { useAuth } from '@cks/auth';
 import { getAllowedActions, getActionLabel } from '@cks/policies';
 import { useServices as useDirectoryServices } from '../shared/api/directory';
+import { useCatalogItems } from '../shared/api/catalog';
 
 import MyHubSection from '../components/MyHubSection';
 import {
@@ -177,6 +178,7 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
   const [inventoryFilter, setInventoryFilter] = useState<string>('');
   const [pendingAction, setPendingAction] = useState<{ orderId: string; action: OrderActionType } | null>(null);
   const [selectedOrderForDetails, setSelectedOrderForDetails] = useState<HubOrderItem | null>(null);
+  const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
 
   const { code: authCode } = useAuth();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
@@ -370,41 +372,132 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
   }, [inventoryFilter, inventorySearchQuery, archivedInventoryData]);
 
   const { activeServicesData, serviceHistoryData } = useMemo(() => {
-    const active: Array<{ serviceId: string; serviceName: string; type: string; status: string; startDate: string }>
-      = [];
+    const active: Array<{
+      serviceId: string;
+      serviceName: string;
+      type: string;
+      status: string;
+      startDate: string;
+      onStart?: () => void;
+      onComplete?: () => void;
+      onCancel?: () => void;
+    }> = [];
     const history: Array<{ serviceId: string; serviceName: string; type: string; status: string; startDate: string; endDate: string }>
       = [];
 
     serviceOrders.forEach((order) => {
+      // Only include transformed services (orders that have been converted to services)
+      if (!(order as any).serviceId && !(order as any).transformedId) {
+        return;
+      }
+
+      const meta: any = (order as any).metadata || {};
+      const svcStatus = (meta?.serviceStatus || '').toLowerCase().replace(/\s+/g, '_');
       const normalizedStatus = normalizeStatusValue(order.status);
-      const base = {
-        serviceId: order.serviceId ?? order.orderId,
-        serviceName: order.title ?? order.serviceId ?? order.orderId,
-        type: order.orderType === 'service' ? 'Service' : 'Product',
-        status: formatStatusLabel(order.status),
-        startDate: formatDisplayDate(order.requestedDate),
-        endDate: formatDisplayDate(order.expectedDate),
+      const rawServiceId = (order as any).serviceId ?? (order as any).transformedId;
+
+      const onStart = async () => {
+        try {
+          const notes = window.prompt('Add notes for starting this service (optional):');
+          if (notes === null) return; // User cancelled
+          const { applyServiceAction } = await import('../shared/api/hub');
+          await applyServiceAction(rawServiceId, 'start', notes || undefined);
+          refreshOrders();
+        } catch (err) {
+          console.error('[warehouse] failed to start service', err);
+          alert(err instanceof Error ? err.message : 'Failed to start service');
+        }
       };
 
-      if (HISTORY_STATUSES.has(normalizedStatus)) {
-        history.push(base);
+      const onComplete = async () => {
+        try {
+          const notes = window.prompt('Add notes for completing this service (describe work performed):');
+          if (notes === null) return; // User cancelled
+          const { applyServiceAction } = await import('../shared/api/hub');
+          await applyServiceAction(rawServiceId, 'complete', notes || undefined);
+          refreshOrders();
+        } catch (err) {
+          console.error('[warehouse] failed to complete service', err);
+          alert(err instanceof Error ? err.message : 'Failed to complete service');
+        }
+      };
+
+      const onCancel = async () => {
+        try {
+          const reason = window.prompt('Please provide a reason for cancellation:');
+          if (!reason) return;
+          const { applyServiceAction } = await import('../shared/api/hub');
+          await applyServiceAction(rawServiceId, 'cancel');
+          refreshOrders();
+        } catch (err) {
+          console.error('[warehouse] failed to cancel service', err);
+          alert(err instanceof Error ? err.message : 'Failed to cancel service');
+        }
+      };
+
+      // Determine service type from metadata
+      const serviceType = meta.serviceType === 'recurring' ? 'Ongoing' : 'One-Time';
+
+      // Use serviceStatus for display if available, otherwise use order status
+      const displayStatus = svcStatus
+        ? formatStatusLabel(svcStatus)
+        : formatStatusLabel(order.status);
+
+      // Only show start date if service has actually been started
+      const actualStartDate = meta.serviceActualStartTime || meta.actualStartDate || null;
+      const actualEndDate = meta.serviceCompletedAt || meta.serviceCancelledAt || null;
+
+      const base = {
+        serviceId: rawServiceId,
+        serviceName: order.title ?? rawServiceId,
+        type: serviceType,
+        status: displayStatus,
+        startDate: svcStatus === 'created' ? 'Pending' : (actualStartDate ? formatDisplayDate(actualStartDate) : '—'),
+        endDate: actualEndDate ? formatDisplayDate(actualEndDate) : formatDisplayDate(order.expectedDate),
+        onStart,
+        onComplete,
+        onCancel,
+      };
+
+      // Use serviceStatus from metadata to determine active vs history
+      if (svcStatus) {
+        // If serviceStatus is set, use it: created/in_progress = active, completed/cancelled = history
+        if (svcStatus === 'completed' || svcStatus === 'cancelled') {
+          const { onStart: _, onComplete: __, onCancel: ___, ...historyBase } = base;
+          history.push(historyBase);
+        } else {
+          // created or in_progress
+          active.push(base);
+        }
       } else {
-        active.push(base);
+        // Fallback to order status
+        if (HISTORY_STATUSES.has(normalizedStatus)) {
+          const { onStart: _, onComplete: __, onCancel: ___, ...historyBase } = base;
+          history.push(historyBase);
+        } else {
+          active.push(base);
+        }
       }
     });
 
     return { activeServicesData: active, serviceHistoryData: history };
-  }, [serviceOrders]);
+  }, [serviceOrders, refreshOrders]);
 
-  // MVP: Leave Warehouse My Services blank (no warehouse-specific services yet)
-  // Ensure table fields align with Manager Hub My Services
-  const myCertifiedServices: Array<{
-    serviceId: string;
-    serviceName: string;
-    certified: string | null;
-    certificationDate: string | null;
-    expires: string | null;
-  }> = [];
+  // Fetch warehouse-specific services from catalog
+  const { data: catalogData } = useCatalogItems({ type: 'service', pageSize: 500 });
+
+  const myCertifiedServices = useMemo(() => {
+    const items = catalogData?.items || [];
+    // Filter to only show warehouse-managed services
+    const warehouseServices = items.filter((service: any) => service.managedBy === 'warehouse');
+    return warehouseServices.map((service: any) => ({
+      serviceId: service.code ?? 'SRV',
+      serviceName: service.name ?? 'Warehouse Service',
+      certified: 'Yes',
+      certificationDate: null,
+      expires: null,
+    }));
+  }, [catalogData]);
 
   const tabs = useMemo(() => [
     { id: 'dashboard', label: 'Dashboard', path: '/warehouse/dashboard' },
@@ -878,7 +971,7 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
               )}
               <TabSection
                 tabs={[
-                  { id: 'my', label: 'My Services', count: 0 },
+                  { id: 'my', label: 'My Services', count: myCertifiedServices.length },
                   { id: 'active', label: 'Active Services', count: activeServicesData.length },
                   { id: 'history', label: 'Service History', count: serviceHistoryData.length },
                 ]}
@@ -904,10 +997,11 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
                       { key: 'certificationDate', label: 'CERTIFICATION DATE' },
                       { key: 'expires', label: 'EXPIRES' },
                     ]}
-                    data={[]}
+                    data={myCertifiedServices}
                     showSearch={false}
+                    externalSearchQuery={servicesSearchQuery}
                     maxItems={10}
-                    onRowClick={() => undefined}
+                    onRowClick={(row: unknown) => console.log('[warehouse] view service', row)}
                   />
                 )}
                 {servicesTab === 'active' && (
@@ -941,18 +1035,41 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
                       {
                         key: 'actions',
                         label: 'ACTIONS',
-                        render: (_: any, row: any) => (
-                          <Button
-                            size="sm"
-                            roleColor="#8b5cf6"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedServiceId(row.serviceId);
-                            }}
-                          >
-                            View Details
-                          </Button>
-                        ),
+                        render: (_: any, row: any) => {
+                          const status = (row.status || '').toLowerCase();
+                          const isCreated = status === 'created';
+                          const isInProgress = status === 'in progress' || status === 'in_progress' || status === 'active';
+
+                          return (
+                            <div style={{ display: 'flex', gap: 8 }}>
+                              {isCreated && row.onStart && (
+                                <Button size="sm" variant="primary" roleColor="#8b5cf6" onClick={(e) => { e.stopPropagation(); row.onStart(); }}>
+                                  Start
+                                </Button>
+                              )}
+                              {isInProgress && row.onComplete && (
+                                <Button size="sm" variant="primary" roleColor="#8b5cf6" onClick={(e) => { e.stopPropagation(); row.onComplete(); }}>
+                                  Complete
+                                </Button>
+                              )}
+                              <Button
+                                size="sm"
+                                roleColor="#8b5cf6"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedServiceId(row.serviceId);
+                                }}
+                              >
+                                View
+                              </Button>
+                              {(isCreated || isInProgress) && row.onCancel && (
+                                <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); row.onCancel(); }}>
+                                  Cancel
+                                </Button>
+                              )}
+                            </div>
+                          );
+                        },
                       },
                     ]}
                     data={activeServicesData.filter((row) => {
@@ -999,6 +1116,19 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
                       },
                       { key: 'startDate', label: 'START DATE' },
                       { key: 'endDate', label: 'END DATE' },
+                      {
+                        key: 'actions',
+                        label: 'ACTIONS',
+                        render: (_: any, row: any) => (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => setSelectedServiceId(row.serviceId)}
+                          >
+                            View
+                          </Button>
+                        ),
+                      },
                     ]}
                     data={serviceHistoryData.filter((row) => {
                       if (!servicesSearchQuery) {
@@ -1067,6 +1197,7 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
         const status = ((selectedOrderForDetails as any)?.status || '').toLowerCase();
         const isServiceCreated = status === 'service_created' || status === 'service-created';
 
+        const meta = (selectedOrderForDetails as any)?.metadata || {};
         const commonOrder = selectedOrderForDetails
           ? {
               orderId: selectedOrderForDetails.orderId,
@@ -1076,7 +1207,10 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
               requestedDate: selectedOrderForDetails.requestedDate || null,
               notes: selectedOrderForDetails.notes || null,
               status: (selectedOrderForDetails as any).status || null,
-              serviceId: ((selectedOrderForDetails as any)?.metadata?.serviceId) || null,
+              serviceId: meta.serviceId || null,
+              managedBy: meta.serviceManagedBy || null,
+              managedById: meta.warehouseId || meta.managerId || null,
+              managedByName: meta.warehouseName || meta.managerName || null,
             }
           : null;
 
@@ -1162,6 +1296,95 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
             />
           );
         }
+      })()}
+
+      {/* Warehouse Service Details Modal */}
+      {selectedServiceId && (() => {
+        const service = serviceOrders.find(o => (o.serviceId ?? o.orderId) === selectedServiceId);
+        if (!service) return null;
+
+        const meta = (service as any).metadata || {};
+        const serviceData = {
+          serviceId: service.serviceId ?? service.orderId,
+          serviceName: service.title ?? service.serviceId ?? service.orderId,
+          serviceType: (meta.serviceType || 'one-time') as 'one-time' | 'recurring',
+          serviceStatus: formatStatusLabel(meta.serviceStatus || service.status),
+          centerId: service.centerId || null,
+          centerName: meta.contacts?.destination?.name || service.centerId || null,
+          warehouseId: meta.warehouseId || null,
+          warehouseName: meta.warehouseName || null,
+          managedBy: 'warehouse' as const,
+          startDate: meta.serviceActualStartTime || meta.actualStartDate || null,
+          serviceStartNotes: meta.serviceStartNotes || null,
+          serviceCompleteNotes: meta.serviceCompleteNotes || null,
+        };
+
+        const onStart = async () => {
+          try {
+            const notes = window.prompt('Add notes for starting this service (optional):');
+            if (notes === null) return;
+            const { applyServiceAction } = await import('../shared/api/hub');
+            await applyServiceAction(selectedServiceId, 'start', notes || undefined);
+            refreshOrders();
+            setSelectedServiceId(null); // Close modal after action
+          } catch (err) {
+            console.error('[warehouse] failed to start service', err);
+            alert(err instanceof Error ? err.message : 'Failed to start service');
+          }
+        };
+
+        const onComplete = async () => {
+          try {
+            const notes = window.prompt('Add notes for completing this service (describe work performed):');
+            if (notes === null) return;
+            const { applyServiceAction } = await import('../shared/api/hub');
+            await applyServiceAction(selectedServiceId, 'complete', notes || undefined);
+            refreshOrders();
+            setSelectedServiceId(null); // Close modal after action
+          } catch (err) {
+            console.error('[warehouse] failed to complete service', err);
+            alert(err instanceof Error ? err.message : 'Failed to complete service');
+          }
+        };
+
+        const onCancel = async () => {
+          try {
+            const reason = window.prompt('Please provide a reason for cancellation:');
+            if (!reason) return;
+            const { applyServiceAction } = await import('../shared/api/hub');
+            await applyServiceAction(selectedServiceId, 'cancel');
+            refreshOrders();
+            setSelectedServiceId(null); // Close modal after action
+          } catch (err) {
+            console.error('[warehouse] failed to cancel service', err);
+            alert(err instanceof Error ? err.message : 'Failed to cancel service');
+          }
+        };
+
+        const onAddNotes = async () => {
+          try {
+            const notes = window.prompt('Add notes for this service:');
+            if (!notes) return;
+            const { applyServiceAction } = await import('../shared/api/hub');
+            await applyServiceAction(selectedServiceId, 'update-notes', notes);
+            refreshOrders();
+          } catch (err) {
+            console.error('[warehouse] failed to add notes', err);
+            alert(err instanceof Error ? err.message : 'Failed to add notes');
+          }
+        };
+
+        return (
+          <ServiceViewModal
+            isOpen={true}
+            onClose={() => setSelectedServiceId(null)}
+            service={serviceData}
+            onStartService={onStart}
+            onCompleteService={onComplete}
+            onCancelService={onCancel}
+            onAddNotes={onAddNotes}
+          />
+        );
       })()}
     </div>
   );
