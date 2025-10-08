@@ -9,6 +9,9 @@ interface ReportsSectionProps {
   reports?: ReportFeedback[];
   feedback?: ReportFeedback[];
   isLoading?: boolean;
+  onSubmit?: (payload: { type: 'report' | 'feedback'; category: string; title: string; description: string; tags?: string; relatedService?: string; relatedOrder?: string }) => Promise<void> | void;
+  onAcknowledge?: (id: string, type: 'report' | 'feedback') => Promise<void> | void;
+  onResolve?: (id: string, details?: { actionTaken?: string; notes?: string }) => Promise<void> | void;
 }
 
 const ReportsSection: React.FC<ReportsSectionProps> = ({
@@ -17,13 +20,21 @@ const ReportsSection: React.FC<ReportsSectionProps> = ({
   primaryColor = '#3b82f6',
   reports = [],
   feedback = [],
-  isLoading = false
+  isLoading = false,
+  onSubmit,
+  onAcknowledge,
+  onResolve,
 }) => {
   const [activeTab, setActiveTab] = useState('all-reports');
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Determine if user can create reports/feedback at all
+  // Only contractor, customer, center, and manager can create
+  // Crew and warehouse are read-only
+  const canCreate = ['contractor', 'customer', 'center', 'manager'].includes(role.toLowerCase());
+
   // Determine if user can create reports (vs only feedback)
-  const canCreateReports = ['contractor', 'customer', 'center'].includes(role);
+  const canCreateReports = ['contractor', 'customer', 'center'].includes(role.toLowerCase());
   const defaultType = canCreateReports ? 'report' : 'feedback';
 
   const [reportForm, setReportForm] = useState({
@@ -101,13 +112,33 @@ const ReportsSection: React.FC<ReportsSectionProps> = ({
 
   const filteredReports = getFilteredReports();
 
-  const handleSubmitReport = () => {
+  const handleSubmitReport = async () => {
     if (!reportForm.type || !reportForm.category || !reportForm.title || !reportForm.description) {
       alert('Please fill in all required fields');
       return;
     }
 
-    console.log('Submitting report:', reportForm);
+    try {
+      if (onSubmit) {
+        await Promise.resolve(
+          onSubmit({
+            type: reportForm.type,
+            category: reportForm.category,
+            title: reportForm.title,
+            description: reportForm.description,
+            tags: reportForm.tags,
+            relatedService: reportForm.relatedService,
+            relatedOrder: reportForm.relatedOrder,
+          }),
+        );
+      } else {
+        console.log('Submitting report:', reportForm);
+      }
+    } catch (err) {
+      console.error('Failed to submit', err);
+      alert('Failed to submit. Please try again.');
+      return;
+    }
 
     // Reset form
     setReportForm({
@@ -120,17 +151,33 @@ const ReportsSection: React.FC<ReportsSectionProps> = ({
       relatedOrder: ''
     });
 
-    alert('Report submitted successfully!');
+    alert('Submitted successfully!');
   };
 
-  const handleAcknowledge = (reportId: string) => {
-    console.log('Acknowledging report:', reportId);
-    // In real implementation, this would call an API
+  const handleAcknowledge = async (reportId: string, type: 'report' | 'feedback') => {
+    try {
+      if (onAcknowledge) {
+        await Promise.resolve(onAcknowledge(reportId, type));
+      } else {
+        console.log('Acknowledging', type, reportId);
+      }
+    } catch (err) {
+      console.error('Acknowledge failed', err);
+      alert('Failed to acknowledge.');
+    }
   };
 
-  const handleResolve = (reportId: string, actionTaken: string, notes: string) => {
-    console.log('Resolving report:', reportId, actionTaken, notes);
-    // In real implementation, this would call an API
+  const handleResolve = async (reportId: string, actionTaken: string, notes: string) => {
+    try {
+      if (onResolve) {
+        await Promise.resolve(onResolve(reportId, { actionTaken, notes }));
+      } else {
+        console.log('Resolving report:', reportId, actionTaken, notes);
+      }
+    } catch (err) {
+      console.error('Resolve failed', err);
+      alert('Failed to resolve.');
+    }
   };
 
   const renderSubmitForm = () => (
@@ -428,7 +475,7 @@ const ReportsSection: React.FC<ReportsSectionProps> = ({
               report={report}
               currentUser={userId}
               userRole={role}
-              onAcknowledge={handleAcknowledge}
+              onAcknowledge={(id) => handleAcknowledge(id, report.type)}
               onResolve={handleResolve}
             />
           ))}
@@ -437,15 +484,18 @@ const ReportsSection: React.FC<ReportsSectionProps> = ({
     </div>
   );
 
+  // Build tabs array based on role permissions
+  const tabs = [
+    { id: 'all-reports', label: 'All Reports', count: allReports.filter(r => r.status === 'open').length },
+    { id: 'reports', label: 'Reports', count: reports.length },
+    { id: 'feedback', label: 'Feedback', count: feedback.length },
+    ...(canCreate ? [{ id: 'create', label: 'Create' }] : []),
+    { id: 'archive', label: 'Archive', count: allReports.filter(r => r.status === 'closed').length }
+  ];
+
   return (
     <TabSection
-      tabs={[
-        { id: 'all-reports', label: 'All Reports', count: allReports.filter(r => r.status === 'open').length },
-        { id: 'reports', label: 'Reports', count: reports.length },
-        { id: 'feedback', label: 'Feedback', count: feedback.length },
-        { id: 'create', label: 'Create' },
-        { id: 'archive', label: 'Archive', count: allReports.filter(r => r.status === 'closed').length }
-      ]}
+      tabs={tabs}
       activeTab={activeTab}
       onTabChange={setActiveTab}
       description={
@@ -462,7 +512,7 @@ const ReportsSection: React.FC<ReportsSectionProps> = ({
       primaryColor={primaryColor}
       contentPadding="flush"
     >
-      {activeTab === 'create' && renderSubmitForm()}
+      {activeTab === 'create' && canCreate && renderSubmitForm()}
       {activeTab !== 'create' && renderReportsList()}
     </TabSection>
   );

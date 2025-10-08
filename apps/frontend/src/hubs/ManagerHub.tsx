@@ -67,6 +67,7 @@ import {
   type HubOrderItem,
   type OrderActionRequest,
 } from '../shared/api/hub';
+import { createReport as apiCreateReport, createFeedback as apiCreateFeedback, acknowledgeItem as apiAcknowledgeItem, resolveReport as apiResolveReport } from '../shared/api/hub';
 import { useSWRConfig } from 'swr';
 import { buildEcosystemTree } from '../shared/utils/ecosystem';
 
@@ -569,7 +570,7 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
   const managerRootId = profileData?.cksCode ?? managerCode ?? 'MANAGER';
 
   // Fetch reports data
-  const { data: reportsData, isLoading: reportsLoading } = useHubReports(managerCode);
+  const { data: reportsData, isLoading: reportsLoading, mutate: mutateReports } = useHubReports(managerCode);
   const managerReports = useMemo<ReportFeedback[]>(
     () => (reportsData?.reports ?? []).map((item) => mapHubReportItem(item, 'report')),
     [reportsData],
@@ -1257,16 +1258,32 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
               <SupportSection role="manager" primaryColor={MANAGER_PRIMARY_COLOR} />
             </PageWrapper>
           ) : activeTab === 'reports' ? (
-            <PageWrapper title="Reports" headerSrOnly>
-              <ReportsSection
-                role="manager"
-                userId={managerRootId}
-                primaryColor={MANAGER_PRIMARY_COLOR}
-                reports={managerReports}
-                feedback={managerFeedback}
-                isLoading={reportsLoading}
-              />
-            </PageWrapper>
+          <PageWrapper title="Reports" headerSrOnly>
+            <ReportsSection
+              role="manager"
+              userId={managerRootId}
+              primaryColor={MANAGER_PRIMARY_COLOR}
+              reports={managerReports}
+              feedback={managerFeedback}
+              isLoading={reportsLoading}
+              onSubmit={async (payload) => {
+                if (payload.type === 'report') {
+                  await apiCreateReport({ title: payload.title, description: payload.description, category: payload.category });
+                } else {
+                  await apiCreateFeedback({ title: payload.title, message: payload.description, category: payload.category });
+                }
+                await mutateReports();
+              }}
+              onAcknowledge={async (id, type) => {
+                await apiAcknowledgeItem(id, type);
+                await mutateReports();
+              }}
+              onResolve={async (id, details) => {
+                await apiResolveReport(id, details ?? {});
+                await mutateReports();
+              }}
+            />
+          </PageWrapper>
           ) : (
             <PageWrapper title={activeTab} showHeader headerSrOnly>
               <h2>Manager Hub - {activeTab}</h2>

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 // Import the proper archive API client and types
 // Note: This import path needs to be adjusted based on your actual app structure
 // For now, we'll define the interface that the parent should pass
-export type EntityType = 'manager' | 'contractor' | 'customer' | 'center' | 'crew' | 'warehouse' | 'service' | 'product' | 'order';
+export type EntityType = 'manager' | 'contractor' | 'customer' | 'center' | 'crew' | 'warehouse' | 'service' | 'product' | 'order' | 'report' | 'feedback';
 
 export interface ArchivedEntity {
   id: string;
@@ -39,6 +39,7 @@ const ARCHIVE_TABS = [
   { id: 'services', label: 'Services', color: '#14b8a6', search: 'archived services', hasDropdown: true },
   { id: 'product', label: 'Products', color: '#d946ef', search: 'archived products' },
   { id: 'orders', label: 'Orders', color: '#6366f1', search: 'archived orders', hasDropdown: true },
+  { id: 'reports', label: 'Reports & Feedback', color: '#92400e', search: 'archived reports', hasDropdown: true },
 ];
 
 const TAB_COLUMN_CONFIG: Record<string, { idLabel: string; nameLabel: string }> = {
@@ -53,6 +54,8 @@ const TAB_COLUMN_CONFIG: Record<string, { idLabel: string; nameLabel: string }> 
   product: { idLabel: 'PRODUCT ID', nameLabel: 'PRODUCT NAME' },
   'product-orders': { idLabel: 'ORDER ID', nameLabel: 'PRODUCT ORDER' },
   'service-orders': { idLabel: 'ORDER ID', nameLabel: 'SERVICE ORDER' },
+  'reports': { idLabel: 'REPORT ID', nameLabel: 'TITLE' },
+  'feedback': { idLabel: 'FEEDBACK ID', nameLabel: 'TITLE' },
 };
 
 const BASE_COLUMNS = [
@@ -94,6 +97,7 @@ export default function ArchiveSection({ archiveAPI, onViewOrderDetails }: Archi
   const [activeTab, setActiveTab] = useState('manager');
   const [servicesSubTab, setServicesSubTab] = useState<string>('catalog-services');
   const [ordersSubTab, setOrdersSubTab] = useState<string>('product-orders');
+  const [reportsSubTab, setReportsSubTab] = useState<string>('reports');
   const [archivedData, setArchivedData] = useState<ArchivedEntity[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -114,7 +118,7 @@ export default function ArchiveSection({ archiveAPI, onViewOrderDetails }: Archi
 
   useEffect(() => {
     loadArchivedData();
-  }, [activeTab, servicesSubTab, ordersSubTab]);
+  }, [activeTab, servicesSubTab, ordersSubTab, reportsSubTab]);
 
   const loadArchivedData = async () => {
     setLoading(true);
@@ -124,6 +128,7 @@ export default function ArchiveSection({ archiveAPI, onViewOrderDetails }: Archi
       const effectiveTab = (() => {
         if (activeTab === 'services') return servicesSubTab;
         if (activeTab === 'orders') return ordersSubTab;
+        if (activeTab === 'reports') return reportsSubTab;
         return activeTab;
       })();
 
@@ -142,6 +147,9 @@ export default function ArchiveSection({ archiveAPI, onViewOrderDetails }: Archi
         orderTypeFilter = 'service';
       } else if (effectiveTab === 'catalog-services' || effectiveTab === 'active-services') {
         entityType = 'service';
+      } else if (effectiveTab === 'reports' || effectiveTab === 'feedback') {
+        // For reports subtab, use the specific entity type
+        entityType = effectiveTab as EntityType;
       }
 
       const data = await api.listArchived(entityType);
@@ -360,6 +368,24 @@ export default function ArchiveSection({ archiveAPI, onViewOrderDetails }: Archi
               onClick={() => setOrdersSubTab('service-orders')}
             >
               Service Orders
+            </Button>
+          </div>
+        )}
+        {activeTab === 'reports' && (
+          <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
+            <Button
+              variant={reportsSubTab === 'reports' ? 'primary' : 'secondary'}
+              size="small"
+              onClick={() => setReportsSubTab('reports')}
+            >
+              Reports
+            </Button>
+            <Button
+              variant={reportsSubTab === 'feedback' ? 'primary' : 'secondary'}
+              size="small"
+              onClick={() => setReportsSubTab('feedback')}
+            >
+              Feedback
             </Button>
           </div>
         )}

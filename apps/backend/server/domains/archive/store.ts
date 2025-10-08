@@ -4,7 +4,7 @@ import type { AuditContext } from '../provisioning';
 
 export interface ArchivedEntity {
   id: string;
-  entityType: 'manager' | 'contractor' | 'customer' | 'center' | 'crew' | 'warehouse' | 'service' | 'product' | 'order';
+  entityType: 'manager' | 'contractor' | 'customer' | 'center' | 'crew' | 'warehouse' | 'service' | 'product' | 'order' | 'report' | 'feedback';
   name: string;
   archivedAt: Date;
   archivedBy: string;
@@ -18,14 +18,14 @@ export interface ArchivedEntity {
 }
 
 interface ArchiveOperation {
-  entityType: 'manager' | 'contractor' | 'customer' | 'center' | 'crew' | 'warehouse' | 'service' | 'product' | 'order';
+  entityType: 'manager' | 'contractor' | 'customer' | 'center' | 'crew' | 'warehouse' | 'service' | 'product' | 'order' | 'report' | 'feedback';
   entityId: string;
   reason?: string;
   actor: AuditContext;
 }
 
 interface RestoreOperation {
-  entityType: 'manager' | 'contractor' | 'customer' | 'center' | 'crew' | 'warehouse' | 'service' | 'product' | 'order';
+  entityType: 'manager' | 'contractor' | 'customer' | 'center' | 'crew' | 'warehouse' | 'service' | 'product' | 'order' | 'report' | 'feedback';
   entityId: string;
   actor: AuditContext;
 }
@@ -377,6 +377,14 @@ export async function archiveEntity(operation: ArchiveOperation): Promise<{ succ
       tableName = 'orders';
       idColumn = 'order_id';
       break;
+    case 'report':
+      tableName = 'reports';
+      idColumn = 'report_id';
+      break;
+    case 'feedback':
+      tableName = 'feedback';
+      idColumn = 'feedback_id';
+      break;
     default:
       tableName = `${operation.entityType}s`;
       idColumn = `${operation.entityType}_id`;
@@ -563,7 +571,7 @@ export async function restoreEntity(operation: RestoreOperation): Promise<{ succ
 }
 
 export async function listArchivedEntities(
-  entityType?: 'manager' | 'contractor' | 'customer' | 'center' | 'crew' | 'warehouse' | 'service' | 'product' | 'order',
+  entityType?: 'manager' | 'contractor' | 'customer' | 'center' | 'crew' | 'warehouse' | 'service' | 'product' | 'order' | 'report' | 'feedback',
   limit = 100
 ): Promise<ArchivedEntity[]> {
   let queryText: string;
@@ -609,6 +617,16 @@ export async function listArchivedEntities(
         tableName = 'centers';
         idColumn = 'center_id';
         nameColumn = 'name';
+        break;
+      case 'report':
+        tableName = 'reports';
+        idColumn = 'report_id';
+        nameColumn = 'title';
+        break;
+      case 'feedback':
+        tableName = 'feedback';
+        idColumn = 'feedback_id';
+        nameColumn = 'title';
         break;
       default:
         tableName = `${entityType}s`;

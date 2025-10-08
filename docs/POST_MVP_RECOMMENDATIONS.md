@@ -1287,3 +1287,258 @@ Implement when:
 - Code change: 2 hours
 - Testing: 4-6 hours
 - Admin UI for warehouse assignment: 1 day
+
+## 25. UI/UX Consistency & Modal System Refinement
+
+### Current State
+During warehouse service implementation (Oct 7, 2025 session), several consistency issues emerged:
+- ServiceViewModal was created to consolidate warehouse and manager service views
+- Basic consistency achieved through conditional rendering based on `managedBy` field
+- Notes currently use `window.prompt()` - functional but poor UX
+- Modal behavior is consistent but lacks polish for production use
+
+### Problems Identified
+1. **Notes Interface**: Using `window.prompt()` for adding notes - basic but not user-friendly
+2. **Cross-Hub Visual Consistency**: Need comprehensive audit of all modals across all hubs
+3. **Date Display Standardization**: Some inconsistencies in how dates/statuses appear across different views
+4. **Modal Actions**: Action buttons need consistent placement, sizing, and behavior patterns
+5. **Empty States**: Not all modals have well-designed empty states
+6. **Loading States**: Inconsistent loading/skeleton patterns across modals
+7. **Error Handling**: Modal error states need standardization
+
+### Recommended Improvements
+
+#### Phase 1: Notes System Enhancement (Week 1-2)
+Replace `window.prompt()` with proper UI components:
+
+**Rich Notes Editor Component:**
+- Create `NotesEditorModal` component in `packages/ui/src/modals/`
+- Features:
+  - Multi-line textarea with character counter
+  - Timestamp display for historical notes
+  - User attribution ("Added by MGR-001 - John Smith on Oct 7, 2025 at 2:30 PM")
+  - Optional rich text formatting (bold, italic, lists)
+  - File attachment support (photos/PDFs of completed work)
+  - Preview mode before submission
+  - Cancel/Save buttons with confirmation on cancel if unsaved changes
+
+**Integration Points:**
+- ServiceViewModal: Replace `window.prompt()` in `onAddNotes` handler
+- Update backend to support note metadata (author, timestamp, attachments)
+- Add note editing/deletion capabilities (with audit trail)
+
+**Implementation:**
+```typescript
+// packages/ui/src/modals/NotesEditorModal/NotesEditorModal.tsx
+interface NotesEditorModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSave: (notes: string, attachments?: File[]) => Promise<void>;
+  title: string;
+  placeholder?: string;
+  maxLength?: number;
+  existingNotes?: Array<{
+    id: string;
+    content: string;
+    author: string;
+    timestamp: string;
+    attachments?: string[];
+  }>;
+  allowAttachments?: boolean;
+}
+```
+
+#### Phase 2: Modal System Audit & Standardization (Week 2-3)
+Conduct comprehensive review of all modals:
+
+**Modals to Audit:**
+- ServiceViewModal
+- OrderDetailsModal
+- ProductOrderModal
+- ServiceOrderModal
+- CreateServiceModal
+- AssignServiceModal
+- CatalogServiceModal
+- CrewSelectionModal
+- EditOrderModal
+- ActionModal
+
+**Standardization Checklist:**
+- [ ] Consistent header structure (title, subtitle, close button)
+- [ ] Consistent footer button layout (primary right, secondary left)
+- [ ] Consistent spacing and padding (use design tokens)
+- [ ] Consistent section headers and dividers
+- [ ] Consistent empty state messages and icons
+- [ ] Consistent loading states (skeleton screens)
+- [ ] Consistent error display (error banners, field validation)
+- [ ] Consistent color usage (no custom purple headers, etc.)
+- [ ] Consistent typography (font sizes, weights, line heights)
+- [ ] Consistent animations (fade in/out, slide transitions)
+
+**Create Modal Design System Document:**
+- Document standard modal widths (small: 400px, medium: 600px, large: 800px, extra-large: 1000px)
+- Standard header patterns
+- Standard section layouts
+- Standard button groups
+- Color palette for status indicators
+- Icon usage guidelines
+
+#### Phase 3: Status & Date Display Standardization (Week 3)
+Ensure consistency across all views:
+
+**Status Display:**
+- Create `StatusBadge` component with predefined color schemes
+- Status types: pending, created, in_progress, completed, cancelled, delivered, rejected, archived
+- Consistent color mapping across all hubs
+- Same status should always show same color/text
+
+**Date Display:**
+- Create `DateDisplay` component with format options
+- Show "Pending" for dates not yet occurred (consistent across all hubs)
+- Use `actualStartDate`, `actualEndDate` fields consistently
+- Format: "Oct 7, 2025" (short) or "October 7, 2025 at 2:30 PM" (long)
+- Relative time option: "2 hours ago", "3 days ago"
+
+**Implementation:**
+```typescript
+// packages/ui/src/components/StatusBadge/StatusBadge.tsx
+interface StatusBadgeProps {
+  status: 'pending' | 'created' | 'in_progress' | 'completed' | 'cancelled' | 'delivered' | 'rejected' | 'archived';
+  size?: 'sm' | 'md' | 'lg';
+  showIcon?: boolean;
+}
+
+// packages/ui/src/components/DateDisplay/DateDisplay.tsx
+interface DateDisplayProps {
+  date: string | null;
+  format?: 'short' | 'long' | 'relative';
+  showTime?: boolean;
+  pendingText?: string; // Default: "Pending"
+  emptyText?: string;   // Default: "—"
+}
+```
+
+#### Phase 4: Modal Actions & Behavior (Week 4)
+Standardize action button patterns:
+
+**Button Patterns:**
+- Primary actions: Right side, blue/primary color
+- Secondary actions: Left side, gray/secondary color
+- Destructive actions: Red, with confirmation modal
+- Disabled states: Gray with tooltip explaining why disabled
+
+**Confirmation Modals:**
+- Create `ConfirmationModal` component
+- Use for all destructive actions (delete, cancel, reject)
+- Clear title, description, and action buttons
+- "Are you sure?" pattern with consequences explained
+
+**Loading States:**
+- Disable buttons during async operations
+- Show loading spinner on button
+- Prevent modal close during operations
+- Show success/error feedback after operation
+
+#### Phase 5: Advanced UX Polish (Month 2)
+
+**Keyboard Navigation:**
+- Tab order through form fields and buttons
+- Escape key closes modal (with unsaved changes confirmation)
+- Enter key submits form (when appropriate)
+- Arrow keys for navigation in lists
+
+**Accessibility:**
+- ARIA labels on all interactive elements
+- Focus management (return focus after modal close)
+- Screen reader announcements
+- High contrast mode support
+- Keyboard-only navigation
+
+**Animations:**
+- Smooth modal open/close transitions
+- Skeleton loading animations
+- Button press animations
+- Success/error feedback animations
+- Non-jarring, subtle, professional
+
+**Responsive Design:**
+- All modals work on mobile/tablet
+- Stack sections vertically on small screens
+- Touch-friendly button sizes
+- Scrollable content areas
+
+#### Phase 6: Documentation & Guidelines (Ongoing)
+
+**Create:**
+- `MODAL_DESIGN_GUIDELINES.md` - Comprehensive modal design rules
+- `UI_COMPONENT_LIBRARY.md` - Documentation of all UI components
+- Storybook stories for all modal components
+- Visual regression tests (Percy, Chromatic)
+- Figma/design mockups for reference
+
+**Guidelines Should Cover:**
+- When to use which modal size
+- How to structure modal content
+- Button placement and labeling conventions
+- Color usage for different contexts
+- Error message formatting
+- Empty state best practices
+
+### Implementation Priority
+
+**High Priority (Month 1):**
+1. Notes system enhancement (replaces window.prompt)
+2. Modal audit and basic standardization
+3. StatusBadge and DateDisplay components
+4. ConfirmationModal for destructive actions
+
+**Medium Priority (Month 2):**
+5. Advanced UX polish (animations, keyboard nav)
+6. Accessibility improvements
+7. Responsive design refinements
+8. Loading state standardization
+
+**Low Priority (Month 3+):**
+9. Rich text editing for notes
+10. File attachments system
+11. Visual regression testing
+12. Comprehensive Storybook documentation
+
+### Success Metrics
+
+**Quantitative:**
+- 100% of modals pass consistency checklist
+- 0 instances of `window.prompt()` in production code
+- All modals meet WCAG 2.1 AA accessibility standards
+- Modal load time < 200ms
+- < 1% modal-related user error rate
+
+**Qualitative:**
+- User feedback: "Modals feel professional and consistent"
+- Developer feedback: "Easy to create new modals following patterns"
+- Design review approval: "Meets brand/UX standards"
+
+### Technical Debt Addressed
+- Replaces hacky `window.prompt()` usage
+- Eliminates custom styling inconsistencies (purple headers, etc.)
+- Creates reusable component library
+- Establishes patterns for future modal development
+- Reduces cognitive load for users (consistent = predictable)
+
+### Notes from Oct 7 Session
+User feedback: "PLEASE PLEASE PLEASE CAN WE HAVE SOME FUCKING CONSISTENCY????"
+
+Key learnings:
+- Users notice and care deeply about visual consistency
+- Small inconsistencies (colors, spacing, widths) erode trust
+- "Close enough" is not good enough for production
+- Consistency across all user roles is critical
+- Modal consolidation (ServiceViewModal) was the right call - maintain single-source-of-truth pattern
+
+**Priority:** High (Post-MVP Month 1)
+
+**Effort:** 3-4 weeks
+- Notes system: 1 week
+- Modal audit/standardization: 1 week
+- Component creation (StatusBadge, DateDisplay, etc.): 1 week
+- Polish and testing: 1 week

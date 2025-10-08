@@ -40,12 +40,14 @@ function buildPoolConfig(): PoolConfig {
     throw new Error('DATABASE_URL must be a valid PostgreSQL connection string starting with postgresql:// or postgres://');
   }
 
+  const sslEnv = String(process.env.DATABASE_SSL ?? 'true').toLowerCase();
+  const useSsl = sslEnv !== 'false' && sslEnv !== '0' && sslEnv !== 'disable';
   return {
     connectionString,
     max: 20,
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 10_000,
-    ssl: { rejectUnauthorized: false },
+    ...(useSsl ? { ssl: { rejectUnauthorized: false } } : {}),
   } satisfies PoolConfig;
 }
 

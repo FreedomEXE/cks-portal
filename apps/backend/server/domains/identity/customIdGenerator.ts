@@ -8,6 +8,9 @@ const IDENTITY_DESCRIPTORS: Record<IdentityEntity, IdentityDescriptor> = {
   center: { prefix: 'CEN', sequence: 'center_id_seq' },
   crew: { prefix: 'CRW', sequence: 'crew_id_seq' },
   warehouse: { prefix: 'WHS', sequence: 'warehouse_id_seq' },
+  // System records
+  report: { prefix: 'RPT', sequence: 'report_id_seq' },
+  feedback: { prefix: 'FBK', sequence: 'feedback_id_seq' },
 };
 
 const VALID_SEQUENCES = new Set(

@@ -13,9 +13,12 @@ export type AuthResult =
   | { ok: false; reason: AuthFailureReason };
 
 const CLERK_SECRET_KEY = process.env.CLERK_SECRET_KEY;
-
-if (!CLERK_SECRET_KEY) {
-  throw new Error('CLERK_SECRET_KEY is required to verify Clerk tokens.');
+const DEV_AUTH_ENABLED = String(process.env.CKS_ENABLE_DEV_AUTH ?? 'false') === 'true';
+// In dev override mode, do not hard-throw during module load if Clerk is not configured
+if (!CLERK_SECRET_KEY && !DEV_AUTH_ENABLED) {
+  // Keep a soft warning to help surface misconfiguration
+  // eslint-disable-next-line no-console
+  console.warn('[auth] CLERK_SECRET_KEY missing; token verification will fail. Set CKS_ENABLE_DEV_AUTH=true to use dev headers.');
 }
 
 export async function authenticate(req: FastifyRequest): Promise<AuthResult> {
@@ -32,6 +35,10 @@ export async function authenticate(req: FastifyRequest): Promise<AuthResult> {
   }
 
   try {
+    if (!CLERK_SECRET_KEY) {
+      // Without a secret key we cannot verify; return failure so guards can fall back to dev headers
+      return { ok: false, reason: 'verify_fail' };
+    }
     const payload = await verifyToken(token, {
       secretKey: CLERK_SECRET_KEY,
       audience: process.env.CLERK_JWT_AUDIENCE || undefined,

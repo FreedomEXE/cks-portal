@@ -8,7 +8,7 @@ import {
   hardDeleteEntity
 } from './store';
 
-const EntityTypeSchema = z.enum(['manager', 'contractor', 'customer', 'center', 'crew', 'warehouse', 'service', 'product', 'order']);
+const EntityTypeSchema = z.enum(['manager', 'contractor', 'customer', 'center', 'crew', 'warehouse', 'service', 'product', 'order', 'report', 'feedback']);
 
 const ArchiveRequestSchema = z.object({
   entityType: EntityTypeSchema,

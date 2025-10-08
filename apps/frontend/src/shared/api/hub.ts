@@ -544,6 +544,66 @@ export async function fetchHubReports(cksCode: string, init?: ApiFetchInit) {
   return response.data;
 }
 
+// Reports & Feedback actions
+function normalizeReportType(category: string): string {
+  const map: Record<string, string> = {
+    'Service Quality': 'service_quality',
+    'Product Quality': 'product_quality',
+    'Crew Performance': 'crew_performance',
+    'Delivery Issues': 'delivery_issues',
+    'System Bug': 'system_bug',
+    'Safety Concern': 'safety',
+    Other: 'other',
+  };
+  return map[category] ?? 'other';
+}
+
+function normalizeFeedbackKind(category: string): string {
+  const map: Record<string, string> = {
+    'Service Excellence': 'service_excellence',
+    'Staff Performance': 'staff_performance',
+    'Process Improvement': 'process_improvement',
+    'Product Suggestion': 'product_suggestion',
+    'System Enhancement': 'system_enhancement',
+    Recognition: 'recognition',
+    Other: 'other',
+  };
+  return map[category] ?? 'other';
+}
+
+export async function createReport(payload: { title: string; description: string; category: string; centerId?: string | null; customerId?: string | null; severity?: string | null }) {
+  const body = {
+    title: payload.title,
+    description: payload.description,
+    type: normalizeReportType(payload.category),
+    severity: payload.severity ?? undefined,
+    ...(payload.centerId ? { centerId: payload.centerId } : {}),
+    ...(payload.customerId ? { customerId: payload.customerId } : {}),
+  };
+  await apiFetch<ApiResponse<{ id: string }>>('/reports', { method: 'POST', body: JSON.stringify(body) });
+}
+
+export async function createFeedback(payload: { title: string; message: string; category: string; centerId?: string | null; customerId?: string | null }) {
+  const body = {
+    title: payload.title,
+    message: payload.message,
+    kind: normalizeFeedbackKind(payload.category),
+    ...(payload.centerId ? { centerId: payload.centerId } : {}),
+    ...(payload.customerId ? { customerId: payload.customerId } : {}),
+  };
+  await apiFetch<ApiResponse<{ id: string }>>('/feedback', { method: 'POST', body: JSON.stringify(body) });
+}
+
+export async function acknowledgeItem(id: string, type: 'report' | 'feedback') {
+  const path = type === 'report' ? `/reports/${encodeURIComponent(id)}/acknowledge` : `/feedback/${encodeURIComponent(id)}/acknowledge`;
+  await apiFetch<ApiResponse<{ id: string }>>(path, { method: 'POST' });
+}
+
+export async function resolveReport(id: string, details?: { actionTaken?: string; notes?: string }) {
+  // details are currently not persisted but included for future compatibility
+  await apiFetch<ApiResponse<{ id: string }>>(`/reports/${encodeURIComponent(id)}/resolve`, { method: 'POST' });
+}
+
 export function useHubInventory(cksCode?: string | null) {
   const key = sectionPath('inventory', cksCode);
   const result = useHubSWR<HubInventoryResponse>(key);

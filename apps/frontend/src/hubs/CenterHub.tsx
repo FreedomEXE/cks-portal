@@ -40,6 +40,7 @@ import {
   type HubOrderItem,
   type OrderActionRequest,
 } from '../shared/api/hub';
+import { createReport as apiCreateReport, createFeedback as apiCreateFeedback, acknowledgeItem as apiAcknowledgeItem, resolveReport as apiResolveReport } from '../shared/api/hub';
 
 import { buildEcosystemTree, DEFAULT_ROLE_COLOR_MAP } from '../shared/utils/ecosystem';
 
@@ -671,6 +672,35 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
                 reports={reportsData?.reports || []}
                 feedback={reportsData?.feedback || []}
                 isLoading={reportsLoading}
+                onSubmit={async (payload) => {
+                  if (payload.type === 'report') {
+                    await apiCreateReport({ title: payload.title, description: payload.description, category: payload.category, centerId: normalizedCode ?? undefined });
+                  } else {
+                    await apiCreateFeedback({ title: payload.title, message: payload.description, category: payload.category, centerId: normalizedCode ?? undefined });
+                  }
+                  // Refresh
+                  const code = normalizedCode ?? '';
+                  if (code) {
+                    const { mutate } = await import('swr');
+                    (mutate as any)(`/hub/reports/${code}`);
+                  }
+                }}
+                onAcknowledge={async (id, type) => {
+                  await apiAcknowledgeItem(id, type);
+                  const code = normalizedCode ?? '';
+                  if (code) {
+                    const { mutate } = await import('swr');
+                    (mutate as any)(`/hub/reports/${code}`);
+                  }
+                }}
+                onResolve={async (id, details) => {
+                  await apiResolveReport(id, details ?? {});
+                  const code = normalizedCode ?? '';
+                  if (code) {
+                    const { mutate } = await import('swr');
+                    (mutate as any)(`/hub/reports/${code}`);
+                  }
+                }}
               />
             </PageWrapper>
           ) : activeTab === 'support' ? (

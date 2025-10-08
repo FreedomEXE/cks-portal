@@ -28,6 +28,7 @@ import {
 } from '@cks/domain-widgets';
 import { Button, DataTable, OrderDetailsModal, ProductOrderModal, ServiceOrderModal, ServiceViewModal, PageHeader, PageWrapper, Scrollbar, TabSection } from '@cks/ui';
 import { useSWRConfig } from 'swr';
+import { createReport as apiCreateReport, createFeedback as apiCreateFeedback, acknowledgeItem as apiAcknowledgeItem, resolveReport as apiResolveReport } from '../shared/api/hub';
 import { useAuth } from '@cks/auth';
 
 import MyHubSection from '../components/MyHubSection';
@@ -929,6 +930,22 @@ export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHu
                 reports={reportsData?.reports || []}
                 feedback={reportsData?.feedback || []}
                 isLoading={reportsLoading}
+                onSubmit={async (payload) => {
+                  if (payload.type === 'report') {
+                    await apiCreateReport({ title: payload.title, description: payload.description, category: payload.category });
+                  } else {
+                    await apiCreateFeedback({ title: payload.title, message: payload.description, category: payload.category });
+                  }
+                  await mutate(`/hub/reports/${contractorCode}`);
+                }}
+                onAcknowledge={async (id, type) => {
+                  await apiAcknowledgeItem(id, type);
+                  await mutate(`/hub/reports/${contractorCode}`);
+                }}
+                onResolve={async (id, details) => {
+                  await apiResolveReport(id, details ?? {});
+                  await mutate(`/hub/reports/${contractorCode}`);
+                }}
               />
             </PageWrapper>
           ) : activeTab === 'support' ? (
@@ -1106,7 +1123,6 @@ export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHu
     </div>
   );
 }
-
 
 
 

@@ -215,6 +215,7 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
   const [directoryTab, setDirectoryTab] = useState<string>('admins');
   const [servicesSubTab, setServicesSubTab] = useState<string>('catalog-services');
   const [ordersSubTab, setOrdersSubTab] = useState<string>('product-orders');
+  const [reportsSubTab, setReportsSubTab] = useState<string>('reports');
   const [showActionModal, setShowActionModal] = useState(false);
   const [selectedEntity, setSelectedEntity] = useState<Record<string, any> | null>(null);
   const [showServiceCatalogModal, setShowServiceCatalogModal] = useState(false);
@@ -443,6 +444,7 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
       const effectiveTab = (() => {
         if (directoryTab === 'services') return servicesSubTab;
         if (directoryTab === 'orders') return ordersSubTab;
+        if (directoryTab === 'reports') return reportsSubTab;
         return directoryTab;
       })();
 
@@ -474,6 +476,12 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
       } else if (directoryTab === 'products' && entity.id) {
         entityType = 'product';
         entityId = (entity as any).rawId || entity.id;
+      } else if (effectiveTab === 'reports' && entity.id) {
+        entityType = 'report';
+        entityId = entity.id;
+      } else if (effectiveTab === 'feedback' && entity.id) {
+        entityType = 'feedback';
+        entityId = entity.id;
       } else if (entity.id) {
         // Fallback to generic id field and guess based on tab
         entityId = entity.id;
@@ -485,6 +493,8 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
         else if (directoryTab === 'warehouses') entityType = 'warehouse';
         else if (effectiveTab === 'catalog-services' || effectiveTab === 'active-services') entityType = 'service';
         else if (directoryTab === 'products') entityType = 'product';
+        else if (effectiveTab === 'reports') entityType = 'report';
+        else if (effectiveTab === 'feedback') entityType = 'feedback';
       }
 
       if (!entityType || !entityId) {
@@ -529,6 +539,10 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
           mutate('/admin/directory/products');
         } else if (entityType === 'order') {
           mutate('/admin/directory/orders');
+        } else if (entityType === 'report') {
+          mutate('/admin/directory/reports');
+        } else if (entityType === 'feedback') {
+          mutate('/admin/directory/feedback');
         }
 
         // Also refresh the archive list
@@ -547,7 +561,7 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
         alert(`Failed to archive ${entityType}: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     },
-    [handleModalClose, directoryTab, servicesSubTab, ordersSubTab, mutate],
+    [handleModalClose, directoryTab, servicesSubTab, ordersSubTab, reportsSubTab, mutate],
   );
 
 
@@ -822,6 +836,9 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
         centerId: formatText(report.centerId),
         status: formatText(report.status),
         createdAt: formatDate(report.createdAt),
+        // Store full report data for modal
+        _fullReport: report,
+        _entityType: 'report',
       })),
     [reports],
   );
@@ -835,6 +852,9 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
         customerId: formatText(entry.customerId),
         centerId: formatText(entry.centerId),
         createdAt: formatDate(entry.createdAt),
+        // Store full feedback data for modal
+        _fullFeedback: entry,
+        _entityType: 'feedback',
       })),
     [feedbackEntries],
   );
@@ -1045,6 +1065,7 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
         { key: 'centerId', label: 'CENTER' },
         { key: 'status', label: 'STATUS', render: renderStatusBadge },
         { key: 'createdAt', label: 'CREATED' },
+        { key: 'actions', label: 'ACTIONS', render: renderActions },
       ],
       data: reportRows,
       emptyMessage: 'No reports filed.',
@@ -1057,6 +1078,7 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
         { key: 'customerId', label: 'CUSTOMER' },
         { key: 'centerId', label: 'CENTER' },
         { key: 'createdAt', label: 'CREATED' },
+        { key: 'actions', label: 'ACTIONS', render: renderActions },
       ],
       data: feedbackRows,
       emptyMessage: 'No feedback submitted.',
@@ -1224,31 +1246,40 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
       );
     }
 
-    // Handle Reports & Feedback (side-by-side)
+    // Handle Reports & Feedback dropdown
     if (directoryTab === 'reports') {
+      const activeSubTab = reportsSubTab;
+      const section = (directoryConfig as any)[activeSubTab];
+      if (!section) {
+        return <div style={{ color: '#64748b', fontSize: 14 }}>No data available.</div>;
+      }
       return (
-        <div style={{ display: 'flex', gap: '4%' }}>
-          <div style={{ width: '48%' }}>
-            <DataTable
-              columns={(directoryConfig as any).reports.columns}
-              data={(directoryConfig as any).reports.data}
-              emptyMessage={(directoryConfig as any).reports.emptyMessage}
-              searchPlaceholder="Search reports..."
-              maxItems={25}
-              showSearch
-            />
+        <>
+          <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
+            <Button
+              variant={reportsSubTab === 'reports' ? 'primary' : 'secondary'}
+              size="small"
+              onClick={() => setReportsSubTab('reports')}
+            >
+              Reports
+            </Button>
+            <Button
+              variant={reportsSubTab === 'feedback' ? 'primary' : 'secondary'}
+              size="small"
+              onClick={() => setReportsSubTab('feedback')}
+            >
+              Feedback
+            </Button>
           </div>
-          <div style={{ width: '48%' }}>
-            <DataTable
-              columns={(directoryConfig as any).feedback.columns}
-              data={(directoryConfig as any).feedback.data}
-              emptyMessage={(directoryConfig as any).feedback.emptyMessage}
-              searchPlaceholder="Search feedback..."
-              maxItems={25}
-              showSearch
-            />
-          </div>
-        </div>
+          <DataTable
+            columns={section.columns}
+            data={section.data}
+            emptyMessage={section.emptyMessage}
+            searchPlaceholder={`Search ${reportsSubTab === 'reports' ? 'reports' : 'feedback'}...`}
+            maxItems={25}
+            showSearch
+          />
+        </>
       );
     }
 
@@ -1369,6 +1400,9 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
             return servicesSubTab === 'catalog-services' ? 'Catalog Service Actions' : 'Active Service Actions';
           }
           if (directoryTab === 'warehouses') return 'Warehouse Actions';
+          if (directoryTab === 'reports') {
+            return reportsSubTab === 'reports' ? 'Report Actions' : 'Feedback Actions';
+          }
           return undefined; // Use default title for users
         })()}
         actions={(() => {
@@ -1553,6 +1587,31 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
               },
               {
                 label: 'Delete Warehouse',
+                variant: 'danger' as const,
+                onClick: () => selectedEntity && handleDelete(selectedEntity),
+              },
+            ];
+          }
+          if (directoryTab === 'reports') {
+            const fullReport = (selectedEntity as any)?._fullReport;
+            const fullFeedback = (selectedEntity as any)?._fullFeedback;
+            const item = fullReport || fullFeedback;
+            const isReport = reportsSubTab === 'reports';
+
+            return [
+              {
+                label: `View ${isReport ? 'Report' : 'Feedback'}`,
+                variant: 'secondary' as const,
+                onClick: () => {
+                  if (!item) return;
+                  const details = isReport
+                    ? `ID: ${item.id}\nTitle: ${item.title}\nCategory: ${item.category}\nDescription: ${item.description}\nSeverity: ${item.severity || 'N/A'}\nStatus: ${item.status}\nSubmitted By: ${item.submittedBy}\nDate: ${item.submittedDate}\nService ID: ${item.relatedService || 'N/A'}\nTags: ${(item.tags || []).join(', ') || 'None'}`
+                    : `ID: ${item.id}\nTitle: ${item.title}\nCategory: ${item.category}\nMessage: ${item.description}\nStatus: ${item.status}\nSubmitted By: ${item.submittedBy}\nDate: ${item.submittedDate}`;
+                  alert(details);
+                },
+              },
+              {
+                label: `Delete ${isReport ? 'Report' : 'Feedback'}`,
                 variant: 'danger' as const,
                 onClick: () => selectedEntity && handleDelete(selectedEntity),
               },

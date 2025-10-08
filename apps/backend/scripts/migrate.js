@@ -14,12 +14,14 @@ function buildPoolConfig() {
     throw new Error('DATABASE_URL environment variable is required to run migrations.');
   }
 
+  const sslEnv = String(process.env.DATABASE_SSL ?? 'true').toLowerCase();
+  const useSsl = sslEnv !== 'false' && sslEnv !== '0' && sslEnv !== 'disable';
   return {
     connectionString,
     max: 20,
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 10_000,
-    ssl: { rejectUnauthorized: false },
+    ...(useSsl ? { ssl: { rejectUnauthorized: false } } : {}),
   };
 }
 

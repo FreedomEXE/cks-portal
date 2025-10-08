@@ -21,180 +21,174 @@ export interface HubReportsPayload {
   cksCode: string;
   reports: ReportItem[];
   feedback: ReportItem[];
-  // ...existing code...
 }
 
-async function getManagerReports(cksCode: string): Promise<HubReportsPayload> {
-  // Manager sees all reports from their customers and centers
-  const reportsResult = await query<any>(
-    `SELECT r.* FROM reports r
-     WHERE r.customer_id IN (
-       SELECT customer_id FROM customers WHERE UPPER(cks_manager) = $1
-     ) OR r.center_id IN (
-       SELECT center_id FROM centers WHERE UPPER(cks_manager) = $1
-     )
-     ORDER BY r.created_at DESC NULLS LAST`,
-    [cksCode],
-  );
-
-  const reports: ReportItem[] = reportsResult.rows.map(row => ({
-    id: row.id,
-    type: row.kind === 'feedback' ? 'feedback' : 'report',
-    category: row.severity ?? 'General',
+function mapReportRow(row: any): ReportItem {
+  return {
+    id: row.report_id,
+    type: 'report',
+    category: row.type ?? 'General',
     title: row.title ?? 'Untitled',
     description: row.description ?? '',
-    submittedBy: row.customer_id ?? row.center_id ?? 'Unknown',
-    submittedDate: row.created_at,
+    submittedBy: row.customer_id ?? row.center_id ?? row.created_by_id ?? 'Unknown',
+    submittedDate: row.created_at ?? new Date().toISOString(),
     status: row.status ?? 'open',
-    relatedService: row.service_id,
-    tags: row.tags ? row.tags.split(',') : [],
-  }));
-
-  return {
-    role: 'manager',
-    cksCode,
-    reports: reports.filter(r => r.type === 'report'),
-    feedback: reports.filter(r => r.type === 'feedback'),
+    relatedService: row.service_id ?? null,
+    tags: Array.isArray(row.tags) ? row.tags : (typeof row.tags === 'string' ? String(row.tags).split(',') : []),
+    acknowledgments: [],
   };
 }
 
-async function getCustomerReports(cksCode: string): Promise<HubReportsPayload> {
+function mapFeedbackRow(row: any): ReportItem {
+  return {
+    id: row.feedback_id,
+    type: 'feedback',
+    category: row.kind ?? 'General',
+    title: row.title ?? 'Untitled',
+    description: row.message ?? '',
+    submittedBy: row.customer_id ?? row.center_id ?? row.created_by_id ?? 'Unknown',
+    submittedDate: row.created_at ?? new Date().toISOString(),
+    status: (row.status ?? 'open') === 'resolved' ? 'closed' : (row.status ?? 'open'),
+    relatedService: null,
+    tags: [],
+    acknowledgments: [],
+  };
+}
+
+/**
+ * Helper function to get the manager ID for a given user code and role.
+ * This determines which ecosystem the user belongs to.
+ */
+async function getManagerForUser(cksCode: string, role: HubRole): Promise<string | null> {
+  const normalized = normalizeIdentity(cksCode);
+  if (!normalized) return null;
+
+  switch (role.toLowerCase()) {
+    case 'manager': {
+      // Manager is the ecosystem themselves
+      return normalized;
+    }
+    case 'center': {
+      const result = await query<{ cks_manager: string | null }>(
+        'SELECT cks_manager FROM centers WHERE UPPER(center_id) = UPPER($1)',
+        [normalized]
+      );
+      return result.rows[0]?.cks_manager ? normalizeIdentity(result.rows[0].cks_manager) : null;
+    }
+    case 'customer': {
+      const result = await query<{ cks_manager: string | null }>(
+        'SELECT cks_manager FROM customers WHERE UPPER(customer_id) = UPPER($1)',
+        [normalized]
+      );
+      return result.rows[0]?.cks_manager ? normalizeIdentity(result.rows[0].cks_manager) : null;
+    }
+    case 'contractor': {
+      const result = await query<{ cks_manager: string | null }>(
+        'SELECT cks_manager FROM contractors WHERE UPPER(contractor_id) = UPPER($1)',
+        [normalized]
+      );
+      return result.rows[0]?.cks_manager ? normalizeIdentity(result.rows[0].cks_manager) : null;
+    }
+    case 'crew': {
+      // Crew members belong to centers, need to find their assigned center
+      const result = await query<{ assigned_center: string | null }>(
+        'SELECT assigned_center FROM crew WHERE UPPER(crew_id) = UPPER($1)',
+        [normalized]
+      );
+      if (result.rows[0]?.assigned_center) {
+        const centerResult = await query<{ cks_manager: string | null }>(
+          'SELECT cks_manager FROM centers WHERE UPPER(center_id) = UPPER($1)',
+          [result.rows[0].assigned_center]
+        );
+        return centerResult.rows[0]?.cks_manager ? normalizeIdentity(centerResult.rows[0].cks_manager) : null;
+      }
+      return null;
+    }
+    case 'warehouse': {
+      // Warehouses don't have direct manager relationship in current schema
+      // For now, return null - may need to add warehouse-to-manager mapping
+      return null;
+    }
+    default:
+      return null;
+  }
+}
+
+/**
+ * Admin function to get ALL reports and feedback across all ecosystems.
+ * Admins have system-wide visibility with no ecosystem boundaries.
+ */
+async function getAllReportsForAdmin(cksCode: string): Promise<HubReportsPayload> {
+  // Query ALL reports in the system (not ecosystem-scoped)
   const reportsResult = await query<any>(
-    `SELECT * FROM reports
-     WHERE (UPPER(customer_id) = $1 OR (UPPER(created_by_id) = $1 AND created_by_role = 'customer'))
+    `SELECT report_id, type, severity, title, description, service_id, center_id, customer_id,
+            status, created_by_id, created_by_role, created_at, tags
+     FROM reports
+     WHERE archived_at IS NULL
+     ORDER BY created_at DESC NULLS LAST`
+  );
+
+  // Query ALL feedback in the system (not ecosystem-scoped)
+  const feedbackResult = await query<any>(
+    `SELECT feedback_id, kind, title, message, center_id, customer_id,
+            status, created_by_id, created_by_role, created_at
+     FROM feedback
+     WHERE archived_at IS NULL
+     ORDER BY created_at DESC NULLS LAST`
+  );
+
+  return {
+    role: 'admin',
+    cksCode,
+    reports: reportsResult.rows.map(mapReportRow),
+    feedback: feedbackResult.rows.map(mapFeedbackRow),
+  };
+}
+
+/**
+ * Universal function to get reports and feedback for any role.
+ * All users see all reports/feedback within their ecosystem (determined by cks_manager).
+ * Ecosystem boundaries are strict - no cross-ecosystem visibility.
+ */
+async function getEcosystemReports(cksCode: string, role: HubRole): Promise<HubReportsPayload> {
+  // Get the manager (ecosystem) for this user
+  const managerCode = await getManagerForUser(cksCode, role);
+
+  if (!managerCode) {
+    // If we can't determine the manager, return empty results
+    return {
+      role,
+      cksCode,
+      reports: [],
+      feedback: [],
+    };
+  }
+
+  // Query all reports in this ecosystem (WHERE cks_manager = manager AND not archived)
+  const reportsResult = await query<any>(
+    `SELECT report_id, type, severity, title, description, service_id, center_id, customer_id,
+            status, created_by_id, created_by_role, created_at, tags
+     FROM reports
+     WHERE UPPER(cks_manager) = UPPER($1) AND archived_at IS NULL
      ORDER BY created_at DESC NULLS LAST`,
-    [cksCode],
+    [managerCode]
   );
 
-  const reports: ReportItem[] = reportsResult.rows.map(row => ({
-    id: row.id,
-    type: row.kind === 'feedback' ? 'feedback' : 'report',
-    category: row.severity ?? 'General',
-    title: row.title ?? 'Untitled',
-    description: row.description ?? '',
-    submittedBy: row.customer_id ?? 'Unknown',
-    submittedDate: row.created_at,
-    status: row.status ?? 'open',
-    relatedService: row.service_id,
-    tags: row.tags ? row.tags.split(',') : [],
-  }));
-
-  return {
-    role: 'customer',
-    cksCode,
-    reports: reports.filter(r => r.type === 'report'),
-    feedback: reports.filter(r => r.type === 'feedback'),
-  };
-}
-
-async function getCenterReports(cksCode: string): Promise<HubReportsPayload> {
-  const reportsResult = await query<any>(
-    `SELECT * FROM reports
-     WHERE (UPPER(center_id) = $1 OR (UPPER(created_by_id) = $1 AND created_by_role = 'center'))
+  // Query all feedback in this ecosystem (WHERE cks_manager = manager AND not archived)
+  const feedbackResult = await query<any>(
+    `SELECT feedback_id, kind, title, message, center_id, customer_id,
+            status, created_by_id, created_by_role, created_at
+     FROM feedback
+     WHERE UPPER(cks_manager) = UPPER($1) AND archived_at IS NULL
      ORDER BY created_at DESC NULLS LAST`,
-    [cksCode],
+    [managerCode]
   );
 
-  const reports: ReportItem[] = reportsResult.rows.map(row => ({
-    id: row.id,
-    type: row.kind === 'feedback' ? 'feedback' : 'report',
-    category: row.severity ?? 'General',
-    title: row.title ?? 'Untitled',
-    description: row.description ?? '',
-    submittedBy: row.center_id ?? 'Unknown',
-    submittedDate: row.created_at,
-    status: row.status ?? 'open',
-    relatedService: row.service_id,
-    tags: row.tags ? row.tags.split(',') : [],
-  }));
-
   return {
-    role: 'center',
+    role,
     cksCode,
-    reports: reports.filter(r => r.type === 'report'),
-    feedback: reports.filter(r => r.type === 'feedback'),
-  };
-}
-
-async function getContractorReports(cksCode: string): Promise<HubReportsPayload> {
-  // Contractor sees reports from their centers
-  const reportsResult = await query<any>(
-    `SELECT r.* FROM reports r
-     WHERE r.center_id IN (
-       SELECT center_id FROM centers WHERE UPPER(contractor_id) = $1
-     )
-     ORDER BY r.created_at DESC NULLS LAST`,
-    [cksCode],
-  );
-
-  const reports: ReportItem[] = reportsResult.rows.map(row => ({
-    id: row.id,
-    type: row.kind === 'feedback' ? 'feedback' : 'report',
-    category: row.severity ?? 'General',
-    title: row.title ?? 'Untitled',
-    description: row.description ?? '',
-    submittedBy: row.center_id ?? 'Unknown',
-    submittedDate: row.created_at,
-    status: row.status ?? 'open',
-    relatedService: row.service_id,
-    tags: row.tags ? row.tags.split(',') : [],
-  }));
-
-  return {
-    role: 'contractor',
-    cksCode,
-    reports: reports.filter(r => r.type === 'report'),
-    feedback: reports.filter(r => r.type === 'feedback'),
-  };
-}
-
-async function getCrewReports(cksCode: string): Promise<HubReportsPayload> {
-  // Crew can only submit feedback, not reports
-  const reportsResult = await query<any>(
-    `SELECT * FROM reports
-     WHERE UPPER(created_by_id) = $1 AND created_by_role = 'crew'
-     ORDER BY created_at DESC NULLS LAST`,
-    [cksCode],
-  );
-
-  const reports: ReportItem[] = reportsResult.rows.map(row => ({
-    id: row.id,
-    type: 'feedback', // Crew only does feedback
-    category: row.severity ?? 'General',
-    title: row.title ?? 'Untitled',
-    description: row.description ?? '',
-    submittedBy: row.created_by_id ?? 'Unknown',
-    submittedDate: row.created_at,
-    status: row.status ?? 'open',
-    relatedService: row.service_id,
-    tags: row.tags ? row.tags.split(',') : [],
-  }));
-
-  return {
-    role: 'crew',
-    cksCode,
-    reports: [],
-    feedback: reports,
-  };
-}
-
-async function getWarehouseReports(cksCode: string): Promise<HubReportsPayload> {
-  // Warehouses see reports related to product and service orders they were involved in
-  // This will be mapped out in more detail later when we wire and test the entire reports flow
-  // Per CKS REPORTS WORKFLOW doc: Warehouses can create feedback only and can resolve reports
-
-  // TODO: Implement proper query once the reports table has proper warehouse linkage
-  // The query should:
-  // 1. Find all orders (product/service) involving this warehouse
-  // 2. Get reports related to those orders via relatedOrder/relatedService fields
-  // 3. Also get any feedback submitted by this warehouse
-
-  // For now, return empty arrays to prevent errors
-  return {
-    role: 'warehouse',
-    cksCode,
-    reports: [],
-    feedback: [],
+    reports: reportsResult.rows.map(mapReportRow),
+    feedback: feedbackResult.rows.map(mapFeedbackRow),
   };
 }
 
@@ -204,21 +198,11 @@ export async function getHubReports(role: HubRole, cksCode: string): Promise<Hub
     return null;
   }
 
-  switch (role) {
-    case 'manager':
-      return getManagerReports(normalizedCode);
-    case 'customer':
-      return getCustomerReports(normalizedCode);
-    case 'contractor':
-      return getContractorReports(normalizedCode);
-    case 'center':
-      return getCenterReports(normalizedCode);
-    case 'crew':
-      return getCrewReports(normalizedCode);
-    case 'warehouse':
-      return getWarehouseReports(normalizedCode);
-    default:
-      return null;
+  // Admin sees ALL reports across all ecosystems
+  if (role.toLowerCase() === 'admin') {
+    return getAllReportsForAdmin(normalizedCode);
   }
-}
 
+  // All other roles use the ecosystem-based query
+  return getEcosystemReports(normalizedCode, role);
+}

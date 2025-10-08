@@ -43,6 +43,7 @@ import {
   type OrderActionRequest,
   type OrderActionType,
 } from '../shared/api/hub';
+import { createFeedback as apiCreateFeedback, acknowledgeItem as apiAcknowledgeItem, resolveReport as apiResolveReport } from '../shared/api/hub';
 
 const ACTION_LABEL_MAP: Record<string, OrderActionType> = {
   Accept: 'accept',
@@ -1175,6 +1176,26 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
                 reports={reportsData?.reports || []}
                 feedback={reportsData?.feedback || []}
                 isLoading={reportsLoading}
+                onSubmit={async (payload) => {
+                  if (payload.type === 'feedback') {
+                    await apiCreateFeedback({ title: payload.title, message: payload.description, category: payload.category });
+                  } else {
+                    alert('Warehouse can only submit feedback at this time.');
+                    return;
+                  }
+                  const { mutate } = await import('swr');
+                  (mutate as any)(`/hub/reports/${normalizedCode}`);
+                }}
+                onAcknowledge={async (id, type) => {
+                  await apiAcknowledgeItem(id, type);
+                  const { mutate } = await import('swr');
+                  (mutate as any)(`/hub/reports/${normalizedCode}`);
+                }}
+                onResolve={async (id, details) => {
+                  await apiResolveReport(id, details ?? {});
+                  const { mutate } = await import('swr');
+                  (mutate as any)(`/hub/reports/${normalizedCode}`);
+                }}
               />
             </PageWrapper>
           ) : activeTab === 'support' ? (

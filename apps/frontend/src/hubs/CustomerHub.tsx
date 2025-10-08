@@ -29,6 +29,7 @@ import {
 import { Button, DataTable, OrderDetailsModal, ProductOrderModal, ServiceOrderModal, ServiceViewModal, PageHeader, PageWrapper, Scrollbar, TabSection } from '@cks/ui';
 import { useAuth } from '@cks/auth';
 import { useSWRConfig } from 'swr';
+import { createReport as apiCreateReport, createFeedback as apiCreateFeedback, acknowledgeItem as apiAcknowledgeItem, resolveReport as apiResolveReport } from '../shared/api/hub';
 
 import MyHubSection from '../components/MyHubSection';
 import {
@@ -689,6 +690,22 @@ export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubPro
                 reports={reportsData?.reports || []}
                 feedback={reportsData?.feedback || []}
                 isLoading={reportsLoading}
+                onSubmit={async (payload) => {
+                  if (payload.type === 'report') {
+                    await apiCreateReport({ title: payload.title, description: payload.description, category: payload.category, customerId: normalizedCode ?? undefined });
+                  } else {
+                    await apiCreateFeedback({ title: payload.title, message: payload.description, category: payload.category, customerId: normalizedCode ?? undefined });
+                  }
+                  await mutate(`/hub/reports/${normalizedCode}`);
+                }}
+                onAcknowledge={async (id, type) => {
+                  await apiAcknowledgeItem(id, type);
+                  await mutate(`/hub/reports/${normalizedCode}`);
+                }}
+                onResolve={async (id, details) => {
+                  await apiResolveReport(id, details ?? {});
+                  await mutate(`/hub/reports/${normalizedCode}`);
+                }}
               />
             </PageWrapper>
           ) : activeTab === 'support' ? (

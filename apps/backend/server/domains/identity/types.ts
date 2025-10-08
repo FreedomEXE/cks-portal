@@ -4,7 +4,10 @@ export type IdentityEntity =
   | 'customer'
   | 'center'
   | 'crew'
-  | 'warehouse';
+  | 'warehouse'
+  // Extended entities for system records
+  | 'report'
+  | 'feedback';
 
 export interface IdentityDescriptor {
   prefix: string;
