@@ -1279,8 +1279,52 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
                 await mutateReports();
               }}
               onResolve={async (id, details) => {
-                await apiResolveReport(id, details ?? {});
+                console.log('[ManagerHub] onResolve called with:', { id, details, managerCode });
+
+                // Optimistic update: immediately update the local cache with all resolved fields
+                await mutateReports(
+                  async (currentData) => {
+                    console.log('[ManagerHub] mutateReports updater - currentData:', currentData);
+                    if (!currentData?.data) {
+                      console.log('[ManagerHub] No currentData, returning early');
+                      return currentData;
+                    }
+
+                    const now = new Date().toISOString();
+
+                    // Update the specific report with all resolved-related fields
+                    const updatedReports = currentData.data.reports.map(report =>
+                      report.id === id ? {
+                        ...report,
+                        status: 'resolved' as const,
+                        resolvedBy: managerCode,
+                        resolvedAt: now,
+                        resolution_notes: details?.notes || null
+                      } : report
+                    );
+
+                    const updatedData = {
+                      ...currentData,
+                      data: {
+                        ...currentData.data,
+                        reports: updatedReports
+                      }
+                    };
+
+                    console.log('[ManagerHub] mutateReports updater - returning updatedData:', updatedData);
+                    return updatedData;
+                  },
+                  { revalidate: false }
+                );
+
+                console.log('[ManagerHub] Calling apiResolveReport');
+                // Then make the API call in the background
+                await apiResolveReport(id, details);
+
+                console.log('[ManagerHub] Calling final mutateReports revalidate');
+                // Finally revalidate to get the complete updated data from server
                 await mutateReports();
+                console.log('[ManagerHub] onResolve complete');
               }}
             />
           </PageWrapper>

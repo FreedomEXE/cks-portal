@@ -10,10 +10,13 @@ export interface ReportItem {
   description: string;
   submittedBy: string;
   submittedDate: string;
-  status: 'open' | 'closed' | 'in-progress';
+  status: 'open' | 'resolved' | 'closed';
   relatedService?: string | null;
   acknowledgments?: Array<{ userId: string; date: string }>;
   tags?: string[];
+  resolution_notes?: string | null;
+  resolvedBy?: string | null;
+  resolvedAt?: string | null;
 }
 
 export interface HubReportsPayload {
@@ -23,7 +26,7 @@ export interface HubReportsPayload {
   feedback: ReportItem[];
 }
 
-function mapReportRow(row: any): ReportItem {
+function mapReportRow(row: any, acknowledgments: Array<{ userId: string; date: string }> = []): ReportItem {
   return {
     id: row.report_id,
     type: 'report',
@@ -35,11 +38,14 @@ function mapReportRow(row: any): ReportItem {
     status: row.status ?? 'open',
     relatedService: row.service_id ?? null,
     tags: Array.isArray(row.tags) ? row.tags : (typeof row.tags === 'string' ? String(row.tags).split(',') : []),
-    acknowledgments: [],
+    acknowledgments,
+    resolution_notes: row.resolution_notes ?? null,
+    resolvedBy: row.resolved_by_id ?? null,
+    resolvedAt: row.resolved_at ?? null,
   };
 }
 
-function mapFeedbackRow(row: any): ReportItem {
+function mapFeedbackRow(row: any, acknowledgments: Array<{ userId: string; date: string }> = []): ReportItem {
   return {
     id: row.feedback_id,
     type: 'feedback',
@@ -51,7 +57,8 @@ function mapFeedbackRow(row: any): ReportItem {
     status: (row.status ?? 'open') === 'resolved' ? 'closed' : (row.status ?? 'open'),
     relatedService: null,
     tags: [],
-    acknowledgments: [],
+    acknowledgments,
+    resolution_notes: row.resolution_notes ?? null,
   };
 }
 
@@ -137,11 +144,49 @@ async function getAllReportsForAdmin(cksCode: string): Promise<HubReportsPayload
      ORDER BY created_at DESC NULLS LAST`
   );
 
+  // Load acknowledgments for all reports
+  const reportAcksResult = await query<any>(
+    `SELECT report_id, acknowledged_by_id, acknowledged_at
+     FROM report_acknowledgments
+     ORDER BY acknowledged_at ASC`
+  );
+
+  // Load acknowledgments for all feedback
+  const feedbackAcksResult = await query<any>(
+    `SELECT feedback_id, acknowledged_by_id, acknowledged_at
+     FROM feedback_acknowledgments
+     ORDER BY acknowledged_at ASC`
+  );
+
+  // Group acknowledgments by report_id
+  const reportAcksMap = new Map<string, Array<{ userId: string; date: string }>>();
+  for (const ack of reportAcksResult.rows) {
+    if (!reportAcksMap.has(ack.report_id)) {
+      reportAcksMap.set(ack.report_id, []);
+    }
+    reportAcksMap.get(ack.report_id)!.push({
+      userId: ack.acknowledged_by_id,
+      date: ack.acknowledged_at,
+    });
+  }
+
+  // Group acknowledgments by feedback_id
+  const feedbackAcksMap = new Map<string, Array<{ userId: string; date: string }>>();
+  for (const ack of feedbackAcksResult.rows) {
+    if (!feedbackAcksMap.has(ack.feedback_id)) {
+      feedbackAcksMap.set(ack.feedback_id, []);
+    }
+    feedbackAcksMap.get(ack.feedback_id)!.push({
+      userId: ack.acknowledged_by_id,
+      date: ack.acknowledged_at,
+    });
+  }
+
   return {
     role: 'admin',
     cksCode,
-    reports: reportsResult.rows.map(mapReportRow),
-    feedback: feedbackResult.rows.map(mapFeedbackRow),
+    reports: reportsResult.rows.map(row => mapReportRow(row, reportAcksMap.get(row.report_id) || [])),
+    feedback: feedbackResult.rows.map(row => mapFeedbackRow(row, feedbackAcksMap.get(row.feedback_id) || [])),
   };
 }
 
@@ -167,7 +212,7 @@ async function getEcosystemReports(cksCode: string, role: HubRole): Promise<HubR
   // Query all reports in this ecosystem (WHERE cks_manager = manager AND not archived)
   const reportsResult = await query<any>(
     `SELECT report_id, type, severity, title, description, service_id, center_id, customer_id,
-            status, created_by_id, created_by_role, created_at, tags
+            status, created_by_id, created_by_role, created_at, tags, resolution_notes, resolved_by_id, resolved_at
      FROM reports
      WHERE UPPER(cks_manager) = UPPER($1) AND archived_at IS NULL
      ORDER BY created_at DESC NULLS LAST`,
@@ -177,18 +222,62 @@ async function getEcosystemReports(cksCode: string, role: HubRole): Promise<HubR
   // Query all feedback in this ecosystem (WHERE cks_manager = manager AND not archived)
   const feedbackResult = await query<any>(
     `SELECT feedback_id, kind, title, message, center_id, customer_id,
-            status, created_by_id, created_by_role, created_at
+            status, created_by_id, created_by_role, created_at, resolution_notes
      FROM feedback
      WHERE UPPER(cks_manager) = UPPER($1) AND archived_at IS NULL
      ORDER BY created_at DESC NULLS LAST`,
     [managerCode]
   );
 
+  // Load acknowledgments for all reports in this ecosystem
+  const reportIds = reportsResult.rows.map(r => r.report_id);
+  const reportAcksResult = reportIds.length > 0 ? await query<any>(
+    `SELECT report_id, acknowledged_by_id, acknowledged_at
+     FROM report_acknowledgments
+     WHERE report_id = ANY($1)
+     ORDER BY acknowledged_at ASC`,
+    [reportIds]
+  ) : { rows: [] };
+
+  // Load acknowledgments for all feedback in this ecosystem
+  const feedbackIds = feedbackResult.rows.map(f => f.feedback_id);
+  const feedbackAcksResult = feedbackIds.length > 0 ? await query<any>(
+    `SELECT feedback_id, acknowledged_by_id, acknowledged_at
+     FROM feedback_acknowledgments
+     WHERE feedback_id = ANY($1)
+     ORDER BY acknowledged_at ASC`,
+    [feedbackIds]
+  ) : { rows: [] };
+
+  // Group acknowledgments by report_id
+  const reportAcksMap = new Map<string, Array<{ userId: string; date: string }>>();
+  for (const ack of reportAcksResult.rows) {
+    if (!reportAcksMap.has(ack.report_id)) {
+      reportAcksMap.set(ack.report_id, []);
+    }
+    reportAcksMap.get(ack.report_id)!.push({
+      userId: ack.acknowledged_by_id,
+      date: ack.acknowledged_at,
+    });
+  }
+
+  // Group acknowledgments by feedback_id
+  const feedbackAcksMap = new Map<string, Array<{ userId: string; date: string }>>();
+  for (const ack of feedbackAcksResult.rows) {
+    if (!feedbackAcksMap.has(ack.feedback_id)) {
+      feedbackAcksMap.set(ack.feedback_id, []);
+    }
+    feedbackAcksMap.get(ack.feedback_id)!.push({
+      userId: ack.acknowledged_by_id,
+      date: ack.acknowledged_at,
+    });
+  }
+
   return {
     role,
     cksCode,
-    reports: reportsResult.rows.map(mapReportRow),
-    feedback: feedbackResult.rows.map(mapFeedbackRow),
+    reports: reportsResult.rows.map(row => mapReportRow(row, reportAcksMap.get(row.report_id) || [])),
+    feedback: feedbackResult.rows.map(row => mapFeedbackRow(row, feedbackAcksMap.get(row.feedback_id) || [])),
   };
 }
 

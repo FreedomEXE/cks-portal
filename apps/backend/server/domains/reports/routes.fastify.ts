@@ -2,8 +2,9 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { requireActiveRole } from '../../core/auth/guards';
 import { getHubReports } from './store';
-import { createReport, createFeedback, updateReportStatus, updateFeedbackStatus } from './repository';
+import { createReport, createFeedback, updateReportStatus, updateFeedbackStatus, acknowledgeReport, acknowledgeFeedback } from './repository';
 import type { HubRole } from '../profile/types';
+import { query } from '../../db/connection';
 
 export async function reportsRoutes(fastify: FastifyInstance) {
   fastify.get('/hub/reports/:cksCode', async (request, reply) => {
@@ -102,20 +103,43 @@ export async function reportsRoutes(fastify: FastifyInstance) {
       reply.code(400).send({ error: 'Invalid report identifier' });
       return;
     }
-    await updateReportStatus(params.data.id, 'acknowledged');
-    reply.send({ data: { id: params.data.id, status: 'acknowledged' } });
+
+    // Check if user is the creator - creators don't need to acknowledge their own reports
+    const reportCheck = await query('SELECT created_by_id FROM reports WHERE report_id = $1', [params.data.id]);
+    if (reportCheck.rows[0]?.created_by_id?.toUpperCase() === account.cksCode?.toUpperCase()) {
+      reply.code(400).send({ error: 'Creators cannot acknowledge their own reports' });
+      return;
+    }
+
+    // Add acknowledgment for this user instead of changing global status
+    await acknowledgeReport(params.data.id, account.cksCode ?? '', account.role);
+    reply.send({ data: { id: params.data.id, acknowledged: true } });
   });
 
   fastify.post('/reports/:id/resolve', async (request, reply) => {
     const account = await requireActiveRole(request, reply);
     if (!account) return;
+
+    // Only managers and warehouses can resolve reports
+    if (account.role.toLowerCase() !== 'manager' && account.role.toLowerCase() !== 'warehouse') {
+      reply.code(403).send({ error: 'Only managers and warehouses can resolve reports' });
+      return;
+    }
+
     const params = reportIdParams.safeParse(request.params);
     if (!params.success) {
       reply.code(400).send({ error: 'Invalid report identifier' });
       return;
     }
-    await updateReportStatus(params.data.id, 'closed');
-    reply.send({ data: { id: params.data.id, status: 'closed' } });
+
+    const bodySchema = z.object({
+      resolution_notes: z.string().trim().max(2000).optional()
+    });
+    const body = bodySchema.safeParse(request.body);
+    const resolutionNotes = body.success ? body.data.resolution_notes : undefined;
+
+    await updateReportStatus(params.data.id, 'resolved', account.cksCode ?? '', resolutionNotes);
+    reply.send({ data: { id: params.data.id, status: 'resolved' } });
   });
 
   // Acknowledge/Resolve actions for feedback
@@ -127,19 +151,17 @@ export async function reportsRoutes(fastify: FastifyInstance) {
       reply.code(400).send({ error: 'Invalid feedback identifier' });
       return;
     }
-    await updateFeedbackStatus(params.data.id, 'acknowledged');
-    reply.send({ data: { id: params.data.id, status: 'acknowledged' } });
-  });
 
-  fastify.post('/feedback/:id/resolve', async (request, reply) => {
-    const account = await requireActiveRole(request, reply);
-    if (!account) return;
-    const params = reportIdParams.safeParse(request.params);
-    if (!params.success) {
-      reply.code(400).send({ error: 'Invalid feedback identifier' });
+    // Check if user is the creator - creators don't need to acknowledge their own feedback
+    const feedbackCheck = await query('SELECT created_by_id FROM feedback WHERE feedback_id = $1', [params.data.id]);
+    if (feedbackCheck.rows[0]?.created_by_id?.toUpperCase() === account.cksCode?.toUpperCase()) {
+      reply.code(400).send({ error: 'Creators cannot acknowledge their own feedback' });
       return;
     }
-    await updateFeedbackStatus(params.data.id, 'resolved');
-    reply.send({ data: { id: params.data.id, status: 'resolved' } });
+
+    // Add acknowledgment for this user instead of changing global status
+    await acknowledgeFeedback(params.data.id, account.cksCode ?? '', account.role);
+    reply.send({ data: { id: params.data.id, acknowledged: true } });
   });
+
 }

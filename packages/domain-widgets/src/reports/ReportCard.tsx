@@ -15,7 +15,7 @@ export interface ReportFeedback {
   description: string;
   submittedBy: string;
   submittedDate: string;
-  status: 'open' | 'closed';
+  status: 'open' | 'resolved' | 'closed';
   relatedService?: string;
   relatedOrder?: string;
   acknowledgments: Array<{userId: string, date: string}>;
@@ -25,6 +25,9 @@ export interface ReportFeedback {
     actionTaken: string;
     notes: string;
   };
+  resolution_notes?: string | null;
+  resolvedBy?: string | null;
+  resolvedAt?: string | null;
 }
 
 interface ReportCardProps {
@@ -64,11 +67,13 @@ const ReportCard: React.FC<ReportCardProps> = ({
 
   const colors = getColors();
   const hasAcknowledged = report.acknowledgments.some(ack => ack.userId === currentUser);
-  const canResolve = (userRole === 'manager' || userRole === 'warehouse') && report.status === 'open';
+  // Manager/warehouse can only resolve AFTER they've acknowledged
+  const canResolve = (userRole === 'manager' || userRole === 'warehouse') && report.status === 'open' && report.type === 'report' && hasAcknowledged;
+  const isCreator = report.submittedBy === currentUser;
 
   const handleResolve = () => {
     if (actionTaken.trim() && resolutionNotes.trim()) {
-      onResolve?.(report.id, actionTaken, resolutionNotes);
+      onResolve?.(report.id, { actionTaken, notes: resolutionNotes });
       setIsResolving(false);
       setActionTaken('');
       setResolutionNotes('');
@@ -98,6 +103,11 @@ const ReportCard: React.FC<ReportCardProps> = ({
           color: 'white'
         };
       }
+    } else if (report.status === 'resolved') {
+      return {
+        backgroundColor: '#f59e0b', // Amber/orange for resolved (waiting for acknowledgments)
+        color: 'white'
+      };
     } else {
       return {
         backgroundColor: '#4b5563', // Gray for closed (matches OrderCard gray text color)
@@ -396,10 +406,73 @@ const ReportCard: React.FC<ReportCardProps> = ({
                     borderRadius: '4px',
                     border: '1px solid #e0f2fe'
                   }}>
-                    {ack.userId} ({ack.date})
+                    {ack.userId}
+                    {currentUser === ack.userId && <span style={{ fontWeight: 600 }}> (you)</span>}
                   </span>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* Resolved By Section */}
+          {report.resolvedBy && (
+            <div style={{
+              marginBottom: '16px',
+              padding: '12px',
+              backgroundColor: '#f0fdf4',
+              borderRadius: '6px',
+              border: '1px solid #bbf7d0'
+            }}>
+              <h4 style={{
+                fontSize: '12px',
+                fontWeight: 500,
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                margin: '0 0 8px 0'
+              }}>Resolved By</h4>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                <span style={{
+                  padding: '4px 8px',
+                  fontSize: '12px',
+                  backgroundColor: 'white',
+                  color: '#15803d',
+                  borderRadius: '4px',
+                  border: '1px solid #bbf7d0',
+                  fontWeight: 600
+                }}>
+                  {report.resolvedBy}
+                </span>
+                {report.resolvedAt && (
+                  <span style={{
+                    fontSize: '12px',
+                    color: '#6b7280'
+                  }}>
+                    on {new Date(report.resolvedAt).toLocaleString()}
+                  </span>
+                )}
+              </div>
+              {report.resolution_notes && (
+                <div style={{ marginTop: '8px' }}>
+                  <span style={{
+                    fontSize: '12px',
+                    fontWeight: 500,
+                    color: '#6b7280',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>Resolution Notes</span>
+                  <p style={{
+                    margin: '4px 0 0 0',
+                    fontSize: '14px',
+                    color: '#111827',
+                    lineHeight: '1.5'
+                  }}>{report.resolution_notes}</p>
+                </div>
+              )}
             </div>
           )}
 
@@ -544,7 +617,7 @@ const ReportCard: React.FC<ReportCardProps> = ({
                     cursor: actionTaken.trim() && resolutionNotes.trim() ? 'pointer' : 'not-allowed'
                   }}
                 >
-                  Resolve
+                  Mark as Resolved
                 </button>
                 <button
                   onClick={() => setIsResolving(false)}
@@ -566,7 +639,7 @@ const ReportCard: React.FC<ReportCardProps> = ({
           )}
 
           {/* Actions Section */}
-          {(!hasAcknowledged && report.status === 'open') || (canResolve && !isResolving && report.type === 'report') ? (
+          {(!hasAcknowledged && !isCreator && report.status !== 'closed') || (canResolve && !isResolving && report.type === 'report') ? (
             <div style={{
               padding: '12px',
               backgroundColor: '#f9fafb',
@@ -584,7 +657,7 @@ const ReportCard: React.FC<ReportCardProps> = ({
                 display: 'flex',
                 gap: '8px'
               }}>
-                {!hasAcknowledged && report.status === 'open' && (
+                {!hasAcknowledged && !isCreator && report.status !== 'closed' && (
                   <button
                     onClick={(e) => {
                       e.stopPropagation();

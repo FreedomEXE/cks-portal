@@ -1,6 +1,6 @@
 import { apiFetch } from './client';
 
-export type EntityType = 'manager' | 'contractor' | 'customer' | 'center' | 'crew' | 'warehouse' | 'service' | 'product' | 'order';
+export type EntityType = 'manager' | 'contractor' | 'customer' | 'center' | 'crew' | 'warehouse' | 'service' | 'product' | 'order' | 'report' | 'feedback';
 
 export interface ArchivedEntity {
   id: string;

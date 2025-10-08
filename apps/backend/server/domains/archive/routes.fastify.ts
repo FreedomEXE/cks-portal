@@ -37,7 +37,17 @@ export function registerArchiveRoutes(fastify: FastifyInstance) {
         limit?: string;
       };
 
-      const validatedType = entityType ? EntityTypeSchema.parse(entityType) : undefined;
+      console.log('[archive] Received entityType from frontend:', entityType);
+
+      // Map plural tab names to singular entity types
+      let normalizedEntityType = entityType;
+      if (entityType === 'reports') normalizedEntityType = 'report';
+      if (entityType === 'services') normalizedEntityType = 'service';
+      if (entityType === 'orders') normalizedEntityType = 'order';
+
+      console.log('[archive] Normalized entityType:', normalizedEntityType);
+
+      const validatedType = normalizedEntityType ? EntityTypeSchema.parse(normalizedEntityType) : undefined;
       const entities = await listArchivedEntities(
         validatedType,
         limit ? parseInt(limit) : 100
@@ -86,6 +96,7 @@ export function registerArchiveRoutes(fastify: FastifyInstance) {
   // Restore an entity from archive
   fastify.post('/api/archive/restore', async (request, reply) => {
     try {
+      console.log('[archive] Restore request body:', JSON.stringify(request.body));
       const body = RestoreRequestSchema.parse(request.body);
       const actor = {
         actorId: (request as any).user?.id || 'ADMIN',
@@ -104,6 +115,7 @@ export function registerArchiveRoutes(fastify: FastifyInstance) {
       });
     } catch (error) {
       console.error('[archive] Failed to restore entity:', error);
+      console.error('[archive] Request body was:', JSON.stringify(request.body));
       return reply.status(500).send({
         success: false,
         error: error instanceof Error ? error.message : 'Failed to restore entity'

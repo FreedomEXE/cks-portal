@@ -25,7 +25,7 @@ const ReportsSection: React.FC<ReportsSectionProps> = ({
   onAcknowledge,
   onResolve,
 }) => {
-  const [activeTab, setActiveTab] = useState('all-reports');
+  const [activeTab, setActiveTab] = useState('reports');
   const [searchQuery, setSearchQuery] = useState('');
 
   // Determine if user can create reports/feedback at all
@@ -81,13 +81,12 @@ const ReportsSection: React.FC<ReportsSectionProps> = ({
 
     switch (activeTab) {
       case 'reports':
-        filtered = reports; // Only show reports (issues/problems)
+        // Only show reports that are NOT closed (open or resolved)
+        filtered = reports.filter(report => report.status !== 'closed');
         break;
       case 'feedback':
-        filtered = feedback; // Only show feedback (suggestions/compliments)
-        break;
-      case 'all-reports':
-        filtered = allReports.filter(report => report.status === 'open');
+        // Only show feedback that are NOT closed (open only)
+        filtered = feedback.filter(report => report.status !== 'closed');
         break;
       case 'archive':
         filtered = allReports.filter(report => report.status === 'closed');
@@ -486,9 +485,8 @@ const ReportsSection: React.FC<ReportsSectionProps> = ({
 
   // Build tabs array based on role permissions
   const tabs = [
-    { id: 'all-reports', label: 'All Reports', count: allReports.filter(r => r.status === 'open').length },
-    { id: 'reports', label: 'Reports', count: reports.length },
-    { id: 'feedback', label: 'Feedback', count: feedback.length },
+    { id: 'reports', label: 'Reports', count: reports.filter(r => r.status !== 'closed').length },
+    { id: 'feedback', label: 'Feedback', count: feedback.filter(r => r.status !== 'closed').length },
     ...(canCreate ? [{ id: 'create', label: 'Create' }] : []),
     { id: 'archive', label: 'Archive', count: allReports.filter(r => r.status === 'closed').length }
   ];
@@ -502,7 +500,6 @@ const ReportsSection: React.FC<ReportsSectionProps> = ({
         activeTab === 'create' ? 'Submit new reports or feedback to your ecosystem' :
         activeTab === 'reports' ? 'Issues and problems reported by your ecosystem' :
         activeTab === 'feedback' ? 'Suggestions and compliments from your ecosystem' :
-        activeTab === 'all-reports' ? 'All open reports and feedback in your ecosystem' :
         'Resolved and closed reports archive'
       }
       searchPlaceholder={

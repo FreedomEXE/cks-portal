@@ -54,7 +54,7 @@ const TAB_COLUMN_CONFIG: Record<string, { idLabel: string; nameLabel: string }> 
   product: { idLabel: 'PRODUCT ID', nameLabel: 'PRODUCT NAME' },
   'product-orders': { idLabel: 'ORDER ID', nameLabel: 'PRODUCT ORDER' },
   'service-orders': { idLabel: 'ORDER ID', nameLabel: 'SERVICE ORDER' },
-  'reports': { idLabel: 'REPORT ID', nameLabel: 'TITLE' },
+  'report': { idLabel: 'REPORT ID', nameLabel: 'TITLE' },
   'feedback': { idLabel: 'FEEDBACK ID', nameLabel: 'TITLE' },
 };
 
@@ -97,7 +97,7 @@ export default function ArchiveSection({ archiveAPI, onViewOrderDetails }: Archi
   const [activeTab, setActiveTab] = useState('manager');
   const [servicesSubTab, setServicesSubTab] = useState<string>('catalog-services');
   const [ordersSubTab, setOrdersSubTab] = useState<string>('product-orders');
-  const [reportsSubTab, setReportsSubTab] = useState<string>('reports');
+  const [reportsSubTab, setReportsSubTab] = useState<string>('report');
   const [archivedData, setArchivedData] = useState<ArchivedEntity[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -147,7 +147,7 @@ export default function ArchiveSection({ archiveAPI, onViewOrderDetails }: Archi
         orderTypeFilter = 'service';
       } else if (effectiveTab === 'catalog-services' || effectiveTab === 'active-services') {
         entityType = 'service';
-      } else if (effectiveTab === 'reports' || effectiveTab === 'feedback') {
+      } else if (effectiveTab === 'report' || effectiveTab === 'feedback') {
         // For reports subtab, use the specific entity type
         entityType = effectiveTab as EntityType;
       }
@@ -203,6 +203,7 @@ export default function ArchiveSection({ archiveAPI, onViewOrderDetails }: Archi
     const effectiveTab = (() => {
       if (activeTab === 'services') return servicesSubTab;
       if (activeTab === 'orders') return ordersSubTab;
+      if (activeTab === 'reports') return reportsSubTab;
       return activeTab;
     })();
 
@@ -210,6 +211,7 @@ export default function ArchiveSection({ archiveAPI, onViewOrderDetails }: Archi
     const actualEntityType = (() => {
       if (effectiveTab === 'product-orders' || effectiveTab === 'service-orders') return 'order';
       if (effectiveTab === 'catalog-services' || effectiveTab === 'active-services') return 'service';
+      if (effectiveTab === 'report' || effectiveTab === 'feedback') return effectiveTab;
       return selectedEntity.entityType;
     })();
 
@@ -234,6 +236,7 @@ export default function ArchiveSection({ archiveAPI, onViewOrderDetails }: Archi
     const effectiveTab = (() => {
       if (activeTab === 'services') return servicesSubTab;
       if (activeTab === 'orders') return ordersSubTab;
+      if (activeTab === 'reports') return reportsSubTab;
       return activeTab;
     })();
 
@@ -241,6 +244,7 @@ export default function ArchiveSection({ archiveAPI, onViewOrderDetails }: Archi
     const actualEntityType = (() => {
       if (effectiveTab === 'product-orders' || effectiveTab === 'service-orders') return 'order';
       if (effectiveTab === 'catalog-services' || effectiveTab === 'active-services') return 'service';
+      if (effectiveTab === 'report' || effectiveTab === 'feedback') return effectiveTab;
       return selectedEntity.entityType;
     })();
 
@@ -269,6 +273,7 @@ export default function ArchiveSection({ archiveAPI, onViewOrderDetails }: Archi
     const effectiveTab = (() => {
       if (activeTab === 'services') return servicesSubTab;
       if (activeTab === 'orders') return ordersSubTab;
+      if (activeTab === 'reports') return reportsSubTab;
       return activeTab;
     })();
 
@@ -317,7 +322,7 @@ export default function ArchiveSection({ archiveAPI, onViewOrderDetails }: Archi
       searchPlaceholder: `Search ${tab.search}...`,
       emptyMessage: loading ? 'Loading...' : error ? `Error: ${error}` : 'No archived records found.',
     };
-  }, [activeTab, servicesSubTab, ordersSubTab, archivedData, searchTerm, loading, error]);
+  }, [activeTab, servicesSubTab, ordersSubTab, reportsSubTab, archivedData, searchTerm, loading, error]);
 
   return (
     <PageWrapper title="Archive" showHeader={false}>
@@ -374,9 +379,9 @@ export default function ArchiveSection({ archiveAPI, onViewOrderDetails }: Archi
         {activeTab === 'reports' && (
           <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
             <Button
-              variant={reportsSubTab === 'reports' ? 'primary' : 'secondary'}
+              variant={reportsSubTab === 'report' ? 'primary' : 'secondary'}
               size="small"
-              onClick={() => setReportsSubTab('reports')}
+              onClick={() => setReportsSubTab('report')}
             >
               Reports
             </Button>

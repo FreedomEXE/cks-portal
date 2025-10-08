@@ -600,8 +600,10 @@ export async function acknowledgeItem(id: string, type: 'report' | 'feedback') {
 }
 
 export async function resolveReport(id: string, details?: { actionTaken?: string; notes?: string }) {
-  // details are currently not persisted but included for future compatibility
-  await apiFetch<ApiResponse<{ id: string }>>(`/reports/${encodeURIComponent(id)}/resolve`, { method: 'POST' });
+  await apiFetch<ApiResponse<{ id: string }>>(`/reports/${encodeURIComponent(id)}/resolve`, {
+    method: 'POST',
+    body: JSON.stringify({ resolution_notes: details?.notes })
+  });
 }
 
 export function useHubInventory(cksCode?: string | null) {

@@ -520,6 +520,14 @@ export async function restoreEntity(operation: RestoreOperation): Promise<{ succ
       tableName = 'orders';
       idColumn = 'order_id';
       break;
+    case 'report':
+      tableName = 'reports';
+      idColumn = 'report_id';
+      break;
+    case 'feedback':
+      tableName = 'feedback';
+      idColumn = 'feedback_id';
+      break;
     default:
       tableName = `${operation.entityType}s`;
       idColumn = `${operation.entityType}_id`;
@@ -730,6 +738,21 @@ export async function hardDeleteEntity(
   } else if (operation.entityType === 'product') {
     tableName = 'inventory_items';
     idColumn = 'item_id';
+  } else if (operation.entityType === 'warehouse') {
+    tableName = 'warehouses';
+    idColumn = 'warehouse_id';
+  } else if (operation.entityType === 'service') {
+    tableName = 'services';
+    idColumn = 'service_id';
+  } else if (operation.entityType === 'order') {
+    tableName = 'orders';
+    idColumn = 'order_id';
+  } else if (operation.entityType === 'report') {
+    tableName = 'reports';
+    idColumn = 'report_id';
+  } else if (operation.entityType === 'feedback') {
+    tableName = 'feedback';
+    idColumn = 'feedback_id';
   } else {
     tableName = `${operation.entityType}s`;
     idColumn = `${operation.entityType}_id`;
