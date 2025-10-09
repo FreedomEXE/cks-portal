@@ -43,7 +43,7 @@ import {
   type OrderActionRequest,
   type OrderActionType,
 } from '../shared/api/hub';
-import { createFeedback as apiCreateFeedback, acknowledgeItem as apiAcknowledgeItem, resolveReport as apiResolveReport } from '../shared/api/hub';
+import { createFeedback as apiCreateFeedback, acknowledgeItem as apiAcknowledgeItem, resolveReport as apiResolveReport, fetchServicesForReports, fetchProceduresForReports, fetchOrdersForReports } from '../shared/api/hub';
 
 const ACTION_LABEL_MAP: Record<string, OrderActionType> = {
   Accept: 'accept',
@@ -1186,6 +1186,9 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
                   const { mutate } = await import('swr');
                   (mutate as any)(`/hub/reports/${normalizedCode}`);
                 }}
+                fetchServices={fetchServicesForReports}
+                fetchProcedures={fetchProceduresForReports}
+                fetchOrders={fetchOrdersForReports}
                 onAcknowledge={async (id, type) => {
                   await apiAcknowledgeItem(id, type);
                   const { mutate } = await import('swr');

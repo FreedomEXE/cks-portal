@@ -31,14 +31,14 @@ async function ensureDirectories() {
 }
 
 function extractSql(content, marker) {
-  const markerRegex = new RegExp(`--\s+\+migrate\s+${marker}`, 'i');
+  const markerRegex = new RegExp(`--\\s+\\+migrate\\s+${marker}`, 'i');
   const match = markerRegex.exec(content);
   if (!match) {
     return content.trim();
   }
   const sliceFromMarker = content.slice(match.index + match[0].length);
   const otherMarker = marker.toLowerCase() === 'up' ? 'down' : 'up';
-  const otherRegex = new RegExp(`--\s+\+migrate\s+${otherMarker}`, 'i');
+  const otherRegex = new RegExp(`--\\s+\\+migrate\\s+${otherMarker}`, 'i');
   const endMatch = otherRegex.exec(sliceFromMarker);
   const block = endMatch ? sliceFromMarker.slice(0, endMatch.index) : sliceFromMarker;
   return block.trim();

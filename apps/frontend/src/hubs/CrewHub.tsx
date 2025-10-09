@@ -43,7 +43,7 @@ import {
   type OrderActionRequest,
 } from '../shared/api/hub';
 import { useSWRConfig } from 'swr';
-import { createFeedback as apiCreateFeedback, acknowledgeItem as apiAcknowledgeItem } from '../shared/api/hub';
+import { createFeedback as apiCreateFeedback, acknowledgeItem as apiAcknowledgeItem, fetchServicesForReports, fetchProceduresForReports, fetchOrdersForReports } from '../shared/api/hub';
 
 import { buildEcosystemTree, DEFAULT_ROLE_COLOR_MAP } from '../shared/utils/ecosystem';
 
@@ -776,6 +776,9 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
                   await apiCreateFeedback({ title: payload.title, message: payload.description, category: payload.category });
                   await mutate(`/hub/reports/${normalizedCode}`);
                 }}
+                fetchServices={fetchServicesForReports}
+                fetchProcedures={fetchProceduresForReports}
+                fetchOrders={fetchOrdersForReports}
                 onAcknowledge={async (id, type) => {
                   await apiAcknowledgeItem(id, type);
                   await mutate(`/hub/reports/${normalizedCode}`);

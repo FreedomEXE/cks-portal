@@ -40,7 +40,7 @@ import {
   type HubOrderItem,
   type OrderActionRequest,
 } from '../shared/api/hub';
-import { createReport as apiCreateReport, createFeedback as apiCreateFeedback, acknowledgeItem as apiAcknowledgeItem, resolveReport as apiResolveReport } from '../shared/api/hub';
+import { createReport as apiCreateReport, createFeedback as apiCreateFeedback, acknowledgeItem as apiAcknowledgeItem, resolveReport as apiResolveReport, fetchServicesForReports, fetchProceduresForReports, fetchOrdersForReports } from '../shared/api/hub';
 
 import { buildEcosystemTree, DEFAULT_ROLE_COLOR_MAP } from '../shared/utils/ecosystem';
 
@@ -673,9 +673,19 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
                 feedback={reportsData?.feedback || []}
                 isLoading={reportsLoading}
                 onSubmit={async (payload) => {
-                  if (payload.type === 'report') {
+                  // Handle structured dropdown-based reports/feedback
+                  if (payload.reportCategory && payload.relatedEntityId && payload.reportReason) {
+                    await apiCreateReport({
+                      reportCategory: payload.reportCategory,
+                      relatedEntityId: payload.relatedEntityId,
+                      reportReason: payload.reportReason,
+                      centerId: normalizedCode ?? undefined,
+                    });
+                  } else if (payload.type === 'report') {
+                    // Legacy text-based reports (fallback)
                     await apiCreateReport({ title: payload.title, description: payload.description, category: payload.category, centerId: normalizedCode ?? undefined });
                   } else {
+                    // Legacy text-based feedback (fallback)
                     await apiCreateFeedback({ title: payload.title, message: payload.description, category: payload.category, centerId: normalizedCode ?? undefined });
                   }
                   // Refresh
@@ -685,6 +695,9 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
                     (mutate as any)(`/hub/reports/${code}`);
                   }
                 }}
+                fetchServices={fetchServicesForReports}
+                fetchProcedures={fetchProceduresForReports}
+                fetchOrders={fetchOrdersForReports}
                 onAcknowledge={async (id, type) => {
                   await apiAcknowledgeItem(id, type);
                   const code = normalizedCode ?? '';

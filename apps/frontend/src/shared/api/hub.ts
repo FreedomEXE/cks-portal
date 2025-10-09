@@ -606,6 +606,22 @@ export async function resolveReport(id: string, details?: { actionTaken?: string
   });
 }
 
+// Fetch entities for structured report/feedback dropdowns
+export async function fetchServicesForReports() {
+  const response = await apiFetch<ApiResponse<any[]>>('/reports/entities/services');
+  return response.data || [];
+}
+
+export async function fetchOrdersForReports() {
+  const response = await apiFetch<ApiResponse<any[]>>('/reports/entities/orders');
+  return response.data || [];
+}
+
+export async function fetchProceduresForReports() {
+  const response = await apiFetch<ApiResponse<any[]>>('/reports/entities/procedures');
+  return response.data || [];
+}
+
 export function useHubInventory(cksCode?: string | null) {
   const key = sectionPath('inventory', cksCode);
   const result = useHubSWR<HubInventoryResponse>(key);

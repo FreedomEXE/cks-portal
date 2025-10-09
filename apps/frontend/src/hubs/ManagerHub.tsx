@@ -67,7 +67,7 @@ import {
   type HubOrderItem,
   type OrderActionRequest,
 } from '../shared/api/hub';
-import { createReport as apiCreateReport, createFeedback as apiCreateFeedback, acknowledgeItem as apiAcknowledgeItem, resolveReport as apiResolveReport } from '../shared/api/hub';
+import { createReport as apiCreateReport, createFeedback as apiCreateFeedback, acknowledgeItem as apiAcknowledgeItem, resolveReport as apiResolveReport, fetchServicesForReports, fetchProceduresForReports, fetchOrdersForReports } from '../shared/api/hub';
 import { useSWRConfig } from 'swr';
 import { buildEcosystemTree } from '../shared/utils/ecosystem';
 
@@ -1267,13 +1267,25 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
               feedback={managerFeedback}
               isLoading={reportsLoading}
               onSubmit={async (payload) => {
-                if (payload.type === 'report') {
+                // Handle structured dropdown-based reports/feedback
+                if (payload.reportCategory && payload.relatedEntityId && payload.reportReason) {
+                  await apiCreateReport({
+                    reportCategory: payload.reportCategory,
+                    relatedEntityId: payload.relatedEntityId,
+                    reportReason: payload.reportReason,
+                  });
+                } else if (payload.type === 'report') {
+                  // Legacy text-based reports (fallback)
                   await apiCreateReport({ title: payload.title, description: payload.description, category: payload.category });
                 } else {
+                  // Legacy text-based feedback (fallback)
                   await apiCreateFeedback({ title: payload.title, message: payload.description, category: payload.category });
                 }
                 await mutateReports();
               }}
+              fetchServices={fetchServicesForReports}
+              fetchProcedures={fetchProceduresForReports}
+              fetchOrders={fetchOrdersForReports}
               onAcknowledge={async (id, type) => {
                 await apiAcknowledgeItem(id, type);
                 await mutateReports();

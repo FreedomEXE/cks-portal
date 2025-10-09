@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { requireActiveRole } from '../../core/auth/guards';
 import { getHubReports } from './store';
-import { createReport, createFeedback, updateReportStatus, updateFeedbackStatus, acknowledgeReport, acknowledgeFeedback } from './repository';
+import { createReport, createFeedback, updateReportStatus, updateFeedbackStatus, acknowledgeReport, acknowledgeFeedback, getServicesForReports, getOrdersForReports, getProceduresForReports } from './repository';
 import type { HubRole } from '../profile/types';
 import { query } from '../../db/connection';
 
@@ -31,13 +31,17 @@ export async function reportsRoutes(fastify: FastifyInstance) {
     }
 
     const schema = z.object({
-      title: z.string().trim().min(1).max(255),
-      description: z.string().trim().min(1).max(2000),
-      // UI category maps to a normalized type string (snake_case)
+      // Legacy fields (for old text-based reports)
+      title: z.string().trim().min(1).max(255).optional(),
+      description: z.string().trim().min(1).max(2000).optional(),
       type: z.string().trim().min(1).max(50).optional(),
       severity: z.string().trim().min(1).max(20).optional(),
       centerId: z.string().trim().min(1).optional(),
       customerId: z.string().trim().min(1).optional(),
+      // New structured fields (for dropdown-based reports)
+      reportCategory: z.enum(['service', 'order', 'procedure']).optional(),
+      relatedEntityId: z.string().trim().min(1).max(64).optional(),
+      reportReason: z.string().trim().min(1).max(100).optional(),
     });
     const body = schema.safeParse(request.body);
     if (!body.success) {
@@ -46,15 +50,30 @@ export async function reportsRoutes(fastify: FastifyInstance) {
     }
 
     const payload = body.data;
+
+    // Auto-generate title and description from structured fields if provided
+    let title = payload.title || '';
+    let description = payload.description || '';
+
+    if (payload.reportCategory && payload.relatedEntityId && payload.reportReason) {
+      // Structured report: auto-generate title/description
+      const categoryLabel = payload.reportCategory.charAt(0).toUpperCase() + payload.reportCategory.slice(1);
+      title = `Report: ${categoryLabel} [${payload.relatedEntityId}] - ${payload.reportReason}`;
+      description = `Structured report for ${payload.reportCategory}: ${payload.relatedEntityId}. Reason: ${payload.reportReason}`;
+    }
+
     const created = await createReport({
-      title: payload.title,
-      description: payload.description,
+      title: title || 'Untitled Report',
+      description: description || 'No description provided',
       type: payload.type ?? 'other',
       severity: payload.severity ?? 'medium',
       centerId: payload.centerId ?? null,
       customerId: payload.customerId ?? null,
       createdByRole: account.role,
       createdById: account.cksCode ?? '',
+      reportCategory: payload.reportCategory ?? null,
+      relatedEntityId: payload.relatedEntityId ?? null,
+      reportReason: payload.reportReason ?? null,
     });
     reply.code(201).send({ data: { id: created.id } });
   });
@@ -162,6 +181,32 @@ export async function reportsRoutes(fastify: FastifyInstance) {
     // Add acknowledgment for this user instead of changing global status
     await acknowledgeFeedback(params.data.id, account.cksCode ?? '', account.role);
     reply.send({ data: { id: params.data.id, acknowledged: true } });
+  });
+
+  // Endpoints for fetching entities to populate dropdowns when creating structured reports/feedback
+  // Endpoints for fetching entities to populate dropdowns when creating structured reports/feedback
+  fastify.get('/reports/entities/services', async (request, reply) => {
+    const account = await requireActiveRole(request, reply);
+    if (!account) return;
+
+    const services = await getServicesForReports(account.cksCode ?? '');
+    reply.send({ data: services });
+  });
+
+  fastify.get('/reports/entities/orders', async (request, reply) => {
+    const account = await requireActiveRole(request, reply);
+    if (!account) return;
+
+    const orders = await getOrdersForReports(account.cksCode ?? '');
+    reply.send({ data: orders });
+  });
+
+  fastify.get('/reports/entities/procedures', async (request, reply) => {
+    const account = await requireActiveRole(request, reply);
+    if (!account) return;
+
+    const procedures = await getProceduresForReports(account.cksCode ?? '');
+    reply.send({ data: procedures });
   });
 
 }

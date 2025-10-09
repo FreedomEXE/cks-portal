@@ -28,6 +28,10 @@ export interface ReportFeedback {
   resolution_notes?: string | null;
   resolvedBy?: string | null;
   resolvedAt?: string | null;
+  // New structured fields
+  reportCategory?: string | null;
+  relatedEntityId?: string | null;
+  reportReason?: string | null;
 }
 
 interface ReportCardProps {
@@ -351,6 +355,80 @@ const ReportCard: React.FC<ReportCardProps> = ({
               )}
             </div>
           </div>
+
+          {/* Structured Report Details (if present) */}
+          {report.reportCategory && report.relatedEntityId && report.reportReason && (
+            <div style={{
+              marginBottom: '16px',
+              padding: '12px',
+              backgroundColor: '#eff6ff',
+              borderRadius: '6px',
+              border: '1px solid #bfdbfe'
+            }}>
+              <h4 style={{
+                fontSize: '12px',
+                fontWeight: 500,
+                color: '#1e40af',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                margin: '0 0 12px 0'
+              }}>Structured Report Details</h4>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                gap: '12px'
+              }}>
+                <div>
+                  <span style={{
+                    fontSize: '12px',
+                    fontWeight: 500,
+                    color: '#6b7280',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>Report Category</span>
+                  <span style={{
+                    display: 'block',
+                    fontSize: '14px',
+                    color: '#1e40af',
+                    marginTop: '2px',
+                    fontWeight: 600
+                  }}>{report.reportCategory.charAt(0).toUpperCase() + report.reportCategory.slice(1)}</span>
+                </div>
+                <div>
+                  <span style={{
+                    fontSize: '12px',
+                    fontWeight: 500,
+                    color: '#6b7280',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>Related Entity</span>
+                  <span style={{
+                    display: 'block',
+                    fontSize: '14px',
+                    color: '#1e40af',
+                    marginTop: '2px',
+                    fontWeight: 600
+                  }}>{report.relatedEntityId}</span>
+                </div>
+                <div>
+                  <span style={{
+                    fontSize: '12px',
+                    fontWeight: 500,
+                    color: '#6b7280',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>Reason</span>
+                  <span style={{
+                    display: 'block',
+                    fontSize: '14px',
+                    color: '#1e40af',
+                    marginTop: '2px',
+                    fontWeight: 600
+                  }}>{report.reportReason}</span>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Description Section */}
           <div style={{

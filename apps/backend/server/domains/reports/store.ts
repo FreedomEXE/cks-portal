@@ -17,6 +17,10 @@ export interface ReportItem {
   resolution_notes?: string | null;
   resolvedBy?: string | null;
   resolvedAt?: string | null;
+  // New structured fields
+  reportCategory?: string | null;
+  relatedEntityId?: string | null;
+  reportReason?: string | null;
 }
 
 export interface HubReportsPayload {
@@ -42,6 +46,10 @@ function mapReportRow(row: any, acknowledgments: Array<{ userId: string; date: s
     resolution_notes: row.resolution_notes ?? null,
     resolvedBy: row.resolved_by_id ?? null,
     resolvedAt: row.resolved_at ?? null,
+    // New structured fields
+    reportCategory: row.report_category ?? null,
+    relatedEntityId: row.related_entity_id ?? null,
+    reportReason: row.report_reason ?? null,
   };
 }
 
@@ -112,9 +120,12 @@ async function getManagerForUser(cksCode: string, role: HubRole): Promise<string
       return null;
     }
     case 'warehouse': {
-      // Warehouses don't have direct manager relationship in current schema
-      // For now, return null - may need to add warehouse-to-manager mapping
-      return null;
+      // Query the warehouses table to get the manager for this warehouse
+      const result = await query<{ cks_manager: string | null }>(
+        'SELECT cks_manager FROM warehouses WHERE UPPER(warehouse_id) = UPPER($1)',
+        [normalized]
+      );
+      return result.rows[0]?.cks_manager ? normalizeIdentity(result.rows[0].cks_manager) : null;
     }
     default:
       return null;
@@ -129,7 +140,8 @@ async function getAllReportsForAdmin(cksCode: string): Promise<HubReportsPayload
   // Query ALL reports in the system (not ecosystem-scoped)
   const reportsResult = await query<any>(
     `SELECT report_id, type, severity, title, description, service_id, center_id, customer_id,
-            status, created_by_id, created_by_role, created_at, tags
+            status, created_by_id, created_by_role, created_at, tags,
+            report_category, related_entity_id, report_reason
      FROM reports
      WHERE archived_at IS NULL
      ORDER BY created_at DESC NULLS LAST`
@@ -212,7 +224,8 @@ async function getEcosystemReports(cksCode: string, role: HubRole): Promise<HubR
   // Query all reports in this ecosystem (WHERE cks_manager = manager AND not archived)
   const reportsResult = await query<any>(
     `SELECT report_id, type, severity, title, description, service_id, center_id, customer_id,
-            status, created_by_id, created_by_role, created_at, tags, resolution_notes, resolved_by_id, resolved_at
+            status, created_by_id, created_by_role, created_at, tags, resolution_notes, resolved_by_id, resolved_at,
+            report_category, related_entity_id, report_reason
      FROM reports
      WHERE UPPER(cks_manager) = UPPER($1) AND archived_at IS NULL
      ORDER BY created_at DESC NULLS LAST`,

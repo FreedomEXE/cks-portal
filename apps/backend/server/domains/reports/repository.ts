@@ -97,6 +97,10 @@ export type CreateReportInput = {
   customerId?: string | null;
   createdByRole: string;
   createdById: string;
+  // New structured fields
+  reportCategory?: string | null;
+  relatedEntityId?: string | null;
+  reportReason?: string | null;
 };
 
 export type CreateFeedbackInput = {
@@ -125,9 +129,10 @@ export async function createReport(input: CreateReportInput) {
   const sql = `
     INSERT INTO reports (
       report_id, type, severity, title, description, center_id, customer_id, status,
-      created_by_role, created_by_id, cks_manager, created_at, updated_at
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
-    RETURNING report_id, type, severity, title, description, center_id, customer_id, status, created_by_role, created_by_id, cks_manager, created_at, updated_at
+      created_by_role, created_by_id, cks_manager, created_at, updated_at,
+      report_category, related_entity_id, report_reason
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+    RETURNING report_id, type, severity, title, description, center_id, customer_id, status, created_by_role, created_by_id, cks_manager, created_at, updated_at, report_category, related_entity_id, report_reason
   `;
   const params = [
     reportId,
@@ -143,6 +148,9 @@ export async function createReport(input: CreateReportInput) {
     cksManager,
     now,
     now,
+    input.reportCategory ?? null,
+    input.relatedEntityId ?? null,
+    input.reportReason ?? null,
   ];
   const result = await query(sql, params);
   return { id: reportId, row: result.rows[0] };
@@ -423,5 +431,60 @@ export async function archiveReport(reportId: string) {
 export async function archiveFeedback(feedbackId: string) {
   const now = new Date().toISOString();
   await query('UPDATE feedback SET archived_at = $2 WHERE feedback_id = $1', [feedbackId, now]);
+}
+
+/**
+ * Fetch all services for a manager's ecosystem from the services table
+ * Used to populate the dropdown when creating structured reports/feedback
+ */
+export async function getServicesForReports(managerCode: string) {
+  const sql = `
+    SELECT
+      service_id as id,
+      service_id as name,
+      description,
+      status
+    FROM services
+    WHERE manager_code = $1
+      AND status NOT IN ('cancelled', 'archived')
+      AND archived_at IS NULL
+    ORDER BY created_at DESC
+  `;
+  const result = await query(sql, [managerCode]);
+  return result.rows;
+}
+
+/**
+ * Fetch all orders for a manager's ecosystem
+ * Used to populate the dropdown when creating structured reports/feedback
+ */
+export async function getOrdersForReports(managerCode: string) {
+  const sql = `
+    SELECT
+      order_id as id,
+      order_id as name,
+      title,
+      order_type,
+      status,
+      created_at,
+      total_amount
+    FROM orders
+    WHERE manager_id = $1
+      AND status NOT IN ('cancelled', 'rejected', 'archived')
+      AND archived_at IS NULL
+    ORDER BY created_at DESC
+  `;
+  const result = await query(sql, [managerCode]);
+  return result.rows;
+}
+
+/**
+ * Fetch procedures for a manager's ecosystem
+ * Note: Procedures table doesn't exist yet, return empty array for now
+ * Will be wired into services later
+ */
+export async function getProceduresForReports(managerCode: string) {
+  // TODO: Wire this into services when procedures are implemented
+  return [];
 }
 
