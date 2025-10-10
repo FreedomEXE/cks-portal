@@ -1,6 +1,8 @@
 import { Login, RoleGuard, useAuth } from '@cks/auth';
-import { type ComponentType } from 'react';
+import { useEffect, useRef, type ComponentType } from 'react';
 import { Navigate, Route, Routes, useSearchParams } from 'react-router-dom';
+import { useLoading } from './contexts/LoadingContext';
+import { HubLoadingProvider, useHubLoading } from './contexts/HubLoadingContext';
 
 import AdminHub from './hubs/AdminHub';
 import CenterHub from './hubs/CenterHub';
@@ -33,8 +35,35 @@ function sanitizeTab(value: string | null): string | undefined {
 
 function HubLoader({ initialTab }: { initialTab?: string }): JSX.Element | null {
   const { status, role, code } = useAuth();
+  const { start } = useLoading();
+  const { isHubLoading } = useHubLoading();
+  const loaderEndRef = useRef<(() => void) | null>(null);
 
-  console.log('[HubLoader] Auth state:', { status, role, code });
+  console.log('[HubLoader] Auth state:', { status, role, code, isHubLoading });
+
+  // Manage loader based on hub's loading state
+  useEffect(() => {
+    if (isHubLoading && !loaderEndRef.current) {
+      loaderEndRef.current = start();
+      console.log('[HubLoader] Started loader - hub is loading');
+    } else if (!isHubLoading && loaderEndRef.current) {
+      // Delay hiding the loader slightly to ensure hub is rendered
+      setTimeout(() => {
+        if (loaderEndRef.current) {
+          loaderEndRef.current();
+          loaderEndRef.current = null;
+          console.log('[HubLoader] Stopped loader - hub is ready');
+        }
+      }, 100);
+    }
+
+    return () => {
+      if (loaderEndRef.current) {
+        loaderEndRef.current();
+        loaderEndRef.current = null;
+      }
+    };
+  }, [isHubLoading, start]);
 
   if (status === 'idle' || status === 'loading') {
     console.log('[HubLoader] Still loading...');
@@ -54,7 +83,16 @@ function HubLoader({ initialTab }: { initialTab?: string }): JSX.Element | null 
     return <Navigate to="/login" replace />;
   }
 
-  return <Hub initialTab={initialTab} />;
+  // Always render hub, but keep it hidden while loading
+  // This ensures seamless transition from loader to hub
+  return (
+    <div style={{
+      visibility: isHubLoading ? 'hidden' : 'visible',
+      position: isHubLoading ? 'absolute' : 'relative'
+    }}>
+      <Hub initialTab={initialTab} />
+    </div>
+  );
 }
 
 function RoleHubRoute(): JSX.Element {
@@ -63,7 +101,9 @@ function RoleHubRoute(): JSX.Element {
 
   return (
     <RoleGuard initialTab={initialTab}>
-      <HubLoader initialTab={initialTab} />
+      <HubLoadingProvider>
+        <HubLoader initialTab={initialTab} />
+      </HubLoadingProvider>
     </RoleGuard>
   );
 }

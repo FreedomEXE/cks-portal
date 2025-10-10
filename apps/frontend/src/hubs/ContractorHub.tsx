@@ -45,6 +45,7 @@ import {
 } from '../shared/api/hub';
 import { buildEcosystemTree } from '../shared/utils/ecosystem';
 import { useCatalogItems } from '../shared/api/catalog';
+import { useHubLoading } from '../contexts/HubLoadingContext';
 
 interface ContractorHubProps {
   initialTab?: string;
@@ -218,6 +219,7 @@ export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHu
 
   const { code: authCode } = useAuth();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
+  const { setHubLoading } = useHubLoading();
 
   // Fetch fresh service details when modal is opened
   useEffect(() => {
@@ -269,6 +271,15 @@ export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHu
 
   const contractorCode = useMemo(() => profile?.cksCode ?? normalizedCode, [profile?.cksCode, normalizedCode]);
   const welcomeName = profile?.mainContact ?? profile?.name ?? undefined;
+
+  // Signal when critical data is loaded
+  useEffect(() => {
+    const hasCriticalData = !!profile && !!dashboard;
+    if (hasCriticalData) {
+      console.log('[ContractorHub] Critical data loaded, signaling ready');
+      setHubLoading(false);
+    }
+  }, [profile, dashboard, setHubLoading]);
 
   useEffect(() => {
     const style = document.createElement('style');
@@ -614,7 +625,11 @@ export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHu
   const dashboardErrorMessage = dashboardError ? 'Unable to load dashboard metrics. Showing cached values if available.' : null;
   const ordersErrorMessage = ordersError ? 'Unable to load order data. Showing cached values if available.' : null;
 
-
+  // Don't render anything until we have critical data
+  if (!profile || !dashboard) {
+    console.log('[ContractorHub] Waiting for critical data...');
+    return null;
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#f8fafc' }}>

@@ -13,6 +13,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useHubLoading } from '../contexts/HubLoadingContext';
 import {
   MemosPreview,
   NewsPreview,
@@ -169,6 +170,7 @@ function buildActivities(serviceOrders: HubOrderItem[], productOrders: HubOrderI
 
 export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubProps) {
   const navigate = useNavigate();
+  const { setHubLoading } = useHubLoading();
   const [activeTab, setActiveTab] = useState(initialTab);
   const [servicesTab, setServicesTab] = useState<'my' | 'active' | 'history'>('active');
   const [servicesSearchQuery, setServicesSearchQuery] = useState('');
@@ -206,6 +208,16 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
     isLoading: inventoryLoading,
     error: inventoryError,
   } = useHubInventory(normalizedCode);
+
+  // Signal to App.tsx when critical data is loaded
+  useEffect(() => {
+    const hasCriticalData = !!profile && !!dashboard;
+
+    if (hasCriticalData) {
+      console.log('[WarehouseHub] Critical data loaded, signaling hub is ready');
+      setHubLoading(false);
+    }
+  }, [profile, dashboard, setHubLoading]);
 
   useEffect(() => {
     const style = document.createElement('style');
@@ -613,6 +625,12 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
   const inventoryLoadMessage = inventoryLoading && activeInventoryData.length === 0 && archivedInventoryData.length === 0
     ? 'Loading inventory data…'
     : null;
+
+  // Don't render anything until we have critical data
+  if (!profile || !dashboard) {
+    console.log('[WarehouseHub] Waiting for critical data...');
+    return null;
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#f8fafc' }}>

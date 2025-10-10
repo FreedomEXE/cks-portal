@@ -48,6 +48,7 @@ import { archiveAPI, type EntityType } from '../shared/api/archive';
 import '../shared/api/test-archive'; // Temporary test import
 import AdminAssignSection from './components/AdminAssignSection';
 import AdminCreateSection from './components/AdminCreateSection';
+import { useHubLoading } from '../contexts/HubLoadingContext';
 
 import { useAdminUsers, updateInventory, fetchAdminOrderById } from '../shared/api/admin';
 import {
@@ -206,6 +207,7 @@ interface DirectorySectionConfig {
 
 export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
   const { code, firstName, fullName } = useAuth();
+  const { setHubLoading } = useHubLoading();
 
   // Dynamic overview cards for admin metrics
   const overviewCards = [
@@ -284,6 +286,15 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
   const { data: activityItems, isLoading: activitiesLoading, error: activitiesError } = useActivities();
 
   const [activityFeed, setActivityFeed] = useState<Activity[]>([]);
+
+  // Signal when critical data is loaded
+  useEffect(() => {
+    const hasCriticalData = !!activityItems && !activitiesLoading;
+    if (hasCriticalData) {
+      console.log('[AdminHub] Critical data loaded, signaling ready');
+      setHubLoading(false);
+    }
+  }, [activityItems, activitiesLoading, setHubLoading]);
 
   // Admin fallback profile resolver using directory data
   const getDirectoryProfile = useCallback(
@@ -1310,6 +1321,12 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
       : 'No recent activity yet.';
 
   const handleClearActivity = () => setActivityFeed([]);
+
+  // Don't render anything until we have critical data
+  if (!activityItems) {
+    console.log('[AdminHub] Waiting for critical data...');
+    return null;
+  }
 
   return (
   <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: '#f9fafb' }}>

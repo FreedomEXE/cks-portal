@@ -43,6 +43,7 @@ import {
 import { createReport as apiCreateReport, createFeedback as apiCreateFeedback, acknowledgeItem as apiAcknowledgeItem, resolveReport as apiResolveReport, fetchServicesForReports, fetchProceduresForReports, fetchOrdersForReports } from '../shared/api/hub';
 
 import { buildEcosystemTree, DEFAULT_ROLE_COLOR_MAP } from '../shared/utils/ecosystem';
+import { useHubLoading } from '../contexts/HubLoadingContext';
 
 interface CenterHubProps {
   initialTab?: string;
@@ -174,6 +175,7 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
 
   const { code: authCode } = useAuth();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
+  const { setHubLoading } = useHubLoading();
 
   // Fetch fresh service details when modal is opened
   useEffect(() => {
@@ -215,6 +217,15 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
   const {
     data: scopeData,
   } = useHubRoleScope(normalizedCode);
+
+  // Signal when critical data is loaded
+  useEffect(() => {
+    const hasCriticalData = !!profile && !!dashboard;
+    if (hasCriticalData) {
+      console.log('[CenterHub] Critical data loaded, signaling ready');
+      setHubLoading(false);
+    }
+  }, [profile, dashboard, setHubLoading]);
 
   useEffect(() => {
     const style = document.createElement('style');
@@ -401,6 +412,12 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
   const profileErrorMessage = profileError ? 'Unable to load profile details. Showing cached values if available.' : null;
   const dashboardErrorMessage = dashboardError ? 'Unable to load dashboard metrics. Showing cached values if available.' : null;
   const ordersErrorMessage = ordersError ? 'Unable to load order data. Showing cached values if available.' : null;
+
+  // Don't render anything until we have critical data
+  if (!profile || !dashboard) {
+    console.log('[CenterHub] Waiting for critical data...');
+    return null;
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#f8fafc' }}>

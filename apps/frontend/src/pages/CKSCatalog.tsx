@@ -6,6 +6,7 @@ import { createHubOrder } from "../shared/api/hub";
 import { useAuth as useClerkAuth, useUser } from "@clerk/clerk-react";
 import { useAuth as useCksAuth } from "@cks/auth";
 import { useHubRoleScope } from "../shared/api/hub";
+import { useLoading } from "../contexts/LoadingContext";
 
 type CatalogKind = "products" | "services";
 
@@ -718,6 +719,7 @@ export default function CKSCatalog() {
   const { role: authRole, code: authCode} = useCksAuth();
   const normalizedCode = useMemo(() => (authCode ? authCode.trim().toUpperCase() : null), [authCode]);
   const { data: scope } = useHubRoleScope(normalizedCode || undefined);
+  const { start } = useLoading();
 
   // Read mode from URL params: ?mode=products or ?mode=services
   const [searchParams] = useState(() => new URLSearchParams(window.location.search));
@@ -796,6 +798,21 @@ export default function CKSCatalog() {
 
   const { data, isLoading, error } = useCatalogItems(params);
   const items = data?.items ?? [];
+
+  // Manage loader based on catalog loading state
+  useEffect(() => {
+    let endLoader: (() => void) | null = null;
+
+    if (isLoading) {
+      endLoader = start();
+    }
+
+    return () => {
+      if (endLoader) {
+        endLoader();
+      }
+    };
+  }, [isLoading, start]);
 
   const handleAddProduct = (item: CatalogItem) => {
     cart.addItem(item);
@@ -968,7 +985,7 @@ export default function CKSCatalog() {
         {error ? (
           <div className="text-center text-red-500 py-16">Unable to load catalog. Please try again.</div>
         ) : isLoading ? (
-          <div className="text-center text-gray-500 py-16">Loading catalog...</div>
+          null
         ) : items.length === 0 ? (
           <div className="text-center text-gray-500 py-16">No {kind} found.</div>
         ) : (

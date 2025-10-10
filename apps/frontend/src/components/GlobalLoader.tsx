@@ -167,7 +167,6 @@ export default function GlobalLoader(): JSX.Element | null {
         ) : (
           <VectorSpinner size={sizePx} />
         )}
-        <span className="mt-3 text-sm text-slate-700">Loading…</span>
       </div>
     </div>
   );

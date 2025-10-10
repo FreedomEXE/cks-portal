@@ -178,6 +178,189 @@ export interface ComponentProps {
 
 ---
 
+## Loading System Architecture
+
+**Location:** `apps/frontend/src/contexts/` and `apps/frontend/src/components/`
+
+The CKS Portal uses a centralized loading animation system that provides consistent UX during data fetching operations.
+
+### Components:
+
+#### 1. LoadingContext
+**File:** `apps/frontend/src/contexts/LoadingContext.tsx`
+
+Global context that manages the visibility of the loading animation. Multiple components can trigger the loader simultaneously, and it only hides when all triggers have completed.
+
+**API:**
+```tsx
+const { visible, start } = useLoading();
+
+// Start loading - returns cleanup function
+const endLoader = start();
+
+// Stop loading when done
+endLoader();
+```
+
+#### 2. HubLoadingContext
+**File:** `apps/frontend/src/contexts/HubLoadingContext.tsx`
+
+Hub-specific loading context that allows hubs to signal when their critical data has loaded and they're ready to display.
+
+**Features:**
+- Tracks hub loading state (`isHubLoading`)
+- 15-second failsafe auto-reload if hub doesn't load
+- Session storage prevents reload loops (max 1 reload per 60 seconds)
+
+**API:**
+```tsx
+const { isHubLoading, setHubLoading } = useHubLoading();
+
+// Signal hub is ready
+setHubLoading(false);
+```
+
+#### 3. GlobalLoader Component
+**File:** `apps/frontend/src/components/GlobalLoader.tsx`
+
+Displays the animated portal icon during loading states.
+
+**Features:**
+- SVG path animation using `LogoLoader` component
+- Full-screen overlay with backdrop blur
+- Configurable via environment variables
+- Automatically shown/hidden based on `LoadingContext`
+
+**Environment Configuration:**
+```env
+VITE_LOADER_SVG=/portal-icon.svg    # Path to SVG logo
+VITE_LOADER_COLOR=#111827           # Animation color (hex)
+VITE_LOADER_SIZE=128                # Size in pixels
+```
+
+#### 4. LogoLoader Component
+**File:** `apps/frontend/src/components/LogoLoader.tsx`
+
+Animates SVG paths with stroke-dasharray technique for smooth drawing effect.
+
+**Features:**
+- Parses SVG paths and extracts viewBox
+- Animates each path with configurable duration, delay, and stagger
+- Uses Framer Motion for smooth animations
+- Supports custom colors and stroke thickness
+
+### Hub Loading Pattern
+
+All hubs follow this consistent loading pattern:
+
+```tsx
+export default function RoleHub({ initialTab = 'dashboard' }: HubProps) {
+  const { code } = useAuth();
+  const normalizedCode = useMemo(() => normalizeId(code), [code]);
+  const { setHubLoading } = useHubLoading();
+
+  // Fetch critical data
+  const { data: profile } = useHubProfile(normalizedCode);
+  const { data: dashboard } = useHubDashboard(normalizedCode);
+
+  // Signal when critical data is loaded
+  useEffect(() => {
+    const hasCriticalData = !!profile && !!dashboard;
+    if (hasCriticalData) {
+      console.log('[RoleHub] Critical data loaded, signaling ready');
+      setHubLoading(false);
+    }
+  }, [profile, dashboard, setHubLoading]);
+
+  // Additional hooks...
+
+  // Don't render until critical data is available
+  if (!profile || !dashboard) {
+    console.log('[RoleHub] Waiting for critical data...');
+    return null;
+  }
+
+  return (
+    <div>
+      <MyHubSection role="role" userId={normalizedCode} />
+      {/* Hub content */}
+    </div>
+  );
+}
+```
+
+**Critical Rules:**
+1. **All hooks must be called before any early returns** (React Rules of Hooks)
+2. **Signal loading complete** via `setHubLoading(false)` when critical data arrives
+3. **Return null** if critical data is missing (hub renders hidden until ready)
+4. **Critical data** = minimum data needed to render without placeholder values
+
+### Loading Flow
+
+```
+User navigates to hub
+    ↓
+App.tsx wraps HubLoader in HubLoadingProvider
+    ↓
+isHubLoading = true (default)
+    ↓
+GlobalLoader displays portal icon animation
+    ↓
+Hub renders (visibility: hidden, position: absolute)
+    ↓
+Hub fetches critical data (profile + dashboard)
+    ↓
+Hub signals: setHubLoading(false)
+    ↓
+App.tsx hides loader (100ms delay for smooth transition)
+    ↓
+Hub becomes visible (visibility: visible, position: relative)
+```
+
+### Failsafe Mechanism
+
+If a hub doesn't signal completion within 15 seconds:
+
+1. Check `sessionStorage` for recent reload
+2. If no recent reload → reload page once
+3. If already reloaded → give up, show hub anyway
+4. Session key: `cks_hub_auto_reload`
+5. Prevents infinite reload loops
+
+### Catalog Loading
+
+The catalog uses `LoadingContext` directly:
+
+```tsx
+const { start } = useLoading();
+const { data, isLoading } = useCatalogItems(params);
+
+useEffect(() => {
+  let endLoader: (() => void) | null = null;
+
+  if (isLoading) {
+    endLoader = start();
+  }
+
+  return () => {
+    if (endLoader) {
+      endLoader();
+    }
+  };
+}, [isLoading, start]);
+```
+
+### Visual Design
+
+- **Animation:** Portal icon SVG paths draw in sequence
+- **Duration:** ~1.1 seconds per cycle
+- **Stagger:** 0.25s delay between paths
+- **Background:** White with 65% opacity + backdrop blur
+- **Z-index:** 1000 (above all content)
+- **No text:** Clean, minimal animation only
+
+---
+
 ## Hub Architecture
 
 **Location:** `apps/frontend/src/hubs/`
@@ -348,5 +531,5 @@ packages/
 
 ---
 
-**Last Updated:** October 6, 2025
+**Last Updated:** October 10, 2025
 **Maintained By:** Development Team

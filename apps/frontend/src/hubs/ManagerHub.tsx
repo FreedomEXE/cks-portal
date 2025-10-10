@@ -70,6 +70,7 @@ import {
 import { createReport as apiCreateReport, createFeedback as apiCreateFeedback, acknowledgeItem as apiAcknowledgeItem, resolveReport as apiResolveReport, fetchServicesForReports, fetchProceduresForReports, fetchOrdersForReports } from '../shared/api/hub';
 import { useSWRConfig } from 'swr';
 import { buildEcosystemTree } from '../shared/utils/ecosystem';
+import { useHubLoading } from '../contexts/HubLoadingContext';
 
 interface ManagerHubProps {
   initialTab?: string;
@@ -471,6 +472,7 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
 
   const { code, fullName, firstName } = useAuth();
   const logout = useLogout();
+  const { setHubLoading } = useHubLoading();
 
   const managerCode = useMemo(() => normalizeId(code), [code]);
 
@@ -481,6 +483,15 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
   const { data: activitiesData, isLoading: activitiesLoading, error: activitiesError } = useHubActivities(managerCode);
   const { data: ordersData } = useHubOrders(managerCode);
   const { mutate } = useSWRConfig();
+
+  // Signal when critical data is loaded
+  useEffect(() => {
+    const hasCriticalData = !!profileData && !!dashboardData;
+    if (hasCriticalData) {
+      console.log('[ManagerHub] Critical data loaded, signaling ready');
+      setHubLoading(false);
+    }
+  }, [profileData, dashboardData, setHubLoading]);
 
   // Extract role-scoped entities from scope data
   const managerScope = scopeData?.role === 'manager' ? scopeData : null;
@@ -1029,6 +1040,12 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
   // Services are now auto-created on manager accept
   // Crew, procedures, training are managed from Active Services section
 
+  // Don't render anything until we have critical data
+  if (!profileData || !dashboardData) {
+    console.log('[ManagerHub] Waiting for critical data...');
+    return null;
+  }
+
   return (
     <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: '#f9fafb' }}>
       <MyHubSection
@@ -1037,6 +1054,8 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
         activeTab={activeTab}
         onTabClick={setActiveTab}
         onLogout={logout}
+        userId={managerCode ?? undefined}
+        role="manager"
       />
 
       <Scrollbar style={{ flex: 1, padding: '0 24px' }} className="hub-content-scroll">

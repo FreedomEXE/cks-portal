@@ -44,6 +44,7 @@ import {
 } from '../shared/api/hub';
 
 import { buildEcosystemTree, DEFAULT_ROLE_COLOR_MAP } from '../shared/utils/ecosystem';
+import { useHubLoading } from '../contexts/HubLoadingContext';
 
 interface CustomerHubProps {
   initialTab?: string;
@@ -175,6 +176,7 @@ export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubPro
 
   const { code: authCode } = useAuth();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
+  const { setHubLoading } = useHubLoading();
 
   const {
     data: profile,
@@ -200,6 +202,15 @@ export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubPro
   } = useHubRoleScope(normalizedCode);
   const { mutate } = useSWRConfig();
   const [notice, setNotice] = useState<string | null>(null);
+
+  // Signal when critical data is loaded
+  useEffect(() => {
+    const hasCriticalData = !!profile && !!dashboard;
+    if (hasCriticalData) {
+      console.log('[CustomerHub] Critical data loaded, signaling ready');
+      setHubLoading(false);
+    }
+  }, [profile, dashboard, setHubLoading]);
 
   // Fetch fresh service details when modal is opened
   useEffect(() => {
@@ -395,6 +406,12 @@ export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubPro
   const profileErrorMessage = profileError ? 'Unable to load profile details. Showing cached values if available.' : null;
   const dashboardErrorMessage = dashboardError ? 'Unable to load dashboard metrics. Showing cached values if available.' : null;
   const ordersErrorMessage = ordersError ? 'Unable to load order data. Showing cached values if available.' : null;
+
+  // Don't render anything until we have critical data
+  if (!profile || !dashboard) {
+    console.log('[CustomerHub] Waiting for critical data...');
+    return null;
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#f8fafc' }}>
