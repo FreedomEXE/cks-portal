@@ -21,6 +21,8 @@ export interface ReportItem {
   reportCategory?: string | null;
   relatedEntityId?: string | null;
   reportReason?: string | null;
+  priority?: 'LOW' | 'MEDIUM' | 'HIGH' | null;
+  rating?: number | null;
 }
 
 export interface HubReportsPayload {
@@ -50,6 +52,7 @@ function mapReportRow(row: any, acknowledgments: Array<{ userId: string; date: s
     reportCategory: row.report_category ?? null,
     relatedEntityId: row.related_entity_id ?? null,
     reportReason: row.report_reason ?? null,
+    priority: row.priority ?? null,
   };
 }
 
@@ -67,6 +70,11 @@ function mapFeedbackRow(row: any, acknowledgments: Array<{ userId: string; date:
     tags: [],
     acknowledgments,
     resolution_notes: row.resolution_notes ?? null,
+    // Structured + rating
+    reportCategory: row.report_category ?? null,
+    relatedEntityId: row.related_entity_id ?? null,
+    reportReason: row.report_reason ?? null,
+    rating: typeof row.rating === 'number' ? row.rating : (row.rating ? Number(row.rating) : null),
   };
 }
 
@@ -141,7 +149,7 @@ async function getAllReportsForAdmin(cksCode: string): Promise<HubReportsPayload
   const reportsResult = await query<any>(
     `SELECT report_id, type, severity, title, description, service_id, center_id, customer_id,
             status, created_by_id, created_by_role, created_at, tags,
-            report_category, related_entity_id, report_reason
+            report_category, related_entity_id, report_reason, priority
      FROM reports
      WHERE archived_at IS NULL
      ORDER BY created_at DESC NULLS LAST`
@@ -150,7 +158,7 @@ async function getAllReportsForAdmin(cksCode: string): Promise<HubReportsPayload
   // Query ALL feedback in the system (not ecosystem-scoped)
   const feedbackResult = await query<any>(
     `SELECT feedback_id, kind, title, message, center_id, customer_id,
-            status, created_by_id, created_by_role, created_at
+            status, created_by_id, created_by_role, created_at, rating
      FROM feedback
      WHERE archived_at IS NULL
      ORDER BY created_at DESC NULLS LAST`
@@ -225,7 +233,7 @@ async function getEcosystemReports(cksCode: string, role: HubRole): Promise<HubR
   const reportsResult = await query<any>(
     `SELECT report_id, type, severity, title, description, service_id, center_id, customer_id,
             status, created_by_id, created_by_role, created_at, tags, resolution_notes, resolved_by_id, resolved_at,
-            report_category, related_entity_id, report_reason
+            report_category, related_entity_id, report_reason, priority
      FROM reports
      WHERE UPPER(cks_manager) = UPPER($1) AND archived_at IS NULL
      ORDER BY created_at DESC NULLS LAST`,
@@ -235,7 +243,8 @@ async function getEcosystemReports(cksCode: string, role: HubRole): Promise<HubR
   // Query all feedback in this ecosystem (WHERE cks_manager = manager AND not archived)
   const feedbackResult = await query<any>(
     `SELECT feedback_id, kind, title, message, center_id, customer_id,
-            status, created_by_id, created_by_role, created_at, resolution_notes
+            status, created_by_id, created_by_role, created_at, resolution_notes,
+            report_category, related_entity_id, report_reason, rating
      FROM feedback
      WHERE UPPER(cks_manager) = UPPER($1) AND archived_at IS NULL
      ORDER BY created_at DESC NULLS LAST`,
@@ -294,6 +303,136 @@ async function getEcosystemReports(cksCode: string, role: HubRole): Promise<HubR
   };
 }
 
+/**
+ * Warehouse function to get ONLY reports/feedback related to warehouse-specific orders.
+ * Warehouses are NOT part of ecosystems - they only see reports about orders assigned to them.
+ */
+async function getWarehouseReports(cksCode: string): Promise<HubReportsPayload> {
+  const normalized = normalizeIdentity(cksCode);
+  if (!normalized) {
+    return {
+      role: 'warehouse',
+      cksCode,
+      reports: [],
+      feedback: [],
+    };
+  }
+
+  // Get all order IDs assigned to this warehouse
+  const ordersResult = await query<{ order_id: string }>(
+    'SELECT order_id FROM orders WHERE UPPER(assigned_warehouse) = UPPER($1)',
+    [normalized]
+  );
+  const orderIds = ordersResult.rows.map(r => r.order_id);
+
+  if (orderIds.length === 0) {
+    // No orders assigned to this warehouse, return empty
+    return {
+      role: 'warehouse',
+      cksCode,
+      reports: [],
+      feedback: [],
+    };
+  }
+
+  // Get all service IDs that were created from warehouse-managed orders
+  // (service orders transform into services via orders.transformed_id)
+  const servicesResult = await query<{ service_id: string }>(
+    `SELECT DISTINCT transformed_id as service_id
+     FROM orders
+     WHERE UPPER(assigned_warehouse) = UPPER($1)
+       AND transformed_id IS NOT NULL`,
+    [normalized]
+  );
+  const serviceIds = servicesResult.rows.map(r => r.service_id).filter(Boolean);
+
+  // Combine order IDs and service IDs into one array for matching
+  const entityIds = [...orderIds, ...serviceIds];
+
+  // Query reports where related_entity_id matches warehouse's orders OR services
+  // This includes both warehouse-managed service orders AND product orders
+  const reportsResult = await query<any>(
+    `SELECT report_id, type, severity, title, description, service_id, center_id, customer_id,
+            status, created_by_id, created_by_role, created_at, tags, resolution_notes, resolved_by_id, resolved_at,
+            report_category, related_entity_id, report_reason, priority
+     FROM reports
+     WHERE archived_at IS NULL
+       AND (
+         (report_category IN ('order', 'service') AND related_entity_id = ANY($1))
+         OR created_by_id = $2
+       )
+     ORDER BY created_at DESC NULLS LAST`,
+    [entityIds, normalized]
+  );
+
+  // Query feedback where related_entity_id matches warehouse's orders OR services
+  // This now includes feedback ABOUT warehouse-managed entities, not just feedback created BY the warehouse
+  const feedbackResult = await query<any>(
+    `SELECT feedback_id, kind, title, message, center_id, customer_id,
+            status, created_by_id, created_by_role, created_at, resolution_notes,
+            report_category, related_entity_id, report_reason, rating
+     FROM feedback
+     WHERE archived_at IS NULL
+       AND (
+         (report_category IN ('order', 'service') AND related_entity_id = ANY($1))
+         OR created_by_id = $2
+       )
+     ORDER BY created_at DESC NULLS LAST`,
+    [entityIds, normalized]
+  );
+
+  // Load acknowledgments for warehouse reports
+  const reportIds = reportsResult.rows.map(r => r.report_id);
+  const reportAcksResult = reportIds.length > 0 ? await query<any>(
+    `SELECT report_id, acknowledged_by_id, acknowledged_at
+     FROM report_acknowledgments
+     WHERE report_id = ANY($1)
+     ORDER BY acknowledged_at ASC`,
+    [reportIds]
+  ) : { rows: [] };
+
+  // Load acknowledgments for warehouse feedback
+  const feedbackIds = feedbackResult.rows.map(f => f.feedback_id);
+  const feedbackAcksResult = feedbackIds.length > 0 ? await query<any>(
+    `SELECT feedback_id, acknowledged_by_id, acknowledged_at
+     FROM feedback_acknowledgments
+     WHERE feedback_id = ANY($1)
+     ORDER BY acknowledged_at ASC`,
+    [feedbackIds]
+  ) : { rows: [] };
+
+  // Group acknowledgments by report_id
+  const reportAcksMap = new Map<string, Array<{ userId: string; date: string }>>();
+  for (const ack of reportAcksResult.rows) {
+    if (!reportAcksMap.has(ack.report_id)) {
+      reportAcksMap.set(ack.report_id, []);
+    }
+    reportAcksMap.get(ack.report_id)!.push({
+      userId: ack.acknowledged_by_id,
+      date: ack.acknowledged_at,
+    });
+  }
+
+  // Group acknowledgments by feedback_id
+  const feedbackAcksMap = new Map<string, Array<{ userId: string; date: string }>>();
+  for (const ack of feedbackAcksResult.rows) {
+    if (!feedbackAcksMap.has(ack.feedback_id)) {
+      feedbackAcksMap.set(ack.feedback_id, []);
+    }
+    feedbackAcksMap.get(ack.feedback_id)!.push({
+      userId: ack.acknowledged_by_id,
+      date: ack.acknowledged_at,
+    });
+  }
+
+  return {
+    role: 'warehouse',
+    cksCode,
+    reports: reportsResult.rows.map(row => mapReportRow(row, reportAcksMap.get(row.report_id) || [])),
+    feedback: feedbackResult.rows.map(row => mapFeedbackRow(row, feedbackAcksMap.get(row.feedback_id) || [])),
+  };
+}
+
 export async function getHubReports(role: HubRole, cksCode: string): Promise<HubReportsPayload | null> {
   const normalizedCode = normalizeIdentity(cksCode);
   if (!normalizedCode) {
@@ -303,6 +442,11 @@ export async function getHubReports(role: HubRole, cksCode: string): Promise<Hub
   // Admin sees ALL reports across all ecosystems
   if (role.toLowerCase() === 'admin') {
     return getAllReportsForAdmin(normalizedCode);
+  }
+
+  // Warehouse has special logic - only sees reports about their assigned orders
+  if (role.toLowerCase() === 'warehouse') {
+    return getWarehouseReports(normalizedCode);
   }
 
   // All other roles use the ecosystem-based query

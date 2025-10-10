@@ -446,8 +446,22 @@ function useHubSWR<T>(key: string | null, transform?: (value: T) => T) {
   );
 
   return useSWR<T, Error>(key, async (endpoint: string) => {
-    const data = await fetcher(endpoint);
+    const response = await apiFetch<ApiResponse<T>>(endpoint, {
+      getToken,
+      timeoutMs: 25000,
+    });
+    const data = response.data;
     return transform ? transform(data) : data;
+  }, {
+    revalidateOnFocus: false,
+    revalidateOnReconnect: true,
+    errorRetryCount: 2,
+    errorRetryInterval: 4000,
+    shouldRetryOnError: (err: any) => {
+      const status = err?.status;
+      if (status === 401 || status === 403) return false;
+      return true;
+    },
   });
 }
 
@@ -488,6 +502,39 @@ export function useHubDashboard(cksCode?: string | null) {
 export async function fetchHubDashboard(cksCode: string, init?: ApiFetchInit) {
   const response = await apiFetch<ApiResponse<HubDashboardResponse>>(`/hub/dashboard/${encodeURIComponent(cksCode)}`, init);
   return response.data;
+}
+
+// Combine core hub bootstrapping queries (kept for compatibility, no longer gates UI)
+export function useHubBootstrap(cksCode?: string | null) {
+  const profile = useHubProfile(cksCode);
+  const dashboard = useHubDashboard(cksCode);
+  const orders = useHubOrders(cksCode);
+  const reports = useHubReports(cksCode);
+  const scope = useHubRoleScope(cksCode);
+
+  const hasCode = !!cksCode;
+
+  const isLoading = hasCode && (
+    !!profile.isLoading ||
+    !!dashboard.isLoading ||
+    !!orders.isLoading ||
+    !!reports.isLoading ||
+    !!scope.isLoading
+  );
+
+  const error = profile.error || dashboard.error || orders.error || reports.error || scope.error;
+
+  const revalidate = async () => {
+    await Promise.allSettled([
+      profile.mutate?.(undefined, true),
+      dashboard.mutate?.(undefined, true),
+      orders.mutate?.(undefined, true),
+      reports.mutate?.(undefined, true),
+      scope.mutate?.(undefined, true),
+    ]);
+  };
+
+  return { isLoading, error, revalidate } as const;
 }
 
 export function useHubOrders(cksCode?: string | null, options?: { status?: string; type?: 'service' | 'product' }) {
@@ -571,25 +618,58 @@ function normalizeFeedbackKind(category: string): string {
   return map[category] ?? 'other';
 }
 
-export async function createReport(payload: { title: string; description: string; category: string; centerId?: string | null; customerId?: string | null; severity?: string | null }) {
-  const body = {
-    title: payload.title,
-    description: payload.description,
-    type: normalizeReportType(payload.category),
-    severity: payload.severity ?? undefined,
+export async function createReport(payload: {
+  title?: string | null;
+  description?: string | null;
+  category?: string;
+  centerId?: string | null;
+  customerId?: string | null;
+  severity?: string | null;
+  // Structured fields
+  reportCategory?: 'service' | 'order' | 'procedure';
+  relatedEntityId?: string;
+  reportReason?: string;
+  // Priority
+  priority?: 'LOW' | 'MEDIUM' | 'HIGH';
+}) {
+  const body: any = {
+    ...(payload.title ? { title: payload.title } : {}),
+    ...(payload.description ? { description: payload.description } : {}),
+    ...(payload.category ? { type: normalizeReportType(payload.category) } : {}),
+    ...(payload.severity ? { severity: payload.severity } : {}),
     ...(payload.centerId ? { centerId: payload.centerId } : {}),
     ...(payload.customerId ? { customerId: payload.customerId } : {}),
+    ...(payload.reportCategory && payload.relatedEntityId && payload.reportReason
+      ? { reportCategory: payload.reportCategory, relatedEntityId: payload.relatedEntityId, reportReason: payload.reportReason }
+      : {}),
+    ...(payload.priority ? { priority: payload.priority } : {}),
   };
   await apiFetch<ApiResponse<{ id: string }>>('/reports', { method: 'POST', body: JSON.stringify(body) });
 }
 
-export async function createFeedback(payload: { title: string; message: string; category: string; centerId?: string | null; customerId?: string | null }) {
-  const body = {
+export async function createFeedback(payload: {
+  title: string;
+  message: string;
+  category: string;
+  centerId?: string | null;
+  customerId?: string | null;
+  // Structured fields
+  reportCategory?: 'service' | 'order' | 'procedure';
+  relatedEntityId?: string;
+  reportReason?: string;
+  // Rating
+  rating?: number;
+}) {
+  const body: any = {
     title: payload.title,
     message: payload.message,
     kind: normalizeFeedbackKind(payload.category),
     ...(payload.centerId ? { centerId: payload.centerId } : {}),
     ...(payload.customerId ? { customerId: payload.customerId } : {}),
+    ...(payload.reportCategory && payload.relatedEntityId && payload.reportReason
+      ? { reportCategory: payload.reportCategory, relatedEntityId: payload.relatedEntityId, reportReason: payload.reportReason }
+      : {}),
+    ...(payload.rating ? { rating: payload.rating } : {}),
   };
   await apiFetch<ApiResponse<{ id: string }>>('/feedback', { method: 'POST', body: JSON.stringify(body) });
 }

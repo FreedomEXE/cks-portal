@@ -1,4 +1,5 @@
 import { useAuth } from '@cks/auth';
+import { useUser } from '@clerk/clerk-react';
 import { MyHubSection as BaseMyHubSection, type MyHubSectionProps } from '@cks/ui';
 import { useLogout } from '../hooks/useLogout';
 
@@ -13,10 +14,11 @@ export default function MyHubSection({
 }: Props) {
   const logout = useLogout();
   const { code, firstName, ownerFirstName, role } = useAuth();
+  const { user } = useUser();
 
   const onLogout = providedOnLogout ?? logout;
   const welcomeName = providedWelcomeName ?? ownerFirstName ?? firstName ?? undefined;
-  const userId = code ?? providedUserId ?? undefined;
+  const userId = code ?? providedUserId ?? user?.username ?? undefined;
   const resolvedRole = (providedRole ?? role ?? 'admin').toLowerCase();
 
   return (

@@ -187,16 +187,49 @@ if (report.report_category) {
 8. ⏳ Test with creating a report for a service (READY FOR TESTING)
 
 ## Testing Checklist
+
+### Basic Functionality
 - [ ] Can select "Service" from Report For dropdown
 - [ ] Services dropdown populates with real services from database (service CEN-010-SRV-001 should appear)
+- [ ] Services dropdown shows "Name (ID)" format (e.g., "Emergency Stock Retrieval (CEN-010-SRV-002)")
 - [ ] Orders dropdown populates with real orders from database (order CEN-010-SO-035 should appear)
+- [ ] Orders dropdown shows "Name (ID)" format
 - [ ] Procedures dropdown shows empty (expected behavior for now)
 - [ ] Can select a reason from the reasons dropdown
-- [ ] Submit button is disabled until all 3 dropdowns are selected
-- [ ] Report creates successfully
+- [ ] Submit button is disabled until all dropdowns are selected
+
+### Priority System (Reports)
+- [ ] Priority dropdown appears when creating a report
+- [ ] Priority dropdown has options: Low, Medium, High
+- [ ] Submit button disabled until priority is selected
+- [ ] Report creates successfully with priority
+- [ ] Priority displays correctly in ReportCard (LOW/MEDIUM/HIGH badge)
+- [ ] Priority value stored correctly in database (`reports.priority`)
+
+### Rating System (Feedback)
+- [ ] Rating dropdown appears when creating feedback
+- [ ] Rating dropdown has options: ★ 1 through ★★★★★ 5
+- [ ] Submit button disabled until rating is selected (rating > 0)
+- [ ] Feedback creates successfully with rating
+- [ ] Rating displays correctly in FeedbackCard (star rating)
+- [ ] Rating value stored correctly in database (`feedback.rating`)
+
+### Role-Based Visibility
+- [ ] **Manager**: Can see all services/orders in their ecosystem
+- [ ] **Center**: Can see services/orders related to their center (via cks_manager lookup)
+- [ ] **Customer**: Can see services/orders related to their customer (via cks_manager lookup)
+- [ ] **Contractor**: Can see services/orders related to their contractor (via cks_manager lookup)
+- [ ] **Crew**: Can see services/orders related to their assigned center (via cks_manager lookup)
+- [ ] **Warehouse**: Can ONLY see orders assigned to their warehouse (NOT ecosystem-based)
+
+### Display & Formatting
 - [ ] Report displays with formatted text: "Report: Service [ID] - Reason"
+- [ ] "Managed By" field shows correctly (not NULL)
+- [ ] "Managed By" shows warehouse name when applicable
+- [ ] "Managed By" shows manager name when applicable
 - [ ] Other users can see the report with proper formatting
 - [ ] Feedback works with the same structure
+- [ ] Priority badge color-coded (if implemented: RED=HIGH, YELLOW=MEDIUM, GREEN=LOW)
 
 ## Notes
 - NO text input fields - everything is dropdowns
@@ -208,19 +241,52 @@ if (report.report_category) {
 - Orders are queried from the `orders` table with `manager_id` filtering
 - Procedures will be implemented later (currently returns empty array)
 
-## Recent Updates (Oct 9, 2025)
+## Recent Updates
 
-### Bug Fixes
+### Oct 9, 2025 - Session 1
+
+#### Bug Fixes
 - **Fixed critical bug**: Services dropdown was querying wrong table (`order_items` instead of `services`)
 - **Fixed filtering**: Now properly filters out archived and cancelled items from dropdowns
 - **Fixed validation**: Backend now rejects Product category in validation schema
 
-### Code Changes
+#### Code Changes
 - Removed all Product-related code from codebase
 - Updated `ReportCategory` type: `'service' | 'order' | 'procedure'`
 - Removed `fetchProductsForReports()` and `getProductsForReports()`
 - Added `fetchProceduresForReports()` and `getProceduresForReports()`
 - Updated all 6 Hub components to use new procedures API
 
+### Oct 9, 2025 - Session 2
+
+#### New Features
+- **Priority System for Reports**: Added LOW/MEDIUM/HIGH priority levels (required field)
+- **Rating System for Feedback**: Added 1-5 star ratings (required field)
+- **Improved Dropdown UX**: Shows "Name (ID)" format (e.g., "Emergency Stock Retrieval (CEN-010-SRV-002)")
+- **Role-Aware Filtering**: Non-manager users can now see services/orders in their ecosystem
+- **Warehouse Isolation**: Warehouses only see reports about their assigned orders
+
+#### Database Changes
+- Migration: `20251010_01_add_priority_and_rating_to_reports_feedback.sql`
+- Added `priority` (VARCHAR 10) to `reports` table
+- Added `rating` (INTEGER) to `feedback` table
+- Added `report_category`, `related_entity_id`, `report_reason` to `feedback` table
+
+#### Bug Fixes
+- **Empty dropdowns for non-managers**: Fixed by implementing `resolveManagerForUser()` helper
+- **Services query error**: Now queries `services` table with JOIN to `orders` via `transformed_id`
+- **Warehouse query error**: Removed invalid `cks_manager` subquery from warehouse filtering
+- **"Managed By: NULL" display**: Added `managedBy*` fields to all hub `commonOrder` objects
+- **Function signature mismatch**: Fixed `onResolve` prop signature throughout component chain
+
+#### Code Changes
+- **Backend**: `resolveManagerForUser()` determines ecosystem manager based on role
+- **Backend**: Updated `getServicesForReports()` and `getOrdersForReports()` to accept `(userCode, role)`
+- **Backend**: Added `getWarehouseReports()` for warehouse-specific visibility
+- **Frontend**: Added priority dropdown (reports) and rating dropdown (feedback)
+- **Frontend**: Refactored JSX conditionals from `&&` to ternary operators for better ESBuild compatibility
+- **All Hubs**: Updated to pass `managedBy`, `managedById`, `managedByName` fields
+
 ### Status
-✅ **IMPLEMENTATION COMPLETE** - Ready for end-to-end testing
+✅ **IMPLEMENTATION COMPLETE** - Priority/Rating features added
+⏳ **TESTING IN PROGRESS** - Build verification needed, then end-to-end testing

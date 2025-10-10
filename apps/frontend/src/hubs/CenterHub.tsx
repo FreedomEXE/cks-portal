@@ -675,12 +675,26 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
                 onSubmit={async (payload) => {
                   // Handle structured dropdown-based reports/feedback
                   if (payload.reportCategory && payload.relatedEntityId && payload.reportReason) {
-                    await apiCreateReport({
-                      reportCategory: payload.reportCategory,
-                      relatedEntityId: payload.relatedEntityId,
-                      reportReason: payload.reportReason,
-                      centerId: normalizedCode ?? undefined,
-                    });
+                    if (payload.type === 'report') {
+                      await apiCreateReport({
+                        reportCategory: payload.reportCategory,
+                        relatedEntityId: payload.relatedEntityId,
+                        reportReason: payload.reportReason,
+                        priority: payload.priority,
+                        centerId: normalizedCode ?? undefined,
+                      });
+                    } else {
+                      await apiCreateFeedback({
+                        title: 'Feedback',
+                        message: payload.reportReason,
+                        category: 'Recognition',
+                        reportCategory: payload.reportCategory,
+                        relatedEntityId: payload.relatedEntityId,
+                        reportReason: payload.reportReason,
+                        rating: payload.rating,
+                        centerId: normalizedCode ?? undefined,
+                      });
+                    }
                   } else if (payload.type === 'report') {
                     // Legacy text-based reports (fallback)
                     await apiCreateReport({ title: payload.title, description: payload.description, category: payload.category, centerId: normalizedCode ?? undefined });
@@ -747,6 +761,8 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
               status: (selectedOrderForDetails as any).status || null,
               serviceId: ((selectedOrderForDetails as any)?.metadata?.serviceId) || null,
               managedBy: ((selectedOrderForDetails as any)?.metadata?.serviceManagedBy) || null,
+              managedById: ((selectedOrderForDetails as any)?.metadata?.warehouseId) || ((selectedOrderForDetails as any)?.metadata?.managerId) || null,
+              managedByName: ((selectedOrderForDetails as any)?.metadata?.warehouseName) || ((selectedOrderForDetails as any)?.metadata?.managerName) || null,
             }
           : null;
 

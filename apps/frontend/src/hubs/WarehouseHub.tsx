@@ -1178,7 +1178,17 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
                 isLoading={reportsLoading}
                 onSubmit={async (payload) => {
                   if (payload.type === 'feedback') {
-                    await apiCreateFeedback({ title: payload.title, message: payload.description, category: payload.category });
+                    await apiCreateFeedback({
+                      title: payload.title || 'Feedback',
+                      message: payload.description || (payload.reportReason ?? ''),
+                      category: payload.category || 'Recognition',
+                      ...(payload.reportCategory && payload.relatedEntityId && payload.reportReason ? {
+                        reportCategory: payload.reportCategory,
+                        relatedEntityId: payload.relatedEntityId,
+                        reportReason: payload.reportReason,
+                        rating: payload.rating,
+                      } : {}),
+                    });
                   } else {
                     alert('Warehouse can only submit feedback at this time.');
                     return;

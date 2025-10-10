@@ -772,8 +772,18 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
                 reports={reportsData?.reports || []}
                 feedback={reportsData?.feedback || []}
                 isLoading={reportsLoading}
-                onSubmit={async (payload) => {
-                  await apiCreateFeedback({ title: payload.title, message: payload.description, category: payload.category });
+              onSubmit={async (payload) => {
+                  await apiCreateFeedback({
+                    title: payload.title || 'Feedback',
+                    message: payload.description || (payload.reportReason ?? ''),
+                    category: payload.category || 'Recognition',
+                    ...(payload.reportCategory && payload.relatedEntityId && payload.reportReason ? {
+                      reportCategory: payload.reportCategory,
+                      relatedEntityId: payload.relatedEntityId,
+                      reportReason: payload.reportReason,
+                      rating: payload.rating,
+                    } : {}),
+                  });
                   await mutate(`/hub/reports/${normalizedCode}`);
                 }}
                 fetchServices={fetchServicesForReports}

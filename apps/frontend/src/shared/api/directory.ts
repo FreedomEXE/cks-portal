@@ -244,7 +244,12 @@ function createDirectoryResource<TResponse, TMapped = TResponse>(
       [getToken],
     );
 
-    const { data, error, isLoading } = useSWR<TMapped[], Error>(config.path, fetcher);
+    const { data, error, isLoading } = useSWR<TMapped[], Error>(config.path, fetcher, {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: true,
+      revalidateIfStale: false,
+      dedupingInterval: 10000,
+    });
     const fallbackData = useMemo<TMapped[]>(() => [], []);
     const safeData = data ?? fallbackData;
 
@@ -350,5 +355,4 @@ export const useFeedback = feedbackResource.useResource;
 export const fetchFeedback = feedbackResource.fetchResource;
 export const useActivities = activitiesResource.useResource;
 export const fetchActivities = activitiesResource.fetchResource;
-
 

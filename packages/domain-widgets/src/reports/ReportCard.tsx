@@ -32,6 +32,9 @@ export interface ReportFeedback {
   reportCategory?: string | null;
   relatedEntityId?: string | null;
   reportReason?: string | null;
+  // New rating/priority
+  priority?: 'LOW' | 'MEDIUM' | 'HIGH' | null;
+  rating?: number | null;
 }
 
 interface ReportCardProps {
@@ -39,7 +42,7 @@ interface ReportCardProps {
   currentUser: string;
   userRole: string;
   onAcknowledge?: (reportId: string) => void;
-  onResolve?: (reportId: string, actionTaken: string, notes: string) => void;
+  onResolve?: (reportId: string, details?: { actionTaken?: string; notes?: string }) => void;
 }
 
 const ReportCard: React.FC<ReportCardProps> = ({
@@ -118,6 +121,47 @@ const ReportCard: React.FC<ReportCardProps> = ({
         color: 'white'
       };
     }
+  };
+
+  const renderPriorityOrRating = () => {
+    if (report.type === 'report' && report.priority) {
+      const color = report.priority === 'HIGH' ? '#b91c1c' : report.priority === 'MEDIUM' ? '#f59e0b' : '#059669';
+      const bg = report.priority === 'HIGH' ? '#fee2e2' : report.priority === 'MEDIUM' ? '#fef3c7' : '#ecfdf5';
+      return (
+        <span style={{
+          padding: '4px 10px',
+          borderRadius: '9999px',
+          fontSize: '12px',
+          fontWeight: 600,
+          textTransform: 'uppercase',
+          color,
+          backgroundColor: bg,
+          border: `1px solid ${color}33`,
+          flexShrink: 0,
+        }}>
+          {report.priority} Priority
+        </span>
+      );
+    }
+    if (report.type === 'feedback' && report.rating && report.rating > 0) {
+      const full = '★★★★★'.slice(0, Math.min(5, report.rating));
+      const empty = '☆☆☆☆☆'.slice(0, 5 - Math.min(5, report.rating));
+      return (
+        <span style={{
+          padding: '4px 10px',
+          borderRadius: '9999px',
+          fontSize: '12px',
+          fontWeight: 600,
+          color: '#92400e',
+          backgroundColor: '#fffbeb',
+          border: '1px solid #fcd34d',
+          flexShrink: 0,
+        }}>
+          {full}{empty}
+        </span>
+      );
+    }
+    return null;
   };
 
   return (
@@ -207,18 +251,21 @@ const ReportCard: React.FC<ReportCardProps> = ({
             </span>
           </div>
 
-          {/* Status Badge */}
-          <span style={{
-            padding: '4px 12px',
-            borderRadius: '9999px',
-            fontSize: '12px',
-            fontWeight: 600,
-            textTransform: 'uppercase',
-            flexShrink: 0,
-            ...getStatusBadgeStyle(),
-          }}>
-            {report.status}
-          </span>
+          {/* Status Badge + Priority/Rating */}
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <span style={{
+              padding: '4px 12px',
+              borderRadius: '9999px',
+              fontSize: '12px',
+              fontWeight: 600,
+              textTransform: 'uppercase',
+              flexShrink: 0,
+              ...getStatusBadgeStyle(),
+            }}>
+              {report.status}
+            </span>
+            {renderPriorityOrRating()}
+          </div>
         </div>
       </div>
 

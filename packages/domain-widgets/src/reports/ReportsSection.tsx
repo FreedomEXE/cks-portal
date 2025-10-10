@@ -41,12 +41,14 @@ const ReportsSection: React.FC<ReportsSectionProps> = ({
   const canCreateReports = ['contractor', 'customer', 'center'].includes(role.toLowerCase());
   const defaultType = canCreateReports ? 'report' : 'feedback';
 
-  // NEW STRUCTURED STATE: 3 dropdown selections
+  // NEW STRUCTURED STATE: selections + rating/priority
   const [reportForm, setReportForm] = useState({
     type: defaultType as 'report' | 'feedback',
     reportCategory: '' as ReportCategory | '',  // service | order | procedure
     relatedEntityId: '',                         // ID of selected entity
     reportReason: '',                            // Selected reason
+    priority: '' as '' | 'LOW' | 'MEDIUM' | 'HIGH',
+    rating: 0 as 0 | 1 | 2 | 3 | 4 | 5,
   });
 
   // State for entity lists (populated by API calls)
@@ -140,6 +142,15 @@ const ReportsSection: React.FC<ReportsSectionProps> = ({
       return;
     }
 
+    if (reportForm.type === 'report' && !reportForm.priority) {
+      alert('Please select a priority for the report');
+      return;
+    }
+    if (reportForm.type === 'feedback' && (!reportForm.rating || reportForm.rating < 1)) {
+      alert('Please select a rating (1-5) for the feedback');
+      return;
+    }
+
     try {
       if (onSubmit) {
         // Send structured data to backend
@@ -149,6 +160,8 @@ const ReportsSection: React.FC<ReportsSectionProps> = ({
             reportCategory: reportForm.reportCategory,
             relatedEntityId: reportForm.relatedEntityId,
             reportReason: reportForm.reportReason,
+            priority: reportForm.type === 'report' ? reportForm.priority : undefined,
+            rating: reportForm.type === 'feedback' ? reportForm.rating : undefined,
           }),
         );
       } else {
@@ -166,6 +179,8 @@ const ReportsSection: React.FC<ReportsSectionProps> = ({
       reportCategory: '',
       relatedEntityId: '',
       reportReason: '',
+      priority: '',
+      rating: 0,
     });
 
     alert('Submitted successfully!');
@@ -184,12 +199,12 @@ const ReportsSection: React.FC<ReportsSectionProps> = ({
     }
   };
 
-  const handleResolve = async (reportId: string, actionTaken: string, notes: string) => {
+  const handleResolve = async (reportId: string, details?: { actionTaken?: string; notes?: string }) => {
     try {
       if (onResolve) {
-        await Promise.resolve(onResolve(reportId, { actionTaken, notes }));
+        await Promise.resolve(onResolve(reportId, details));
       } else {
-        console.log('Resolving report:', reportId, actionTaken, notes);
+        console.log('Resolving report:', reportId, details);
       }
     } catch (err) {
       console.error('Resolve failed', err);
@@ -206,6 +221,19 @@ const ReportsSection: React.FC<ReportsSectionProps> = ({
   const renderSubmitForm = () => {
     const entityList = getEntityList();
     const availableReasons = getAvailableReasons();
+    const hasCategory = Boolean(reportForm.reportCategory);
+    const hasEntity = Boolean(reportForm.relatedEntityId);
+    const selectedCategoryLabel = hasCategory
+      ? CATEGORY_LABELS[reportForm.reportCategory as ReportCategory]
+      : '';
+    const entityOptions = entityList.map((entity) => {
+      const label = `${entity.name || entity.title || entity.id} (${entity.id})`;
+      return (
+        <option key={entity.id} value={entity.id}>
+          {label}
+        </option>
+      );
+    });
 
     return (
       <div style={{ padding: '24px' }}>
@@ -238,7 +266,9 @@ const ReportsSection: React.FC<ReportsSectionProps> = ({
                     type: e.target.value as 'report' | 'feedback',
                     reportCategory: '',
                     relatedEntityId: '',
-                    reportReason: ''
+                    reportReason: '',
+                    priority: '',
+                    rating: 0,
                   })}
                   style={{
                     width: '100%',
@@ -286,7 +316,9 @@ const ReportsSection: React.FC<ReportsSectionProps> = ({
                   ...reportForm,
                   reportCategory: e.target.value as ReportCategory | '',
                   relatedEntityId: '',
-                  reportReason: ''
+                  reportReason: '',
+                  priority: '',
+                  rating: 0,
                 })}
                 style={{
                   width: '100%',
@@ -307,7 +339,7 @@ const ReportsSection: React.FC<ReportsSectionProps> = ({
           </div>
 
           {/* Row 3: Dropdown 2 - Select Entity */}
-          {reportForm.reportCategory && (
+          {hasCategory ? (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
               <div>
                 <label style={{
@@ -317,7 +349,7 @@ const ReportsSection: React.FC<ReportsSectionProps> = ({
                   color: '#374151',
                   marginBottom: '6px'
                 }}>
-                  Select {CATEGORY_LABELS[reportForm.reportCategory as ReportCategory]} *
+                  Select {selectedCategoryLabel} *
                 </label>
                 <select
                   value={reportForm.relatedEntityId}
@@ -340,19 +372,15 @@ const ReportsSection: React.FC<ReportsSectionProps> = ({
                   <option value="">
                     {entitiesLoading ? 'Loading...' : `Select ${reportForm.reportCategory}`}
                   </option>
-                  {entityList.map((entity) => (
-                    <option key={entity.id} value={entity.id}>
-                      {entity.name || entity.title || entity.id}
-                    </option>
-                  ))}
+                  {entityOptions}
                 </select>
               </div>
               <div></div>
             </div>
-          )}
+          ) : null}
 
           {/* Row 4: Dropdown 3 - Select Reason */}
-          {reportForm.reportCategory && reportForm.relatedEntityId && (
+          {hasCategory && hasEntity ? (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
               <div>
                 <label style={{
@@ -389,22 +417,90 @@ const ReportsSection: React.FC<ReportsSectionProps> = ({
               </div>
               <div></div>
             </div>
-          )}
+          ) : null}
+
+          {/* Row 5: Priority (reports) or Rating (feedback) */}
+          {hasCategory && hasEntity ? (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              {reportForm.type === 'report' ? (
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    color: '#374151',
+                    marginBottom: '6px'
+                  }}>
+                    Priority *
+                  </label>
+                  <select
+                    value={reportForm.priority}
+                    onChange={(e) => setReportForm({ ...reportForm, priority: e.target.value as 'LOW' | 'MEDIUM' | 'HIGH' })}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                      backgroundColor: '#ffffff'
+                    }}
+                  >
+                    <option value="">Select priority</option>
+                    <option value="LOW">Low</option>
+                    <option value="MEDIUM">Medium</option>
+                    <option value="HIGH">High</option>
+                  </select>
+                </div>
+              ) : (
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    color: '#374151',
+                    marginBottom: '6px'
+                  }}>
+                    Rating *
+                  </label>
+                  <select
+                    value={String(reportForm.rating)}
+                    onChange={(e) => setReportForm({ ...reportForm, rating: Number(e.target.value) as 0 | 1 | 2 | 3 | 4 | 5 })}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                      backgroundColor: '#ffffff'
+                    }}
+                  >
+                    <option value="0">Select rating</option>
+                    <option value="1">★ 1</option>
+                    <option value="2">★★ 2</option>
+                    <option value="3">★★★ 3</option>
+                    <option value="4">★★★★ 4</option>
+                    <option value="5">★★★★★ 5</option>
+                  </select>
+                </div>
+              )}
+              <div></div>
+            </div>
+          ) : null}
 
           {/* Submit Button */}
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
             <button
               onClick={handleSubmitReport}
-              disabled={!reportForm.reportCategory || !reportForm.relatedEntityId || !reportForm.reportReason}
+              disabled={!reportForm.reportCategory || !reportForm.relatedEntityId || !reportForm.reportReason || (reportForm.type === 'report' ? !reportForm.priority : reportForm.rating === 0)}
               style={{
                 padding: '12px 24px',
                 fontSize: '14px',
                 fontWeight: 500,
-                backgroundColor: (reportForm.reportCategory && reportForm.relatedEntityId && reportForm.reportReason) ? primaryColor : '#e5e7eb',
+                backgroundColor: (reportForm.reportCategory && reportForm.relatedEntityId && reportForm.reportReason && (reportForm.type === 'report' ? !!reportForm.priority : reportForm.rating > 0)) ? primaryColor : '#e5e7eb',
                 color: 'white',
                 border: 'none',
                 borderRadius: '6px',
-                cursor: (reportForm.reportCategory && reportForm.relatedEntityId && reportForm.reportReason) ? 'pointer' : 'not-allowed'
+                cursor: (reportForm.reportCategory && reportForm.relatedEntityId && reportForm.reportReason && (reportForm.type === 'report' ? !!reportForm.priority : reportForm.rating > 0)) ? 'pointer' : 'not-allowed'
               }}
             >
               Submit {reportForm.type === 'report' ? 'Report' : 'Feedback'}

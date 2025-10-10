@@ -2,6 +2,12 @@
 const path = require('path');
 const fs = require('fs/promises');
 const { Pool } = require('pg');
+// Load env from backend/.env (and root .env if present) so DATABASE_URL is available
+try {
+  const dotenv = require('dotenv');
+  dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
+  dotenv.config();
+} catch {}
 
 const BACKEND_DIR = path.resolve(__dirname, '..');
 const MIGRATIONS_DIR = path.resolve(process.cwd(), 'database', 'migrations');

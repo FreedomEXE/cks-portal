@@ -42,6 +42,7 @@ export async function reportsRoutes(fastify: FastifyInstance) {
       reportCategory: z.enum(['service', 'order', 'procedure']).optional(),
       relatedEntityId: z.string().trim().min(1).max(64).optional(),
       reportReason: z.string().trim().min(1).max(100).optional(),
+      priority: z.enum(['LOW','MEDIUM','HIGH']).optional(),
     });
     const body = schema.safeParse(request.body);
     if (!body.success) {
@@ -74,6 +75,7 @@ export async function reportsRoutes(fastify: FastifyInstance) {
       reportCategory: payload.reportCategory ?? null,
       relatedEntityId: payload.relatedEntityId ?? null,
       reportReason: payload.reportReason ?? null,
+      priority: payload.priority ?? null,
     });
     reply.code(201).send({ data: { id: created.id } });
   });
@@ -91,6 +93,11 @@ export async function reportsRoutes(fastify: FastifyInstance) {
       kind: z.string().trim().min(1).max(50),
       centerId: z.string().trim().min(1).optional(),
       customerId: z.string().trim().min(1).optional(),
+      // Structured + rating fields
+      reportCategory: z.enum(['service', 'order', 'procedure']).optional(),
+      relatedEntityId: z.string().trim().min(1).max(64).optional(),
+      reportReason: z.string().trim().min(1).max(100).optional(),
+      rating: z.number().int().min(1).max(5).optional(),
     });
     const body = schema.safeParse(request.body);
     if (!body.success) {
@@ -107,6 +114,10 @@ export async function reportsRoutes(fastify: FastifyInstance) {
       customerId: payload.customerId ?? null,
       createdByRole: account.role,
       createdById: account.cksCode ?? '',
+      reportCategory: payload.reportCategory ?? null,
+      relatedEntityId: payload.relatedEntityId ?? null,
+      reportReason: payload.reportReason ?? null,
+      rating: payload.rating ?? null,
     });
     reply.code(201).send({ data: { id: created.id } });
   });
@@ -189,7 +200,7 @@ export async function reportsRoutes(fastify: FastifyInstance) {
     const account = await requireActiveRole(request, reply);
     if (!account) return;
 
-    const services = await getServicesForReports(account.cksCode ?? '');
+    const services = await getServicesForReports(account.cksCode ?? '', account.role as HubRole);
     reply.send({ data: services });
   });
 
@@ -197,7 +208,7 @@ export async function reportsRoutes(fastify: FastifyInstance) {
     const account = await requireActiveRole(request, reply);
     if (!account) return;
 
-    const orders = await getOrdersForReports(account.cksCode ?? '');
+    const orders = await getOrdersForReports(account.cksCode ?? '', account.role as HubRole);
     reply.send({ data: orders });
   });
 

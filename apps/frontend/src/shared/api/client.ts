@@ -1,5 +1,6 @@
 import { useAuth as useClerkAuth } from '@clerk/clerk-react';
 import { useCallback } from 'react';
+import * as LoadingService from '../loading';
 
 // Prefer Vite dev proxy by default. Allow override via env.
 const DEV_PROXY_BASE = '/api';
@@ -19,10 +20,16 @@ export type ApiResponse<T> = { data: T };
 
 export type ApiFetchInit = RequestInit & {
   getToken?: () => Promise<string | null>;
+  // When true, shows the global blocking overlay for this request
+  blocking?: boolean;
+  // Optional timeout for the request; if reached, the request is aborted
+  timeoutMs?: number;
 };
 
+const DEFAULT_TIMEOUT_MS = Number(((import.meta as any).env?.VITE_API_TIMEOUT_MS as string | undefined) || '25000');
+
 export async function apiFetch<T>(path: string, init?: ApiFetchInit): Promise<T> {
-  const { getToken: providedGetToken, headers: initHeaders, ...restInit } = (init ?? {}) as ApiFetchInit;
+  const { getToken: providedGetToken, headers: initHeaders, blocking, timeoutMs, ...restInit } = (init ?? {}) as ApiFetchInit;
   const headers = new Headers(initHeaders as HeadersInit | undefined);
   const normalizedPath = path.startsWith('/') ? path : '/' + path;
   const url = API_BASE + normalizedPath;
@@ -101,11 +108,37 @@ export async function apiFetch<T>(path: string, init?: ApiFetchInit): Promise<T>
 
   console.log('[apiFetch] Final headers:', Object.fromEntries(headers.entries()));
 
-  const response = await fetch(url, {
-    credentials: 'include',
-    ...restInit,
-    headers,
-  });
+  const end = LoadingService.start({ blocking: !!blocking });
+  let response: Response;
+  try {
+    const controller = new AbortController();
+    const providedSignal = restInit.signal as AbortSignal | undefined;
+    if (providedSignal) {
+      if (providedSignal.aborted) controller.abort();
+      else providedSignal.addEventListener('abort', () => controller.abort(), { once: true });
+    }
+    const t = window.setTimeout(() => controller.abort(), Number(timeoutMs ?? DEFAULT_TIMEOUT_MS)) as unknown as number;
+    try {
+      response = await fetch(url, {
+        credentials: 'include',
+        ...restInit,
+        signal: controller.signal,
+        headers,
+      });
+    } catch (error: any) {
+      if (error?.name === 'AbortError') {
+        console.error('[apiFetch] Request timed out:', path);
+        const e = new Error('Request timed out');
+        (e as any).code = 'ETIMEOUT';
+        throw e;
+      }
+      throw error;
+    } finally {
+      window.clearTimeout(t);
+    }
+  } finally {
+    end();
+  }
 
   if (response.status === 401) {
     console.error('[apiFetch] 401 Unauthorized for:', path);

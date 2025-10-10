@@ -43,6 +43,7 @@ import { useSWRConfig } from 'swr';
 
 import MyHubSection from '../components/MyHubSection';
 import { useLogout } from '../hooks/useLogout';
+import { useAuth } from '@cks/auth';
 import { archiveAPI, type EntityType } from '../shared/api/archive';
 import '../shared/api/test-archive'; // Temporary test import
 import AdminAssignSection from './components/AdminAssignSection';
@@ -204,6 +205,8 @@ interface DirectorySectionConfig {
 }
 
 export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
+  const { code, firstName, fullName } = useAuth();
+
   // Dynamic overview cards for admin metrics
   const overviewCards = [
     { id: 'users', title: 'Total Users', dataKey: 'userCount', color: 'blue' },
