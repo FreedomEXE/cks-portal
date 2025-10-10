@@ -202,7 +202,7 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
     error: ordersError,
     mutate: refreshOrders,
   } = useHubOrders(normalizedCode);
-  const { data: reportsData, isLoading: reportsLoading } = useHubReports(normalizedCode);
+  const { data: reportsData, isLoading: reportsLoading, mutate: mutateReports } = useHubReports(normalizedCode);
   const {
     data: inventory,
     isLoading: inventoryLoading,
@@ -1211,21 +1211,23 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
                     alert('Warehouse can only submit feedback at this time.');
                     return;
                   }
-                  const { mutate } = await import('swr');
-                  (mutate as any)(`/hub/reports/${normalizedCode}`);
+                  console.log('[WarehouseHub] AFTER submit feedback - calling mutateReports');
+                  await mutateReports();
                 }}
                 fetchServices={fetchServicesForReports}
                 fetchProcedures={fetchProceduresForReports}
                 fetchOrders={fetchOrdersForReports}
                 onAcknowledge={async (id, type) => {
+                  console.log('[WarehouseHub] BEFORE acknowledge mutateReports');
                   await apiAcknowledgeItem(id, type);
-                  const { mutate } = await import('swr');
-                  await (mutate as any)(`/hub/reports/${normalizedCode}`, undefined, { revalidate: true });
+                  await mutateReports();
+                  console.log('[WarehouseHub] AFTER acknowledge mutateReports');
                 }}
                 onResolve={async (id, details) => {
+                  console.log('[WarehouseHub] BEFORE resolve mutateReports');
                   await apiResolveReport(id, details ?? {});
-                  const { mutate } = await import('swr');
-                  await (mutate as any)(`/hub/reports/${normalizedCode}`, undefined, { revalidate: true });
+                  await mutateReports();
+                  console.log('[WarehouseHub] AFTER resolve mutateReports');
                 }}
               />
             </PageWrapper>

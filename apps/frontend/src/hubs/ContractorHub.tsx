@@ -261,7 +261,7 @@ export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHu
   const {
     data: reportsData,
     isLoading: reportsLoading,
-  } = useHubReports(normalizedCode);
+  mutate: mutateReports } = useHubReports(normalizedCode);
   const { data: scopeData } = useHubRoleScope(normalizedCode);
   const {
     data: activitiesData,
@@ -979,12 +979,16 @@ export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHu
                 fetchProcedures={fetchProceduresForReports}
                 fetchOrders={fetchOrdersForReports}
                 onAcknowledge={async (id, type) => {
+                  console.log('[ContractorHub] BEFORE acknowledge mutate');
                   await apiAcknowledgeItem(id, type);
-                  await (mutate as any)(`/hub/reports/${contractorCode}`, undefined, { revalidate: true });
+                  await (mutate as any)(`/hub/reports/${contractorCode}`);
+                  console.log('[ContractorHub] AFTER acknowledge mutate');
                 }}
                 onResolve={async (id, details) => {
+                  console.log('[ContractorHub] BEFORE resolve mutate');
                   await apiResolveReport(id, details ?? {});
-                  await (mutate as any)(`/hub/reports/${contractorCode}`, undefined, { revalidate: true });
+                  await (mutate as any)(`/hub/reports/${contractorCode}`);
+                  console.log('[ContractorHub] AFTER resolve mutate');
                 }}
               />
             </PageWrapper>
@@ -1166,7 +1170,6 @@ export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHu
     </div>
   );
 }
-
 
 
 

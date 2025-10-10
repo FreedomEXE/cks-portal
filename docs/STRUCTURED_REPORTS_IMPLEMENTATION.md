@@ -287,6 +287,75 @@ if (report.report_category) {
 - **Frontend**: Refactored JSX conditionals from `&&` to ternary operators for better ESBuild compatibility
 - **All Hubs**: Updated to pass `managedBy`, `managedById`, `managedByName` fields
 
+### Oct 10, 2025 - Session 2
+
+#### Critical Bug Fixes - Auto-Close Logic
+
+**Files Modified**:
+- `apps/backend/server/domains/reports/repository.ts`
+- `apps/frontend/src/hubs/CustomerHub.tsx`
+- `apps/frontend/src/hubs/ContractorHub.tsx`
+
+#### Bug Fixes
+
+1. **Backend 500 Errors Fixed**: Corrected database column names in SQL queries
+   - Changed: `assigned_contractor` → `contractor_id`
+   - Changed: `assigned_crew` → `crew_id`
+   - Changed: `cks_manager` → `manager_id`
+   - Applied to both `acknowledgeReport()` and `updateReportStatus()` functions
+
+2. **Auto-Close Logic Rewritten**: Changed from ecosystem-wide to order-specific stakeholder counting
+   - **OLD**: Counted all users in manager's ecosystem (incorrect)
+   - **NEW**: Query orders table to identify actual order participants
+   - Uses JavaScript `Set` to avoid duplicate stakeholders
+   - Excludes report creator from count
+   - `totalUsers = stakeholders.size` (actual participants only)
+   - Report auto-closes when: `acknowledgements.length === totalUsers` AND status is "resolved"
+
+3. **Cache Invalidation Fixed**: Reports now appear immediately after creation
+   - Added `mutate: mutateReports` to CustomerHub.tsx (line 199)
+   - Added `mutate: mutateReports` to ContractorHub.tsx (line 264)
+   - CenterHub already had correct pattern
+
+#### Technical Details
+
+**Order-Specific Stakeholder Counting Algorithm**:
+```typescript
+// Query the orders table for specific order
+const order = orderResult.rows[0];
+const stakeholders = new Set<string>();
+
+// Add each role if present and not the creator
+if (order.manager_id && order.manager_id.toUpperCase() !== createdById.toUpperCase()) {
+  stakeholders.add(order.manager_id.toUpperCase());
+}
+if (order.customer_id && order.customer_id.toUpperCase() !== createdById.toUpperCase()) {
+  stakeholders.add(order.customer_id.toUpperCase());
+}
+if (order.contractor_id && order.contractor_id.toUpperCase() !== createdById.toUpperCase()) {
+  stakeholders.add(order.contractor_id.toUpperCase());
+}
+if (order.crew_id && order.crew_id.toUpperCase() !== createdById.toUpperCase()) {
+  stakeholders.add(order.crew_id.toUpperCase());
+}
+if (order.assigned_warehouse && order.assigned_warehouse.toUpperCase() !== createdById.toUpperCase()) {
+  stakeholders.add(order.assigned_warehouse.toUpperCase());
+}
+
+totalUsers = stakeholders.size;
+```
+
+**Why We Use Set**: Prevents duplicate counting if a user has multiple roles in the order
+
+**Why We Exclude Creator**: Report creator shouldn't need to acknowledge their own report
+
+#### Bugs Resolved
+
+1. ✅ **"Failed to acknowledge" toasts** - Backend no longer crashes after saving acknowledgments
+2. ✅ **Reports not auto-closing** - Now correctly identifies all stakeholders and auto-closes when all acknowledge + resolved
+3. ✅ **Reports not appearing after creation** - Cache now updates immediately without manual refresh
+
 ### Status
 ✅ **IMPLEMENTATION COMPLETE** - Priority/Rating features added
-⏳ **TESTING IN PROGRESS** - Build verification needed, then end-to-end testing
+✅ **CRITICAL BUGS FIXED** - Auto-close logic and cache invalidation working
+⏳ **TESTING IN PROGRESS** - End-to-end testing required

@@ -196,7 +196,7 @@ export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubPro
   const {
     data: reportsData,
     isLoading: reportsLoading,
-  } = useHubReports(normalizedCode);
+  mutate: mutateReports } = useHubReports(normalizedCode);
   const {
     data: scopeData,
   } = useHubRoleScope(normalizedCode);
@@ -743,12 +743,16 @@ export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubPro
                 fetchProcedures={fetchProceduresForReports}
                 fetchOrders={fetchOrdersForReports}
                 onAcknowledge={async (id, type) => {
+                  console.log('[CustomerHub] BEFORE acknowledge mutate');
                   await apiAcknowledgeItem(id, type);
-                  await mutate(`/hub/reports/${normalizedCode}`, undefined, { revalidate: true });
+                  await mutate(`/hub/reports/${normalizedCode}`);
+                  console.log('[CustomerHub] AFTER acknowledge mutate');
                 }}
                 onResolve={async (id, details) => {
+                  console.log('[CustomerHub] BEFORE resolve mutate');
                   await apiResolveReport(id, details ?? {});
-                  await mutate(`/hub/reports/${normalizedCode}`, undefined, { revalidate: true });
+                  await mutate(`/hub/reports/${normalizedCode}`);
+                  console.log('[CustomerHub] AFTER resolve mutate');
                 }}
               />
             </PageWrapper>

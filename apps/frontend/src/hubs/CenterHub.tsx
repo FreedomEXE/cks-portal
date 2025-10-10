@@ -212,7 +212,7 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
     isLoading: ordersLoading,
     error: ordersError,
   } = useHubOrders(normalizedCode);
-  const { data: reportsData, isLoading: reportsLoading } = useHubReports(normalizedCode);
+  const { data: reportsData, isLoading: reportsLoading, mutate: mutateReports } = useHubReports(normalizedCode);
 
   const {
     data: scopeData,
@@ -720,30 +720,30 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
                     await apiCreateFeedback({ title: payload.title, message: payload.description, category: payload.category, centerId: normalizedCode ?? undefined });
                   }
                   // Refresh
-                  const code = normalizedCode ?? '';
-                  if (code) {
-                    const { mutate } = await import('swr');
-                    (mutate as any)(`/hub/reports/${code}`);
-                  }
+                  await mutateReports();
                 }}
                 fetchServices={fetchServicesForReports}
                 fetchProcedures={fetchProceduresForReports}
                 fetchOrders={fetchOrdersForReports}
                 onAcknowledge={async (id, type) => {
+                  console.log('[CenterHub] BEFORE acknowledge mutate');
                   await apiAcknowledgeItem(id, type);
                   const code = normalizedCode ?? '';
                   if (code) {
                     const { mutate } = await import('swr');
-                    await (mutate as any)(`/hub/reports/${code}`, undefined, { revalidate: true });
+                    await (mutate as any)(`/hub/reports/${code}`);
                   }
+                  console.log('[CenterHub] AFTER acknowledge mutate');
                 }}
                 onResolve={async (id, details) => {
+                  console.log('[CenterHub] BEFORE resolve mutate');
                   await apiResolveReport(id, details ?? {});
                   const code = normalizedCode ?? '';
                   if (code) {
                     const { mutate } = await import('swr');
-                    await (mutate as any)(`/hub/reports/${code}`, undefined, { revalidate: true });
+                    await (mutate as any)(`/hub/reports/${code}`);
                   }
+                  console.log('[CenterHub] AFTER resolve mutate');
                 }}
               />
             </PageWrapper>

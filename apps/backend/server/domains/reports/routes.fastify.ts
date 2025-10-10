@@ -168,6 +168,19 @@ export async function reportsRoutes(fastify: FastifyInstance) {
       return;
     }
 
+    // Check category-based resolution permissions (defense-in-depth)
+    const reportCheck = await query('SELECT report_category FROM reports WHERE report_id = $1', [params.data.id]);
+    const reportCategory = reportCheck.rows[0]?.report_category;
+
+    if (reportCategory === 'order' && account.role !== 'warehouse') {
+      reply.code(403).send({ error: 'Only warehouse can resolve order reports' });
+      return;
+    }
+    if ((reportCategory === 'service' || reportCategory === 'procedure') && account.role !== 'manager') {
+      reply.code(403).send({ error: 'Only manager can resolve service/procedure reports' });
+      return;
+    }
+
     const bodySchema = z.object({
       resolution_notes: z.string().trim().max(2000).optional(),
       action_taken: z.string().trim().max(2000).optional()

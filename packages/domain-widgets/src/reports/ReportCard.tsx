@@ -136,6 +136,16 @@ const ReportCard: React.FC<ReportCardProps> = ({
     return userRole === 'manager' || userRole === 'warehouse';
   })();
 
+  // Debug: surface permission evaluation inputs/outputs
+  console.log('DEBUG canResolve:', {
+    userRole,
+    reportCategory: report.reportCategory,
+    status: report.status,
+    type: report.type,
+    hasAcknowledged,
+    canResolve,
+  });
+
   const isCreator = report.submittedBy === currentUser;
 
   const handleResolve = () => {

@@ -313,7 +313,33 @@ interface Action {
 6. **Integration**: Connect with external ticketing systems
 7. **Predictive Analytics**: Predict issues before they occur
 
+## Recent Updates
+
+### October 10, 2025 - Auto-Close Logic Fix
+
+**Critical Bug Fixes**:
+
+1. **Order-Specific Stakeholder Counting**: Reports now correctly identify which users are actually involved in each specific order/service, rather than counting all users in the manager's ecosystem.
+
+2. **Auto-Close Behavior**:
+   - Reports transition: `open` → `resolved` → `closed`
+   - Auto-close occurs when: ALL order participants acknowledge + report is resolved
+   - Stakeholders identified from orders table: manager_id, customer_id, contractor_id, crew_id, assigned_warehouse
+   - Creator excluded from acknowledgment count
+
+3. **Cache Synchronization**: Reports and feedback now appear immediately after creation without requiring manual page refresh.
+
+**Files Modified**:
+- `apps/backend/server/domains/reports/repository.ts` - Fixed SQL column names and auto-close logic
+- `apps/frontend/src/hubs/CustomerHub.tsx` - Added cache mutation
+- `apps/frontend/src/hubs/ContractorHub.tsx` - Added cache mutation
+
+**Technical Details**:
+- Database queries corrected to use actual column names: `contractor_id`, `crew_id`, `manager_id`
+- Stakeholder counting uses JavaScript `Set` to avoid duplicates
+- Logging added: `[acknowledgeReport] Order stakeholders:` shows identified participants
+
 ---
 
-*Last Updated: 2025-09-28*
-*Version: 2.0 - Consolidated from multiple sources*
+*Last Updated: 2025-10-10*
+*Version: 2.1 - Auto-close logic and cache fixes*

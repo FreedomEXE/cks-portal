@@ -807,8 +807,10 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
                 fetchProcedures={fetchProceduresForReports}
                 fetchOrders={fetchOrdersForReports}
                 onAcknowledge={async (id, type) => {
+                  console.log('[CrewHub] BEFORE acknowledge mutate');
                   await apiAcknowledgeItem(id, type);
-                  await (mutate as any)(`/hub/reports/${normalizedCode}`, undefined, { revalidate: true });
+                  await (mutate as any)(`/hub/reports/${normalizedCode}`);
+                  console.log('[CrewHub] AFTER acknowledge mutate');
                 }}
               />
             </PageWrapper>

@@ -228,33 +228,55 @@ export async function updateReportStatus(reportId: string, status: string, resol
     if (cksManager) {
       let totalUsers = 0;
 
-      // Check if this is a warehouse-managed report
-      const isWarehouseReport = reportCategory && relatedEntityId && ['order', 'service'].includes(reportCategory);
-      let warehouseId: string | null = null;
+      // For order/service reports, count stakeholders based on the order participants, not ecosystem
+      if (reportCategory && relatedEntityId && ['order', 'service'].includes(reportCategory)) {
+        // Get order details to find all stakeholders
+        const orderQuery = reportCategory === 'order'
+          ? 'SELECT customer_id, contractor_id, crew_id, assigned_warehouse, manager_id FROM orders WHERE UPPER(order_id) = UPPER($1)'
+          : 'SELECT customer_id, contractor_id, crew_id, assigned_warehouse, manager_id FROM orders WHERE UPPER(transformed_id) = UPPER($1)';
 
-      if (isWarehouseReport) {
-        // Find the warehouse managing this entity
-        if (reportCategory === 'order') {
-          const orderResult = await query<{ assigned_warehouse: string | null }>(
-            'SELECT assigned_warehouse FROM orders WHERE UPPER(order_id) = UPPER($1)',
-            [relatedEntityId]
-          );
-          warehouseId = orderResult.rows[0]?.assigned_warehouse ?? null;
-        } else if (reportCategory === 'service') {
-          // Service -> find parent order -> get warehouse
-          const serviceOrderResult = await query<{ assigned_warehouse: string | null }>(
-            'SELECT assigned_warehouse FROM orders WHERE UPPER(transformed_id) = UPPER($1)',
-            [relatedEntityId]
-          );
-          warehouseId = serviceOrderResult.rows[0]?.assigned_warehouse ?? null;
+        const orderResult = await query<{
+          customer_id: string | null;
+          contractor_id: string | null;
+          crew_id: string | null;
+          assigned_warehouse: string | null;
+          manager_id: string | null;
+        }>(orderQuery, [relatedEntityId]);
+
+        if (orderResult.rows[0]) {
+          const order = orderResult.rows[0];
+          const stakeholders = new Set<string>();
+
+          // Add manager
+          if (order.manager_id && order.manager_id.toUpperCase() !== (createdById ?? '').toUpperCase()) {
+            stakeholders.add(order.manager_id.toUpperCase());
+          }
+
+          // Add customer
+          if (order.customer_id && order.customer_id.toUpperCase() !== (createdById ?? '').toUpperCase()) {
+            stakeholders.add(order.customer_id.toUpperCase());
+          }
+
+          // Add contractor
+          if (order.contractor_id && order.contractor_id.toUpperCase() !== (createdById ?? '').toUpperCase()) {
+            stakeholders.add(order.contractor_id.toUpperCase());
+          }
+
+          // Add crew
+          if (order.crew_id && order.crew_id.toUpperCase() !== (createdById ?? '').toUpperCase()) {
+            stakeholders.add(order.crew_id.toUpperCase());
+          }
+
+          // Add warehouse
+          if (order.assigned_warehouse && order.assigned_warehouse.toUpperCase() !== (createdById ?? '').toUpperCase()) {
+            stakeholders.add(order.assigned_warehouse.toUpperCase());
+          }
+
+          totalUsers = stakeholders.size;
+          console.log('[updateReportStatus] Order stakeholders:', { reportId, relatedEntityId, stakeholders: Array.from(stakeholders), totalUsers });
         }
-      }
-
-      if (warehouseId) {
-        // Warehouse-managed report: only count Manager + Warehouse (2 people)
-        totalUsers = 2;
       } else {
-        // Ecosystem report: count all users in ecosystem EXCLUDING the creator
+        // For procedure reports or reports without category, use ecosystem counting
         const totalUsersResult = await query<{ total: number }>(`
           SELECT (
             (SELECT COUNT(*) FROM centers WHERE UPPER(cks_manager) = UPPER($1) AND UPPER(center_id) != UPPER($2)) +
@@ -274,6 +296,8 @@ export async function updateReportStatus(reportId: string, status: string, resol
       );
 
       const ackCount = parseInt(String(ackCountResult.rows[0]?.count ?? 0));
+
+      console.log('[updateReportStatus] Close check:', { reportId, ackCount, totalUsers, currentStatus: status, reportCategory, relatedEntityId });
 
       // If everyone has already acknowledged, mark as closed
       if (totalUsers > 0 && ackCount >= totalUsers) {
@@ -337,33 +361,55 @@ export async function acknowledgeReport(reportId: string, acknowledgedById: stri
   if (cksManager) {
     let totalUsers = 0;
 
-    // Check if this is a warehouse-managed report
-    const isWarehouseReport = reportCategory && relatedEntityId && ['order', 'service'].includes(reportCategory);
-    let warehouseId: string | null = null;
+    // For order/service reports, count stakeholders based on the order participants, not ecosystem
+    if (reportCategory && relatedEntityId && ['order', 'service'].includes(reportCategory)) {
+      // Get order details to find all stakeholders
+      const orderQuery = reportCategory === 'order'
+        ? 'SELECT customer_id, contractor_id, crew_id, assigned_warehouse, manager_id FROM orders WHERE UPPER(order_id) = UPPER($1)'
+        : 'SELECT customer_id, contractor_id, crew_id, assigned_warehouse, manager_id FROM orders WHERE UPPER(transformed_id) = UPPER($1)';
 
-    if (isWarehouseReport) {
-      // Find the warehouse managing this entity
-      if (reportCategory === 'order') {
-        const orderResult = await query<{ assigned_warehouse: string | null }>(
-          'SELECT assigned_warehouse FROM orders WHERE UPPER(order_id) = UPPER($1)',
-          [relatedEntityId]
-        );
-        warehouseId = orderResult.rows[0]?.assigned_warehouse ?? null;
-      } else if (reportCategory === 'service') {
-        // Service -> find parent order -> get warehouse
-        const serviceOrderResult = await query<{ assigned_warehouse: string | null }>(
-          'SELECT assigned_warehouse FROM orders WHERE UPPER(transformed_id) = UPPER($1)',
-          [relatedEntityId]
-        );
-        warehouseId = serviceOrderResult.rows[0]?.assigned_warehouse ?? null;
+      const orderResult = await query<{
+        customer_id: string | null;
+        contractor_id: string | null;
+        crew_id: string | null;
+        assigned_warehouse: string | null;
+        manager_id: string | null;
+      }>(orderQuery, [relatedEntityId]);
+
+      if (orderResult.rows[0]) {
+        const order = orderResult.rows[0];
+        const stakeholders = new Set<string>();
+
+        // Add manager
+        if (order.manager_id && order.manager_id.toUpperCase() !== (createdById ?? '').toUpperCase()) {
+          stakeholders.add(order.manager_id.toUpperCase());
+        }
+
+        // Add customer
+        if (order.customer_id && order.customer_id.toUpperCase() !== (createdById ?? '').toUpperCase()) {
+          stakeholders.add(order.customer_id.toUpperCase());
+        }
+
+        // Add contractor
+        if (order.contractor_id && order.contractor_id.toUpperCase() !== (createdById ?? '').toUpperCase()) {
+          stakeholders.add(order.contractor_id.toUpperCase());
+        }
+
+        // Add crew
+        if (order.crew_id && order.crew_id.toUpperCase() !== (createdById ?? '').toUpperCase()) {
+          stakeholders.add(order.crew_id.toUpperCase());
+        }
+
+        // Add warehouse
+        if (order.assigned_warehouse && order.assigned_warehouse.toUpperCase() !== (createdById ?? '').toUpperCase()) {
+          stakeholders.add(order.assigned_warehouse.toUpperCase());
+        }
+
+        totalUsers = stakeholders.size;
+        console.log('[acknowledgeReport] Order stakeholders:', { reportId, relatedEntityId, stakeholders: Array.from(stakeholders), totalUsers });
       }
-    }
-
-    if (warehouseId) {
-      // Warehouse-managed report: only count Manager + Warehouse (2 people)
-      totalUsers = 2;
     } else {
-      // Ecosystem report: count all users in ecosystem EXCLUDING the creator
+      // For procedure reports or reports without category, use ecosystem counting
       const totalUsersResult = await query<{ total: number }>(`
         SELECT (
           (SELECT COUNT(*) FROM centers WHERE UPPER(cks_manager) = UPPER($1) AND UPPER(center_id) != UPPER($2)) +
@@ -383,6 +429,8 @@ export async function acknowledgeReport(reportId: string, acknowledgedById: stri
     );
 
     const ackCount = parseInt(String(ackCountResult.rows[0]?.count ?? 0));
+
+    console.log('[acknowledgeReport] Close check:', { reportId, ackCount, totalUsers, status, reportCategory, relatedEntityId });
 
     // Edge case: If no users need to acknowledge (single-user ecosystem), don't auto-close
     if (totalUsers === 0) {

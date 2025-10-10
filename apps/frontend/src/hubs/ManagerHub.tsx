@@ -582,15 +582,29 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
 
   // Fetch reports data
   const { data: reportsData, isLoading: reportsLoading, mutate: mutateReports } = useHubReports(managerCode);
+  // IMPORTANT: Pass through structured fields from backend (reportCategory, relatedEntityId, reportReason, priority)
+  // WarehouseHub already passes raw items; align ManagerHub to preserve all fields
   const managerReports = useMemo<ReportFeedback[]>(
-    () => (reportsData?.reports ?? []).map((item) => mapHubReportItem(item, 'report')),
+    () => (reportsData?.reports ?? []) as unknown as ReportFeedback[],
     [reportsData],
   );
 
   const managerFeedback = useMemo<ReportFeedback[]>(
-    () => (reportsData?.feedback ?? []).map((item) => mapHubReportItem(item, 'feedback')),
+    () => (reportsData?.feedback ?? []) as unknown as ReportFeedback[],
     [reportsData],
   );
+
+  // Debug: verify structured fields are present for permission logic & modal
+  useEffect(() => {
+    if (reportsData?.reports) {
+      const dbg = (reportsData.reports as any[]).map((r) => ({
+        id: r.id,
+        reportCategory: (r as any).reportCategory,
+        priority: (r as any).priority,
+      }));
+      console.log('ManagerHub reports:', dbg);
+    }
+  }, [reportsData]);
 
 
   // Hub scope data is already filtered for this manager
@@ -1319,8 +1333,10 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
               fetchProcedures={fetchProceduresForReports}
               fetchOrders={fetchOrdersForReports}
               onAcknowledge={async (id, type) => {
+                console.log('[ManagerHub] BEFORE acknowledge mutateReports');
                 await apiAcknowledgeItem(id, type);
-                await (mutateReports as any)(undefined, { revalidate: true });
+                await mutateReports();
+                console.log('[ManagerHub] AFTER acknowledge mutateReports');
               }}
               onResolve={async (id, details) => {
                 console.log('[ManagerHub] onResolve called with:', { id, details, managerCode });
@@ -1365,9 +1381,9 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
                 // Then make the API call in the background
                 await apiResolveReport(id, details);
 
-                console.log('[ManagerHub] Calling final mutateReports revalidate');
+                console.log('[ManagerHub] Calling final mutateReports refetch');
                 // Finally revalidate to get the complete updated data from server
-                await (mutateReports as any)(undefined, { revalidate: true });
+                await mutateReports();
                 console.log('[ManagerHub] onResolve complete');
               }}
             />

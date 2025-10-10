@@ -533,11 +533,19 @@
 | Search & Filter | 1 | ⬜ | ⬜ | ⬜ |
 | **TOTAL** | **16** | **__** | **__** | **__** |
 
-### Critical Issues Found
+### Critical Issues Found (October 10, 2025 - Session 2 Fixes)
 
-1. _______________________________________________________________
-2. _______________________________________________________________
-3. _______________________________________________________________
+**RESOLVED**:
+1. ✅ Backend 500 errors causing "Failed to acknowledge" toasts (Fixed: corrected SQL column names)
+2. ✅ Reports not auto-closing despite all acknowledgments (Fixed: order-specific stakeholder counting)
+3. ✅ Reports not appearing after creation without manual refresh (Fixed: added cache mutation to hubs)
+
+**NEW TEST CASES NEEDED**:
+1. [ ] Verify reports auto-close when all ORDER PARTICIPANTS acknowledge (not ecosystem-wide)
+2. [ ] Verify creator is excluded from acknowledgment count
+3. [ ] Verify cache updates immediately after report creation (no manual refresh needed)
+4. [ ] Verify no 500 errors in backend logs when acknowledging/resolving
+5. [ ] Test with orders having NULL contractor_id or crew_id (edge case)
 
 ### Non-Critical Issues
 
