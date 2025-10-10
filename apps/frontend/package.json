@@ -11,13 +11,14 @@
   },
   "dependencies": {
     "@cks/auth": "workspace:*",
-    "@cks/ui": "workspace:*",
     "@cks/domain-widgets": "workspace:*",
     "@cks/policies": "workspace:*",
+    "@cks/ui": "workspace:*",
     "@clerk/clerk-react": "^5.47.0",
     "framer-motion": "^11.0.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "react-hot-toast": "^2.6.0",
     "react-router-dom": "^7.9.1",
     "swr": "^2.3.6"
   },

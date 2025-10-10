@@ -980,11 +980,11 @@ export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHu
                 fetchOrders={fetchOrdersForReports}
                 onAcknowledge={async (id, type) => {
                   await apiAcknowledgeItem(id, type);
-                  await mutate(`/hub/reports/${contractorCode}`);
+                  await (mutate as any)(`/hub/reports/${contractorCode}`, undefined, { revalidate: true });
                 }}
                 onResolve={async (id, details) => {
                   await apiResolveReport(id, details ?? {});
-                  await mutate(`/hub/reports/${contractorCode}`);
+                  await (mutate as any)(`/hub/reports/${contractorCode}`, undefined, { revalidate: true });
                 }}
               />
             </PageWrapper>

@@ -744,11 +744,11 @@ export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubPro
                 fetchOrders={fetchOrdersForReports}
                 onAcknowledge={async (id, type) => {
                   await apiAcknowledgeItem(id, type);
-                  await mutate(`/hub/reports/${normalizedCode}`);
+                  await mutate(`/hub/reports/${normalizedCode}`, undefined, { revalidate: true });
                 }}
                 onResolve={async (id, details) => {
                   await apiResolveReport(id, details ?? {});
-                  await mutate(`/hub/reports/${normalizedCode}`);
+                  await mutate(`/hub/reports/${normalizedCode}`, undefined, { revalidate: true });
                 }}
               />
             </PageWrapper>

@@ -734,7 +734,7 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
                   const code = normalizedCode ?? '';
                   if (code) {
                     const { mutate } = await import('swr');
-                    (mutate as any)(`/hub/reports/${code}`);
+                    await (mutate as any)(`/hub/reports/${code}`, undefined, { revalidate: true });
                   }
                 }}
                 onResolve={async (id, details) => {
@@ -742,7 +742,7 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
                   const code = normalizedCode ?? '';
                   if (code) {
                     const { mutate } = await import('swr');
-                    (mutate as any)(`/hub/reports/${code}`);
+                    await (mutate as any)(`/hub/reports/${code}`, undefined, { revalidate: true });
                   }
                 }}
               />

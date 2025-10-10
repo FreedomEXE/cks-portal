@@ -1,4 +1,43 @@
 import React, { useState } from 'react';
+import { Button } from '@cks/ui';
+
+// Helper to get user-friendly role name from ID
+const getRoleName = (userId: string): string => {
+  const prefix = userId.split('-')[0]?.toUpperCase();
+  const roleMap: Record<string, string> = {
+    'CUS': 'Customer',
+    'CEN': 'Center',
+    'CON': 'Contractor',
+    'CRW': 'Crew',
+    'MGR': 'Manager',
+    'WHS': 'Warehouse',
+    'ADM': 'Administrator'
+  };
+  return roleMap[prefix] || 'User';
+};
+
+// Helper to format date nicely
+const formatDate = (dateString: string): string => {
+  const date = new Date(dateString);
+  return date.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  });
+};
+
+// Helper to get category display name
+const getCategoryDisplay = (category: string): string => {
+  const map: Record<string, string> = {
+    'service': 'Service',
+    'order': 'Product Order',
+    'procedure': 'Procedure'
+  };
+  return map[category] || category;
+};
 
 export interface ReportFeedback {
   id: string;
@@ -43,6 +82,7 @@ interface ReportCardProps {
   userRole: string;
   onAcknowledge?: (reportId: string) => void;
   onResolve?: (reportId: string, details?: { actionTaken?: string; notes?: string }) => void;
+  onViewDetails?: (reportId: string) => void;
 }
 
 const ReportCard: React.FC<ReportCardProps> = ({
@@ -50,7 +90,8 @@ const ReportCard: React.FC<ReportCardProps> = ({
   currentUser,
   userRole,
   onAcknowledge,
-  onResolve
+  onResolve,
+  onViewDetails
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isResolving, setIsResolving] = useState(false);
@@ -74,8 +115,27 @@ const ReportCard: React.FC<ReportCardProps> = ({
 
   const colors = getColors();
   const hasAcknowledged = report.acknowledgments.some(ack => ack.userId === currentUser);
-  // Manager/warehouse can only resolve AFTER they've acknowledged
-  const canResolve = (userRole === 'manager' || userRole === 'warehouse') && report.status === 'open' && report.type === 'report' && hasAcknowledged;
+
+  // Determine who can resolve based on report category
+  const canResolve = (() => {
+    if (report.status !== 'open' || report.type !== 'report' || !hasAcknowledged) {
+      return false;
+    }
+
+    // If structured report, check category-based permissions
+    if (report.reportCategory) {
+      if (report.reportCategory === 'order') {
+        return userRole === 'warehouse'; // Only warehouse resolves order reports
+      }
+      if (report.reportCategory === 'service' || report.reportCategory === 'procedure') {
+        return userRole === 'manager'; // Only manager resolves service/procedure reports
+      }
+    }
+
+    // Fallback for legacy reports without category: both can resolve
+    return userRole === 'manager' || userRole === 'warehouse';
+  })();
+
   const isCreator = report.submittedBy === currentUser;
 
   const handleResolve = () => {
@@ -278,21 +338,13 @@ const ReportCard: React.FC<ReportCardProps> = ({
           borderRadius: '6px',
           border: '1px solid #e5e7eb',
         }}>
-          {/* Report Details Section */}
+          {/* Simple Summary - Just the essentials */}
           <div style={{
             marginBottom: '16px',
             padding: '12px',
             backgroundColor: '#f9fafb',
             borderRadius: '6px'
           }}>
-            <h4 style={{
-              fontSize: '12px',
-              fontWeight: 500,
-              color: '#6b7280',
-              textTransform: 'uppercase',
-              letterSpacing: '0.5px',
-              margin: '0 0 12px 0'
-            }}>Report Details</h4>
             <div style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
@@ -311,7 +363,7 @@ const ReportCard: React.FC<ReportCardProps> = ({
                   fontSize: '14px',
                   color: '#111827',
                   marginTop: '2px'
-                }}>{report.submittedBy}</span>
+                }}>{getRoleName(report.submittedBy)} ({report.submittedBy})</span>
               </div>
               <div>
                 <span style={{
@@ -326,105 +378,9 @@ const ReportCard: React.FC<ReportCardProps> = ({
                   fontSize: '14px',
                   color: '#111827',
                   marginTop: '2px'
-                }}>{report.submittedDate}</span>
+                }}>{formatDate(report.submittedDate)}</span>
               </div>
-              <div>
-                <span style={{
-                  fontSize: '12px',
-                  fontWeight: 500,
-                  color: '#6b7280',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.5px'
-                }}>Category</span>
-                <span style={{
-                  display: 'block',
-                  fontSize: '14px',
-                  color: '#111827',
-                  marginTop: '2px'
-                }}>{report.category}</span>
-              </div>
-              {(report.relatedService || report.relatedOrder) && (
-                <div>
-                  <span style={{
-                    fontSize: '14px',
-                    fontWeight: 500,
-                    color: '#6b7280',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.5px'
-                  }}>Related</span>
-                  <div style={{ marginTop: '4px' }}>
-                    {report.relatedService && (
-                      <span style={{
-                        display: 'block',
-                        fontSize: '14px',
-                        color: '#3b82f6'
-                      }}>Service: {report.relatedService}</span>
-                    )}
-                    {report.relatedOrder && (
-                      <span style={{
-                        display: 'block',
-                        fontSize: '14px',
-                        color: '#3b82f6'
-                      }}>Order: {report.relatedOrder}</span>
-                    )}
-                  </div>
-                </div>
-              )}
-              {report.tags && report.tags.length > 0 && (
-                <div>
-                  <span style={{
-                    fontSize: '14px',
-                    fontWeight: 500,
-                    color: '#6b7280',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.5px'
-                  }}>Tags</span>
-                  <div style={{
-                    marginTop: '2px',
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    gap: '6px'
-                  }}>
-                    {report.tags.map((tag, index) => (
-                      <span key={index} style={{
-                        padding: '2px 6px',
-                        fontSize: '12px',
-                        backgroundColor: 'white',
-                        color: '#374151',
-                        borderRadius: '4px',
-                        border: '1px solid #e5e7eb'
-                      }}>
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Structured Report Details (if present) */}
-          {report.reportCategory && report.relatedEntityId && report.reportReason && (
-            <div style={{
-              marginBottom: '16px',
-              padding: '12px',
-              backgroundColor: '#eff6ff',
-              borderRadius: '6px',
-              border: '1px solid #bfdbfe'
-            }}>
-              <h4 style={{
-                fontSize: '12px',
-                fontWeight: 500,
-                color: '#1e40af',
-                textTransform: 'uppercase',
-                letterSpacing: '0.5px',
-                margin: '0 0 12px 0'
-              }}>Structured Report Details</h4>
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-                gap: '12px'
-              }}>
+              {report.reportCategory && (
                 <div>
                   <span style={{
                     fontSize: '12px',
@@ -432,15 +388,16 @@ const ReportCard: React.FC<ReportCardProps> = ({
                     color: '#6b7280',
                     textTransform: 'uppercase',
                     letterSpacing: '0.5px'
-                  }}>Report Category</span>
+                  }}>Type</span>
                   <span style={{
                     display: 'block',
                     fontSize: '14px',
-                    color: '#1e40af',
-                    marginTop: '2px',
-                    fontWeight: 600
-                  }}>{report.reportCategory.charAt(0).toUpperCase() + report.reportCategory.slice(1)}</span>
+                    color: '#111827',
+                    marginTop: '2px'
+                  }}>{getCategoryDisplay(report.reportCategory)}</span>
                 </div>
+              )}
+              {report.relatedEntityId && (
                 <div>
                   <span style={{
                     fontSize: '12px',
@@ -448,15 +405,17 @@ const ReportCard: React.FC<ReportCardProps> = ({
                     color: '#6b7280',
                     textTransform: 'uppercase',
                     letterSpacing: '0.5px'
-                  }}>Related Entity</span>
+                  }}>Related To</span>
                   <span style={{
                     display: 'block',
                     fontSize: '14px',
-                    color: '#1e40af',
+                    color: '#3b82f6',
                     marginTop: '2px',
-                    fontWeight: 600
+                    fontWeight: 500
                   }}>{report.relatedEntityId}</span>
                 </div>
+              )}
+              {report.reportReason && (
                 <div>
                   <span style={{
                     fontSize: '12px',
@@ -464,203 +423,36 @@ const ReportCard: React.FC<ReportCardProps> = ({
                     color: '#6b7280',
                     textTransform: 'uppercase',
                     letterSpacing: '0.5px'
-                  }}>Reason</span>
+                  }}>Issue</span>
                   <span style={{
                     display: 'block',
                     fontSize: '14px',
-                    color: '#1e40af',
+                    color: '#111827',
                     marginTop: '2px',
                     fontWeight: 600
                   }}>{report.reportReason}</span>
                 </div>
-              </div>
-            </div>
-          )}
-
-          {/* Description Section */}
-          <div style={{
-            marginBottom: '16px',
-            padding: '12px',
-            backgroundColor: '#f9fafb',
-            borderRadius: '6px'
-          }}>
-            <h4 style={{
-              fontSize: '12px',
-              fontWeight: 500,
-              color: '#6b7280',
-              textTransform: 'uppercase',
-              letterSpacing: '0.5px',
-              margin: '0 0 8px 0'
-            }}>Description</h4>
-            <p style={{
-              margin: '0',
-              fontSize: '14px',
-              color: '#111827',
-              lineHeight: '1.5'
-            }}>{report.description}</p>
-          </div>
-
-
-          {/* Acknowledgments Section */}
-          {report.acknowledgments.length > 0 && (
-            <div style={{
-              marginBottom: '16px',
-              padding: '12px',
-              backgroundColor: '#f9fafb',
-              borderRadius: '6px'
-            }}>
-              <h4 style={{
-                fontSize: '12px',
-                fontWeight: 500,
-                color: '#6b7280',
-                textTransform: 'uppercase',
-                letterSpacing: '0.5px',
-                margin: '0 0 8px 0'
-              }}>Acknowledged By</h4>
-              <div style={{
-                display: 'flex',
-                flexWrap: 'wrap',
-                gap: '8px'
-              }}>
-                {report.acknowledgments.map((ack, index) => (
-                  <span key={index} style={{
-                    padding: '4px 8px',
-                    fontSize: '12px',
-                    backgroundColor: 'white',
-                    color: '#0369a1',
-                    borderRadius: '4px',
-                    border: '1px solid #e0f2fe'
-                  }}>
-                    {ack.userId}
-                    {currentUser === ack.userId && <span style={{ fontWeight: 600 }}> (you)</span>}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Resolved By Section */}
-          {report.resolvedBy && (
-            <div style={{
-              marginBottom: '16px',
-              padding: '12px',
-              backgroundColor: '#f0fdf4',
-              borderRadius: '6px',
-              border: '1px solid #bbf7d0'
-            }}>
-              <h4 style={{
-                fontSize: '12px',
-                fontWeight: 500,
-                color: '#6b7280',
-                textTransform: 'uppercase',
-                letterSpacing: '0.5px',
-                margin: '0 0 8px 0'
-              }}>Resolved By</h4>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px'
-              }}>
-                <span style={{
-                  padding: '4px 8px',
-                  fontSize: '12px',
-                  backgroundColor: 'white',
-                  color: '#15803d',
-                  borderRadius: '4px',
-                  border: '1px solid #bbf7d0',
-                  fontWeight: 600
-                }}>
-                  {report.resolvedBy}
-                </span>
-                {report.resolvedAt && (
-                  <span style={{
-                    fontSize: '12px',
-                    color: '#6b7280'
-                  }}>
-                    on {new Date(report.resolvedAt).toLocaleString()}
-                  </span>
-                )}
-              </div>
-              {report.resolution_notes && (
-                <div style={{ marginTop: '8px' }}>
+              )}
+              {report.status === 'resolved' && report.resolvedBy && (
+                <div>
                   <span style={{
                     fontSize: '12px',
                     fontWeight: 500,
                     color: '#6b7280',
                     textTransform: 'uppercase',
                     letterSpacing: '0.5px'
-                  }}>Resolution Notes</span>
-                  <p style={{
-                    margin: '4px 0 0 0',
+                  }}>Resolved By</span>
+                  <span style={{
+                    display: 'block',
                     fontSize: '14px',
-                    color: '#111827',
-                    lineHeight: '1.5'
-                  }}>{report.resolution_notes}</p>
+                    color: '#15803d',
+                    marginTop: '2px',
+                    fontWeight: 600
+                  }}>{report.resolvedBy}</span>
                 </div>
               )}
             </div>
-          )}
-
-          {/* Resolution Section */}
-          {report.resolution && (
-            <div style={{
-              marginBottom: '16px',
-              padding: '12px',
-              backgroundColor: '#f0fdf4',
-              border: '1px solid #bbf7d0',
-              borderRadius: '6px'
-            }}>
-              <h4 style={{
-                fontSize: '12px',
-                fontWeight: 500,
-                color: '#6b7280',
-                textTransform: 'uppercase',
-                letterSpacing: '0.5px',
-                margin: '0 0 12px 0'
-              }}>Resolution</h4>
-              <div style={{ marginBottom: '8px' }}>
-                <span style={{
-                  fontSize: '12px',
-                  fontWeight: 500,
-                  color: '#15803d'
-                }}>Resolved by {report.resolution.resolvedBy} on {report.resolution.resolvedDate}</span>
-              </div>
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
-                gap: '12px'
-              }}>
-                <div>
-                  <span style={{
-                    fontSize: '12px',
-                    fontWeight: 500,
-                    color: '#6b7280',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.5px'
-                  }}>Action Taken</span>
-                  <p style={{
-                    margin: '2px 0 0 0',
-                    fontSize: '14px',
-                    color: '#111827'
-                  }}>{report.resolution.actionTaken}</p>
-                </div>
-                <div>
-                  <span style={{
-                    fontSize: '12px',
-                    fontWeight: 500,
-                    color: '#6b7280',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.5px'
-                  }}>Notes</span>
-                  <p style={{
-                    margin: '2px 0 0 0',
-                    fontSize: '14px',
-                    color: '#111827'
-                  }}>{report.resolution.notes}</p>
-                </div>
-              </div>
-            </div>
-          )}
+          </div>
 
           {/* Resolution Form */}
           {isResolving && (
@@ -728,43 +520,28 @@ const ReportCard: React.FC<ReportCardProps> = ({
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '8px' }}>
-                <button
+                <Button
                   onClick={handleResolve}
                   disabled={!actionTaken.trim() || !resolutionNotes.trim()}
-                  style={{
-                    padding: '8px 16px',
-                    fontSize: '14px',
-                    fontWeight: 500,
-                    backgroundColor: actionTaken.trim() && resolutionNotes.trim() ? '#10b981' : '#e5e7eb',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '4px',
-                    cursor: actionTaken.trim() && resolutionNotes.trim() ? 'pointer' : 'not-allowed'
-                  }}
+                  variant="primary"
+                  size="md"
+                  roleColor="#10b981"
                 >
                   Mark as Resolved
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={() => setIsResolving(false)}
-                  style={{
-                    padding: '8px 16px',
-                    fontSize: '14px',
-                    fontWeight: 500,
-                    backgroundColor: 'transparent',
-                    color: '#6b7280',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '4px',
-                    cursor: 'pointer'
-                  }}
+                  variant="secondary"
+                  size="md"
                 >
                   Cancel
-                </button>
+                </Button>
               </div>
             </div>
           )}
 
           {/* Actions Section */}
-          {(!hasAcknowledged && !isCreator && report.status !== 'closed') || (canResolve && !isResolving && report.type === 'report') ? (
+          {(!hasAcknowledged && !isCreator && report.status !== 'closed') || (canResolve && !isResolving && report.type === 'report') || onViewDetails ? (
             <div style={{
               padding: '12px',
               backgroundColor: '#f9fafb',
@@ -782,46 +559,46 @@ const ReportCard: React.FC<ReportCardProps> = ({
                 display: 'flex',
                 gap: '8px'
               }}>
+                {onViewDetails && (
+                  <Button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onViewDetails(report.id);
+                    }}
+                    variant="primary"
+                    size="md"
+                    roleColor="#6b7280"
+                  >
+                    View Details
+                  </Button>
+                )}
+
                 {!hasAcknowledged && !isCreator && report.status !== 'closed' && (
-                  <button
+                  <Button
                     onClick={(e) => {
                       e.stopPropagation();
                       onAcknowledge?.(report.id);
                     }}
-                    style={{
-                      padding: '8px 16px',
-                      fontSize: '14px',
-                      fontWeight: 500,
-                      backgroundColor: '#3b82f6',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: 'pointer'
-                    }}
+                    variant="primary"
+                    size="md"
+                    roleColor="#3b82f6"
                   >
                     Acknowledge
-                  </button>
+                  </Button>
                 )}
 
                 {canResolve && !isResolving && report.type === 'report' && (
-                  <button
+                  <Button
                     onClick={(e) => {
                       e.stopPropagation();
                       setIsResolving(true);
                     }}
-                    style={{
-                      padding: '8px 16px',
-                      fontSize: '14px',
-                      fontWeight: 500,
-                      backgroundColor: '#10b981',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: 'pointer'
-                    }}
+                    variant="primary"
+                    size="md"
+                    roleColor="#10b981"
                   >
                     Resolve
-                  </button>
+                  </Button>
                 )}
               </div>
             </div>

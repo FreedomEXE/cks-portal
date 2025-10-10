@@ -682,7 +682,10 @@ export async function acknowledgeItem(id: string, type: 'report' | 'feedback') {
 export async function resolveReport(id: string, details?: { actionTaken?: string; notes?: string }) {
   await apiFetch<ApiResponse<{ id: string }>>(`/reports/${encodeURIComponent(id)}/resolve`, {
     method: 'POST',
-    body: JSON.stringify({ resolution_notes: details?.notes })
+    body: JSON.stringify({
+      resolution_notes: details?.notes,
+      action_taken: details?.actionTaken
+    })
   });
 }
 

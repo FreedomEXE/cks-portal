@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(DATABASE_URL=\"postgresql://cks_portal_db_user:SN6DBtsYKzDjo9JbfzdDbcoTOda6AH4X@dpg-d2aesdvgi27c73f87q7g-a.oregon-postgres.render.com:5432/cks_portal_db\" DATABASE_SSL=\"true\" node -e \"\nconst { Client } = require(''pg'');\nconst client = new Client({\n  connectionString: process.env.DATABASE_URL,\n  ssl: { rejectUnauthorized: false }\n});\n\nclient.connect().then(async () => {\n  console.log(''=== SERVICE CEN-010-SRV-002 ==='');\n  const srv = await client.query(''SELECT service_id, service_name, category, manager_code, assigned_warehouse FROM services WHERE service_id = $1'', [''CEN-010-SRV-002'']);\n  console.log(srv.rows[0]);\n  \n  console.log(''\\n=== FIND PRODUCT ORDERS ==='');\n  const productOrders = await client.query(''SELECT order_id, order_type, manager_id, assigned_warehouse, title FROM orders WHERE order_type = $1 AND assigned_warehouse IS NOT NULL LIMIT 3'', [''product'']);\n  console.log(productOrders.rows);\n  \n  console.log(''\\n=== FIND SERVICE ORDERS MANAGED BY WAREHOUSE ==='');\n  const serviceOrders = await client.query(''SELECT order_id, order_type, manager_id, assigned_warehouse, title FROM orders WHERE order_type = $1 AND assigned_warehouse IS NOT NULL LIMIT 3'', [''service'']);\n  console.log(serviceOrders.rows);\n  \n  await client.end();\n}).catch(console.error);\n\")"
+      "Bash(pnpm add:*)",
+      "Bash(pnpm migrate:up:*)",
+      "Bash(pnpm build:*)"
     ],
     "deny": [],
     "ask": []

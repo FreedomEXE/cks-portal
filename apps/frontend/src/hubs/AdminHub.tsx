@@ -19,6 +19,7 @@ import {
   NewsPreview,
   OverviewSection,
   RecentActivity,
+  ReportDetailsModal,
   type Activity,
 } from '@cks/domain-widgets';
 import {
@@ -230,6 +231,7 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
   // merged assign flow into CatalogServiceModal
   const [selectedOrderForDetails, setSelectedOrderForDetails] = useState<HubOrderItem | null>(null);
   const [selectedOrderForEdit, setSelectedOrderForEdit] = useState<HubOrderItem | null>(null);
+  const [selectedReportForDetails, setSelectedReportForDetails] = useState<any | null>(null);
   const logout = useLogout();
   const { mutate } = useSWRConfig();
 
@@ -1620,14 +1622,14 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
 
             return [
               {
-                label: `View ${isReport ? 'Report' : 'Feedback'}`,
+                label: `View Details`,
                 variant: 'secondary' as const,
                 onClick: () => {
                   if (!item) return;
-                  const details = isReport
-                    ? `ID: ${item.id}\nTitle: ${item.title}\nCategory: ${item.category}\nDescription: ${item.description}\nSeverity: ${item.severity || 'N/A'}\nStatus: ${item.status}\nSubmitted By: ${item.submittedBy}\nDate: ${item.submittedDate}\nService ID: ${item.relatedService || 'N/A'}\nTags: ${(item.tags || []).join(', ') || 'None'}`
-                    : `ID: ${item.id}\nTitle: ${item.title}\nCategory: ${item.category}\nMessage: ${item.description}\nStatus: ${item.status}\nSubmitted By: ${item.submittedBy}\nDate: ${item.submittedDate}`;
-                  alert(details);
+                  // Set the selected report to open the ReportDetailsModal
+                  // We'll need to manage this state
+                  setSelectedReportForDetails(item);
+                  handleModalClose(); // Close action modal so details modal can show
                 },
               },
               {
@@ -1932,6 +1934,34 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
             alert(`Failed to update order: ${error instanceof Error ? error.message : 'Unknown error'}`);
           }
         }}
+      />
+
+      <ReportDetailsModal
+        isOpen={!!selectedReportForDetails}
+        onClose={() => setSelectedReportForDetails(null)}
+        report={selectedReportForDetails ? {
+          id: selectedReportForDetails.id || selectedReportForDetails.report_id,
+          type: selectedReportForDetails._entityType === 'feedback' ? 'feedback' : 'report',
+          submittedBy: selectedReportForDetails.created_by_id || selectedReportForDetails.customerId || selectedReportForDetails.centerId,
+          submittedDate: selectedReportForDetails.createdAt || selectedReportForDetails.created_at,
+          status: selectedReportForDetails.status,
+          description: selectedReportForDetails.description || selectedReportForDetails.message,
+          reportCategory: selectedReportForDetails.report_category,
+          relatedEntityId: selectedReportForDetails.related_entity_id,
+          reportReason: selectedReportForDetails.report_reason,
+          priority: selectedReportForDetails.priority,
+          rating: selectedReportForDetails.rating,
+          acknowledgments: selectedReportForDetails.acknowledgments || [],
+          resolvedBy: selectedReportForDetails.resolved_by_id,
+          resolvedAt: selectedReportForDetails.resolved_at,
+          resolution: {
+            notes: selectedReportForDetails.resolution_notes,
+            actionTaken: selectedReportForDetails.action_taken
+          },
+          resolution_notes: selectedReportForDetails.resolution_notes
+        } : null}
+        currentUser={code || ''}
+        userRole="admin"
       />
     </div>
   );

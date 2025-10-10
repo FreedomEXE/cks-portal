@@ -1320,13 +1320,13 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
               fetchOrders={fetchOrdersForReports}
               onAcknowledge={async (id, type) => {
                 await apiAcknowledgeItem(id, type);
-                await mutateReports();
+                await (mutateReports as any)(undefined, { revalidate: true });
               }}
               onResolve={async (id, details) => {
                 console.log('[ManagerHub] onResolve called with:', { id, details, managerCode });
 
                 // Optimistic update: immediately update the local cache with all resolved fields
-                await mutateReports(
+                await (mutateReports as any)(
                   async (currentData) => {
                     console.log('[ManagerHub] mutateReports updater - currentData:', currentData);
                     if (!currentData?.data) {
@@ -1367,7 +1367,7 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
 
                 console.log('[ManagerHub] Calling final mutateReports revalidate');
                 // Finally revalidate to get the complete updated data from server
-                await mutateReports();
+                await (mutateReports as any)(undefined, { revalidate: true });
                 console.log('[ManagerHub] onResolve complete');
               }}
             />

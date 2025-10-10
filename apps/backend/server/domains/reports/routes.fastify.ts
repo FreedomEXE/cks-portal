@@ -57,9 +57,8 @@ export async function reportsRoutes(fastify: FastifyInstance) {
     let description = payload.description || '';
 
     if (payload.reportCategory && payload.relatedEntityId && payload.reportReason) {
-      // Structured report: auto-generate title/description
-      const categoryLabel = payload.reportCategory.charAt(0).toUpperCase() + payload.reportCategory.slice(1);
-      title = `Report: ${categoryLabel} [${payload.relatedEntityId}] - ${payload.reportReason}`;
+      // Structured report: auto-generate simple title, detailed description
+      title = payload.reportReason;
       description = `Structured report for ${payload.reportCategory}: ${payload.relatedEntityId}. Reason: ${payload.reportReason}`;
     }
 
@@ -162,13 +161,22 @@ export async function reportsRoutes(fastify: FastifyInstance) {
       return;
     }
 
+    // Check if resolver has acknowledged first
+    const ackCheck = await query('SELECT 1 FROM report_acknowledgments WHERE report_id = $1 AND UPPER(acknowledged_by_id) = UPPER($2)', [params.data.id, account.cksCode ?? '']);
+    if (ackCheck.rows.length === 0) {
+      reply.code(400).send({ error: 'You must acknowledge the report before resolving it' });
+      return;
+    }
+
     const bodySchema = z.object({
-      resolution_notes: z.string().trim().max(2000).optional()
+      resolution_notes: z.string().trim().max(2000).optional(),
+      action_taken: z.string().trim().max(2000).optional()
     });
     const body = bodySchema.safeParse(request.body);
     const resolutionNotes = body.success ? body.data.resolution_notes : undefined;
+    const actionTaken = body.success ? body.data.action_taken : undefined;
 
-    await updateReportStatus(params.data.id, 'resolved', account.cksCode ?? '', resolutionNotes);
+    await updateReportStatus(params.data.id, 'resolved', account.cksCode ?? '', resolutionNotes, actionTaken);
     reply.send({ data: { id: params.data.id, status: 'resolved' } });
   });
 

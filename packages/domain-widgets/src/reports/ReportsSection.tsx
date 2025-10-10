@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import toast, { Toaster } from 'react-hot-toast';
 import { TabSection } from '@cks/ui';
 import ReportCard, { type ReportFeedback } from './ReportCard';
+import ReportDetailsModal from './ReportDetailsModal';
 import { getReasonsForCategory, type ReportCategory, CATEGORY_LABELS } from './reportReasons';
 
 interface ReportsSectionProps {
@@ -35,6 +37,7 @@ const ReportsSection: React.FC<ReportsSectionProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState('reports');
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedReport, setSelectedReport] = useState<ReportFeedback | null>(null);
 
   // Determine if user can create reports/feedback at all
   const canCreate = ['contractor', 'customer', 'center', 'manager'].includes(role.toLowerCase());
@@ -190,12 +193,14 @@ const ReportsSection: React.FC<ReportsSectionProps> = ({
     try {
       if (onAcknowledge) {
         await Promise.resolve(onAcknowledge(reportId, type));
+        toast.success(`${type === 'report' ? 'Report' : 'Feedback'} acknowledged successfully`);
       } else {
         console.log('Acknowledging', type, reportId);
+        toast.success(`${type === 'report' ? 'Report' : 'Feedback'} acknowledged successfully`);
       }
     } catch (err) {
       console.error('Acknowledge failed', err);
-      alert('Failed to acknowledge.');
+      toast.error('Failed to acknowledge. Please try again.');
     }
   };
 
@@ -203,12 +208,14 @@ const ReportsSection: React.FC<ReportsSectionProps> = ({
     try {
       if (onResolve) {
         await Promise.resolve(onResolve(reportId, details));
+        toast.success('Report resolved successfully');
       } else {
         console.log('Resolving report:', reportId, details);
+        toast.success('Report resolved successfully');
       }
     } catch (err) {
       console.error('Resolve failed', err);
-      alert('Failed to resolve.');
+      toast.error('Failed to resolve. Please try again.');
     }
   };
 
@@ -555,6 +562,12 @@ const ReportsSection: React.FC<ReportsSectionProps> = ({
               userRole={role}
               onAcknowledge={(id) => handleAcknowledge(id, report.type)}
               onResolve={handleResolve}
+              onViewDetails={(id) => {
+                const reportToView = allReports.find(r => r.id === id);
+                if (reportToView) {
+                  setSelectedReport(reportToView);
+                }
+              }}
             />
           ))}
         </div>
@@ -571,26 +584,38 @@ const ReportsSection: React.FC<ReportsSectionProps> = ({
   ];
 
   return (
-    <TabSection
-      tabs={tabs}
-      activeTab={activeTab}
-      onTabChange={setActiveTab}
-      description={
-        activeTab === 'create' ? 'Submit new reports or feedback to your ecosystem' :
-        activeTab === 'reports' ? 'Issues and problems reported by your ecosystem' :
-        activeTab === 'feedback' ? 'Suggestions and compliments from your ecosystem' :
-        'Resolved and closed reports archive'
-      }
-      searchPlaceholder={
-        activeTab !== 'create' ? 'Search reports and feedback...' : undefined
-      }
-      onSearch={activeTab !== 'create' ? setSearchQuery : undefined}
-      primaryColor={primaryColor}
-      contentPadding="flush"
-    >
-      {activeTab === 'create' && canCreate && renderSubmitForm()}
-      {activeTab !== 'create' && renderReportsList()}
-    </TabSection>
+    <>
+      <Toaster position="top-right" />
+      <TabSection
+        tabs={tabs}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        description={
+          activeTab === 'create' ? 'Submit new reports or feedback to your ecosystem' :
+          activeTab === 'reports' ? 'Issues and problems reported by your ecosystem' :
+          activeTab === 'feedback' ? 'Suggestions and compliments from your ecosystem' :
+          'Resolved and closed reports archive'
+        }
+        searchPlaceholder={
+          activeTab !== 'create' ? 'Search reports and feedback...' : undefined
+        }
+        onSearch={activeTab !== 'create' ? setSearchQuery : undefined}
+        primaryColor={primaryColor}
+        contentPadding="flush"
+      >
+        {activeTab === 'create' && canCreate && renderSubmitForm()}
+        {activeTab !== 'create' && renderReportsList()}
+      </TabSection>
+
+      {/* Report Details Modal */}
+      <ReportDetailsModal
+        isOpen={!!selectedReport}
+        onClose={() => setSelectedReport(null)}
+        report={selectedReport}
+        currentUser={userId}
+        userRole={role}
+      />
+    </>
   );
 };
 

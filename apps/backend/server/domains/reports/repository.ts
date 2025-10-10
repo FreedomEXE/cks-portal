@@ -207,15 +207,15 @@ export async function createFeedback(input: CreateFeedbackInput) {
   return { id: feedbackId, row: result.rows[0] };
 }
 
-export async function updateReportStatus(reportId: string, status: string, resolvedById?: string, resolutionNotes?: string) {
+export async function updateReportStatus(reportId: string, status: string, resolvedById?: string, resolutionNotes?: string, actionTaken?: string) {
   const now = new Date().toISOString();
 
   // Update status to resolved and capture who resolved it
   const sql = `
-    UPDATE reports SET status = $2, updated_at = $3, resolved_by_id = $4, resolved_at = $5, resolution_notes = $6 WHERE report_id = $1
-    RETURNING report_id, status, updated_at, resolved_by_id, resolved_at, resolution_notes, cks_manager, created_by_id, report_category, related_entity_id
+    UPDATE reports SET status = $2, updated_at = $3, resolved_by_id = $4, resolved_at = $5, resolution_notes = $6, action_taken = $7 WHERE report_id = $1
+    RETURNING report_id, status, updated_at, resolved_by_id, resolved_at, resolution_notes, action_taken, cks_manager, created_by_id, report_category, related_entity_id
   `;
-  const result = await query(sql, [reportId, status, now, resolvedById ?? null, status === 'resolved' ? now : null, resolutionNotes ?? null]);
+  const result = await query(sql, [reportId, status, now, resolvedById ?? null, status === 'resolved' ? now : null, resolutionNotes ?? null, actionTaken ?? null]);
 
   // If status is being set to 'resolved', check if everyone has already acknowledged
   // If so, auto-close the report

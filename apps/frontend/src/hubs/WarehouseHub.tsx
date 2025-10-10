@@ -1220,12 +1220,12 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
                 onAcknowledge={async (id, type) => {
                   await apiAcknowledgeItem(id, type);
                   const { mutate } = await import('swr');
-                  (mutate as any)(`/hub/reports/${normalizedCode}`);
+                  await (mutate as any)(`/hub/reports/${normalizedCode}`, undefined, { revalidate: true });
                 }}
                 onResolve={async (id, details) => {
                   await apiResolveReport(id, details ?? {});
                   const { mutate } = await import('swr');
-                  (mutate as any)(`/hub/reports/${normalizedCode}`);
+                  await (mutate as any)(`/hub/reports/${normalizedCode}`, undefined, { revalidate: true });
                 }}
               />
             </PageWrapper>
