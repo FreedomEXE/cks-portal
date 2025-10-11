@@ -23,6 +23,7 @@ export interface ReportItem {
   reportReason?: string | null;
   priority?: 'LOW' | 'MEDIUM' | 'HIGH' | null;
   rating?: number | null;
+  serviceManagedBy?: string | null;
 }
 
 export interface HubReportsPayload {
@@ -53,6 +54,7 @@ function mapReportRow(row: any, acknowledgments: Array<{ userId: string; date: s
     relatedEntityId: row.related_entity_id ?? null,
     reportReason: row.report_reason ?? null,
     priority: row.priority ?? null,
+    serviceManagedBy: row.service_managed_by ?? null,
   };
 }
 
@@ -146,13 +148,16 @@ async function getManagerForUser(cksCode: string, role: HubRole): Promise<string
  */
 async function getAllReportsForAdmin(cksCode: string): Promise<HubReportsPayload> {
   // Query ALL reports in the system (not ecosystem-scoped)
+  // LEFT JOIN with services to get managed_by for service reports
   const reportsResult = await query<any>(
-    `SELECT report_id, type, severity, title, description, service_id, center_id, customer_id,
-            status, created_by_id, created_by_role, created_at, tags,
-            report_category, related_entity_id, report_reason, priority
-     FROM reports
-     WHERE archived_at IS NULL
-     ORDER BY created_at DESC NULLS LAST`
+    `SELECT r.report_id, r.type, r.severity, r.title, r.description, r.service_id, r.center_id, r.customer_id,
+            r.status, r.created_by_id, r.created_by_role, r.created_at, r.tags,
+            r.report_category, r.related_entity_id, r.report_reason, r.priority,
+            s.managed_by as service_managed_by
+     FROM reports r
+     LEFT JOIN services s ON r.report_category = 'service' AND UPPER(s.service_id) = UPPER(r.related_entity_id)
+     WHERE r.archived_at IS NULL
+     ORDER BY r.created_at DESC NULLS LAST`
   );
 
   // Query ALL feedback in the system (not ecosystem-scoped)
@@ -230,13 +235,16 @@ async function getEcosystemReports(cksCode: string, role: HubRole): Promise<HubR
   }
 
   // Query all reports in this ecosystem (WHERE cks_manager = manager AND not archived)
+  // LEFT JOIN with services to get managed_by for service reports
   const reportsResult = await query<any>(
-    `SELECT report_id, type, severity, title, description, service_id, center_id, customer_id,
-            status, created_by_id, created_by_role, created_at, tags, resolution_notes, resolved_by_id, resolved_at,
-            report_category, related_entity_id, report_reason, priority
-     FROM reports
-     WHERE UPPER(cks_manager) = UPPER($1) AND archived_at IS NULL
-     ORDER BY created_at DESC NULLS LAST`,
+    `SELECT r.report_id, r.type, r.severity, r.title, r.description, r.service_id, r.center_id, r.customer_id,
+            r.status, r.created_by_id, r.created_by_role, r.created_at, r.tags, r.resolution_notes, r.resolved_by_id, r.resolved_at,
+            r.report_category, r.related_entity_id, r.report_reason, r.priority,
+            s.managed_by as service_managed_by
+     FROM reports r
+     LEFT JOIN services s ON r.report_category = 'service' AND UPPER(s.service_id) = UPPER(r.related_entity_id)
+     WHERE UPPER(r.cks_manager) = UPPER($1) AND r.archived_at IS NULL
+     ORDER BY r.created_at DESC NULLS LAST`,
     [managerCode]
   );
 
@@ -351,15 +359,18 @@ async function getWarehouseReports(cksCode: string): Promise<HubReportsPayload> 
 
   // Query reports where related_entity_id matches warehouse's orders OR services
   // This includes both warehouse-managed service orders AND product orders
+  // LEFT JOIN with services to get managed_by for service reports
   const reportsResult = await query<any>(
-    `SELECT report_id, type, severity, title, description, service_id, center_id, customer_id,
-            status, created_by_id, created_by_role, created_at, tags, resolution_notes, resolved_by_id, resolved_at,
-            report_category, related_entity_id, report_reason, priority
-     FROM reports
-     WHERE archived_at IS NULL
+    `SELECT r.report_id, r.type, r.severity, r.title, r.description, r.service_id, r.center_id, r.customer_id,
+            r.status, r.created_by_id, r.created_by_role, r.created_at, r.tags, r.resolution_notes, r.resolved_by_id, r.resolved_at,
+            r.report_category, r.related_entity_id, r.report_reason, r.priority,
+            s.managed_by as service_managed_by
+     FROM reports r
+     LEFT JOIN services s ON r.report_category = 'service' AND UPPER(s.service_id) = UPPER(r.related_entity_id)
+     WHERE r.archived_at IS NULL
        AND (
-         (report_category IN ('order', 'service') AND related_entity_id = ANY($1))
-         OR created_by_id = $2
+         (r.report_category IN ('order', 'service') AND r.related_entity_id = ANY($1))
+         OR r.created_by_id = $2
        )
      ORDER BY created_at DESC NULLS LAST`,
     [entityIds, normalized]

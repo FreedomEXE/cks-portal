@@ -8,15 +8,64 @@
 
 ## Role Permissions Summary
 
-| Role | Can Create Reports/Feedback | Can View | Can Acknowledge/Resolve |
-|------|---------------------------|----------|------------------------|
-| Customer | ✅ Yes | Own + Related | ❌ No |
-| Center | ✅ Yes | Own + Related | ❌ No |
-| Contractor | ✅ Yes (Feedback mainly) | Own + Related | ❌ No |
-| Manager | ✅ Yes | All (System-wide) | ✅ Yes (All) |
-| Warehouse | ❌ **NO** | Product Orders, Services | ✅ Yes (Operational) |
-| Crew | ❌ No | Own only | ❌ No |
-| Admin | ❌ No | All | ✅ Yes (All) |
+| Role | Can Create Reports | Can Create Feedback | Can Acknowledge | Can Resolve |
+|------|-------------------|--------------------|--------------------|-------------|
+| Customer | ✅ Yes | ✅ Yes | ✅ Yes (Related) | ❌ No |
+| Center | ✅ Yes | ✅ Yes | ✅ Yes (Related) | ❌ No |
+| Contractor | ✅ Yes | ✅ Yes | ✅ Yes (Related) | ❌ No |
+| Manager | ❌ **NO** | ✅ Yes | ✅ Yes (All) | ✅ Yes (Service/Procedure) |
+| Warehouse | ❌ **NO** | ✅ Yes | ✅ Yes (Orders) | ✅ Yes (Order Reports) |
+| Crew | ❌ **NO** | ❌ **NO** | ✅ Yes (Related) | ❌ No |
+| Admin | ❌ No | ❌ No | ✅ Yes (All) | ✅ Yes (All) |
+
+---
+
+## Testing Progress Summary (Oct 10, 2025)
+
+### ✅ TESTED & WORKING (3 Flows):
+
+1. **Product Order Report** (Warehouse-managed)
+   - Report ID: `CEN-010-RPT-012`
+   - Creator: Center (CEN-010)
+   - Reason: Billing Issue
+   - Status: ✅ PASS - Auto-close works correctly
+
+2. **Service Report** (Manager-managed)
+   - Report ID: `CUS-015-RPT-011`
+   - Creator: Customer (CUS-015)
+   - Reason: Crew Behavior
+   - Status: ✅ PASS - Stakeholder filtering working
+
+3. **Service Feedback** (Manager creates)
+   - Feedback ID: `MGR-012-FBK-001`
+   - Creator: Manager (MGR-012)
+   - Reason: Excellent Quality (5★)
+   - Status: ✅ PASS - Modal terminology fixed
+
+### 🔧 CRITICAL FIXES APPLIED:
+
+1. **Auto-Close Logic Fix** (repository.ts:411-420, 278-287)
+   - Now filters `ackCount` to only count stakeholder acknowledgments
+   - Non-stakeholders can acknowledge but don't trigger auto-close
+
+2. **Modal Terminology Fix** (ReportDetailsModal.tsx:165, 282, 303, 344)
+   - Feedback modals now show "Feedback" labels (not "Report")
+   - Resolution section hidden for feedback
+
+3. **Warehouse-Managed Service Detection (Oct 11, 2025)**
+   - Services are considered warehouse‑managed when `services.managed_by` is:
+     - the literal string `warehouse` (legacy), or
+     - a specific warehouse ID starting with `WHS-` (e.g., `WHS-004`).
+   - Verify “Managed By” shows Warehouse in ReportDetailsModal for such services.
+   - Verify warehouse users can resolve service reports managed by `WHS-*`.
+
+### ❌ STILL TO TEST:
+- [ ] Order Feedback (Customer/Center/Contractor)
+- [ ] Service Feedback (Customer/Center/Contractor - non-Manager)
+- [ ] Procedure Reports/Feedback (Not ready yet - skip)
+- [ ] Warehouse permissions (cannot create reports)
+- [ ] Crew permissions (cannot create anything)
+- [ ] Service report resolution as Warehouse on a `WHS-*` managed service
 
 ---
 
@@ -83,26 +132,26 @@
    - [✅] Correct priority badge (Medium)
    - [✅] Status: Open
 
-**Report Created**: CUS-015-RPT-003
+**Report Created**: CEN-010-RPT-012
 
 **Visibility Test Results**:
-- [✅] CRW-006 can view - YES | Can ACKNOWLEDGE - YES
-- [✅] CEN-010 can view - YES | Can ACKNOWLEDGE - YES ⚠️ **NO SUCCESS TOAST**
-- [✅] CON-010 can view - YES | Can ACKNOWLEDGE - YES
-- [✅] WHS-004 can view - YES | Can ACKNOWLEDGE - YES | Can RESOLVE - YES
-- [✅] MGR-012 can view - YES (after refresh)
+- [✅] CRW-006 (Crew) can view - YES | Can ACKNOWLEDGE - YES
+- [✅] CUS-015 (Customer) can view - YES | Can ACKNOWLEDGE - YES (creator excluded ✓)
+- [✅] CON-010 (Contractor) can view - YES | Can ACKNOWLEDGE - YES
+- [✅] WHS-004 (Warehouse) can view - YES | Can ACKNOWLEDGE - YES | Can RESOLVE - YES
+- [✅] MGR-012 (Manager) can view - YES | Can ACKNOWLEDGE - YES
 
 **Expected Result**: Report created successfully, visible to customer and warehouse
 
-**Result**: ⬜ PASS | ✅ PARTIAL PASS
+**Result**: ✅ PASS | ⬜ FAIL
 **Notes**:
-**CRITICAL ISSUES FOUND**:
-1. ❌ No success toast after acknowledgment (CEN-010 test)
-2. ❌ No success toast after resolution (WHS-004 test)
-3. ❌ Page requires manual refresh to see updated status - BAD UX
-4. ❌ Report archived immediately when WHS-004 resolved, even though MGR-012 hadn't acknowledged yet
-5. ⚠️ **BUSINESS RULE VIOLATION**: Report should NOT be archived until ALL users acknowledge, regardless of resolution
-6. ⚠️ Current view modal needs significant improvement - lacks proper structure and information
+**ALL FLOWS WORKING CORRECTLY (Oct 10, 2025)**:
+1. ✅ Report appears immediately after creation (no refresh needed)
+2. ✅ All stakeholders can acknowledge (creator excluded from count)
+3. ✅ Warehouse can resolve product order reports
+4. ✅ Auto-close works: Report marked "closed" when all parties acknowledge + warehouse resolves
+5. ✅ Order-specific stakeholder counting working perfectly
+6. ✅ Cache mutations functioning across all actions
 
 ---
 
@@ -132,52 +181,99 @@
 
 ---
 
-## Test Group 3: Service Order Reports (Manager)
+## Test Group 3: Service Order Reports (Customer/Center/Contractor)
 
-**Scenario**: Manager reports issues with services
+**Scenario**: Customer/Center/Contractor reports service issues (Manager manages/resolves)
 
-### Test Case 3A: Manager Reports Service Issue ⬜
+### Test Case 3A: Customer Reports Service Issue ✅
 
-**Login**: `MGR-012` (Manager)
+**Login**: `CUS-015` (Customer)
 
 **Steps**:
-1. [ ] Reports → "Create"
-2. [ ] Select Type: **Report**
-3. [ ] Select Report For: **Service**
-4. [ ] Select Service: _(Any service from dropdown)_
-5. [ ] Select Reason: **Quality Issue** or **Crew Behavior**
-6. [ ] Select Priority: **High**
-7. [ ] Submit
-8. [ ] Verify report created with:
-   - [ ] High priority badge (red/orange)
-   - [ ] Service category
-   - [ ] Status: Open
+1. [✅] Reports → "Create"
+2. [✅] Select Type: **Report**
+3. [✅] Select Report For: **Service**
+4. [✅] Select Service: CEN-010-SRV-001
+5. [✅] Select Reason: **Crew Behavior**
+6. [✅] Select Priority: **High**
+7. [✅] Submit
+8. [✅] Verify report created with:
+   - [✅] High priority badge (red/orange)
+   - [✅] Service category
+   - [✅] Status: Open
 
-**Result**: ⬜ PASS | ⬜ FAIL
-**Notes**: _______________________________________________________________
+**Report Created**: CUS-015-RPT-011
+
+**Visibility & Acknowledgment Test Results**:
+- [✅] CEN-010 (Center) can view - YES | Can ACKNOWLEDGE - YES
+- [✅] CON-010 (Contractor) can view - YES | Can ACKNOWLEDGE - YES
+- [✅] CRW-006 (Crew) can view - YES | Can ACKNOWLEDGE - YES (but doesn't count toward stakeholders)
+- [✅] MGR-012 (Manager) can view - YES | Can ACKNOWLEDGE - YES | Can RESOLVE - YES
+- [✅] WHS-004 (Warehouse) - NOT involved (service report, not order)
+
+**Auto-Close Test**:
+- [✅] Manager resolved report
+- [✅] All stakeholders (CEN-010, CON-010, MGR-012, excluding creator CUS-015) acknowledged
+- [✅] Report auto-closed to "closed" status ONLY after all stakeholders acknowledged
+- [✅] Non-stakeholder acknowledgments (CRW-006) correctly ignored in count
+
+**Result**: ✅ PASS | ⬜ FAIL
+**Notes**:
+**ALL FLOWS WORKING CORRECTLY (Oct 10, 2025 - After Fix)**:
+1. ✅ Service reports correctly identify stakeholders from order (manager, customer, contractor, crew - NO warehouse)
+2. ✅ Only stakeholder acknowledgments count toward auto-close threshold
+3. ✅ Auto-close works correctly: All stakeholders acknowledge + manager resolves = closed
+4. ✅ Non-stakeholders can acknowledge but don't affect auto-close logic
+5. ✅ FIX APPLIED: ackCount now filters to stakeholders only (repository.ts:411-420, 278-287)
 
 ---
 
-## Test Group 4: Service Order Feedback (Manager)
+## Test Group 4: Service Feedback (Manager)
 
 **Scenario**: Manager provides positive feedback on services
 
-### Test Case 4A: Manager Service Feedback ⬜
+### Test Case 4A: Manager Service Feedback ✅
 
 **Login**: `MGR-012` (Manager)
 
 **Steps**:
-1. [ ] Reports → "Create"
-2. [ ] Select Type: **Feedback**
-3. [ ] Select Feedback For: **Service**
-4. [ ] Select Service: _(Any service)_
-5. [ ] Select Reason: **Professional Crew** or **Excellent Quality**
-6. [ ] Select Rating: **5 stars**
-7. [ ] Submit
-8. [ ] Verify feedback appears with 5-star rating
+1. [✅] Reports → "Create"
+2. [✅] Select Type: **Feedback**
+3. [✅] Select Feedback For: **Service**
+4. [✅] Select Service: CEN-010-SRV-002
+5. [✅] Select Reason: **Excellent Quality**
+6. [✅] Select Rating: **5 stars**
+7. [✅] Submit
+8. [✅] Verify feedback appears with 5-star rating
 
-**Result**: ⬜ PASS | ⬜ FAIL
-**Notes**: _______________________________________________________________
+**Feedback Created**: MGR-012-FBK-001
+
+**Visibility Test Results**:
+- [✅] CEN-010 (Center) can view - YES | Can ACKNOWLEDGE - YES
+- [✅] CON-010 (Contractor) can view - YES | Can ACKNOWLEDGE - YES
+- [✅] CRW-006 (Crew) can view - YES | Can ACKNOWLEDGE - YES
+- [✅] CUS-015 (Customer) can view - YES | Can ACKNOWLEDGE - YES
+- [✅] WHS-004 (Warehouse) - NOT required to acknowledge (service feedback)
+
+**Auto-Close Test**:
+- [✅] All ecosystem stakeholders acknowledged (excluding warehouse)
+- [✅] Feedback auto-closed to "closed" status
+- [✅] No resolution required (feedback doesn't need resolution)
+
+**Modal Display Test**:
+- [✅] Modal shows "Feedback Summary" (not "Report Summary")
+- [✅] Modal shows "Feedback Lifecycle" (not "Report Lifecycle")
+- [✅] Modal does NOT show "Resolution Status" section (correct for feedback)
+- [✅] Modal shows "Feedback closed" text (context-aware)
+
+**Result**: ✅ PASS | ⬜ FAIL
+**Notes**:
+**ALL FLOWS WORKING CORRECTLY (Oct 10, 2025)**:
+1. ✅ Feedback created successfully with 5-star rating
+2. ✅ All ecosystem members can acknowledge
+3. ✅ Auto-closed when all stakeholders acknowledged (no resolution needed)
+4. ✅ Modal correctly uses "Feedback" terminology throughout
+5. ✅ FIX APPLIED: Modal context-aware for feedback vs reports (ReportDetailsModal.tsx:165, 282, 303, 344)
 
 ---
 

@@ -5,6 +5,50 @@ Replace free-form text report/feedback creation with a structured dropdown syste
 
 **UPDATE (Oct 9, 2025)**: Simplified from 4 categories to 3. Product category has been removed. System now only supports Service, Order, and Procedure.
 
+**UPDATE (Oct 10, 2025 - Session 3)**: System is 95% complete and in end-to-end testing phase. Critical bugs fixed:
+- ✅ Auto-close logic now filters acknowledgments to stakeholders only
+- ✅ Warehouse-managed service reports properly identified and routable
+- ✅ Modal terminology fixed for feedback vs reports
+- ✅ Warehouse resolution permissions working
+- ⏳ Testing in progress (3/8 scenarios passed)
+
+## Implementation Status: 95% COMPLETE 🎯
+
+### ✅ Fully Implemented:
+- Structured report/feedback creation with dropdowns
+- Category-specific entity selection (Service, Order, Procedure)
+- Priority levels (LOW, MEDIUM, HIGH) for reports
+- Rating system (1-5 stars) for feedback
+- Acknowledgment workflow with auto-close logic
+- Resolution workflow (Manager/Warehouse based on category)
+- Stakeholder identification from order participants
+- Warehouse-managed service support
+- Context-aware UI (reports vs feedback)
+- Real-time cache updates
+
+### 🔧 Bug Fixes Applied (Oct 10):
+1. **Auto-Close Logic**: Now counts only stakeholder acknowledgments (not all users)
+2. **Service Management**: Warehouse-managed services properly detected (supports 'warehouse' or 'WHS-*' IDs)
+3. **Modal Terminology**: Feedback modals no longer show report-specific labels
+4. **Resolution Permissions**: Warehouse can resolve warehouse-managed service reports
+
+**UPDATE (Oct 11, 2025)**:
+- Service management detection now recognizes actual warehouse IDs. A service is considered warehouse‑managed when `services.managed_by` is:
+  - the literal string `warehouse` (legacy), or
+  - a specific warehouse ID starting with `WHS-` (e.g., `WHS-004`).
+- Backend resolve endpoint enforces this rule: warehouse resolves warehouse‑managed services; manager resolves manager‑managed services; warehouse resolves order reports; manager resolves procedures.
+- Frontend display (“Managed By”) and resolve permissions reflect the same logic.
+
+### ⏳ In Testing:
+- End-to-end flow validation (3/8 complete)
+- Edge cases and permission boundaries
+- Auto-close verification across all report types
+
+### ❌ Not Started (Post-MVP):
+- Procedure infrastructure (reports/feedback routes work, but no procedures exist yet)
+- Archive view/search
+- Analytics dashboard
+
 ## Database Changes - COMPLETED ✓
 Already added these columns to the `reports` table:
 ```sql

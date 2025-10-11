@@ -1,7 +1,20 @@
 # CKS Reports & Feedback Flow Documentation
 
+**Status**: ✅ 95% Complete | 🧪 In Testing (Oct 10, 2025)
+
 ## Overview
 The CKS reports and feedback system facilitates issue tracking, communication, and problem resolution across the entire ecosystem. It operates as a dual system: Reports for serious issues and Feedback for general communication.
+
+**Latest Updates (Oct 11, 2025)**:
+- Managed By detection updated: services with `managed_by = 'warehouse'` or any `WHS-*` are treated as warehouse‑managed.
+- Resolve permissions enforced server‑side for service reports based on `services.managed_by` (warehouse vs manager).
+
+**Latest Updates (Oct 10, 2025)**:
+- ✅ Auto-close logic fixed (now filters to stakeholders only)
+- ✅ Warehouse-managed services properly routed to warehouse for resolution
+- ✅ Context-aware UI (reports vs feedback terminology)
+- ✅ Real-time updates via cache mutations
+- 🧪 End-to-end testing in progress (3/8 scenarios passing)
 
 ## Related Code Files
 - **Report Components**: `/apps/frontend/src/components/reports/`
@@ -27,18 +40,25 @@ The CKS reports and feedback system facilitates issue tracking, communication, a
 
 ### Reports (Issues/Problems)
 **Can Create:**
-- Customers
-- Centers
-- Contractors
+- ✅ Customers
+- ✅ Centers
+- ✅ Contractors
 
-**Cannot Create (View Only):**
-- Crew members
-- Managers (resolve only)
-- Warehouses (operational items only)
+**Cannot Create:**
+- ❌ Managers (can only acknowledge/resolve reports)
+- ❌ Warehouses (can only acknowledge/resolve warehouse-related reports)
+- ❌ Crew members (can only acknowledge reports they're involved in)
 
 ### Feedback (Suggestions/Compliments)
 **Can Create:**
-- All roles
+- ✅ Customers
+- ✅ Centers
+- ✅ Contractors
+- ✅ Managers
+- ✅ Warehouses
+
+**Cannot Create:**
+- ❌ Crew members (view and acknowledge only)
 
 ## Report Categories
 

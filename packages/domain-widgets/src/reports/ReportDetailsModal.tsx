@@ -59,6 +59,11 @@ const ReportDetailsModal: React.FC<ReportDetailsModalProps> = ({
 
   const isReport = report.type === 'report';
   const roleName = getRoleName(report.submittedBy);
+  const isWarehouseManaged = (managed?: string | null): boolean => {
+    if (!managed) return false;
+    const val = managed.toString();
+    return val.toLowerCase() === 'warehouse' || val.toUpperCase().startsWith('WHS-');
+  };
 
   return (
     <ModalRoot isOpen={isOpen} onClose={onClose}>
@@ -162,7 +167,7 @@ const ReportDetailsModal: React.FC<ReportDetailsModalProps> = ({
             letterSpacing: '0.5px',
             marginBottom: '16px'
           }}>
-            Report Summary
+            {isReport ? 'Report' : 'Feedback'} Summary
           </h3>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
@@ -202,8 +207,7 @@ const ReportDetailsModal: React.FC<ReportDetailsModalProps> = ({
                     Managed By
                   </p>
                   <p style={{ fontSize: '14px', color: '#111827', margin: 0 }}>
-                    {/* TODO: This should be fetched from backend based on entity */}
-                    {report.reportCategory === 'order' ? 'Warehouse' : 'Manager'}
+                    {report.reportCategory === 'order' || isWarehouseManaged(report.serviceManagedBy) ? 'Warehouse' : 'Manager'}
                   </p>
                 </div>
               </>
@@ -279,7 +283,7 @@ const ReportDetailsModal: React.FC<ReportDetailsModalProps> = ({
             letterSpacing: '0.5px',
             marginBottom: '16px'
           }}>
-            Report Lifecycle
+            {isReport ? 'Report' : 'Feedback'} Lifecycle
           </h3>
 
           {/* Status */}
@@ -300,9 +304,9 @@ const ReportDetailsModal: React.FC<ReportDetailsModalProps> = ({
                 {report.status}
               </span>
               <span style={{ fontSize: '13px', color: '#6b7280' }}>
-                {report.status === 'open' && 'Awaiting acknowledgment and resolution'}
-                {report.status === 'resolved' && 'Resolved and awaiting closure'}
-                {report.status === 'closed' && 'Report closed'}
+                {report.status === 'open' && (isReport ? 'Awaiting acknowledgment and resolution' : 'Awaiting acknowledgment')}
+                {report.status === 'resolved' && (isReport ? 'Resolved and awaiting closure' : 'Awaiting closure')}
+                {report.status === 'closed' && `${isReport ? 'Report' : 'Feedback'} closed`}
               </span>
             </div>
           </div>
@@ -340,8 +344,8 @@ const ReportDetailsModal: React.FC<ReportDetailsModalProps> = ({
             )}
           </div>
 
-          {/* Resolution Status */}
-          {(report.status === 'resolved' || report.status === 'closed') && (
+          {/* Resolution Status - Only show for reports */}
+          {isReport && (report.status === 'resolved' || report.status === 'closed') && (
             <div>
               <p style={{ fontSize: '12px', fontWeight: 500, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px', margin: '0 0 8px 0' }}>
                 Resolution Status

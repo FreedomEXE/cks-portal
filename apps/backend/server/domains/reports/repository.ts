@@ -231,6 +231,7 @@ export async function updateReportStatus(reportId: string, status: string, resol
       // For order/service reports, count stakeholders based on the order participants, not ecosystem
       if (reportCategory && relatedEntityId && ['order', 'service'].includes(reportCategory)) {
         // Get order details to find all stakeholders
+        // For service reports, also get the service's managed_by to determine if warehouse should be included
         const orderQuery = reportCategory === 'order'
           ? 'SELECT customer_id, contractor_id, crew_id, assigned_warehouse, manager_id FROM orders WHERE UPPER(order_id) = UPPER($1)'
           : 'SELECT customer_id, contractor_id, crew_id, assigned_warehouse, manager_id FROM orders WHERE UPPER(transformed_id) = UPPER($1)';
@@ -242,6 +243,16 @@ export async function updateReportStatus(reportId: string, status: string, resol
           assigned_warehouse: string | null;
           manager_id: string | null;
         }>(orderQuery, [relatedEntityId]);
+
+        // For service reports, check if the service is warehouse-managed
+        let serviceManagedBy: string | null = null;
+        if (reportCategory === 'service') {
+          const serviceResult = await query<{ managed_by: string | null }>(
+            'SELECT managed_by FROM services WHERE UPPER(service_id) = UPPER($1)',
+            [relatedEntityId]
+          );
+          serviceManagedBy = serviceResult.rows[0]?.managed_by ?? null;
+        }
 
         if (orderResult.rows[0]) {
           const order = orderResult.rows[0];
@@ -267,13 +278,43 @@ export async function updateReportStatus(reportId: string, status: string, resol
             stakeholders.add(order.crew_id.toUpperCase());
           }
 
-          // Add warehouse
+          // Add warehouse for:
+          // 1. Order reports (always)
+          // 2. Service reports that are warehouse-managed
           if (order.assigned_warehouse && order.assigned_warehouse.toUpperCase() !== (createdById ?? '').toUpperCase()) {
-            stakeholders.add(order.assigned_warehouse.toUpperCase());
+            const svcManaged = (serviceManagedBy ?? '').toString();
+            const svcIsWarehouse = svcManaged.toLowerCase() === 'warehouse' || svcManaged.toUpperCase().startsWith('WHS-');
+            if (reportCategory === 'order' || (reportCategory === 'service' && svcIsWarehouse)) {
+              stakeholders.add(order.assigned_warehouse.toUpperCase());
+            }
           }
 
           totalUsers = stakeholders.size;
-          console.log('[updateReportStatus] Order stakeholders:', { reportId, relatedEntityId, stakeholders: Array.from(stakeholders), totalUsers });
+          console.log('[updateReportStatus] Order stakeholders:', { reportId, relatedEntityId, reportCategory, serviceManagedBy, stakeholders: Array.from(stakeholders), totalUsers });
+
+          // Count acknowledgments ONLY from stakeholders (not all acks)
+          if (stakeholders.size > 0) {
+            const stakeholderList = Array.from(stakeholders);
+            const placeholders = stakeholderList.map((_, i) => `$${i + 2}`).join(',');
+            const ackCountResult = await query<{ count: number }>(
+              `SELECT COUNT(*) as count FROM report_acknowledgments
+               WHERE report_id = $1 AND UPPER(acknowledged_by_id) IN (${placeholders})`,
+              [reportId, ...stakeholderList]
+            );
+            const ackCount = parseInt(String(ackCountResult.rows[0]?.count ?? 0));
+
+            console.log('[updateReportStatus] Close check:', { reportId, ackCount, totalUsers, currentStatus: status, reportCategory, relatedEntityId, stakeholderList });
+
+            // If everyone has already acknowledged, mark as closed
+            if (ackCount >= totalUsers) {
+              await query(
+                'UPDATE reports SET status = $2 WHERE report_id = $1',
+                [reportId, 'closed']
+              );
+              // Update the returned result
+              result.rows[0].status = 'closed';
+            }
+          }
         }
       } else {
         // For procedure reports or reports without category, use ecosystem counting
@@ -287,26 +328,26 @@ export async function updateReportStatus(reportId: string, status: string, resol
           ) as total
         `, [cksManager, createdById ?? '']);
         totalUsers = totalUsersResult.rows[0]?.total ?? 0;
-      }
 
-      // Count acknowledgments
-      const ackCountResult = await query<{ count: number }>(
-        'SELECT COUNT(*) as count FROM report_acknowledgments WHERE report_id = $1',
-        [reportId]
-      );
-
-      const ackCount = parseInt(String(ackCountResult.rows[0]?.count ?? 0));
-
-      console.log('[updateReportStatus] Close check:', { reportId, ackCount, totalUsers, currentStatus: status, reportCategory, relatedEntityId });
-
-      // If everyone has already acknowledged, mark as closed
-      if (totalUsers > 0 && ackCount >= totalUsers) {
-        await query(
-          'UPDATE reports SET status = $2 WHERE report_id = $1',
-          [reportId, 'closed']
+        // Count acknowledgments (ecosystem-based reports)
+        const ackCountResult = await query<{ count: number }>(
+          'SELECT COUNT(*) as count FROM report_acknowledgments WHERE report_id = $1',
+          [reportId]
         );
-        // Update the returned result
-        result.rows[0].status = 'closed';
+
+        const ackCount = parseInt(String(ackCountResult.rows[0]?.count ?? 0));
+
+        console.log('[updateReportStatus] Close check:', { reportId, ackCount, totalUsers, currentStatus: status, reportCategory, relatedEntityId });
+
+        // If everyone has already acknowledged, mark as closed
+        if (totalUsers > 0 && ackCount >= totalUsers) {
+          await query(
+            'UPDATE reports SET status = $2 WHERE report_id = $1',
+            [reportId, 'closed']
+          );
+          // Update the returned result
+          result.rows[0].status = 'closed';
+        }
       }
     }
   }
@@ -364,6 +405,7 @@ export async function acknowledgeReport(reportId: string, acknowledgedById: stri
     // For order/service reports, count stakeholders based on the order participants, not ecosystem
     if (reportCategory && relatedEntityId && ['order', 'service'].includes(reportCategory)) {
       // Get order details to find all stakeholders
+      // For service reports, also get the service's managed_by to determine if warehouse should be included
       const orderQuery = reportCategory === 'order'
         ? 'SELECT customer_id, contractor_id, crew_id, assigned_warehouse, manager_id FROM orders WHERE UPPER(order_id) = UPPER($1)'
         : 'SELECT customer_id, contractor_id, crew_id, assigned_warehouse, manager_id FROM orders WHERE UPPER(transformed_id) = UPPER($1)';
@@ -375,6 +417,16 @@ export async function acknowledgeReport(reportId: string, acknowledgedById: stri
         assigned_warehouse: string | null;
         manager_id: string | null;
       }>(orderQuery, [relatedEntityId]);
+
+      // For service reports, check if the service is warehouse-managed
+      let serviceManagedBy: string | null = null;
+      if (reportCategory === 'service') {
+        const serviceResult = await query<{ managed_by: string | null }>(
+          'SELECT managed_by FROM services WHERE UPPER(service_id) = UPPER($1)',
+          [relatedEntityId]
+        );
+        serviceManagedBy = serviceResult.rows[0]?.managed_by ?? null;
+      }
 
       if (orderResult.rows[0]) {
         const order = orderResult.rows[0];
@@ -400,13 +452,44 @@ export async function acknowledgeReport(reportId: string, acknowledgedById: stri
           stakeholders.add(order.crew_id.toUpperCase());
         }
 
-        // Add warehouse
+        // Add warehouse for:
+        // 1. Order reports (always)
+        // 2. Service reports that are warehouse-managed
         if (order.assigned_warehouse && order.assigned_warehouse.toUpperCase() !== (createdById ?? '').toUpperCase()) {
-          stakeholders.add(order.assigned_warehouse.toUpperCase());
+          const svcManaged = (serviceManagedBy ?? '').toString();
+          const svcIsWarehouse = svcManaged.toLowerCase() === 'warehouse' || svcManaged.toUpperCase().startsWith('WHS-');
+          if (reportCategory === 'order' || (reportCategory === 'service' && svcIsWarehouse)) {
+            stakeholders.add(order.assigned_warehouse.toUpperCase());
+          }
         }
 
         totalUsers = stakeholders.size;
-        console.log('[acknowledgeReport] Order stakeholders:', { reportId, relatedEntityId, stakeholders: Array.from(stakeholders), totalUsers });
+        console.log('[acknowledgeReport] Order stakeholders:', { reportId, relatedEntityId, reportCategory, stakeholders: Array.from(stakeholders), totalUsers });
+
+        // Count acknowledgments ONLY from stakeholders (not all acks)
+        if (stakeholders.size > 0) {
+          const stakeholderList = Array.from(stakeholders);
+          const placeholders = stakeholderList.map((_, i) => `$${i + 2}`).join(',');
+          const ackCountResult = await query<{ count: number }>(
+            `SELECT COUNT(*) as count FROM report_acknowledgments
+             WHERE report_id = $1 AND UPPER(acknowledged_by_id) IN (${placeholders})`,
+            [reportId, ...stakeholderList]
+          );
+          const ackCount = parseInt(String(ackCountResult.rows[0]?.count ?? 0));
+
+          console.log('[acknowledgeReport] Close check:', { reportId, ackCount, totalUsers, status, reportCategory, relatedEntityId, stakeholderList });
+
+          // Only mark as closed if BOTH conditions are met:
+          // 1. All stakeholders have acknowledged
+          // 2. Report status is 'resolved' (manager/warehouse has resolved it)
+          if (ackCount >= totalUsers && status === 'resolved') {
+            await query(
+              'UPDATE reports SET status = $2 WHERE report_id = $1',
+              [reportId, 'closed']
+            );
+          }
+        }
+        return result.rows[0] ?? null;
       }
     } else {
       // For procedure reports or reports without category, use ecosystem counting
@@ -422,7 +505,7 @@ export async function acknowledgeReport(reportId: string, acknowledgedById: stri
       totalUsers = totalUsersResult.rows[0]?.total ?? 0;
     }
 
-    // Count acknowledgments for this report
+    // Count acknowledgments for this report (ecosystem-based reports)
     const ackCountResult = await query<{ count: number }>(
       'SELECT COUNT(*) as count FROM report_acknowledgments WHERE report_id = $1',
       [reportId]

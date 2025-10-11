@@ -169,16 +169,39 @@ export async function reportsRoutes(fastify: FastifyInstance) {
     }
 
     // Check category-based resolution permissions (defense-in-depth)
-    const reportCheck = await query('SELECT report_category FROM reports WHERE report_id = $1', [params.data.id]);
-    const reportCategory = reportCheck.rows[0]?.report_category;
+    const reportCheck = await query('SELECT report_category, related_entity_id FROM reports WHERE report_id = $1', [params.data.id]);
+    const reportCategory = reportCheck.rows[0]?.report_category as string | null;
+    const relatedEntityId = reportCheck.rows[0]?.related_entity_id as string | null;
 
-    if (reportCategory === 'order' && account.role !== 'warehouse') {
-      reply.code(403).send({ error: 'Only warehouse can resolve order reports' });
-      return;
-    }
-    if ((reportCategory === 'service' || reportCategory === 'procedure') && account.role !== 'manager') {
-      reply.code(403).send({ error: 'Only manager can resolve service/procedure reports' });
-      return;
+    if (reportCategory === 'order') {
+      if (account.role.toLowerCase() !== 'warehouse') {
+        reply.code(403).send({ error: 'Only warehouse can resolve order reports' });
+        return;
+      }
+    } else if (reportCategory === 'service') {
+      // Determine if the service is warehouse-managed by checking services.managed_by
+      let managedBy: string | null = null;
+      if (relatedEntityId) {
+        const svc = await query<{ managed_by: string | null }>('SELECT managed_by FROM services WHERE UPPER(service_id) = UPPER($1)', [relatedEntityId]);
+        managedBy = svc.rows[0]?.managed_by ?? null;
+      }
+      const isWarehouseManaged = !!managedBy && (managedBy.toLowerCase() === 'warehouse' || managedBy.toUpperCase().startsWith('WHS-'));
+      if (isWarehouseManaged) {
+        if (account.role.toLowerCase() !== 'warehouse') {
+          reply.code(403).send({ error: 'Only warehouse can resolve warehouse-managed service reports' });
+          return;
+        }
+      } else {
+        if (account.role.toLowerCase() !== 'manager') {
+          reply.code(403).send({ error: 'Only manager can resolve manager-managed service reports' });
+          return;
+        }
+      }
+    } else if (reportCategory === 'procedure') {
+      if (account.role.toLowerCase() !== 'manager') {
+        reply.code(403).send({ error: 'Only manager can resolve procedure reports' });
+        return;
+      }
     }
 
     const bodySchema = z.object({

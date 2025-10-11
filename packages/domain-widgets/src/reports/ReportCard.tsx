@@ -74,6 +74,8 @@ export interface ReportFeedback {
   // New rating/priority
   priority?: 'LOW' | 'MEDIUM' | 'HIGH' | null;
   rating?: number | null;
+  // Service managed_by (from services table join)
+  serviceManagedBy?: string | null;
 }
 
 interface ReportCardProps {
@@ -116,6 +118,12 @@ const ReportCard: React.FC<ReportCardProps> = ({
   const colors = getColors();
   const hasAcknowledged = report.acknowledgments.some(ack => ack.userId === currentUser);
 
+  const isWarehouseManaged = (managed?: string | null): boolean => {
+    if (!managed) return false;
+    const val = managed.toString();
+    return val.toLowerCase() === 'warehouse' || val.toUpperCase().startsWith('WHS-');
+  };
+
   // Determine who can resolve based on report category
   const canResolve = (() => {
     if (report.status !== 'open' || report.type !== 'report' || !hasAcknowledged) {
@@ -127,8 +135,15 @@ const ReportCard: React.FC<ReportCardProps> = ({
       if (report.reportCategory === 'order') {
         return userRole === 'warehouse'; // Only warehouse resolves order reports
       }
-      if (report.reportCategory === 'service' || report.reportCategory === 'procedure') {
-        return userRole === 'manager'; // Only manager resolves service/procedure reports
+      if (report.reportCategory === 'service') {
+        // Service reports: check who manages the service
+        if (isWarehouseManaged(report.serviceManagedBy)) {
+          return userRole === 'warehouse'; // Warehouse resolves warehouse-managed services
+        }
+        return userRole === 'manager'; // Manager resolves manager-managed services
+      }
+      if (report.reportCategory === 'procedure') {
+        return userRole === 'manager'; // Only manager resolves procedure reports
       }
     }
 
