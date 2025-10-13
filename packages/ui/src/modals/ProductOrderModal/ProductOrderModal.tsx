@@ -185,9 +185,7 @@ const ProductOrderModal: React.FC<ProductOrderModalProps> = ({
                 <div className={styles.field}>
                   <label className={styles.label}>Name</label>
                   <p className={styles.value}>
-                    {order.requestedBy && requestorInfo?.name
-                      ? `${order.requestedBy} - ${requestorInfo.name}`
-                      : order.requestedBy || requestorInfo?.name || '—'}
+                    {order.requestedBy || requestorInfo?.name || '—'}
                   </p>
                 </div>
                 <div className={styles.field}>
@@ -214,9 +212,7 @@ const ProductOrderModal: React.FC<ProductOrderModalProps> = ({
                 <div className={styles.field}>
                   <label className={styles.label}>Destination</label>
                   <p className={styles.value}>
-                    {order.destination && destinationInfo?.name
-                      ? `${order.destination} - ${destinationInfo.name}`
-                      : order.destination || destinationInfo?.name || '—'}
+                    {order.destination || destinationInfo?.name || '—'}
                   </p>
                 </div>
                 <div className={styles.field}>

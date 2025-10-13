@@ -12,7 +12,7 @@
 -----------------------------------------------*/
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
   EcosystemTree,
@@ -168,7 +168,24 @@ function buildActivities(serviceOrders: HubOrderItem[], productOrders: HubOrderI
 
 export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState(initialTab);
+  const location = useLocation();
+
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Parse URL params for tab navigation and order highlighting
+  const urlTab = searchParams.get('tab');
+  const urlSubTab = searchParams.get('subTab');
+  const urlHighlightOrder = searchParams.get('highlightOrder');
+
+  // Map URL subTab to OrdersSection tab format
+  const mapSubTabToOrderTab = (subTab: string | null): string | undefined => {
+    if (!subTab) return undefined;
+    if (subTab === 'service-orders') return 'service';
+    if (subTab === 'product-orders') return 'product';
+    return undefined;
+  };
+
+  const [activeTab, setActiveTab] = useState(urlTab || initialTab);
   const [servicesTab, setServicesTab] = useState<'active' | 'history'>('active');
   const [servicesSearchQuery, setServicesSearchQuery] = useState('');
   const [selectedOrderForDetails, setSelectedOrderForDetails] = useState<HubOrderItem | null>(null);
@@ -180,6 +197,53 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
   const { setHubLoading } = useHubLoading();
   const { mutate } = useSWRConfig();
 
+  // Clean up URL params after highlight completes
+  const handleHighlightComplete = useCallback(() => {
+    const newParams = new URLSearchParams(searchParams);
+    newParams.delete('highlightOrder');
+    setSearchParams(newParams, { replace: true });
+  }, [searchParams, setSearchParams]);
+
+  // Handle when order is ready to highlight (turn off loader)
+  const handleHighlightReady = useCallback(() => {
+    setHubLoading(false);
+  }, [setHubLoading]);
+
+  // Fallback timeout: notify if order not found yet (do not stop loader)
+  useEffect(() => {
+    if (urlHighlightOrder) {
+      const fallbackTimer = setTimeout(() => {
+        toast.error('Still preparing your order… it will appear shortly.');
+      }, 5000);
+      return () => clearTimeout(fallbackTimer);
+    }
+  }, [urlHighlightOrder]);
+
+  // Upsert preloaded order into orders cache for immediacy
+  useEffect(() => {
+    const preloaded: any = (location.state as any)?.preloadedOrder;
+    if (preloaded && normalizedCode) {
+      mutate(`/hub/orders/${normalizedCode}`, (prev: any) => {
+        if (!prev) return prev;
+        const o = preloaded;
+        const orders = [o, ...(prev.orders || []).filter((x: any) => (x.orderId || x.id) !== o.orderId)];
+        const serviceOrders = o.orderType === 'service'
+          ? [o, ...(prev.serviceOrders || []).filter((x: any) => (x.orderId || x.id) !== o.orderId)]
+          : (prev.serviceOrders || []);
+        const productOrders = o.orderType === 'product'
+          ? [o, ...(prev.productOrders || []).filter((x: any) => (x.orderId || x.id) !== o.orderId)]
+          : (prev.productOrders || []);
+        return { ...prev, orders, serviceOrders, productOrders };
+      }, false);
+    }
+  }, [location.state, normalizedCode, mutate]);
+
+  // Revalidate orders when highlighting to fetch fresh data including new order
+  useEffect(() => {
+    if (urlHighlightOrder && normalizedCode) {
+      mutate(`/hub/orders/${normalizedCode}`);
+    }
+  }, [urlHighlightOrder, normalizedCode, mutate]);
 
   // Fetch fresh service details when modal is opened
   useEffect(() => {
@@ -222,14 +286,14 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
     data: scopeData,
   } = useHubRoleScope(normalizedCode);
 
-  // Signal when critical data is loaded
+  // Signal when critical data is loaded (but only if not highlighting an order)
   useEffect(() => {
     const hasCriticalData = !!profile && !!dashboard;
-    if (hasCriticalData) {
-      console.log('[CenterHub] Critical data loaded, signaling ready');
+    if (hasCriticalData && !urlHighlightOrder) {
+      console.log('[CenterHub] Critical data loaded, signaling ready (no highlight)');
       setHubLoading(false);
     }
-  }, [profile, dashboard, setHubLoading]);
+  }, [profile, dashboard, urlHighlightOrder, setHubLoading]);
 
   useEffect(() => {
     const style = document.createElement('style');
@@ -259,23 +323,63 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
     if (!orders?.serviceOrders) {
       return [];
     }
-    return orders.serviceOrders.map((order) => ({
+    let mapped = orders.serviceOrders.map((order) => ({
       ...order,
       title: order.title ?? order.serviceId ?? order.orderId,
       status: normalizeOrderStatus(order.viewerStatus ?? order.status),
     }));
-  }, [orders]);
+
+    // Force-include highlighted order if it's a service order and not already in the list
+    if (urlHighlightOrder) {
+      const hasHighlight = mapped.some((o) => (o.orderId || o.id) === urlHighlightOrder);
+      if (!hasHighlight) {
+        const highlightOrder = orders.serviceOrders.find(
+          (o) => (o.orderId || o.id) === urlHighlightOrder
+        );
+        if (highlightOrder) {
+          const mappedHighlight = {
+            ...highlightOrder,
+            title: highlightOrder.title ?? highlightOrder.serviceId ?? highlightOrder.orderId,
+            status: normalizeOrderStatus(highlightOrder.viewerStatus ?? highlightOrder.status),
+          };
+          mapped = [mappedHighlight, ...mapped];
+        }
+      }
+    }
+
+    return mapped;
+  }, [orders, urlHighlightOrder]);
 
   const productOrders = useMemo<HubOrderItem[]>(() => {
     if (!orders?.productOrders) {
       return [];
     }
-    return orders.productOrders.map((order) => ({
+    let mapped = orders.productOrders.map((order) => ({
       ...order,
       title: order.title ?? order.orderId,
       status: normalizeOrderStatus(order.viewerStatus ?? order.status),
     }));
-  }, [orders]);
+
+    // Force-include highlighted order if it's a product order and not already in the list
+    if (urlHighlightOrder) {
+      const hasHighlight = mapped.some((o) => (o.orderId || o.id) === urlHighlightOrder);
+      if (!hasHighlight) {
+        const highlightOrder = orders.productOrders.find(
+          (o) => (o.orderId || o.id) === urlHighlightOrder
+        );
+        if (highlightOrder) {
+          const mappedHighlight = {
+            ...highlightOrder,
+            title: highlightOrder.title ?? highlightOrder.orderId,
+            status: normalizeOrderStatus(highlightOrder.viewerStatus ?? highlightOrder.status),
+          };
+          mapped = [mappedHighlight, ...mapped];
+        }
+      }
+    }
+
+    return mapped;
+  }, [orders, urlHighlightOrder]);
 
   const activities = useMemo(() => buildActivities(serviceOrders, productOrders), [serviceOrders, productOrders]);
 
@@ -667,13 +771,16 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
                   applyHubOrderAction(orderId, payload)
                     .then(() => {
                       console.log('[center] action applied', { orderId, action: act });
-                      mutate(`/hub/orders/${normalizedCode}`);
                     })
                     .catch((err) => console.error('[center] failed to apply action', err));
                 }}
                 showServiceOrders={true}
                 showProductOrders={true}
                 primaryColor="#f97316"
+                initialOrderTab={mapSubTabToOrderTab(urlSubTab)}
+                highlightOrderId={urlHighlightOrder || undefined}
+                onHighlightReady={handleHighlightReady}
+                onHighlightComplete={handleHighlightComplete}
               />
             </PageWrapper>
           ) : activeTab === 'reports' ? (

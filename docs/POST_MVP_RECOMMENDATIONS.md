@@ -1542,3 +1542,220 @@ Key learnings:
 - Modal audit/standardization: 1 week
 - Component creation (StatusBadge, DateDisplay, etc.): 1 week
 - Polish and testing: 1 week
+
+## 26. Order Highlight Animation (Modular Implementation)
+
+### Background
+During MVP development, we attempted to implement a highlight animation for newly created orders that would visually draw attention when users are redirected from catalog to hub after order submission. The feature was removed after spending significant time due to complexity and performance concerns with the non-modular approach.
+
+### Current State
+- Order creation redirects to hub with orders tab open
+- New order appears at top of list via optimistic cache update
+- No visual indicator to highlight the newly created order
+- User experience is functional but could be improved
+
+### Why It Was Removed
+- Initial implementation added business logic to 6 separate hub files (violated modular architecture)
+- Complex URL parameter management across multiple components
+- Performance issues from duplicated code and multiple rerenders
+- Difficult to maintain and debug across different hubs
+
+### Proposed Modular Implementation
+
+#### Key Principle
+**All highlight animation logic should live in the OrdersSection component, not in individual hub files.**
+
+#### Implementation Strategy
+
+**Phase 1: Component-Level State Management**
+- Add `highlightOrderId` state to OrdersSection component
+- Read from location.state in OrdersSection (not in hubs)
+- Automatically clear highlight after animation completes (3-5 seconds)
+
+```typescript
+// packages/domain-widgets/src/OrdersSection/OrdersSection.tsx
+const OrdersSection = ({ serviceOrders, productOrders, ... }) => {
+  const location = useLocation();
+  const [highlightOrderId, setHighlightOrderId] = useState<string | null>(null);
+
+  // Read highlight request from navigation state
+  useEffect(() => {
+    const newOrderId = (location.state as any)?.highlightOrderId;
+    if (newOrderId) {
+      setHighlightOrderId(newOrderId);
+      // Clear after animation completes
+      setTimeout(() => setHighlightOrderId(null), 5000);
+    }
+  }, [location.state]);
+
+  // Pass highlightOrderId to OrderCard components
+  return (
+    <div>
+      {orders.map(order => (
+        <OrderCard
+          key={order.orderId}
+          order={order}
+          isHighlighted={order.orderId === highlightOrderId}
+        />
+      ))}
+    </div>
+  );
+};
+```
+
+**Phase 2: OrderCard Animation**
+- Add CSS animation to OrderCard component when `isHighlighted` prop is true
+- Smooth pulse/glow effect that catches user's eye
+- Non-intrusive, professional animation (subtle blue pulse)
+- Automatically fades out
+
+```css
+/* OrderCard.module.css */
+@keyframes highlightPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
+    background-color: inherit;
+  }
+  50% {
+    box-shadow: 0 0 20px 4px rgba(59, 130, 246, 0.4);
+    background-color: rgba(59, 130, 246, 0.05);
+  }
+}
+
+.orderCard--highlighted {
+  animation: highlightPulse 2s ease-in-out 2;
+  scroll-margin-top: 80px; /* Account for fixed header */
+}
+```
+
+**Phase 3: Catalog Integration**
+- Update catalog order creation to pass `highlightOrderId` in location.state
+- Works automatically across all hubs (no hub-specific code needed)
+
+```typescript
+// apps/frontend/src/pages/CKSCatalog.tsx
+navigate('/hub', {
+  state: {
+    openTab: 'orders',
+    highlightOrderId: newOrder.orderId
+  }
+});
+```
+
+**Phase 4: Auto-Scroll Enhancement**
+- Scroll highlighted order into view after tab opens
+- Smooth scroll behavior
+- Respect user's scroll position if they navigate away
+
+```typescript
+// In OrdersSection useEffect
+useEffect(() => {
+  if (highlightOrderId) {
+    const element = document.getElementById(`order-${highlightOrderId}`);
+    if (element) {
+      element.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center'
+      });
+    }
+  }
+}, [highlightOrderId]);
+```
+
+### Benefits of Modular Approach
+
+**Performance:**
+- Logic in single component (OrdersSection) = single source of truth
+- No duplicated code across 6 hubs
+- No unnecessary rerenders in hub components
+
+**Maintainability:**
+- Changes only need to be made in OrdersSection component
+- Easy to test in isolation
+- Clear separation of concerns
+
+**Scalability:**
+- Works automatically when adding new hubs
+- No hub-specific code to maintain
+- Easy to extend (e.g., highlight on filters, highlight on updates)
+
+**User Experience:**
+- Smooth, professional animation
+- Doesn't interfere with navigation
+- Automatically cleans up after itself
+
+### Testing Checklist
+
+- [ ] Animation triggers when navigating from catalog with new order
+- [ ] Animation works across all 6 hub types (crew, center, customer, contractor, manager, warehouse)
+- [ ] Highlighted order scrolls into view smoothly
+- [ ] Animation clears after timeout
+- [ ] No animation when navigating to hub normally (without highlight state)
+- [ ] Performance: no stuttering or lag during animation
+- [ ] Works with both service and product orders
+- [ ] Works when orders tab is default vs. switching from another tab
+
+### Edge Cases to Consider
+
+1. **Order not found**: What if highlighted order ID doesn't exist in the list?
+   - Solution: Silently ignore, no animation
+
+2. **Multiple rapid navigations**: User creates order, goes back, creates another
+   - Solution: Latest highlightOrderId overwrites previous
+
+3. **Tab switching during animation**: User switches away from orders tab during animation
+   - Solution: Animation state persists if user returns to orders tab
+
+4. **Slow data loading**: Order list loads after navigation
+   - Solution: Wait for orders to load, then trigger animation
+
+### Why This Belongs Post-MVP
+
+**Reasons to defer:**
+- Core functionality (order creation + redirect) works without it
+- Spent 24 hours on non-modular version with poor results
+- Need to focus on testing all other critical user flows first
+- Animation is a UX enhancement, not a blocker
+
+**Reasons it will work post-MVP:**
+- Modular architecture now proven and working well
+- Component-based approach reduces implementation time significantly
+- Learnings from catalog → hub redirect optimization directly applicable
+- Can implement in 1-2 days (vs. 24 hours of struggle with non-modular approach)
+
+### Implementation Timeline
+
+**When to implement:**
+- After all critical MVP user flows are tested and stable
+- After any other UX polish items are complete
+- When there's dedicated time for non-critical enhancements
+
+**Estimated effort:**
+- Phase 1 (Component state): 2-3 hours
+- Phase 2 (Animation CSS): 2-3 hours
+- Phase 3 (Catalog integration): 1 hour
+- Phase 4 (Auto-scroll): 1-2 hours
+- Testing across all hubs: 3-4 hours
+- **Total: 1-2 days**
+
+### Success Criteria
+
+**Functional:**
+- ✅ Highlight animation displays on new order
+- ✅ Works across all 6 hub types
+- ✅ Automatically clears after timeout
+- ✅ No performance degradation
+
+**Technical:**
+- ✅ All logic in OrdersSection component (zero hub file changes)
+- ✅ No duplicated code
+- ✅ Passes all existing tests + new animation tests
+
+**User Experience:**
+- ✅ User immediately sees their new order
+- ✅ Animation is subtle and professional (not distracting)
+- ✅ Feels polished and intentional
+
+**Priority:** Low (Post-MVP Month 2-3, after critical flows are stable)
+
+**Effort:** 1-2 days

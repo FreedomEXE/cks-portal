@@ -3,7 +3,7 @@
 -----------------------------------------------*/
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useAuth } from '@cks/auth';
 import { EcosystemTree } from '@cks/domain-widgets';
@@ -437,7 +437,21 @@ function formatReportsTo(value: string | null | undefined): string | null {
 export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps) {
   const navigate = useNavigate();
 
-  const [activeTab, setActiveTab] = useState(initialTab);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Parse URL params for tab navigation and new order highlighting
+  const urlTab = searchParams.get('tab');
+  const urlSubTab = searchParams.get('subTab');
+
+  // Map URL subTab to OrdersSection tab format
+  const mapSubTabToOrderTab = (subTab: string | null): string | undefined => {
+    if (!subTab) return undefined;
+    if (subTab === 'service-orders') return 'service';
+    if (subTab === 'product-orders') return 'product';
+    return undefined;
+  };
+
+  const [activeTab, setActiveTab] = useState(urlTab || initialTab);
   const [servicesTab, setServicesTab] = useState<'my' | 'active' | 'history'>('my');
   const [servicesSearchQuery, setServicesSearchQuery] = useState('');
   const [activityFeed, setActivityFeed] = useState<Activity[]>([]);
@@ -705,7 +719,7 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
             try {
               const { applyServiceAction } = await import('../shared/api/hub');
               await applyServiceAction(rawServiceId, 'start');
-              mutate(`/hub/orders/${managerCode}`, undefined, { revalidate: true });
+              mutate(`/hub/orders/${managerCode}`);
               setToast('Service started');
               setTimeout(() => setToast(null), 1800);
             } catch (err) {
@@ -718,7 +732,7 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
             try {
               const { applyServiceAction } = await import('../shared/api/hub');
               await applyServiceAction(rawServiceId, 'complete');
-              mutate(`/hub/orders/${managerCode}`, undefined, { revalidate: true });
+              mutate(`/hub/orders/${managerCode}`);
               setToast('Service completed');
               setTimeout(() => setToast(null), 1800);
             } catch (err) {
@@ -731,7 +745,7 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
             try {
               const { applyServiceAction } = await import('../shared/api/hub');
               await applyServiceAction(rawServiceId, 'verify');
-              mutate(`/hub/orders/${managerCode}`, undefined, { revalidate: true });
+              mutate(`/hub/orders/${managerCode}`);
             } catch (err) {
               console.error('[manager] failed to verify service', err);
               alert(err instanceof Error ? err.message : 'Failed to verify service');
@@ -973,7 +987,7 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
       };
       try {
         await applyHubOrderAction(orderId, payload);
-        mutate(`/hub/orders/${managerCode}`, undefined, { revalidate: true });
+        mutate(`/hub/orders/${managerCode}`);
         console.log('[manager] order cancelled', { orderId });
       } catch (error) {
         console.error('[manager] failed to cancel order', error);
@@ -990,13 +1004,13 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
       if (nextRole && nextRole !== 'manager') {
         setNotice(`This order is now pending ${nextRole}. Refreshing...`);
         setTimeout(() => setNotice(null), 2000);
-        mutate(`/hub/orders/${managerCode}`, undefined, { revalidate: true });
+        mutate(`/hub/orders/${managerCode}`);
         return;
       }
       try {
         const payload: OrderActionRequest = { action: 'accept' };
         await applyHubOrderAction(orderId, payload);
-        setNotice('Success'); setTimeout(() => setNotice(null), 1200); mutate(`/hub/orders/${managerCode}`, undefined, { revalidate: true });
+        setNotice('Success'); setTimeout(() => setNotice(null), 1200); mutate(`/hub/orders/${managerCode}`);
         console.log('[manager] accepted order', { orderId });
       } catch (err) {
         console.error('[manager] failed to accept order', err);
@@ -1018,11 +1032,11 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
         if (nextRole && nextRole !== 'manager') {
           setNotice(`This order is now pending ${nextRole}. Refreshing...`);
           setTimeout(() => setNotice(null), 2000);
-          mutate(`/hub/orders/${managerCode}`, undefined, { revalidate: true });
+          mutate(`/hub/orders/${managerCode}`);
           return;
         }
         await applyHubOrderAction(orderId, payload);
-        setNotice('Success'); setTimeout(() => setNotice(null), 1200); mutate(`/hub/orders/${managerCode}`, undefined, { revalidate: true });
+        setNotice('Success'); setTimeout(() => setNotice(null), 1200); mutate(`/hub/orders/${managerCode}`);
         console.log('[manager] rejected order', { orderId });
       } catch (err) {
         console.error('[manager] failed to reject order', err);
@@ -1042,7 +1056,7 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
       await applyHubOrderAction(orderId, payload);
 
       // Refresh the orders list
-      mutate(`/hub/orders/${managerCode}`, undefined, { revalidate: true });
+      mutate(`/hub/orders/${managerCode}`);
 
       console.log('[manager] order action applied', { orderId, action });
     } catch (error) {
@@ -1215,6 +1229,7 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
                 showServiceOrders
                 showProductOrders
                 primaryColor={MANAGER_PRIMARY_COLOR}
+                initialOrderTab={mapSubTabToOrderTab(urlSubTab)}
               />
             </PageWrapper>
           ) : activeTab === 'procedures' ? (
@@ -1539,7 +1554,7 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ crewCodes }),
             });
-            mutate(`/hub/orders/${managerCode}`, undefined, { revalidate: true });
+            mutate(`/hub/orders/${managerCode}`);
           } catch (err) {
             console.error('[manager] failed to send crew request', err);
             alert('Failed to send crew requests. Please try again.');
@@ -1557,7 +1572,7 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
             });
             setShowServiceDetails(false);
             setServiceDetails(null);
-            mutate(`/hub/orders/${managerCode}`, undefined, { revalidate: true });
+            mutate(`/hub/orders/${managerCode}`);
           } catch (err) {
             console.error('[manager] failed to update service', err);
           }
@@ -1567,7 +1582,7 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
             if (!serviceDetails?.serviceId) return;
             const { applyServiceAction } = await import('../shared/api/hub');
             await applyServiceAction(serviceDetails.serviceId, 'start');
-            mutate(`/hub/orders/${managerCode}`, undefined, { revalidate: true });
+            mutate(`/hub/orders/${managerCode}`);
             setToast('Service started');
             setTimeout(() => setToast(null), 1800);
           } catch (err) {
@@ -1580,7 +1595,7 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
             if (!serviceDetails?.serviceId) return;
             const { applyServiceAction } = await import('../shared/api/hub');
             await applyServiceAction(serviceDetails.serviceId, 'complete');
-            mutate(`/hub/orders/${managerCode}`, undefined, { revalidate: true });
+            mutate(`/hub/orders/${managerCode}`);
             setToast('Service completed');
             setTimeout(() => setToast(null), 1800);
           } catch (err) {
@@ -1595,7 +1610,7 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
             if (!reason) return;
             const { applyServiceAction } = await import('../shared/api/hub');
             await applyServiceAction(serviceDetails.serviceId, 'cancel');
-            mutate(`/hub/orders/${managerCode}`, undefined, { revalidate: true });
+            mutate(`/hub/orders/${managerCode}`);
           } catch (err) {
             console.error('[manager] failed to cancel service', err);
             alert(err instanceof Error ? err.message : 'Failed to cancel service');

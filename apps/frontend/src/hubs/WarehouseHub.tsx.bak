@@ -12,7 +12,7 @@
 -----------------------------------------------*/
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useHubLoading } from '../contexts/HubLoadingContext';
 import {
@@ -172,9 +172,25 @@ function buildActivities(serviceOrders: HubOrderItem[], productOrders: HubOrderI
 
 export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubProps) {
   const navigate = useNavigate();
+  const location = useLocation();
   const { mutate } = useSWRConfig();
 
-  const [activeTab, setActiveTab] = useState(initialTab);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Parse URL params for tab navigation and order highlighting
+  const urlTab = searchParams.get('tab');
+  const urlSubTab = searchParams.get('subTab');
+  const urlHighlightOrder = searchParams.get('highlightOrder');
+
+  // Map URL subTab to OrdersSection tab format
+  const mapSubTabToOrderTab = (subTab: string | null): string | undefined => {
+    if (!subTab) return undefined;
+    if (subTab === 'service-orders') return 'service';
+    if (subTab === 'product-orders') return 'product';
+    return undefined;
+  };
+
+  const [activeTab, setActiveTab] = useState(urlTab || initialTab);
   const [servicesTab, setServicesTab] = useState<'my' | 'active' | 'history'>('active');
   const [servicesSearchQuery, setServicesSearchQuery] = useState('');
   const [deliveriesTab, setDeliveriesTab] = useState<'pending' | 'completed'>('pending');
@@ -190,8 +206,54 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
   const { setHubLoading } = useHubLoading();
 
+  // Clean up URL params after highlight completes
+  const handleHighlightComplete = useCallback(() => {
+    const newParams = new URLSearchParams(searchParams);
+    newParams.delete('highlightOrder');
+    setSearchParams(newParams, { replace: true });
+  }, [searchParams, setSearchParams]);
 
+  // Handle when order is ready to highlight (turn off loader)
+  const handleHighlightReady = useCallback(() => {
+    setHubLoading(false);
+  }, [setHubLoading]);
 
+  // Fallback timeout: notify if order not found yet (do not stop loader)
+  useEffect(() => {
+    if (urlHighlightOrder) {
+      const fallbackTimer = setTimeout(() => {
+        toast.error('Still preparing your order… it will appear shortly.');
+      }, 5000);
+
+      return () => clearTimeout(fallbackTimer);
+    }
+  }, [urlHighlightOrder]);
+
+  // Upsert preloaded order into orders cache
+  useEffect(() => {
+    const preloaded: any = (location.state as any)?.preloadedOrder;
+    if (preloaded && normalizedCode) {
+      mutate(`/hub/orders/${normalizedCode}`, (prev: any) => {
+        if (!prev) return prev;
+        const o = preloaded;
+        const orders = [o, ...(prev.orders || []).filter((x: any) => (x.orderId || x.id) !== o.orderId)];
+        const serviceOrders = o.orderType === 'service'
+          ? [o, ...(prev.serviceOrders || []).filter((x: any) => (x.orderId || x.id) !== o.orderId)]
+          : (prev.serviceOrders || []);
+        const productOrders = o.orderType === 'product'
+          ? [o, ...(prev.productOrders || []).filter((x: any) => (x.orderId || x.id) !== o.orderId)]
+          : (prev.productOrders || []);
+        return { ...prev, orders, serviceOrders, productOrders };
+      }, false);
+    }
+  }, [location.state, normalizedCode, mutate]);
+
+  // Revalidate orders when highlighting to fetch fresh data including new order
+  useEffect(() => {
+    if (urlHighlightOrder && normalizedCode) {
+      mutate(`/hub/orders/${normalizedCode}`);
+    }
+  }, [urlHighlightOrder, normalizedCode, mutate]);
 
   const {
     data: profile,
@@ -220,11 +282,11 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
   useEffect(() => {
     const hasCriticalData = !!profile && !!dashboard;
 
-    if (hasCriticalData) {
+    if (hasCriticalData && !urlHighlightOrder) {
       console.log('[WarehouseHub] Critical data loaded, signaling hub is ready (no highlight)');
       setHubLoading(false);
     }
-  }, [profile, dashboard, setHubLoading]);
+  }, [profile, dashboard, urlHighlightOrder, setHubLoading]);
 
   useEffect(() => {
     const style = document.createElement('style');
@@ -254,27 +316,67 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
     if (!orders?.serviceOrders) {
       return [];
     }
-    return orders.serviceOrders.map((order) => ({
+    let mapped = orders.serviceOrders.map((order) => ({
       ...order,
       title: order.title ?? order.serviceId ?? order.orderId,
       status: normalizeOrderStatus(order.viewerStatus ?? order.status),
     }));
-  }, [orders]);
+
+    // Force-include highlighted order if it's a service order and not already in the list
+    if (urlHighlightOrder) {
+      const hasHighlight = mapped.some((o) => (o.orderId || o.id) === urlHighlightOrder);
+      if (!hasHighlight) {
+        const highlightOrder = orders.serviceOrders.find(
+          (o) => (o.orderId || o.id) === urlHighlightOrder
+        );
+        if (highlightOrder) {
+          const mappedHighlight = {
+            ...highlightOrder,
+            title: highlightOrder.title ?? highlightOrder.serviceId ?? highlightOrder.orderId,
+            status: normalizeOrderStatus(highlightOrder.viewerStatus ?? highlightOrder.status),
+          };
+          mapped = [mappedHighlight, ...mapped];
+        }
+      }
+    }
+
+    return mapped;
+  }, [orders, urlHighlightOrder]);
 
   const productOrders = useMemo<HubOrderItem[]>(() => {
     if (!orders?.productOrders) {
       return [];
     }
-    const mapped = orders.productOrders.map((order) => ({
+    let mapped = orders.productOrders.map((order) => ({
       ...order,
       title: order.title ?? order.orderId,
       // Keep both: canonical status for deliveries filtering, viewer status for Orders section display
       canonicalStatus: order.status,
       status: normalizeOrderStatus(order.viewerStatus ?? order.status),
     }));
+
+    // Force-include highlighted order if it's a product order and not already in the list
+    if (urlHighlightOrder) {
+      const hasHighlight = mapped.some((o) => (o.orderId || o.id) === urlHighlightOrder);
+      if (!hasHighlight) {
+        const highlightOrder = orders.productOrders.find(
+          (o) => (o.orderId || o.id) === urlHighlightOrder
+        );
+        if (highlightOrder) {
+          const mappedHighlight = {
+            ...highlightOrder,
+            title: highlightOrder.title ?? highlightOrder.orderId,
+            canonicalStatus: highlightOrder.status,
+            status: normalizeOrderStatus(highlightOrder.viewerStatus ?? highlightOrder.status),
+          };
+          mapped = [mappedHighlight, ...mapped];
+        }
+      }
+    }
+
     console.log('[WAREHOUSE] Product orders after mapping:', mapped);
     return mapped;
-  }, [orders]);
+  }, [orders, urlHighlightOrder]);
 
   const activities = useMemo(() => buildActivities(serviceOrders, productOrders), [serviceOrders, productOrders]);
 
@@ -1190,6 +1292,10 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
                 showServiceOrders={true}
                 showProductOrders={true}
                 primaryColor="#8b5cf6"
+                initialOrderTab={mapSubTabToOrderTab(urlSubTab)}
+                highlightOrderId={urlHighlightOrder || undefined}
+                onHighlightReady={handleHighlightReady}
+                onHighlightComplete={handleHighlightComplete}
               />
             </PageWrapper>
           ) : activeTab === 'reports' ? (

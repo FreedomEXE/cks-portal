@@ -14,8 +14,8 @@ type LoadingContextValue = {
 const LoadingContext = createContext<LoadingContextValue | null>(null);
 
 // UI timing to keep UX smooth
-const SHOW_DELAY_MS = 300; // avoid flicker but feel responsive
-const MIN_VISIBLE_MS = 300; // keep visible briefly once shown
+const SHOW_DELAY_MS = 100; // avoid flicker but feel responsive
+const MIN_VISIBLE_MS = 400; // keep visible briefly once shown (ensure seamless UX)
 
 export function LoadingProvider({ children }: { children: React.ReactNode }) {
   const [count, setCount] = useState(() => LoadingService.getCounts().blocking);

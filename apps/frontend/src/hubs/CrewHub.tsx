@@ -11,8 +11,9 @@
   Manifested by Freedom_EXE
 -----------------------------------------------*/
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import {
   EcosystemTree,
   MemosPreview,
@@ -181,6 +182,8 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
   const { mutate } = useSWRConfig();
   const { setHubLoading } = useHubLoading();
 
+
+
   // Fetch fresh service details when modal is opened
   useEffect(() => {
     if (!selectedServiceId) {
@@ -259,7 +262,7 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
     if (!orders?.serviceOrders) {
       return [];
     }
-    return orders.serviceOrders.map((order) => {
+    let mapped = orders.serviceOrders.map((order) => {
       // Check if this service has a pending crew request for this crew member
       const meta: any = (order as any).metadata || {};
       const crewReqs: any[] = Array.isArray(meta.crewRequests) ? meta.crewRequests : [];
@@ -291,6 +294,8 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
         availableActions,
       };
     });
+
+    return mapped;
   }, [orders, normalizedCode]);
 
   const productOrders = useMemo<HubOrderItem[]>(() => {
@@ -555,15 +560,6 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
                 }
                 searchPlaceholder="Search services"
                 onSearch={setServicesSearchQuery}
-                actionButton={
-                  <Button
-                    variant="primary"
-                    roleColor="#000000"
-                    onClick={() => navigate('/catalog')}
-                  >
-                    Browse CKS Catalog
-                  </Button>
-                }
                 primaryColor="#ef4444"
               >
                 {servicesTab === 'my' && (

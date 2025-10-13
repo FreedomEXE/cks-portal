@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { Button, OrderCard, TabSection } from '@cks/ui';
 import styles from './OrdersSection.module.css';
 
@@ -39,6 +39,10 @@ interface OrdersSectionProps {
   showProductOrders?: boolean;
   readOnlyProduct?: boolean;
   primaryColor?: string;
+  initialOrderTab?: 'all' | 'service' | 'product' | 'archive';  // Initial tab to show (from URL params)
+  newOrderId?: string;  // Newly created order ID to highlight (from URL params)
+  onHighlightReady?: () => void;  // Callback when order is found and ready
+  onHighlightComplete?: () => void;  // Callback to clean up URL param
 }
 
 const OrdersSection: React.FC<OrdersSectionProps> = ({
@@ -53,9 +57,17 @@ const OrdersSection: React.FC<OrdersSectionProps> = ({
   showProductOrders = true,
   readOnlyProduct = false,
   primaryColor = '#3b82f6',
+  initialOrderTab,
+  newOrderId,
+  onHighlightReady,
+  onHighlightComplete,
 }) => {
+
   // Determine initial tab based on what's available
   const getInitialTab = () => {
+    // Use initialOrderTab if provided (from URL params)
+    if (initialOrderTab) return initialOrderTab;
+
     // Warehouse doesn't have "All Orders", so default to service/product
     if (userRole === 'warehouse') {
       if (showServiceOrders) return 'service';
@@ -66,11 +78,32 @@ const OrdersSection: React.FC<OrdersSectionProps> = ({
     return 'all';
   };
 
-  const [activeOrderTab, setActiveOrderTab] = useState(getInitialTab());
+  const [activeOrderTab, setActiveOrderTab] = useState<string>(getInitialTab());
   const [searchQuery, setSearchQuery] = useState('');
 
   // Combine all orders for counting
   const allOrders = [...serviceOrders, ...productOrders];
+
+  // Simple highlight logic: when newOrderId exists and order is present, signal ready
+  const highlightRef = useRef<HTMLDivElement>(null);
+  const readyCalledRef = useRef(false);
+
+  useEffect(() => {
+    if (!newOrderId || readyCalledRef.current) return;
+
+    const orderExists = allOrders.some((o) => o.orderId === newOrderId);
+    if (orderExists) {
+      readyCalledRef.current = true;
+      onHighlightReady?.();  // Signal hub to turn off loader
+
+      // Scroll to highlighted order
+      requestAnimationFrame(() => {
+        if (highlightRef.current) {
+          highlightRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      });
+    }
+  }, [newOrderId, allOrders, onHighlightReady]);
 
   // Helper to check if user is directly involved in an order
   const isDirectlyInvolved = useCallback((order: Order): boolean => {
@@ -160,41 +193,59 @@ const OrdersSection: React.FC<OrdersSectionProps> = ({
   const filterOrders = (orders: Order[], tabType: string) => {
     let filtered = orders;
 
-    // Filter by search query
-    if (searchQuery) {
-      filtered = filtered.filter((order) =>
-        order.orderId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        order.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        order.requestedBy.toLowerCase().includes(searchQuery.toLowerCase())
-      );
+    // Filter by search query (null-safe)
+    const q = (searchQuery || '').toLowerCase().trim();
+    if (q) {
+      filtered = filtered.filter((order) => {
+        const id = (order.orderId || '').toLowerCase();
+        const title = (order.title || '').toLowerCase();
+        const requester = (order.requestedBy || '').toLowerCase();
+        return id.includes(q) || title.includes(q) || requester.includes(q);
+      });
     }
 
-    // Filter by tab status
+    // Filter by tab status (null-safe)
     if (tabType === 'archive') {
-      return filtered.filter(o => ['cancelled', 'rejected', 'delivered', 'completed', 'archived', 'service-created'].includes(o.status));  // Only truly completed
+      const doneStatuses = new Set(['cancelled', 'rejected', 'delivered', 'completed', 'archived', 'service-created']);
+      return filtered.filter((o) => doneStatuses.has((o.status || '').toLowerCase()));
     } else {
-      // Non-archive tabs show active orders
-      return filtered.filter(o => ['pending', 'in-progress', 'approved', 'crew-requested', 'crew-assigned', 'manager-accepted'].includes(o.status));
+      const activeStatuses = new Set(['pending', 'in-progress', 'approved', 'crew-requested', 'crew-assigned', 'manager-accepted']);
+      return filtered.filter((o) => activeStatuses.has((o.status || '').toLowerCase()));
     }
   };
 
   const getDisplayOrders = useMemo(() => {
+    let filtered: Order[] = [];
+
     if (activeOrderTab === 'all') {
       // All Orders tab shows both product and service orders from entire ecosystem
-      return filterOrders(allOrders, activeOrderTab);
+      filtered = filterOrders(allOrders, activeOrderTab);
     } else if (activeOrderTab === 'service') {
       // Service Orders tab shows only orders where user is directly involved
       const involved = serviceOrders.filter(isDirectlyInvolved);
-      return filterOrders(involved, activeOrderTab);
+      filtered = filterOrders(involved, activeOrderTab);
     } else if (activeOrderTab === 'product') {
       // Product Orders tab shows only orders where user is directly involved
       const involved = productOrders.filter(isDirectlyInvolved);
-      return filterOrders(involved, activeOrderTab);
+      filtered = filterOrders(involved, activeOrderTab);
     } else {
       // Archive tab shows all completed/cancelled orders
-      return filterOrders(allOrders, 'archive');
+      filtered = filterOrders(allOrders, 'archive');
     }
-  }, [activeOrderTab, serviceOrders, productOrders, allOrders, searchQuery, userCode]);
+
+    // Ensure highlighted order is always included (bypass filters temporarily)
+    if (newOrderId) {
+      const hasHighlight = filtered.some((o) => o.orderId === newOrderId);
+      if (!hasHighlight) {
+        const highlightOrder = allOrders.find((o) => o.orderId === newOrderId);
+        if (highlightOrder) {
+          filtered = [highlightOrder, ...filtered];
+        }
+      }
+    }
+
+    return filtered;
+  }, [activeOrderTab, serviceOrders, productOrders, allOrders, searchQuery, userCode, isDirectlyInvolved, newOrderId]);
 
   const getOrderActions = (order: Order): string[] => {
     // Use actions from backend policy if available
@@ -349,26 +400,36 @@ const OrdersSection: React.FC<OrdersSectionProps> = ({
               statusText = 'waiting';
             }
           }
+
+          // Simple highlight check
+          const isHighlighted = newOrderId && order.orderId === newOrderId;
+
           return (
-          <OrderCard
-            key={order.orderId}
-            orderId={order.orderId}
-            orderType={order.orderType}
-            title={order.title}
-            requestedBy={order.requestedBy}
-            destination={order.destination}
-            requestedDate={order.requestedDate}
-            expectedDate={order.expectedDate}
-            status={order.status}
-            statusText={statusText}
-            approvalStages={order.approvalStages}
-            actions={getOrderActions(order)}
-            onAction={(action) => onOrderAction?.(order.orderId, action)}
-            showWorkflow={userRole === 'manager' || (order.approvalStages?.length ?? 0) > 0}
-            collapsible={true}
-            defaultExpanded={false}
-            transformedId={activeOrderTab === 'archive' ? order.transformedId : undefined}
-          />
+            <div
+              key={order.orderId}
+              ref={isHighlighted ? highlightRef : null}
+              onAnimationEnd={isHighlighted ? () => onHighlightComplete?.() : undefined}
+              className={isHighlighted ? styles.newOrder : ''}
+            >
+              <OrderCard
+                orderId={order.orderId}
+                orderType={order.orderType}
+                title={order.title}
+                requestedBy={order.requestedBy}
+                destination={order.destination}
+                requestedDate={order.requestedDate}
+                expectedDate={order.expectedDate}
+                status={order.status}
+                statusText={statusText}
+                approvalStages={order.approvalStages}
+                actions={getOrderActions(order)}
+                onAction={(action) => onOrderAction?.(order.orderId, action)}
+                showWorkflow={userRole === 'manager' || (order.approvalStages?.length ?? 0) > 0}
+                collapsible={true}
+                defaultExpanded={false}
+                transformedId={activeOrderTab === 'archive' ? order.transformedId : undefined}
+              />
+            </div>
           );
         })}
       </div>

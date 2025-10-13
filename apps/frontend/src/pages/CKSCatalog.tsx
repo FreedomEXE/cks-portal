@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
+import { useSWRConfig } from 'swr';
 import { useCatalogItems, type CatalogItem } from "../shared/api/catalog";
 import { useCart } from "../contexts/CartContext";
 import { createHubOrder } from "../shared/api/hub";
@@ -7,6 +9,7 @@ import { useAuth as useClerkAuth, useUser } from "@clerk/clerk-react";
 import { useAuth as useCksAuth } from "@cks/auth";
 import { useHubRoleScope } from "../shared/api/hub";
 import { useLoading } from "../contexts/LoadingContext";
+import { useHubLoading } from "../contexts/HubLoadingContext";
 
 type CatalogKind = "products" | "services";
 
@@ -684,25 +687,49 @@ function CartPanel({
             <span className="font-semibold">Total Items:</span>
             <span className="font-semibold">{totalItems}</span>
           </div>
-          <button
-            onClick={() => {
-              const availability = { tz: browserTz, days, window: { start, end } };
-              let destination: { code: string; role: 'center' } | undefined = undefined;
-              const r = (role || '').trim().toLowerCase();
-              if (r && r !== 'center') {
-                const chosen = selectedCenter || defaultDestination || null;
-                if (!chosen) {
-                  alert('Please select a destination center.');
-                  return;
-                }
-                destination = { code: chosen, role: 'center' };
-              }
-              onCheckout(availability, notes, destination, selectedService);
-            }}
-            className="w-full bg-black text-white py-2 rounded-md hover:bg-neutral-800"
-          >
-            Request Products
-          </button>
+          {(() => {
+            const r = (role || '').trim().toLowerCase();
+            const needsDestination = r && r !== 'center';
+            const hasDestination = !!(selectedCenter || defaultDestination);
+            const isDisabled = needsDestination && !hasDestination;
+
+            return (
+              <>
+                {isDisabled && centers.length === 0 && (
+                  <div className="mb-3 p-2 bg-yellow-50 border border-yellow-200 rounded text-sm text-yellow-800">
+                    Your account isn't linked to a center. Please contact your admin.
+                  </div>
+                )}
+                <button
+                  onClick={() => {
+                    if (isDisabled) {
+                      toast.error('Your account isn\'t linked to a center. Please contact your admin.');
+                      return;
+                    }
+                    const availability = { tz: browserTz, days, window: { start, end } };
+                    let destination: { code: string; role: 'center' } | undefined = undefined;
+                    if (needsDestination) {
+                      const chosen = selectedCenter || defaultDestination || null;
+                      if (!chosen) {
+                        toast.error('Please select a destination center before submitting.');
+                        return;
+                      }
+                      destination = { code: chosen, role: 'center' };
+                    }
+                    onCheckout(availability, notes, destination, selectedService);
+                  }}
+                  disabled={isDisabled}
+                  className={`w-full py-2 rounded-md ${
+                    isDisabled
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      : 'bg-black text-white hover:bg-neutral-800'
+                  }`}
+                >
+                  Request Products
+                </button>
+              </>
+            );
+          })()}
         </div>
       )}
     </div>
@@ -719,7 +746,9 @@ export default function CKSCatalog() {
   const { role: authRole, code: authCode} = useCksAuth();
   const normalizedCode = useMemo(() => (authCode ? authCode.trim().toUpperCase() : null), [authCode]);
   const { data: scope } = useHubRoleScope(normalizedCode || undefined);
+  const { mutate } = useSWRConfig();
   const { start } = useLoading();
+  const { setHubLoading } = useHubLoading();
 
   // Read mode from URL params: ?mode=products or ?mode=services
   const [searchParams] = useState(() => new URLSearchParams(window.location.search));
@@ -829,9 +858,18 @@ export default function CKSCatalog() {
   ) => {
     if (!selectedService || isSubmitting) return;
 
+    // Guard: destination required for non-center roles
+    const r = (authRole || '').toLowerCase();
+    const needsDestination = r && r !== 'center';
+    if (needsDestination && !destination?.code) {
+      toast.error('Please select a destination center before submitting.');
+      return;
+    }
+
     setIsSubmitting(true);
+    setHubLoading(true); // Start loading immediately
     try {
-      await createHubOrder({
+      const result = await createHubOrder({
         orderType: "service",
         title: selectedService.name,
         notes: notes || undefined,
@@ -843,8 +881,29 @@ export default function CKSCatalog() {
         }],
       });
 
-      alert("Service order created successfully!");
+      const newOrder = result as any;
+      const orderId = newOrder?.orderId || 'Unknown';
+      toast.success(`Service order ${orderId} created successfully!`);
       setSelectedService(null);
+
+      // Optimistically update cache with new order
+      if (normalizedCode) {
+        mutate(
+          `/hub/orders/${normalizedCode}`,
+          (current: any) => {
+            if (!current) return current;
+            return {
+              ...current,
+              orders: [newOrder, ...(current.orders || [])],
+              serviceOrders: [newOrder, ...(current.serviceOrders || [])],
+            };
+          },
+          { revalidate: false }
+        );
+      }
+
+      // Redirect to hub with orders tab open
+      navigate('/hub', { state: { openTab: 'orders' } });
     } catch (error) {
       console.error("Failed to create service order:", error);
       let message = "Failed to create service order. Please try again.";
@@ -858,7 +917,8 @@ export default function CKSCatalog() {
           message = error.message;
         }
       }
-      alert(message);
+      toast.error(message);
+      setHubLoading(false); // Turn off loading on error
     } finally {
       setIsSubmitting(false);
     }
@@ -872,9 +932,18 @@ export default function CKSCatalog() {
   ) => {
     if (cart.items.length === 0 || isSubmitting) return;
 
+    // Guard: destination required for non-center roles
+    const r = (authRole || '').toLowerCase();
+    const needsDestination = r && r !== 'center';
+    if (needsDestination && !destination?.code) {
+      toast.error('Please select a destination center before submitting.');
+      return;
+    }
+
     setIsSubmitting(true);
+    setHubLoading(true); // Start loading immediately
     try {
-      await createHubOrder({
+      const result = await createHubOrder({
         orderType: "product",
         title: `Product Order - ${cart.items.length} items`,
         notes: (notesInput && notesInput.trim().length > 0) ? notesInput.trim() : undefined,
@@ -886,9 +955,30 @@ export default function CKSCatalog() {
         })),
       });
 
-      alert("Product order created successfully!");
+      const newOrder = result as any;
+      const orderId = newOrder?.orderId || 'Unknown';
+      toast.success(`Product order ${orderId} created successfully!`);
       cart.clearCart();
       setShowCart(false);
+
+      // Optimistically update cache with new order
+      if (normalizedCode) {
+        mutate(
+          `/hub/orders/${normalizedCode}`,
+          (current: any) => {
+            if (!current) return current;
+            return {
+              ...current,
+              orders: [newOrder, ...(current.orders || [])],
+              productOrders: [newOrder, ...(current.productOrders || [])],
+            };
+          },
+          { revalidate: false }
+        );
+      }
+
+      // Redirect to hub with orders tab open
+      navigate('/hub', { state: { openTab: 'orders' } });
     } catch (error) {
       console.error("Failed to create product order:", error);
       let message = "Failed to create product order. Please try again.";
@@ -903,7 +993,8 @@ export default function CKSCatalog() {
           message = error.message;
         }
       }
-      alert(message);
+      toast.error(message);
+      setHubLoading(false); // Turn off loading on error
     } finally {
       setIsSubmitting(false);
     }
@@ -1011,8 +1102,11 @@ export default function CKSCatalog() {
             const r = (authRole || '').toLowerCase();
             // Crew: single center (if provided via scope)
             if (r === 'crew') {
-              const center = (scope as any)?.relationships?.center;
-              return center?.id || null;
+              const rel = (scope as any)?.relationships || {};
+              const center = rel.center || null;
+              if (center?.id) return center.id;
+              if (Array.isArray(rel.centers) && rel.centers.length > 0) return rel.centers[0].id;
+              return null;
             }
             // Customer: if exactly one center, default
             if (r === 'customer') {
@@ -1061,9 +1155,14 @@ export default function CKSCatalog() {
               return list.map((x: any) => ({ id: x.id, name: x.name || x.id }));
             }
             if (r === 'crew') {
-              const center = (scope as any)?.relationships?.center;
-              return center ? [{ id: center.id, name: center.name || center.id }] : [];
+              const rel = (scope as any)?.relationships || {};
+              const list = Array.isArray(rel.centers) && rel.centers.length > 0 ? rel.centers : (rel.center ? [rel.center] : []);
+              return list.map((x: any) => ({ id: x.id, name: x.name || x.id }));
             }
+            // Fallbacks when role not resolved or no centers found
+            const rel = (scope as any)?.relationships;
+            if (rel?.center?.id) return [{ id: rel.center.id, name: rel.center.name || rel.center.id }];
+            if (Array.isArray(rel?.centers) && rel.centers.length > 0) return rel.centers.map((x: any) => ({ id: x.id, name: x.name || x.id, customerId: x.customerId || null }));
             return [];
           })()}
           services={(() => {

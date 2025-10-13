@@ -418,7 +418,9 @@ async function listWarehouses(limit = DEFAULT_LIMIT): Promise<WarehouseDirectory
 }
 
 async function listServices(limit = DEFAULT_LIMIT): Promise<ServiceDirectoryEntry[]> {
-  // Primary: catalog services (admin manages the catalog)
+  const allServices: ServiceDirectoryEntry[] = [];
+
+  // Query catalog services (SRV-001, SRV-002, etc.)
   try {
     const catalog = await query<{
       service_id: string;
@@ -438,7 +440,7 @@ async function listServices(limit = DEFAULT_LIMIT): Promise<ServiceDirectoryEntr
        LIMIT $1`,
       [limit]
     );
-    return catalog.rows.map((row) => ({
+    const catalogServices = catalog.rows.map((row) => ({
       id: formatPrefixedId(row.service_id, 'SRV'),
       name: toNullableString(row.name),
       category: toNullableString(row.category),
@@ -451,26 +453,34 @@ async function listServices(limit = DEFAULT_LIMIT): Promise<ServiceDirectoryEntr
       // extra for admin UI
       metadata: row.metadata ?? null,
     }));
+    allServices.push(...catalogServices);
   } catch (err) {
-    // Fallback to legacy services table if catalog not available
-    console.error('[directory] Failed to query catalog_services, falling back to legacy services table:', err);
+    console.error('[directory] Failed to query catalog_services:', err);
   }
 
-  const result = await query<ServiceRow>(
-    'SELECT service_id, service_name, category, description, pricing_model, requirements, status, created_at, updated_at FROM services WHERE archived_at IS NULL ORDER BY service_id LIMIT $1',
-    [limit],
-  );
-  return result.rows.map((row) => ({
-    id: formatPrefixedId(row.service_id, 'SRV'),
-    name: toNullableString(row.service_name),
-    category: toNullableString(row.category),
-    description: toNullableString(row.description),
-    pricingModel: toNullableString(row.pricing_model),
-    managedBy: null, // Legacy services don't have managedBy
-    status: toNullableString(row.status),
-    createdAt: toIso(row.created_at),
-    updatedAt: toIso(row.updated_at),
-  }));
+  // Query active service instances (CEN-010-SRV-003, etc.)
+  try {
+    const result = await query<ServiceRow>(
+      'SELECT service_id, service_name, category, description, pricing_model, requirements, status, created_at, updated_at FROM services WHERE archived_at IS NULL ORDER BY service_id LIMIT $1',
+      [limit],
+    );
+    const activeServices = result.rows.map((row) => ({
+      id: formatPrefixedId(row.service_id, 'SRV'),
+      name: toNullableString(row.service_name),
+      category: toNullableString(row.category),
+      description: toNullableString(row.description),
+      pricingModel: toNullableString(row.pricing_model),
+      managedBy: null,
+      status: toNullableString(row.status),
+      createdAt: toIso(row.created_at),
+      updatedAt: toIso(row.updated_at),
+    }));
+    allServices.push(...activeServices);
+  } catch (err) {
+    console.error('[directory] Failed to query services table:', err);
+  }
+
+  return allServices;
 }
 
 async function listOrders(limit = DEFAULT_LIMIT): Promise<OrderDirectoryEntry[]> {

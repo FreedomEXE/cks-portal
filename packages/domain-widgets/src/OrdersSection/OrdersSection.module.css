@@ -67,6 +67,29 @@
   margin-left: 4px;
 }
 
+@keyframes gentleHighlight {
+  0%, 100% {
+    background-color: transparent;
+  }
+  50% {
+    background-color: rgba(59, 130, 246, 0.15);
+  }
+}
+
+.newOrder {
+  animation: gentleHighlight 1.5s ease-in-out 2;
+  border-radius: 8px;
+}
+
+/* Respect user's motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .newOrder {
+    animation: none;
+    background-color: rgba(59, 130, 246, 0.1);
+    /* Static subtle highlight instead of animation */
+  }
+}
+
 @media (max-width: 768px) {
   .searchInput {
     width: 100%;

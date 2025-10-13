@@ -420,6 +420,23 @@ Use this section to mark completed tests:
 - [ ] Test start/complete service buttons across all roles
 - [ ] Add toast notifications for service actions
 
+### Post-Order UX Flow Testing (Session 2025-10-12)
+- [ ] Test complete post-order redirect flow for all roles
+- [ ] Test loader overlay appears after order creation
+- [ ] Test loader remains visible until order is fully rendered
+- [ ] Test highlight animation appears after loader stops
+- [ ] Test highlight is visible (blue pulsing border, 2 pulses)
+- [ ] Test auto-scroll to highlighted order
+- [ ] Test click-to-dismiss highlight functionality
+- [ ] Test URL parameter cleanup after highlight ready
+- [ ] Test sessionStorage acknowledgment (no re-highlight on back/forward)
+- [ ] Test with slow network conditions (loader timing)
+- [ ] Test with missing destination center (validation guards)
+- [ ] Test destination validation for crew users
+- [ ] Test destination validation for other roles (customer, contractor, center)
+- [ ] Test warning banner for users without linked center
+- [ ] Test button disable when destination unavailable
+
 ### Warehouse Services (Next Session)
 - [ ] Wire warehouse-specific services end-to-end
 - [ ] Update catalog to include warehouse services
@@ -433,6 +450,6 @@ Use this section to mark completed tests:
 
 ---
 
-**Last Updated**: 2025-10-06
-**Version**: 1.2
-**Status**: Product orders 100%, service orders 98% (start/complete working, verify optional)
+**Last Updated**: 2025-10-12
+**Version**: 1.3
+**Status**: Product orders 100%, service orders 98%, post-order UX flow implemented (pending testing)

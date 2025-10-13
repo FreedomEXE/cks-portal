@@ -47,14 +47,10 @@ function HubLoader({ initialTab }: { initialTab?: string }): JSX.Element | null 
       loaderEndRef.current = start();
       console.log('[HubLoader] Started loader - hub is loading');
     } else if (!isHubLoading && loaderEndRef.current) {
-      // Delay hiding the loader slightly to ensure hub is rendered
-      setTimeout(() => {
-        if (loaderEndRef.current) {
-          loaderEndRef.current();
-          loaderEndRef.current = null;
-          console.log('[HubLoader] Stopped loader - hub is ready');
-        }
-      }, 100);
+      // Hide loader immediately when hub is ready
+      loaderEndRef.current();
+      loaderEndRef.current = null;
+      console.log('[HubLoader] Stopped loader - hub is ready');
     }
 
     return () => {
@@ -83,16 +79,9 @@ function HubLoader({ initialTab }: { initialTab?: string }): JSX.Element | null 
     return <Navigate to="/login" replace />;
   }
 
-  // Always render hub, but keep it hidden while loading
-  // This ensures seamless transition from loader to hub
-  return (
-    <div style={{
-      visibility: isHubLoading ? 'hidden' : 'visible',
-      position: isHubLoading ? 'absolute' : 'relative'
-    }}>
-      <Hub initialTab={initialTab} />
-    </div>
-  );
+  // Always render hub - keep it laid out (not hidden) so OrdersSection
+  // can scroll and measure correctly under the global loader overlay
+  return <Hub initialTab={initialTab} />;
 }
 
 function RoleHubRoute(): JSX.Element {
@@ -101,22 +90,22 @@ function RoleHubRoute(): JSX.Element {
 
   return (
     <RoleGuard initialTab={initialTab}>
-      <HubLoadingProvider>
-        <HubLoader initialTab={initialTab} />
-      </HubLoadingProvider>
+      <HubLoader initialTab={initialTab} />
     </RoleGuard>
   );
 }
 
 export function AuthenticatedApp(): JSX.Element {
   return (
-    <Routes>
-      <Route path="/" element={<Navigate to="/hub" replace />} />
-      <Route path="/hub" element={<RoleHubRoute />} />
-      <Route path="/catalog" element={<CKSCatalog />} />
-      <Route path="/hub/*" element={<Navigate to="/hub" replace />} />
-      <Route path="*" element={<Navigate to="/hub" replace />} />
-    </Routes>
+    <HubLoadingProvider>
+      <Routes>
+        <Route path="/" element={<Navigate to="/hub" replace />} />
+        <Route path="/hub" element={<RoleHubRoute />} />
+        <Route path="/catalog" element={<CKSCatalog />} />
+        <Route path="/hub/*" element={<Navigate to="/hub" replace />} />
+        <Route path="*" element={<Navigate to="/hub" replace />} />
+      </Routes>
+    </HubLoadingProvider>
   );
 }
 

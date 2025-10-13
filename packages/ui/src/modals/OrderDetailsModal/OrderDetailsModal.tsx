@@ -205,7 +205,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
               <div className={styles.grid}>
                 <div className={styles.field}>
                   <label className={styles.label}>Name</label>
-                  <p className={styles.value}>{order.requestedBy && requestorInfo?.name ? (order.requestedBy + ' - ' + requestorInfo.name) : (order.requestedBy || requestorInfo?.name || '�')}</p>
+                  <p className={styles.value}>{order.requestedBy || requestorInfo?.name || '—'}</p>
                 </div>
                 <div className={styles.field}>
                   <label className={styles.label}>Address</label>
@@ -230,7 +230,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
               <div className={styles.grid}>
                 <div className={styles.field}>
                   <label className={styles.label}>Destination</label>
-                  <p className={styles.value}>{order.destination && destinationInfo?.name ? (order.destination + ' - ' + destinationInfo.name) : (order.destination || destinationInfo?.name || '�')}</p>
+                  <p className={styles.value}>{order.destination || destinationInfo?.name || '—'}</p>
                 </div>
                 <div className={styles.field}>
                   <label className={styles.label}>Address</label>

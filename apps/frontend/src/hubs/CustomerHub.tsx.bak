@@ -1,18 +1,18 @@
 /*-----------------------------------------------
-  Property of CKS  © 2025
+  Property of CKS  Ac 2025
 -----------------------------------------------*/
 /**
- * File: CenterHub.tsx
+ * File: CustomerHub.tsx
  *
  * Description:
- * Center Hub orchestrator component wired to real backend data.
+ * Customer Hub orchestrator component wired to real backend data.
  */
 /*-----------------------------------------------
   Manifested by Freedom_EXE
 -----------------------------------------------*/
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
   EcosystemTree,
@@ -30,6 +30,7 @@ import {
 import { Button, DataTable, OrderDetailsModal, ProductOrderModal, ServiceOrderModal, ServiceViewModal, PageHeader, PageWrapper, Scrollbar, TabSection } from '@cks/ui';
 import { useAuth } from '@cks/auth';
 import { useSWRConfig } from 'swr';
+import { createReport as apiCreateReport, createFeedback as apiCreateFeedback, acknowledgeItem as apiAcknowledgeItem, resolveReport as apiResolveReport, fetchServicesForReports, fetchProceduresForReports, fetchOrdersForReports } from '../shared/api/hub';
 
 import MyHubSection from '../components/MyHubSection';
 import {
@@ -42,16 +43,15 @@ import {
   type HubOrderItem,
   type OrderActionRequest,
 } from '../shared/api/hub';
-import { createReport as apiCreateReport, createFeedback as apiCreateFeedback, acknowledgeItem as apiAcknowledgeItem, resolveReport as apiResolveReport, fetchServicesForReports, fetchProceduresForReports, fetchOrdersForReports } from '../shared/api/hub';
 
 import { buildEcosystemTree, DEFAULT_ROLE_COLOR_MAP } from '../shared/utils/ecosystem';
 import { useHubLoading } from '../contexts/HubLoadingContext';
 
-interface CenterHubProps {
+interface CustomerHubProps {
   initialTab?: string;
 }
 
-const ACTIVE_STATUSES = new Set(['pending', 'in-progress', 'approved', 'submitted', 'active']);
+const ACTIVE_STATUSES = new Set(['pending', 'in-progress', 'approved', 'submitted']);
 const HISTORY_STATUSES = new Set(['delivered', 'rejected', 'cancelled', 'completed', 'service-created']);
 
 function normalizeIdentity(value?: string | null) {
@@ -90,7 +90,7 @@ function formatStatusLabel(value?: string | null) {
 
 function getStatusBadgePalette(status: string | undefined) {
   const normalized = normalizeStatusValue(status);
-  if (normalized === 'completed' || normalized === 'delivered' || normalized === 'active') {
+  if (normalized === 'completed' || normalized === 'delivered') {
     return { background: '#dcfce7', color: '#16a34a' };
   }
   if (normalized === 'cancelled' || normalized === 'rejected') {
@@ -159,17 +159,34 @@ function buildActivities(serviceOrders: HubOrderItem[], productOrders: HubOrderI
     timestamp,
     type: getStatusBadgePalette(order.status).color === '#16a34a' ? 'success' : 'info',
     metadata: {
-      role: 'center',
+      role: 'customer',
       orderType: order.orderType,
       status: order.status,
     },
   }));
 }
 
-export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) {
+export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubProps) {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState(initialTab);
-  const [servicesTab, setServicesTab] = useState<'active' | 'history'>('active');
+  const location = useLocation();
+
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Parse URL params for tab navigation and order highlighting
+  const urlTab = searchParams.get('tab');
+  const urlSubTab = searchParams.get('subTab');
+  const urlHighlightOrder = searchParams.get('highlightOrder');
+
+  // Map URL subTab to OrdersSection tab format
+  const mapSubTabToOrderTab = (subTab: string | null): string | undefined => {
+    if (!subTab) return undefined;
+    if (subTab === 'service-orders') return 'service';
+    if (subTab === 'product-orders') return 'product';
+    return undefined;
+  };
+
+  const [activeTab, setActiveTab] = useState(urlTab || initialTab);
+  const [servicesTab, setServicesTab] = useState<'my' | 'history'>('my');
   const [servicesSearchQuery, setServicesSearchQuery] = useState('');
   const [selectedOrderForDetails, setSelectedOrderForDetails] = useState<HubOrderItem | null>(null);
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
@@ -178,28 +195,55 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
   const { code: authCode } = useAuth();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
   const { setHubLoading } = useHubLoading();
-  const { mutate } = useSWRConfig();
 
+  // Clean up URL params after highlight completes
+  const handleHighlightComplete = useCallback(() => {
+    const newParams = new URLSearchParams(searchParams);
+    newParams.delete('highlightOrder');
+    setSearchParams(newParams, { replace: true });
+  }, [searchParams, setSearchParams]);
 
-  // Fetch fresh service details when modal is opened
+  // Handle when order is ready to highlight (turn off loader)
+  const handleHighlightReady = useCallback(() => {
+    setHubLoading(false);
+  }, [setHubLoading]);
+
+  // Fallback timeout: notify if order not found yet (do not stop loader)
   useEffect(() => {
-    if (!selectedServiceId) {
-      setFetchedServiceDetails(null);
-      return;
-    }
+    if (urlHighlightOrder) {
+      const fallbackTimer = setTimeout(() => {
+        toast.error('Still preparing your order… it will appear shortly.');
+      }, 5000);
 
-    (async () => {
-      try {
-        const { apiFetch } = await import('../shared/api/client');
-        const res = await apiFetch(`/services/${encodeURIComponent(selectedServiceId)}`);
-        if (res && res.data) {
-          setFetchedServiceDetails(res.data);
-        }
-      } catch (err) {
-        console.error('[center] failed to load service details', err);
-      }
-    })();
-  }, [selectedServiceId]);
+      return () => clearTimeout(fallbackTimer);
+    }
+  }, [urlHighlightOrder]);
+
+  // Upsert preloaded order into orders cache
+  useEffect(() => {
+    const preloaded: any = (location.state as any)?.preloadedOrder;
+    if (preloaded && normalizedCode) {
+      mutate(`/hub/orders/${normalizedCode}`, (prev: any) => {
+        if (!prev) return prev;
+        const o = preloaded;
+        const orders = [o, ...(prev.orders || []).filter((x: any) => (x.orderId || x.id) !== o.orderId)];
+        const serviceOrders = o.orderType === 'service'
+          ? [o, ...(prev.serviceOrders || []).filter((x: any) => (x.orderId || x.id) !== o.orderId)]
+          : (prev.serviceOrders || []);
+        const productOrders = o.orderType === 'product'
+          ? [o, ...(prev.productOrders || []).filter((x: any) => (x.orderId || x.id) !== o.orderId)]
+          : (prev.productOrders || []);
+        return { ...prev, orders, serviceOrders, productOrders };
+      }, false);
+    }
+  }, [location.state, normalizedCode, mutate]);
+
+  // Revalidate orders when highlighting to fetch fresh data including new order
+  useEffect(() => {
+    if (urlHighlightOrder && normalizedCode) {
+      mutate(`/hub/orders/${normalizedCode}`);
+    }
+  }, [urlHighlightOrder, normalizedCode, mutate]);
 
   const {
     data: profile,
@@ -216,20 +260,44 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
     isLoading: ordersLoading,
     error: ordersError,
   } = useHubOrders(normalizedCode);
-  const { data: reportsData, isLoading: reportsLoading, mutate: mutateReports } = useHubReports(normalizedCode);
-
+  const {
+    data: reportsData,
+    isLoading: reportsLoading,
+  mutate: mutateReports } = useHubReports(normalizedCode);
   const {
     data: scopeData,
   } = useHubRoleScope(normalizedCode);
+  const { mutate } = useSWRConfig();
+  const [notice, setNotice] = useState<string | null>(null);
 
-  // Signal when critical data is loaded
+  // Signal when critical data is loaded (but only if not highlighting an order)
   useEffect(() => {
     const hasCriticalData = !!profile && !!dashboard;
-    if (hasCriticalData) {
-      console.log('[CenterHub] Critical data loaded, signaling ready');
+    if (hasCriticalData && !urlHighlightOrder) {
+      console.log('[CustomerHub] Critical data loaded, signaling ready (no highlight)');
       setHubLoading(false);
     }
-  }, [profile, dashboard, setHubLoading]);
+  }, [profile, dashboard, urlHighlightOrder, setHubLoading]);
+
+  // Fetch fresh service details when modal is opened
+  useEffect(() => {
+    if (!selectedServiceId) {
+      setFetchedServiceDetails(null);
+      return;
+    }
+
+    (async () => {
+      try {
+        const { apiFetch } = await import('../shared/api/client');
+        const res = await apiFetch(`/services/${encodeURIComponent(selectedServiceId)}`);
+        if (res && res.data) {
+          setFetchedServiceDetails(res.data);
+        }
+      } catch (err) {
+        console.error('[customer] failed to load service details', err);
+      }
+    })();
+  }, [selectedServiceId]);
 
   useEffect(() => {
     const style = document.createElement('style');
@@ -259,64 +327,103 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
     if (!orders?.serviceOrders) {
       return [];
     }
-    return orders.serviceOrders.map((order) => ({
+    let mapped = orders.serviceOrders.map((order) => ({
       ...order,
       title: order.title ?? order.serviceId ?? order.orderId,
       status: normalizeOrderStatus(order.viewerStatus ?? order.status),
     }));
-  }, [orders]);
+
+    // Force-include highlighted order if it's a service order and not already in the list
+    if (urlHighlightOrder) {
+      const hasHighlight = mapped.some((o) => (o.orderId || o.id) === urlHighlightOrder);
+      if (!hasHighlight) {
+        const highlightOrder = orders.serviceOrders.find(
+          (o) => (o.orderId || o.id) === urlHighlightOrder
+        );
+        if (highlightOrder) {
+          const mappedHighlight = {
+            ...highlightOrder,
+            title: highlightOrder.title ?? highlightOrder.serviceId ?? highlightOrder.orderId,
+            status: normalizeOrderStatus(highlightOrder.viewerStatus ?? highlightOrder.status),
+          };
+          mapped = [mappedHighlight, ...mapped];
+        }
+      }
+    }
+
+    return mapped;
+  }, [orders, urlHighlightOrder]);
 
   const productOrders = useMemo<HubOrderItem[]>(() => {
     if (!orders?.productOrders) {
       return [];
     }
-    return orders.productOrders.map((order) => ({
+    let mapped = orders.productOrders.map((order) => ({
       ...order,
       title: order.title ?? order.orderId,
       status: normalizeOrderStatus(order.viewerStatus ?? order.status),
     }));
-  }, [orders]);
+
+    // Force-include highlighted order if it's a product order and not already in the list
+    if (urlHighlightOrder) {
+      const hasHighlight = mapped.some((o) => (o.orderId || o.id) === urlHighlightOrder);
+      if (!hasHighlight) {
+        const highlightOrder = orders.productOrders.find(
+          (o) => (o.orderId || o.id) === urlHighlightOrder
+        );
+        if (highlightOrder) {
+          const mappedHighlight = {
+            ...highlightOrder,
+            title: highlightOrder.title ?? highlightOrder.orderId,
+            status: normalizeOrderStatus(highlightOrder.viewerStatus ?? highlightOrder.status),
+          };
+          mapped = [mappedHighlight, ...mapped];
+        }
+      }
+    }
+
+    return mapped;
+  }, [orders, urlHighlightOrder]);
 
   const activities = useMemo(() => buildActivities(serviceOrders, productOrders), [serviceOrders, productOrders]);
 
   const overviewData = useMemo(() => ({
-    crewCount: (dashboard as any)?.crewCount ?? 0,
-    activeServices: (dashboard as any)?.activeServices ?? 0,
-    pendingRequests: (dashboard as any)?.pendingRequests ?? 0,
-    equipmentCount: (dashboard as any)?.equipmentCount ?? 0,
-    accountStatus: dashboard?.accountStatus ?? 'Unknown',
+    serviceCount: dashboard?.serviceCount ?? 0,
+    centerCount: dashboard?.centerCount ?? 0,
+    crewCount: dashboard?.crewCount ?? 0,
+    pendingRequests: dashboard?.pendingRequests ?? 0,
+    accountStatus: dashboard?.accountStatus === 'assigned' ? 'Active' : (dashboard?.accountStatus ?? 'Unknown'),
   }), [dashboard]);
 
-  const centerScope = scopeData?.role === 'center' ? scopeData : null;
+  const customerScope = scopeData?.role === 'customer' ? scopeData : null;
 
   const ecosystemTree = useMemo<TreeNode>(() => {
-    const fallbackId = normalizedCode ?? 'CENTER';
+    const fallbackId = normalizedCode ?? 'CUSTOMER';
     const fallbackName = profile?.name ?? fallbackId;
-    if (!centerScope) {
+    if (!customerScope) {
       return {
       user: {
         id: fallbackId,
-        role: 'Service Center',
+        role: 'Customer',
         name: fallbackName,
       },
-      type: 'center',
+      type: 'customer',
     };
     }
-    return buildEcosystemTree(centerScope, { rootName: fallbackName });
-  }, [centerScope, normalizedCode, profile?.name]);
+    return buildEcosystemTree(customerScope, { rootName: fallbackName });
+  }, [customerScope, normalizedCode, profile?.name]);
 
   const ecosystemRootId = ecosystemTree.user.id;
 
-  const { activeServicesData, serviceHistoryData } = useMemo(() => {
-    const active: Array<{ serviceId: string; serviceName: string; crewAssigned: string; type: string; status: string; startDate: string }>
+  const { myServicesData, serviceHistoryData } = useMemo(() => {
+    const my: Array<{ serviceId: string; serviceName: string; type: string; status: string; startDate: string }>
       = [];
-    const history: Array<{ serviceId: string; serviceName: string; type: string; status: string; startDate: string; endDate: string }>
+    const history: Array<{ serviceId: string; serviceName: string; centerId: string; type: string; status: string; startDate: string; endDate: string }>
       = [];
 
     serviceOrders.forEach((order) => {
-      // Check for service ID or transformed ID (handles both camelCase and snake_case)
-      const hasServiceId = (order as any).serviceId || (order as any).transformedId || (order as any).transformed_id;
-      if (!hasServiceId) {
+      // Only include after service is created
+      if (!(order as any).serviceId && !(order as any).transformedId) {
         return;
       }
       const normalizedStatus = normalizeStatusValue(order.status);
@@ -324,16 +431,13 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
       const svcStatus = normalizeStatusValue((metadata as any).serviceStatus);
       const serviceType = metadata.serviceType === 'recurring' ? 'Ongoing' : 'One-Time';
       const serviceStatus = svcStatus ? formatStatusLabel(svcStatus) : (normalizedStatus === 'service-created' || normalizedStatus === 'service_created' ? 'Active' : formatStatusLabel(order.status));
-      const managedBy = metadata.warehouseId
-        ? `${metadata.warehouseId}${metadata.warehouseName ? ' - ' + metadata.warehouseName : ''}`
-        : metadata.managerId
-          ? `${metadata.managerId}${metadata.managerName ? ' - ' + metadata.managerName : ''}`
-          : '—';
-      const actualStartDate = metadata.serviceActualStartTime || metadata.actualStartDate || metadata.serviceStartDate;
+      const managedBy = metadata.managerId ? `${metadata.managerId}${metadata.managerName ? ' - ' + metadata.managerName : ''}` : '—';
+      const actualStartDate = metadata.actualStartDate || metadata.serviceStartDate;
 
       const base = {
         serviceId: order.serviceId ?? order.orderId,
         serviceName: order.title ?? order.serviceId ?? order.orderId,
+        centerId: order.centerId ?? order.destination ?? '—',
         type: serviceType,
         status: serviceStatus,
         managedBy: managedBy,
@@ -341,19 +445,12 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
         endDate: formatDisplayDate(order.expectedDate),
       };
 
-      // Completed/cancelled services go to history for centers
+      // Completed/cancelled services go to history; otherwise active
       if (svcStatus === 'completed' || svcStatus === 'cancelled' || normalizedStatus === 'cancelled' || normalizedStatus === 'rejected') {
-        history.push({
-          serviceId: base.serviceId,
-          serviceName: base.serviceName,
-          type: base.type,
-          status: base.status,
-          startDate: base.startDate,
-          endDate: base.endDate,
-        });
+        history.push(base);
       } else {
         // Include active service statuses: pending approval stages, in-progress work, AND created services that are active
-        active.push({
+        my.push({
           serviceId: base.serviceId,
           serviceName: base.serviceName,
           type: base.type,
@@ -364,37 +461,37 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
       }
     });
 
-    return { activeServicesData: active, serviceHistoryData: history };
+    return { myServicesData: my, serviceHistoryData: history };
   }, [serviceOrders]);
 
   const tabs = useMemo(() => [
-    { id: 'dashboard', label: 'Dashboard', path: '/center/dashboard' },
-    { id: 'profile', label: 'My Profile', path: '/center/profile' },
-    { id: 'ecosystem', label: 'My Ecosystem', path: '/center/ecosystem' },
-    { id: 'services', label: 'Services', path: '/center/services' },
-    { id: 'orders', label: 'Orders', path: '/center/orders' },
-    { id: 'reports', label: 'Reports', path: '/center/reports' },
-    { id: 'support', label: 'Support', path: '/center/support' },
+    { id: 'dashboard', label: 'Dashboard', path: '/customer/dashboard' },
+    { id: 'profile', label: 'My Profile', path: '/customer/profile' },
+    { id: 'ecosystem', label: 'My Ecosystem', path: '/customer/ecosystem' },
+    { id: 'services', label: 'My Services', path: '/customer/services' },
+    { id: 'orders', label: 'Orders', path: '/customer/orders' },
+    { id: 'reports', label: 'Reports', path: '/customer/reports' },
+    { id: 'support', label: 'Support', path: '/customer/support' },
   ], []);
 
   const overviewCards = useMemo(() => [
+    { id: 'services', title: 'Active Services', dataKey: 'serviceCount', color: 'teal' },
+    { id: 'centers', title: 'Active Centers', dataKey: 'centerCount', color: 'orange' },
     { id: 'crew', title: 'Active Crew', dataKey: 'crewCount', color: 'red' },
-    { id: 'services', title: 'Active Services', dataKey: 'activeServices', color: 'teal' },
-    { id: 'requests', title: 'Pending Requests', dataKey: 'pendingRequests', color: 'orange' },
-    { id: 'equipment', title: 'Equipment', dataKey: 'equipmentCount', color: 'purple' },
-    { id: 'status', title: 'Center Status', dataKey: 'accountStatus', color: 'orange' },
+    { id: 'requests', title: 'Pending Requests', dataKey: 'pendingRequests', color: 'yellow' },
+    { id: 'status', title: 'Account Status', dataKey: 'accountStatus', color: 'yellow' },
   ], []);
 
   const profileCardData = useMemo(() => ({
     name: profile?.name ?? '—',
-    centerId: normalizedCode ?? '—',
+    customerId: normalizedCode ?? '—',
     address: profile?.address ?? '—',
     phone: profile?.phone ?? '—',
     email: profile?.email ?? '—',
-    customerId: (dashboard as any)?.customerId ?? '—',
-    mainContact: profile?.mainContact ?? '—',
+    website: getMetadataString(profile?.metadata ?? null, 'website') ?? '—',
+    mainContact: profile?.mainContact ?? profile?.manager?.name ?? '—',
     startDate: formatDisplayDate(profile?.createdAt ?? null),
-  }), [profile, normalizedCode, dashboard]);
+  }), [profile, normalizedCode]);
 
   const accountManagerCard = useMemo(() => {
     if (!profile?.manager) {
@@ -419,19 +516,19 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
 
   // Don't render anything until we have critical data
   if (!profile || !dashboard) {
-    console.log('[CenterHub] Waiting for critical data...');
+    console.log('[CustomerHub] Waiting for critical data...');
     return null;
   }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#f8fafc' }}>
       <MyHubSection
-        hubName="Center Hub"
+        hubName="Customer Hub"
         tabs={tabs}
         activeTab={activeTab}
         onTabClick={setActiveTab}
-        userId={normalizedCode ?? 'CENTER'}
-        role="center"
+        userId={normalizedCode ?? 'CUSTOMER'}
+        role="customer"
       />
 
       <Scrollbar className="hub-content-scroll" style={{ flex: 1, padding: '0 24px' }}>
@@ -452,12 +549,12 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
               <RecentActivity
                 activities={activities}
                 onClear={() => undefined}
-                emptyMessage="No recent center activity"
+                emptyMessage="No recent customer activity"
               />
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 24 }}>
-                <NewsPreview color="#f97316" onViewAll={() => navigate('/news')} />
-                <MemosPreview color="#f97316" onViewAll={() => navigate('/memos')} />
+                <NewsPreview color="#eab308" onViewAll={() => navigate('/news')} />
+                <MemosPreview color="#eab308" onViewAll={() => navigate('/memos')} />
               </div>
             </PageWrapper>
           ) : activeTab === 'profile' ? (
@@ -469,10 +566,10 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
                 <div style={{ marginBottom: 12, color: '#dc2626' }}>{profileErrorMessage}</div>
               )}
               <ProfileInfoCard
-                role="center"
+                role="customer"
                 profileData={profileCardData}
                 accountManager={accountManagerCard}
-                primaryColor="#f97316"
+                primaryColor="#eab308"
                 onUpdatePhoto={() => undefined}
                 onContactManager={() => undefined}
                 onScheduleMeeting={() => undefined}
@@ -487,8 +584,8 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
                 expandedNodes={ecosystemRootId ? [ecosystemRootId] : []}
                 currentUserId={ecosystemRootId}
                 title="Ecosystem"
-                subtitle="Your center network overview"
-                description="Click any row with an arrow to expand and explore your center ecosystem."
+                subtitle="Your business network overview"
+                description="Click any row with an arrow to expand and explore your ecosystem connections."
                 roleColorMap={DEFAULT_ROLE_COLOR_MAP}
               />
             </PageWrapper>
@@ -503,25 +600,25 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
               )}
               <TabSection
                 tabs={[
-                  { id: 'active', label: 'Active Services', count: activeServicesData.length },
+                  { id: 'my', label: 'My Services', count: myServicesData.length },
                   { id: 'history', label: 'Service History', count: serviceHistoryData.length },
                 ]}
                 activeTab={servicesTab}
-                onTabChange={(tab) => setServicesTab(tab as 'active' | 'history')}
+                onTabChange={(tab) => setServicesTab(tab as 'my' | 'history')}
                 description={
-                  servicesTab === 'active'
-                    ? 'Services currently being performed at this center'
-                    : 'Completed services archive'
+                  servicesTab === 'my'
+                    ? 'CKS services currently provided at your centers'
+                    : 'Services archive'
                 }
                 searchPlaceholder={
-                  servicesTab === 'active'
-                    ? 'Search active services'
+                  servicesTab === 'my'
+                    ? 'Search by Service ID or name'
                     : 'Search service history'
                 }
                 onSearch={setServicesSearchQuery}
-                primaryColor="#f97316"
+                primaryColor="#eab308"
               >
-                {servicesTab === 'active' && (
+                {servicesTab === 'my' && (
                   <DataTable
                     columns={[
                       { key: 'serviceId', label: 'SERVICE ID', clickable: true },
@@ -556,7 +653,7 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
                         render: (_: any, row: any) => (
                           <Button
                             size="sm"
-                            roleColor="#f97316"
+                            roleColor="#eab308"
                             onClick={(e) => {
                               e.stopPropagation();
                               setSelectedServiceId(row.serviceId);
@@ -567,7 +664,7 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
                         ),
                       },
                     ]}
-                    data={activeServicesData.filter((row) => {
+                    data={myServicesData.filter((row) => {
                       if (!servicesSearchQuery) {
                         return true;
                       }
@@ -587,6 +684,7 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
                     columns={[
                       { key: 'serviceId', label: 'SERVICE ID', clickable: true },
                       { key: 'serviceName', label: 'SERVICE NAME' },
+                      { key: 'centerId', label: 'CENTER ID' },
                       { key: 'type', label: 'TYPE' },
                       {
                         key: 'status',
@@ -637,8 +735,11 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
               {ordersErrorMessage && (
                 <div style={{ marginBottom: 12, color: '#dc2626' }}>{ordersErrorMessage}</div>
               )}
+              {notice && (
+                <div style={{ marginBottom: 12, padding: '8px 12px', background: '#ecfeff', color: '#0369a1', border: '1px solid #bae6fd', borderRadius: 6 }}>{notice}</div>
+              )}
               <OrdersSection
-                userRole="center"
+                userRole="customer"
                 userCode={normalizedCode ?? undefined}
                 serviceOrders={serviceOrders}
                 productOrders={productOrders}
@@ -652,36 +753,59 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
                     }
                     return;
                   }
-                  // Map UI labels to backend actions
+                  const target = orders?.orders?.find((o: any) => (o.orderId || o.id) === orderId) as any;
                   const label = (action || '').toLowerCase();
                   let act: OrderActionRequest['action'] | null = null;
                   if (label.includes('cancel')) act = 'cancel';
                   if (label.includes('accept') && !act) act = 'accept';
-                  if (label.includes('reject') || label.includes('deny')) act = 'reject';
+                  if ((label.includes('reject') || label.includes('deny')) && !act) act = 'reject';
                   if (!act) return;
-                  const notes = label === 'cancel' ? (window.prompt('Optional: reason for cancellation?')?.trim() || null) : null;
+                  const nextRole = (target?.nextActorRole || '').toLowerCase();
+                  if ((act === 'accept' || act === 'reject') && nextRole && nextRole !== 'customer') {
+                    setNotice(`This order is now pending ${nextRole}. Refreshing...`);
+                    setTimeout(() => setNotice(null), 2000);
+                    mutate(`/hub/orders/${normalizedCode}`);
+                    return;
+                  }
+                  let notes: string | null = null;
+                  if (act === 'cancel') {
+                    notes = window.prompt('Optional: reason for cancellation?')?.trim() || null;
+                  } else if (act === 'reject') {
+                    const reason = window.prompt('Please provide a short reason for rejection (required)')?.trim() || '';
+                    if (!reason) {
+                      alert('Rejection requires a short reason.');
+                      return;
+                    }
+                    notes = reason;
+                  }
                   let payload: OrderActionRequest = { action: act } as OrderActionRequest;
                   if (typeof notes === 'string' && notes.trim().length > 0) {
                     payload.notes = notes;
                   }
                   applyHubOrderAction(orderId, payload)
-                    .then(() => {
-                      console.log('[center] action applied', { orderId, action: act });
-                      mutate(`/hub/orders/${normalizedCode}`);
-                    })
-                    .catch((err) => console.error('[center] failed to apply action', err));
+                    .then(() => { setNotice('Success'); setTimeout(() => setNotice(null), 1200); mutate(`/hub/orders/${normalizedCode}`); })
+                    .catch((err) => {
+                      console.error('[customer] failed to apply action', err);
+                      const msg = err instanceof Error ? err.message : 'Failed to apply action';
+                      setNotice(msg);
+                      setTimeout(() => setNotice(null), 2200);
+                    });
                 }}
                 showServiceOrders={true}
                 showProductOrders={true}
-                primaryColor="#f97316"
+                primaryColor="#eab308"
+                initialOrderTab={mapSubTabToOrderTab(urlSubTab)}
+                highlightOrderId={urlHighlightOrder || undefined}
+                onHighlightReady={handleHighlightReady}
+                onHighlightComplete={handleHighlightComplete}
               />
             </PageWrapper>
           ) : activeTab === 'reports' ? (
             <PageWrapper headerSrOnly>
               <ReportsSection
-                role="center"
+                role="customer"
                 userId={normalizedCode ?? undefined}
-                primaryColor="#f97316"
+                primaryColor="#eab308"
                 reports={reportsData?.reports || []}
                 feedback={reportsData?.feedback || []}
                 isLoading={reportsLoading}
@@ -694,7 +818,7 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
                         relatedEntityId: payload.relatedEntityId,
                         reportReason: payload.reportReason,
                         priority: payload.priority,
-                        centerId: normalizedCode ?? undefined,
+                        customerId: normalizedCode ?? undefined,
                       });
                     } else {
                       await apiCreateFeedback({
@@ -705,51 +829,42 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
                         relatedEntityId: payload.relatedEntityId,
                         reportReason: payload.reportReason,
                         rating: payload.rating,
-                        centerId: normalizedCode ?? undefined,
+                        customerId: normalizedCode ?? undefined,
                       });
                     }
                   } else if (payload.type === 'report') {
                     // Legacy text-based reports (fallback)
-                    await apiCreateReport({ title: payload.title, description: payload.description, category: payload.category, centerId: normalizedCode ?? undefined });
+                    await apiCreateReport({ title: payload.title, description: payload.description, category: payload.category, customerId: normalizedCode ?? undefined });
                   } else {
                     // Legacy text-based feedback (fallback)
-                    await apiCreateFeedback({ title: payload.title, message: payload.description, category: payload.category, centerId: normalizedCode ?? undefined });
+                    await apiCreateFeedback({ title: payload.title, message: payload.description, category: payload.category, customerId: normalizedCode ?? undefined });
                   }
-                  // Refresh
-                  await mutateReports();
+                  await mutate(`/hub/reports/${normalizedCode}`);
                 }}
                 fetchServices={fetchServicesForReports}
                 fetchProcedures={fetchProceduresForReports}
                 fetchOrders={fetchOrdersForReports}
                 onAcknowledge={async (id, type) => {
-                  console.log('[CenterHub] BEFORE acknowledge mutate');
+                  console.log('[CustomerHub] BEFORE acknowledge mutate');
                   await apiAcknowledgeItem(id, type);
-                  const code = normalizedCode ?? '';
-                  if (code) {
-                    const { mutate } = await import('swr');
-                    await (mutate as any)(`/hub/reports/${code}`);
-                  }
-                  console.log('[CenterHub] AFTER acknowledge mutate');
+                  await mutate(`/hub/reports/${normalizedCode}`);
+                  console.log('[CustomerHub] AFTER acknowledge mutate');
                 }}
                 onResolve={async (id, details) => {
-                  console.log('[CenterHub] BEFORE resolve mutate');
+                  console.log('[CustomerHub] BEFORE resolve mutate');
                   await apiResolveReport(id, details ?? {});
-                  const code = normalizedCode ?? '';
-                  if (code) {
-                    const { mutate } = await import('swr');
-                    await (mutate as any)(`/hub/reports/${code}`);
-                  }
-                  console.log('[CenterHub] AFTER resolve mutate');
+                  await mutate(`/hub/reports/${normalizedCode}`);
+                  console.log('[CustomerHub] AFTER resolve mutate');
                 }}
               />
             </PageWrapper>
           ) : activeTab === 'support' ? (
             <PageWrapper headerSrOnly>
-              <SupportSection role="center" primaryColor="#f97316" />
+              <SupportSection role="customer" primaryColor="#eab308" />
             </PageWrapper>
           ) : (
             <PageWrapper title={activeTab} showHeader headerSrOnly>
-              <h2>Center Hub - {activeTab}</h2>
+              <h2>Customer Hub - {activeTab}</h2>
               <p>Content for {activeTab} will be implemented here.</p>
             </PageWrapper>
           )}

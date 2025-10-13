@@ -11,8 +11,9 @@
   Manifested by Freedom_EXE
 -----------------------------------------------*/
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import {
   EcosystemTree,
   MemosPreview,
@@ -174,9 +175,13 @@ export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubPro
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
   const [fetchedServiceDetails, setFetchedServiceDetails] = useState<any>(null);
 
+
   const { code: authCode } = useAuth();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
   const { setHubLoading } = useHubLoading();
+
+
+
 
   const {
     data: profile,
@@ -203,11 +208,11 @@ export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubPro
   const { mutate } = useSWRConfig();
   const [notice, setNotice] = useState<string | null>(null);
 
-  // Signal when critical data is loaded
+  // Signal when critical data is loaded (but only if not highlighting an order)
   useEffect(() => {
     const hasCriticalData = !!profile && !!dashboard;
     if (hasCriticalData) {
-      console.log('[CustomerHub] Critical data loaded, signaling ready');
+      console.log('[CustomerHub] Critical data loaded, signaling ready (no highlight)');
       setHubLoading(false);
     }
   }, [profile, dashboard, setHubLoading]);
@@ -509,15 +514,6 @@ export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubPro
                     : 'Search service history'
                 }
                 onSearch={setServicesSearchQuery}
-                actionButton={
-                  <Button
-                    variant="primary"
-                    roleColor="#000000"
-                    onClick={() => navigate('/catalog')}
-                  >
-                    Browse CKS Catalog
-                  </Button>
-                }
                 primaryColor="#eab308"
               >
                 {servicesTab === 'my' && (

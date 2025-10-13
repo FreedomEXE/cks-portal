@@ -13,6 +13,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import {
   EcosystemTree,
   MemosPreview,
@@ -217,9 +218,13 @@ export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHu
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
   const [fetchedServiceDetails, setFetchedServiceDetails] = useState<any>(null);
 
+
   const { code: authCode } = useAuth();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
   const { setHubLoading } = useHubLoading();
+
+
+
 
   // Fetch fresh service details when modal is opened
   useEffect(() => {
@@ -272,11 +277,11 @@ export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHu
   const contractorCode = useMemo(() => profile?.cksCode ?? normalizedCode, [profile?.cksCode, normalizedCode]);
   const welcomeName = profile?.mainContact ?? profile?.name ?? undefined;
 
-  // Signal when critical data is loaded
+  // Signal when critical data is loaded (but only if not highlighting an order)
   useEffect(() => {
     const hasCriticalData = !!profile && !!dashboard;
     if (hasCriticalData) {
-      console.log('[ContractorHub] Critical data loaded, signaling ready');
+      console.log('[ContractorHub] Critical data loaded, signaling ready (no highlight)');
       setHubLoading(false);
     }
   }, [profile, dashboard, setHubLoading]);
@@ -361,26 +366,24 @@ export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHu
   }, [orders]);
 
   const serviceOrders = useMemo<HubOrderItem[]>(
-    () =>
-      orderEntries
-        .filter((order) => order.orderType === 'service')
-        .map((order) => ({
-          ...order,
-          title: order.title ?? order.serviceId ?? order.orderId ?? order.id ?? 'Service Order',
-          status: normalizeOrderStatus(order.viewerStatus ?? order.status),
-        })),
+    () => orderEntries
+      .filter((order) => order.orderType === 'service')
+      .map((order) => ({
+        ...order,
+        title: order.title ?? order.serviceId ?? order.orderId ?? order.id ?? 'Service Order',
+        status: normalizeOrderStatus(order.viewerStatus ?? order.status),
+      })),
     [orderEntries],
   );
 
   const productOrders = useMemo<HubOrderItem[]>(
-    () =>
-      orderEntries
-        .filter((order) => order.orderType === 'product')
-        .map((order) => ({
-          ...order,
-          title: order.title ?? order.orderId ?? order.id ?? 'Product Order',
-          status: normalizeOrderStatus(order.viewerStatus ?? order.status),
-        })),
+    () => orderEntries
+      .filter((order) => order.orderType === 'product')
+      .map((order) => ({
+        ...order,
+        title: order.title ?? order.orderId ?? order.id ?? 'Product Order',
+        status: normalizeOrderStatus(order.viewerStatus ?? order.status),
+      })),
     [orderEntries],
   );
 
@@ -741,15 +744,6 @@ export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHu
                       : 'Search service history'
                 }
                 onSearch={setServicesSearchQuery}
-                actionButton={
-                  <Button
-                    variant="primary"
-                    roleColor="#000000"
-                    onClick={() => navigate('/catalog')}
-                  >
-                    Browse CKS Catalog
-                  </Button>
-                }
                 primaryColor="#10b981"
               >
                 {servicesTab === 'my' && (
@@ -1170,7 +1164,6 @@ export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHu
     </div>
   );
 }
-
 
 
 
