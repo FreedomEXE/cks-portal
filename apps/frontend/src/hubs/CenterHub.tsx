@@ -27,7 +27,7 @@ import {
   type Activity,
   type TreeNode,
 } from '@cks/domain-widgets';
-import { Button, DataTable, OrderDetailsModal, ProductOrderModal, ServiceOrderModal, ServiceViewModal, PageHeader, PageWrapper, Scrollbar, TabSection } from '@cks/ui';
+import { Button, DataTable, ModalProvider, OrderDetailsModal, ProductOrderModal, ServiceOrderModal, ServiceViewModal, PageHeader, PageWrapper, Scrollbar, TabSection } from '@cks/ui';
 import { useAuth } from '@cks/auth';
 import { useSWRConfig } from 'swr';
 
@@ -424,12 +424,13 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#f8fafc' }}>
-      <MyHubSection
-        hubName="Center Hub"
-        tabs={tabs}
-        activeTab={activeTab}
-        onTabClick={setActiveTab}
+    <ModalProvider>
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#f8fafc' }}>
+        <MyHubSection
+          hubName="Center Hub"
+          tabs={tabs}
+          activeTab={activeTab}
+          onTabClick={setActiveTab}
         userId={normalizedCode ?? 'CENTER'}
         role="center"
       />
@@ -624,7 +625,7 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
                     })}
                     showSearch={false}
                     maxItems={10}
-                    onRowClick={(row) => setSelectedServiceId(row.serviceId)}
+                    modalType="service-history"
                   />
                 )}
               </TabSection>
@@ -918,6 +919,7 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
           />
         );
       })()}
-    </div>
+      </div>
+    </ModalProvider>
   );
 }

@@ -10,6 +10,7 @@ import { useAuth as useCksAuth } from "@cks/auth";
 import { useHubRoleScope } from "../shared/api/hub";
 import { useLoading } from "../contexts/LoadingContext";
 import { useHubLoading } from "../contexts/HubLoadingContext";
+import { ProductModal, ServiceModal } from "@cks/ui";
 
 type CatalogKind = "products" | "services";
 
@@ -763,6 +764,7 @@ export default function CKSCatalog() {
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [showCart, setShowCart] = useState(false);
   const [selectedService, setSelectedService] = useState<CatalogItem | null>(null);
+  const [selectedViewItem, setSelectedViewItem] = useState<CatalogItem | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [managerServices, setManagerServices] = useState<ServiceOption[]>([]);
 
@@ -1085,6 +1087,7 @@ export default function CKSCatalog() {
               <Card
                 key={item.code}
                 item={item}
+                onView={() => setSelectedViewItem(item)}
                 onAdd={() => item.type === "product" ? handleAddProduct(item) : handleAddService(item)}
                 isInCart={cart.isInCart(item.code)}
               />
@@ -1262,6 +1265,46 @@ export default function CKSCatalog() {
             if (Array.isArray(rel?.centers) && rel.centers.length > 0) return rel.centers.map((x: any) => ({ id: x.id, name: x.name || x.id, customerId: x.customerId || null }));
             return [];
           })()}
+        />
+      )}
+
+      {/* View Product Modal */}
+      {selectedViewItem && selectedViewItem.type === 'product' && (
+        <ProductModal
+          isOpen={true}
+          onClose={() => setSelectedViewItem(null)}
+          product={{
+            productId: selectedViewItem.code,
+            name: selectedViewItem.name,
+            description: selectedViewItem.description || null,
+            category: selectedViewItem.category || null,
+            unitOfMeasure: selectedViewItem.unitOfMeasure || 'EA',
+            minimumOrderQuantity: selectedViewItem.product?.minimumOrderQuantity || null,
+            leadTimeDays: selectedViewItem.product?.leadTimeDays || null,
+            status: selectedViewItem.status || 'active',
+            metadata: selectedViewItem.metadata || null,
+          }}
+        />
+      )}
+
+      {/* View Service Modal */}
+      {selectedViewItem && selectedViewItem.type === 'service' && (
+        <ServiceModal
+          isOpen={true}
+          onClose={() => setSelectedViewItem(null)}
+          service={{
+            serviceId: selectedViewItem.code,
+            name: selectedViewItem.name,
+            description: selectedViewItem.description || null,
+            category: selectedViewItem.category || null,
+            estimatedDuration: selectedViewItem.service?.durationMinutes
+              ? `${Math.floor(selectedViewItem.service.durationMinutes / 60)} hrs`
+              : null,
+            requirements: selectedViewItem.service?.requirements || null,
+            status: selectedViewItem.status || 'active',
+            metadata: selectedViewItem.metadata || null,
+          }}
+          context="catalog"
         />
       )}
     </div>

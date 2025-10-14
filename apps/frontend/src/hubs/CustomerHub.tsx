@@ -27,7 +27,7 @@ import {
   type Activity,
   type TreeNode,
 } from '@cks/domain-widgets';
-import { Button, DataTable, OrderDetailsModal, ProductOrderModal, ServiceOrderModal, ServiceViewModal, PageHeader, PageWrapper, Scrollbar, TabSection } from '@cks/ui';
+import { Button, DataTable, ModalProvider, OrderDetailsModal, ProductOrderModal, ServiceOrderModal, ServiceViewModal, PageHeader, PageWrapper, Scrollbar, TabSection } from '@cks/ui';
 import { useAuth } from '@cks/auth';
 import { useSWRConfig } from 'swr';
 import { createReport as apiCreateReport, createFeedback as apiCreateFeedback, acknowledgeItem as apiAcknowledgeItem, resolveReport as apiResolveReport, fetchServicesForReports, fetchProceduresForReports, fetchOrdersForReports } from '../shared/api/hub';
@@ -366,7 +366,7 @@ export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubPro
     { id: 'dashboard', label: 'Dashboard', path: '/customer/dashboard' },
     { id: 'profile', label: 'My Profile', path: '/customer/profile' },
     { id: 'ecosystem', label: 'My Ecosystem', path: '/customer/ecosystem' },
-    { id: 'services', label: 'My Services', path: '/customer/services' },
+    { id: 'services', label: 'Active Services', path: '/customer/services' },
     { id: 'orders', label: 'Orders', path: '/customer/orders' },
     { id: 'reports', label: 'Reports', path: '/customer/reports' },
     { id: 'support', label: 'Support', path: '/customer/support' },
@@ -419,12 +419,13 @@ export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubPro
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#f8fafc' }}>
-      <MyHubSection
-        hubName="Customer Hub"
-        tabs={tabs}
-        activeTab={activeTab}
-        onTabClick={setActiveTab}
+    <ModalProvider>
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#f8fafc' }}>
+        <MyHubSection
+          hubName="Customer Hub"
+          tabs={tabs}
+          activeTab={activeTab}
+          onTabClick={setActiveTab}
         userId={normalizedCode ?? 'CUSTOMER'}
         role="customer"
       />
@@ -620,7 +621,7 @@ export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubPro
                     })}
                     showSearch={false}
                     maxItems={10}
-                    onRowClick={(row) => setSelectedServiceId(row.serviceId)}
+                    modalType="service-history"
                   />
                 )}
               </TabSection>
@@ -927,6 +928,7 @@ export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubPro
           />
         );
       })()}
-    </div>
+      </div>
+    </ModalProvider>
   );
 }

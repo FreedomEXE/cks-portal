@@ -27,7 +27,7 @@ import {
   type Activity,
   type TreeNode,
 } from '@cks/domain-widgets';
-import { Button, DataTable, OrderDetailsModal, ProductOrderModal, ServiceOrderModal, ServiceViewModal, PageHeader, PageWrapper, Scrollbar, TabSection } from '@cks/ui';
+import { Button, DataTable, ModalProvider, OrderDetailsModal, ProductOrderModal, ServiceOrderModal, ServiceViewModal, PageHeader, PageWrapper, Scrollbar, TabSection } from '@cks/ui';
 import { useAuth } from '@cks/auth';
 import { useCatalogItems } from '../shared/api/catalog';
 import { useServices as useDirectoryServices } from '../shared/api/directory';
@@ -466,12 +466,13 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#f8fafc' }}>
-      <MyHubSection
-        hubName="Crew Hub"
-        tabs={tabs}
-        activeTab={activeTab}
-        onTabClick={setActiveTab}
+    <ModalProvider>
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#f8fafc' }}>
+        <MyHubSection
+          hubName="Crew Hub"
+          tabs={tabs}
+          activeTab={activeTab}
+          onTabClick={setActiveTab}
         userId={normalizedCode ?? 'CREW'}
         role="crew"
       />
@@ -565,7 +566,7 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
                 {servicesTab === 'my' && (
                   <DataTable
                     columns={[
-                      { key: 'serviceId', label: 'SERVICE ID', clickable: false },
+                      { key: 'serviceId', label: 'SERVICE ID', clickable: true },
                       { key: 'serviceName', label: 'SERVICE NAME' },
                       { key: 'certified', label: 'CERTIFIED' },
                       { key: 'certificationDate', label: 'CERTIFICATION DATE' },
@@ -578,7 +579,7 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
                     })}
                     showSearch={false}
                     maxItems={10}
-                    onRowClick={() => undefined}
+                    modalType="service-my-services"
                   />
                 )}
 
@@ -695,7 +696,7 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
                     })}
                     showSearch={false}
                     maxItems={10}
-                    onRowClick={() => undefined}
+                    modalType="service-history"
                   />
                 )}
               </TabSection>
@@ -981,6 +982,7 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
           />
         );
       })()}
-    </div>
+      </div>
+    </ModalProvider>
   );
 }

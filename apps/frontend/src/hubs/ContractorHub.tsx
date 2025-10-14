@@ -27,7 +27,7 @@ import {
   type Activity,
   type TreeNode,
 } from '@cks/domain-widgets';
-import { Button, DataTable, OrderDetailsModal, ProductOrderModal, ServiceOrderModal, ServiceViewModal, PageHeader, PageWrapper, Scrollbar, TabSection } from '@cks/ui';
+import { Button, DataTable, ModalProvider, OrderDetailsModal, ProductOrderModal, ServiceOrderModal, ServiceViewModal, PageHeader, PageWrapper, Scrollbar, TabSection } from '@cks/ui';
 import { useSWRConfig } from 'swr';
 import { createReport as apiCreateReport, createFeedback as apiCreateFeedback, acknowledgeItem as apiAcknowledgeItem, resolveReport as apiResolveReport, fetchServicesForReports, fetchProceduresForReports, fetchOrdersForReports } from '../shared/api/hub';
 import { useAuth } from '@cks/auth';
@@ -635,8 +635,9 @@ export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHu
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#f8fafc' }}>
-      <MyHubSection
+    <ModalProvider>
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#f8fafc' }}>
+        <MyHubSection
         hubName="Contractor Hub"
         tabs={tabs}
         activeTab={activeTab}
@@ -765,7 +766,7 @@ export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHu
                     })}
                     showSearch={false}
                     maxItems={10}
-                    onRowClick={(row) => setSelectedServiceId(row.serviceId)}
+                    modalType="service-my-services"
                   />
                 )}
 
@@ -856,7 +857,7 @@ export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHu
                     })}
                     showSearch={false}
                     maxItems={10}
-                    onRowClick={(row) => setSelectedServiceId(row.serviceId)}
+                    modalType="service-history"
                   />
                 )}
               </TabSection>
@@ -1161,7 +1162,8 @@ export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHu
           />
         );
       })()}
-    </div>
+      </div>
+    </ModalProvider>
   );
 }
 

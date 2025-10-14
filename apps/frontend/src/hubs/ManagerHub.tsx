@@ -22,6 +22,7 @@ import {
 import {
   Button,
   DataTable,
+  ModalProvider,
   OrderDetailsModal,
   ProductOrderModal,
   ServiceOrderModal,
@@ -1065,12 +1066,13 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
   }
 
   return (
-    <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: '#f9fafb' }}>
-      <MyHubSection
-        hubName="Manager Hub"
-        tabs={HUB_TABS}
-        activeTab={activeTab}
-        onTabClick={setActiveTab}
+    <ModalProvider>
+      <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: '#f9fafb' }}>
+        <MyHubSection
+          hubName="Manager Hub"
+          tabs={HUB_TABS}
+          activeTab={activeTab}
+          onTabClick={setActiveTab}
         onLogout={logout}
         userId={managerCode ?? undefined}
         role="manager"
@@ -1162,7 +1164,7 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
                     showSearch={false}
                     externalSearchQuery={servicesSearchQuery}
                     maxItems={10}
-                    onRowClick={(row: unknown) => console.log('[manager] view service', row)}
+                    modalType="service-my-services"
                   />
                 )}
 
@@ -1195,7 +1197,7 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
                     showSearch={false}
                     externalSearchQuery={servicesSearchQuery}
                     maxItems={10}
-                    onRowClick={(row: unknown) => console.log('[manager] view service history', row)}
+                    modalType="service-history"
                   />
                 )}
               </TabSection>
@@ -1620,7 +1622,8 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
           {toast}
         </div>
       )}
-    </div>
+      </div>
+    </ModalProvider>
   );
 }
 

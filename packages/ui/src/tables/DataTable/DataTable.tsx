@@ -1,4 +1,6 @@
 import React, { useState, useMemo } from 'react';
+import { useModal } from '../../modals/ModalProvider';
+import type { ModalKey } from '../../modals/ModalProvider';
 
 export interface DataTableColumn {
   key: string;
@@ -25,6 +27,7 @@ export interface DataTableProps {
     placeholder: string;
     onFilter?: (value: string) => void;
   };
+  modalType?: ModalKey; // Optional: auto-open modal on row click
 }
 
 const DataTable: React.FC<DataTableProps> = ({
@@ -38,11 +41,20 @@ const DataTable: React.FC<DataTableProps> = ({
   onRowClick,
   searchFields,
   externalSearchQuery,
-  filterOptions
+  filterOptions,
+  modalType
 }) => {
   const [internalSearchQuery, setInternalSearchQuery] = useState('');
   const [isExpanded, setIsExpanded] = useState(false);
   const [filterValue, setFilterValue] = useState('');
+
+  // Try to access modal context (optional - DataTable can work without ModalProvider)
+  let modalContext: ReturnType<typeof useModal> | null = null;
+  try {
+    modalContext = useModal();
+  } catch {
+    // DataTable used outside ModalProvider - that's fine
+  }
 
   // Use external search if provided, otherwise use internal
   const searchQuery = externalSearchQuery !== undefined ? externalSearchQuery : internalSearchQuery;
@@ -96,6 +108,15 @@ const DataTable: React.FC<DataTableProps> = ({
     const value = e.target.value;
     setFilterValue(value);
     filterOptions?.onFilter?.(value);
+  };
+
+  // Handle row click - either call custom handler or open modal
+  const handleRowClick = (row: any) => {
+    if (onRowClick) {
+      onRowClick(row);
+    } else if (modalType && modalContext) {
+      modalContext.open(modalType, row);
+    }
   };
 
   // Add max indicator to placeholder
@@ -193,12 +214,12 @@ const DataTable: React.FC<DataTableProps> = ({
                     key={rowIndex}
                     style={{
                       backgroundColor: rowIndex % 2 === 0 ? '#ffffff' : '#f9fafb',
-                      cursor: onRowClick ? 'pointer' : 'default',
+                      cursor: (onRowClick || modalType) ? 'pointer' : 'default',
                       transition: 'background-color 0.15s'
                     }}
-                    onClick={() => onRowClick?.(row)}
+                    onClick={() => handleRowClick(row)}
                     onMouseEnter={(e) => {
-                      if (onRowClick) {
+                      if (onRowClick || modalType) {
                         e.currentTarget.style.backgroundColor = '#f3f4f6';
                       }
                     }}

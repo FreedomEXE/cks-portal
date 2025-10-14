@@ -26,7 +26,7 @@ import {
   SupportSection,
   type Activity,
 } from '@cks/domain-widgets';
-import { Button, DataTable, OrderDetailsModal, ProductOrderModal, ServiceOrderModal, ServiceViewModal, PageHeader, PageWrapper, Scrollbar, TabSection } from '@cks/ui';
+import { Button, DataTable, OrderDetailsModal, ProductOrderModal, ServiceOrderModal, ServiceViewModal, ModalProvider, PageHeader, PageWrapper, Scrollbar, TabSection } from '@cks/ui';
 import { useAuth } from '@cks/auth';
 import { useSWRConfig } from 'swr';
 import { getAllowedActions, getActionLabel } from '@cks/policies';
@@ -640,10 +640,11 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#f8fafc' }}>
-      <MyHubSection
-        hubName="Warehouse Hub"
-        tabs={tabs}
+    <ModalProvider>
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#f8fafc' }}>
+        <MyHubSection
+          hubName="Warehouse Hub"
+          tabs={tabs}
         activeTab={activeTab}
         onTabClick={setActiveTab}
         userId={normalizedCode ?? 'WAREHOUSE'}
@@ -751,7 +752,7 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
                   data={filteredActiveInventoryData}
                   showSearch={false}
                   maxItems={10}
-                  onRowClick={(row) => console.log('View product details:', row)}
+                  modalType="product-inventory"
                 />
               )}
 
@@ -767,7 +768,7 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
                   data={filteredArchivedInventoryData}
                   showSearch={false}
                   maxItems={10}
-                  onRowClick={(row) => console.log('View archived product:', row)}
+                  modalType="product-inventory"
                 />
               )}
               </TabSection>
@@ -935,7 +936,13 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
                     })}
                     showSearch={false}
                     maxItems={10}
-                    onRowClick={() => undefined}
+                    onRowClick={(row) => {
+                      // Find the full order object from deliveryId
+                      const order = orders?.orders?.find((o: any) => o.orderId === row.deliveryId);
+                      if (order) {
+                        setSelectedOrderForDetails(order);
+                      }
+                    }}
                   />
                 )}
 
@@ -982,7 +989,13 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
                     })}
                     showSearch={false}
                     maxItems={10}
-                    onRowClick={() => undefined}
+                    onRowClick={(row) => {
+                      // Find the full order object from deliveryId
+                      const order = orders?.orders?.find((o: any) => o.orderId === row.deliveryId);
+                      if (order) {
+                        setSelectedOrderForDetails(order);
+                      }
+                    }}
                   />
                 )}
               </TabSection>
@@ -1027,7 +1040,7 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
                     showSearch={false}
                     externalSearchQuery={servicesSearchQuery}
                     maxItems={10}
-                    onRowClick={(row: unknown) => console.log('[warehouse] view service', row)}
+                    modalType="service-my-services"
                   />
                 )}
                 {servicesTab === 'active' && (
@@ -1142,19 +1155,6 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
                       },
                       { key: 'startDate', label: 'START DATE' },
                       { key: 'endDate', label: 'END DATE' },
-                      {
-                        key: 'actions',
-                        label: 'ACTIONS',
-                        render: (_: any, row: any) => (
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => setSelectedServiceId(row.serviceId)}
-                          >
-                            View
-                          </Button>
-                        ),
-                      },
                     ]}
                     data={serviceHistoryData.filter((row) => {
                       if (!servicesSearchQuery) {
@@ -1168,7 +1168,7 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
                     })}
                     showSearch={false}
                     maxItems={10}
-                    onRowClick={() => undefined}
+                    modalType="service-history"
                   />
                 )}
               </TabSection>
@@ -1447,6 +1447,7 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
           />
         );
       })()}
-    </div>
+      </div>
+    </ModalProvider>
   );
 }
