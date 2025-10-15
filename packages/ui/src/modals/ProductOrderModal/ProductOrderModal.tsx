@@ -1,6 +1,7 @@
 import React from 'react';
 import styles from './ProductOrderModal.module.css';
 import { ModalRoot } from '../ModalRoot';
+import { DeletedBanner } from '../../banners/DeletedBanner';
 
 interface ProductLineItem {
   id: string;
@@ -24,6 +25,9 @@ export interface ProductOrderModalProps {
     status?: string | null;
     items?: ProductLineItem[];
     serviceId?: string | null;
+    isDeleted?: boolean;
+    deletedAt?: string;
+    deletedBy?: string;
   } | null;
   requestorInfo?: {
     name: string | null;
@@ -111,6 +115,18 @@ const ProductOrderModal: React.FC<ProductOrderModalProps> = ({
             ✕
           </button>
         </div>
+
+        {/* Deleted Banner */}
+        {order.isDeleted && (
+          <div style={{ padding: '0 16px', marginTop: '16px' }}>
+            <DeletedBanner
+              deletedAt={order.deletedAt}
+              deletedBy={order.deletedBy}
+              entityType="order"
+              entityId={order.orderId}
+            />
+          </div>
+        )}
 
         {/* Status Badge */}
         {order.status && (

@@ -74,3 +74,6 @@ export * from './modals/ModalProvider';
 
 export * from './modals/ModalRoot';
 export { default as ModalRoot } from './modals/ModalRoot';
+
+export * from './banners/DeletedBanner';
+export { DeletedBanner } from './banners/DeletedBanner';

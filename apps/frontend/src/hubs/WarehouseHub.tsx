@@ -46,6 +46,8 @@ import {
   type OrderActionRequest,
   type OrderActionType,
 } from '../shared/api/hub';
+import { useFormattedActivities } from '../shared/activity/useFormattedActivities';
+import { ActivityFeed } from '../components/ActivityFeed';
 import { createFeedback as apiCreateFeedback, acknowledgeItem as apiAcknowledgeItem, resolveReport as apiResolveReport, fetchServicesForReports, fetchProceduresForReports, fetchOrdersForReports } from '../shared/api/hub';
 
 const ACTION_LABEL_MAP: Record<string, OrderActionType> = {
@@ -148,27 +150,7 @@ function normalizeOrderStatus(value?: string | null): HubOrderItem['status'] {
   }
 }
 
-function buildActivities(serviceOrders: HubOrderItem[], productOrders: HubOrderItem[]): Activity[] {
-  const combined = [...serviceOrders, ...productOrders]
-    .map((order) => ({
-      order,
-      timestamp: order.requestedDate ? new Date(order.requestedDate) : new Date(),
-    }))
-    .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
-    .slice(0, 10);
-
-  return combined.map(({ order, timestamp }) => ({
-    id: order.orderId,
-    message: `${order.orderType === 'service' ? 'Service' : 'Product'} order ${order.orderId} ${formatStatusLabel(order.status)}`,
-    timestamp,
-    type: getStatusBadgePalette(order.status).color === '#16a34a' ? 'success' : 'info',
-    metadata: {
-      role: 'warehouse',
-      orderType: order.orderType,
-      status: order.status,
-    },
-  }));
-}
+// Activities are now sourced from the backend via useFormattedActivities
 
 export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubProps) {
   const navigate = useNavigate();
@@ -276,7 +258,7 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
     return mapped;
   }, [orders]);
 
-  const activities = useMemo(() => buildActivities(serviceOrders, productOrders), [serviceOrders, productOrders]);
+  const { activities, isLoading: activitiesLoading, error: activitiesError } = useFormattedActivities(normalizedCode, { limit: 20 });
 
   const overviewData = useMemo(() => ({
     inventoryCount: (dashboard as any)?.inventoryCount ?? 0,
@@ -666,10 +648,12 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
               />
 
               <PageHeader title="Recent Activity" />
-              <RecentActivity
+              <ActivityFeed
                 activities={activities}
-                onClear={() => undefined}
-                emptyMessage="No recent warehouse activity"
+                hub="warehouse"
+                isLoading={activitiesLoading}
+                error={activitiesError}
+                onError={(msg) => toast.error(msg)}
               />
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 24 }}>

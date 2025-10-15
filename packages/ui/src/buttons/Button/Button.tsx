@@ -28,7 +28,7 @@ import React from 'react';
 export interface ButtonProps {
   variant?: 'primary' | 'secondary' | 'danger' | 'ghost' | 'link';
   size?: 'sm' | 'md' | 'lg' | 'small' | 'medium' | 'large';
-  onClick?: () => void;
+  onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void;
   disabled?: boolean;
   className?: string;
   children: React.ReactNode;
@@ -176,7 +176,7 @@ export default function Button({
   return (
     <button
       type={type}
-      onClick={disabled ? undefined : onClick}
+      onClick={disabled ? undefined : (e) => onClick?.(e)}
       disabled={disabled}
       style={combinedStyles}
       className={className}

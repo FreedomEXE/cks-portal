@@ -1,0 +1,83 @@
+import { useMemo } from 'react';
+import type { Activity } from '@cks/domain-widgets';
+import { useHubActivities, type HubActivityItem } from '../api/hub';
+
+export type UseFormattedActivitiesOptions = {
+  limit?: number;
+  categories?: string[]; // optional allowlist of backend categories
+};
+
+function toActivityType(category?: string | null): Activity['type'] {
+  const c = (category || '').toLowerCase();
+  if (/delivered|completed|accepted|approved|verified/.test(c)) return 'success';
+  if (/rejected|cancelled|failed|denied|error/.test(c)) return 'warning';
+  if (/assigned|assignment|created|updated|order|service/.test(c)) return 'action';
+  return 'info';
+}
+
+function formatRoleLabel(role?: string | null): string {
+  if (!role) return 'System';
+
+  const normalized = role.toLowerCase().trim();
+
+  // Map backend roles to display names
+  const roleLabels: Record<string, string> = {
+    admin: 'Admin',
+    manager: 'Manager',
+    contractor: 'Contractor',
+    customer: 'Customer',
+    center: 'Center',
+    crew: 'Crew',
+    warehouse: 'Warehouse',
+    system: 'System',
+  };
+
+  return roleLabels[normalized] || 'System';
+}
+
+function mapHubItemToActivity(item: HubActivityItem): Activity {
+  const timestamp = new Date(item.createdAt);
+  const validDate = isNaN(timestamp.getTime()) ? new Date() : timestamp;
+
+  const role = (item.actorRole || 'system').toLowerCase();
+  const roleLabel = formatRoleLabel(item.actorRole);
+
+  return {
+    id: item.id,
+    message: item.description,
+    timestamp: validDate,
+    type: toActivityType(item.category),
+    metadata: {
+      role, // Used for color coding in ActivityItem
+      title: roleLabel, // Header displayed above the activity
+      targetId: item.targetId || undefined,
+      targetType: item.targetType || undefined,
+      actorId: item.actorId || undefined,
+      category: item.category || undefined,
+      // spread backend-provided metadata last for transparency
+      ...(item.metadata ?? undefined),
+    },
+  };
+}
+
+export function useFormattedActivities(
+  cksCode?: string | null,
+  options?: UseFormattedActivitiesOptions,
+) {
+  const { data, isLoading, error, mutate } = useHubActivities(cksCode);
+  const { limit = 20, categories } = options ?? {};
+
+  const activities: Activity[] = useMemo(() => {
+    const items = data?.activities ?? [];
+    const filtered = categories && categories.length
+      ? items.filter((a) => categories.includes((a.category || '').toLowerCase()))
+      : items;
+
+    const mapped = filtered.map(mapHubItemToActivity);
+    mapped.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+    return mapped.slice(0, limit);
+  }, [data?.activities, limit, categories]);
+
+  return { activities, isLoading, error, mutate, raw: data?.activities ?? [] };
+}
+

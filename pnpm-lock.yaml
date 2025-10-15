@@ -265,6 +265,9 @@ importers:
 
   packages/ui:
     dependencies:
+      '@cks/domain-widgets':
+        specifier: workspace:*
+        version: link:../domain-widgets
       clsx:
         specifier: ^2.0.0
         version: 2.1.1

@@ -26,6 +26,7 @@ import { registerServicesRoutes } from "./domains/services/routes.fastify";
 import { registerCatalogRoutes } from "./domains/catalog/routes.fastify";
 import { reportsRoutes } from "./domains/reports/routes.fastify";
 import { registerInventoryRoutes } from "./domains/inventory/routes.fastify";
+import entityRoutes from "./domains/entities/routes.fastify";
 import { initializeSequences } from "./db/init-sequences";
 
 type BootstrapResponse = {
@@ -260,6 +261,7 @@ export async function buildServer() {
   await registerCatalogRoutes(server);
   await registerInventoryRoutes(server);
   await server.register(reportsRoutes, { prefix: '/api' });
+  await server.register(entityRoutes, { prefix: '/api' });
 
   return server;
 }

@@ -1,6 +1,7 @@
 import React from 'react';
 import styles from './OrderDetailsModal.module.css';
 import { ModalRoot } from '../ModalRoot';
+import { DeletedBanner } from '../../banners/DeletedBanner';
 
 interface OrderLineItem {
   id: string;
@@ -25,6 +26,9 @@ interface OrderDetailsModalProps {
     status?: string | null;
     items?: OrderLineItem[];
     serviceId?: string | null;
+    isDeleted?: boolean;
+    deletedAt?: string;
+    deletedBy?: string;
   } | null;
   requestorInfo?: {
     name: string | null;
@@ -99,6 +103,18 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
             ✕
           </button>
         </div>
+
+        {/* Deleted Banner */}
+        {order.isDeleted && (
+          <div style={{ padding: '0 16px', marginTop: '16px' }}>
+            <DeletedBanner
+              deletedAt={order.deletedAt}
+              deletedBy={order.deletedBy}
+              entityType="order"
+              entityId={order.orderId}
+            />
+          </div>
+        )}
 
         {/* Optional Info Banner */}
         {infoBanner && (

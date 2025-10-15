@@ -63,6 +63,57 @@ const client = new Client({
 - The mcp__postgres__query tool may not work with Render due to SSL requirements
 - Use Node.js scripts with pg client instead for reliable database access
 
+## Task Completion Notifications
+
+**IMPORTANT: Always notify the user when completing significant work!**
+
+### Modern Neural Voice (Recommended)
+
+Use modern British female neural voice (same as Microsoft Edge/Copilot):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "scripts/notify-complete-modern.ps1" -Message "Your summary here"
+```
+
+**Voice Options** (change with `-Voice` parameter):
+- `en-GB-LibbyNeural` (default - bright, friendly)
+- `en-GB-MaisieNeural` (warm, professional)
+- `en-GB-SoniaNeural` (sophisticated)
+
+**First-time setup:**
+```powershell
+powershell -ExecutionPolicy Bypass -File "scripts/setup-modern-voice.ps1"
+```
+
+### Fallback (Basic Windows Voice)
+
+If Python isn't available, use basic Windows TTS:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "scripts/notify-complete.ps1" -Message "Your summary here"
+```
+
+### When to Notify:
+- ✅ Completing a phase of work (Phase A, Phase B, Phase C, etc.)
+- ✅ Finishing multi-step tasks from the todo list
+- ✅ Completing major feature implementations
+- ✅ After fixing critical bugs or issues
+- ✅ When reaching important milestones
+
+### Message Guidelines:
+- Can be detailed (up to 60 seconds of speech)
+- Summarize what was accomplished
+- Mention key deliverables or changes
+- End with next steps or status (e.g., "Ready for testing")
+- **IMPORTANT:** Use 60-second timeout: `timeout: 60000` in Bash tool call
+
+### Example:
+```powershell
+powershell -ExecutionPolicy Bypass -File "scripts/notify-complete-modern.ps1" -Message "Phase C frontend activity routing complete. All 6 role hubs now have clickable activities with smart navigation. DeletedBanner component shows deletion info for admins. Ready for testing."
+```
+
+**Note:** All scripts automatically add a random greeting at the start (e.g., "Hello Freedom", "Hello Daddy", "Hey Freedom", etc.).
+
 ## Other Important Notes
 
 ### Testing Commands

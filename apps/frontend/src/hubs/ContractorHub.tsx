@@ -31,10 +31,11 @@ import { Button, DataTable, ModalProvider, OrderDetailsModal, ProductOrderModal,
 import { useSWRConfig } from 'swr';
 import { createReport as apiCreateReport, createFeedback as apiCreateFeedback, acknowledgeItem as apiAcknowledgeItem, resolveReport as apiResolveReport, fetchServicesForReports, fetchProceduresForReports, fetchOrdersForReports } from '../shared/api/hub';
 import { useAuth } from '@cks/auth';
+import { useFormattedActivities } from '../shared/activity/useFormattedActivities';
+import { ActivityFeed } from '../components/ActivityFeed';
 
 import MyHubSection from '../components/MyHubSection';
 import {
-  useHubActivities,
   useHubDashboard,
   useHubOrders,
   useHubProfile,
@@ -186,34 +187,12 @@ function normalizeOrderStatus(value?: string | null): HubOrderItem['status'] {
   }
 }
 
-function buildActivities(serviceOrders: HubOrderItem[], productOrders: HubOrderItem[]): Activity[] {
-  const combined = [...serviceOrders, ...productOrders]
-    .map((order) => ({
-      order,
-      timestamp: order.requestedDate ? new Date(order.requestedDate) : new Date(),
-    }))
-    .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
-    .slice(0, 10);
-
-  return combined.map(({ order, timestamp }) => ({
-    id: order.orderId,
-    message: `${order.orderType === 'service' ? 'Service' : 'Product'} order ${order.orderId} ${formatStatusLabel(order.status)}`,
-    timestamp,
-    type: getStatusBadgePalette(order.status).color === '#16a34a' ? 'success' : 'info',
-    metadata: {
-      role: 'contractor',
-      orderType: order.orderType,
-      status: order.status,
-    },
-  }));
-}
 
 export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHubProps) {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState(initialTab);
   const [servicesTab, setServicesTab] = useState<'my' | 'active' | 'history'>('my');
   const [servicesSearchQuery, setServicesSearchQuery] = useState('');
-  const [activityFeed, setActivityFeed] = useState<Activity[]>([]);
   const [selectedOrderForDetails, setSelectedOrderForDetails] = useState<HubOrderItem | null>(null);
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
   const [fetchedServiceDetails, setFetchedServiceDetails] = useState<any>(null);
@@ -268,11 +247,7 @@ export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHu
     isLoading: reportsLoading,
   mutate: mutateReports } = useHubReports(normalizedCode);
   const { data: scopeData } = useHubRoleScope(normalizedCode);
-  const {
-    data: activitiesData,
-    isLoading: activitiesLoading,
-    error: activitiesError,
-  } = useHubActivities(normalizedCode);
+  const { activities: formattedActivities, isLoading: activitiesLoading, error: activitiesError } = useFormattedActivities(normalizedCode, { limit: 20 });
 
   const contractorCode = useMemo(() => profile?.cksCode ?? normalizedCode, [profile?.cksCode, normalizedCode]);
   const welcomeName = profile?.mainContact ?? profile?.name ?? undefined;
@@ -422,57 +397,11 @@ export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHu
 
   // Ecosystem grouping is handled by the shared builder; no local maps needed
 
-  const fallbackActivities = useMemo(
-    () => buildActivities(serviceOrders, productOrders),
-    [serviceOrders, productOrders],
-  );
-
-  const apiActivities = useMemo<Activity[]>(() => {
-    if (!activitiesData?.activities || activitiesData.activities.length === 0) {
-      return [];
-    }
-    return activitiesData.activities.map((item) => ({
-      id: item.id,
-      message: item.description ?? `${item.category ?? 'Activity'} update`,
-      timestamp: item.createdAt ? new Date(item.createdAt) : new Date(),
-      type:
-        item.category === 'warning'
-          ? 'warning'
-          : item.category === 'action'
-            ? 'action'
-            : 'info',
-      metadata: {
-        role: item.actorRole ?? 'system',
-        userId: item.actorId ?? undefined,
-        targetId: item.targetId ?? undefined,
-        targetType: item.targetType ?? undefined,
-      },
-    }));
-  }, [activitiesData]);
-
-  const resolvedActivities = useMemo<Activity[]>(() => {
-    if (apiActivities.length > 0) {
-      return apiActivities;
-    }
-    if (activitiesLoading) {
-      return [];
-    }
-    return fallbackActivities;
-  }, [apiActivities, activitiesLoading, fallbackActivities]);
-
-  useEffect(() => {
-    setActivityFeed(resolvedActivities);
-  }, [resolvedActivities]);
-
   const activityEmptyMessage = activitiesError
     ? 'Failed to load contractor activity.'
-    : activitiesLoading && apiActivities.length === 0
+    : activitiesLoading
       ? 'Loading recent activity...'
       : 'No recent contractor activity';
-
-  const handleClearActivity = useCallback(() => {
-    setActivityFeed([]);
-  }, []);
 
   const ecosystemData = useMemo<TreeNode>(() => {
     if (scopeData) {
@@ -662,10 +591,12 @@ export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHu
               />
 
               <PageHeader title="Recent Activity" />
-              <RecentActivity
-                activities={activityFeed}
-                onClear={handleClearActivity}
-                emptyMessage={activityEmptyMessage}
+              <ActivityFeed
+                activities={formattedActivities}
+                hub="contractor"
+                isLoading={activitiesLoading}
+                error={activitiesError}
+                onError={(msg) => toast.error(msg)}
               />
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 24 }}>

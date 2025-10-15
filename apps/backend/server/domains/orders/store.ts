@@ -1,5 +1,6 @@
 import { query, withTransaction } from "../../db/connection";
 import { normalizeIdentity } from "../identity";
+import { recordActivity } from "../activity/writer";
 import type { HubRole } from "../profile/types";
 import type {
   HubOrderItem,
@@ -1598,34 +1599,36 @@ export async function createOrder(input: CreateOrderInput): Promise<HubOrderItem
   }
 
   // If crew created the order, populate relationships from the crew's assigned center
-  if (input.creator.role === 'crew' && !centerId && !customerId && !contractorId && !managerId) {
+  if (input.creator.role === 'crew') {
     const crewResult = await query<{ assigned_center: string | null; cks_manager: string | null }>(
       `SELECT assigned_center, cks_manager FROM crew WHERE UPPER(crew_id) = $1 LIMIT 1`,
       [normalizeCodeValue(input.creator.code)]
     );
     const crewRow = crewResult.rows[0];
 
-    if (crewRow?.assigned_center) {
+    if (!centerId && crewRow?.assigned_center) {
       centerId = normalizeCodeValue(crewRow.assigned_center);
     }
     if (!managerId && crewRow?.cks_manager) {
       managerId = normalizeCodeValue(crewRow.cks_manager);
     }
 
-    // Get customer and contractor from the center
-    if (centerId) {
-      const centerResult = await query<{ customer_id: string | null }>(
-        `SELECT customer_id FROM centers WHERE UPPER(center_id) = $1 LIMIT 1`,
-        [centerId]
-      );
-      const centerRow = centerResult.rows[0];
-
-      if (centerRow?.customer_id) {
-        customerId = normalizeCodeValue(centerRow.customer_id);
+    // Always populate customer and contractor for crew-created orders (needed for activity filtering)
+    const resolvedCenterId = centerId || normalizeCodeValue(crewRow?.assigned_center);
+    if (resolvedCenterId) {
+      if (!customerId) {
+        const centerResult = await query<{ customer_id: string | null }>(
+          `SELECT customer_id FROM centers WHERE UPPER(center_id) = $1 LIMIT 1`,
+          [resolvedCenterId]
+        );
+        const centerRow = centerResult.rows[0];
+        if (centerRow?.customer_id) {
+          customerId = normalizeCodeValue(centerRow.customer_id);
+        }
       }
 
       // Get contractor from the customer record
-      if (customerId) {
+      if (!contractorId && customerId) {
         const customerResult = await query<{ contractor_id: string | null }>(
           `SELECT contractor_id FROM customers WHERE UPPER(customer_id) = $1 LIMIT 1`,
           [customerId]
@@ -1778,6 +1781,26 @@ export async function createOrder(input: CreateOrderInput): Promise<HubOrderItem
       await ensureParticipant({ orderId, role: "manager", code: managerId, participationType: 'actor' }, q);
     }
     await ensureParticipantList(orderId, input.participants, q);
+  });
+
+  // Record activity: order_created
+  await recordActivity({
+    activityType: 'order_created',
+    description: `${input.orderType === 'product' ? 'Product' : 'Service'} order ${orderId} created`,
+    actorId: creatorCode,
+    actorRole: input.creator.role,
+    targetId: orderId,
+    targetType: 'order',
+    metadata: {
+      orderId,
+      orderType: input.orderType,
+      customerId: customerId ?? undefined,
+      centerId: centerId ?? undefined,
+      contractorId: contractorId ?? undefined,
+      managerId: managerId ?? undefined,
+      crewId: crewId ?? undefined,
+      warehouseId: assignedWarehouse ?? undefined,
+    },
   });
 
   const created = await fetchOrderById(orderId, { viewerRole: input.creator.role, viewerCode: creatorCode });
@@ -2226,6 +2249,54 @@ export async function applyOrderAction(input: OrderActionInput): Promise<HubOrde
   } catch (error) {
     await query("ROLLBACK");
     throw error;
+  }
+
+  // Record activity for status transitions (Phase 1)
+  let activityType: string | null = null;
+  let activityDescription: string | null = null;
+
+  switch (input.action) {
+    case "start-delivery":
+      activityType = 'delivery_started';
+      activityDescription = `Delivery started for ${orderType === 'product' ? 'product' : 'service'} order ${input.orderId}`;
+      break;
+    case "deliver":
+      activityType = 'order_delivered';
+      activityDescription = `${orderType === 'product' ? 'Product' : 'Service'} order ${input.orderId} delivered`;
+      break;
+    case "complete":
+      activityType = 'order_completed';
+      activityDescription = `Service order ${input.orderId} completed`;
+      break;
+    case "cancel":
+      activityType = 'order_cancelled';
+      activityDescription = `${orderType === 'product' ? 'Product' : 'Service'} order ${input.orderId} cancelled`;
+      break;
+    case "reject":
+      activityType = 'order_rejected';
+      activityDescription = `${orderType === 'product' ? 'Product' : 'Service'} order ${input.orderId} rejected`;
+      break;
+  }
+
+  if (activityType && activityDescription) {
+    await recordActivity({
+      activityType,
+      description: activityDescription,
+      actorId: actorCodeNormalized || 'SYSTEM',
+      actorRole: input.actorRole,
+      targetId: input.orderId,
+      targetType: 'order',
+      metadata: {
+        orderId: input.orderId,
+        orderType,
+        customerId: normalizeCodeValue(row.customer_id) ?? undefined,
+        centerId: normalizeCodeValue(row.center_id) ?? undefined,
+        contractorId: normalizeCodeValue(row.contractor_id) ?? undefined,
+        managerId: normalizeCodeValue(row.manager_id) ?? undefined,
+        crewId: normalizeCodeValue(row.crew_id) ?? undefined,
+        warehouseId: normalizeCodeValue(row.assigned_warehouse) ?? undefined,
+      },
+    });
   }
 
   return fetchOrderById(input.orderId, { viewerRole: input.actorRole, viewerCode: actorCodeNormalized });

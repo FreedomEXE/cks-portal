@@ -272,6 +272,25 @@ function createDirectoryResource<TResponse, TMapped = TResponse>(
   };
 }
 
+function formatRoleLabel(role?: string | null): string {
+  if (!role) return 'System';
+
+  const normalized = role.toLowerCase().trim();
+
+  const roleLabels: Record<string, string> = {
+    admin: 'Admin',
+    manager: 'Manager',
+    contractor: 'Contractor',
+    customer: 'Customer',
+    center: 'Center',
+    crew: 'Crew',
+    warehouse: 'Warehouse',
+    system: 'System',
+  };
+
+  return roleLabels[normalized] || 'System';
+}
+
 function mapActivities(items: ActivityApiItem[]): Activity[] {
   return items.map((item) => {
     const timestamp = item.createdAt ? new Date(item.createdAt) : new Date();
@@ -280,7 +299,8 @@ function mapActivities(items: ActivityApiItem[]): Activity[] {
       Object.assign(metadata, item.metadata);
     }
     if (item.actorRole) {
-      metadata.role = item.actorRole;
+      metadata.role = item.actorRole.toLowerCase();
+      metadata.title = formatRoleLabel(item.actorRole);
     }
     if (item.actorId) {
       metadata.actorId = item.actorId;

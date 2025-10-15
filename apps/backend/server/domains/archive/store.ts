@@ -1,6 +1,7 @@
-import { query } from '../../db/connection';
+import { query, withTransaction, type QueryResult, type QueryResultRow } from '../../db/connection';
 import { normalizeIdentity } from '../identity';
 import type { AuditContext } from '../provisioning';
+import { recordActivity as writeActivity } from '../activity/writer';
 
 export interface ArchivedEntity {
   id: string;
@@ -30,29 +31,97 @@ interface RestoreOperation {
   actor: AuditContext;
 }
 
+type QueryFunction = <R extends QueryResultRow = QueryResultRow>(
+  text: string,
+  params?: readonly unknown[],
+) => Promise<QueryResult<R>>;
+
+/**
+ * Redact PII fields from entity snapshots for compliance (GDPR, privacy)
+ * Keeps: ID, name, role, relationships, status
+ * Redacts: email, phone, address, SSN, emergency contacts, etc.
+ */
+function redactPII(entityType: string, snapshot: any): any {
+  const PII_ENTITY_TYPES = ['manager', 'contractor', 'customer', 'crew', 'center', 'warehouse'];
+
+  if (!PII_ENTITY_TYPES.includes(entityType)) {
+    return snapshot; // No PII in orders, services, reports, etc.
+  }
+
+  // Create shallow copy to avoid mutating original
+  const redacted = { ...snapshot };
+
+  // Redact common PII fields
+  const PII_FIELDS = [
+    'email',
+    'phone',
+    'mobile',
+    'address',
+    'street',
+    'city',
+    'state',
+    'zip',
+    'zipcode',
+    'postal_code',
+    'ssn',
+    'social_security',
+    'emergency_contact',
+    'emergency_phone',
+    'date_of_birth',
+    'dob',
+    'bank_account',
+    'routing_number',
+    'tax_id',
+    'ein',
+  ];
+
+  for (const field of PII_FIELDS) {
+    if (field in redacted && redacted[field] != null) {
+      redacted[field] = '[REDACTED]';
+    }
+  }
+
+  // Redact nested requestor/destination info if present
+  if (redacted.requestor_info?.data) {
+    redacted.requestor_info.data = redactPII('generic', redacted.requestor_info.data);
+  }
+  if (redacted.destination_info?.data) {
+    redacted.destination_info.data = redactPII('generic', redacted.destination_info.data);
+  }
+  if (redacted.center_info) {
+    redacted.center_info = redactPII('center', redacted.center_info);
+  }
+  if (redacted.customer_info) {
+    redacted.customer_info = redactPII('customer', redacted.customer_info);
+  }
+
+  return redacted;
+}
+
 async function recordActivity(
   activityType: string,
   description: string,
   targetId: string,
   targetType: string,
   actor: AuditContext,
-  metadata?: Record<string, unknown>
+  metadata?: Record<string, unknown>,
+  options?: { txQuery?: QueryFunction; throwOnError?: boolean }
 ): Promise<void> {
   const actorId = normalizeIdentity(actor.actorId) ?? 'ADMIN';
   const actorRole = actor.actorRole || 'admin';
 
-  try {
-    await query(
-      `INSERT INTO system_activity (
-        activity_type, description, actor_id, actor_role,
-        target_id, target_type, metadata, created_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, NOW())`,
-      [activityType, description, actorId, actorRole, targetId, targetType,
-       metadata ? JSON.stringify(metadata) : null]
-    );
-  } catch (error) {
-    console.warn('[archive] Failed to record activity', { activityType, targetId, error });
-  }
+  await writeActivity(
+    {
+      activityType,
+      description,
+      actorId,
+      actorRole,
+      targetId,
+      targetType,
+      metadata,
+    },
+    options
+  );
 }
 
 async function storeRelationships(entityType: string, entityId: string, actor: AuditContext): Promise<void> {
@@ -774,27 +843,106 @@ export async function hardDeleteEntity(
     throw new Error(`Cannot hard delete: Entity has ${childrenCount} active children`);
   }
 
-  // Perform hard delete
-  await query(
-    `DELETE FROM ${tableName} WHERE ${idColumn} = $1`,
-    [normalizedId]
-  );
+  // Execute deletion atomically within a transaction
+  // Order: capture snapshot → write activity → delete entity → clean relationships
+  // This ensures snapshot is never lost if deletion succeeds
+  await withTransaction(async (txQuery) => {
+    // 1. Capture entity snapshot BEFORE deleting
+    let snapshot: any = null;
 
-  // Clean up relationships
-  await query(
-    `DELETE FROM archive_relationships
-     WHERE entity_type = $1 AND entity_id = $2`,
-    [operation.entityType, normalizedId]
-  );
+    // For orders and services, capture enriched snapshot with related data
+    if (operation.entityType === 'order') {
+      const enrichedResult = await txQuery(
+        `SELECT
+          o.*,
+          json_agg(DISTINCT oi.*) FILTER (WHERE oi.item_id IS NOT NULL) as items,
+          row_to_json(req.*) as requestor_info,
+          row_to_json(dest.*) as destination_info
+        FROM ${tableName} o
+        LEFT JOIN order_items oi ON o.order_id = oi.order_id
+        LEFT JOIN LATERAL (
+          SELECT
+            CASE
+              WHEN o.requested_by_role = 'crew' THEN (SELECT row_to_json(c) FROM crew c WHERE c.crew_id = o.requested_by_code)
+              WHEN o.requested_by_role = 'center' THEN (SELECT row_to_json(ce) FROM centers ce WHERE ce.center_id = o.requested_by_code)
+              WHEN o.requested_by_role = 'customer' THEN (SELECT row_to_json(cu) FROM customers cu WHERE cu.customer_id = o.requested_by_code)
+              WHEN o.requested_by_role = 'contractor' THEN (SELECT row_to_json(co) FROM contractors co WHERE co.contractor_id = o.requested_by_code)
+              WHEN o.requested_by_role = 'manager' THEN (SELECT row_to_json(m) FROM managers m WHERE m.manager_id = o.requested_by_code)
+              WHEN o.requested_by_role = 'warehouse' THEN (SELECT row_to_json(w) FROM warehouses w WHERE w.warehouse_id = o.requested_by_code)
+            END as data
+        ) req ON true
+        LEFT JOIN LATERAL (
+          SELECT
+            CASE
+              WHEN o.destination_role = 'crew' THEN (SELECT row_to_json(c) FROM crew c WHERE c.crew_id = o.destination_code)
+              WHEN o.destination_role = 'center' THEN (SELECT row_to_json(ce) FROM centers ce WHERE ce.center_id = o.destination_code)
+              WHEN o.destination_role = 'customer' THEN (SELECT row_to_json(cu) FROM customers cu WHERE cu.customer_id = o.destination_code)
+              WHEN o.destination_role = 'warehouse' THEN (SELECT row_to_json(w) FROM warehouses w WHERE w.warehouse_id = o.destination_code)
+            END as data
+        ) dest ON true
+        WHERE ${idColumn} = $1
+        GROUP BY o.order_id, req.data, dest.data`,
+        [normalizedId]
+      );
+      snapshot = enrichedResult.rows[0] || null;
+    } else if (operation.entityType === 'service') {
+      const enrichedResult = await txQuery(
+        `SELECT
+          s.*,
+          row_to_json(c.*) as center_info,
+          row_to_json(cu.*) as customer_info
+        FROM ${tableName} s
+        LEFT JOIN centers c ON c.center_id = s.center_id
+        LEFT JOIN customers cu ON cu.customer_id = s.customer_id
+        WHERE ${idColumn} = $1`,
+        [normalizedId]
+      );
+      snapshot = enrichedResult.rows[0] || null;
+    } else {
+      // For other entity types, simple snapshot
+      const snapshotResult = await txQuery(
+        `SELECT * FROM ${tableName} WHERE ${idColumn} = $1`,
+        [normalizedId]
+      );
+      snapshot = snapshotResult.rows[0] || null;
+    }
 
-  await recordActivity(
-    `${operation.entityType}_hard_deleted`,
-    `Permanently deleted ${operation.entityType} ${normalizedId}`,
-    normalizedId,
-    operation.entityType,
-    operation.actor,
-    { reason: operation.reason }
-  );
+    if (!snapshot) {
+      throw new Error(`Entity not found: ${normalizedId}`);
+    }
+
+    // Redact PII for compliance (GDPR, etc.)
+    const redactedSnapshot = redactPII(operation.entityType, snapshot);
+
+    // 2. Record deletion activity FIRST (with snapshot)
+    // This ensures snapshot is saved before entity disappears
+    await recordActivity(
+      `${operation.entityType}_hard_deleted`,
+      `Permanently deleted ${operation.entityType} ${normalizedId}`,
+      normalizedId,
+      operation.entityType,
+      operation.actor,
+      {
+        reason: operation.reason,
+        snapshot: redactedSnapshot,  // Redacted snapshot for compliance
+        deletedAt: new Date().toISOString()
+      },
+      { txQuery, throwOnError: true }
+    );
+
+    // 3. Perform hard delete
+    await txQuery(
+      `DELETE FROM ${tableName} WHERE ${idColumn} = $1`,
+      [normalizedId]
+    );
+
+    // 4. Clean up relationships
+    await txQuery(
+      `DELETE FROM archive_relationships
+       WHERE entity_type = $1 AND entity_id = $2`,
+      [operation.entityType, normalizedId]
+    );
+  });
 
   return {
     success: true,

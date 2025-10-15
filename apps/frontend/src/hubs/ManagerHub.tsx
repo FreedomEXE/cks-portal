@@ -7,13 +7,14 @@ import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useAuth } from '@cks/auth';
 import { EcosystemTree } from '@cks/domain-widgets';
+import { useFormattedActivities } from '../shared/activity/useFormattedActivities';
+import { ActivityFeed } from '../components/ActivityFeed';
 import {
   MemosPreview,
   NewsPreview,
   OrdersSection,
   OverviewSection,
   ProfileInfoCard,
-  RecentActivity,
   ReportsSection,
   SupportSection,
   type Activity,
@@ -441,7 +442,6 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
   const [activeTab, setActiveTab] = useState(initialTab);
   const [servicesTab, setServicesTab] = useState<'my' | 'active' | 'history'>('my');
   const [servicesSearchQuery, setServicesSearchQuery] = useState('');
-  const [activityFeed, setActivityFeed] = useState<Activity[]>([]);
   const [toast, setToast] = useState<string | null>(null);
 
   // Service modal state (for Active Services section)
@@ -485,7 +485,8 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
   const { data: profileData } = useHubProfile(managerCode);
   const { data: dashboardData } = useHubDashboard(managerCode);
   const { data: scopeData } = useHubRoleScope(managerCode);
-  const { data: activitiesData, isLoading: activitiesLoading, error: activitiesError } = useHubActivities(managerCode);
+  const { activities: formattedActivities, isLoading: activitiesLoading, error: activitiesError } = useFormattedActivities(managerCode, { limit: 20 });
+
   const { data: ordersData } = useHubOrders(managerCode);
   const { mutate } = useSWRConfig();
 
@@ -560,26 +561,6 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
       actualStatus: order.status,
     }));
   }, [ordersData]);
-
-  // Map hub activities to the Activity format expected by RecentActivity component
-  const activityItems = useMemo(() => {
-    if (!activitiesData?.activities) return [];
-    return activitiesData.activities.map(item => ({
-      id: item.id,
-      timestamp: item.createdAt ? new Date(item.createdAt) : new Date(),
-      actorType: item.actorRole ?? 'Manager',
-      actorName: item.actorId ?? 'System',
-      action: item.category ?? 'action',
-      target: item.targetId ?? '',
-      details: item.description ?? '',
-      location: item.targetType ?? '',
-      status: 'completed' as const
-    }));
-  }, [activitiesData]);
-
-  useEffect(() => {
-    setActivityFeed(activityItems);
-  }, [activityItems]);
 
   const managerRecord = profileData;
   const managerDisplayName = profileData?.name ?? fullName ?? firstName ?? 'Manager';
@@ -940,10 +921,6 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
       ? 'Loading recent activity...'
       : 'No recent manager activity';
 
-  const handleClearActivity = useCallback(() => {
-    setActivityFeed([]);
-  }, []);
-
   const [selectedOrderForDetails, setSelectedOrderForDetails] = useState<HubOrderItem | null>(null);
 
   const handleOrderAction = useCallback(async (orderId: string, action: string) => {
@@ -1086,10 +1063,12 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
               <OverviewSection cards={OVERVIEW_CARDS} data={overviewData} />
 
               <PageHeader title="Recent Activity" />
-              <RecentActivity
-                activities={activityFeed}
-                onClear={handleClearActivity}
-                emptyMessage={activityEmptyMessage}
+              <ActivityFeed
+                activities={formattedActivities}
+                hub="manager"
+                isLoading={activitiesLoading}
+                error={activitiesError}
+                onError={(msg) => toast.error(msg)}
               />
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 24 }}>

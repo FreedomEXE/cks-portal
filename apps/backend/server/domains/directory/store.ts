@@ -261,9 +261,43 @@ type ActivityRow = {
 };
 
 const activityTypeCategory: Record<string, string> = {
+  // Assignment activities
   assignment_made: 'action',
+  manager_assigned: 'action',
+  contractor_assigned_to_manager: 'action',
+  customer_assigned_to_contractor: 'action',
+  center_assigned_to_customer: 'action',
+  crew_assigned_to_center: 'action',
+  order_assigned_to_warehouse: 'action',
+
+  // Creation activities
+  manager_created: 'action',
+  contractor_created: 'action',
+  customer_created: 'action',
+  center_created: 'action',
+  crew_created: 'action',
+  warehouse_created: 'action',
+  order_created: 'action',
+  service_created: 'action',
+
+  // Success/completion activities
+  order_delivered: 'success',
+  order_completed: 'success',
+  service_completed: 'success',
+  order_accepted: 'success',
+  order_approved: 'success',
+
+  // Warning/error activities
+  order_cancelled: 'warning',
+  order_rejected: 'warning',
+  order_failed: 'warning',
+  service_cancelled: 'warning',
   support_ticket_updated: 'warning',
-  manager_assigned: 'info',
+
+  // Update activities
+  order_updated: 'info',
+  service_updated: 'info',
+  profile_updated: 'info',
 };
 
 async function listManagers(limit = DEFAULT_LIMIT): Promise<ManagerDirectoryEntry[]> {
@@ -762,7 +796,7 @@ async function listFeedback(limit = DEFAULT_LIMIT): Promise<FeedbackDirectoryEnt
 }
 
 async function listActivities(limit = DEFAULT_LIMIT): Promise<ActivityEntry[]> {
-  const result = await query<ActivityRow>('SELECT activity_id, description, activity_type, actor_id, actor_role, target_id, target_type, metadata, created_at FROM system_activity ORDER BY activity_id LIMIT $1', [limit]);
+  const result = await query<ActivityRow>('SELECT activity_id, description, activity_type, actor_id, actor_role, target_id, target_type, metadata, created_at FROM system_activity ORDER BY created_at DESC', []);
   return result.rows.map((row) => ({
     id: String(row.activity_id),
     description: row.description,

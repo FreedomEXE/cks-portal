@@ -85,9 +85,43 @@ function ensureId(value: string | null | undefined, fallbackPrefix: string): str
   return trimmed.toUpperCase();
 }
 const activityTypeCategory: Record<string, string> = {
+  // Assignment activities
   assignment_made: 'action',
+  manager_assigned: 'action',
+  contractor_assigned_to_manager: 'action',
+  customer_assigned_to_contractor: 'action',
+  center_assigned_to_customer: 'action',
+  crew_assigned_to_center: 'action',
+  order_assigned_to_warehouse: 'action',
+
+  // Creation activities
+  manager_created: 'action',
+  contractor_created: 'action',
+  customer_created: 'action',
+  center_created: 'action',
+  crew_created: 'action',
+  warehouse_created: 'action',
+  order_created: 'action',
+  service_created: 'action',
+
+  // Success/completion activities
+  order_delivered: 'success',
+  order_completed: 'success',
+  service_completed: 'success',
+  order_accepted: 'success',
+  order_approved: 'success',
+
+  // Warning/error activities
+  order_cancelled: 'warning',
+  order_rejected: 'warning',
+  order_failed: 'warning',
+  service_cancelled: 'warning',
   support_ticket_updated: 'warning',
-  manager_assigned: 'info',
+
+  // Update activities
+  order_updated: 'info',
+  service_updated: 'info',
+  profile_updated: 'info',
 };
 
 type ActivityRow = {
@@ -317,13 +351,36 @@ async function getManagerActivities(cksCode: string): Promise<HubRoleActivitiesP
     `SELECT activity_id, description, activity_type, actor_id, actor_role, target_id, target_type, metadata, created_at
      FROM system_activity
      WHERE (
-       actor_id IS NOT NULL AND UPPER(actor_id) = ANY($1::text[])
-     ) OR (
-       target_id IS NOT NULL AND UPPER(target_id) = ANY($1::text[])
-     ) OR (
-       metadata ? 'managerId' AND UPPER(metadata->>'managerId') = $2
-     ) OR (
-       metadata ? 'cksManager' AND UPPER(metadata->>'cksManager') = $2
+       -- Exclude archive/delete activities (admin-only)
+       activity_type NOT LIKE '%_archived'
+       AND activity_type NOT LIKE '%_deleted'
+       AND activity_type NOT LIKE '%_hard_deleted'
+       AND activity_type NOT LIKE '%_restored'
+     ) AND (
+       -- Show creation activities ONLY if target is self
+       (activity_type LIKE '%_created' AND UPPER(target_id) = $2)
+       OR
+       -- Show assignments where YOU are being assigned (target is self)
+       (activity_type LIKE '%_assigned%' AND UPPER(target_id) = $2)
+       OR
+       -- Show assignments where someone is assigned TO you (you're the parent)
+       (
+         (activity_type = 'contractor_assigned_to_manager' AND metadata ? 'managerId' AND UPPER(metadata->>'managerId') = $2)
+       )
+       OR
+       -- Show other activity types (orders, services, etc.) for ecosystem
+       -- SAFE: Only if target is in ecosystem OR actor is self OR metadata references self
+       (
+         activity_type NOT IN ('manager_created', 'contractor_created', 'customer_created', 'center_created', 'crew_created', 'warehouse_created')
+         AND activity_type NOT LIKE '%assigned%'
+         AND activity_type != 'assignment_made'
+       )
+       AND (
+         (target_id IS NOT NULL AND UPPER(target_id) = ANY($1::text[]))
+         OR (actor_id IS NOT NULL AND UPPER(actor_id) = $2)
+         OR (metadata ? 'managerId' AND UPPER(metadata->>'managerId') = $2)
+         OR (metadata ? 'cksManager' AND UPPER(metadata->>'cksManager') = $2)
+       )
      )
      ORDER BY created_at DESC
      LIMIT 50`,
@@ -845,8 +902,7 @@ async function getWarehouseRoleScope(cksCode: string): Promise<WarehouseRoleScop
       `SELECT COUNT(*)::text AS count
        FROM orders
        WHERE UPPER(warehouse_id) = $1
-       AND LOWER(status) = 'scheduled'
-       AND scheduled_date >= CURRENT_DATE`,
+       AND LOWER(status) = 'scheduled'`,
       [normalizedCode],
     ),
     query<{ count: string }>(
@@ -927,11 +983,35 @@ async function getContractorActivities(cksCode: string): Promise<HubRoleActiviti
     `SELECT activity_id, description, activity_type, actor_id, actor_role, target_id, target_type, metadata, created_at
      FROM system_activity
      WHERE (
-       actor_id IS NOT NULL AND UPPER(actor_id) = ANY($1::text[])
-     ) OR (
-       target_id IS NOT NULL AND UPPER(target_id) = ANY($1::text[])
-     ) OR (
-       metadata ? 'contractorId' AND UPPER(metadata->>'contractorId') = $2
+       -- Exclude archive/delete activities (admin-only)
+       activity_type NOT LIKE '%_archived'
+       AND activity_type NOT LIKE '%_deleted'
+       AND activity_type NOT LIKE '%_hard_deleted'
+       AND activity_type NOT LIKE '%_restored'
+     ) AND (
+       -- Show creation activities ONLY if target is self
+       (activity_type LIKE '%_created' AND UPPER(target_id) = $2)
+       OR
+       -- Show assignments where YOU are being assigned (target is self)
+       (activity_type LIKE '%_assigned%' AND UPPER(target_id) = $2)
+       OR
+       -- Show assignments where someone is assigned TO you (you're the parent)
+       (
+         (activity_type = 'customer_assigned_to_contractor' AND metadata ? 'contractorId' AND UPPER(metadata->>'contractorId') = $2)
+       )
+       OR
+       -- Show other activity types (orders, services, etc.) for ecosystem
+       -- SAFE: Only if target is in ecosystem OR actor is self OR metadata references self
+       (
+         activity_type NOT IN ('manager_created', 'contractor_created', 'customer_created', 'center_created', 'crew_created', 'warehouse_created')
+         AND activity_type NOT LIKE '%assigned%'
+         AND activity_type != 'assignment_made'
+       )
+       AND (
+         (target_id IS NOT NULL AND UPPER(target_id) = ANY($1::text[]))
+         OR (actor_id IS NOT NULL AND UPPER(actor_id) = $2)
+         OR (metadata ? 'contractorId' AND UPPER(metadata->>'contractorId') = $2)
+       )
      )
      ORDER BY created_at DESC
      LIMIT 50`,
@@ -982,11 +1062,35 @@ async function getCustomerActivities(cksCode: string): Promise<HubRoleActivities
     `SELECT activity_id, description, activity_type, actor_id, actor_role, target_id, target_type, metadata, created_at
      FROM system_activity
      WHERE (
-       actor_id IS NOT NULL AND UPPER(actor_id) = ANY($1::text[])
-     ) OR (
-       target_id IS NOT NULL AND UPPER(target_id) = ANY($1::text[])
-     ) OR (
-       metadata ? 'customerId' AND UPPER(metadata->>'customerId') = $2
+       -- Exclude archive/delete activities (admin-only)
+       activity_type NOT LIKE '%_archived'
+       AND activity_type NOT LIKE '%_deleted'
+       AND activity_type NOT LIKE '%_hard_deleted'
+       AND activity_type NOT LIKE '%_restored'
+     ) AND (
+       -- Show creation activities ONLY if target is self
+       (activity_type LIKE '%_created' AND UPPER(target_id) = $2)
+       OR
+       -- Show assignments where YOU are being assigned (target is self)
+       (activity_type LIKE '%_assigned%' AND UPPER(target_id) = $2)
+       OR
+       -- Show assignments where someone is assigned TO you (you're the parent)
+       (
+         (activity_type = 'center_assigned_to_customer' AND metadata ? 'customerId' AND UPPER(metadata->>'customerId') = $2)
+       )
+       OR
+       -- Show other activity types (orders, services, etc.) for ecosystem
+       -- SAFE: Only if target is in ecosystem OR actor is self OR metadata references self
+       (
+         activity_type NOT IN ('manager_created', 'contractor_created', 'customer_created', 'center_created', 'crew_created', 'warehouse_created')
+         AND activity_type NOT LIKE '%assigned%'
+         AND activity_type != 'assignment_made'
+       )
+       AND (
+         (target_id IS NOT NULL AND UPPER(target_id) = ANY($1::text[]))
+         OR (actor_id IS NOT NULL AND UPPER(actor_id) = $2)
+         OR (metadata ? 'customerId' AND UPPER(metadata->>'customerId') = $2)
+       )
      )
      ORDER BY created_at DESC
      LIMIT 50`,
@@ -1030,11 +1134,35 @@ async function getCenterActivities(cksCode: string): Promise<HubRoleActivitiesPa
     `SELECT activity_id, description, activity_type, actor_id, actor_role, target_id, target_type, metadata, created_at
      FROM system_activity
      WHERE (
-       actor_id IS NOT NULL AND UPPER(actor_id) = ANY($1::text[])
-     ) OR (
-       target_id IS NOT NULL AND UPPER(target_id) = ANY($1::text[])
-     ) OR (
-       metadata ? 'centerId' AND UPPER(metadata->>'centerId') = $2
+       -- Exclude archive/delete activities (admin-only)
+       activity_type NOT LIKE '%_archived'
+       AND activity_type NOT LIKE '%_deleted'
+       AND activity_type NOT LIKE '%_hard_deleted'
+       AND activity_type NOT LIKE '%_restored'
+     ) AND (
+       -- Show creation activities ONLY if target is self
+       (activity_type LIKE '%_created' AND UPPER(target_id) = $2)
+       OR
+       -- Show assignments where YOU are being assigned (target is self)
+       (activity_type LIKE '%_assigned%' AND UPPER(target_id) = $2)
+       OR
+       -- Show assignments where someone is assigned TO you (you're the parent)
+       (
+         (activity_type = 'crew_assigned_to_center' AND metadata ? 'centerId' AND UPPER(metadata->>'centerId') = $2)
+       )
+       OR
+       -- Show other activity types (orders, services, etc.) for ecosystem
+       -- SAFE: Only if target is in ecosystem OR actor is self OR metadata references self
+       (
+         activity_type NOT IN ('manager_created', 'contractor_created', 'customer_created', 'center_created', 'crew_created', 'warehouse_created')
+         AND activity_type NOT LIKE '%assigned%'
+         AND activity_type != 'assignment_made'
+       )
+       AND (
+         (target_id IS NOT NULL AND UPPER(target_id) = ANY($1::text[]))
+         OR (actor_id IS NOT NULL AND UPPER(actor_id) = $2)
+         OR (metadata ? 'centerId' AND UPPER(metadata->>'centerId') = $2)
+       )
      )
      ORDER BY created_at DESC
      LIMIT 50`,
@@ -1078,11 +1206,30 @@ async function getCrewActivities(cksCode: string): Promise<HubRoleActivitiesPayl
     `SELECT activity_id, description, activity_type, actor_id, actor_role, target_id, target_type, metadata, created_at
      FROM system_activity
      WHERE (
-       actor_id IS NOT NULL AND UPPER(actor_id) = ANY($1::text[])
-     ) OR (
-       target_id IS NOT NULL AND UPPER(target_id) = ANY($1::text[])
-     ) OR (
-       metadata ? 'crewId' AND UPPER(metadata->>'crewId') = $2
+       -- Exclude archive/delete activities (admin-only)
+       activity_type NOT LIKE '%_archived'
+       AND activity_type NOT LIKE '%_deleted'
+       AND activity_type NOT LIKE '%_hard_deleted'
+       AND activity_type NOT LIKE '%_restored'
+     ) AND (
+       -- Show creation activities ONLY if target is self
+       (activity_type LIKE '%_created' AND UPPER(target_id) = $2)
+       OR
+       -- Show assignments where YOU are being assigned (target is self)
+       (activity_type LIKE '%_assigned%' AND UPPER(target_id) = $2)
+       OR
+       -- Show other activity types (orders, services, etc.) for ecosystem
+       -- SAFE: Only if target is in ecosystem OR actor is self OR metadata references self
+       (
+         activity_type NOT IN ('manager_created', 'contractor_created', 'customer_created', 'center_created', 'crew_created', 'warehouse_created')
+         AND activity_type NOT LIKE '%assigned%'
+         AND activity_type != 'assignment_made'
+       )
+       AND (
+         (target_id IS NOT NULL AND UPPER(target_id) = ANY($1::text[]))
+         OR (actor_id IS NOT NULL AND UPPER(actor_id) = $2)
+         OR (metadata ? 'crewId' AND UPPER(metadata->>'crewId') = $2)
+       )
      )
      ORDER BY created_at DESC
      LIMIT 50`,
@@ -1126,11 +1273,35 @@ async function getWarehouseActivities(cksCode: string): Promise<HubRoleActivitie
     `SELECT activity_id, description, activity_type, actor_id, actor_role, target_id, target_type, metadata, created_at
      FROM system_activity
      WHERE (
-       actor_id IS NOT NULL AND UPPER(actor_id) = ANY($1::text[])
-     ) OR (
-       target_id IS NOT NULL AND UPPER(target_id) = ANY($1::text[])
-     ) OR (
-       metadata ? 'warehouseId' AND UPPER(metadata->>'warehouseId') = $2
+       -- Exclude archive/delete activities (admin-only)
+       activity_type NOT LIKE '%_archived'
+       AND activity_type NOT LIKE '%_deleted'
+       AND activity_type NOT LIKE '%_hard_deleted'
+       AND activity_type NOT LIKE '%_restored'
+     ) AND (
+       -- Show creation activities ONLY if target is self
+       (activity_type LIKE '%_created' AND UPPER(target_id) = $2)
+       OR
+       -- Show assignments where YOU are being assigned (target is self)
+       (activity_type LIKE '%_assigned%' AND UPPER(target_id) = $2)
+       OR
+       -- Show assignments where someone is assigned TO you (warehouse might have order assignments)
+       (
+         (activity_type = 'order_assigned_to_warehouse' AND metadata ? 'warehouseId' AND UPPER(metadata->>'warehouseId') = $2)
+       )
+       OR
+       -- Show other activity types (orders, services, etc.) for ecosystem
+       -- SAFE: Only if target is in ecosystem OR actor is self OR metadata references self
+       (
+         activity_type NOT IN ('manager_created', 'contractor_created', 'customer_created', 'center_created', 'crew_created', 'warehouse_created')
+         AND activity_type NOT LIKE '%assigned%'
+         AND activity_type != 'assignment_made'
+       )
+       AND (
+         (target_id IS NOT NULL AND UPPER(target_id) = ANY($1::text[]))
+         OR (actor_id IS NOT NULL AND UPPER(actor_id) = $2)
+         OR (metadata ? 'warehouseId' AND UPPER(metadata->>'warehouseId') = $2)
+       )
      )
      ORDER BY created_at DESC
      LIMIT 50`,

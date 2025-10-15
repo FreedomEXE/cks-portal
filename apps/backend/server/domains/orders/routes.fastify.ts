@@ -57,7 +57,7 @@ const actionParamsSchema = z.object({
 });
 
 const actionBodySchema = z.object({
-  action: z.enum(['accept', 'reject', 'start-delivery', 'deliver', 'cancel', 'create-service']),
+  action: z.enum(['accept', 'reject', 'start-delivery', 'deliver', 'cancel', 'create-service', 'complete']),
   notes: z.string().trim().max(1000).optional(),
   transformedId: z.string().trim().min(1).optional(),
   metadata: z.record(z.string(), z.any()).optional(), // For create-service action

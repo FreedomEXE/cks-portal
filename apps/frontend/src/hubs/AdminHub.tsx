@@ -18,7 +18,6 @@ import {
   MemosPreview,
   NewsPreview,
   OverviewSection,
-  RecentActivity,
   ReportDetailsModal,
   type Activity,
 } from '@cks/domain-widgets';
@@ -45,6 +44,8 @@ import { useSWRConfig } from 'swr';
 import MyHubSection from '../components/MyHubSection';
 import { useLogout } from '../hooks/useLogout';
 import { useAuth } from '@cks/auth';
+import { useTabsFromUrl } from '../hooks/useTabsFromUrl';
+import { useModalFromUrl } from '../hooks/useModalFromUrl';
 import { archiveAPI, type EntityType } from '../shared/api/archive';
 import '../shared/api/test-archive'; // Temporary test import
 import AdminAssignSection from './components/AdminAssignSection';
@@ -76,6 +77,7 @@ import {
   type OrderActionRequest,
   type UpdateOrderFieldsRequest,
 } from '../shared/api/hub';
+import { ActivityFeed } from '../components/ActivityFeed';
 
 // Removed unused: const MILLIS_PER_DAY = 1000 * 60 * 60 * 24;
 
@@ -217,11 +219,33 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
     { id: 'priority', title: 'High Priority', dataKey: 'highPriorityCount', color: 'red' },
     { id: 'days', title: 'Days Online', dataKey: 'daysOnline', color: 'green' },
   ];
-  const [activeTab, setActiveTab] = useState(initialTab);
-  const [directoryTab, setDirectoryTab] = useState<string>('admins');
-  const [servicesSubTab, setServicesSubTab] = useState<string>('catalog-services');
-  const [ordersSubTab, setOrdersSubTab] = useState<string>('product-orders');
-  const [reportsSubTab, setReportsSubTab] = useState<string>('reports');
+
+  // URL-driven tab state
+  const {
+    activeTab,
+    setActiveTab,
+    directoryTab,
+    setDirectoryTab,
+    ordersSubTab,
+    setOrdersSubTab,
+    servicesSubTab,
+    setServicesSubTab,
+    reportsSubTab,
+    setReportsSubTab,
+  } = useTabsFromUrl({
+    defaultTab: initialTab,
+    defaultDirTab: 'admins',
+    defaultOrdersSubTab: 'product-orders',
+    defaultServicesSubTab: 'catalog-services',
+    defaultReportsSubTab: 'reports',
+  });
+
+  // URL-driven modal state
+  const orderModal = useModalFromUrl('order');
+  const serviceModal = useModalFromUrl('service');
+  const userModal = useModalFromUrl('user');
+  const reportModal = useModalFromUrl('report');
+
   const [showActionModal, setShowActionModal] = useState(false);
   const [selectedEntity, setSelectedEntity] = useState<Record<string, any> | null>(null);
   const [showServiceCatalogModal, setShowServiceCatalogModal] = useState(false);
@@ -234,6 +258,49 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
   const [selectedReportForDetails, setSelectedReportForDetails] = useState<any | null>(null);
   const logout = useLogout();
   const { mutate } = useSWRConfig();
+
+  // Watch URL params and open modals accordingly
+  useEffect(() => {
+    // Order modal from URL
+    if (orderModal.isOpen && orderModal.entityId) {
+      // Fetch order by ID and set selectedOrderForDetails
+      // For now, using existing fetchAdminOrderById from the old logic
+      import('../shared/api/admin').then(({ fetchAdminOrderById }) => {
+        fetchAdminOrderById(orderModal.entityId!).then((order) => {
+          if (order) {
+            setSelectedOrderForDetails(order as any);
+          }
+        }).catch((err) => {
+          console.error('[AdminHub] Failed to fetch order from URL:', err);
+          setToast('Failed to load order');
+          setTimeout(() => setToast(null), 3000);
+        });
+      });
+    } else if (!orderModal.isOpen && selectedOrderForDetails) {
+      // URL cleared, close modal
+      setSelectedOrderForDetails(null);
+    }
+
+    // Service modal from URL
+    if (serviceModal.isOpen && serviceModal.entityId) {
+      // Set selected service for modal
+      setSelectedServiceCatalog({
+        serviceId: serviceModal.entityId,
+        name: null,
+        category: null,
+        status: null,
+        description: null,
+        metadata: null,
+      });
+      setShowServiceCatalogModal(true);
+    } else if (!serviceModal.isOpen && showServiceCatalogModal) {
+      // URL cleared, close modal
+      setShowServiceCatalogModal(false);
+      setSelectedServiceCatalog(null);
+    }
+
+    // Add other modals (user, report) as needed...
+  }, [orderModal.isOpen, orderModal.entityId, serviceModal.isOpen, serviceModal.entityId]);
 
   // Helper function to normalize identity (same as in WarehouseHub)
   const normalizeIdentity = (code: string | null | undefined): string | null => {
@@ -1316,12 +1383,6 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
     );
   };
 
-  const activityEmptyMessage = activitiesError
-    ? 'Failed to load activity feed.'
-    : activitiesLoading
-      ? 'Loading recent activity...'
-      : 'No recent activity yet.';
-
   const handleClearActivity = () => setActivityFeed([]);
 
   // Don't render anything until we have critical data
@@ -1348,10 +1409,16 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
               <OverviewSection cards={overviewCards} data={overviewData} />
 
               <PageHeader title="Recent Activity" />
-              <RecentActivity
+              <ActivityFeed
                 activities={activityFeed}
+                hub="admin"
                 onClear={handleClearActivity}
-                emptyMessage={activityEmptyMessage}
+                isLoading={activitiesLoading}
+                error={activitiesError}
+                onError={(message) => {
+                  setToast(message);
+                  setTimeout(() => setToast(null), 3000);
+                }}
               />
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 24 }}>
@@ -1849,7 +1916,10 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
           return (
             <ServiceOrderModal
               isOpen={!!selectedOrderForDetails}
-              onClose={() => setSelectedOrderForDetails(null)}
+              onClose={() => {
+                orderModal.close();
+                setSelectedOrderForDetails(null);
+              }}
               order={commonOrder}
               availability={commonAvailability}
               cancellationReason={commonCancellation.cancellationReason}
@@ -1866,7 +1936,10 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
           return (
             <ProductOrderModal
               isOpen={!!selectedOrderForDetails}
-              onClose={() => setSelectedOrderForDetails(null)}
+              onClose={() => {
+                orderModal.close();
+                setSelectedOrderForDetails(null);
+              }}
               order={commonOrder ? { ...commonOrder, items } : null}
               availability={commonAvailability}
               cancellationReason={commonCancellation.cancellationReason}
@@ -1882,7 +1955,10 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
           return (
             <OrderDetailsModal
               isOpen={!!selectedOrderForDetails}
-              onClose={() => setSelectedOrderForDetails(null)}
+              onClose={() => {
+                orderModal.close();
+                setSelectedOrderForDetails(null);
+              }}
               order={commonOrder ? { ...commonOrder, orderType, items: selectedOrderForDetails?.items || [] } : null}
               infoBanner={
                 (selectedOrderForDetails as any)?.archivedAt

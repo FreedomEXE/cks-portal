@@ -1,6 +1,7 @@
 import React from 'react';
 import styles from './ServiceOrderModal.module.css';
 import { ModalRoot } from '../ModalRoot';
+import { DeletedBanner } from '../../banners/DeletedBanner';
 
 export interface ServiceOrderModalProps {
   isOpen: boolean;
@@ -16,6 +17,9 @@ export interface ServiceOrderModalProps {
     managedBy?: string | null;
     managedById?: string | null;
     managedByName?: string | null;
+    isDeleted?: boolean;
+    deletedAt?: string;
+    deletedBy?: string;
   } | null;
   requestorInfo?: {
     name: string | null;
@@ -103,6 +107,18 @@ const ServiceOrderModal: React.FC<ServiceOrderModalProps> = ({
             ✕
           </button>
         </div>
+
+        {/* Deleted Banner */}
+        {order.isDeleted && (
+          <div style={{ padding: '0 16px', marginTop: '16px' }}>
+            <DeletedBanner
+              deletedAt={order.deletedAt}
+              deletedBy={order.deletedBy}
+              entityType="order"
+              entityId={order.orderId}
+            />
+          </div>
+        )}
 
         {/* Status Badge */}
         {order.status && (

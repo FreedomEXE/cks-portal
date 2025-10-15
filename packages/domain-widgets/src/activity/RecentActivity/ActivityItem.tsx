@@ -6,6 +6,7 @@ interface ActivityItemProps {
   type?: 'info' | 'success' | 'warning' | 'action';
   role?: string; // Role that generated this activity
   title?: string; // Optional title for the activity
+  onClick?: () => void; // Optional click handler for activity routing
 }
 
 // Role-based color schemes
@@ -74,7 +75,8 @@ export function ActivityItem({
   timestamp,
   type = 'info',
   role = 'default',
-  title
+  title,
+  onClick
 }: ActivityItemProps) {
   const colors = roleColors[role] || roleColors.default;
   const relativeTime = getRelativeTime(timestamp);
@@ -82,6 +84,8 @@ export function ActivityItem({
     hour: '2-digit',
     minute: '2-digit'
   });
+
+  const isClickable = !!onClick;
 
   return (
     <div
@@ -91,11 +95,17 @@ export function ActivityItem({
         borderRadius: '6px',
         marginBottom: '8px',
         transition: 'transform 0.2s, box-shadow 0.2s',
-        cursor: 'default',
+        cursor: isClickable ? 'pointer' : 'default',
       }}
+      onClick={onClick}
       onMouseEnter={(e) => {
-        e.currentTarget.style.transform = 'translateX(2px)';
-        e.currentTarget.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.1)';
+        if (isClickable) {
+          e.currentTarget.style.transform = 'translateX(4px)';
+          e.currentTarget.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.15)';
+        } else {
+          e.currentTarget.style.transform = 'translateX(2px)';
+          e.currentTarget.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.1)';
+        }
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.transform = 'none';

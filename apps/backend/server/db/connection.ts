@@ -1,5 +1,8 @@
 import { Pool, PoolConfig, QueryResult, QueryResultRow } from 'pg';
 
+// Re-export types for use in other modules
+export type { QueryResult, QueryResultRow };
+
 interface LoggerLike {
   info?: (...args: unknown[]) => void;
   warn?: (...args: unknown[]) => void;

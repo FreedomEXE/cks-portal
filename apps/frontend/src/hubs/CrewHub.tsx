@@ -31,6 +31,8 @@ import { Button, DataTable, ModalProvider, OrderDetailsModal, ProductOrderModal,
 import { useAuth } from '@cks/auth';
 import { useCatalogItems } from '../shared/api/catalog';
 import { useServices as useDirectoryServices } from '../shared/api/directory';
+import { useFormattedActivities } from '../shared/activity/useFormattedActivities';
+import { ActivityFeed } from '../components/ActivityFeed';
 
 import MyHubSection from '../components/MyHubSection';
 import {
@@ -146,27 +148,6 @@ function normalizeOrderStatus(value?: string | null): HubOrderItem['status'] {
   }
 }
 
-function buildActivities(serviceOrders: HubOrderItem[], productOrders: HubOrderItem[]): Activity[] {
-  const combined = [...serviceOrders, ...productOrders]
-    .map((order) => ({
-      order,
-      timestamp: order.requestedDate ? new Date(order.requestedDate) : new Date(),
-    }))
-    .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
-    .slice(0, 10);
-
-  return combined.map(({ order, timestamp }) => ({
-    id: order.orderId,
-    message: `${order.orderType === 'service' ? 'Service' : 'Product'} order ${order.orderId} ${formatStatusLabel(order.status)}`,
-    timestamp,
-    type: getStatusBadgePalette(order.status).color === '#16a34a' ? 'success' : 'info',
-    metadata: {
-      role: 'crew',
-      orderType: order.orderType,
-      status: order.status,
-    },
-  }));
-}
 
 export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
   const navigate = useNavigate();
@@ -309,7 +290,7 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
     }));
   }, [orders]);
 
-  const activities = useMemo(() => buildActivities(serviceOrders, productOrders), [serviceOrders, productOrders]);
+  const { activities, isLoading: activitiesLoading, error: activitiesError } = useFormattedActivities(normalizedCode, { limit: 20 });
 
   const overviewData = useMemo(() => ({
     activeServices: (dashboard as any)?.activeServices ?? 0,
@@ -492,10 +473,12 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
               />
 
               <PageHeader title="Recent Activity" />
-              <RecentActivity
+              <ActivityFeed
                 activities={activities}
-                onClear={() => undefined}
-                emptyMessage="No recent crew activity"
+                hub="crew"
+                isLoading={activitiesLoading}
+                error={activitiesError}
+                onError={(msg) => toast.error(msg)}
               />
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 24 }}>

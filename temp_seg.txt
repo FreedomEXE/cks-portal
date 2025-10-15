@@ -1,0 +1,80 @@
+    addId(member.id);
+    addId(member.assignedCenter);
+  });
+
+  const idArray = Array.from(ids);
+  if (!idArray.length) {
+    idArray.push(scope.cksCode);
+  }
+
+  const activitiesResult = await query<ActivityRow>(
+    `SELECT activity_id, description, activity_type, actor_id, actor_role, target_id, target_type, metadata, created_at
+     FROM system_activity
+     WHERE (
+       -- Exclude archive/delete activities (admin-only)
+       activity_type NOT LIKE '%_archived'
+       AND activity_type NOT LIKE '%_deleted'
+       AND activity_type NOT LIKE '%_hard_deleted'
+       AND activity_type NOT LIKE '%_restored'
+     ) AND (
+       -- Show creation activities ONLY if target is self
+       (activity_type LIKE '%_created' AND UPPER(target_id) = $2)
+       OR
+       -- Show assignments where YOU are being assigned (target is self)
+       (activity_type LIKE '%_assigned%' AND UPPER(target_id) = $2)
+       OR
+       -- Show assignments where someone is assigned TO you (you're the parent)
+       (
+         (activity_type = 'contractor_assigned_to_manager' AND metadata ? 'managerId' AND UPPER(metadata->>'managerId') = $2)
+       )
+       OR
+       -- Show other activity types (orders, services, etc.) for ecosystem
+       -- SAFE: Only if target is in ecosystem OR actor is self OR metadata references self
+       (
+         activity_type NOT LIKE '%_created'
+         AND activity_type NOT LIKE '%_assigned'
+         AND activity_type != 'assignment_made'
+       )
+       AND (
+         (target_id IS NOT NULL AND UPPER(target_id) = ANY($1::text[]))
+         OR (actor_id IS NOT NULL AND UPPER(actor_id) = $2)
+         OR (metadata ? 'managerId' AND UPPER(metadata->>'managerId') = $2)
+         OR (metadata ? 'cksManager' AND UPPER(metadata->>'cksManager') = $2)
+       )
+     )
+     ORDER BY created_at DESC
+     LIMIT 50`,
+    [idArray, scope.cksCode],
+  );
+
+  const activities = activitiesResult.rows.map(mapActivityRow);
+
+  return {
+    role: 'manager',
+    cksCode: scope.cksCode,
+    activities,
+  };
+}
+
+async function getContractorRoleScope(cksCode: string): Promise<ContractorRoleScopePayload | null> {
+  const normalizedCode = normalizeIdentity(cksCode);
+  if (!normalizedCode) {
+    return null;
+  }
+
+  const contractorResult = await query<{
+    cks_manager: string | null;
+    status: string | null
+  }>(
+    `SELECT cks_manager, status FROM contractors WHERE UPPER(contractor_id) = $1 LIMIT 1`,
+    [normalizedCode],
+  );
+
+  if (!contractorResult.rowCount) {
+    return null;
+  }
+
+  const contractorRow = contractorResult.rows[0];
+
+  const [customerRows, centerRows, crewRows, serviceCount] = await Promise.all([
+    query<{

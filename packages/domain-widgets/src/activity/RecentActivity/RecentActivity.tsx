@@ -16,10 +16,12 @@ export interface Activity {
 
 interface RecentActivityProps {
   activities: Activity[];
-  onClear: () => void;
+  onClear?: () => void;
   title?: string;
   maxHeight?: string;
   emptyMessage?: string;
+  isLoading?: boolean;
+  error?: Error | null;
 }
 
 export function RecentActivity({
@@ -28,6 +30,8 @@ export function RecentActivity({
   title = 'Recent Activity',
   maxHeight = '400px',
   emptyMessage = 'No recent activity',
+  isLoading = false,
+  error = null,
 }: RecentActivityProps) {
   return (
     <div style={{ marginBottom: 32 }}>
@@ -38,7 +42,7 @@ export function RecentActivity({
           position: 'relative',
         }}
       >
-        {activities.length > 0 && (
+        {activities.length > 0 && onClear && (
           <div
             style={{
               display: 'flex',
@@ -63,7 +67,71 @@ export function RecentActivity({
             overflowX: 'hidden',
           }}
         >
-        {activities.length > 0 ? (
+        {isLoading ? (
+          <div
+            style={{
+              padding: '48px 16px',
+              textAlign: 'center',
+              color: '#9ca3af',
+            }}
+          >
+            <div
+              style={{
+                fontSize: 32,
+                marginBottom: 12,
+                opacity: 0.5,
+                animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+              }}
+            >
+              ⏳
+            </div>
+            <div
+              style={{
+                fontSize: 14,
+                fontWeight: 500,
+                color: '#6b7280',
+              }}
+            >
+              Loading recent activity...
+            </div>
+          </div>
+        ) : error ? (
+          <div
+            style={{
+              padding: '48px 16px',
+              textAlign: 'center',
+              color: '#9ca3af',
+            }}
+          >
+            <div
+              style={{
+                fontSize: 32,
+                marginBottom: 12,
+                opacity: 0.5,
+              }}
+            >
+              ⚠️
+            </div>
+            <div
+              style={{
+                fontSize: 14,
+                fontWeight: 500,
+                color: '#dc2626',
+              }}
+            >
+              Failed to load activity feed
+            </div>
+            <div
+              style={{
+                fontSize: 12,
+                color: '#9ca3af',
+                marginTop: 4,
+              }}
+            >
+              {error.message || 'Please try again later'}
+            </div>
+          </div>
+        ) : activities.length > 0 ? (
           activities.map((activity) => (
             <ActivityItem
               key={activity.id}
