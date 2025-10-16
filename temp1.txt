@@ -19,20 +19,12 @@ export interface ActionItem {
   onClick: () => void;
 }
 
-export interface ArchiveMetadata {
-  archivedBy: string;
-  archivedAt: string;
-  reason?: string;
-  scheduledDeletion?: string;
-}
-
 export interface ActionModalProps {
   isOpen: boolean;
   onClose: () => void;
   entity?: Entity;
   title?: string;
   actions?: ActionItem[];
-  archiveMetadata?: ArchiveMetadata;
   // Legacy props for backward compatibility
   onSendInvite?: () => void;
   onEditProfile?: () => void;
@@ -46,7 +38,6 @@ export default function ActionModal({
   entity,
   title,
   actions,
-  archiveMetadata,
   onSendInvite,
   onEditProfile,
   onPauseAccount,
@@ -57,19 +48,6 @@ export default function ActionModal({
   const entityName = entity.name || entity.companyName || entity.fullName ||
                      entity.code || entity.orderId || entity.product_name ||
                      entity.service_name || 'Entity';
-
-  // Format date helper
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    if (isNaN(date.getTime())) return dateStr;
-    return date.toLocaleDateString(undefined, {
-      year: 'numeric',
-      month: 'short',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
 
   // Use custom actions if provided, otherwise fall back to legacy behavior
   const modalActions = actions || [
@@ -116,7 +94,6 @@ export default function ActionModal({
         }}>
           {title || `Actions for ${entityName}`}
         </h3>
-
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           {modalActions.map((action, index) => (
             <Button

@@ -2026,12 +2026,12 @@ export async function applyOrderAction(input: OrderActionInput): Promise<HubOrde
       break;
 
     case "reject":
+      if (!input.notes) {
+        throw new Error("Rejection reason is required.");
+      }
+      rejectionReason = input.notes;
+      break;
       {
-        if (!input.notes) {
-          throw new Error("Rejection reason is required.");
-        }
-        rejectionReason = input.notes;
-
         // Track actor for rejection in metadata
         const currentMetadata = row.metadata || {};
         const whoCode = normalizeCodeValue(input.actorCode);
@@ -2073,7 +2073,6 @@ export async function applyOrderAction(input: OrderActionInput): Promise<HubOrde
           rejectedByDisplay: display || null,
           rejectedAt: new Date().toISOString(),
         } as Record<string, unknown>;
-        break;
       }
 
     case "start-delivery":
@@ -2649,4 +2648,6 @@ export async function respondToCrewRequest(
 
   return fetchOrderById(orderId, { viewerRole: 'crew', viewerCode: crewCode });
 }
+
+
 

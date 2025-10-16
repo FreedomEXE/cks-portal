@@ -27,12 +27,13 @@ import {
   type Activity,
   type TreeNode,
 } from '@cks/domain-widgets';
-import { Button, DataTable, ModalProvider, OrderDetailsModal, ProductOrderModal, ServiceOrderModal, ServiceViewModal, PageHeader, PageWrapper, Scrollbar, TabSection } from '@cks/ui';
+import { Button, DataTable, ModalProvider, OrderDetailsModal, ServiceViewModal, PageHeader, PageWrapper, Scrollbar, TabSection } from '@cks/ui';
+import OrderDetailsGateway from '../components/OrderDetailsGateway';
 import { useAuth } from '@cks/auth';
 import { useCatalogItems } from '../shared/api/catalog';
 import { useServices as useDirectoryServices } from '../shared/api/directory';
 import { useFormattedActivities } from '../shared/activity/useFormattedActivities';
-import { ActivityFeed, type ActivityClickData } from '../components/ActivityFeed';
+import { ActivityFeed } from '../components/ActivityFeed';
 
 import MyHubSection from '../components/MyHubSection';
 import {
@@ -154,7 +155,7 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
   const [activeTab, setActiveTab] = useState(initialTab);
   const [servicesTab, setServicesTab] = useState<'my' | 'active' | 'history'>('active');
   const [servicesSearchQuery, setServicesSearchQuery] = useState('');
-  const [selectedOrderForDetails, setSelectedOrderForDetails] = useState<HubOrderItem | null>(null);
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
   const [fetchedServiceDetails, setFetchedServiceDetails] = useState<any>(null);
 
@@ -290,34 +291,11 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
     }));
   }, [orders]);
 
+  // Find selected order from hub data for transform-first approach
+  
+  // Use centralized order details hook (transform-first)
+  
   const { activities, isLoading: activitiesLoading, error: activitiesError } = useFormattedActivities(normalizedCode, { limit: 20 });
-
-  const handleActivityClick = ({ targetType, targetId, orderType }: ActivityClickData) => {
-    console.log('[CrewHub] Activity clicked:', { targetType, targetId, orderType });
-
-    if (targetType === 'order') {
-      // Navigate to orders tab
-      setActiveTab('orders');
-
-      // Find and open order modal
-      const target = orders?.orders?.find((o: any) => (o.orderId || o.id) === targetId) || null;
-      if (target) {
-        setSelectedOrderForDetails(target);
-      } else {
-        toast.error('Order not found');
-      }
-    } else if (targetType === 'service') {
-      // Navigate to services tab
-      setActiveTab('services');
-      setServicesTab('active');
-
-      // TODO: Open service modal (not implemented yet)
-      toast('Opening service (modal not implemented yet)');
-    } else {
-      console.warn('[CrewHub] Unsupported target type:', targetType);
-      toast.error(`Cannot open ${targetType} (unsupported type)`);
-    }
-  };
 
   const overviewData = useMemo(() => ({
     activeServices: (dashboard as any)?.activeServices ?? 0,
@@ -503,7 +481,6 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
               <ActivityFeed
                 activities={activities}
                 hub="crew"
-                onActivityClick={handleActivityClick}
                 isLoading={activitiesLoading}
                 error={activitiesError}
                 onError={(msg) => toast.error(msg)}
@@ -729,10 +706,7 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
                 onCreateProductOrder={() => navigate('/catalog?mode=products')}
                 onOrderAction={async (orderId, action) => {
                   if (action === 'View Details') {
-                    const target = orders?.orders?.find((o: any) => (o.orderId || o.id) === orderId) || null;
-                    if (target) {
-                      setSelectedOrderForDetails(target);
-                    }
+                    setSelectedOrderId(orderId);
                     return;
                   }
                   const label = (action || '').toLowerCase();
@@ -835,109 +809,7 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
         </div>
       </Scrollbar>
 
-      {/* Order Details Modal */}
-      {/* Conditional Modal Rendering based on orderType and status */}
-      {(() => {
-        const orderType = selectedOrderForDetails?.orderType || 'product';
-        const status = ((selectedOrderForDetails as any)?.status || '').toLowerCase();
-        const isServiceCreated = status === 'service_created' || status === 'service-created';
-
-        const commonOrder = selectedOrderForDetails
-          ? {
-              orderId: selectedOrderForDetails.orderId,
-              title: selectedOrderForDetails.title || null,
-              requestedBy: selectedOrderForDetails.requestedBy || selectedOrderForDetails.centerId || selectedOrderForDetails.customerId || null,
-              destination: selectedOrderForDetails.destination || selectedOrderForDetails.centerId || null,
-              requestedDate: selectedOrderForDetails.requestedDate || null,
-              notes: selectedOrderForDetails.notes || null,
-              status: (selectedOrderForDetails as any).status || null,
-              serviceId: ((selectedOrderForDetails as any)?.metadata?.serviceId) || null,
-            }
-          : null;
-
-        const commonAvailability = (() => {
-          const meta = (selectedOrderForDetails as any)?.metadata as any;
-          const av = meta?.availability;
-          if (!av) return null;
-          const days = Array.isArray(av.days) ? av.days : [];
-          const window = av.window && av.window.start && av.window.end ? av.window : null;
-          return { tz: av.tz ?? null, days, window };
-        })();
-
-        const commonCancellation = {
-          cancellationReason: (selectedOrderForDetails as any)?.metadata?.cancellationReason || null,
-          cancelledBy: (selectedOrderForDetails as any)?.metadata?.cancelledBy || null,
-          cancelledAt: (selectedOrderForDetails as any)?.metadata?.cancelledAt || null,
-        };
-
-        const commonRejection = (selectedOrderForDetails as any)?.rejectionReason || (selectedOrderForDetails as any)?.metadata?.rejectionReason || null;
-
-        const commonRequestorInfo = selectedOrderForDetails
-          ? {
-              name: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const req = meta?.contacts?.requestor || {}; return (req.name || null); })(),
-              address: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const req = meta?.contacts?.requestor || {}; return (req.address || null); })(),
-              phone: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const req = meta?.contacts?.requestor || {}; return (req.phone || null); })(),
-              email: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const req = meta?.contacts?.requestor || {}; return (req.email || null); })(),
-            }
-          : null;
-
-        const commonDestinationInfo = selectedOrderForDetails
-          ? {
-              name: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const dest = meta?.contacts?.destination || {}; return (dest.name || null); })(),
-              address: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const dest = meta?.contacts?.destination || {}; return (dest.address || null); })(),
-              phone: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const dest = meta?.contacts?.destination || {}; return (dest.phone || null); })(),
-              email: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const dest = meta?.contacts?.destination || {}; return (dest.email || null); })(),
-            }
-          : null;
-
-        if (orderType === 'service') {
-          return (
-            <ServiceOrderModal
-              isOpen={!!selectedOrderForDetails}
-              onClose={() => setSelectedOrderForDetails(null)}
-              order={commonOrder}
-              availability={commonAvailability}
-              cancellationReason={commonCancellation.cancellationReason}
-              cancelledBy={commonCancellation.cancelledBy}
-              cancelledAt={commonCancellation.cancelledAt}
-              rejectionReason={commonRejection}
-              requestorInfo={commonRequestorInfo}
-              destinationInfo={commonDestinationInfo}
-            />
-          );
-        } else if (orderType === 'product') {
-          const items = selectedOrderForDetails?.items || [];
-          return (
-            <ProductOrderModal
-              isOpen={!!selectedOrderForDetails}
-              onClose={() => setSelectedOrderForDetails(null)}
-              order={commonOrder ? { ...commonOrder, items } : null}
-              availability={commonAvailability}
-              cancellationReason={commonCancellation.cancellationReason}
-              cancelledBy={commonCancellation.cancelledBy}
-              cancelledAt={commonCancellation.cancelledAt}
-              rejectionReason={commonRejection}
-              requestorInfo={commonRequestorInfo}
-              destinationInfo={commonDestinationInfo}
-            />
-          );
-        } else {
-          return (
-            <OrderDetailsModal
-              isOpen={!!selectedOrderForDetails}
-              onClose={() => setSelectedOrderForDetails(null)}
-              order={commonOrder ? { ...commonOrder, orderType, items: selectedOrderForDetails?.items || [] } : null}
-              availability={commonAvailability}
-              cancellationReason={commonCancellation.cancellationReason}
-              cancelledBy={commonCancellation.cancelledBy}
-              cancelledAt={commonCancellation.cancelledAt}
-              rejectionReason={commonRejection}
-              requestorInfo={commonRequestorInfo}
-              destinationInfo={commonDestinationInfo}
-            />
-          );
-        }
-      })()}
+      <OrderDetailsGateway orderId={selectedOrderId} onClose={() => setSelectedOrderId(null)} />
 
       {/* Service View Modal */}
       {(() => {
@@ -997,3 +869,4 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
     </ModalProvider>
   );
 }
+

@@ -2,7 +2,10 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { requireActiveRole } from '../../core/auth/guards';
 import { requireActiveAdmin } from '../adminUsers/guards';
+import { authenticate } from '../../core/auth/authenticate';
+import { getAdminUserByClerkId } from '../adminUsers/store';
 import { applyOrderAction, createOrder, getHubOrders, getOrderById, archiveOrder as svcArchiveOrder, restoreOrder as svcRestoreOrder, hardDeleteOrder as svcHardDeleteOrder, requestCrewAssignment, respondToCrewRequest, type CreateOrderInput, type OrderActionInput } from './service';
+import { fetchOrderForViewer } from './store';
 import type { HubRole } from '../profile/types';
 import type { HubOrderItem } from './types';
 
@@ -83,6 +86,61 @@ function filterByStatus(items: HubOrderItem[], status?: string | null): HubOrder
 }
 
 export async function registerOrdersRoutes(server: FastifyInstance) {
+  // Unified details endpoint for all roles
+  // GET /api/order/:orderId/details?includeDeleted=1
+  server.get('/api/order/:orderId/details', async (request, reply) => {
+    const params = z.object({ orderId: z.string().min(1) }).safeParse(request.params);
+    if (!params.success) {
+      reply.code(400).send({ error: 'Invalid order identifier' });
+      return;
+    }
+
+    // Authenticate first (non-enforcing w.r.t role)
+    const auth = await authenticate(request);
+    if (!auth.ok) {
+      reply.code(401).send({ error: 'Unauthorized' });
+      return;
+    }
+
+    // Soft admin check (do not block hub roles)
+    let isAdmin = false;
+    try {
+      const adminRecord = await getAdminUserByClerkId(auth.userId);
+      isAdmin = (adminRecord?.role || '').toLowerCase().trim() === 'admin';
+    } catch (e) {
+      // fall through; treat as non-admin
+      isAdmin = false;
+    }
+
+    if (isAdmin) {
+      const order = await getOrderById(params.data.orderId);
+      if (!order) {
+        reply.code(404).send({ error: 'Order not found' });
+        return;
+      }
+      reply.send({ data: order });
+      return;
+    }
+
+    // Hub role path (RBAC-scoped). Use existing guard to validate active role.
+    const account = await requireActiveRole(request, reply, {});
+    if (!account) {
+      return; // guard already replied
+    }
+    const role = resolveHubRole(account.role ?? null);
+    const code = account.cksCode ?? null;
+    if (!role || !code) {
+      reply.code(403).send({ error: 'Unsupported role for order details' });
+      return;
+    }
+
+    const order = await fetchOrderForViewer(role, code, params.data.orderId);
+    if (!order) {
+      reply.code(404).send({ error: 'Order not found' });
+      return;
+    }
+    reply.send({ data: order });
+  });
   // Admin-only: Get full order by ID (includes items and notes)
   server.get('/api/orders/:orderId', async (request, reply) => {
     const params = z.object({ orderId: z.string().min(1) }).safeParse(request.params);
@@ -366,7 +424,8 @@ export async function registerOrdersRoutes(server: FastifyInstance) {
     if (!account) return;
 
     try {
-      const result = await svcArchiveOrder(params.data.orderId);
+      const archivedBy = account.fullName || account.email || 'Admin';
+      const result = await svcArchiveOrder(params.data.orderId, archivedBy);
       reply.send({ data: result });
     } catch (error) {
       reply.code(400).send({ error: error instanceof Error ? error.message : 'Failed to archive order' });

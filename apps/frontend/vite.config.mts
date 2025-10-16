@@ -8,6 +8,12 @@ const uiDistPath = path.resolve(workspaceRoot, 'packages', 'ui', 'dist')
 
 export default defineConfig({
   plugins: [react()],
+  resolve: {
+    alias: {
+      // Use workspace source for domain-widgets during dev/build to avoid missing dist
+      '@cks/domain-widgets': path.resolve(workspaceRoot, 'packages', 'domain-widgets', 'src', 'index.ts'),
+    },
+  },
   server: {
     port: 5173,
     fs: {

@@ -1,0 +1,240 @@
+/*-----------------------------------------------
+  Property of CKS  (c) 2025
+-----------------------------------------------*/
+/**
+ * File: AdminHub.tsx
+ *
+ * Description:
+ * Administrator hub container that wires dashboard metrics,
+ * directory views, create/assign flows, and support tools.
+ */
+/*-----------------------------------------------
+  Manifested by Freedom_EXE
+-----------------------------------------------*/
+
+import {
+  AdminSupportSection,
+  ArchiveSection,
+  MemosPreview,
+  NewsPreview,
+  OverviewSection,
+  ReportDetailsModal,
+  type Activity,
+} from '@cks/domain-widgets';
+import {
+  ActionModal,
+  Button,
+  DataTable,
+  EditOrderModal,
+  NavigationTab,
+  OrderDetailsModal,
+  ProductOrderModal,
+  ServiceOrderModal,
+  ServiceViewModal,
+  PageHeader,
+  PageWrapper,
+  Scrollbar,
+  TabContainer,
+  CatalogServiceModal,
+} from '@cks/ui';
+import type { ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSWRConfig } from 'swr';
+
+import MyHubSection from '../components/MyHubSection';
+import { useLogout } from '../hooks/useLogout';
+import { useAuth } from '@cks/auth';
+import { archiveAPI, type EntityType } from '../shared/api/archive';
+import '../shared/api/test-archive'; // Temporary test import
+import AdminAssignSection from './components/AdminAssignSection';
+import AdminCreateSection from './components/AdminCreateSection';
+import { useHubLoading } from '../contexts/HubLoadingContext';
+
+import { useAdminUsers, updateInventory, fetchAdminOrderById } from '../shared/api/admin';
+import {
+  useActivities,
+  useCenters,
+  useContractors,
+  useCrew,
+  useCustomers,
+  useFeedback,
+  useManagers,
+  useOrders,
+  useProcedures,
+  useProducts,
+  useReports,
+  useServices,
+  useTraining,
+  useWarehouses,
+} from '../shared/api/directory';
+import {
+  applyHubOrderAction,
+  updateOrderFields,
+  useHubProfile,
+  type HubOrderItem,
+  type OrderActionRequest,
+  type UpdateOrderFieldsRequest,
+} from '../shared/api/hub';
+import { ActivityFeed } from '../components/ActivityFeed';
+
+// Removed unused: const MILLIS_PER_DAY = 1000 * 60 * 60 * 24;
+
+interface AdminHubProps {
+  initialTab?: string;
+}
+
+const GO_LIVE_DATE_INPUT = (import.meta as any).env?.VITE_GO_LIVE_DATE as string | undefined;
+const GO_LIVE_TIMESTAMP = (() => {
+  if (!GO_LIVE_DATE_INPUT) {
+    return null;
+  }
+  const parsed = new Date(GO_LIVE_DATE_INPUT);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.getTime();
+})();
+
+type StatusPalette = {
+  bg: string;
+  fg: string;
+};
+
+const STATUS_PALETTES: Record<string, StatusPalette> = {
+  active: { bg: '#dcfce7', fg: '#16a34a' },
+  available: { bg: '#dcfce7', fg: '#16a34a' },
+  operational: { bg: '#dcfce7', fg: '#16a34a' },
+  open: { bg: '#dcfce7', fg: '#16a34a' },
+  pending: { bg: '#fef3c7', fg: '#d97706' },
+  in_progress: { bg: '#fef3c7', fg: '#d97706' },
+  processing: { bg: '#fef3c7', fg: '#d97706' },
+  scheduled: { bg: '#fef3c7', fg: '#d97706' },
+  suspended: { bg: '#fee2e2', fg: '#dc2626' },
+  archived: { bg: '#fee2e2', fg: '#dc2626' },
+  inactive: { bg: '#fee2e2', fg: '#dc2626' },
+  closed: { bg: '#fee2e2', fg: '#dc2626' },
+  cancelled: { bg: '#fee2e2', fg: '#dc2626' },
+  unassigned: { bg: '#e0f2fe', fg: '#0369a1' },
+  unknown: { bg: '#e2e8f0', fg: '#475569' },
+};
+
+function renderStatusBadge(value: string | null | undefined) {
+  if (!value) return null;
+  const normalized = value.toLowerCase().trim().replace(/\s+/g, '_');
+  const palette = STATUS_PALETTES[normalized] ?? STATUS_PALETTES.unknown;
+  const label = value.replace(/_/g, ' ');
+  return (
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '4px 12px',
+        borderRadius: '999px',
+        fontSize: 12,
+        fontWeight: 500,
+        backgroundColor: palette.bg,
+        color: palette.fg,
+      }}
+    >
+      {label}
+    </span>
+  );
+}
+
+function formatDate(value?: string | null): string {
+  if (!value) {
+    return 'N/A';
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return 'N/A';
+  }
+  return parsed.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: '2-digit' });
+}
+
+function formatText(value?: string | null): string {
+  if (!value) {
+    return 'N/A';
+  }
+  const trimmed = value.trim();
+  return trimmed.length ? trimmed : 'N/A';
+}
+
+const HUB_TABS = [
+  { id: 'dashboard', label: 'Dashboard', path: '/dashboard' },
+  { id: 'directory', label: 'Directory', path: '/directory' },
+  { id: 'create', label: 'Create', path: '/create' },
+  { id: 'assign', label: 'Assign', path: '/assign' },
+  { id: 'archive', label: 'Archive', path: '/archive' },
+  { id: 'support', label: 'Support', path: '/support' },
+];
+
+const DIRECTORY_TABS: Array<{ id: string; label: string; color: string; hasDropdown?: boolean; dropdownOptions?: Array<{ id: string; label: string }> }> = [
+  { id: 'admins', label: 'Admins', color: '#0f172a' },
+  { id: 'managers', label: 'Managers', color: '#2563eb' },
+  { id: 'contractors', label: 'Contractors', color: '#10b981' },
+  { id: 'customers', label: 'Customers', color: '#eab308' },
+  { id: 'centers', label: 'Centers', color: '#f97316' },
+  { id: 'crew', label: 'Crew', color: '#ef4444' },
+  { id: 'warehouses', label: 'Warehouses', color: '#8b5cf6' },
+  {
+    id: 'services',
+    label: 'Services',
+    color: '#14b8a6',
+    hasDropdown: true,
+    dropdownOptions: [
+      { id: 'catalog-services', label: 'Catalog Services' },
+      { id: 'active-services', label: 'Active Services' },
+    ]
+  },
+  { id: 'products', label: 'Products', color: '#d946ef' },
+  {
+    id: 'orders',
+    label: 'Orders',
+    color: '#6366f1',
+    hasDropdown: true,
+    dropdownOptions: [
+      { id: 'product-orders', label: 'Product Orders' },
+      { id: 'service-orders', label: 'Service Orders' },
+    ]
+  },
+  { id: 'training', label: 'Training & Procedures', color: '#ec4899' },
+  { id: 'reports', label: 'Reports & Feedback', color: '#92400e' },
+];
+
+interface DirectorySectionConfig {
+  columns: Array<{ key: string; label: string; clickable?: boolean; render?: (value: any, row?: any) => ReactNode }>;
+  data: Record<string, any>[];
+  emptyMessage: string;
+}
+
+export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
+  const { code, firstName, fullName } = useAuth();
+  const { setHubLoading } = useHubLoading();
+
+  // Dynamic overview cards for admin metrics
+  const overviewCards = [
+    { id: 'users', title: 'Total Users', dataKey: 'userCount', color: 'blue' },
+    { id: 'tickets', title: 'Open Support Tickets', dataKey: 'ticketCount', color: 'orange' },
+    { id: 'priority', title: 'High Priority', dataKey: 'highPriorityCount', color: 'red' },
+    { id: 'days', title: 'Days Online', dataKey: 'daysOnline', color: 'green' },
+  ];
+
+  // Local tab state (no URL changes)
+  const [activeTab, setActiveTab] = useState(initialTab);
+  const [directoryTab, setDirectoryTab] = useState('admins');
+  const [ordersSubTab, setOrdersSubTab] = useState('product-orders');
+  const [servicesSubTab, setServicesSubTab] = useState('catalog-services');
+  const [reportsSubTab, setReportsSubTab] = useState('reports');
+
+  const [showActionModal, setShowActionModal] = useState(false);
+  const [selectedEntity, setSelectedEntity] = useState<Record<string, any> | null>(null);
+  const [showServiceCatalogModal, setShowServiceCatalogModal] = useState(false);
+  const [selectedServiceCatalog, setSelectedServiceCatalog] = useState<{ serviceId: string; name: string | null; category: string | null; status?: string | null; description?: string | null; metadata?: any } | null>(null);
+  const [serviceAssignSelected, setServiceAssignSelected] = useState<{ managers: string[]; crew: string[]; warehouses: string[] } | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  // merged assign flow into CatalogServiceModal
+  const [selectedOrderForDetails, setSelectedOrderForDetails] = useState<HubOrderItem | null>(null);
+  const [selectedOrderForEdit, setSelectedOrderForEdit] = useState<HubOrderItem | null>(null);
+  const [selectedReportForDetails, setSelectedReportForDetails] = useState<any | null>(null);
+  const logout = useLogout();
+  const { mutate } = useSWRConfig();
+

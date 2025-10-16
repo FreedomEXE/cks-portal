@@ -12,6 +12,13 @@ interface ProductLineItem {
   unitOfMeasure: string | null;
 }
 
+interface ArchiveMetadata {
+  archivedBy: string;
+  archivedAt: string;
+  reason?: string;
+  scheduledDeletion?: string;
+}
+
 export interface ProductOrderModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -50,6 +57,9 @@ export interface ProductOrderModalProps {
   cancelledBy?: string | null;
   cancelledAt?: string | null;
   rejectionReason?: string | null;
+  rejectedBy?: string | null;
+  rejectedAt?: string | null;
+  archiveMetadata?: ArchiveMetadata | null;
 }
 
 const ProductOrderModal: React.FC<ProductOrderModalProps> = ({
@@ -63,6 +73,9 @@ const ProductOrderModal: React.FC<ProductOrderModalProps> = ({
   cancelledBy,
   cancelledAt,
   rejectionReason,
+  rejectedBy,
+  rejectedAt,
+  archiveMetadata,
 }) => {
   if (!isOpen || !order) return null;
 
@@ -125,6 +138,36 @@ const ProductOrderModal: React.FC<ProductOrderModalProps> = ({
               entityType="order"
               entityId={order.orderId}
             />
+          </div>
+        )}
+
+        {/* Archive Information Banner */}
+        {archiveMetadata && !order.isDeleted && (
+          <div style={{
+            margin: '16px 16px 0 16px',
+            padding: '12px 16px',
+            backgroundColor: '#f3f4f6',
+            border: '1px solid #9ca3af',
+            borderRadius: '6px'
+          }}>
+            <h4 style={{ margin: '0 0 12px 0', fontSize: '15px', fontWeight: 600, color: '#111827' }}>
+              This order has been Archived
+            </h4>
+            <h5 style={{ margin: '0 0 8px 0', fontSize: '13px', fontWeight: 600, color: '#374151' }}>
+              Archive Information
+            </h5>
+            <div style={{ fontSize: '13px', color: '#374151', lineHeight: '1.6' }}>
+              <div><strong>Archived by:</strong> {archiveMetadata.archivedBy || 'Admin'}</div>
+              <div><strong>Archived on:</strong> {formatDate(archiveMetadata.archivedAt)}</div>
+              {archiveMetadata.reason && (
+                <div><strong>Reason:</strong> {archiveMetadata.reason}</div>
+              )}
+              {archiveMetadata.scheduledDeletion && (
+                <div style={{ color: '#ef4444', fontWeight: 500, marginTop: '4px' }}>
+                  <strong>Scheduled for deletion:</strong> {formatDate(archiveMetadata.scheduledDeletion)}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -201,7 +244,7 @@ const ProductOrderModal: React.FC<ProductOrderModalProps> = ({
                 <div className={styles.field}>
                   <label className={styles.label}>Name</label>
                   <p className={styles.value}>
-                    {order.requestedBy || requestorInfo?.name || '—'}
+                    {order.requestedBy || '-'}
                   </p>
                 </div>
                 <div className={styles.field}>
@@ -228,7 +271,7 @@ const ProductOrderModal: React.FC<ProductOrderModalProps> = ({
                 <div className={styles.field}>
                   <label className={styles.label}>Destination</label>
                   <p className={styles.value}>
-                    {order.destination || destinationInfo?.name || '—'}
+                    {order.destination || '-'}
                   </p>
                 </div>
                 <div className={styles.field}>
@@ -308,7 +351,17 @@ const ProductOrderModal: React.FC<ProductOrderModalProps> = ({
           {order.status === 'rejected' && (
             <section className={styles.section}>
               <h3 className={styles.sectionTitle}>Rejection Reason</h3>
-              <p className={styles.notes}>{rejectionReason || '—'}</p>
+              <p className={styles.notes}>{rejectionReason || '-'}</p>
+              <div className={styles.grid} style={{ marginTop: 8 }}>
+                <div className={styles.field}>
+                  <label className={styles.label}>Rejected By</label>
+                  <p className={styles.value}>{rejectedBy || '-'}</p>
+                </div>
+                <div className={styles.field}>
+                  <label className={styles.label}>Rejected At</label>
+                  <p className={styles.value}>{formatDate(rejectedAt || null)}</p>
+                </div>
+              </div>
             </section>
           )}
         </div>

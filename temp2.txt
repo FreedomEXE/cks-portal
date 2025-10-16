@@ -1,16 +1,18 @@
 import React from 'react';
-import styles from './ServiceOrderModal.module.css';
+import styles from './ProductOrderModal.module.css';
 import { ModalRoot } from '../ModalRoot';
 import { DeletedBanner } from '../../banners/DeletedBanner';
 
-interface ArchiveMetadata {
-  archivedBy: string;
-  archivedAt: string;
-  reason?: string;
-  scheduledDeletion?: string;
+interface ProductLineItem {
+  id: string;
+  code: string | null;
+  name: string;
+  description: string | null;
+  quantity: number;
+  unitOfMeasure: string | null;
 }
 
-export interface ServiceOrderModalProps {
+export interface ProductOrderModalProps {
   isOpen: boolean;
   onClose: () => void;
   order: {
@@ -21,9 +23,8 @@ export interface ServiceOrderModalProps {
     requestedDate: string | null;
     notes: string | null;
     status?: string | null;
-    managedBy?: string | null;
-    managedById?: string | null;
-    managedByName?: string | null;
+    items?: ProductLineItem[];
+    serviceId?: string | null;
     isDeleted?: boolean;
     deletedAt?: string;
     deletedBy?: string;
@@ -49,12 +50,9 @@ export interface ServiceOrderModalProps {
   cancelledBy?: string | null;
   cancelledAt?: string | null;
   rejectionReason?: string | null;
-  rejectedBy?: string | null;
-  rejectedAt?: string | null;
-  archiveMetadata?: ArchiveMetadata | null;
 }
 
-const ServiceOrderModal: React.FC<ServiceOrderModalProps> = ({
+const ProductOrderModal: React.FC<ProductOrderModalProps> = ({
   isOpen,
   onClose,
   order,
@@ -65,9 +63,6 @@ const ServiceOrderModal: React.FC<ServiceOrderModalProps> = ({
   cancelledBy,
   cancelledAt,
   rejectionReason,
-  rejectedBy,
-  rejectedAt,
-  archiveMetadata,
 }) => {
   if (!isOpen || !order) return null;
 
@@ -93,13 +88,13 @@ const ServiceOrderModal: React.FC<ServiceOrderModalProps> = ({
 
   const getStatusColor = (status?: string | null) => {
     const normalized = (status || '').toLowerCase();
-    if (normalized === 'service_completed' || normalized === 'completed' || normalized === 'service-created' || normalized === 'service_created') {
+    if (normalized === 'delivered' || normalized === 'completed') {
       return { bg: '#dcfce7', fg: '#166534' };
     } else if (normalized === 'cancelled' || normalized === 'rejected') {
       return { bg: '#fee2e2', fg: '#991b1b' };
-    } else if (normalized.startsWith('pending') || normalized === 'manager_accepted' || normalized === 'manager-accepted') {
+    } else if (normalized.startsWith('pending')) {
       return { bg: '#fef3c7', fg: '#92400e' };
-    } else if (normalized === 'service_in_progress' || normalized === 'in-progress' || normalized === 'crew_requested' || normalized === 'crew-requested' || normalized === 'crew_assigned' || normalized === 'crew-assigned') {
+    } else if (normalized === 'awaiting_delivery' || normalized === 'in-progress') {
       return { bg: '#dbeafe', fg: '#1e3a8a' };
     }
     return { bg: '#f3f4f6', fg: '#111827' };
@@ -113,7 +108,7 @@ const ServiceOrderModal: React.FC<ServiceOrderModalProps> = ({
         {/* Header */}
         <div className={styles.header}>
           <div>
-            <h2 className={styles.title}>Service Order Details</h2>
+            <h2 className={styles.title}>Product Order Details</h2>
             <p className={styles.orderId}>{order.orderId}</p>
           </div>
           <button className={styles.closeButton} onClick={onClose} aria-label="Close">
@@ -130,36 +125,6 @@ const ServiceOrderModal: React.FC<ServiceOrderModalProps> = ({
               entityType="order"
               entityId={order.orderId}
             />
-          </div>
-        )}
-
-        {/* Archive Information Banner */}
-        {archiveMetadata && !order.isDeleted && (
-          <div style={{
-            margin: '16px 16px 0 16px',
-            padding: '12px 16px',
-            backgroundColor: '#f3f4f6',
-            border: '1px solid #9ca3af',
-            borderRadius: '6px'
-          }}>
-            <h4 style={{ margin: '0 0 12px 0', fontSize: '15px', fontWeight: 600, color: '#111827' }}>
-              This order has been Archived
-            </h4>
-            <h5 style={{ margin: '0 0 8px 0', fontSize: '13px', fontWeight: 600, color: '#374151' }}>
-              Archive Information
-            </h5>
-            <div style={{ fontSize: '13px', color: '#374151', lineHeight: '1.6' }}>
-              <div><strong>Archived by:</strong> {archiveMetadata.archivedBy || 'Admin'}</div>
-              <div><strong>Archived on:</strong> {formatDate(archiveMetadata.archivedAt)}</div>
-              {archiveMetadata.reason && (
-                <div><strong>Reason:</strong> {archiveMetadata.reason}</div>
-              )}
-              {archiveMetadata.scheduledDeletion && (
-                <div style={{ color: '#ef4444', fontWeight: 500, marginTop: '4px' }}>
-                  <strong>Scheduled for deletion:</strong> {formatDate(archiveMetadata.scheduledDeletion)}
-                </div>
-              )}
-            </div>
           </div>
         )}
 
@@ -185,28 +150,37 @@ const ServiceOrderModal: React.FC<ServiceOrderModalProps> = ({
 
         {/* Content */}
         <div className={styles.content}>
-          {/* Service Information */}
-          <section className={styles.section}>
-            <h3 className={styles.sectionTitle}>Service Information</h3>
-            <div className={styles.grid}>
-              {order.title && (
+          {/* Service Information (if linked to a service) */}
+          {order.serviceId && (
+            <section className={styles.section}>
+              <h3 className={styles.sectionTitle}>Related Service</h3>
+              <div className={styles.grid}>
                 <div className={styles.field}>
-                  <label className={styles.label}>Service Name</label>
-                  <p className={styles.value}>{order.title}</p>
+                  <label className={styles.label}>Service ID</label>
+                  <p className={styles.value} style={{ color: '#2563eb', fontWeight: 500 }}>{order.serviceId}</p>
                 </div>
-              )}
-              <div className={styles.field}>
-                <label className={styles.label}>Managed By</label>
-                <p className={styles.value}>
-                  {order.managedById && order.managedByName
-                    ? `${order.managedById} - ${order.managedByName}`
-                    : order.managedBy === 'warehouse'
-                      ? 'Warehouse'
-                      : order.managedBy === 'manager'
-                        ? 'Manager'
-                        : '—'}
-                </p>
               </div>
+              <div style={{
+                marginTop: 12,
+                padding: '10px 12px',
+                background: '#eff6ff',
+                border: '1px solid #bfdbfe',
+                borderRadius: 6,
+                fontSize: 13,
+                color: '#1e40af',
+              }}>
+                ℹ️ This product order was created for service <strong>{order.serviceId}</strong>
+              </div>
+              <p style={{ fontSize: '13px', color: '#6b7280', marginTop: '8px' }}>
+                This product order is linked to a specific service
+              </p>
+            </section>
+          )}
+
+          {/* Order Information */}
+          <section className={styles.section}>
+            <h3 className={styles.sectionTitle}>Order Information</h3>
+            <div className={styles.grid}>
               <div className={styles.field}>
                 <label className={styles.label}>Availability Window</label>
                 <p className={styles.value}>
@@ -227,7 +201,7 @@ const ServiceOrderModal: React.FC<ServiceOrderModalProps> = ({
                 <div className={styles.field}>
                   <label className={styles.label}>Name</label>
                   <p className={styles.value}>
-                    {order.requestedBy || '—'}
+                    {order.requestedBy || requestorInfo?.name || '—'}
                   </p>
                 </div>
                 <div className={styles.field}>
@@ -246,15 +220,15 @@ const ServiceOrderModal: React.FC<ServiceOrderModalProps> = ({
             </section>
           )}
 
-          {/* Service Location */}
+          {/* Delivery Information */}
           {destinationInfo && (
             <section className={styles.section}>
-              <h3 className={styles.sectionTitle}>Service Location</h3>
+              <h3 className={styles.sectionTitle}>Delivery Information</h3>
               <div className={styles.grid}>
                 <div className={styles.field}>
-                  <label className={styles.label}>Location</label>
+                  <label className={styles.label}>Destination</label>
                   <p className={styles.value}>
-                    {order.destination || '—'}
+                    {order.destination || destinationInfo?.name || '—'}
                   </p>
                 </div>
                 <div className={styles.field}>
@@ -273,60 +247,4 @@ const ServiceOrderModal: React.FC<ServiceOrderModalProps> = ({
             </section>
           )}
 
-          {/* Special Instructions */}
-          {order.notes && (
-            <section className={styles.section}>
-              <h3 className={styles.sectionTitle}>Special Instructions</h3>
-              <p className={styles.notes}>{order.notes}</p>
-            </section>
-          )}
-
-          {/* Cancellation Reason */}
-          {order.status === 'cancelled' && (
-            <section className={styles.section}>
-              <h3 className={styles.sectionTitle}>Cancellation Reason</h3>
-              <p className={styles.notes}>{cancellationReason || '—'}</p>
-              <div className={styles.grid} style={{ marginTop: 8 }}>
-                <div className={styles.field}>
-                  <label className={styles.label}>Cancelled By</label>
-                  <p className={styles.value}>{cancelledBy || '—'}</p>
-                </div>
-                <div className={styles.field}>
-                  <label className={styles.label}>Cancelled At</label>
-                  <p className={styles.value}>{formatDate(cancelledAt || null)}</p>
-                </div>
-              </div>
-            </section>
-          )}
-
-          {/* Rejection Reason */}
-          {order.status === 'rejected' && (
-            <section className={styles.section}>
-              <h3 className={styles.sectionTitle}>Rejection Reason</h3>
-              <p className={styles.notes}>{rejectionReason || '-'}</p>
-              <div className={styles.grid} style={{ marginTop: 8 }}>
-                <div className={styles.field}>
-                  <label className={styles.label}>Rejected By</label>
-                  <p className={styles.value}>{rejectedBy || '-'}</p>
-                </div>
-                <div className={styles.field}>
-                  <label className={styles.label}>Rejected At</label>
-                  <p className={styles.value}>{formatDate(rejectedAt || null)}</p>
-                </div>
-              </div>
-            </section>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className={styles.footer}>
-          <button className={styles.closeButtonSecondary} onClick={onClose}>
-            Close
-          </button>
-        </div>
-      </div>
-    </ModalRoot>
-  );
-};
-
-export default ServiceOrderModal;
+          {/* Product Items */}

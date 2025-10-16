@@ -62,8 +62,8 @@ export async function getOrderById(orderId: string): Promise<HubOrderItem | null
   return storeFetchOrderById(orderId, {});
 }
 
-export async function archiveOrder(orderId: string): Promise<HubOrderItem | null> {
-  return storeArchiveOrder(orderId);
+export async function archiveOrder(orderId: string, archivedBy?: string): Promise<HubOrderItem | null> {
+  return storeArchiveOrder(orderId, archivedBy);
 }
 
 export async function restoreOrder(orderId: string): Promise<HubOrderItem | null> {

@@ -7,4 +7,5 @@ export * from './overview';
 export * from './profile';
 export * from './reports';
 export * from './support';
+export * from './shared/utils/buildOrderActions';
 export { default as EcosystemTree } from './EcosystemTree';

@@ -26,7 +26,8 @@ import {
   SupportSection,
   type Activity,
 } from '@cks/domain-widgets';
-import { Button, DataTable, OrderDetailsModal, ProductOrderModal, ServiceOrderModal, ServiceViewModal, ModalProvider, PageHeader, PageWrapper, Scrollbar, TabSection } from '@cks/ui';
+import { Button, DataTable, OrderDetailsModal, ServiceViewModal, ModalProvider, PageHeader, PageWrapper, Scrollbar, TabSection } from '@cks/ui';
+import OrderDetailsGateway from '../components/OrderDetailsGateway';
 import { useAuth } from '@cks/auth';
 import { useSWRConfig } from 'swr';
 import { getAllowedActions, getActionLabel } from '@cks/policies';
@@ -47,7 +48,7 @@ import {
   type OrderActionType,
 } from '../shared/api/hub';
 import { useFormattedActivities } from '../shared/activity/useFormattedActivities';
-import { ActivityFeed, type ActivityClickData } from '../components/ActivityFeed';
+import { ActivityFeed } from '../components/ActivityFeed';
 import { createFeedback as apiCreateFeedback, acknowledgeItem as apiAcknowledgeItem, resolveReport as apiResolveReport, fetchServicesForReports, fetchProceduresForReports, fetchOrdersForReports } from '../shared/api/hub';
 
 const ACTION_LABEL_MAP: Record<string, OrderActionType> = {
@@ -165,8 +166,10 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
   const [inventorySearchQuery, setInventorySearchQuery] = useState('');
   const [inventoryFilter, setInventoryFilter] = useState<string>('');
   const [pendingAction, setPendingAction] = useState<{ orderId: string; action: OrderActionType } | null>(null);
-  const [selectedOrderForDetails, setSelectedOrderForDetails] = useState<HubOrderItem | null>(null);
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
+
+  
 
   const { code: authCode } = useAuth();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
@@ -258,34 +261,11 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
     return mapped;
   }, [orders]);
 
+  // Find selected order from hub data for transform-first approach
+  
+  // Use centralized order details hook (transform-first)
+  
   const { activities, isLoading: activitiesLoading, error: activitiesError } = useFormattedActivities(normalizedCode, { limit: 20 });
-
-  const handleActivityClick = ({ targetType, targetId, orderType }: ActivityClickData) => {
-    console.log('[WarehouseHub] Activity clicked:', { targetType, targetId, orderType });
-
-    if (targetType === 'order') {
-      // Navigate to orders tab
-      setActiveTab('orders');
-
-      // Find and open order modal
-      const target = orders?.orders?.find((o: any) => (o.orderId || o.id) === targetId) || null;
-      if (target) {
-        setSelectedOrderForDetails(target);
-      } else {
-        toast.error('Order not found');
-      }
-    } else if (targetType === 'service') {
-      // Navigate to services tab
-      setActiveTab('services');
-      setServicesTab('active');
-
-      // TODO: Open service modal (not implemented yet)
-      toast('Opening service (modal not implemented yet)');
-    } else {
-      console.warn('[WarehouseHub] Unsupported target type:', targetType);
-      toast.error(`Cannot open ${targetType} (unsupported type)`);
-    }
-  };
 
   const overviewData = useMemo(() => ({
     inventoryCount: (dashboard as any)?.inventoryCount ?? 0,
@@ -551,10 +531,7 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
     console.log('[WAREHOUSE] Order action triggered:', { orderId, actionLabel, providedReason });
 
     if (actionLabel === 'View Details') {
-      const target = orders?.orders?.find((o: any) => (o.orderId || o.id) === orderId) || null;
-      if (target) {
-        setSelectedOrderForDetails(target);
-      }
+      setSelectedOrderId(orderId);
       return;
     }
 
@@ -678,7 +655,6 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
               <ActivityFeed
                 activities={activities}
                 hub="warehouse"
-                onActivityClick={handleActivityClick}
                 isLoading={activitiesLoading}
                 error={activitiesError}
                 onError={(msg) => toast.error(msg)}
@@ -1263,113 +1239,7 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
         </div>
       </Scrollbar>
 
-      {/* Order Details Modal */}
-      {/* Conditional Modal Rendering based on orderType and status */}
-      {(() => {
-        const orderType = selectedOrderForDetails?.orderType || 'product';
-        const status = ((selectedOrderForDetails as any)?.status || '').toLowerCase();
-        const isServiceCreated = status === 'service_created' || status === 'service-created';
-
-        const meta = (selectedOrderForDetails as any)?.metadata || {};
-        const commonOrder = selectedOrderForDetails
-          ? {
-              orderId: selectedOrderForDetails.orderId,
-              title: selectedOrderForDetails.title || null,
-              requestedBy: selectedOrderForDetails.requestedBy || selectedOrderForDetails.centerId || selectedOrderForDetails.customerId || null,
-              destination: selectedOrderForDetails.destination || selectedOrderForDetails.centerId || null,
-              requestedDate: selectedOrderForDetails.requestedDate || null,
-              notes: selectedOrderForDetails.notes || null,
-              status: (selectedOrderForDetails as any).status || null,
-              serviceId: meta.serviceId || null,
-              managedBy: meta.serviceManagedBy || null,
-              managedById: meta.warehouseId || meta.managerId || null,
-              managedByName: meta.warehouseName || meta.managerName || null,
-            }
-          : null;
-
-        const commonAvailability = (() => {
-          const meta = (selectedOrderForDetails as any)?.metadata as any;
-          const av = meta?.availability;
-          if (!av) return null;
-          const days = Array.isArray(av.days) ? av.days : [];
-          const window = av.window && av.window.start && av.window.end ? av.window : null;
-          return { tz: av.tz ?? null, days, window };
-        })();
-
-        const commonCancellation = {
-          cancellationReason: (selectedOrderForDetails as any)?.metadata?.cancellationReason || null,
-          cancelledBy: (selectedOrderForDetails as any)?.metadata?.cancelledBy || null,
-          cancelledAt: (selectedOrderForDetails as any)?.metadata?.cancelledAt || null,
-        };
-
-        const commonRejection = (selectedOrderForDetails as any)?.rejectionReason || (selectedOrderForDetails as any)?.metadata?.rejectionReason || null;
-
-        const commonRequestorInfo = selectedOrderForDetails
-          ? {
-              name: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const req = meta?.contacts?.requestor || {}; return (req.name || null); })(),
-              address: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const req = meta?.contacts?.requestor || {}; return (req.address || null); })(),
-              phone: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const req = meta?.contacts?.requestor || {}; return (req.phone || null); })(),
-              email: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const req = meta?.contacts?.requestor || {}; return (req.email || null); })(),
-            }
-          : null;
-
-        const commonDestinationInfo = selectedOrderForDetails
-          ? {
-              name: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const dest = meta?.contacts?.destination || {}; return (dest.name || null); })(),
-              address: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const dest = meta?.contacts?.destination || {}; return (dest.address || null); })(),
-              phone: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const dest = meta?.contacts?.destination || {}; return (dest.phone || null); })(),
-              email: (() => { const meta = (selectedOrderForDetails as any)?.metadata as any; const dest = meta?.contacts?.destination || {}; return (dest.email || null); })(),
-            }
-          : null;
-
-        if (orderType === 'service') {
-          return (
-            <ServiceOrderModal
-              isOpen={!!selectedOrderForDetails}
-              onClose={() => setSelectedOrderForDetails(null)}
-              order={commonOrder}
-              availability={commonAvailability}
-              cancellationReason={commonCancellation.cancellationReason}
-              cancelledBy={commonCancellation.cancelledBy}
-              cancelledAt={commonCancellation.cancelledAt}
-              rejectionReason={commonRejection}
-              requestorInfo={commonRequestorInfo}
-              destinationInfo={commonDestinationInfo}
-            />
-          );
-        } else if (orderType === 'product') {
-          const items = selectedOrderForDetails?.items || [];
-          return (
-            <ProductOrderModal
-              isOpen={!!selectedOrderForDetails}
-              onClose={() => setSelectedOrderForDetails(null)}
-              order={commonOrder ? { ...commonOrder, items } : null}
-              availability={commonAvailability}
-              cancellationReason={commonCancellation.cancellationReason}
-              cancelledBy={commonCancellation.cancelledBy}
-              cancelledAt={commonCancellation.cancelledAt}
-              rejectionReason={commonRejection}
-              requestorInfo={commonRequestorInfo}
-              destinationInfo={commonDestinationInfo}
-            />
-          );
-        } else {
-          return (
-            <OrderDetailsModal
-              isOpen={!!selectedOrderForDetails}
-              onClose={() => setSelectedOrderForDetails(null)}
-              order={commonOrder ? { ...commonOrder, orderType, items: selectedOrderForDetails?.items || [] } : null}
-              availability={commonAvailability}
-              cancellationReason={commonCancellation.cancellationReason}
-              cancelledBy={commonCancellation.cancelledBy}
-              cancelledAt={commonCancellation.cancelledAt}
-              rejectionReason={commonRejection}
-              requestorInfo={commonRequestorInfo}
-              destinationInfo={commonDestinationInfo}
-            />
-          );
-        }
-      })()}
+      <OrderDetailsGateway orderId={selectedOrderId} onClose={() => setSelectedOrderId(null)} />
 
       {/* Warehouse Service Details Modal */}
       {selectedServiceId && (() => {
@@ -1463,3 +1333,5 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
     </ModalProvider>
   );
 }
+
+

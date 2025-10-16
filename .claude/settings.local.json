@@ -39,7 +39,10 @@
       "Bash(timeout 90 pnpm build)",
       "Bash(timeout 120 pnpm build)",
       "Bash(pnpm dev:*)",
-      "Bash(timeout:*)"
+      "Bash(timeout:*)",
+      "Bash(for f in AdminHub.tsx ManagerHub.tsx CenterHub.tsx ContractorHub.tsx CustomerHub.tsx CrewHub.tsx WarehouseHub.tsx)",
+      "Bash(for hub in CenterHub.tsx ManagerHub.tsx ContractorHub.tsx CustomerHub.tsx CrewHub.tsx WarehouseHub.tsx)",
+      "Bash(do echo \"=== $hub ===\")"
     ],
     "deny": [],
     "ask": []

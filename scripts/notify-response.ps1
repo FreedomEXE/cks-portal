@@ -1,6 +1,6 @@
-# Task Completion Notification with Modern Neural TTS (edge-tts)
+# Response Notification with Modern Neural TTS (edge-tts)
 param(
-    [string]$Message = "Task completed",
+    [string]$Message = "Response ready",
     [string]$Voice = "en-GB-LibbyNeural"  # Options: LibbyNeural, MaisieNeural, SoniaNeural
 )
 
