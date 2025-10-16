@@ -32,7 +32,7 @@ import { useAuth } from '@cks/auth';
 import { useSWRConfig } from 'swr';
 import { createReport as apiCreateReport, createFeedback as apiCreateFeedback, acknowledgeItem as apiAcknowledgeItem, resolveReport as apiResolveReport, fetchServicesForReports, fetchProceduresForReports, fetchOrdersForReports } from '../shared/api/hub';
 import { useFormattedActivities } from '../shared/activity/useFormattedActivities';
-import { ActivityFeed } from '../components/ActivityFeed';
+import { ActivityFeed, type ActivityClickData } from '../components/ActivityFeed';
 
 import MyHubSection from '../components/MyHubSection';
 import {
@@ -266,6 +266,33 @@ export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubPro
 
   const { activities, isLoading: activitiesLoading, error: activitiesError } = useFormattedActivities(normalizedCode, { limit: 20 });
 
+  const handleActivityClick = ({ targetType, targetId, orderType }: ActivityClickData) => {
+    console.log('[CustomerHub] Activity clicked:', { targetType, targetId, orderType });
+
+    if (targetType === 'order') {
+      // Navigate to orders tab
+      setActiveTab('orders');
+
+      // Find and open order modal
+      const target = orders?.orders?.find((o: any) => (o.orderId || o.id) === targetId) || null;
+      if (target) {
+        setSelectedOrderForDetails(target);
+      } else {
+        toast.error('Order not found');
+      }
+    } else if (targetType === 'service') {
+      // Navigate to services tab
+      setActiveTab('services');
+      setServicesTab('my');
+
+      // TODO: Open service modal (not implemented yet)
+      toast('Opening service (modal not implemented yet)');
+    } else {
+      console.warn('[CustomerHub] Unsupported target type:', targetType);
+      toast.error(`Cannot open ${targetType} (unsupported type)`);
+    }
+  };
+
   const overviewData = useMemo(() => ({
     serviceCount: dashboard?.serviceCount ?? 0,
     centerCount: dashboard?.centerCount ?? 0,
@@ -429,6 +456,7 @@ export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubPro
               <ActivityFeed
                 activities={activities}
                 hub="customer"
+                onActivityClick={handleActivityClick}
                 isLoading={activitiesLoading}
                 error={activitiesError}
                 onError={(msg) => toast.error(msg)}

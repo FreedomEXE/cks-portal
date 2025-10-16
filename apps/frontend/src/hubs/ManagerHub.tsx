@@ -8,7 +8,7 @@ import toast from 'react-hot-toast';
 import { useAuth } from '@cks/auth';
 import { EcosystemTree } from '@cks/domain-widgets';
 import { useFormattedActivities } from '../shared/activity/useFormattedActivities';
-import { ActivityFeed } from '../components/ActivityFeed';
+import { ActivityFeed, type ActivityClickData } from '../components/ActivityFeed';
 import {
   MemosPreview,
   NewsPreview,
@@ -923,6 +923,39 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
 
   const [selectedOrderForDetails, setSelectedOrderForDetails] = useState<HubOrderItem | null>(null);
 
+  const handleActivityClick = ({ targetType, targetId, orderType }: ActivityClickData) => {
+    console.log('[ManagerHub] Activity clicked:', { targetType, targetId, orderType });
+
+    if (targetType === 'order') {
+      // Navigate to orders tab
+      setActiveTab('orders');
+
+      // Find and open order modal
+      const target = ordersData?.orders?.find((o: any) => (o.orderId || o.id) === targetId) || null;
+      if (target) {
+        setSelectedOrderForDetails(target);
+      } else {
+        toast.error('Order not found');
+      }
+    } else if (targetType === 'service') {
+      // Navigate to services tab
+      setActiveTab('services');
+      setServicesTab('active');
+
+      // TODO: Open service modal (not implemented yet)
+      toast('Opening service (modal not implemented yet)');
+    } else if (targetType === 'report') {
+      // Navigate to reports tab
+      setActiveTab('reports');
+
+      // TODO: Open report modal (not implemented yet)
+      toast('Opening report (modal not implemented yet)');
+    } else {
+      console.warn('[ManagerHub] Unsupported target type:', targetType);
+      toast.error(`Cannot open ${targetType} (unsupported type)`);
+    }
+  };
+
   const handleOrderAction = useCallback(async (orderId: string, action: string) => {
     if (action === 'View Details') {
       // Search in all orders including archived/completed ones
@@ -1066,6 +1099,7 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
               <ActivityFeed
                 activities={formattedActivities}
                 hub="manager"
+                onActivityClick={handleActivityClick}
                 isLoading={activitiesLoading}
                 error={activitiesError}
                 onError={(msg) => toast.error(msg)}

@@ -32,7 +32,7 @@ import { useSWRConfig } from 'swr';
 import { createReport as apiCreateReport, createFeedback as apiCreateFeedback, acknowledgeItem as apiAcknowledgeItem, resolveReport as apiResolveReport, fetchServicesForReports, fetchProceduresForReports, fetchOrdersForReports } from '../shared/api/hub';
 import { useAuth } from '@cks/auth';
 import { useFormattedActivities } from '../shared/activity/useFormattedActivities';
-import { ActivityFeed } from '../components/ActivityFeed';
+import { ActivityFeed, type ActivityClickData } from '../components/ActivityFeed';
 
 import MyHubSection from '../components/MyHubSection';
 import {
@@ -248,6 +248,33 @@ export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHu
   mutate: mutateReports } = useHubReports(normalizedCode);
   const { data: scopeData } = useHubRoleScope(normalizedCode);
   const { activities: formattedActivities, isLoading: activitiesLoading, error: activitiesError } = useFormattedActivities(normalizedCode, { limit: 20 });
+
+  const handleActivityClick = ({ targetType, targetId, orderType }: ActivityClickData) => {
+    console.log('[ContractorHub] Activity clicked:', { targetType, targetId, orderType });
+
+    if (targetType === 'order') {
+      // Navigate to orders tab
+      setActiveTab('orders');
+
+      // Find and open order modal
+      const target = orders?.orders?.find((o: any) => (o.orderId || o.id) === targetId) || null;
+      if (target) {
+        setSelectedOrderForDetails(target);
+      } else {
+        toast.error('Order not found');
+      }
+    } else if (targetType === 'service') {
+      // Navigate to services tab
+      setActiveTab('services');
+      setServicesTab('active');
+
+      // TODO: Open service modal (not implemented yet)
+      toast('Opening service (modal not implemented yet)');
+    } else {
+      console.warn('[ContractorHub] Unsupported target type:', targetType);
+      toast.error(`Cannot open ${targetType} (unsupported type)`);
+    }
+  };
 
   const contractorCode = useMemo(() => profile?.cksCode ?? normalizedCode, [profile?.cksCode, normalizedCode]);
   const welcomeName = profile?.mainContact ?? profile?.name ?? undefined;
@@ -594,6 +621,7 @@ export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHu
               <ActivityFeed
                 activities={formattedActivities}
                 hub="contractor"
+                onActivityClick={handleActivityClick}
                 isLoading={activitiesLoading}
                 error={activitiesError}
                 onError={(msg) => toast.error(msg)}

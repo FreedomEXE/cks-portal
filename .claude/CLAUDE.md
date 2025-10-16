@@ -101,11 +101,11 @@ powershell -ExecutionPolicy Bypass -File "scripts/notify-complete.ps1" -Message 
 - ✅ When reaching important milestones
 
 ### Message Guidelines:
-- Can be detailed (up to 60 seconds of speech)
+- Can be detailed (up to 5 minutes of speech)
 - Summarize what was accomplished
 - Mention key deliverables or changes
 - End with next steps or status (e.g., "Ready for testing")
-- **IMPORTANT:** Use 60-second timeout: `timeout: 60000` in Bash tool call
+- **IMPORTANT:** Use 5-minute timeout: `timeout: 300000` in Bash tool call
 
 ### Example:
 ```powershell

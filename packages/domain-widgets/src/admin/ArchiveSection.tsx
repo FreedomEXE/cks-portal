@@ -27,6 +27,8 @@ export interface ArchiveAPI {
 export interface ArchiveSectionProps {
   archiveAPI?: ArchiveAPI;
   onViewOrderDetails?: (orderId: string, orderType: 'product' | 'service') => void;
+  initialTab?: string;
+  initialOrdersSubTab?: string;
 }
 
 const ARCHIVE_TABS = [
@@ -88,15 +90,21 @@ function formatDate(dateString?: string): string {
   });
 }
 
-export default function ArchiveSection({ archiveAPI, onViewOrderDetails }: ArchiveSectionProps) {
+export default function ArchiveSection({
+  archiveAPI,
+  onViewOrderDetails,
+  initialTab,
+  initialOrdersSubTab
+}: ArchiveSectionProps) {
   console.log('[ArchiveSection] Component rendering with archiveAPI:', !!archiveAPI);
   console.log('[ArchiveSection] archiveAPI methods:', archiveAPI ? Object.getOwnPropertyNames(Object.getPrototypeOf(archiveAPI)) : 'No API');
   console.log('[ArchiveSection] archiveAPI type:', typeof archiveAPI);
   console.log('[ArchiveSection] archiveAPI full object:', archiveAPI);
+  console.log('[ArchiveSection] initialTab:', initialTab, 'initialOrdersSubTab:', initialOrdersSubTab);
 
-  const [activeTab, setActiveTab] = useState('manager');
+  const [activeTab, setActiveTab] = useState(initialTab || 'manager');
   const [servicesSubTab, setServicesSubTab] = useState<string>('catalog-services');
-  const [ordersSubTab, setOrdersSubTab] = useState<string>('product-orders');
+  const [ordersSubTab, setOrdersSubTab] = useState<string>(initialOrdersSubTab || 'product-orders');
   const [reportsSubTab, setReportsSubTab] = useState<string>('report');
   const [archivedData, setArchivedData] = useState<ArchivedEntity[]>([]);
   const [loading, setLoading] = useState(false);
@@ -104,6 +112,21 @@ export default function ArchiveSection({ archiveAPI, onViewOrderDetails }: Archi
   const [searchTerm, setSearchTerm] = useState('');
   const [showActionModal, setShowActionModal] = useState(false);
   const [selectedEntity, setSelectedEntity] = useState<ArchivedEntity | null>(null);
+
+  // Update state when initial props change (for activity navigation)
+  useEffect(() => {
+    if (initialTab) {
+      console.log('[ArchiveSection] Updating activeTab from prop:', initialTab);
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
+
+  useEffect(() => {
+    if (initialOrdersSubTab) {
+      console.log('[ArchiveSection] Updating ordersSubTab from prop:', initialOrdersSubTab);
+      setOrdersSubTab(initialOrdersSubTab);
+    }
+  }, [initialOrdersSubTab]);
 
   // Fallback to a no-op API if none provided (for dev/testing)
   const api = archiveAPI || {

@@ -35,7 +35,11 @@
       "Bash(pnpm install:*)",
       "Bash(timeout 600 pnpm build)",
       "Bash(timeout 60 pnpm vite build)",
-      "Bash(timeout 90 pnpm vite build)"
+      "Bash(timeout 90 pnpm vite build)",
+      "Bash(timeout 90 pnpm build)",
+      "Bash(timeout 120 pnpm build)",
+      "Bash(pnpm dev:*)",
+      "Bash(timeout:*)"
     ],
     "deny": [],
     "ask": []

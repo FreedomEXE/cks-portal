@@ -44,8 +44,6 @@ import { useSWRConfig } from 'swr';
 import MyHubSection from '../components/MyHubSection';
 import { useLogout } from '../hooks/useLogout';
 import { useAuth } from '@cks/auth';
-import { useTabsFromUrl } from '../hooks/useTabsFromUrl';
-import { useModalFromUrl } from '../hooks/useModalFromUrl';
 import { archiveAPI, type EntityType } from '../shared/api/archive';
 import '../shared/api/test-archive'; // Temporary test import
 import AdminAssignSection from './components/AdminAssignSection';
@@ -77,7 +75,9 @@ import {
   type OrderActionRequest,
   type UpdateOrderFieldsRequest,
 } from '../shared/api/hub';
-import { ActivityFeed } from '../components/ActivityFeed';
+import { ActivityFeed, type ActivityClickData } from '../components/ActivityFeed';
+import { fetchJson } from '../shared/utils/fetch';
+import type { EntityFetchResult } from '../shared/utils/activityRouter';
 
 // Removed unused: const MILLIS_PER_DAY = 1000 * 60 * 60 * 24;
 
@@ -220,31 +220,16 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
     { id: 'days', title: 'Days Online', dataKey: 'daysOnline', color: 'green' },
   ];
 
-  // URL-driven tab state
-  const {
-    activeTab,
-    setActiveTab,
-    directoryTab,
-    setDirectoryTab,
-    ordersSubTab,
-    setOrdersSubTab,
-    servicesSubTab,
-    setServicesSubTab,
-    reportsSubTab,
-    setReportsSubTab,
-  } = useTabsFromUrl({
-    defaultTab: initialTab,
-    defaultDirTab: 'admins',
-    defaultOrdersSubTab: 'product-orders',
-    defaultServicesSubTab: 'catalog-services',
-    defaultReportsSubTab: 'reports',
-  });
+  // Local tab state (no URL changes)
+  const [activeTab, setActiveTab] = useState(initialTab);
+  const [directoryTab, setDirectoryTab] = useState('admins');
+  const [ordersSubTab, setOrdersSubTab] = useState('product-orders');
+  const [servicesSubTab, setServicesSubTab] = useState('catalog-services');
+  const [reportsSubTab, setReportsSubTab] = useState('reports');
 
-  // URL-driven modal state
-  const orderModal = useModalFromUrl('order');
-  const serviceModal = useModalFromUrl('service');
-  const userModal = useModalFromUrl('user');
-  const reportModal = useModalFromUrl('report');
+  // Archive section initial state (for activity navigation)
+  const [archiveInitialTab, setArchiveInitialTab] = useState<string | undefined>(undefined);
+  const [archiveInitialOrdersSubTab, setArchiveInitialOrdersSubTab] = useState<string | undefined>(undefined);
 
   const [showActionModal, setShowActionModal] = useState(false);
   const [selectedEntity, setSelectedEntity] = useState<Record<string, any> | null>(null);
@@ -259,55 +244,20 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
   const logout = useLogout();
   const { mutate } = useSWRConfig();
 
-  // Watch URL params and open modals accordingly
-  useEffect(() => {
-    // Order modal from URL
-    if (orderModal.isOpen && orderModal.entityId) {
-      // Fetch order by ID and set selectedOrderForDetails
-      // For now, using existing fetchAdminOrderById from the old logic
-      import('../shared/api/admin').then(({ fetchAdminOrderById }) => {
-        fetchAdminOrderById(orderModal.entityId!).then((order) => {
-          if (order) {
-            setSelectedOrderForDetails(order as any);
-          }
-        }).catch((err) => {
-          console.error('[AdminHub] Failed to fetch order from URL:', err);
-          setToast('Failed to load order');
-          setTimeout(() => setToast(null), 3000);
-        });
-      });
-    } else if (!orderModal.isOpen && selectedOrderForDetails) {
-      // URL cleared, close modal
-      setSelectedOrderForDetails(null);
-    }
-
-    // Service modal from URL
-    if (serviceModal.isOpen && serviceModal.entityId) {
-      // Set selected service for modal
-      setSelectedServiceCatalog({
-        serviceId: serviceModal.entityId,
-        name: null,
-        category: null,
-        status: null,
-        description: null,
-        metadata: null,
-      });
-      setShowServiceCatalogModal(true);
-    } else if (!serviceModal.isOpen && showServiceCatalogModal) {
-      // URL cleared, close modal
-      setShowServiceCatalogModal(false);
-      setSelectedServiceCatalog(null);
-    }
-
-    // Add other modals (user, report) as needed...
-  }, [orderModal.isOpen, orderModal.entityId, serviceModal.isOpen, serviceModal.entityId]);
-
   // Helper function to normalize identity (same as in WarehouseHub)
   const normalizeIdentity = (code: string | null | undefined): string | null => {
     if (!code) return null;
     const trimmed = code.trim().toUpperCase();
     return trimmed.length > 0 ? trimmed : null;
   };
+
+  // Reset archive initial values when leaving archive tab
+  useEffect(() => {
+    if (activeTab !== 'archive') {
+      setArchiveInitialTab(undefined);
+      setArchiveInitialOrdersSubTab(undefined);
+    }
+  }, [activeTab]);
 
   // Fetch destination profile for order details (derive from directory order fields)
   const rawDestinationCode = selectedOrderForDetails
@@ -425,19 +375,25 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
     // Always try cached values first to enrich missing fields
     const cached = fullOrderCacheRef.current.get(orderId);
     if (cached) {
-      setSelectedOrderForDetails((prev) => {
-        if (!prev) return prev;
-        const prevId = (prev as any).orderId || (prev as any).id;
-        if (prevId !== orderId) return prev;
-        return {
-          ...(prev as any),
-          items: (cached as any).items ?? (prev as any).items ?? [],
-          notes: (cached as any).notes ?? (prev as any).notes ?? null,
-          expectedDate: (cached as any).expectedDate ?? (prev as any).expectedDate ?? null,
-          requestedDate: (cached as any).requestedDate ?? (prev as any).requestedDate ?? null,
-          metadata: (cached as any).metadata ?? (prev as any).metadata ?? null,
-        } as any;
-      });
+      const prevItems = (current as any).items;
+      const cachedItems = (cached as any).items;
+
+      // Only update if items are missing and cache has them
+      if ((!prevItems || prevItems.length === 0) && cachedItems && cachedItems.length > 0) {
+        setSelectedOrderForDetails((prev) => {
+          if (!prev) return prev;
+          const prevId = (prev as any).orderId || (prev as any).id;
+          if (prevId !== orderId) return prev;
+          return {
+            ...(prev as any),
+            items: (cached as any).items ?? (prev as any).items ?? [],
+            notes: (cached as any).notes ?? (prev as any).notes ?? null,
+            expectedDate: (cached as any).expectedDate ?? (prev as any).expectedDate ?? null,
+            requestedDate: (cached as any).requestedDate ?? (prev as any).requestedDate ?? null,
+            metadata: (cached as any).metadata ?? (prev as any).metadata ?? null,
+          } as any;
+        });
+      }
     }
 
     // Avoid refetching multiple times per open
@@ -452,19 +408,31 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
         const full = await fetchAdminOrderById(orderId);
         if (cancelled || !full) return;
         fullOrderCacheRef.current.set(orderId, full as any);
-        setSelectedOrderForDetails((prev) => {
-          if (!prev) return prev;
-          const prevId = (prev as any).orderId || (prev as any).id;
-          if (prevId !== orderId) return prev;
-          return {
-            ...(prev as any),
-            items: (full as any).items ?? (prev as any).items ?? [],
-            notes: (full as any).notes ?? (prev as any).notes ?? null,
-            expectedDate: (full as any).expectedDate ?? (prev as any).expectedDate ?? null,
-            requestedDate: (full as any).requestedDate ?? (prev as any).requestedDate ?? null,
-            metadata: (full as any).metadata ?? (prev as any).metadata ?? null,
-          } as any;
-        });
+
+        // Only update if items are missing
+        const fullItems = (full as any).items;
+        const hasItems = fullItems && fullItems.length > 0;
+
+        if (hasItems) {
+          setSelectedOrderForDetails((prev) => {
+            if (!prev) return prev;
+            const prevId = (prev as any).orderId || (prev as any).id;
+            if (prevId !== orderId) return prev;
+
+            // Only update if prev doesn't have items
+            const prevItems = (prev as any).items;
+            if (prevItems && prevItems.length > 0) return prev;
+
+            return {
+              ...(prev as any),
+              items: (full as any).items ?? (prev as any).items ?? [],
+              notes: (full as any).notes ?? (prev as any).notes ?? null,
+              expectedDate: (full as any).expectedDate ?? (prev as any).expectedDate ?? null,
+              requestedDate: (full as any).requestedDate ?? (prev as any).requestedDate ?? null,
+              metadata: (full as any).metadata ?? (prev as any).metadata ?? null,
+            } as any;
+          });
+        }
       } catch (e) {
         console.warn('Failed to fetch full order for admin view:', e);
       }
@@ -1385,6 +1353,140 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
 
   const handleClearActivity = () => setActivityFeed([]);
 
+  const handleActivityClick = ({ targetType, targetId, orderType }: ActivityClickData) => {
+    console.log('[AdminHub] Activity clicked:', { targetType, targetId, orderType });
+
+    if (targetType === 'order') {
+      // Use entity endpoint with includeDeleted to handle archived/deleted
+      (async () => {
+        try {
+          const resp = await fetchJson<EntityFetchResult>(
+            `/entity/order/${encodeURIComponent(targetId)}?includeDeleted=1`
+          );
+
+          if (!resp.ok) {
+            throw new Error(resp.error?.message || 'Failed to load order');
+          }
+
+          const { entity, state, deletedAt, deletedBy } = resp.data;
+
+          // Deleted: open modal with tombstone banner; do not navigate
+          if (state === 'deleted') {
+            console.log('[AdminHub] Order is deleted, opening modal without navigation');
+            setSelectedOrderForDetails({
+              ...(entity as any),
+              isDeleted: true,
+              deletedAt,
+              deletedBy,
+            } as any);
+            return;
+          }
+
+          // Archived: navigate to Archive tab and open modal
+          if (state === 'archived') {
+            console.log('[AdminHub] Order is archived, navigating to Archive tab');
+
+            // Fetch full order data
+            const fullOrder = await fetchAdminOrderById(targetId);
+            if (!fullOrder) {
+              throw new Error('Failed to load archived order details');
+            }
+
+            // Set archive initial values to navigate to correct sub-tab
+            // Try multiple orderType sources for robustness
+            const detectedOrderType =
+              orderType ||
+              (fullOrder as any).orderType ||
+              (fullOrder as any).order_type ||
+              (entity as any).orderType ||
+              (entity as any).order_type ||
+              'product';
+
+            console.log('[AdminHub] Detected order type:', detectedOrderType);
+            console.log('[AdminHub] Before setting archive state:', {
+              archiveInitialTab,
+              archiveInitialOrdersSubTab,
+              activeTab
+            });
+
+            setArchiveInitialTab('orders');
+            setArchiveInitialOrdersSubTab(detectedOrderType === 'service' ? 'service-orders' : 'product-orders');
+
+            console.log('[AdminHub] Set archive initial values to:', {
+              initialTab: 'orders',
+              initialOrdersSubTab: detectedOrderType === 'service' ? 'service-orders' : 'product-orders'
+            });
+
+            // Navigate to Archive
+            setActiveTab('archive');
+
+            // Delay modal opening to allow ArchiveSection to remount with correct sub-tab
+            setTimeout(() => {
+              setSelectedOrderForDetails(fullOrder as any);
+            }, 100);
+            return;
+          }
+
+          // Active: navigate to Orders in Directory with correct sub-tab
+          console.log('[AdminHub] Order is active, navigating to Orders tab');
+
+          // Fetch full order data
+          const fullOrder = await fetchAdminOrderById(targetId);
+          if (!fullOrder) {
+            throw new Error('Failed to load order details');
+          }
+
+          // Navigate and open modal with full data
+          setActiveTab('directory');
+          setDirectoryTab('orders');
+          setOrdersSubTab(orderType === 'service' ? 'service-orders' : 'product-orders');
+          setSelectedOrderForDetails(fullOrder as any);
+        } catch (err) {
+          console.error('[AdminHub] Failed to fetch entity for activity:', err);
+          setToast('Failed to load order');
+          setTimeout(() => setToast(null), 3000);
+        }
+      })();
+    } else if (targetType === 'service') {
+      // Navigate to services tab
+      setActiveTab('directory');
+      setDirectoryTab('services');
+      setServicesSubTab('catalog-services');
+
+      // Open service modal
+      setSelectedServiceCatalog({
+        serviceId: targetId,
+        name: null,
+        category: null,
+        status: null,
+        description: null,
+        metadata: null,
+      });
+      setShowServiceCatalogModal(true);
+    } else if (targetType === 'manager' || targetType === 'contractor' || targetType === 'customer' || targetType === 'center' || targetType === 'crew' || targetType === 'warehouse') {
+      // Navigate to user directory
+      setActiveTab('directory');
+      setDirectoryTab(`${targetType}s`); // e.g., 'managers', 'contractors'
+
+      // TODO: Open user modal (not implemented yet)
+      setToast(`Opening ${targetType} profile (modal not implemented yet)`);
+      setTimeout(() => setToast(null), 3000);
+    } else if (targetType === 'report' || targetType === 'feedback') {
+      // Navigate to reports tab
+      setActiveTab('directory');
+      setDirectoryTab('reports');
+      setReportsSubTab(targetType === 'report' ? 'reports' : 'feedback');
+
+      // TODO: Open report modal (not implemented yet)
+      setToast(`Opening ${targetType} (modal not implemented yet)`);
+      setTimeout(() => setToast(null), 3000);
+    } else {
+      console.warn('[AdminHub] Unsupported target type:', targetType);
+      setToast(`Cannot open ${targetType} (unsupported type)`);
+      setTimeout(() => setToast(null), 3000);
+    }
+  };
+
   // Don't render anything until we have critical data
   if (!activityItems) {
     console.log('[AdminHub] Waiting for critical data...');
@@ -1413,6 +1515,7 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
                 activities={activityFeed}
                 hub="admin"
                 onClear={handleClearActivity}
+                onActivityClick={handleActivityClick}
                 isLoading={activitiesLoading}
                 error={activitiesError}
                 onError={(message) => {
@@ -1449,21 +1552,33 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
           ) : activeTab === 'assign' ? (
             <AdminAssignSection />
           ) : activeTab === 'archive' ? (
-            <ArchiveSection
-              archiveAPI={archiveAPI}
-              onViewOrderDetails={async (orderId: string, orderType: 'product' | 'service') => {
-                try {
-                  // Fetch the full archived order
-                  const fullOrder = await fetchAdminOrderById(orderId);
-                  if (fullOrder) {
-                    setSelectedOrderForDetails(fullOrder as any);
-                  }
-                } catch (error) {
-                  console.error('Failed to fetch archived order:', error);
-                  alert('Failed to load order details');
-                }
-              }}
-            />
+            (() => {
+              console.log('[AdminHub] Rendering ArchiveSection with:', {
+                key: `archive-${archiveInitialTab}-${archiveInitialOrdersSubTab}`,
+                initialTab: archiveInitialTab,
+                initialOrdersSubTab: archiveInitialOrdersSubTab
+              });
+              return (
+                <ArchiveSection
+                  key={`archive-${archiveInitialTab}-${archiveInitialOrdersSubTab}`}
+                  archiveAPI={archiveAPI}
+                  initialTab={archiveInitialTab}
+                  initialOrdersSubTab={archiveInitialOrdersSubTab}
+                  onViewOrderDetails={async (orderId: string, orderType: 'product' | 'service') => {
+                    try {
+                      // Fetch the full archived order
+                      const fullOrder = await fetchAdminOrderById(orderId);
+                      if (fullOrder) {
+                        setSelectedOrderForDetails(fullOrder as any);
+                      }
+                    } catch (error) {
+                      console.error('Failed to fetch archived order:', error);
+                      alert('Failed to load order details');
+                    }
+                  }}
+                />
+              );
+            })()
           ) : activeTab === 'support' ? (
             <PageWrapper title="Support" headerSrOnly>
               <AdminSupportSection primaryColor="#6366f1" />
@@ -1917,7 +2032,6 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
             <ServiceOrderModal
               isOpen={!!selectedOrderForDetails}
               onClose={() => {
-                orderModal.close();
                 setSelectedOrderForDetails(null);
               }}
               order={commonOrder}
@@ -1937,7 +2051,6 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
             <ProductOrderModal
               isOpen={!!selectedOrderForDetails}
               onClose={() => {
-                orderModal.close();
                 setSelectedOrderForDetails(null);
               }}
               order={commonOrder ? { ...commonOrder, items } : null}
@@ -1956,7 +2069,6 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
             <OrderDetailsModal
               isOpen={!!selectedOrderForDetails}
               onClose={() => {
-                orderModal.close();
                 setSelectedOrderForDetails(null);
               }}
               order={commonOrder ? { ...commonOrder, orderType, items: selectedOrderForDetails?.items || [] } : null}
@@ -2043,7 +2155,6 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
   );
 
 }
-
 
 
 

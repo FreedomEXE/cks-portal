@@ -7,6 +7,7 @@ export interface Activity {
   message: string;
   timestamp: Date;
   type?: 'info' | 'success' | 'warning' | 'action';
+  onClick?: () => void;
   metadata?: {
     role?: string;
     userId?: string;
@@ -140,6 +141,7 @@ export function RecentActivity({
               type={activity.type}
               role={activity.metadata?.role}
               title={activity.metadata?.title}
+              onClick={activity.onClick}
             />
           ))
         ) : (

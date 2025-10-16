@@ -47,7 +47,7 @@ import {
   type OrderActionType,
 } from '../shared/api/hub';
 import { useFormattedActivities } from '../shared/activity/useFormattedActivities';
-import { ActivityFeed } from '../components/ActivityFeed';
+import { ActivityFeed, type ActivityClickData } from '../components/ActivityFeed';
 import { createFeedback as apiCreateFeedback, acknowledgeItem as apiAcknowledgeItem, resolveReport as apiResolveReport, fetchServicesForReports, fetchProceduresForReports, fetchOrdersForReports } from '../shared/api/hub';
 
 const ACTION_LABEL_MAP: Record<string, OrderActionType> = {
@@ -259,6 +259,33 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
   }, [orders]);
 
   const { activities, isLoading: activitiesLoading, error: activitiesError } = useFormattedActivities(normalizedCode, { limit: 20 });
+
+  const handleActivityClick = ({ targetType, targetId, orderType }: ActivityClickData) => {
+    console.log('[WarehouseHub] Activity clicked:', { targetType, targetId, orderType });
+
+    if (targetType === 'order') {
+      // Navigate to orders tab
+      setActiveTab('orders');
+
+      // Find and open order modal
+      const target = orders?.orders?.find((o: any) => (o.orderId || o.id) === targetId) || null;
+      if (target) {
+        setSelectedOrderForDetails(target);
+      } else {
+        toast.error('Order not found');
+      }
+    } else if (targetType === 'service') {
+      // Navigate to services tab
+      setActiveTab('services');
+      setServicesTab('active');
+
+      // TODO: Open service modal (not implemented yet)
+      toast('Opening service (modal not implemented yet)');
+    } else {
+      console.warn('[WarehouseHub] Unsupported target type:', targetType);
+      toast.error(`Cannot open ${targetType} (unsupported type)`);
+    }
+  };
 
   const overviewData = useMemo(() => ({
     inventoryCount: (dashboard as any)?.inventoryCount ?? 0,
@@ -651,6 +678,7 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
               <ActivityFeed
                 activities={activities}
                 hub="warehouse"
+                onActivityClick={handleActivityClick}
                 isLoading={activitiesLoading}
                 error={activitiesError}
                 onError={(msg) => toast.error(msg)}
