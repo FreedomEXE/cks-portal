@@ -1,0 +1,310 @@
+/* ProductQuickActions - Inventory management for admin */
+
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+}
+
+.section {
+  background-color: #f9fafb;
+  border-radius: 6px;
+  padding: 16px;
+}
+
+.sectionTitle {
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+  margin: 0 0 12px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Filter Row */
+.filterRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.filterLabel {
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
+}
+
+.filterSelect {
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  background: white;
+  cursor: pointer;
+  min-width: 200px;
+}
+
+.filterSelect:focus {
+  outline: none;
+  border-color: #6b7280;
+  box-shadow: 0 0 0 3px rgba(107, 114, 128, 0.1);
+}
+
+/* Inventory Table */
+.inventoryTable {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: white;
+  overflow: hidden;
+}
+
+.tableHeader {
+  display: grid;
+  grid-template-columns: 2fr 1fr 2fr 1fr;
+  background-color: #f3f4f6;
+  border-bottom: 2px solid #d1d5db;
+  font-weight: 600;
+  font-size: 12px;
+  color: #374151;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.headerCell {
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+}
+
+.tableRow {
+  display: grid;
+  grid-template-columns: 2fr 1fr 2fr 1fr;
+  border-bottom: 1px solid #f3f4f6;
+  transition: background-color 0.2s;
+}
+
+.tableRow:last-child {
+  border-bottom: none;
+}
+
+.tableRow:hover {
+  background-color: #f9fafb;
+}
+
+.tableCell {
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+}
+
+/* Warehouse Info */
+.warehouseInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.warehouseName {
+  font-weight: 500;
+  color: #111827;
+}
+
+.warehouseId {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.location {
+  font-size: 11px;
+  color: #9ca3af;
+}
+
+/* Quantity Display */
+.quantityDisplay {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.quantity {
+  font-weight: 600;
+  color: #111827;
+}
+
+.stockStatus {
+  font-size: 11px;
+  font-weight: 500;
+}
+
+/* Adjustment Controls */
+.adjustmentControls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.adjustButton {
+  padding: 6px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  background: white;
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.2s;
+  min-width: 36px;
+}
+
+.adjustButton:hover {
+  background-color: #f3f4f6;
+  border-color: #9ca3af;
+}
+
+.adjustButton:active {
+  background-color: #e5e7eb;
+}
+
+.adjustInput {
+  width: 70px;
+  padding: 6px 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  font-size: 14px;
+  text-align: center;
+  font-weight: 500;
+}
+
+.adjustInput:focus {
+  outline: none;
+  border-color: #6b7280;
+}
+
+.adjustInput::placeholder {
+  color: #d1d5db;
+}
+
+/* Remove spinner from number input */
+.adjustInput::-webkit-inner-spin-button,
+.adjustInput::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.adjustInput[type='number'] {
+  -moz-appearance: textfield;
+}
+
+.newQuantity {
+  font-weight: 600;
+  font-size: 16px;
+}
+
+/* Actions Section */
+.actionsSection {
+  background-color: #f9fafb;
+  border-radius: 6px;
+  padding: 16px;
+}
+
+.actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.leftActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.rightActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+
+.actionButton {
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.actionButton:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.actionSave {
+  background-color: #10b981;
+  color: white;
+}
+
+.actionSave:hover:not(:disabled) {
+  background-color: #059669;
+}
+
+.actionSave:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.actionDelete {
+  background-color: #ef4444;
+  color: white;
+}
+
+.actionDelete:hover {
+  background-color: #dc2626;
+}
+
+.emptyState {
+  padding: 30px 16px;
+  text-align: center;
+  color: #9ca3af;
+  font-size: 14px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .tableHeader,
+  .tableRow {
+    grid-template-columns: 1fr;
+  }
+
+  .tableHeader {
+    display: none;
+  }
+
+  .tableRow {
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    margin-bottom: 8px;
+  }
+
+  .tableCell {
+    padding: 8px 12px;
+  }
+
+  .tableCell::before {
+    content: attr(data-label);
+    font-weight: 600;
+    font-size: 12px;
+    color: #6b7280;
+    margin-right: 8px;
+  }
+}

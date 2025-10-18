@@ -28,6 +28,7 @@ export interface ArchiveAPI {
 export interface ArchiveSectionProps {
   archiveAPI?: ArchiveAPI;
   onViewOrderDetails?: (orderId: string, orderType: 'product' | 'service') => void;
+  onViewServiceDetails?: (serviceId: string) => void;
 }
 
 const ARCHIVE_TABS = [
@@ -63,7 +64,6 @@ const BASE_COLUMNS = [
   { key: 'archivedBy', label: 'ARCHIVED BY' },
   { key: 'archivedAt', label: 'ARCHIVED ON' },
   { key: 'deletionScheduled', label: 'SCHEDULED DELETION' },
-  { key: 'actions', label: '', width: '80px' },
 ];
 
 function buildColumns(tabId: string) {
@@ -301,23 +301,6 @@ export default function ArchiveSection({
         archivedBy: item.archivedBy,
         archivedAt: formatDate(item.archivedAt),
         deletionScheduled: formatDate(item.deletionScheduled),
-        actions: (
-          <button
-            onClick={() => handleView(item)}
-            style={{
-              padding: '6px 12px',
-              backgroundColor: '#111827',
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontSize: '12px',
-              fontWeight: 500
-            }}
-          >
-            View
-          </button>
-        )
       }));
 
     return {
@@ -443,6 +426,32 @@ export default function ArchiveSection({
           data={config.data}
           emptyMessage={config.emptyMessage}
           showSearch={false}
+          onRowClick={(row) => {
+            // Determine effective tab for routing behavior
+            const effectiveTab = (() => {
+              if (activeTab === 'services') return servicesSubTab;
+              if (activeTab === 'orders') return ordersSubTab;
+              if (activeTab === 'reports') return reportsSubTab;
+              return activeTab;
+            })();
+
+            // For orders: open details modal directly
+            if ((effectiveTab === 'product-orders' || effectiveTab === 'service-orders') && onViewOrderDetails) {
+              const orderType = effectiveTab === 'service-orders' ? 'service' : 'product';
+              onViewOrderDetails(row.id, orderType);
+              return;
+            }
+
+            // For services: open service modal directly if provided
+            if ((effectiveTab === 'catalog-services' || effectiveTab === 'active-services') && onViewServiceDetails) {
+              onViewServiceDetails(row.id);
+              return;
+            }
+
+            // Default: open action modal
+            const entity = archivedData.find((e) => e.id === row.id);
+            if (entity) handleView(entity);
+          }}
         />
 
         <div style={{ marginTop: 24, padding: 16, backgroundColor: '#fef3c7', borderRadius: 8 }}>

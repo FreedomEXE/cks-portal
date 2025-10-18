@@ -127,7 +127,7 @@ export async function initializeSequences() {
         id BIGSERIAL PRIMARY KEY,
         service_id VARCHAR(32) NOT NULL REFERENCES catalog_services(service_id) ON DELETE CASCADE,
         user_id VARCHAR(64) NOT NULL,
-        role TEXT NOT NULL CHECK (role IN ('manager','crew','warehouse')),
+        role TEXT NOT NULL CHECK (role IN ('manager','contractor','crew','warehouse')),
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         archived_at TIMESTAMPTZ,
         UNIQUE(service_id, user_id, role)

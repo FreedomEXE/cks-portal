@@ -27,6 +27,7 @@ import {
   type Activity,
   type TreeNode,
 } from '@cks/domain-widgets';
+import { customerOverviewCards } from '@cks/domain-widgets';
 import { Button, DataTable, ModalProvider, OrderDetailsModal, ServiceViewModal, PageHeader, PageWrapper, Scrollbar, TabSection, OrderActionModal } from '@cks/ui';
 import OrderDetailsGateway from '../components/OrderDetailsGateway';
 import { useAuth } from '@cks/auth';
@@ -47,8 +48,10 @@ import {
   type HubOrderItem,
   type OrderActionRequest,
 } from '../shared/api/hub';
+import { useCertifiedServices } from '../hooks/useCertifiedServices';
 
 import { buildEcosystemTree, DEFAULT_ROLE_COLOR_MAP } from '../shared/utils/ecosystem';
+import { buildCustomerOverviewData } from '../shared/overview/builders';
 import { useHubLoading } from '../contexts/HubLoadingContext';
 
 interface CustomerHubProps {
@@ -187,6 +190,7 @@ export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubPro
   const {
     data: scopeData,
   } = useHubRoleScope(normalizedCode);
+  const { data: certifiedServicesData, isLoading: certifiedServicesLoading } = useCertifiedServices(normalizedCode, 'customer', 500);
   const { mutate } = useSWRConfig();
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -271,13 +275,14 @@ export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubPro
   
   const { activities, isLoading: activitiesLoading, error: activitiesError } = useFormattedActivities(normalizedCode, { limit: 20 });
 
-  const overviewData = useMemo(() => ({
-    serviceCount: dashboard?.serviceCount ?? 0,
-    centerCount: dashboard?.centerCount ?? 0,
-    crewCount: dashboard?.crewCount ?? 0,
-    pendingRequests: dashboard?.pendingRequests ?? 0,
-    accountStatus: dashboard?.accountStatus === 'assigned' ? 'Active' : (dashboard?.accountStatus ?? 'Unknown'),
-  }), [dashboard]);
+  const overviewData = useMemo(() =>
+    buildCustomerOverviewData({
+      dashboard: dashboard ?? null,
+      profile: profile ?? null,
+      scope: scopeData ?? null,
+      certifiedServices: certifiedServicesData,
+    }),
+  [dashboard, profile, scopeData, certifiedServicesData]);
 
   const customerScope = scopeData?.role === 'customer' ? scopeData : null;
 
@@ -352,19 +357,13 @@ export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubPro
     { id: 'dashboard', label: 'Dashboard', path: '/customer/dashboard' },
     { id: 'profile', label: 'My Profile', path: '/customer/profile' },
     { id: 'ecosystem', label: 'My Ecosystem', path: '/customer/ecosystem' },
-    { id: 'services', label: 'Active Services', path: '/customer/services' },
+    { id: 'services', label: 'Services', path: '/customer/services' },
     { id: 'orders', label: 'Orders', path: '/customer/orders' },
     { id: 'reports', label: 'Reports', path: '/customer/reports' },
     { id: 'support', label: 'Support', path: '/customer/support' },
   ], []);
 
-  const overviewCards = useMemo(() => [
-    { id: 'services', title: 'Active Services', dataKey: 'serviceCount', color: 'teal' },
-    { id: 'centers', title: 'Active Centers', dataKey: 'centerCount', color: 'orange' },
-    { id: 'crew', title: 'Active Crew', dataKey: 'crewCount', color: 'red' },
-    { id: 'requests', title: 'Pending Requests', dataKey: 'pendingRequests', color: 'yellow' },
-    { id: 'status', title: 'Account Status', dataKey: 'accountStatus', color: 'yellow' },
-  ], []);
+  // Cards provided by shared domain widgets
 
   const profileCardData = useMemo(() => ({
     name: profile?.name ?? '-',
@@ -426,7 +425,7 @@ export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubPro
                 <div style={{ marginBottom: 12, color: '#dc2626' }}>{dashboardErrorMessage}</div>
               )}
               <OverviewSection
-                cards={overviewCards}
+                cards={customerOverviewCards}
                 data={overviewData}
                 loading={dashboardLoading}
               />

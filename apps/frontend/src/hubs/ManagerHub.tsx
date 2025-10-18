@@ -22,6 +22,7 @@ import {
   type Activity,
   type ReportFeedback,
 } from '@cks/domain-widgets';
+import { managerOverviewCards } from '@cks/domain-widgets';
 import {
   Button,
   DataTable,
@@ -29,6 +30,7 @@ import {
   OrderDetailsModal,
   ServiceDetailsModal,
   ServiceViewModal,
+  CatalogServiceModal,
   PageHeader,
   PageWrapper,
   Scrollbar,
@@ -37,7 +39,9 @@ import {
 import OrderDetailsGateway from '../components/OrderDetailsGateway';
 import MyHubSection from '../components/MyHubSection';
 import { useCatalogItems } from '../shared/api/catalog';
+import { useCertifiedServices } from '../hooks/useCertifiedServices';
 import { useLogout } from '../hooks/useLogout';
+import { buildManagerOverviewData } from '../shared/overview/builders';
 
 /**
  * File: ManagerHub.tsx
@@ -139,19 +143,14 @@ const HUB_TABS = [
   { id: 'support', label: 'Support', path: '/manager/support' },
 ];
 
-const OVERVIEW_CARDS = [
-  { id: 'contractors', title: 'My Contractors', dataKey: 'contractorCount', color: 'green' },
-  { id: 'customers', title: 'My Customers', dataKey: 'customerCount', color: 'yellow' },
-  { id: 'centers', title: 'My Centers', dataKey: 'centerCount', color: 'orange' },
-  { id: 'crew', title: 'My Crew', dataKey: 'crewCount', color: 'red' },
-  { id: 'orders', title: 'Pending Orders', dataKey: 'pendingOrders', color: 'indigo' },
-  { id: 'status', title: 'Account Status', dataKey: 'accountStatus', color: 'green' },
-];
+// Cards are defined in shared domain widgets
 
 const MY_SERVICES_COLUMNS_BASE = [
   { key: 'serviceId', label: 'SERVICE ID', clickable: true },
   { key: 'serviceName', label: 'SERVICE NAME' },
   { key: 'category', label: 'CATEGORY' },
+  { key: 'certifiedAt', label: 'CERTIFIED DATE' },
+  { key: 'renewalDate', label: 'RENEWAL DATE' },
 ];
 
 const MY_SERVICES_COLUMNS_CERTIFIED = [
@@ -453,6 +452,8 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
   // Service modal state (for Active Services section)
   const [showServiceDetails, setShowServiceDetails] = useState(false);
   const [serviceDetails, setServiceDetails] = useState<any>(null);
+  const [showCatalogServiceModal, setShowCatalogServiceModal] = useState(false);
+  const [selectedCatalogService, setSelectedCatalogService] = useState<{ serviceId: string; name: string; category: string | null; status?: string } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
@@ -653,38 +654,21 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
   );
 
   // Find selected order from hub data for transform-first approach
-  
-  // Catalog services list for My Services tab (MVP: show all services to managers)
-  const { data: catalogData } = useCatalogItems({ type: 'service', pageSize: 500 });
+
+  // Certified services for My Services tab (filtered by certifications)
+  const { data: certifiedServicesData, isLoading: certifiedServicesLoading } = useCertifiedServices(managerCode, 'manager', 500);
 
   const myServicesData = useMemo(() => {
-    const items = catalogData?.items || [];
-    return items.map((service: any) => {
-      const certifications = service.metadata?.certifications || {};
-      const managerCerts = certifications.manager || [];
-      const isCertified = managerCerts.includes(managerCode);
+    return certifiedServicesData.map((service) => ({
+      serviceId: service.serviceId,
+      serviceName: service.name,
+      category: service.category ?? '-',
+      certifiedAt: service.certifiedAt ? new Date(service.certifiedAt).toLocaleDateString() : '-',
+      renewalDate: service.renewalDate ? new Date(service.renewalDate).toLocaleDateString() : '-',
+    }));
+  }, [certifiedServicesData]);
 
-      return {
-        serviceId: service.code ?? 'CAT-SRV',
-        serviceName: service.name ?? 'Service',
-        category: service.category ?? '-',
-        certified: isCertified ? 'Yes' : 'No',
-        certificationDate: isCertified ? '-' : null,
-        expires: isCertified ? '-' : null,
-        _isCertified: isCertified, // For column logic
-      };
-    });
-  }, [catalogData, managerCode]);
-
-  // Check if any service has the user certified to determine columns
-  const hasAnyCertification = useMemo(
-    () => myServicesData.some((s: any) => s._isCertified),
-    [myServicesData]
-  );
-
-  const myServicesColumns = hasAnyCertification
-    ? MY_SERVICES_COLUMNS_CERTIFIED
-    : MY_SERVICES_COLUMNS_BASE;
+  const myServicesColumns = MY_SERVICES_COLUMNS_BASE;
 
   const activeServicesData = useMemo(
     () =>
@@ -812,31 +796,15 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
         }),
     [managerServiceOrders, serviceById],
   );
-  const overviewData = useMemo(() => {
-    if (dashboardData) {
-      return {
-        contractorCount: dashboardData.contractorCount ?? 0,
-        customerCount: dashboardData.customerCount ?? 0,
-        centerCount: dashboardData.centerCount ?? 0,
-        crewCount: dashboardData.crewCount ?? 0,
-        pendingOrders: dashboardData.pendingOrders ?? 0,
-        accountStatus: formatAccountStatus(dashboardData.accountStatus),
-      };
-    }
-    // Fallback to counting from scope data
-    const pendingOrders = orderEntries.reduce((count, order) => {
-      const status = normalizeOrderStatus(order.status);
-      return count + (status === 'pending' || status === 'in-progress' ? 1 : 0);
-    }, 0);
-    return {
-      contractorCount: contractorEntries.length,
-      customerCount: customerEntries.length,
-      centerCount: centerEntries.length,
-      crewCount: crewEntries.length,
-      pendingOrders,
-      accountStatus: formatAccountStatus(profileData?.status),
-    };
-  }, [dashboardData, contractorEntries, customerEntries, centerEntries, crewEntries, orderEntries, profileData]);
+  const overviewData = useMemo(() =>
+    buildManagerOverviewData({
+      dashboard: dashboardData ?? null,
+      profile: profileData ?? null,
+      scope: scopeData ?? null,
+      certifiedServices: certifiedServicesData,
+      orders: ordersData?.orders ?? [],
+    }),
+  [dashboardData, profileData, scopeData, certifiedServicesData, ordersData]);
 
   const managerProfileData = useMemo(
     () => ({
@@ -1079,7 +1047,7 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
           {activeTab === 'dashboard' ? (
             <PageWrapper title="Dashboard" showHeader={false}>
               <PageHeader title="Overview" />
-              <OverviewSection cards={OVERVIEW_CARDS} data={overviewData} />
+              <OverviewSection cards={managerOverviewCards} data={overviewData} />
 
               <PageHeader title="Recent Activity" />
               <ActivityFeed
@@ -1165,6 +1133,15 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
                     externalSearchQuery={servicesSearchQuery}
                     maxItems={10}
                     modalType="service-my-services"
+                    onRowClick={(row: any) => {
+                      setSelectedCatalogService({
+                        serviceId: row.serviceId,
+                        name: row.serviceName,
+                        category: row.category === '-' ? null : row.category,
+                        status: 'active',
+                      });
+                      setShowCatalogServiceModal(true);
+                    }}
                   />
                 )}
 
@@ -1531,6 +1508,16 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
         }}
       />
 
+      {/* Catalog Service Modal - for My Services section (view-only) */}
+      <CatalogServiceModal
+        isOpen={showCatalogServiceModal}
+        onClose={() => {
+          setShowCatalogServiceModal(false);
+          setSelectedCatalogService(null);
+        }}
+        service={selectedCatalogService}
+      />
+
       {toast && (
         <div style={{
           position: 'fixed',
@@ -1552,8 +1539,6 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
     </ModalProvider>
   );
 }
-
-
 
 
 

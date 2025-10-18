@@ -86,6 +86,9 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
     const { serviceId } = p.data;
     const { name, category, description, tags, isActive, metadata } = b.data;
 
+    console.log('[CATALOG] PATCH service:', serviceId);
+    console.log('[CATALOG] Received metadata:', JSON.stringify(metadata, null, 2));
+
     const sets: string[] = [];
     const params: any[] = [];
 
@@ -106,14 +109,18 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
 
     params.push(serviceId);
     try {
-      await query(
-        `UPDATE catalog_services
+      const sql = `UPDATE catalog_services
          SET ${sets.join(', ')}, updated_at = NOW()
-         WHERE service_id = $${params.length}`,
-        params,
-      );
+         WHERE service_id = $${params.length}`;
+      console.log('[CATALOG] Executing SQL:', sql);
+      console.log('[CATALOG] With params:', params);
+
+      await query(sql, params);
+
+      console.log('[CATALOG] Update successful for service:', serviceId);
       reply.send({ success: true });
     } catch (error) {
+      console.error('[CATALOG] Update failed:', error);
       request.log.error({ err: error, serviceId }, 'update catalog service failed');
       reply.code(500).send({ error: 'Failed to update catalog service' });
     }
@@ -136,14 +143,16 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
       [serviceId],
     );
     const managers: string[] = [];
+    const contractors: string[] = [];
     const crew: string[] = [];
     const warehouses: string[] = [];
     for (const r of rows.rows) {
       if (r.role === 'manager') managers.push(r.user_id);
+      else if (r.role === 'contractor') contractors.push(r.user_id);
       else if (r.role === 'crew') crew.push(r.user_id);
       else if (r.role === 'warehouse') warehouses.push(r.user_id);
     }
-    reply.send({ success: true, data: { managers, crew, warehouses } });
+    reply.send({ success: true, data: { managers, contractors, crew, warehouses } });
   });
 
   // Admin: assign/unassign certifications for a service
@@ -153,7 +162,7 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
 
     const paramsSchema = z.object({ serviceId: z.string().min(1) });
     const bodySchema = z.object({
-      role: z.enum(['manager','crew','warehouse']),
+      role: z.enum(['manager','contractor','crew','warehouse']),
       add: z.array(z.string()).default([]),
       remove: z.array(z.string()).default([]),
     });
@@ -191,5 +200,56 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
       }
     }
     reply.send({ success: true });
+  });
+
+  // Admin: Get inventory data for a product across all warehouses
+  server.get('/api/admin/catalog/products/:productId/inventory', async (request, reply) => {
+    const admin = await requireActiveAdmin(request, reply);
+    if (!admin) return;
+
+    const paramsSchema = z.object({ productId: z.string().min(1) });
+    const p = paramsSchema.safeParse(request.params);
+    if (!p.success) {
+      reply.code(400).send({ error: 'Invalid product ID' });
+      return;
+    }
+
+    const { productId } = p.data;
+
+    try {
+      // Fetch inventory records from inventory_items table (same as warehouse view)
+      const result = await query<{
+        warehouse_id: string;
+        item_name: string;
+        quantity_on_hand: number;
+        min_stock_level: number | null;
+      }>(
+        `SELECT
+          warehouse_id,
+          item_name,
+          quantity_on_hand,
+          min_stock_level
+         FROM inventory_items
+         WHERE UPPER(item_id) = $1 AND status = 'active'
+         ORDER BY warehouse_id`,
+        [productId.toUpperCase()],
+      );
+
+      const inventoryData = result.rows.map((row) => ({
+        warehouseId: row.warehouse_id,
+        warehouseName: row.warehouse_id,
+        quantityOnHand: Number(row.quantity_on_hand) || 0,
+        minStockLevel: row.min_stock_level !== null ? Number(row.min_stock_level) : null,
+        location: null,
+      }));
+
+      reply.send({ success: true, data: inventoryData });
+    } catch (error) {
+      request.log.error({ err: error, productId }, 'Failed to fetch product inventory');
+      reply.code(500).send({
+        error: 'Failed to fetch product inventory',
+        details: error instanceof Error ? error.message : String(error)
+      });
+    }
   });
 }

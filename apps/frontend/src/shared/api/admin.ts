@@ -119,11 +119,33 @@ export async function fetchServiceCertifications(serviceId: string, init?: ApiFe
   return res.data;
 }
 
-export async function patchServiceAssignments(serviceId: string, payload: { role: 'manager'|'crew'|'warehouse'; add: string[]; remove: string[] }, init?: ApiFetchInit) {
+export async function patchServiceAssignments(serviceId: string, payload: { role: 'manager'|'contractor'|'crew'|'warehouse'; add: string[]; remove: string[] }, init?: ApiFetchInit) {
   return apiFetch<{ success: boolean }>(`/admin/catalog/services/${encodeURIComponent(serviceId)}/assign`, {
     method: 'PATCH',
     body: JSON.stringify(payload),
     headers: { 'Content-Type': 'application/json', ...(init?.headers || {}) },
+    ...init,
+  });
+}
+
+export async function getServiceCertifications(serviceId: string, init?: ApiFetchInit) {
+  return apiFetch<{ success: boolean; data: { managers: string[]; contractors: string[]; crew: string[]; warehouses: string[] } }>(`/admin/catalog/services/${encodeURIComponent(serviceId)}/certifications`, {
+    method: 'GET',
+    ...init,
+  });
+}
+
+export interface ProductInventory {
+  warehouseId: string;
+  warehouseName: string;
+  quantityOnHand: number;
+  minStockLevel: number | null;
+  location: string | null;
+}
+
+export async function getProductInventory(productId: string, init?: ApiFetchInit) {
+  return apiFetch<{ success: boolean; data: ProductInventory[] }>(`/admin/catalog/products/${encodeURIComponent(productId)}/inventory`, {
+    method: 'GET',
     ...init,
   });
 }

@@ -10,7 +10,7 @@ import { useAuth as useCksAuth } from "@cks/auth";
 import { useHubRoleScope } from "../shared/api/hub";
 import { useLoading } from "../contexts/LoadingContext";
 import { useHubLoading } from "../contexts/HubLoadingContext";
-import { ProductModal, ServiceModal } from "@cks/ui";
+import { CatalogProductModal, CatalogServiceModal, Button } from "@cks/ui";
 
 type CatalogKind = "products" | "services";
 
@@ -72,22 +72,23 @@ function Card({
       return {
         bg: 'bg-green-50',
         border: 'border-green-200',
-        badge: null
+        badge: { text: 'CKS Product', color: 'bg-green-100 text-green-700 border-green-300' }
       };
     }
     if (item.type === 'service') {
+      // Keep color coding but use unified "CKS Service" badge
       if (item.managedBy === 'warehouse') {
         return {
           bg: 'bg-purple-50',
           border: 'border-purple-200',
-          badge: { text: 'Warehouse Service', color: 'bg-purple-100 text-purple-700 border-purple-300' }
+          badge: { text: 'CKS Service', color: 'bg-purple-100 text-purple-700 border-purple-300' }
         };
       }
       if (item.managedBy === 'manager') {
         return {
           bg: 'bg-blue-50',
           border: 'border-blue-200',
-          badge: { text: 'Manager Service', color: 'bg-blue-100 text-blue-700 border-blue-300' }
+          badge: { text: 'CKS Service', color: 'bg-blue-100 text-blue-700 border-blue-300' }
         };
       }
     }
@@ -101,8 +102,14 @@ function Card({
 
   const cardStyle = getCardStyle();
 
+  // Limit visible tags to keep card heights consistent across the grid
+  const allTags = Array.isArray(item.tags) ? item.tags : [];
+  const maxTags = 3;
+  const displayTags = allTags.slice(0, maxTags);
+  const extraTags = Math.max(0, allTags.length - displayTags.length);
+
   return (
-    <div className={`group ${cardStyle.bg} rounded-xl border ${cardStyle.border} shadow-sm overflow-hidden hover:shadow-md transition-shadow`}>
+    <div className={`group ${cardStyle.bg} rounded-xl border ${cardStyle.border} shadow-sm overflow-hidden hover:shadow-md transition-shadow h-full`}>
       <div className="aspect-[4/3] w-full bg-gray-100 overflow-hidden">
         {item.imageUrl ? (
           <img
@@ -114,46 +121,58 @@ function Card({
           <div className="w-full h-full flex items-center justify-center text-gray-400">No image</div>
         )}
       </div>
-      <div className="p-4">
-        <div className="flex flex-col gap-2">
-          <div>
+      <div className="p-4 flex flex-col min-h-[180px]">
+        {/* Title + subtitle + badge area: fixed height to align buttons across cards */}
+        <div className="flex-1">
+          <div className="h-[100px] flex flex-col justify-between">
             <div className="flex items-start justify-between gap-2">
-              <h3 className="text-gray-900 font-semibold leading-tight flex-1">{item.name}</h3>
-              <span className="text-xs text-gray-700 font-mono bg-yellow-100 px-2 py-1 rounded font-semibold">{item.code}</span>
+              <h3 className="text-gray-900 font-semibold leading-tight flex-1 line-clamp-2">{item.name}</h3>
+              <span className="text-xs text-gray-700 font-mono bg-yellow-100 px-2 py-1 rounded font-semibold shrink-0">{item.code}</span>
             </div>
-            {subtitle && <p className="text-sm text-gray-500 mt-0.5">{subtitle}</p>}
-            {cardStyle.badge && (
-              <span className={`inline-block text-xs px-2 py-1 rounded border mt-2 font-medium ${cardStyle.badge.color}`}>
+            <p className={`text-sm text-gray-500 ${subtitle ? '' : 'invisible'}`}>{subtitle ?? 'placeholder'}</p>
+            {cardStyle.badge ? (
+              <span className={`inline-flex self-start items-center text-xs px-2 py-1 rounded border font-medium ${cardStyle.badge.color}`}>
                 {cardStyle.badge.text}
               </span>
+            ) : (
+              <span className="inline-flex self-start items-center text-xs px-2 py-1 rounded border font-medium invisible">placeholder</span>
             )}
           </div>
-          <div className="flex gap-2">
-            <button
-              onClick={onView}
-              className="flex-1 h-9 px-3 rounded-md border border-gray-300 text-gray-700 text-sm hover:bg-gray-50 transition-colors"
-            >
-              View
-            </button>
-            <button
-              onClick={onAdd}
-              className={`flex-1 h-9 px-3 rounded-md text-sm transition-colors ${
-                isInCart
-                  ? "bg-green-600 text-white hover:bg-green-700"
-                  : "bg-black text-white hover:bg-neutral-800"
-              }`}
-            >
-              {isInCart ? "Added" : "Add"}
-            </button>
-          </div>
         </div>
-        {item.tags && item.tags.length > 0 && (
+
+        {/* Buttons - Always at same position */}
+        <div className="flex gap-2 mt-3">
+          <button
+            onClick={onView}
+            className="flex-1 h-9 px-3 rounded-md border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50 transition-colors"
+          >
+            View
+          </button>
+          <button
+            onClick={onAdd}
+            className={`flex-1 h-9 px-3 rounded-md text-sm font-medium transition-colors ${
+              isInCart
+                ? "bg-green-600 text-white hover:bg-green-700"
+                : "bg-black text-white hover:bg-neutral-800"
+            }`}
+          >
+            {isInCart ? "Added" : "Add"}
+          </button>
+        </div>
+
+        {/* Tags - limit count to keep row heights aligned */}
+        {displayTags.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-1.5">
-            {item.tags.map((t) => (
+            {displayTags.map((t) => (
               <span key={t} className="text-xs px-2 py-1 rounded bg-gray-100 text-gray-600 border border-gray-200">
                 {t}
               </span>
             ))}
+            {extraTags > 0 && (
+              <span className="text-xs px-2 py-1 rounded bg-gray-100 text-gray-600 border border-gray-200">
+                +{extraTags} more
+              </span>
+            )}
           </div>
         )}
       </div>
@@ -1270,18 +1289,18 @@ export default function CKSCatalog() {
 
       {/* View Product Modal */}
       {selectedViewItem && selectedViewItem.type === 'product' && (
-        <ProductModal
+        <CatalogProductModal
           isOpen={true}
           onClose={() => setSelectedViewItem(null)}
           product={{
             productId: selectedViewItem.code,
             name: selectedViewItem.name,
-            description: selectedViewItem.description || null,
             category: selectedViewItem.category || null,
-            unitOfMeasure: selectedViewItem.unitOfMeasure || 'EA',
+            status: selectedViewItem.status || 'active',
+            description: selectedViewItem.description || null,
+            unitOfMeasure: selectedViewItem.unitOfMeasure || null,
             minimumOrderQuantity: selectedViewItem.product?.minimumOrderQuantity || null,
             leadTimeDays: selectedViewItem.product?.leadTimeDays || null,
-            status: selectedViewItem.status || 'active',
             metadata: selectedViewItem.metadata || null,
           }}
         />
@@ -1289,22 +1308,15 @@ export default function CKSCatalog() {
 
       {/* View Service Modal */}
       {selectedViewItem && selectedViewItem.type === 'service' && (
-        <ServiceModal
+        <CatalogServiceModal
           isOpen={true}
           onClose={() => setSelectedViewItem(null)}
           service={{
             serviceId: selectedViewItem.code,
             name: selectedViewItem.name,
-            description: selectedViewItem.description || null,
             category: selectedViewItem.category || null,
-            estimatedDuration: selectedViewItem.service?.durationMinutes
-              ? `${Math.floor(selectedViewItem.service.durationMinutes / 60)} hrs`
-              : null,
-            requirements: selectedViewItem.service?.requirements || null,
             status: selectedViewItem.status || 'active',
-            metadata: selectedViewItem.metadata || null,
           }}
-          context="catalog"
         />
       )}
     </div>

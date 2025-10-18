@@ -171,7 +171,7 @@ export async function registerServicesRoutes(server: FastifyInstance) {
   server.get('/api/certified-services', async (request, reply) => {
     const schema = z.object({
       userId: z.string().min(1),
-      role: z.enum(['manager', 'crew', 'warehouse']),
+      role: z.enum(['manager', 'contractor', 'crew', 'warehouse']),
       limit: z.coerce.number().int().min(1).max(500).optional(),
     });
     const parsed = schema.safeParse(request.query);
@@ -193,8 +193,9 @@ export async function registerServicesRoutes(server: FastifyInstance) {
         category: string | null;
         is_active: boolean | null;
         updated_at: Date | null;
+        certified_at: Date | null;
       }>(
-        `SELECT s.service_id, s.name, s.category, s.is_active, s.updated_at
+        `SELECT s.service_id, s.name, s.category, s.is_active, s.updated_at, c.created_at as certified_at
          FROM service_certifications c
          JOIN catalog_services s ON s.service_id = c.service_id
          WHERE c.user_id = $1 AND c.role = $2 AND c.archived_at IS NULL
@@ -202,13 +203,20 @@ export async function registerServicesRoutes(server: FastifyInstance) {
          LIMIT $3`,
         [userId, role, limit ?? 250],
       );
-      const data = result.rows.map((r) => ({
-        serviceId: r.service_id,
-        name: r.name,
-        category: r.category,
-        status: r.is_active ? 'active' : 'inactive',
-        updatedAt: r.updated_at ? r.updated_at.toISOString() : null,
-      }));
+      const data = result.rows.map((r) => {
+        const certifiedAt = r.certified_at ? new Date(r.certified_at) : null;
+        const renewalDate = certifiedAt ? new Date(certifiedAt.getTime() + 365 * 24 * 60 * 60 * 1000) : null; // +1 year
+
+        return {
+          serviceId: r.service_id,
+          name: r.name,
+          category: r.category,
+          status: r.is_active ? 'active' : 'inactive',
+          updatedAt: r.updated_at ? r.updated_at.toISOString() : null,
+          certifiedAt: certifiedAt ? certifiedAt.toISOString() : null,
+          renewalDate: renewalDate ? renewalDate.toISOString() : null,
+        };
+      });
       reply.send({ data });
     } catch (error) {
       request.log.error({ err: error, userId, role }, 'certified-services failed');

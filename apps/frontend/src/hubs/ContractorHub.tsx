@@ -27,7 +27,8 @@ import {
   type Activity,
   type TreeNode,
 } from '@cks/domain-widgets';
-import { Button, DataTable, ModalProvider, OrderDetailsModal, ServiceViewModal, PageHeader, PageWrapper, Scrollbar, TabSection, OrderActionModal } from '@cks/ui';
+import { contractorOverviewCards } from '@cks/domain-widgets';
+import { Button, DataTable, ModalProvider, OrderDetailsModal, ServiceViewModal, CatalogServiceModal, PageHeader, PageWrapper, Scrollbar, TabSection, OrderActionModal } from '@cks/ui';
 import OrderDetailsGateway from '../components/OrderDetailsGateway';
 import { useSWRConfig } from 'swr';
 import { createReport as apiCreateReport, createFeedback as apiCreateFeedback, acknowledgeItem as apiAcknowledgeItem, resolveReport as apiResolveReport, fetchServicesForReports, fetchProceduresForReports, fetchOrdersForReports } from '../shared/api/hub';
@@ -49,7 +50,9 @@ import {
 } from '../shared/api/hub';
 import { buildEcosystemTree } from '../shared/utils/ecosystem';
 import { useCatalogItems } from '../shared/api/catalog';
+import { useCertifiedServices } from '../hooks/useCertifiedServices';
 import { useHubLoading } from '../contexts/HubLoadingContext';
+import { buildContractorOverviewData } from '../shared/overview/builders';
 
 interface ContractorHubProps {
   initialTab?: string;
@@ -195,6 +198,8 @@ export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHu
   const [activeTab, setActiveTab] = useState(initialTab);
   const [servicesTab, setServicesTab] = useState<'my' | 'active' | 'history'>('my');
   const [servicesSearchQuery, setServicesSearchQuery] = useState('');
+  const [showCatalogServiceModal, setShowCatalogServiceModal] = useState(false);
+  const [selectedCatalogService, setSelectedCatalogService] = useState<{ serviceId: string; name: string; category: string | null; status?: string } | null>(null);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [actionOrder, setActionOrder] = useState<any | null>(null);
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
@@ -468,51 +473,29 @@ export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHu
     return { activeServicesData: active, serviceHistoryData: history };
   }, [serviceOrders, serviceById, centerNameMap]);
 
-  // Catalog-backed "My Services" list (MVP): show all catalog services to contractors
-  const { data: catalogData } = useCatalogItems({ type: 'service', pageSize: 500 });
+  // Certified services for My Services tab (filtered by certifications)
+  const { data: certifiedServicesData, isLoading: certifiedServicesLoading } = useCertifiedServices(contractorCode, 'contractor', 500);
 
   // Column definitions for My Services
   const MY_SERVICES_COLUMNS_BASE = [
     { key: 'serviceId', label: 'SERVICE ID', clickable: true },
     { key: 'serviceName', label: 'SERVICE NAME' },
     { key: 'category', label: 'CATEGORY' },
-  ];
-
-  const MY_SERVICES_COLUMNS_CERTIFIED = [
-    ...MY_SERVICES_COLUMNS_BASE,
-    { key: 'certified', label: 'CERTIFIED' },
-    { key: 'certificationDate', label: 'CERTIFICATION DATE' },
-    { key: 'expires', label: 'EXPIRES' },
+    { key: 'certifiedAt', label: 'CERTIFIED DATE' },
+    { key: 'renewalDate', label: 'RENEWAL DATE' },
   ];
 
   const myCatalogServices = useMemo(() => {
-    const items = catalogData?.items || [];
-    return items.map((svc: any) => {
-      const certifications = svc.metadata?.certifications || {};
-      const contractorCerts = certifications.contractor || [];
-      const isCertified = contractorCerts.includes(contractorCode);
+    return certifiedServicesData.map((service) => ({
+      serviceId: service.serviceId,
+      serviceName: service.name,
+      category: service.category ?? '-',
+      certifiedAt: service.certifiedAt ? new Date(service.certifiedAt).toLocaleDateString() : '-',
+      renewalDate: service.renewalDate ? new Date(service.renewalDate).toLocaleDateString() : '-',
+    }));
+  }, [certifiedServicesData]);
 
-      return {
-        serviceId: svc.code ?? 'CAT-SRV',
-        serviceName: svc.name ?? 'Service',
-        category: (svc.tags && svc.tags[0]) || null,
-        certified: isCertified ? 'Yes' : 'No',
-        certificationDate: isCertified ? '-' : null,
-        expires: isCertified ? '-' : null,
-        _isCertified: isCertified,
-      };
-    });
-  }, [catalogData, contractorCode]);
-
-  // Check if any service has the user certified to determine columns
-  const hasAnyCertification = useMemo(
-    () => myCatalogServices.some((s: any) => s._isCertified),
-    [myCatalogServices]
-  );
-
-  const myServicesColumns = hasAnyCertification
-    ? MY_SERVICES_COLUMNS_CERTIFIED
-    : MY_SERVICES_COLUMNS_BASE;
+  const myServicesColumns = MY_SERVICES_COLUMNS_BASE;
 
   const tabs = useMemo(() => [
     { id: 'dashboard', label: 'Dashboard', path: '/contractor/dashboard' },
@@ -524,45 +507,15 @@ export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHu
     { id: 'support', label: 'Support', path: '/contractor/support' },
   ], []);
 
-  const overviewCards = useMemo(() => [
-    { id: 'centers', title: 'Active Centers', dataKey: 'centerCount', color: 'blue' },
-    { id: 'crew', title: 'Active Crew', dataKey: 'crewCount', color: 'green' },
-    { id: 'services', title: 'Active Services', dataKey: 'activeServices', color: 'purple' },
-    { id: 'orders', title: 'Pending Orders', dataKey: 'pendingOrders', color: 'orange' },
-    { id: 'status', title: 'Account Status', dataKey: 'accountStatus', color: 'green' },
-  ], []);
-
-  const overviewData = useMemo(() => {
-    if (dashboard) {
-      const pendingOrders =
-        (dashboard as any)?.pendingOrders ??
-        orderEntries.reduce((count, order) => {
-          const status = normalizeStatusValue(order.status);
-          return count + (status === 'pending' || status === 'in-progress' ? 1 : 0);
-        }, 0);
-      return {
-        centerCount: (dashboard as any)?.centerCount ?? 0,
-        crewCount: (dashboard as any)?.crewCount ?? 0,
-        activeServices: (dashboard as any)?.activeServices ?? (dashboard as any)?.serviceCount ?? serviceEntries.length,
-        pendingOrders,
-        accountStatus: formatAccountStatus(dashboard?.accountStatus ?? profile?.status ?? null),
-      };
-    }
-
-    const summary = contractorScope?.summary;
-    const pendingOrders = orderEntries.reduce((count, order) => {
-      const status = normalizeStatusValue(order.status);
-      return count + (status === 'pending' || status === 'in-progress' ? 1 : 0);
-    }, 0);
-
-    return {
-      centerCount: summary?.centerCount ?? scopeCenters.length,
-      crewCount: summary?.crewCount ?? scopeCrew.length,
-      activeServices: summary?.serviceCount ?? serviceEntries.length,
-      pendingOrders,
-      accountStatus: formatAccountStatus(summary?.accountStatus ?? profile?.status ?? null),
-    };
-  }, [dashboard, contractorScope, scopeCenters, scopeCrew, serviceEntries, orderEntries, profile]);
+  const overviewData = useMemo(() =>
+    buildContractorOverviewData({
+      dashboard: dashboard ?? null,
+      profile: profile ?? null,
+      scope: contractorScope ?? null,
+      certifiedServices: certifiedServicesData,
+      orders: orders?.orders ?? [],
+    }),
+  [dashboard, profile, contractorScope, certifiedServicesData, orders]);
 
   const profileCardData = useMemo(() => ({
     name: profile?.name ?? EMPTY_VALUE,
@@ -626,7 +579,7 @@ export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHu
                 <div style={{ marginBottom: 12, color: '#dc2626' }}>{dashboardErrorMessage}</div>
               )}
               <OverviewSection
-                cards={overviewCards}
+                cards={contractorOverviewCards}
                 data={overviewData}
                 loading={dashboardLoading}
               />
@@ -738,6 +691,15 @@ export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHu
                     showSearch={false}
                     maxItems={10}
                     modalType="service-my-services"
+                    onRowClick={(row: any) => {
+                      setSelectedCatalogService({
+                        serviceId: row.serviceId,
+                        name: row.serviceName,
+                        category: row.category === '-' ? null : row.category,
+                        status: 'active',
+                      });
+                      setShowCatalogServiceModal(true);
+                    }}
                   />
                 )}
 
@@ -1082,6 +1044,16 @@ export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHu
           />
         );
       })()}
+
+      {/* Catalog Service Modal - for My Services section (view-only) */}
+      <CatalogServiceModal
+        isOpen={showCatalogServiceModal}
+        onClose={() => {
+          setShowCatalogServiceModal(false);
+          setSelectedCatalogService(null);
+        }}
+        service={selectedCatalogService}
+      />
       </div>
     </ModalProvider>
   );

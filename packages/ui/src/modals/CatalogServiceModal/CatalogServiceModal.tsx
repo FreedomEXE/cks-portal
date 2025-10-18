@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import BaseViewModal from '../BaseViewModal';
 import ServiceCard from '../../cards/ServiceCard';
-import ServiceQuickActions, { type CertifiedUser } from './components/ServiceQuickActions';
+import ServiceQuickActions, { type CertifiedUser, type CertificationChanges } from './components/ServiceQuickActions';
 import ServiceDetails from './components/ServiceDetails';
 
 export type RoleKey = 'manager' | 'contractor' | 'crew' | 'warehouse';
@@ -20,7 +20,7 @@ export interface CatalogServiceModalProps {
   onClose: () => void;
   service: CatalogService | null;
   // Admin-only props
-  onCertificationChange?: (role: RoleKey, userCode: string, certified: boolean) => void;
+  onSave?: (changes: CertificationChanges) => Promise<void>;
   onEdit?: () => void;
   onDelete?: () => void;
   // User lists for certifications (admin only)
@@ -39,7 +39,7 @@ const CatalogServiceModal: React.FC<CatalogServiceModalProps> = ({
   isOpen,
   onClose,
   service,
-  onCertificationChange,
+  onSave,
   onEdit,
   onDelete,
   peopleManagers = [],
@@ -52,7 +52,7 @@ const CatalogServiceModal: React.FC<CatalogServiceModalProps> = ({
   certifiedWarehouses = [],
 }) => {
   // Determine if admin view (has admin callbacks)
-  const isAdminView = Boolean(onCertificationChange || onEdit || onDelete);
+  const isAdminView = Boolean(onSave || onEdit || onDelete);
 
   // Tab state
   const [activeTab, setActiveTab] = useState(isAdminView ? 'quick-actions' : 'details');
@@ -129,7 +129,7 @@ const CatalogServiceModal: React.FC<CatalogServiceModalProps> = ({
           warehouses={warehousesData}
           managedBy={managedBy}
           category={category}
-          onCertificationChange={onCertificationChange}
+          onSave={onSave}
           onEdit={onEdit}
           onDelete={onDelete}
         />

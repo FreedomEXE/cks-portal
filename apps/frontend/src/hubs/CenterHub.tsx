@@ -27,6 +27,7 @@ import {
   type Activity,
   type TreeNode,
 } from '@cks/domain-widgets';
+import { centerOverviewCards } from '@cks/domain-widgets';
 import { Button, DataTable, ModalProvider, OrderDetailsModal, ServiceViewModal, PageHeader, PageWrapper, Scrollbar, TabSection, OrderActionModal } from '@cks/ui';
 import OrderDetailsGateway from '../components/OrderDetailsGateway';
 import { useAuth } from '@cks/auth';
@@ -50,6 +51,7 @@ import { createReport as apiCreateReport, createFeedback as apiCreateFeedback, a
 
 import { buildEcosystemTree, DEFAULT_ROLE_COLOR_MAP } from '../shared/utils/ecosystem';
 import { useHubLoading } from '../contexts/HubLoadingContext';
+import { buildCenterOverviewData } from '../shared/overview/builders';
 
 interface CenterHubProps {
   initialTab?: string;
@@ -266,13 +268,13 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
   
   const { activities, isLoading: activitiesLoading, error: activitiesError } = useFormattedActivities(normalizedCode, { limit: 20 });
 
-  const overviewData = useMemo(() => ({
-    crewCount: (dashboard as any)?.crewCount ?? 0,
-    activeServices: (dashboard as any)?.activeServices ?? 0,
-    pendingRequests: (dashboard as any)?.pendingRequests ?? 0,
-    equipmentCount: (dashboard as any)?.equipmentCount ?? 0,
-    accountStatus: dashboard?.accountStatus ?? 'Unknown',
-  }), [dashboard]);
+  const overviewData = useMemo(() =>
+    buildCenterOverviewData({
+      dashboard: dashboard ?? null,
+      profile: profile ?? null,
+      scope: scopeData ?? null,
+    }),
+  [dashboard, profile, scopeData]);
 
   const centerScope = scopeData?.role === 'center' ? scopeData : null;
 
@@ -364,13 +366,7 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
     { id: 'support', label: 'Support', path: '/center/support' },
   ], []);
 
-  const overviewCards = useMemo(() => [
-    { id: 'crew', title: 'Active Crew', dataKey: 'crewCount', color: 'red' },
-    { id: 'services', title: 'Active Services', dataKey: 'activeServices', color: 'teal' },
-    { id: 'requests', title: 'Pending Requests', dataKey: 'pendingRequests', color: 'orange' },
-    { id: 'equipment', title: 'Equipment', dataKey: 'equipmentCount', color: 'purple' },
-    { id: 'status', title: 'Center Status', dataKey: 'accountStatus', color: 'orange' },
-  ], []);
+  // Cards provided by shared domain widgets
 
   const profileCardData = useMemo(() => ({
     name: profile?.name ?? '-',
@@ -433,7 +429,7 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
                 <div style={{ marginBottom: 12, color: '#dc2626' }}>{dashboardErrorMessage}</div>
               )}
               <OverviewSection
-                cards={overviewCards}
+                cards={centerOverviewCards}
                 data={overviewData}
                 loading={dashboardLoading}
               />

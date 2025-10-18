@@ -203,8 +203,22 @@
 
 .actions {
   display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.leftActions {
+  display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.rightActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-left: auto;
 }
 
 .actionButton {
@@ -238,4 +252,18 @@
 
 .actionDelete:hover {
   background-color: #dc2626;
+}
+
+.actionSave {
+  background-color: #10b981;
+  color: white;
+}
+
+.actionSave:hover:not(:disabled) {
+  background-color: #059669;
+}
+
+.actionSave:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }

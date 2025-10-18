@@ -28,12 +28,12 @@ try {
 
     if (Test-Path $tempAudio) {
         # Play audio (Windows Media Player)
-        $player = New-Object System.Media.SoundPlayer
-
-        # Use PowerShell to play MP3
         Add-Type -AssemblyName presentationCore
         $mediaPlayer = New-Object System.Windows.Media.MediaPlayer
-        $mediaPlayer.Open([uri]$tempAudio)
+
+        # Convert to absolute path for URI
+        $absolutePath = (Resolve-Path $tempAudio).Path
+        $mediaPlayer.Open([uri]$absolutePath)
         $mediaPlayer.Play()
 
         # Wait for audio to finish (estimate based on text length with generous buffer)

@@ -27,10 +27,12 @@ import {
   type Activity,
   type TreeNode,
 } from '@cks/domain-widgets';
-import { Button, DataTable, ModalProvider, OrderDetailsModal, ServiceViewModal, PageHeader, PageWrapper, Scrollbar, TabSection } from '@cks/ui';
+import { crewOverviewCards } from '@cks/domain-widgets';
+import { Button, DataTable, ModalProvider, OrderDetailsModal, ServiceViewModal, CatalogServiceModal, PageHeader, PageWrapper, Scrollbar, TabSection } from '@cks/ui';
 import ActivityModalGateway from '../components/ActivityModalGateway';
 import { useAuth } from '@cks/auth';
 import { useCatalogItems } from '../shared/api/catalog';
+import { useCertifiedServices } from '../hooks/useCertifiedServices';
 import { useServices as useDirectoryServices } from '../shared/api/directory';
 import { useFormattedActivities } from '../shared/activity/useFormattedActivities';
 import { ActivityFeed } from '../components/ActivityFeed';
@@ -50,6 +52,7 @@ import { useSWRConfig } from 'swr';
 import { createFeedback as apiCreateFeedback, acknowledgeItem as apiAcknowledgeItem, fetchServicesForReports, fetchProceduresForReports, fetchOrdersForReports } from '../shared/api/hub';
 
 import { buildEcosystemTree, DEFAULT_ROLE_COLOR_MAP } from '../shared/utils/ecosystem';
+import { buildCrewOverviewData } from '../shared/overview/builders';
 import { useHubLoading } from '../contexts/HubLoadingContext';
 
 interface CrewHubProps {
@@ -155,6 +158,8 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
   const [activeTab, setActiveTab] = useState(initialTab);
   const [servicesTab, setServicesTab] = useState<'my' | 'active' | 'history'>('active');
   const [servicesSearchQuery, setServicesSearchQuery] = useState('');
+  const [showCatalogServiceModal, setShowCatalogServiceModal] = useState(false);
+  const [selectedCatalogService, setSelectedCatalogService] = useState<{ serviceId: string; name: string; category: string | null; status?: string } | null>(null);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [actionOrder, setActionOrder] = useState<any | null>(null);
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
@@ -207,6 +212,8 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
   const {
     data: scopeData,
   } = useHubRoleScope(normalizedCode);
+  // Certified services for My Services tab
+  const { data: certifiedServicesData, isLoading: certifiedServicesLoading } = useCertifiedServices(normalizedCode, 'crew', 500);
 
   // Signal when critical data is loaded
   useEffect(() => {
@@ -298,13 +305,14 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
   
   const { activities, isLoading: activitiesLoading, error: activitiesError } = useFormattedActivities(normalizedCode, { limit: 20 });
 
-  const overviewData = useMemo(() => ({
-    activeServices: (dashboard as any)?.activeServices ?? 0,
-    completedToday: (dashboard as any)?.completedToday ?? 0,
-    trainings: (dashboard as any)?.trainings ?? 0,
-    assignedCenter: (dashboard as any)?.assignedCenter ?? null,
-    accountStatus: dashboard?.accountStatus ?? 'Unknown',
-  }), [dashboard]);
+  const overviewData = useMemo(() =>
+    buildCrewOverviewData({
+      dashboard: dashboard ?? null,
+      profile: profile ?? null,
+      scope: scopeData ?? null,
+      certifiedServices: certifiedServicesData,
+    }),
+  [dashboard, profile, scopeData, certifiedServicesData]);
 
   const crewScope = scopeData?.role === 'crew' ? scopeData : null;
 
@@ -393,12 +401,7 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
     { id: 'support', label: 'Support', path: '/crew/support' },
   ], []);
 
-  const overviewCards = useMemo(() => [
-    { id: 'services', title: 'Active Services', dataKey: 'activeServices', color: 'teal' },
-    { id: 'completed', title: 'Completed Tasks', dataKey: 'completedTasks', color: 'red' },
-    { id: 'hours', title: 'Hours', dataKey: 'hours', color: 'red' },
-    { id: 'status', title: 'Status', dataKey: 'accountStatus', color: 'red' },
-  ], []);
+  // Cards provided by shared domain widgets
 
   const profileCardData = useMemo(() => ({
     name: profile?.name ?? '-',
@@ -434,49 +437,24 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
   const dashboardErrorMessage = dashboardError ? 'Unable to load dashboard metrics. Showing cached values if available.' : null;
   const ordersErrorMessage = ordersError ? 'Unable to load order data. Showing cached values if available.' : null;
 
-  // Catalog-backed My Services (MVP): show all services to crew via catalog endpoint
-  const { data: catalogData } = useCatalogItems({ type: 'service', pageSize: 500 });
-
   // Column definitions for My Services
   const MY_SERVICES_COLUMNS_BASE = [
     { key: 'serviceId', label: 'SERVICE ID', clickable: true },
     { key: 'serviceName', label: 'SERVICE NAME' },
-  ];
-
-  const MY_SERVICES_COLUMNS_CERTIFIED = [
-    ...MY_SERVICES_COLUMNS_BASE,
-    { key: 'certified', label: 'CERTIFIED' },
-    { key: 'certificationDate', label: 'CERTIFICATION DATE' },
-    { key: 'expires', label: 'EXPIRES' },
+    { key: 'certifiedAt', label: 'CERTIFIED DATE' },
+    { key: 'renewalDate', label: 'RENEWAL DATE' },
   ];
 
   const myCatalogServices = useMemo(() => {
-    const items = catalogData?.items || [];
-    return items.map((svc: any) => {
-      const certifications = svc.metadata?.certifications || {};
-      const crewCerts = certifications.crew || [];
-      const isCertified = crewCerts.includes(normalizedCode);
+    return certifiedServicesData.map((service) => ({
+      serviceId: service.serviceId,
+      serviceName: service.name,
+      certifiedAt: service.certifiedAt ? new Date(service.certifiedAt).toLocaleDateString() : '-',
+      renewalDate: service.renewalDate ? new Date(service.renewalDate).toLocaleDateString() : '-',
+    }));
+  }, [certifiedServicesData]);
 
-      return {
-        serviceId: svc.code ?? 'CAT-SRV',
-        serviceName: svc.name ?? 'Service',
-        certified: isCertified ? 'Yes' : 'No',
-        certificationDate: isCertified ? '-' : null,
-        expires: isCertified ? '-' : null,
-        _isCertified: isCertified,
-      };
-    });
-  }, [catalogData, normalizedCode]);
-
-  // Check if any service has the user certified to determine columns
-  const hasAnyCertification = useMemo(
-    () => myCatalogServices.some((s: any) => s._isCertified),
-    [myCatalogServices]
-  );
-
-  const myServicesColumns = hasAnyCertification
-    ? MY_SERVICES_COLUMNS_CERTIFIED
-    : MY_SERVICES_COLUMNS_BASE;
+  const myServicesColumns = MY_SERVICES_COLUMNS_BASE;
 
   // Centralized handler for actionable orders from ActivityFeed
   const handleOrderAction = useCallback(async (orderId: string, action: string) => {
@@ -542,7 +520,7 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
                 <div style={{ marginBottom: 12, color: '#dc2626' }}>{dashboardErrorMessage}</div>
               )}
               <OverviewSection
-                cards={overviewCards}
+                cards={crewOverviewCards}
                 data={overviewData}
                 loading={dashboardLoading}
               />
@@ -635,6 +613,15 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
                     showSearch={false}
                     maxItems={10}
                     modalType="service-my-services"
+                    onRowClick={(row: any) => {
+                      setSelectedCatalogService({
+                        serviceId: row.serviceId,
+                        name: row.serviceName,
+                        category: null,
+                        status: 'active',
+                      });
+                      setShowCatalogServiceModal(true);
+                    }}
                   />
                 )}
 
@@ -958,6 +945,16 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
           />
         );
       })()}
+
+      {/* Catalog Service Modal - for My Services section (view-only) */}
+      <CatalogServiceModal
+        isOpen={showCatalogServiceModal}
+        onClose={() => {
+          setShowCatalogServiceModal(false);
+          setSelectedCatalogService(null);
+        }}
+        service={selectedCatalogService}
+      />
       </div>
     </ModalProvider>
   );

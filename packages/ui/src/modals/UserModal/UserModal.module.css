@@ -115,8 +115,22 @@
 
 .actions {
   display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.leftActions {
+  display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.rightActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-left: auto;
 }
 
 .actionButton {

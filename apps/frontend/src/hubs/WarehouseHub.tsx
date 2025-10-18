@@ -26,13 +26,16 @@ import {
   SupportSection,
   type Activity,
 } from '@cks/domain-widgets';
-import { Button, DataTable, OrderDetailsModal, ServiceViewModal, ModalProvider, PageHeader, PageWrapper, Scrollbar, TabSection, OrderActionModal } from '@cks/ui';
+import { warehouseOverviewCards } from '@cks/domain-widgets';
+import { Button, DataTable, ModalProvider, PageHeader, PageWrapper, Scrollbar, TabSection, OrderActionModal, CatalogServiceModal, ServiceViewModal } from '@cks/ui';
 import OrderDetailsGateway from '../components/OrderDetailsGateway';
 import { useAuth } from '@cks/auth';
 import { useSWRConfig } from 'swr';
 import { getAllowedActions, getActionLabel } from '@cks/policies';
 import { useServices as useDirectoryServices } from '../shared/api/directory';
 import { useCatalogItems } from '../shared/api/catalog';
+import { useCertifiedServices } from '../hooks/useCertifiedServices';
+import { buildWarehouseOverviewData } from '../shared/overview/builders';
 
 import MyHubSection from '../components/MyHubSection';
 import {
@@ -40,6 +43,7 @@ import {
   useHubOrders,
   useHubProfile,
   useHubReports,
+  useHubRoleScope,
   useHubInventory,
   applyHubOrderAction,
   type HubOrderItem,
@@ -161,6 +165,8 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
   const [activeTab, setActiveTab] = useState(initialTab);
   const [servicesTab, setServicesTab] = useState<'my' | 'active' | 'history'>('active');
   const [servicesSearchQuery, setServicesSearchQuery] = useState('');
+  const [showCatalogServiceModal, setShowCatalogServiceModal] = useState(false);
+  const [selectedCatalogService, setSelectedCatalogService] = useState<{ serviceId: string; name: string; category: string | null; status?: string } | null>(null);
   const [deliveriesTab, setDeliveriesTab] = useState<'pending' | 'completed'>('pending');
   const [deliveriesSearchQuery, setDeliveriesSearchQuery] = useState('');
   const [inventoryTab, setInventoryTab] = useState<'active' | 'archive'>('active');
@@ -169,6 +175,7 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
   const [pendingAction, setPendingAction] = useState<{ orderId: string; action: OrderActionType } | null>(null);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [actionOrder, setActionOrder] = useState<any | null>(null);
+  // Removed old ServiceViewModal path; service details modals will be added later when designed
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
 
   
@@ -202,6 +209,11 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
     isLoading: inventoryLoading,
     error: inventoryError,
   } = useHubInventory(normalizedCode);
+  const {
+    data: scopeData,
+  } = useHubRoleScope(normalizedCode);
+  // Certified services for My Services tab (filtered by certifications)
+  const { data: certifiedServicesData, isLoading: certifiedServicesLoading } = useCertifiedServices(normalizedCode, 'warehouse', 500);
 
   // Signal to App.tsx when critical data is loaded (but only if not highlighting an order)
   useEffect(() => {
@@ -269,13 +281,15 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
   
   const { activities, isLoading: activitiesLoading, error: activitiesError } = useFormattedActivities(normalizedCode, { limit: 20 });
 
-  const overviewData = useMemo(() => ({
-    inventoryCount: (dashboard as any)?.inventoryCount ?? 0,
-    pendingOrders: (dashboard as any)?.pendingOrders ?? 0,
-    deliveriesScheduled: (dashboard as any)?.deliveriesScheduled ?? 0,
-    lowStockItems: (dashboard as any)?.lowStockItems ?? 0,
-    accountStatus: dashboard?.accountStatus ?? 'Unknown',
-  }), [dashboard]);
+  const overviewData = useMemo(() =>
+    buildWarehouseOverviewData({
+      dashboard: dashboard ?? null,
+      profile: profile ?? null,
+      scope: scopeData ?? null,
+      certifiedServices: certifiedServicesData,
+      inventory: inventory ?? null,
+    }),
+  [dashboard, profile, scopeData, certifiedServicesData, inventory]);
 
 
   const { pendingDeliveries, completedDeliveries } = useMemo(() => {
@@ -494,51 +508,24 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
     return { activeServicesData: active, serviceHistoryData: history };
   }, [serviceOrders, refreshOrders]);
 
-  // Fetch warehouse-specific services from catalog
-  const { data: catalogData } = useCatalogItems({ type: 'service', pageSize: 500 });
-
   // Column definitions for My Services
   const MY_SERVICES_COLUMNS_BASE = [
     { key: 'serviceId', label: 'SERVICE ID', clickable: true },
     { key: 'serviceName', label: 'SERVICE NAME' },
-  ];
-
-  const MY_SERVICES_COLUMNS_CERTIFIED = [
-    ...MY_SERVICES_COLUMNS_BASE,
-    { key: 'certified', label: 'CERTIFIED' },
-    { key: 'certificationDate', label: 'CERTIFICATION DATE' },
-    { key: 'expires', label: 'EXPIRES' },
+    { key: 'certifiedAt', label: 'CERTIFIED DATE' },
+    { key: 'renewalDate', label: 'RENEWAL DATE' },
   ];
 
   const myCertifiedServices = useMemo(() => {
-    const items = catalogData?.items || [];
-    // Filter to only show warehouse-managed services
-    const warehouseServices = items.filter((service: any) => service.managedBy === 'warehouse');
-    return warehouseServices.map((service: any) => {
-      const certifications = service.metadata?.certifications || {};
-      const warehouseCerts = certifications.warehouse || [];
-      const isCertified = warehouseCerts.includes(normalizedCode);
+    return certifiedServicesData.map((service) => ({
+      serviceId: service.serviceId,
+      serviceName: service.name,
+      certifiedAt: service.certifiedAt ? new Date(service.certifiedAt).toLocaleDateString() : '-',
+      renewalDate: service.renewalDate ? new Date(service.renewalDate).toLocaleDateString() : '-',
+    }));
+  }, [certifiedServicesData]);
 
-      return {
-        serviceId: service.code ?? 'SRV',
-        serviceName: service.name ?? 'Warehouse Service',
-        certified: isCertified ? 'Yes' : 'No',
-        certificationDate: isCertified ? '-' : null,
-        expires: isCertified ? '-' : null,
-        _isCertified: isCertified,
-      };
-    });
-  }, [catalogData, normalizedCode]);
-
-  // Check if any service has the user certified to determine columns
-  const hasAnyCertification = useMemo(
-    () => myCertifiedServices.some((s: any) => s._isCertified),
-    [myCertifiedServices]
-  );
-
-  const myServicesColumns = hasAnyCertification
-    ? MY_SERVICES_COLUMNS_CERTIFIED
-    : MY_SERVICES_COLUMNS_BASE;
+  const myServicesColumns = MY_SERVICES_COLUMNS_BASE;
 
   const tabs = useMemo(() => [
     { id: 'dashboard', label: 'Dashboard', path: '/warehouse/dashboard' },
@@ -551,13 +538,7 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
     { id: 'support', label: 'Support', path: '/warehouse/support' },
   ], []);
 
-  const overviewCards = useMemo(() => [
-    { id: 'inventory', title: 'Inventory Items', dataKey: 'inventoryCount', color: 'purple' },
-    { id: 'pending', title: 'Pending Orders', dataKey: 'pendingOrders', color: 'indigo' },
-    { id: 'deliveries', title: 'Scheduled Deliveries', dataKey: 'deliveriesScheduled', color: 'purple' },
-    { id: 'lowstock', title: 'Low Stock Items', dataKey: 'lowStockItems', color: 'magenta' },
-    { id: 'status', title: 'Status', dataKey: 'accountStatus', color: 'purple' },
-  ], []);
+  // Cards provided by shared domain widgets
 
   const handleOrderAction = async (orderId: string, actionLabel: string, providedReason?: string) => {
     console.log('[WAREHOUSE] Order action triggered:', { orderId, actionLabel, providedReason });
@@ -679,7 +660,7 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
                 <div style={{ marginBottom: 12, color: '#dc2626' }}>{dashboardErrorMessage}</div>
               )}
               <OverviewSection
-                cards={overviewCards}
+                cards={warehouseOverviewCards}
                 data={overviewData}
                 loading={dashboardLoading}
               />
@@ -961,10 +942,9 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
                     showSearch={false}
                     maxItems={10}
                     onRowClick={(row) => {
-                      // Find the full order object from deliveryId
-                      const order = orders?.orders?.find((o: any) => o.orderId === row.deliveryId);
-                      if (order) {
-                        setSelectedOrderForDetails(order);
+                      // Open the unified order details modal via gateway
+                      if (row?.deliveryId) {
+                        setSelectedOrderId(row.deliveryId);
                       }
                     }}
                   />
@@ -1014,10 +994,9 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
                     showSearch={false}
                     maxItems={10}
                     onRowClick={(row) => {
-                      // Find the full order object from deliveryId
-                      const order = orders?.orders?.find((o: any) => o.orderId === row.deliveryId);
-                      if (order) {
-                        setSelectedOrderForDetails(order);
+                      // Open the unified order details modal via gateway
+                      if (row?.deliveryId) {
+                        setSelectedOrderId(row.deliveryId);
                       }
                     }}
                   />
@@ -1059,6 +1038,15 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
                     externalSearchQuery={servicesSearchQuery}
                     maxItems={10}
                     modalType="service-my-services"
+                    onRowClick={(row: any) => {
+                      setSelectedCatalogService({
+                        serviceId: row.serviceId,
+                        name: row.serviceName,
+                        category: null,
+                        status: 'active',
+                      });
+                      setShowCatalogServiceModal(true);
+                    }}
                   />
                 )}
                 {servicesTab === 'active' && (
@@ -1186,7 +1174,6 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
                     })}
                     showSearch={false}
                     maxItems={10}
-                    modalType="service-history"
                   />
                 )}
               </TabSection>
@@ -1304,94 +1291,26 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
         userAvailableActions={[]}
       />
 
-      {/* Warehouse Service Details Modal */}
-      {selectedServiceId && (() => {
-        const service = serviceOrders.find(o => (o.serviceId ?? o.orderId) === selectedServiceId);
-        if (!service) return null;
+      {/* Catalog Service Modal - for My Services section (view-only) */}
+      <CatalogServiceModal
+        isOpen={showCatalogServiceModal}
+        onClose={() => {
+          setShowCatalogServiceModal(false);
+          setSelectedCatalogService(null);
+        }}
+        service={selectedCatalogService}
+      />
 
-        const meta = (service as any).metadata || {};
-        const serviceData = {
-          serviceId: service.serviceId ?? service.orderId,
-          serviceName: service.title ?? service.serviceId ?? service.orderId,
-          serviceType: (meta.serviceType || 'one-time') as 'one-time' | 'recurring',
-          serviceStatus: formatStatusLabel(meta.serviceStatus || service.status),
-          centerId: service.centerId || null,
-          centerName: meta.contacts?.destination?.name || service.centerId || null,
-          warehouseId: meta.warehouseId || null,
-          warehouseName: meta.warehouseName || null,
-          managedBy: 'warehouse' as const,
-          startDate: meta.serviceActualStartTime || meta.actualStartDate || null,
-          serviceStartNotes: meta.serviceStartNotes || null,
-          serviceCompleteNotes: meta.serviceCompleteNotes || null,
-        };
-
-        const onStart = async () => {
-          try {
-            const notes = window.prompt('Add notes for starting this service (optional):');
-            if (notes === null) return;
-            const { applyServiceAction } = await import('../shared/api/hub');
-            await applyServiceAction(selectedServiceId, 'start', notes || undefined);
-            refreshOrders();
-            setSelectedServiceId(null); // Close modal after action
-          } catch (err) {
-            console.error('[warehouse] failed to start service', err);
-            alert(err instanceof Error ? err.message : 'Failed to start service');
-          }
-        };
-
-        const onComplete = async () => {
-          try {
-            const notes = window.prompt('Add notes for completing this service (describe work performed):');
-            if (notes === null) return;
-            const { applyServiceAction } = await import('../shared/api/hub');
-            await applyServiceAction(selectedServiceId, 'complete', notes || undefined);
-            refreshOrders();
-            setSelectedServiceId(null); // Close modal after action
-          } catch (err) {
-            console.error('[warehouse] failed to complete service', err);
-            alert(err instanceof Error ? err.message : 'Failed to complete service');
-          }
-        };
-
-        const onCancel = async () => {
-          try {
-            const reason = window.prompt('Please provide a reason for cancellation:');
-            if (!reason) return;
-            const { applyServiceAction } = await import('../shared/api/hub');
-            await applyServiceAction(selectedServiceId, 'cancel');
-            refreshOrders();
-            setSelectedServiceId(null); // Close modal after action
-          } catch (err) {
-            console.error('[warehouse] failed to cancel service', err);
-            alert(err instanceof Error ? err.message : 'Failed to cancel service');
-          }
-        };
-
-        const onAddNotes = async () => {
-          try {
-            const notes = window.prompt('Add notes for this service:');
-            if (!notes) return;
-            const { applyServiceAction } = await import('../shared/api/hub');
-            await applyServiceAction(selectedServiceId, 'update-notes', notes);
-            refreshOrders();
-          } catch (err) {
-            console.error('[warehouse] failed to add notes', err);
-            alert(err instanceof Error ? err.message : 'Failed to add notes');
-          }
-        };
-
-        return (
-          <ServiceViewModal
-            isOpen={true}
-            onClose={() => setSelectedServiceId(null)}
-            service={serviceData}
-            onStartService={onStart}
-            onCompleteService={onComplete}
-            onCancelService={onCancel}
-            onAddNotes={onAddNotes}
-          />
-        );
-      })()}
+      {/* Active Service View Modal (read-only for warehouse) */}
+      {selectedServiceId && (
+        <ServiceViewModal
+          isOpen={!!selectedServiceId}
+          onClose={() => setSelectedServiceId(null)}
+          serviceId={selectedServiceId}
+          role="warehouse"
+          showProductsSection={true}
+        />
+      )}
       </div>
     </ModalProvider>
   );

@@ -26,20 +26,38 @@ const UserQuickActions: React.FC<UserQuickActionsProps> = ({ actions }) => {
     return `${styles.actionButton} ${styles.actionDefault}`;
   };
 
+  // Split actions: primary/save actions go right, others go left
+  const leftActions = actions.filter(a => a.variant !== 'primary');
+  const rightActions = actions.filter(a => a.variant === 'primary');
+
   return (
     <div className={styles.actionsSection}>
       <h4 className={styles.sectionTitle}>Actions</h4>
       <div className={styles.actions}>
-        {actions.map((action, index) => (
-          <button
-            key={index}
-            className={getActionButtonClass(action)}
-            onClick={action.onClick}
-            disabled={action.disabled}
-          >
-            {action.label}
-          </button>
-        ))}
+        <div className={styles.leftActions}>
+          {leftActions.map((action, index) => (
+            <button
+              key={index}
+              className={getActionButtonClass(action)}
+              onClick={action.onClick}
+              disabled={action.disabled}
+            >
+              {action.label}
+            </button>
+          ))}
+        </div>
+        <div className={styles.rightActions}>
+          {rightActions.map((action, index) => (
+            <button
+              key={index}
+              className={getActionButtonClass(action)}
+              onClick={action.onClick}
+              disabled={action.disabled}
+            >
+              {action.label}
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );

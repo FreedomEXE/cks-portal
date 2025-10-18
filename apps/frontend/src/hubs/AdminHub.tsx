@@ -20,6 +20,7 @@ import {
   OverviewSection,
   ReportDetailsModal,
   ProfileTab,
+  adminOverviewCards,
   type Activity,
 } from '@cks/domain-widgets';
 import {
@@ -35,6 +36,7 @@ import {
   Scrollbar,
   TabContainer,
   CatalogServiceModal,
+  CatalogProductModal,
   UserModal,
   type UserAction,
 } from '@cks/ui';
@@ -54,6 +56,7 @@ import AdminCreateSection from './components/AdminCreateSection';
 import { useHubLoading } from '../contexts/HubLoadingContext';
 import { buildOrderActions } from '@cks/domain-widgets';
 import { mapProfileDataForRole, type DirectoryRole, directoryTabToRole } from '../shared/utils/profileMapping';
+import { buildAdminOverviewData } from '../shared/overview/builders';
 
 import { useAdminUsers, updateInventory, fetchAdminOrderById } from '../shared/api/admin';
 import {
@@ -201,8 +204,8 @@ const DIRECTORY_TABS: Array<{ id: string; label: string; color: string; hasDropd
       { id: 'service-orders', label: 'Service Orders' },
     ]
   },
-  { id: 'training', label: 'Training & Procedures', color: '#ec4899' },
   { id: 'reports', label: 'Reports & Feedback', color: '#92400e' },
+  { id: 'training', label: 'Training & Procedures', color: '#ec4899' },
 ];
 
 interface DirectorySectionConfig {
@@ -215,14 +218,6 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
   const { code, firstName, fullName } = useAuth();
   const { setHubLoading } = useHubLoading();
 
-  // Dynamic overview cards for admin metrics
-  const overviewCards = [
-    { id: 'users', title: 'Total Users', dataKey: 'userCount', color: 'blue' },
-    { id: 'tickets', title: 'Open Support Tickets', dataKey: 'ticketCount', color: 'orange' },
-    { id: 'priority', title: 'High Priority', dataKey: 'highPriorityCount', color: 'red' },
-    { id: 'days', title: 'Days Online', dataKey: 'daysOnline', color: 'green' },
-  ];
-
   // Local tab state (no URL changes)
   const [activeTab, setActiveTab] = useState(initialTab);
   const [directoryTab, setDirectoryTab] = useState('admins');
@@ -234,6 +229,10 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
   const [selectedEntity, setSelectedEntity] = useState<Record<string, any> | null>(null);
   const [showServiceCatalogModal, setShowServiceCatalogModal] = useState(false);
   const [selectedServiceCatalog, setSelectedServiceCatalog] = useState<{ serviceId: string; name: string | null; category: string | null; status?: string | null; description?: string | null; metadata?: any } | null>(null);
+  const [showProductCatalogModal, setShowProductCatalogModal] = useState(false);
+  const [selectedProductCatalog, setSelectedProductCatalog] = useState<{ productId: string; name: string | null; category: string | null; status?: string | null; description?: string | null; unitOfMeasure?: string | null; minimumOrderQuantity?: number | null; leadTimeDays?: number | null; metadata?: any } | null>(null);
+  const [productInventoryData, setProductInventoryData] = useState<Array<{ warehouseId: string; warehouseName: string; quantityOnHand: number; minStockLevel: number | null; location: string | null }>>([]);
+  const [serviceCertifications, setServiceCertifications] = useState<{ managers: string[]; contractors: string[]; crew: string[]; warehouses: string[] }>({ managers: [], contractors: [], crew: [], warehouses: [] });
   const [toast, setToast] = useState<string | null>(null);
   // merged assign flow into CatalogServiceModal
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
@@ -296,6 +295,42 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
 
   // Use centralized order details hook (with directory context for enrichment)
   // OrderDetails are now handled via OrderDetailsGateway
+
+  // Fetch certifications when service catalog modal opens
+  useEffect(() => {
+    if (selectedServiceCatalog && showServiceCatalogModal) {
+      (async () => {
+        try {
+          const { getServiceCertifications } = await import('../shared/api/admin');
+          const result = await getServiceCertifications(selectedServiceCatalog.serviceId);
+          if (result.success && result.data) {
+            setServiceCertifications(result.data);
+          }
+        } catch (error) {
+          console.error('[ADMIN] Failed to fetch certifications:', error);
+          setServiceCertifications({ managers: [], contractors: [], crew: [], warehouses: [] });
+        }
+      })();
+    }
+  }, [selectedServiceCatalog, showServiceCatalogModal]);
+
+  // Fetch inventory when product catalog modal opens
+  useEffect(() => {
+    if (selectedProductCatalog && showProductCatalogModal) {
+      (async () => {
+        try {
+          const { getProductInventory } = await import('../shared/api/admin');
+          const result = await getProductInventory(selectedProductCatalog.productId);
+          if (result.success && result.data) {
+            setProductInventoryData(result.data);
+          }
+        } catch (error) {
+          console.error('[ADMIN] Failed to fetch product inventory:', error);
+          setProductInventoryData([]);
+        }
+      })();
+    }
+  }, [selectedProductCatalog, showProductCatalogModal]);
 
   useEffect(() => {
     const style = document.createElement('style');
@@ -495,42 +530,19 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
     ];
   }, [selectedUser, handleUserInvite, handleUserEdit, handleUserPause, handleDelete]);
 
-  // Example: Fix for missing variable declarations and misplaced code
-  const overviewData = useMemo(() => {
-    // Calculate days online from GO_LIVE_TIMESTAMP
-    let daysOnline = 0;
-    if (GO_LIVE_TIMESTAMP) {
-      const now = Date.now();
-      daysOnline = Math.max(0, Math.floor((now - GO_LIVE_TIMESTAMP) / (1000 * 60 * 60 * 24)));
-    }
-
-    // Total users: sum all user arrays
-    const userCount =
-      (adminUsers?.length || 0) +
-      (managers?.length || 0) +
-      (contractors?.length || 0) +
-      (customers?.length || 0) +
-      (centers?.length || 0) +
-      (crew?.length || 0) +
-      (warehouses?.length || 0);
-
-    // Open support tickets: count open reports
-    const ticketCount = Array.isArray(reports)
-      ? reports.filter((r) => r.status === 'open').length
-      : 0;
-
-    // High priority tickets: count reports with severity 'high'
-    const highPriorityCount = Array.isArray(reports)
-      ? reports.filter((r) => r.severity === 'high').length
-      : 0;
-
-    return {
-      userCount,
-      ticketCount,
-      highPriorityCount,
-      daysOnline,
-    };
-  }, [adminUsers, managers, contractors, customers, centers, crew, warehouses, reports, GO_LIVE_TIMESTAMP]);
+  const overviewData = useMemo(() =>
+    buildAdminOverviewData({
+      adminUsers,
+      managers,
+      contractors,
+      customers,
+      centers,
+      crew,
+      warehouses,
+      reports,
+      goLiveTimestamp: GO_LIVE_TIMESTAMP,
+    }),
+  [adminUsers, managers, contractors, customers, centers, crew, warehouses, reports]);
 
   const adminRows = useMemo(
     () =>
@@ -724,8 +736,11 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
         id: product.id,
         rawId: (product as any).rawId ?? null,
         name: formatText(product.name),
+        originalName: product.name, // Store original for modal
         category: formatText(product.category),
+        originalCategory: product.category, // Store original for modal
         status: formatText(product.status),
+        originalStatus: product.status, // Store original for modal
         updatedAt: formatDate(product.updatedAt),
         source: (product as any).source ?? 'products',
       })),
@@ -805,15 +820,19 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
   const directoryConfig = useMemo(() => ({
     admins: {
       columns: [
-        { key: 'code', label: 'ADMIN ID' },
+        { key: 'code', label: 'ADMIN ID', clickable: true },
         { key: 'name', label: 'NAME' },
         { key: 'email', label: 'EMAIL' },
         { key: 'status', label: 'STATUS', render: renderStatusBadge },
         { key: 'createdAt', label: 'CREATED' },
-        { key: 'actions', label: 'ACTIONS', render: renderActions },
       ],
       data: adminRows,
       emptyMessage: 'No admin users found yet.',
+      onRowClick: (row: any) => {
+        // Open UserModal for admins (consistent with other user types)
+        setSelectedUser({ id: row.code, role: 'admin' });
+        setShowUserModal(true);
+      },
     },
     managers: {
       columns: [
@@ -823,7 +842,7 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
         { key: 'phone', label: 'PHONE' },
         { key: 'status', label: 'STATUS', render: renderStatusBadge },
         { key: 'createdAt', label: 'CREATED' },
-        { key: 'actions', label: 'ACTIONS', render: renderActions },
+        // Actions column removed – rows open modal on click
       ],
       data: managerRows,
       emptyMessage: 'No managers found.',
@@ -836,7 +855,7 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
         { key: 'phone', label: 'PHONE' },
         { key: 'status', label: 'STATUS', render: renderStatusBadge },
         { key: 'createdAt', label: 'CREATED' },
-        { key: 'actions', label: 'ACTIONS', render: renderActions },
+        // Actions column removed – rows open modal on click
       ],
       data: contractorRows,
       emptyMessage: 'No contractors found.',
@@ -849,7 +868,7 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
         { key: 'phone', label: 'PHONE' },
         { key: 'status', label: 'STATUS', render: renderStatusBadge },
         { key: 'createdAt', label: 'CREATED' },
-        { key: 'actions', label: 'ACTIONS', render: renderActions },
+        // Actions column removed – rows open modal on click
       ],
       data: customerRows,
       emptyMessage: 'No customers found.',
@@ -862,7 +881,7 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
         { key: 'phone', label: 'PHONE' },
         { key: 'status', label: 'STATUS', render: renderStatusBadge },
         { key: 'createdAt', label: 'CREATED' },
-        { key: 'actions', label: 'ACTIONS', render: renderActions },
+        // Actions column removed – rows open modal on click
       ],
       data: centerRows,
       emptyMessage: 'No centers found.',
@@ -875,7 +894,7 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
         { key: 'phone', label: 'PHONE' },
         { key: 'status', label: 'STATUS', render: renderStatusBadge },
         { key: 'createdAt', label: 'CREATED' },
-        { key: 'actions', label: 'ACTIONS', render: renderActions },
+        // Actions column removed – rows open modal on click
       ],
       data: crewRows,
       emptyMessage: 'No crew members found.',
@@ -888,7 +907,7 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
         { key: 'phone', label: 'PHONE' },
         { key: 'status', label: 'STATUS', render: renderStatusBadge },
         { key: 'createdAt', label: 'CREATED' },
-        { key: 'actions', label: 'ACTIONS', render: renderActions },
+        // Actions column removed – rows open modal on click
       ],
       data: warehouseRows,
       emptyMessage: 'No warehouses found.',
@@ -901,20 +920,19 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
         { key: 'managedBy', label: 'MANAGED BY' },
         { key: 'status', label: 'STATUS', render: renderStatusBadge },
         { key: 'updatedAt', label: 'UPDATED' },
-        { key: 'actions', label: 'ACTIONS', render: renderActions },
+        // Actions column removed – rows open modal on click
       ],
       data: serviceRows,
       emptyMessage: 'No catalog services found.',
     },
     'active-services': {
       columns: [
-        { key: 'id', label: 'SERVICE ID' },
+        { key: 'id', label: 'SERVICE ID', clickable: true },
         { key: 'name', label: 'SERVICE NAME' },
         { key: 'requestedBy', label: 'REQUESTED BY' },
         { key: 'destination', label: 'LOCATION' },
         { key: 'status', label: 'STATUS', render: renderStatusBadge },
         { key: 'orderDate', label: 'CREATED' },
-        { key: 'actions', label: 'ACTIONS', render: renderActions },
       ],
       data: serviceOrderRows.filter(order => {
         // Filter for transformed service orders (active services)
@@ -923,8 +941,13 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
         ...order,
         id: order.serviceId || order.id,
         name: order.title || 'Service',
+        orderId: order.orderId || order.id, // Preserve orderId for ActivityModalGateway
       })),
       emptyMessage: 'No active services found.',
+      onRowClick: (row: any) => {
+        // Open ActivityModalGateway for active services (transformed orders)
+        setSelectedOrderId(row.orderId || row.id);
+      },
     },
     'product-orders': {
       columns: [
@@ -934,7 +957,7 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
         { key: 'destination', label: 'DESTINATION' },
         { key: 'status', label: 'STATUS', render: renderStatusBadge },
         { key: 'orderDate', label: 'CREATED' },
-        { key: 'actions', label: 'ACTIONS', render: renderActions },
+        // Actions column removed – rows open modal on click
       ],
       data: productOrderRows,
       emptyMessage: 'No product orders recorded.',
@@ -947,22 +970,31 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
         { key: 'destination', label: 'DESTINATION' },
         { key: 'status', label: 'STATUS', render: renderStatusBadge },
         { key: 'orderDate', label: 'CREATED' },
-        { key: 'actions', label: 'ACTIONS', render: renderActions },
+        // Actions column removed – rows open modal on click
       ],
       data: serviceOrderRows,
       emptyMessage: 'No service orders recorded.',
     },
     products: {
       columns: [
-        { key: 'id', label: 'PRODUCT ID' },
+        { key: 'id', label: 'PRODUCT ID', clickable: true },
         { key: 'name', label: 'NAME' },
         { key: 'category', label: 'CATEGORY' },
         { key: 'status', label: 'STATUS', render: renderStatusBadge },
         { key: 'updatedAt', label: 'UPDATED' },
-        { key: 'actions', label: 'ACTIONS', render: renderActions },
       ],
       data: productRows,
       emptyMessage: 'No products available.',
+      onRowClick: (row: any) => {
+        // Open CatalogProductModal for products
+        setSelectedProductCatalog({
+          productId: row.id,
+          name: row.originalName || null, // Use original, not formatted
+          category: row.originalCategory || null,
+          status: row.originalStatus || null,
+        });
+        setShowProductCatalogModal(true);
+      },
     },
     training: {
       columns: [
@@ -988,30 +1020,36 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
     },
     reports: {
       columns: [
-        { key: 'id', label: 'REPORT ID' },
+        { key: 'id', label: 'REPORT ID', clickable: true },
         { key: 'title', label: 'TITLE' },
         { key: 'severity', label: 'SEVERITY' },
         { key: 'customerId', label: 'CUSTOMER' },
         { key: 'centerId', label: 'CENTER' },
         { key: 'status', label: 'STATUS', render: renderStatusBadge },
         { key: 'createdAt', label: 'CREATED' },
-        { key: 'actions', label: 'ACTIONS', render: renderActions },
       ],
       data: reportRows,
       emptyMessage: 'No reports filed.',
+      onRowClick: (row: any) => {
+        // Open ReportDetailsModal directly (skip ActionModal)
+        setSelectedReportForDetails(row._fullReport || row);
+      },
     },
     feedback: {
       columns: [
-        { key: 'id', label: 'FEEDBACK ID' },
+        { key: 'id', label: 'FEEDBACK ID', clickable: true },
         { key: 'kind', label: 'KIND' },
         { key: 'title', label: 'TITLE' },
         { key: 'customerId', label: 'CUSTOMER' },
         { key: 'centerId', label: 'CENTER' },
         { key: 'createdAt', label: 'CREATED' },
-        { key: 'actions', label: 'ACTIONS', render: renderActions },
       ],
       data: feedbackRows,
       emptyMessage: 'No feedback submitted.',
+      onRowClick: (row: any) => {
+        // Open ReportDetailsModal directly (skip ActionModal)
+        setSelectedReportForDetails(row._fullFeedback || row);
+      },
     },
   }) satisfies Record<string, DirectorySectionConfig>, [
     adminRows,
@@ -1154,6 +1192,12 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
             searchPlaceholder={`Search ${ordersSubTab === 'product-orders' ? 'product orders' : 'service orders'}...`}
             maxItems={25}
             showSearch
+            onRowClick={(row) => {
+              const id = row.orderId || row.id;
+              if (id) {
+                setSelectedOrderId(id);
+              }
+            }}
           />
         </>
       );
@@ -1233,6 +1277,37 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
     const isUserEntity = ['managers', 'contractors', 'customers', 'crew', 'centers', 'warehouses'].includes(directoryTab);
     const isAdminEntity = directoryTab === 'admins';
 
+    // Use section's onRowClick if defined, otherwise use user entity logic
+    const onRowClick = section.onRowClick || (isUserEntity ? (row: any) => {
+      // Resolve the full directory object so fields like reportsTo
+      // (not included in table rows) are available in the modal
+      let full: any = row;
+      try {
+        if (directoryTab === 'managers') {
+          const found = (managers || []).find((m) => m.id === row.id);
+          if (found) full = found;
+        } else if (directoryTab === 'contractors') {
+          const found = (contractors || []).find((m) => m.id === row.id);
+          if (found) full = found;
+        } else if (directoryTab === 'customers') {
+          const found = (customers || []).find((m) => m.id === row.id);
+          if (found) full = found;
+        } else if (directoryTab === 'centers') {
+          const found = (centers || []).find((m) => m.id === row.id);
+          if (found) full = found;
+        } else if (directoryTab === 'crew') {
+          const found = (crew || []).find((m) => m.id === row.id);
+          if (found) full = found;
+        } else if (directoryTab === 'warehouses') {
+          const found = (warehouses || []).find((m) => m.id === row.id);
+          if (found) full = found;
+        }
+      } catch {}
+
+      setSelectedUser(full);
+      setShowUserModal(true);
+    } : undefined);
+
     return (
       <DataTable
         columns={section.columns}
@@ -1241,35 +1316,7 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
         searchPlaceholder={`Search ${directoryTab}...`}
         maxItems={25}
         showSearch
-        onRowClick={isUserEntity ? (row) => {
-          // Resolve the full directory object so fields like reportsTo
-          // (not included in table rows) are available in the modal
-          let full: any = row;
-          try {
-            if (directoryTab === 'managers') {
-              const found = (managers || []).find((m) => m.id === row.id);
-              if (found) full = found;
-            } else if (directoryTab === 'contractors') {
-              const found = (contractors || []).find((m) => m.id === row.id);
-              if (found) full = found;
-            } else if (directoryTab === 'customers') {
-              const found = (customers || []).find((m) => m.id === row.id);
-              if (found) full = found;
-            } else if (directoryTab === 'centers') {
-              const found = (centers || []).find((m) => m.id === row.id);
-              if (found) full = found;
-            } else if (directoryTab === 'crew') {
-              const found = (crew || []).find((m) => m.id === row.id);
-              if (found) full = found;
-            } else if (directoryTab === 'warehouses') {
-              const found = (warehouses || []).find((m) => m.id === row.id);
-              if (found) full = found;
-            }
-          } catch {}
-
-          setSelectedUser(full);
-          setShowUserModal(true);
-        } : undefined}
+        onRowClick={onRowClick}
       />
     );
   };
@@ -1330,7 +1377,7 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
           {activeTab === 'dashboard' ? (
             <PageWrapper title="Dashboard" showHeader={false}>
               <PageHeader title="Overview" />
-              <OverviewSection cards={overviewCards} data={overviewData} />
+              <OverviewSection cards={adminOverviewCards} data={overviewData} />
 
               <PageHeader title="Recent Activity" />
               <ActivityFeed
@@ -1375,12 +1422,23 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
           ) : activeTab === 'assign' ? (
             <AdminAssignSection />
           ) : activeTab === 'archive' ? (
-            <ArchiveSection
-              archiveAPI={archiveAPI}
-              onViewOrderDetails={(orderId: string, orderType: 'product' | 'service') => {
-                setSelectedOrderId(orderId);
-              }}
-            />
+      <ArchiveSection
+        archiveAPI={archiveAPI}
+        onViewOrderDetails={(orderId: string, orderType: 'product' | 'service') => {
+          setSelectedOrderId(orderId);
+        }}
+        onViewServiceDetails={(serviceId: string) => {
+          setSelectedServiceCatalog({
+            serviceId,
+            name: null,
+            category: null,
+            status: null,
+            description: null,
+            metadata: null,
+          });
+          setShowServiceCatalogModal(true);
+        }}
+      />
           ) : activeTab === 'support' ? (
             <PageWrapper title="Support" headerSrOnly>
               <AdminSupportSection primaryColor="#6366f1" />
@@ -1549,7 +1607,24 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
               {
                 label: 'View Product',
                 variant: 'secondary' as const,
-                onClick: () => console.log('View product:', selectedEntity),
+                onClick: () => {
+                  if (selectedEntity) {
+                    const productId = selectedEntity.rawId || selectedEntity.id;
+                    setSelectedProductCatalog({
+                      productId: productId,
+                      name: selectedEntity.originalName || null,
+                      category: selectedEntity.originalCategory || null,
+                      status: selectedEntity.originalStatus || null,
+                      description: null,
+                      unitOfMeasure: null,
+                      minimumOrderQuantity: null,
+                      leadTimeDays: null,
+                      metadata: null,
+                    });
+                    setShowProductCatalogModal(true);
+                    setShowActionModal(false);
+                  }
+                },
               },
               {
                 label: 'Edit Product',
@@ -1716,55 +1791,82 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
         peopleContractors={(contractors || []).map((c) => ({ code: c.id, name: c.name || c.id }))}
         peopleCrew={(crew || []).map((c) => ({ code: c.id, name: c.name || c.id }))}
         peopleWarehouses={(warehouses || []).map((w) => ({ code: w.id, name: w.name || w.id }))}
-        certifiedManagers={selectedServiceCatalog?.metadata?.certifications?.manager || []}
-        certifiedContractors={selectedServiceCatalog?.metadata?.certifications?.contractor || []}
-        certifiedCrew={selectedServiceCatalog?.metadata?.certifications?.crew || []}
-        certifiedWarehouses={selectedServiceCatalog?.metadata?.certifications?.warehouse || []}
-        onCertificationChange={async (role, userCode, certified) => {
+        certifiedManagers={serviceCertifications.managers || []}
+        certifiedContractors={serviceCertifications.contractors || []}
+        certifiedCrew={serviceCertifications.crew || []}
+        certifiedWarehouses={serviceCertifications.warehouses || []}
+        onSave={async (changes) => {
           if (!selectedServiceCatalog) return;
           try {
-            const { updateCatalogService } = await import('../shared/api/admin');
+            const { patchServiceAssignments } = await import('../shared/api/admin');
             const serviceId = selectedServiceCatalog.serviceId;
 
-            // Get current certifications
-            const currentCerts = selectedServiceCatalog.metadata?.certifications || {};
-            const roleKey = role === 'manager' ? 'manager' : role === 'contractor' ? 'contractor' : role === 'crew' ? 'crew' : 'warehouse';
-            const currentList = currentCerts[roleKey] || [];
+            console.log('[ADMIN] Saving certification changes:', changes);
 
-            // Update certification list
-            const updatedList = certified
-              ? [...currentList, userCode]
-              : currentList.filter((code: string) => code !== userCode);
-
-            const updatedCerts = {
-              ...currentCerts,
-              [roleKey]: updatedList,
+            // Get current certifications from state
+            const currentCerts = {
+              manager: serviceCertifications.managers || [],
+              contractor: serviceCertifications.contractors || [],
+              crew: serviceCertifications.crew || [],
+              warehouse: serviceCertifications.warehouses || []
             };
 
-            // Save to backend
-            await updateCatalogService(serviceId, {
-              metadata: {
-                ...selectedServiceCatalog.metadata,
-                certifications: updatedCerts
-              }
-            });
+            // Calculate diff for each role and call /assign endpoint
+            const roles: Array<'manager' | 'contractor' | 'crew' | 'warehouse'> = ['manager', 'contractor', 'crew', 'warehouse'];
 
-            // Update local state
-            setSelectedServiceCatalog({
-              ...selectedServiceCatalog,
-              metadata: {
-                ...selectedServiceCatalog.metadata,
-                certifications: updatedCerts,
-              },
+            for (const role of roles) {
+              const currentSet = new Set(currentCerts[role] || []);
+              const newSet = new Set(changes[role] || []);
+
+              const toAdd: string[] = [];
+              const toRemove: string[] = [];
+
+              // Find additions
+              for (const code of newSet) {
+                if (!currentSet.has(code)) {
+                  toAdd.push(code);
+                }
+              }
+
+              // Find removals
+              for (const code of currentSet) {
+                if (!newSet.has(code)) {
+                  toRemove.push(code);
+                }
+              }
+
+              // Only call API if there are changes for this role
+              if (toAdd.length > 0 || toRemove.length > 0) {
+                console.log(`[ADMIN] ${role}: adding ${toAdd.length}, removing ${toRemove.length}`);
+                await patchServiceAssignments(serviceId, {
+                  role,
+                  add: toAdd,
+                  remove: toRemove
+                });
+              }
+            }
+
+            console.log('[ADMIN] All certification changes saved');
+
+            // Update local certifications state
+            setServiceCertifications({
+              managers: changes.manager || [],
+              contractors: changes.contractor || [],
+              crew: changes.crew || [],
+              warehouses: changes.warehouse || []
             });
 
             // Revalidate
             mutate('/admin/directory/services');
-            setToast('Certification updated');
-            setTimeout(() => setToast(null), 1800);
+            setToast('Certifications saved successfully!');
+            setTimeout(() => setToast(null), 2500);
+
+            // Close modal after successful save
+            setShowServiceCatalogModal(false);
+            setSelectedServiceCatalog(null);
           } catch (error) {
-            console.error('[admin] update certification failed', error);
-            alert(error instanceof Error ? error.message : 'Failed to update certification');
+            console.error('[ADMIN] save certifications failed', error);
+            throw error; // Re-throw so ServiceQuickActions can handle it
           }
         }}
         onEdit={() => {
@@ -1792,8 +1894,74 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
         }}
       />
 
+      <CatalogProductModal
+        isOpen={showProductCatalogModal}
+        onClose={() => {
+          setShowProductCatalogModal(false);
+          setSelectedProductCatalog(null);
+          setProductInventoryData([]);
+        }}
+        product={selectedProductCatalog}
+        inventoryData={productInventoryData}
+        onSave={async (changes) => {
+          if (!selectedProductCatalog) return;
+          try {
+            console.log('[ADMIN] Saving inventory changes:', changes);
+
+            // Apply each inventory change
+            for (const change of changes) {
+              await updateInventory({
+                warehouseId: change.warehouseId,
+                itemId: selectedProductCatalog.productId,
+                quantityChange: change.quantityChange,
+                reason: 'Admin adjustment via catalog modal',
+              });
+            }
+
+            console.log('[ADMIN] All inventory changes saved');
+
+            // Refresh inventory data
+            const { getProductInventory } = await import('../shared/api/admin');
+            const result = await getProductInventory(selectedProductCatalog.productId);
+            if (result.success && result.data) {
+              setProductInventoryData(result.data);
+            }
+
+            // Revalidate
+            mutate('/admin/directory/products');
+            setToast('Inventory updated successfully!');
+            setTimeout(() => setToast(null), 2500);
+
+            // Close modal after successful save
+            setShowProductCatalogModal(false);
+            setSelectedProductCatalog(null);
+          } catch (error) {
+            console.error('[ADMIN] save inventory failed', error);
+            alert(error instanceof Error ? error.message : 'Failed to update inventory');
+            throw error; // Re-throw so ProductQuickActions can handle it
+          }
+        }}
+        onDelete={async () => {
+          if (!selectedProductCatalog) return;
+          if (!confirm(`Are you sure you want to delete product "${selectedProductCatalog.name}"?`)) return;
+
+          try {
+            await archiveAPI.archiveEntity('product', selectedProductCatalog.productId);
+
+            setShowProductCatalogModal(false);
+            setSelectedProductCatalog(null);
+            mutate('/admin/directory/products');
+            setToast('Product deleted');
+            setTimeout(() => setToast(null), 1800);
+          } catch (error) {
+            console.error('[admin] delete product failed', error);
+            alert(error instanceof Error ? error.message : 'Failed to delete product');
+          }
+        }}
+      />
+
       {toast && (
-        <div style={{ position: 'fixed', top: 16, right: 16, background: '#ecfeff', color: '#0369a1', border: '1px solid #bae6fd', borderRadius: 8, padding: '10px 14px', zIndex: 1100, boxShadow: '0 8px 18px rgba(0,0,0,0.08)' }}>
+        <div style={{ position: 'fixed', top: 16, right: 16, background: '#ecfeff', color: '#0369a1', border: '1px solid #bae6fd', borderRadius: 8, padding: '10px 14px', zIndex: 10000, boxShadow: '0 8px 18px rgba(0,0,0,0.08)' }}>
           {toast}
         </div>
       )}
@@ -1935,6 +2103,3 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
   );
 
 }
-
-
-

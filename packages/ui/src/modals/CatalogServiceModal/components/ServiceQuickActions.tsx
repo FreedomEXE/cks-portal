@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import styles from './ServiceQuickActions.module.css';
 
 export interface CertifiedUser {
@@ -9,6 +9,13 @@ export interface CertifiedUser {
 
 export type UserRole = 'manager' | 'contractor' | 'crew' | 'warehouse';
 
+export interface CertificationChanges {
+  manager: string[];
+  contractor: string[];
+  crew: string[];
+  warehouse: string[];
+}
+
 export interface ServiceQuickActionsProps {
   managers?: CertifiedUser[];
   contractors?: CertifiedUser[];
@@ -16,7 +23,7 @@ export interface ServiceQuickActionsProps {
   warehouses?: CertifiedUser[];
   managedBy?: 'manager' | 'warehouse';
   category?: string;
-  onCertificationChange?: (role: UserRole, userCode: string, certified: boolean) => void;
+  onSave?: (changes: CertificationChanges) => Promise<void>;
   onEdit?: () => void;
   onDelete?: () => void;
 }
@@ -28,7 +35,7 @@ const ServiceQuickActions: React.FC<ServiceQuickActionsProps> = ({
   warehouses = [],
   managedBy = 'manager',
   category = '',
-  onCertificationChange,
+  onSave,
   onEdit,
   onDelete,
 }) => {
@@ -36,6 +43,33 @@ const ServiceQuickActions: React.FC<ServiceQuickActionsProps> = ({
   const [addSearchQuery, setAddSearchQuery] = useState('');
   const [certifiedUserType, setCertifiedUserType] = useState<UserRole | 'all'>('all');
   const [certifiedSearchQuery, setCertifiedSearchQuery] = useState('');
+
+  // Track pending certification changes
+  const [pendingCertifications, setPendingCertifications] = useState<{
+    manager: Set<string>;
+    contractor: Set<string>;
+    crew: Set<string>;
+    warehouse: Set<string>;
+  }>({
+    manager: new Set(managers.filter(m => m.isCertified).map(m => m.code)),
+    contractor: new Set(contractors.filter(c => c.isCertified).map(c => c.code)),
+    crew: new Set(crew.filter(c => c.isCertified).map(c => c.code)),
+    warehouse: new Set(warehouses.filter(w => w.isCertified).map(w => w.code)),
+  });
+
+  const [isSaving, setIsSaving] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false);
+
+  // Update pending certifications when props change (e.g., modal reopens)
+  useEffect(() => {
+    setPendingCertifications({
+      manager: new Set(managers.filter(m => m.isCertified).map(m => m.code)),
+      contractor: new Set(contractors.filter(c => c.isCertified).map(c => c.code)),
+      crew: new Set(crew.filter(c => c.isCertified).map(c => c.code)),
+      warehouse: new Set(warehouses.filter(w => w.isCertified).map(w => w.code)),
+    });
+    setHasChanges(false);
+  }, [managers, contractors, crew, warehouses]);
 
   // Determine if this is a warehouse service based on category
   const isWarehouseService = category.toLowerCase() === 'warehouse';
@@ -55,77 +89,121 @@ const ServiceQuickActions: React.FC<ServiceQuickActionsProps> = ({
     }
   }, [isWarehouseService]);
 
-  // Combine all users into single list with role
+  // Combine all users into single list with role and use pending certifications
   const allUsers = useMemo(() => {
     const users: Array<CertifiedUser & { role: UserRole }> = [];
 
     if (isWarehouseService) {
-      warehouses.forEach(u => users.push({ ...u, role: 'warehouse' }));
+      warehouses.forEach(u => users.push({
+        ...u,
+        role: 'warehouse',
+        isCertified: pendingCertifications.warehouse.has(u.code)
+      }));
     } else {
-      managers.forEach(u => users.push({ ...u, role: 'manager' }));
-      contractors.forEach(u => users.push({ ...u, role: 'contractor' }));
-      crew.forEach(u => users.push({ ...u, role: 'crew' }));
+      managers.forEach(u => users.push({
+        ...u,
+        role: 'manager',
+        isCertified: pendingCertifications.manager.has(u.code)
+      }));
+      contractors.forEach(u => users.push({
+        ...u,
+        role: 'contractor',
+        isCertified: pendingCertifications.contractor.has(u.code)
+      }));
+      crew.forEach(u => users.push({
+        ...u,
+        role: 'crew',
+        isCertified: pendingCertifications.crew.has(u.code)
+      }));
     }
 
     return users;
-  }, [managers, contractors, crew, warehouses, isWarehouseService]);
+  }, [managers, contractors, crew, warehouses, isWarehouseService, pendingCertifications]);
+
+  // Toggle certification status
+  const toggleCertification = (role: UserRole, userCode: string) => {
+    setPendingCertifications(prev => {
+      const newCerts = { ...prev };
+      const roleSet = new Set(newCerts[role]);
+
+      if (roleSet.has(userCode)) {
+        roleSet.delete(userCode);
+      } else {
+        roleSet.add(userCode);
+      }
+
+      newCerts[role] = roleSet;
+      return newCerts;
+    });
+    setHasChanges(true);
+  };
+
+  // Handle Save button
+  const handleSave = async () => {
+    if (!onSave || !hasChanges) return;
+
+    setIsSaving(true);
+    try {
+      await onSave({
+        manager: Array.from(pendingCertifications.manager),
+        contractor: Array.from(pendingCertifications.contractor),
+        crew: Array.from(pendingCertifications.crew),
+        warehouse: Array.from(pendingCertifications.warehouse),
+      });
+      setHasChanges(false);
+    } catch (error) {
+      console.error('[ServiceQuickActions] Save failed:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   // Filter users for "Add Certifications" section
   const filteredAddUsers = useMemo(() => {
     let filtered = allUsers;
 
-    // Filter by user type
     if (addUserType !== 'all') {
       filtered = filtered.filter(u => u.role === addUserType);
     }
 
-    // Filter by search query
-    if (addSearchQuery.trim()) {
+    if (addSearchQuery) {
       const query = addSearchQuery.toLowerCase();
-      filtered = filtered.filter(
-        u =>
-          u.code.toLowerCase().includes(query) ||
-          u.name.toLowerCase().includes(query)
+      filtered = filtered.filter(u =>
+        u.name.toLowerCase().includes(query) ||
+        u.code.toLowerCase().includes(query)
       );
     }
 
-    // Sort: certified first
-    return filtered.sort((a, b) => {
-      if (a.isCertified === b.isCertified) return 0;
-      return a.isCertified ? -1 : 1;
-    });
+    return filtered;
   }, [allUsers, addUserType, addSearchQuery]);
 
-  // Filter users for "Certified Users" section
+  // Filter users for "Certified Users" section (only show certified)
   const filteredCertifiedUsers = useMemo(() => {
     let filtered = allUsers.filter(u => u.isCertified);
 
-    // Filter by user type
     if (certifiedUserType !== 'all') {
       filtered = filtered.filter(u => u.role === certifiedUserType);
     }
 
-    // Filter by search query
-    if (certifiedSearchQuery.trim()) {
+    if (certifiedSearchQuery) {
       const query = certifiedSearchQuery.toLowerCase();
-      filtered = filtered.filter(
-        u =>
-          u.code.toLowerCase().includes(query) ||
-          u.name.toLowerCase().includes(query)
+      filtered = filtered.filter(u =>
+        u.name.toLowerCase().includes(query) ||
+        u.code.toLowerCase().includes(query)
       );
     }
 
     return filtered;
   }, [allUsers, certifiedUserType, certifiedSearchQuery]);
 
-  const getRoleLabel = (role: UserRole) => {
-    const labels = {
-      manager: 'Manager',
-      contractor: 'Contractor',
-      crew: 'Crew',
-      warehouse: 'Warehouse'
-    };
-    return labels[role];
+  const getRoleLabel = (role: UserRole): string => {
+    switch (role) {
+      case 'manager': return 'Manager';
+      case 'contractor': return 'Contractor';
+      case 'crew': return 'Crew';
+      case 'warehouse': return 'Warehouse';
+      default: return role;
+    }
   };
 
   return (
@@ -177,9 +255,7 @@ const ServiceQuickActions: React.FC<ServiceQuickActionsProps> = ({
                 className={`${styles.certButton} ${
                   user.isCertified ? styles.removeButton : styles.addButton
                 }`}
-                onClick={() =>
-                  onCertificationChange?.(user.role, user.code, !user.isCertified)
-                }
+                onClick={() => toggleCertification(user.role, user.code)}
               >
                 {user.isCertified ? 'Remove' : '+ Certify'}
               </button>
@@ -246,20 +322,33 @@ const ServiceQuickActions: React.FC<ServiceQuickActionsProps> = ({
       </div>
 
       {/* ACTIONS Section */}
-      {(onEdit || onDelete) && (
+      {(onSave || onEdit || onDelete) && (
         <div className={styles.actionsSection}>
           <h4 className={styles.sectionTitle}>ACTIONS</h4>
           <div className={styles.actions}>
-            {onEdit && (
-              <button className={`${styles.actionButton} ${styles.actionEdit}`} onClick={onEdit}>
-                Edit
-              </button>
-            )}
-            {onDelete && (
-              <button className={`${styles.actionButton} ${styles.actionDelete}`} onClick={onDelete}>
-                Delete
-              </button>
-            )}
+            <div className={styles.leftActions}>
+              {onEdit && (
+                <button className={`${styles.actionButton} ${styles.actionEdit}`} onClick={onEdit}>
+                  Edit
+                </button>
+              )}
+              {onDelete && (
+                <button className={`${styles.actionButton} ${styles.actionDelete}`} onClick={onDelete}>
+                  Delete
+                </button>
+              )}
+            </div>
+            <div className={styles.rightActions}>
+              {onSave && (
+                <button
+                  className={`${styles.actionButton} ${styles.actionSave}`}
+                  onClick={handleSave}
+                  disabled={!hasChanges || isSaving}
+                >
+                  {isSaving ? 'Saving...' : 'Save'}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}

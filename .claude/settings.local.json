@@ -14,7 +14,11 @@
       "Bash(curl:*)",
       "Bash(pnpm build:*)",
       "Bash(timeout:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(git log:*)",
+      "Bash(python -m pip:*)",
+      "Bash(python:*)",
+      "Bash(mkdir:*)"
     ],
     "deny": [],
     "ask": []

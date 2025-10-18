@@ -672,8 +672,8 @@ async function listProducts(limit = DEFAULT_LIMIT): Promise<ProductDirectoryEntr
          cp.base_price AS price,
          cp.unit_of_measure AS unit,
          'active' AS status,
-         NULL::timestamp AS created_at,
-         NULL::timestamp AS updated_at
+         ii.created_at,
+         COALESCE(ii.updated_at, ii.created_at) AS updated_at
        FROM inventory_items ii
        LEFT JOIN catalog_products cp ON cp.product_id = ii.item_id
        WHERE ii.archived_at IS NULL
