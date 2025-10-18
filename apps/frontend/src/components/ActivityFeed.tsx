@@ -31,6 +31,7 @@ export interface ActivityFeedProps {
   onOpenOrderActions?: (data: { entity: any; state: string; deletedAt?: string; deletedBy?: string }) => void;
   onOpenOrderModal?: (order: any) => void;
   onOpenServiceModal?: (service: any) => void;
+  onOpenActionableOrder?: (order: any) => void;
   onError?: (message: string) => void;
 }
 
@@ -46,6 +47,7 @@ export function ActivityFeed({
   onOpenOrderActions,
   onOpenOrderModal,
   onOpenServiceModal,
+  onOpenActionableOrder,
   onError,
 }: ActivityFeedProps) {
   const handleActivityClick = useCallback(
@@ -84,19 +86,28 @@ export function ActivityFeed({
             console.log('[ActivityFeed] Opening deleted order modal:', { orderId: targetId });
             onOpenOrderModal(orderData);
           } else {
-            // Active or Archived orders: Open ActionModal first
-            if (!onOpenOrderActions) {
-              console.warn('[ActivityFeed] onOpenOrderActions not provided, ignoring order click');
+            // Admin pattern (if provided): delegate to onOpenOrderActions
+            if (onOpenOrderActions) {
+              console.log('[ActivityFeed] Admin order actions:', { orderId: targetId, state });
+              onOpenOrderActions({ entity, state, deletedAt, deletedBy });
               return;
             }
 
-            console.log('[ActivityFeed] Opening order actions:', { orderId: targetId, state });
-            onOpenOrderActions({
-              entity,
-              state,
-              deletedAt,
-              deletedBy,
-            });
+            // Non-admin pattern: If order has actions, open OrderActionModal; else open OrderDetailsModal
+            const hasActions = Array.isArray((entity as any)?.availableActions) && (entity as any).availableActions.length > 0;
+
+            if (hasActions && onOpenActionableOrder) {
+              console.log('[ActivityFeed] Opening actionable order modal:', { orderId: targetId });
+              onOpenActionableOrder(entity);
+              return;
+            }
+
+            if (onOpenOrderModal) {
+              console.log('[ActivityFeed] Opening order details (view-only):', { orderId: targetId });
+              onOpenOrderModal(entity);
+            } else {
+              console.warn('[ActivityFeed] onOpenOrderModal not provided, cannot open order');
+            }
           }
         } catch (error) {
           const message = parseActivityError(error);

@@ -33,10 +33,20 @@ interface NormalizedOrder {
   notes: string | null;
   items?: OrderLineItem[];
   serviceId?: string | null;
+  approvalStages?: Array<{
+    role: string;
+    status: string;
+    user?: string | null;
+    timestamp?: string | null;
+  }>;
   metadata?: any;
   isDeleted?: boolean;
   deletedAt?: string;
   deletedBy?: string;
+  managedById?: string | null;
+  managedByName?: string | null;
+  fulfilledById?: string | null;
+  fulfilledByName?: string | null;
 }
 
 interface ContactInfo {
@@ -70,6 +80,13 @@ export interface UseOrderDetailsReturn {
   requestorInfo: ContactInfo | null;
   destinationInfo: ContactInfo | null;
   availability: Availability | null;
+  serviceDetails: {
+    serviceId: string;
+    serviceName: string | null;
+    serviceType: string | null;
+    description: string | null;
+    status: string | null;
+  } | null;
   cancellationInfo: CancellationInfo;
   rejectionReason: string | null;
   rejectedBy?: string | null;
@@ -93,6 +110,7 @@ export interface UseOrderDetailsParams {
  * Normalize backend order into the UI-friendly shape for modals
  */
 function normalizeOrder(entity: any): NormalizedOrder {
+  const metadata = entity.metadata || {};
   return {
     orderId: entity.order_id || entity.orderId || entity.id,
     orderType: entity.order_type || entity.orderType || 'product',
@@ -118,10 +136,15 @@ function normalizeOrder(entity: any): NormalizedOrder {
       unitOfMeasure: i.unit_of_measure || i.unitOfMeasure || null,
     })),
     serviceId: entity.service_id || entity.serviceId || entity.transformedId || null,
-    metadata: entity.metadata || {},
+    approvalStages: entity.approvalStages || [],
+    metadata,
     isDeleted: false,
     deletedAt: undefined,
     deletedBy: undefined,
+    managedById: metadata.managedById || null,
+    managedByName: metadata.managedByName || null,
+    fulfilledById: metadata.fulfilledById || null,
+    fulfilledByName: metadata.fulfilledByName || null,
   };
 }
 
@@ -147,6 +170,37 @@ function extractCancellationInfo(metadata: any): CancellationInfo {
     cancellationReason: metadata?.cancellationReason || null,
     cancelledBy: display,
     cancelledAt: metadata?.cancelledAt || null,
+  };
+}
+
+function extractServiceDetails(order: any, metadata: any): {
+  serviceId: string;
+  serviceName: string | null;
+  serviceType: string | null;
+  description: string | null;
+  status: string | null;
+} | null {
+  // Only extract service details for service orders
+  if (order.orderType !== 'service') return null;
+
+  // Get serviceId (may be null if order hasn't been transformed yet)
+  const serviceId = order.serviceId || metadata?.serviceId || metadata?.service_id || null;
+
+  // Get service details from metadata
+  const serviceName = metadata?.serviceName || metadata?.service_name || null;
+  const serviceType = metadata?.serviceType || metadata?.service_type || null;
+  const description = metadata?.serviceDescription || metadata?.service_description || null;
+  const status = metadata?.serviceStatus || metadata?.service_status || null;
+
+  // Return if we have any service information available
+  if (!serviceId && !serviceName && !serviceType && !description) return null;
+
+  return {
+    serviceId: serviceId || 'N/A',
+    serviceName,
+    serviceType,
+    description,
+    status,
   };
 }
 
@@ -264,6 +318,7 @@ export function useOrderDetails(params: UseOrderDetailsParams): UseOrderDetailsR
       requestorInfo: null,
       destinationInfo: null,
       availability: null,
+      serviceDetails: null,
       cancellationInfo: { cancellationReason: null, cancelledBy: null, cancelledAt: null },
       rejectionReason: null,
       archiveMetadata: null,
@@ -282,6 +337,7 @@ export function useOrderDetails(params: UseOrderDetailsParams): UseOrderDetailsR
     requestorInfo: extractContactInfo(metadata, 'requestor', order.requestedBy),
     destinationInfo: extractContactInfo(metadata, 'destination', order.destination),
     availability: extractAvailability(metadata),
+    serviceDetails: extractServiceDetails(order, metadata),
     cancellationInfo: extractCancellationInfo(metadata),
     rejectionReason: extractRejectionReason(order, metadata),
     rejectedBy: metadata?.rejectedByDisplay || (metadata?.rejectedByCode ? (metadata?.rejectedByName ? `${metadata.rejectedByCode} - ${metadata.rejectedByName}` : metadata.rejectedByCode) : null),

@@ -94,8 +94,9 @@
   inset: 0;
   z-index: 1002; /* above overlay and grid */
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
+  padding-top: 40px;
   opacity: 1;
   transition: opacity var(--cks-modal-duration, 220ms) var(--cks-modal-ease, cubic-bezier(0.2, 0, 0, 1));
   pointer-events: none; /* allow inner box to capture events */

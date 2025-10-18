@@ -19,6 +19,7 @@ import {
   NewsPreview,
   OverviewSection,
   ReportDetailsModal,
+  ProfileTab,
   type Activity,
 } from '@cks/domain-widgets';
 import {
@@ -34,8 +35,10 @@ import {
   Scrollbar,
   TabContainer,
   CatalogServiceModal,
+  UserModal,
+  type UserAction,
 } from '@cks/ui';
-import OrderDetailsGateway from '../components/OrderDetailsGateway';
+import ActivityModalGateway from '../components/ActivityModalGateway';
 import type { ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSWRConfig } from 'swr';
@@ -50,6 +53,7 @@ import AdminAssignSection from './components/AdminAssignSection';
 import AdminCreateSection from './components/AdminCreateSection';
 import { useHubLoading } from '../contexts/HubLoadingContext';
 import { buildOrderActions } from '@cks/domain-widgets';
+import { mapProfileDataForRole, type DirectoryRole, directoryTabToRole } from '../shared/utils/profileMapping';
 
 import { useAdminUsers, updateInventory, fetchAdminOrderById } from '../shared/api/admin';
 import {
@@ -230,12 +234,13 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
   const [selectedEntity, setSelectedEntity] = useState<Record<string, any> | null>(null);
   const [showServiceCatalogModal, setShowServiceCatalogModal] = useState(false);
   const [selectedServiceCatalog, setSelectedServiceCatalog] = useState<{ serviceId: string; name: string | null; category: string | null; status?: string | null; description?: string | null; metadata?: any } | null>(null);
-  const [serviceAssignSelected, setServiceAssignSelected] = useState<{ managers: string[]; crew: string[]; warehouses: string[] } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   // merged assign flow into CatalogServiceModal
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [selectedOrderForEdit, setSelectedOrderForEdit] = useState<HubOrderItem | null>(null);
   const [selectedReportForDetails, setSelectedReportForDetails] = useState<any | null>(null);
+  const [selectedUser, setSelectedUser] = useState<Record<string, any> | null>(null);
+  const [showUserModal, setShowUserModal] = useState(false);
   const logout = useLogout();
   const { mutate } = useSWRConfig();
 
@@ -464,6 +469,31 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
     [handleModalClose, directoryTab, servicesSubTab, ordersSubTab, reportsSubTab, mutate],
   );
 
+  // User action handlers
+  const handleUserInvite = useCallback(() => {
+    console.log('Send Invite clicked for:', selectedUser);
+    // TODO: Implement invite logic
+  }, [selectedUser]);
+
+  const handleUserEdit = useCallback(() => {
+    console.log('Edit User Profile clicked for:', selectedUser);
+    // TODO: Implement edit logic
+  }, [selectedUser]);
+
+  const handleUserPause = useCallback(() => {
+    console.log('Pause Account clicked for:', selectedUser);
+    // TODO: Implement pause logic
+  }, [selectedUser]);
+
+  const userActions: UserAction[] = useMemo(() => {
+    if (!selectedUser) return [];
+    return [
+      { label: 'Invite', variant: 'primary', onClick: handleUserInvite },
+      { label: 'Edit', variant: 'secondary', onClick: handleUserEdit },
+      { label: 'Pause', variant: 'secondary', onClick: handleUserPause },
+      { label: 'Delete', variant: 'danger', onClick: () => handleDelete(selectedUser) },
+    ];
+  }, [selectedUser, handleUserInvite, handleUserEdit, handleUserPause, handleDelete]);
 
   // Example: Fix for missing variable declarations and misplaced code
   const overviewData = useMemo(() => {
@@ -1076,6 +1106,17 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
             searchPlaceholder={`Search ${servicesSubTab === 'catalog-services' ? 'catalog services' : 'active services'}...`}
             maxItems={25}
             showSearch
+            onRowClick={(row) => {
+              setSelectedServiceCatalog({
+                serviceId: row.id,
+                name: row.name ?? null,
+                category: row.category ?? null,
+                status: row.status ?? null,
+                description: row.description ?? null,
+                metadata: (row as any).metadata ?? null,
+              });
+              setShowServiceCatalogModal(true);
+            }}
           />
         </>
       );
@@ -1188,6 +1229,10 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
     if (!section) {
       return <div style={{ color: '#64748b', fontSize: 14 }}>No data available.</div>;
     }
+    // Determine if this is a user entity that should open UserModal
+    const isUserEntity = ['managers', 'contractors', 'customers', 'crew', 'centers', 'warehouses'].includes(directoryTab);
+    const isAdminEntity = directoryTab === 'admins';
+
     return (
       <DataTable
         columns={section.columns}
@@ -1196,6 +1241,35 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
         searchPlaceholder={`Search ${directoryTab}...`}
         maxItems={25}
         showSearch
+        onRowClick={isUserEntity ? (row) => {
+          // Resolve the full directory object so fields like reportsTo
+          // (not included in table rows) are available in the modal
+          let full: any = row;
+          try {
+            if (directoryTab === 'managers') {
+              const found = (managers || []).find((m) => m.id === row.id);
+              if (found) full = found;
+            } else if (directoryTab === 'contractors') {
+              const found = (contractors || []).find((m) => m.id === row.id);
+              if (found) full = found;
+            } else if (directoryTab === 'customers') {
+              const found = (customers || []).find((m) => m.id === row.id);
+              if (found) full = found;
+            } else if (directoryTab === 'centers') {
+              const found = (centers || []).find((m) => m.id === row.id);
+              if (found) full = found;
+            } else if (directoryTab === 'crew') {
+              const found = (crew || []).find((m) => m.id === row.id);
+              if (found) full = found;
+            } else if (directoryTab === 'warehouses') {
+              const found = (warehouses || []).find((m) => m.id === row.id);
+              if (found) full = found;
+            }
+          } catch {}
+
+          setSelectedUser(full);
+          setShowUserModal(true);
+        } : undefined}
       />
     );
   };
@@ -1263,7 +1337,6 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
                 activities={activityFeed}
                 hub="admin"
                 onClear={handleClearActivity}
-                onOpenOrderActions={handleOrderActions}
                 onOpenOrderModal={(order) => setSelectedOrderId(order?.orderId || order?.id || null)}
                 onOpenServiceModal={setSelectedServiceCatalog}
                 isLoading={activitiesLoading}
@@ -1634,54 +1707,87 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
 
       <CatalogServiceModal
         isOpen={showServiceCatalogModal}
-        onClose={() => { setShowServiceCatalogModal(false); setSelectedServiceCatalog(null); setServiceAssignSelected(null); }}
+        onClose={() => {
+          setShowServiceCatalogModal(false);
+          setSelectedServiceCatalog(null);
+        }}
         service={selectedServiceCatalog}
-        showCertifications={false}
         peopleManagers={(managers || []).map((m) => ({ code: m.id, name: m.name || m.id }))}
+        peopleContractors={(contractors || []).map((c) => ({ code: c.id, name: c.name || c.id }))}
         peopleCrew={(crew || []).map((c) => ({ code: c.id, name: c.name || c.id }))}
         peopleWarehouses={(warehouses || []).map((w) => ({ code: w.id, name: w.name || w.id }))}
-        selectedAssignments={serviceAssignSelected || undefined}
-        onSave={async (updates) => {
+        certifiedManagers={selectedServiceCatalog?.metadata?.certifications?.manager || []}
+        certifiedContractors={selectedServiceCatalog?.metadata?.certifications?.contractor || []}
+        certifiedCrew={selectedServiceCatalog?.metadata?.certifications?.crew || []}
+        certifiedWarehouses={selectedServiceCatalog?.metadata?.certifications?.warehouse || []}
+        onCertificationChange={async (role, userCode, certified) => {
           if (!selectedServiceCatalog) return;
           try {
             const { updateCatalogService } = await import('../shared/api/admin');
             const serviceId = selectedServiceCatalog.serviceId;
-            await updateCatalogService(serviceId, { metadata: { certifications: updates.certifications, visibility: updates.visibility } });
 
-            if (updates.assignments && serviceAssignSelected) {
-              const { patchServiceAssignments } = await import('../shared/api/admin');
-              const diff = (prev: string[], now: string[]) => {
-                const p = new Set(prev);
-                const n = new Set(now);
-                const add = Array.from(n).filter((x) => !p.has(x));
-                const remove = Array.from(p).filter((x) => !n.has(x));
-                return { add, remove };
-              };
-              const dMgr = diff(serviceAssignSelected.managers, updates.assignments.managers);
-              const dCrw = diff(serviceAssignSelected.crew, updates.assignments.crew);
-              const dWhs = diff(serviceAssignSelected.warehouses, updates.assignments.warehouses);
-              if (dMgr.add.length || dMgr.remove.length) await patchServiceAssignments(serviceId, { role: 'manager', add: dMgr.add, remove: dMgr.remove });
-              if (dCrw.add.length || dCrw.remove.length) await patchServiceAssignments(serviceId, { role: 'crew', add: dCrw.add, remove: dCrw.remove });
-              if (dWhs.add.length || dWhs.remove.length) await patchServiceAssignments(serviceId, { role: 'warehouse', add: dWhs.add, remove: dWhs.remove });
+            // Get current certifications
+            const currentCerts = selectedServiceCatalog.metadata?.certifications || {};
+            const roleKey = role === 'manager' ? 'manager' : role === 'contractor' ? 'contractor' : role === 'crew' ? 'crew' : 'warehouse';
+            const currentList = currentCerts[roleKey] || [];
 
-              // Revalidate certified-services caches for affected users so their My Services update immediately
-              const revalidate = (role: 'manager' | 'crew' | 'warehouse', ids: string[]) => {
-                ids.forEach((uid) => mutate(`/certified-services?userId=${encodeURIComponent(uid)}&role=${role}`));
-              };
-              revalidate('manager', [...dMgr.add, ...dMgr.remove]);
-              revalidate('crew', [...dCrw.add, ...dCrw.remove]);
-              revalidate('warehouse', [...dWhs.add, ...dWhs.remove]);
-            }
+            // Update certification list
+            const updatedList = certified
+              ? [...currentList, userCode]
+              : currentList.filter((code: string) => code !== userCode);
+
+            const updatedCerts = {
+              ...currentCerts,
+              [roleKey]: updatedList,
+            };
+
+            // Save to backend
+            await updateCatalogService(serviceId, {
+              metadata: {
+                ...selectedServiceCatalog.metadata,
+                certifications: updatedCerts
+              }
+            });
+
+            // Update local state
+            setSelectedServiceCatalog({
+              ...selectedServiceCatalog,
+              metadata: {
+                ...selectedServiceCatalog.metadata,
+                certifications: updatedCerts,
+              },
+            });
+
+            // Revalidate
+            mutate('/admin/directory/services');
+            setToast('Certification updated');
+            setTimeout(() => setToast(null), 1800);
+          } catch (error) {
+            console.error('[admin] update certification failed', error);
+            alert(error instanceof Error ? error.message : 'Failed to update certification');
+          }
+        }}
+        onEdit={() => {
+          console.log('Edit service:', selectedServiceCatalog);
+          // TODO: Open edit modal
+          alert('Edit functionality to be implemented');
+        }}
+        onDelete={async () => {
+          if (!selectedServiceCatalog) return;
+          if (!confirm(`Are you sure you want to delete service "${selectedServiceCatalog.name}"?`)) return;
+
+          try {
+            const { archiveEntity } = await import('../shared/api/admin');
+            await archiveEntity('service', selectedServiceCatalog.serviceId);
 
             setShowServiceCatalogModal(false);
             setSelectedServiceCatalog(null);
-            setServiceAssignSelected(null);
             mutate('/admin/directory/services');
-            setToast('Assignments updated');
+            setToast('Service deleted');
             setTimeout(() => setToast(null), 1800);
           } catch (error) {
-            console.error('[admin] update catalog service failed', error);
-            alert(error instanceof Error ? error.message : 'Failed to update catalog service');
+            console.error('[admin] delete service failed', error);
+            alert(error instanceof Error ? error.message : 'Failed to delete service');
           }
         }}
       />
@@ -1694,10 +1800,56 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
 
       {/* merged assign flow into CatalogServiceModal */}
 
-      {/* Order Details Modal - unified gateway */}
-      <OrderDetailsGateway
+      {/* Activity Modal Gateway - progressive disclosure for orders (Admin) */}
+      <ActivityModalGateway
+        isOpen={!!selectedOrderId}
         orderId={selectedOrderId}
+        role="admin"
         onClose={() => setSelectedOrderId(null)}
+        onEdit={(ord) => {
+          const oid = (ord as any)?.orderId || (ord as any)?.id;
+          if (!oid) return;
+          setSelectedOrderForEdit({ orderId: oid, id: oid, notes: (ord as any)?.notes || null } as any);
+        }}
+        onArchive={async (orderId: string) => {
+          const reason = window.prompt('Provide an archive reason (optional):') || undefined;
+          try {
+            await archiveAPI.archiveEntity('order', orderId, reason);
+            alert('Order archived successfully.');
+            // Keep modal open; it will refresh on next open
+            mutate('/admin/directory/orders');
+            mutate('/admin/directory/activities');
+          } catch (err) {
+            console.error('[admin] archive order failed', err);
+            alert('Failed to archive order');
+          }
+        }}
+        onRestore={async (orderId: string) => {
+          try {
+            await archiveAPI.restoreEntity('order', orderId);
+            alert('Order restored successfully.');
+            mutate('/admin/directory/orders');
+            mutate('/admin/directory/activities');
+          } catch (err) {
+            console.error('[admin] restore order failed', err);
+            alert('Failed to restore order');
+          }
+        }}
+        onDelete={async (orderId: string) => {
+          const confirmed = window.confirm('Permanently delete this order? This cannot be undone.');
+          if (!confirmed) return;
+          const reason = window.prompt('Provide a deletion reason (optional):') || undefined;
+          try {
+            await archiveAPI.hardDelete('order', orderId, reason);
+            alert('Order permanently deleted.');
+            setSelectedOrderId(null);
+            mutate('/admin/directory/orders');
+            mutate('/admin/directory/activities');
+          } catch (err) {
+            console.error('[admin] hard delete order failed', err);
+            alert('Failed to delete order');
+          }
+        }}
       />
 
       <EditOrderModal
@@ -1753,16 +1905,36 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
         currentUser={code || ''}
         userRole="admin"
       />
+
+      <UserModal
+        isOpen={showUserModal}
+        onClose={() => {
+          setShowUserModal(false);
+          setSelectedUser(null);
+        }}
+        user={selectedUser ? {
+          id: selectedUser.id,
+          name: selectedUser.name,
+          status: selectedUser.status,
+          role: directoryTabToRole(directoryTab),
+        } : null}
+        actions={userActions}
+        profileData={selectedUser ? (() => {
+          const role = directoryTabToRole(directoryTab) as DirectoryRole;
+          const mapped = mapProfileDataForRole(role, selectedUser);
+          return (
+            <ProfileTab
+              role={role}
+              profileData={mapped}
+              primaryColor="#6366f1"
+            />
+          );
+        })() : null}
+      />
     </div>
   );
 
 }
-
-
-
-
-
-
 
 
 

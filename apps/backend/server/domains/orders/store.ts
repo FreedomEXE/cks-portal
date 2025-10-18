@@ -79,6 +79,15 @@ interface OrderRow {
   archived_at: Date | string | null;
   service_managed_by?: string | null;
   service_actual_start_time?: Date | string | null;
+  // Service enrichment fields from JOIN queries
+  catalog_service_id?: string | null;
+  service_name?: string | null;
+  catalog_service_name?: string | null;
+  service_category?: string | null;
+  catalog_service_category?: string | null;
+  service_description?: string | null;
+  catalog_service_description?: string | null;
+  service_status?: string | null;
 }
 
 interface OrderItemRow {
@@ -637,7 +646,17 @@ function buildApprovalStages(
 }
 
 async function mapOrderRow(
-  row: OrderRow & { service_managed_by?: string | null; service_actual_start_time?: Date | null },
+  row: OrderRow & {
+    service_managed_by?: string | null;
+    service_actual_start_time?: Date | null;
+    service_name?: string | null;
+    service_category?: string | null;
+    service_description?: string | null;
+    service_status?: string | null;
+    catalog_service_name?: string | null;
+    catalog_service_category?: string | null;
+    catalog_service_description?: string | null;
+  },
   items: OrderItemRow[],
   context?: { viewerRole?: HubRole | null; viewerCode?: string | null },
 ): Promise<HubOrderItem> {
@@ -719,11 +738,98 @@ async function mapOrderRow(
   console.log('[mapOrderRow] START - order_id:', row.order_id);
   let enrichedMetadata = row.metadata ? { ...row.metadata } : {};
 
-  // Add service data from services table if available, or preserve from order metadata
-  // Priority: services table > order metadata
-  if (row.service_managed_by || row.service_actual_start_time || (enrichedMetadata as any).serviceManagedBy) {
-    (enrichedMetadata as any).serviceManagedBy = row.service_managed_by || (enrichedMetadata as any).serviceManagedBy || null;
-    (enrichedMetadata as any).serviceActualStartTime = row.service_actual_start_time ? new Date(row.service_actual_start_time).toISOString() : null;
+  // Add service data from services/catalog_services tables if available
+  // Priority: services table (runtime) > catalog_services (template) > order metadata
+  if (orderType === 'service') {
+    // Service details: prefer runtime service data, fall back to catalog
+    const catalogServiceId = row.catalog_service_id || (enrichedMetadata as any).serviceId || null;
+    const serviceName = row.service_name || row.catalog_service_name || (enrichedMetadata as any).serviceName || null;
+    const serviceType = row.service_category || row.catalog_service_category || (enrichedMetadata as any).serviceType || null;
+    const serviceDescription = row.service_description || row.catalog_service_description || (enrichedMetadata as any).serviceDescription || null;
+    const serviceStatus = row.service_status || (enrichedMetadata as any).serviceStatus || null;
+    const serviceManagedBy = row.service_managed_by || (enrichedMetadata as any).serviceManagedBy || null;
+
+    if (catalogServiceId || serviceName || serviceType || serviceDescription || serviceStatus || serviceManagedBy) {
+      if (catalogServiceId) {
+        (enrichedMetadata as any).serviceId = catalogServiceId;
+        (enrichedMetadata as any).service_id = catalogServiceId; // snake_case alias
+      }
+      (enrichedMetadata as any).serviceName = serviceName;
+      (enrichedMetadata as any).service_name = serviceName; // snake_case alias
+      (enrichedMetadata as any).serviceType = serviceType;
+      (enrichedMetadata as any).service_type = serviceType; // snake_case alias
+      (enrichedMetadata as any).serviceDescription = serviceDescription;
+      (enrichedMetadata as any).service_description = serviceDescription; // snake_case alias
+      (enrichedMetadata as any).serviceStatus = serviceStatus;
+      (enrichedMetadata as any).service_status = serviceStatus; // snake_case alias
+      (enrichedMetadata as any).serviceManagedBy = serviceManagedBy;
+
+      // Resolve managed by code and name
+      let managedByCode: string | null = null;
+      if (serviceManagedBy === 'warehouse') {
+        managedByCode = normalizeCodeValue(row.assigned_warehouse) || normalizeCodeValue(row.destination);
+      } else if (serviceManagedBy === 'manager') {
+        managedByCode = normalizeCodeValue(row.manager_id);
+      }
+
+      if (managedByCode) {
+        (enrichedMetadata as any).managedById = managedByCode;
+
+        // Fetch name for managed by entity
+        try {
+          const prefix = managedByCode.split('-')[0];
+          let managedByName: string | null = null;
+
+          if (prefix === 'WHX') {
+            const res = await query<{ name: string | null }>(
+              `SELECT name FROM warehouses WHERE UPPER(warehouse_id) = $1 LIMIT 1`,
+              [managedByCode]
+            );
+            managedByName = res.rows[0]?.name || null;
+          } else if (prefix === 'MGR') {
+            const res = await query<{ name: string | null }>(
+              `SELECT name FROM managers WHERE UPPER(manager_id) = $1 LIMIT 1`,
+              [managedByCode]
+            );
+            managedByName = res.rows[0]?.name || null;
+          }
+
+          if (managedByName) {
+            (enrichedMetadata as any).managedByName = managedByName;
+          }
+        } catch (err) {
+          console.error('[mapOrderRow] Error fetching managed by name:', err);
+        }
+      }
+    }
+
+    if (row.service_actual_start_time) {
+      (enrichedMetadata as any).serviceActualStartTime = new Date(row.service_actual_start_time).toISOString();
+    }
+  }
+
+  // Add warehouse fulfillment data for product orders
+  if (orderType === 'product') {
+    const assignedWarehouse = normalizeCodeValue(row.assigned_warehouse);
+
+    if (assignedWarehouse) {
+      (enrichedMetadata as any).fulfilledById = assignedWarehouse;
+
+      // Fetch warehouse name
+      try {
+        const res = await query<{ name: string | null }>(
+          `SELECT name FROM warehouses WHERE UPPER(warehouse_id) = $1 LIMIT 1`,
+          [assignedWarehouse]
+        );
+        const warehouseName = res.rows[0]?.name || null;
+
+        if (warehouseName) {
+          (enrichedMetadata as any).fulfilledByName = warehouseName;
+        }
+      } catch (err) {
+        console.error('[mapOrderRow] Error fetching warehouse name:', err);
+      }
+    }
   }
 
   console.log('[mapOrderRow] enrichedMetadata:', JSON.stringify(enrichedMetadata, null, 2));
@@ -998,7 +1104,18 @@ async function loadOrderItems(orderIds: readonly string[]): Promise<Map<string, 
 }
 
 async function fetchOrders(whereClause: string, params: readonly unknown[], context?: { viewerRole?: HubRole | null; viewerCode?: string | null }): Promise<HubOrderItem[]> {
-  const result = await query<OrderRow & { service_managed_by?: string | null; service_actual_start_time?: Date | null }>(
+  const result = await query<OrderRow & {
+    service_managed_by?: string | null;
+    service_actual_start_time?: Date | null;
+    service_name?: string | null;
+    service_category?: string | null;
+    service_description?: string | null;
+    service_status?: string | null;
+    catalog_service_id?: string | null;
+    catalog_service_name?: string | null;
+    catalog_service_category?: string | null;
+    catalog_service_description?: string | null;
+  }>(
     `SELECT
        o.order_id,
        o.order_type,
@@ -1028,8 +1145,16 @@ async function fetchOrders(whereClause: string, params: readonly unknown[], cont
        o.created_at,
        o.updated_at,
        o.archived_at,
-       COALESCE(s.managed_by, cs.managed_by) AS service_managed_by,
-       s.actual_start_time AS service_actual_start_time
+       COALESCE(s.managed_by) AS service_managed_by,
+       s.actual_start_time AS service_actual_start_time,
+       s.service_name AS service_name,
+       s.category AS service_category,
+       s.description AS service_description,
+       s.status AS service_status,
+       oi.catalog_item_code AS catalog_service_id,
+       cs.name AS catalog_service_name,
+       cs.category AS catalog_service_category,
+       cs.description AS catalog_service_description
      FROM orders o
      LEFT JOIN services s ON o.transformed_id = s.service_id
      LEFT JOIN LATERAL (

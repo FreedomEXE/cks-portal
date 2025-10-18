@@ -28,7 +28,7 @@ import {
   type TreeNode,
 } from '@cks/domain-widgets';
 import { Button, DataTable, ModalProvider, OrderDetailsModal, ServiceViewModal, PageHeader, PageWrapper, Scrollbar, TabSection } from '@cks/ui';
-import OrderDetailsGateway from '../components/OrderDetailsGateway';
+import ActivityModalGateway from '../components/ActivityModalGateway';
 import { useAuth } from '@cks/auth';
 import { useCatalogItems } from '../shared/api/catalog';
 import { useServices as useDirectoryServices } from '../shared/api/directory';
@@ -156,6 +156,7 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
   const [servicesTab, setServicesTab] = useState<'my' | 'active' | 'history'>('active');
   const [servicesSearchQuery, setServicesSearchQuery] = useState('');
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [actionOrder, setActionOrder] = useState<any | null>(null);
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
   const [fetchedServiceDetails, setFetchedServiceDetails] = useState<any>(null);
 
@@ -400,12 +401,14 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
   ], []);
 
   const profileCardData = useMemo(() => ({
-    name: profile?.name ?? '—',
-    crewId: normalizedCode ?? '—',
-    address: profile?.address ?? '—',
-    phone: profile?.phone ?? '—',
-    email: profile?.email ?? '—',
-    mainContact: profile?.mainContact ?? '—',
+    name: profile?.name ?? '-',
+    crewId: normalizedCode ?? '-',
+    address: profile?.address ?? '-',
+    phone: profile?.phone ?? '-',
+    email: profile?.email ?? '-',
+    // ProfileTab for crew expects `emergencyContact`, not `mainContact`.
+    // Source from metadata first (backend writes both), then fallback.
+    emergencyContact: (profile?.metadata as any)?.emergencyContact ?? profile?.mainContact ?? '-',
     startDate: formatDisplayDate(profile?.createdAt ?? null),
   }), [profile, normalizedCode]);
 
@@ -433,17 +436,84 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
 
   // Catalog-backed My Services (MVP): show all services to crew via catalog endpoint
   const { data: catalogData } = useCatalogItems({ type: 'service', pageSize: 500 });
+
+  // Column definitions for My Services
+  const MY_SERVICES_COLUMNS_BASE = [
+    { key: 'serviceId', label: 'SERVICE ID', clickable: true },
+    { key: 'serviceName', label: 'SERVICE NAME' },
+  ];
+
+  const MY_SERVICES_COLUMNS_CERTIFIED = [
+    ...MY_SERVICES_COLUMNS_BASE,
+    { key: 'certified', label: 'CERTIFIED' },
+    { key: 'certificationDate', label: 'CERTIFICATION DATE' },
+    { key: 'expires', label: 'EXPIRES' },
+  ];
+
   const myCatalogServices = useMemo(() => {
     const items = catalogData?.items || [];
-    return items.map((svc: any) => ({
-      serviceId: svc.code ?? 'CAT-SRV',
-      serviceName: svc.name ?? 'Service',
-      // Align fields with Manager Hub My Services table
-      certified: 'Yes',
-      certificationDate: null as string | null,
-      expires: null as string | null,
-    }));
-  }, [catalogData]);
+    return items.map((svc: any) => {
+      const certifications = svc.metadata?.certifications || {};
+      const crewCerts = certifications.crew || [];
+      const isCertified = crewCerts.includes(normalizedCode);
+
+      return {
+        serviceId: svc.code ?? 'CAT-SRV',
+        serviceName: svc.name ?? 'Service',
+        certified: isCertified ? 'Yes' : 'No',
+        certificationDate: isCertified ? '-' : null,
+        expires: isCertified ? '-' : null,
+        _isCertified: isCertified,
+      };
+    });
+  }, [catalogData, normalizedCode]);
+
+  // Check if any service has the user certified to determine columns
+  const hasAnyCertification = useMemo(
+    () => myCatalogServices.some((s: any) => s._isCertified),
+    [myCatalogServices]
+  );
+
+  const myServicesColumns = hasAnyCertification
+    ? MY_SERVICES_COLUMNS_CERTIFIED
+    : MY_SERVICES_COLUMNS_BASE;
+
+  // Centralized handler for actionable orders from ActivityFeed
+  const handleOrderAction = useCallback(async (orderId: string, action: string) => {
+    try {
+      if (action === 'Accept') {
+        const payload: OrderActionRequest = { action: 'accept' };
+        await applyHubOrderAction(orderId, payload);
+        mutate(`/hub/orders/${normalizedCode}`);
+        return;
+      }
+      if (action === 'Decline' || action === 'Reject') {
+        const reason = window.prompt('Please provide a short reason')?.trim() || '';
+        if (!reason) {
+          alert('A reason is required.');
+          return;
+        }
+        const payload: OrderActionRequest = { action: 'reject', notes: reason };
+        await applyHubOrderAction(orderId, payload);
+        mutate(`/hub/orders/${normalizedCode}`);
+        return;
+      }
+      if (action === 'Cancel') {
+        const confirmed = window.confirm('Are you sure you want to cancel this order?');
+        if (!confirmed) return;
+        const notes = window.prompt('Optional: provide a short reason')?.trim() || null;
+        const payload: OrderActionRequest = { action: 'cancel', ...(notes ? { notes } : {}) };
+        await applyHubOrderAction(orderId, payload);
+        mutate(`/hub/orders/${normalizedCode}`);
+        return;
+      }
+      // Default: if action not recognized, open details
+      setSelectedOrderId(orderId);
+    } catch (err) {
+      console.error('[crew] failed to process action', err);
+      alert('Failed to process action. Please try again.');
+    }
+  }, [normalizedCode, mutate]);
 
   // Don't render anything until we have critical data
   if (!profile || !dashboard) {
@@ -481,6 +551,9 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
               <ActivityFeed
                 activities={activities}
                 hub="crew"
+        onOpenActionableOrder={(order) => setActionOrder(order)}
+                onOpenOrderModal={(order) => setSelectedOrderId(order?.orderId || order?.id || null)}
+                onOpenServiceModal={setSelectedServiceId}
                 isLoading={activitiesLoading}
                 error={activitiesError}
                 onError={(msg) => toast.error(msg)}
@@ -553,13 +626,7 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
               >
                 {servicesTab === 'my' && (
                   <DataTable
-                    columns={[
-                      { key: 'serviceId', label: 'SERVICE ID', clickable: true },
-                      { key: 'serviceName', label: 'SERVICE NAME' },
-                      { key: 'certified', label: 'CERTIFIED' },
-                      { key: 'certificationDate', label: 'CERTIFICATION DATE' },
-                      { key: 'expires', label: 'EXPIRES' },
-                    ]}
+                    columns={myServicesColumns}
                     data={myCatalogServices.filter((row) => {
                       if (!servicesSearchQuery) return true;
                       const q = servicesSearchQuery.toLowerCase();
@@ -809,7 +876,33 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
         </div>
       </Scrollbar>
 
-      <OrderDetailsGateway orderId={selectedOrderId} onClose={() => setSelectedOrderId(null)} />
+      {/* Action modal showing OrderCard with buttons for actionable orders */}
+      {/* Progressive Disclosure Modal for orders (user role) */}
+      {actionOrder && (
+        <ActivityModalGateway
+          isOpen={!!actionOrder}
+          onClose={() => setActionOrder(null)}
+          orderId={(actionOrder.orderId || actionOrder.id) as string}
+          role="user"
+          userAvailableActions={(actionOrder.availableActions || []) as string[]}
+          onAction={(orderId, action) => {
+            handleOrderAction(orderId, action);
+            // keep modal open; details remain visible if user expands
+          }}
+        />
+      )}
+
+      {/* View-only legacy path replaced by ActivityModal expansion; keep for non-action cases via ActivityFeed */}
+      {selectedOrderId && (
+        <ActivityModalGateway
+          isOpen={!!selectedOrderId}
+          onClose={() => setSelectedOrderId(null)}
+          orderId={selectedOrderId}
+          role="user"
+          userAvailableActions={[]}
+          onAction={(orderId, action) => handleOrderAction(orderId, action)}
+        />
+      )}
 
       {/* Service View Modal */}
       {(() => {
@@ -869,4 +962,3 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
     </ModalProvider>
   );
 }
-

@@ -106,6 +106,7 @@ export interface CrewDirectoryEntry {
   id: string;
   name: string | null;
   status: string | null;
+  territory?: string | null;
   emergencyContact: string | null;
   email: string | null;
   phone: string | null;
@@ -121,6 +122,7 @@ export interface WarehouseDirectoryEntry {
   name: string | null;
   managerId: string | null;
   managerName: string | null;
+  territory?: string | null;
   mainContact: string | null;
   warehouseType: string | null;
   address: string | null;
@@ -277,5 +279,3 @@ export interface DirectoryResourceMap {
 }
 
 export type DirectoryResourceKey = keyof DirectoryResourceMap;
-
-

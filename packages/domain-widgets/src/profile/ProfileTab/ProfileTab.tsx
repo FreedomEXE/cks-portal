@@ -68,15 +68,20 @@ export function ProfileTab({ role, profileData, primaryColor, onUpdatePhoto }: P
       case 'center':
         return ['name', 'centerId', 'address', 'phone', 'email', 'website', 'mainContact', 'startDate'];
       case 'crew':
-        return ['name', 'crewId', 'address', 'phone', 'email', 'territory', 'emergencyContact', 'startDate'];
+        // Territory not collected for crew; remove from display
+        return ['name', 'crewId', 'address', 'phone', 'email', 'emergencyContact', 'startDate'];
       case 'warehouse':
-        return ['name', 'warehouseId', 'address', 'phone', 'email', 'territory', 'mainContact', 'startDate'];
+        // Territory not collected for warehouses; remove from display
+        return ['name', 'warehouseId', 'address', 'phone', 'email', 'mainContact', 'startDate'];
       default:
         return [];
     }
   };
 
   const fields = getFieldsForRole();
+
+  // Fields that should be hidden entirely if empty
+  const hideIfEmpty = new Set<string>(['website']);
 
   const getInitials = () => {
     const name = profileData.name || profileData.fullName;
@@ -117,12 +122,14 @@ export function ProfileTab({ role, profileData, primaryColor, onUpdatePhoto }: P
         }}>
           <span style={{ userSelect: 'none' }}>{getInitials()}</span>
         </div>
-        <Button
-          variant="secondary"
-          onClick={onUpdatePhoto}
-        >
-          Update Photo
-        </Button>
+        {onUpdatePhoto && (
+          <Button
+            variant="secondary"
+            onClick={onUpdatePhoto}
+          >
+            Update Photo
+          </Button>
+        )}
       </div>
 
       {/* Profile Info Grid - Right Side */}
@@ -132,6 +139,11 @@ export function ProfileTab({ role, profileData, primaryColor, onUpdatePhoto }: P
             {fields.map((field) => {
               const value = formatFieldValue(profileData[field]);
               const isNotSet = value === 'Not Set';
+
+              // Hide selected fields (e.g., website) when not set
+              if (isNotSet && hideIfEmpty.has(field)) {
+                return null;
+              }
 
               return (
                 <tr key={field} style={{ borderBottom: '1px solid #f3f4f6' }}>

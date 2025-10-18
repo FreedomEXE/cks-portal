@@ -2,6 +2,7 @@ import React from 'react';
 import styles from './ProductOrderModal.module.css';
 import { ModalRoot } from '../ModalRoot';
 import { DeletedBanner } from '../../banners/DeletedBanner';
+import { ArchivedBanner } from '../../banners/ArchivedBanner';
 
 interface ProductLineItem {
   id: string;
@@ -141,33 +142,17 @@ const ProductOrderModal: React.FC<ProductOrderModalProps> = ({
           </div>
         )}
 
-        {/* Archive Information Banner */}
+        {/* Archive Banner */}
         {archiveMetadata && !order.isDeleted && (
-          <div style={{
-            margin: '16px 16px 0 16px',
-            padding: '12px 16px',
-            backgroundColor: '#f3f4f6',
-            border: '1px solid #9ca3af',
-            borderRadius: '6px'
-          }}>
-            <h4 style={{ margin: '0 0 12px 0', fontSize: '15px', fontWeight: 600, color: '#111827' }}>
-              This order has been Archived
-            </h4>
-            <h5 style={{ margin: '0 0 8px 0', fontSize: '13px', fontWeight: 600, color: '#374151' }}>
-              Archive Information
-            </h5>
-            <div style={{ fontSize: '13px', color: '#374151', lineHeight: '1.6' }}>
-              <div><strong>Archived by:</strong> {archiveMetadata.archivedBy || 'Admin'}</div>
-              <div><strong>Archived on:</strong> {formatDate(archiveMetadata.archivedAt)}</div>
-              {archiveMetadata.reason && (
-                <div><strong>Reason:</strong> {archiveMetadata.reason}</div>
-              )}
-              {archiveMetadata.scheduledDeletion && (
-                <div style={{ color: '#ef4444', fontWeight: 500, marginTop: '4px' }}>
-                  <strong>Scheduled for deletion:</strong> {formatDate(archiveMetadata.scheduledDeletion)}
-                </div>
-              )}
-            </div>
+          <div style={{ padding: '0 16px', marginTop: '16px' }}>
+            <ArchivedBanner
+              archivedAt={archiveMetadata.archivedAt}
+              archivedBy={archiveMetadata.archivedBy}
+              reason={archiveMetadata.reason}
+              scheduledDeletion={archiveMetadata.scheduledDeletion}
+              entityType="order"
+              entityId={order.orderId}
+            />
           </div>
         )}
 

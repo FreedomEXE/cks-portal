@@ -24,7 +24,9 @@ export function OrderDetailsGateway({ orderId, onClose }: Props) {
     rejectionReason: orderDetails.rejectionReason,
     requestorInfo: orderDetails.requestorInfo,
     destinationInfo: orderDetails.destinationInfo,
-        rejectedBy: orderDetails.rejectedBy,    rejectedAt: orderDetails.rejectedAt,
+    rejectedBy: orderDetails.rejectedBy,
+    rejectedAt: orderDetails.rejectedAt,
+    archiveMetadata: orderDetails.archiveMetadata,
   } as const;
 
   return isService ? (

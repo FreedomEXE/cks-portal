@@ -26,7 +26,7 @@ import {
   SupportSection,
   type Activity,
 } from '@cks/domain-widgets';
-import { Button, DataTable, OrderDetailsModal, ServiceViewModal, ModalProvider, PageHeader, PageWrapper, Scrollbar, TabSection } from '@cks/ui';
+import { Button, DataTable, OrderDetailsModal, ServiceViewModal, ModalProvider, PageHeader, PageWrapper, Scrollbar, TabSection, OrderActionModal } from '@cks/ui';
 import OrderDetailsGateway from '../components/OrderDetailsGateway';
 import { useAuth } from '@cks/auth';
 import { useSWRConfig } from 'swr';
@@ -49,6 +49,7 @@ import {
 } from '../shared/api/hub';
 import { useFormattedActivities } from '../shared/activity/useFormattedActivities';
 import { ActivityFeed } from '../components/ActivityFeed';
+import ActivityModalGateway from '../components/ActivityModalGateway';
 import { createFeedback as apiCreateFeedback, acknowledgeItem as apiAcknowledgeItem, resolveReport as apiResolveReport, fetchServicesForReports, fetchProceduresForReports, fetchOrdersForReports } from '../shared/api/hub';
 
 const ACTION_LABEL_MAP: Record<string, OrderActionType> = {
@@ -167,6 +168,7 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
   const [inventoryFilter, setInventoryFilter] = useState<string>('');
   const [pendingAction, setPendingAction] = useState<{ orderId: string; action: OrderActionType } | null>(null);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [actionOrder, setActionOrder] = useState<any | null>(null);
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
 
   
@@ -495,18 +497,48 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
   // Fetch warehouse-specific services from catalog
   const { data: catalogData } = useCatalogItems({ type: 'service', pageSize: 500 });
 
+  // Column definitions for My Services
+  const MY_SERVICES_COLUMNS_BASE = [
+    { key: 'serviceId', label: 'SERVICE ID', clickable: true },
+    { key: 'serviceName', label: 'SERVICE NAME' },
+  ];
+
+  const MY_SERVICES_COLUMNS_CERTIFIED = [
+    ...MY_SERVICES_COLUMNS_BASE,
+    { key: 'certified', label: 'CERTIFIED' },
+    { key: 'certificationDate', label: 'CERTIFICATION DATE' },
+    { key: 'expires', label: 'EXPIRES' },
+  ];
+
   const myCertifiedServices = useMemo(() => {
     const items = catalogData?.items || [];
     // Filter to only show warehouse-managed services
     const warehouseServices = items.filter((service: any) => service.managedBy === 'warehouse');
-    return warehouseServices.map((service: any) => ({
-      serviceId: service.code ?? 'SRV',
-      serviceName: service.name ?? 'Warehouse Service',
-      certified: 'Yes',
-      certificationDate: null,
-      expires: null,
-    }));
-  }, [catalogData]);
+    return warehouseServices.map((service: any) => {
+      const certifications = service.metadata?.certifications || {};
+      const warehouseCerts = certifications.warehouse || [];
+      const isCertified = warehouseCerts.includes(normalizedCode);
+
+      return {
+        serviceId: service.code ?? 'SRV',
+        serviceName: service.name ?? 'Warehouse Service',
+        certified: isCertified ? 'Yes' : 'No',
+        certificationDate: isCertified ? '-' : null,
+        expires: isCertified ? '-' : null,
+        _isCertified: isCertified,
+      };
+    });
+  }, [catalogData, normalizedCode]);
+
+  // Check if any service has the user certified to determine columns
+  const hasAnyCertification = useMemo(
+    () => myCertifiedServices.some((s: any) => s._isCertified),
+    [myCertifiedServices]
+  );
+
+  const myServicesColumns = hasAnyCertification
+    ? MY_SERVICES_COLUMNS_CERTIFIED
+    : MY_SERVICES_COLUMNS_BASE;
 
   const tabs = useMemo(() => [
     { id: 'dashboard', label: 'Dashboard', path: '/warehouse/dashboard' },
@@ -597,12 +629,13 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
     }
   };
   const profileCardData = useMemo(() => ({
-    name: profile?.name ?? '—',
-    warehouseId: normalizedCode ?? '—',
-    address: profile?.address ?? '—',
-    phone: profile?.phone ?? '—',
-    email: profile?.email ?? '—',
-    mainContact: profile?.mainContact ?? '—',
+    name: profile?.name ?? '-',
+    warehouseId: normalizedCode ?? '-',
+    address: profile?.address ?? '-',
+    phone: profile?.phone ?? '-',
+    email: profile?.email ?? '-',
+    // Prefer warehouse-specific mainContact; fallback to assigned manager name
+    mainContact: profile?.mainContact ?? '-',
     startDate: formatDisplayDate(profile?.createdAt ?? null),
   }), [profile, normalizedCode]);
 
@@ -655,6 +688,9 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
               <ActivityFeed
                 activities={activities}
                 hub="warehouse"
+                onOpenActionableOrder={(order) => setActionOrder(order)}
+                onOpenOrderModal={(order) => setSelectedOrderId(order?.orderId || order?.id || null)}
+                onOpenServiceModal={setSelectedServiceId}
                 isLoading={activitiesLoading}
                 error={activitiesError}
                 onError={(msg) => toast.error(msg)}
@@ -1017,13 +1053,7 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
               >
                 {servicesTab === 'my' && (
                   <DataTable
-                    columns={[
-                      { key: 'serviceId', label: 'SERVICE ID', clickable: true },
-                      { key: 'serviceName', label: 'SERVICE NAME' },
-                      { key: 'certified', label: 'CERTIFIED' },
-                      { key: 'certificationDate', label: 'CERTIFICATION DATE' },
-                      { key: 'expires', label: 'EXPIRES' },
-                    ]}
+                    columns={myServicesColumns}
                     data={myCertifiedServices}
                     showSearch={false}
                     externalSearchQuery={servicesSearchQuery}
@@ -1239,7 +1269,40 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
         </div>
       </Scrollbar>
 
-      <OrderDetailsGateway orderId={selectedOrderId} onClose={() => setSelectedOrderId(null)} />
+      {/* Actionable order modal (OrderCard with inline buttons) */}
+      {actionOrder && (
+        <OrderActionModal
+          isOpen={!!actionOrder}
+          onClose={() => setActionOrder(null)}
+          order={{
+            orderId: actionOrder.orderId || actionOrder.id,
+            orderType: (actionOrder.orderType || actionOrder.order_type || 'product') as 'service' | 'product',
+            title: actionOrder.title || actionOrder.orderId || actionOrder.id,
+            requestedBy: actionOrder.requestedBy || null,
+            destination: actionOrder.destination || null,
+            requestedDate: actionOrder.requestedDate || actionOrder.orderDate || null,
+            expectedDate: actionOrder.expectedDate || null,
+            serviceStartDate: actionOrder.serviceStartDate || null,
+            deliveryDate: actionOrder.deliveryDate || null,
+            status: actionOrder.status || 'pending',
+            approvalStages: actionOrder.approvalStages || [],
+            availableActions: actionOrder.availableActions || [],
+            transformedId: actionOrder.transformedId || null,
+          }}
+          onAction={(orderId, action) => {
+            // Delegate to existing hub handler which maps labels to supported actions
+            return handleOrderAction(orderId, action);
+          }}
+        />
+      )}
+
+      <ActivityModalGateway
+        isOpen={!!selectedOrderId}
+        onClose={() => setSelectedOrderId(null)}
+        orderId={selectedOrderId}
+        role="user"
+        userAvailableActions={[]}
+      />
 
       {/* Warehouse Service Details Modal */}
       {selectedServiceId && (() => {
@@ -1333,5 +1396,3 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
     </ModalProvider>
   );
 }
-
-

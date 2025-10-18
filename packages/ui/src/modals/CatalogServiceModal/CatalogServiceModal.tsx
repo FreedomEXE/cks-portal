@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from 'react';
-import Button from '../../buttons/Button';
-import { ModalRoot } from '../ModalRoot';
+import React, { useState, useMemo } from 'react';
+import BaseViewModal from '../BaseViewModal';
+import ServiceCard from '../../cards/ServiceCard';
+import ServiceQuickActions, { type CertifiedUser } from './components/ServiceQuickActions';
+import ServiceDetails from './components/ServiceDetails';
 
 export type RoleKey = 'manager' | 'contractor' | 'crew' | 'warehouse';
-type Entry = { code: string; name: string };
 
 export interface CatalogService {
   serviceId: string;
@@ -18,163 +19,134 @@ export interface CatalogServiceModalProps {
   isOpen: boolean;
   onClose: () => void;
   service: CatalogService | null;
-  onSave?: (updates: {
-    certifications?: Record<RoleKey, boolean>;
-    visibility?: Record<RoleKey, boolean>;
-    assignments?: { managers: string[]; crew: string[]; warehouses: string[] };
-  }) => void;
-  peopleManagers?: Entry[];
-  peopleCrew?: Entry[];
-  peopleWarehouses?: Entry[];
-  selectedAssignments?: { managers: string[]; crew: string[]; warehouses: string[] };
-  showCertifications?: boolean;
+  // Admin-only props
+  onCertificationChange?: (role: RoleKey, userCode: string, certified: boolean) => void;
+  onEdit?: () => void;
+  onDelete?: () => void;
+  // User lists for certifications (admin only)
+  peopleManagers?: Array<{ code: string; name: string }>;
+  peopleContractors?: Array<{ code: string; name: string }>;
+  peopleCrew?: Array<{ code: string; name: string }>;
+  peopleWarehouses?: Array<{ code: string; name: string }>;
+  // Current certifications (admin only)
+  certifiedManagers?: string[];
+  certifiedContractors?: string[];
+  certifiedCrew?: string[];
+  certifiedWarehouses?: string[];
 }
 
-export default function CatalogServiceModal({ isOpen, onClose, service, onSave, peopleManagers = [], peopleCrew = [], peopleWarehouses = [], selectedAssignments, showCertifications = false }: CatalogServiceModalProps) {
-  const [cert, setCert] = useState<Record<RoleKey, boolean>>({ manager: false, contractor: false, crew: false, warehouse: false });
-  const [vis, setVis] = useState<Record<RoleKey, boolean>>({ manager: true, contractor: true, crew: true, warehouse: true });
-  const [search, setSearch] = useState('');
-  const [mgr, setMgr] = useState<Set<string>>(new Set());
-  const [crw, setCrw] = useState<Set<string>>(new Set());
-  const [whs, setWhs] = useState<Set<string>>(new Set());
+const CatalogServiceModal: React.FC<CatalogServiceModalProps> = ({
+  isOpen,
+  onClose,
+  service,
+  onCertificationChange,
+  onEdit,
+  onDelete,
+  peopleManagers = [],
+  peopleContractors = [],
+  peopleCrew = [],
+  peopleWarehouses = [],
+  certifiedManagers = [],
+  certifiedContractors = [],
+  certifiedCrew = [],
+  certifiedWarehouses = [],
+}) => {
+  // Determine if admin view (has admin callbacks)
+  const isAdminView = Boolean(onCertificationChange || onEdit || onDelete);
 
-  useEffect(() => {
-    if (!isOpen || !service) return;
-    const meta = service.metadata || {};
-    const nextCert: Record<RoleKey, boolean> = {
-      manager: Boolean(meta?.certifications?.manager),
-      contractor: Boolean(meta?.certifications?.contractor),
-      crew: Boolean(meta?.certifications?.crew),
-      warehouse: Boolean(meta?.certifications?.warehouse),
-    };
-    const nextVis: Record<RoleKey, boolean> = {
-      manager: meta?.visibility?.manager !== false,
-      contractor: meta?.visibility?.contractor !== false,
-      crew: meta?.visibility?.crew !== false,
-      warehouse: meta?.visibility?.warehouse !== false,
-    };
-    setCert(nextCert);
-    setVis(nextVis);
-    const sel = selectedAssignments || { managers: [], crew: [], warehouses: [] };
-    setMgr(new Set(sel.managers));
-    setCrw(new Set(sel.crew));
-    setWhs(new Set(sel.warehouses));
-    setSearch('');
-  }, [isOpen, service]);
+  // Tab state
+  const [activeTab, setActiveTab] = useState(isAdminView ? 'quick-actions' : 'details');
 
+  // Build tabs based on role
+  const tabs = isAdminView
+    ? [
+        { id: 'quick-actions', label: 'Quick Actions' },
+        { id: 'details', label: 'Details' },
+      ]
+    : [{ id: 'details', label: 'Details' }];
+
+  // Transform user lists into CertifiedUser[] arrays for Quick Actions
+  const buildCertifiedUsers = (
+    allUsers: Array<{ code: string; name: string }>,
+    certifiedCodes: string[]
+  ): CertifiedUser[] => {
+    const certifiedSet = new Set(certifiedCodes);
+    return allUsers.map((u) => ({
+      code: u.code,
+      name: u.name,
+      isCertified: certifiedSet.has(u.code),
+    }));
+  };
+
+  const managersData = useMemo(
+    () => buildCertifiedUsers(peopleManagers, certifiedManagers),
+    [peopleManagers, certifiedManagers]
+  );
+
+  const contractorsData = useMemo(
+    () => buildCertifiedUsers(peopleContractors, certifiedContractors),
+    [peopleContractors, certifiedContractors]
+  );
+
+  const crewData = useMemo(
+    () => buildCertifiedUsers(peopleCrew, certifiedCrew),
+    [peopleCrew, certifiedCrew]
+  );
+
+  const warehousesData = useMemo(
+    () => buildCertifiedUsers(peopleWarehouses, certifiedWarehouses),
+    [peopleWarehouses, certifiedWarehouses]
+  );
+
+  // Early return AFTER all hooks
   if (!isOpen || !service) return null;
 
-  const toggle = (group: 'cert' | 'vis', key: RoleKey) => {
-    if (group === 'cert') setCert((prev) => ({ ...prev, [key]: !prev[key] }));
-    else setVis((prev) => ({ ...prev, [key]: !prev[key] }));
-  };
+  // ServiceCard for header
+  const card = (
+    <ServiceCard
+      serviceId={service.serviceId}
+      serviceName={service.name || 'Unnamed Service'}
+      category={service.category || undefined}
+      managedBy={service.metadata?.managedBy || 'manager'}
+      status={service.status || 'active'}
+      variant="embedded"
+      tabs={tabs}
+      activeTab={activeTab}
+      onTabChange={setActiveTab}
+    />
+  );
 
-  const handleSave = () => {
-    onSave?.({
-      certifications: cert,
-      visibility: vis,
-      assignments: { managers: Array.from(mgr), crew: Array.from(crw), warehouses: Array.from(whs) },
-    });
-  };
+  const managedBy = service.metadata?.managedBy || 'manager';
+  const category = service.category || '';
 
   return (
-    <ModalRoot isOpen={isOpen} onClose={onClose}>
-      <div style={{ backgroundColor: '#fff', borderRadius: 8, padding: 20, width: 640 }}>
-        <h3 style={{ marginTop: 0 }}>Service Catalog Entry</h3>
-        <div style={{ color: '#475569', marginBottom: 12 }}>Service ID: <strong>{service.serviceId}</strong></div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-          <div>
-            <div style={{ fontSize: 12, color: '#64748b' }}>Name</div>
-            <div style={{ fontWeight: 600 }}>{service.name || 'N/A'}</div>
-          </div>
-          <div>
-            <div style={{ fontSize: 12, color: '#64748b' }}>Category</div>
-            <div style={{ fontWeight: 600 }}>{service.category || 'N/A'}</div>
-          </div>
-          <div>
-            <div style={{ fontSize: 12, color: '#64748b' }}>Status</div>
-            <div style={{ fontWeight: 600, textTransform: 'capitalize' }}>{service.status || 'active'}</div>
-          </div>
-          <div>
-            <div style={{ fontSize: 12, color: '#64748b' }}>Description</div>
-            <div style={{ fontWeight: 600, whiteSpace: 'pre-wrap' }}>{service.description || '—'}</div>
-          </div>
-        </div>
+    <BaseViewModal isOpen={isOpen} onClose={onClose} card={card}>
+      {activeTab === 'quick-actions' && isAdminView && (
+        <ServiceQuickActions
+          managers={managersData}
+          contractors={contractorsData}
+          crew={crewData}
+          warehouses={warehousesData}
+          managedBy={managedBy}
+          category={category}
+          onCertificationChange={onCertificationChange}
+          onEdit={onEdit}
+          onDelete={onDelete}
+        />
+      )}
 
-        {showCertifications && (
-          <div style={{ marginTop: 8, paddingTop: 12, borderTop: '1px solid #e5e7eb' }}>
-            <div style={{ fontWeight: 700, marginBottom: 8 }}>Certifications</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 8 }}>
-              {(['manager','contractor','crew','warehouse'] as RoleKey[]).map((key) => (
-                <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 6, border: '1px solid #e5e7eb', borderRadius: 6 }}>
-                  <input type="checkbox" checked={cert[key]} onChange={() => toggle('cert', key)} />
-                  <span style={{ textTransform: 'capitalize' }}>{key}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-        )}
-
-        <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #e5e7eb' }}>
-          <div style={{ fontWeight: 700, marginBottom: 8 }}>Role Visibility (Catalog)</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 8 }}>
-            {(['manager','contractor','crew','warehouse'] as RoleKey[]).map((key) => (
-              <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 6, border: '1px solid #e5e7eb', borderRadius: 6 }}>
-                <input type="checkbox" checked={vis[key]} onChange={() => toggle('vis', key)} />
-                <span style={{ textTransform: 'capitalize' }}>{key}</span>
-              </label>
-            ))}
-          </div>
-          <div style={{ color: '#64748b', fontSize: 12, marginTop: 6 }}>
-            Toggle which roles should see this service in the catalog.
-          </div>
-        </div>
-
-        <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #e5e7eb' }}>
-          <div style={{ fontWeight: 700, marginBottom: 8 }}>Assign People</div>
-          <input placeholder="Search people by id or name" value={search} onChange={(e) => setSearch(e.target.value)} style={{ width: '100%', padding: 8, border: '1px solid #e5e7eb', borderRadius: 6, marginBottom: 8 }} />
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, maxHeight: 260, overflow: 'hidden' }}>
-            <div style={{ border: '1px solid #e5e7eb', borderRadius: 6, padding: 8, overflow: 'auto' }}>
-              <div style={{ fontWeight: 700, marginBottom: 6 }}>Managers</div>
-              {peopleManagers
-                .filter((e) => { const q = search.trim().toLowerCase(); if (!q) return true; return e.code.toLowerCase().includes(q) || (e.name||'').toLowerCase().includes(q); })
-                .map((e) => (
-                  <label key={e.code} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 4 }}>
-                    <input type="checkbox" checked={mgr.has(e.code)} onChange={() => setMgr((prev) => { const n = new Set(prev); if (n.has(e.code)) n.delete(e.code); else n.add(e.code); return n; })} />
-                    <span>{e.name} ({e.code})</span>
-                  </label>
-                ))}
-            </div>
-            <div style={{ border: '1px solid #e5e7eb', borderRadius: 6, padding: 8, overflow: 'auto' }}>
-              <div style={{ fontWeight: 700, marginBottom: 6 }}>Crew</div>
-              {peopleCrew
-                .filter((e) => { const q = search.trim().toLowerCase(); if (!q) return true; return e.code.toLowerCase().includes(q) || (e.name||'').toLowerCase().includes(q); })
-                .map((e) => (
-                  <label key={e.code} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 4 }}>
-                    <input type="checkbox" checked={crw.has(e.code)} onChange={() => setCrw((prev) => { const n = new Set(prev); if (n.has(e.code)) n.delete(e.code); else n.add(e.code); return n; })} />
-                    <span>{e.name} ({e.code})</span>
-                  </label>
-                ))}
-            </div>
-            <div style={{ border: '1px solid #e5e7eb', borderRadius: 6, padding: 8, overflow: 'auto' }}>
-              <div style={{ fontWeight: 700, marginBottom: 6 }}>Warehouses</div>
-              {peopleWarehouses
-                .filter((e) => { const q = search.trim().toLowerCase(); if (!q) return true; return e.code.toLowerCase().includes(q) || (e.name||'').toLowerCase().includes(q); })
-                .map((e) => (
-                  <label key={e.code} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 4 }}>
-                    <input type="checkbox" checked={whs.has(e.code)} onChange={() => setWhs((prev) => { const n = new Set(prev); if (n.has(e.code)) n.delete(e.code); else n.add(e.code); return n; })} />
-                    <span>{e.name} ({e.code})</span>
-                  </label>
-                ))}
-            </div>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
-          <Button onClick={onClose}>Close</Button>
-          <Button variant="primary" onClick={handleSave}>Save</Button>
-        </div>
-      </div>
-    </ModalRoot>
+      {activeTab === 'details' && (
+        <ServiceDetails
+          serviceId={service.serviceId}
+          serviceName={service.name || 'Unnamed Service'}
+          category={service.category || undefined}
+          status={service.status || 'active'}
+          managedBy={managedBy}
+          description={service.description || undefined}
+        />
+      )}
+    </BaseViewModal>
   );
-}
+};
+
+export default CatalogServiceModal;

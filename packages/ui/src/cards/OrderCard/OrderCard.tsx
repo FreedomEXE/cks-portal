@@ -1,5 +1,10 @@
 import React, { useState } from 'react';
 import styles from './OrderCard.module.css';
+import { formatStatus } from '../../utils/formatters';
+import ApprovalWorkflow from '../../workflows/ApprovalWorkflow';
+import StatusBadge from '../../badges/StatusBadge';
+import TabContainer from '../../navigation/TabContainer';
+import NavigationTab from '../../navigation/NavigationTab';
 
 interface ApprovalStage {
   role: string;
@@ -30,6 +35,11 @@ interface OrderCardProps {
   collapsible?: boolean;
   defaultExpanded?: boolean;
   transformedId?: string;
+  variant?: 'default' | 'embedded';
+  // Optional tabs for embedded variant (modal usage)
+  tabs?: Array<{ id: string; label: string; visible: boolean }>;
+  activeTab?: string;
+  onTabChange?: (tabId: string) => void;
 }
 
 const OrderCard: React.FC<OrderCardProps> = ({
@@ -51,7 +61,11 @@ const OrderCard: React.FC<OrderCardProps> = ({
   showWorkflow = true,
   collapsible = false,
   defaultExpanded = false,
-  transformedId
+  transformedId,
+  variant = 'default',
+  tabs,
+  activeTab,
+  onTabChange
 }) => {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
   const formatDateTime = (value?: string) => {
@@ -223,9 +237,7 @@ const OrderCard: React.FC<OrderCardProps> = ({
             </div>
 
             {/* Status Badge */}
-            <span className={`${styles.statusBadge} ${getStatusColor(status)}`}>
-              {(statusText || status).replace('-', ' ').toUpperCase()}
-            </span>
+            <StatusBadge status={statusText || status} variant="pill" />
           </div>
         </div>
 
@@ -289,33 +301,7 @@ const OrderCard: React.FC<OrderCardProps> = ({
 
             {/* Approval Workflow Section */}
             {showWorkflow && approvalStages.length > 0 && (
-              <div className={styles.approvalWorkflow}>
-                <h4 className={styles.workflowTitle}>Approval Workflow</h4>
-                <div className={styles.workflowStages}>
-                  {approvalStages.map((stage, index) => {
-                    // Pulse the first pending stage OR any accepted stage that's the last stage
-                    const firstPendingIndex = approvalStages.findIndex(s => s.status === 'pending');
-                    const shouldPulse = (index === firstPendingIndex) || (stage.status === 'accepted' && index === approvalStages.length - 1);
-
-                    return (
-                      <div key={index} className={styles.stageContainer}>
-                        <div className={`${styles.stage} ${getStatusColor(stage.status, shouldPulse, index === approvalStages.length - 1)}`}>
-                          <div className={styles.stageRole}>{stage.role}</div>
-                          <div className={styles.stageStatus}>
-                            {(stage as any).label || stage.status.replace('-', ' ')}
-                          </div>
-                          {stage.user && (
-                            <div className={styles.stageUser}>{stage.user}</div>
-                          )}
-                        </div>
-                        {index < approvalStages.length - 1 && (
-                          <div className={styles.stageArrow}>→</div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+              <ApprovalWorkflow stages={approvalStages as any} />
             )}
 
             {details && (
@@ -352,16 +338,14 @@ const OrderCard: React.FC<OrderCardProps> = ({
 
   // Original card layout (for non-collapsible mode)
   return (
-    <div className={styles.orderCard}>
+    <div className={`${styles.orderCard} ${variant === 'embedded' ? styles.embeddedCard : ''}`}>
       <div className={styles.cardHeader}>
         <div className={styles.orderInfo}>
           <span className={styles.orderId}>
             {orderId}
           </span>
         </div>
-        <span className={`${styles.status} ${getStatusColor(status)}`}>
-          {status.replace('-', ' ').toUpperCase()}
-        </span>
+        <StatusBadge status={status} variant="badge" />
       </div>
 
       <div className={styles.cardBody}>
@@ -384,33 +368,7 @@ const OrderCard: React.FC<OrderCardProps> = ({
         </div>
 
         {showWorkflow && approvalStages.length > 0 && (
-          <div className={styles.approvalWorkflow}>
-            <h4 className={styles.workflowTitle}>Approval Workflow</h4>
-            <div className={styles.workflowStages}>
-              {approvalStages.map((stage, index) => {
-                // Pulse the first pending stage OR any accepted stage that's the last stage
-                const firstPendingIndex = approvalStages.findIndex(s => s.status === 'pending');
-                const shouldPulse = (index === firstPendingIndex) || (stage.status === 'accepted' && index === approvalStages.length - 1);
-
-                return (
-                  <div key={index} className={styles.stageContainer}>
-                    <div className={`${styles.stage} ${getStatusColor(stage.status, shouldPulse, index === approvalStages.length - 1)}`}>
-                      <div className={styles.stageRole}>{stage.role}</div>
-                      <div className={styles.stageStatus}>
-                        {(stage as any).label || stage.status.replace('-', ' ')}
-                      </div>
-                      {stage.user && (
-                        <div className={styles.stageUser}>{stage.user}</div>
-                      )}
-                    </div>
-                    {index < approvalStages.length - 1 && (
-                      <div className={styles.stageArrow}>→</div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+          <ApprovalWorkflow stages={approvalStages as any} />
         )}
 
         {details && (
@@ -433,6 +391,24 @@ const OrderCard: React.FC<OrderCardProps> = ({
           </div>
         )}
       </div>
+
+      {/* Optional tabs for embedded variant */}
+      {variant === 'embedded' && tabs && tabs.length > 0 && (
+        <div className={styles.cardTabs}>
+          <TabContainer variant="underline" borderBottom={false} fullWidth={false}>
+            {tabs.filter(t => t.visible).map((tab) => (
+              <NavigationTab
+                key={tab.id}
+                label={tab.label}
+                isActive={activeTab === tab.id}
+                onClick={() => onTabChange?.(tab.id)}
+                variant="default"
+                activeColor="#6b7280"
+              />
+            ))}
+          </TabContainer>
+        </div>
+      )}
     </div>
   );
 };

@@ -21,12 +21,13 @@ export interface OrderActionContext {
     status?: string;
     orderType?: string;
   };
-  state: 'active' | 'archived';
+  state: 'active' | 'archived' | 'deleted';
   role: 'admin' | 'manager' | 'crew' | 'center' | 'contractor' | 'customer' | 'warehouse';
   callbacks: {
     onViewDetails?: () => void;
     onEdit?: () => void;
     onCancel?: () => void;
+    onArchive?: () => void;
     onRestore?: () => void;
     onDelete?: () => void;
     onHardDelete?: () => void;
@@ -51,6 +52,11 @@ export function buildOrderActions(context: OrderActionContext): OrderAction[] {
   const { order, state, callbacks } = context;
   const actions: OrderAction[] = [];
 
+  // Deleted state: read-only; container handles details
+  if (state === 'deleted') {
+    return actions;
+  }
+
   // ARCHIVED ORDER ACTIONS (Admin only)
   if (state === 'archived') {
     // View Order Details
@@ -65,8 +71,8 @@ export function buildOrderActions(context: OrderActionContext): OrderAction[] {
     // Restore Data
     if (callbacks.onRestore) {
       actions.push({
-        label: 'Restore Data',
-        variant: 'primary',
+        label: 'Restore Order',
+        variant: 'secondary',
         onClick: callbacks.onRestore,
       });
     }

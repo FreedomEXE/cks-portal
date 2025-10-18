@@ -66,6 +66,7 @@ export interface Center {
 export interface CrewMember {
   id: string;
   name: string | null;
+  territory?: string | null;
   emergencyContact: string | null;
   email: string | null;
   phone: string | null;
@@ -81,6 +82,7 @@ export interface Warehouse {
   name: string | null;
   managerId: string | null;
   managerName: string | null;
+  territory?: string | null;
   mainContact: string | null;
   warehouseType: string | null;
   address: string | null;
@@ -375,4 +377,3 @@ export const useFeedback = feedbackResource.useResource;
 export const fetchFeedback = feedbackResource.fetchResource;
 export const useActivities = activitiesResource.useResource;
 export const fetchActivities = activitiesResource.fetchResource;
-

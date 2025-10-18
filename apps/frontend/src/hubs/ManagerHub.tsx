@@ -9,6 +9,8 @@ import { useAuth } from '@cks/auth';
 import { EcosystemTree } from '@cks/domain-widgets';
 import { useFormattedActivities } from '../shared/activity/useFormattedActivities';
 import { ActivityFeed } from '../components/ActivityFeed';
+import ActivityModalGateway from '../components/ActivityModalGateway';
+import { OrderActionModal } from '@cks/ui';
 import {
   MemosPreview,
   NewsPreview,
@@ -25,6 +27,7 @@ import {
   DataTable,
   ModalProvider,
   OrderDetailsModal,
+  ServiceDetailsModal,
   ServiceViewModal,
   PageHeader,
   PageWrapper,
@@ -145,9 +148,14 @@ const OVERVIEW_CARDS = [
   { id: 'status', title: 'Account Status', dataKey: 'accountStatus', color: 'green' },
 ];
 
-const MY_SERVICES_COLUMNS = [
+const MY_SERVICES_COLUMNS_BASE = [
   { key: 'serviceId', label: 'SERVICE ID', clickable: true },
   { key: 'serviceName', label: 'SERVICE NAME' },
+  { key: 'category', label: 'CATEGORY' },
+];
+
+const MY_SERVICES_COLUMNS_CERTIFIED = [
+  ...MY_SERVICES_COLUMNS_BASE,
   { key: 'certified', label: 'CERTIFIED' },
   { key: 'certificationDate', label: 'CERTIFICATION DATE' },
   { key: 'expires', label: 'EXPIRES' },
@@ -651,14 +659,32 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
 
   const myServicesData = useMemo(() => {
     const items = catalogData?.items || [];
-    return items.map((service: any) => ({
-      serviceId: service.code ?? 'CAT-SRV',
-      serviceName: service.name ?? 'Service',
-      certified: 'Yes',
-      certificationDate: null,
-      expires: null,
-    }));
-  }, [catalogData]);
+    return items.map((service: any) => {
+      const certifications = service.metadata?.certifications || {};
+      const managerCerts = certifications.manager || [];
+      const isCertified = managerCerts.includes(managerCode);
+
+      return {
+        serviceId: service.code ?? 'CAT-SRV',
+        serviceName: service.name ?? 'Service',
+        category: service.category ?? '-',
+        certified: isCertified ? 'Yes' : 'No',
+        certificationDate: isCertified ? '-' : null,
+        expires: isCertified ? '-' : null,
+        _isCertified: isCertified, // For column logic
+      };
+    });
+  }, [catalogData, managerCode]);
+
+  // Check if any service has the user certified to determine columns
+  const hasAnyCertification = useMemo(
+    () => myServicesData.some((s: any) => s._isCertified),
+    [myServicesData]
+  );
+
+  const myServicesColumns = hasAnyCertification
+    ? MY_SERVICES_COLUMNS_CERTIFIED
+    : MY_SERVICES_COLUMNS_BASE;
 
   const activeServicesData = useMemo(
     () =>
@@ -923,6 +949,7 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
       : 'No recent manager activity';
 
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [actionOrder, setActionOrder] = useState<any | null>(null);
 
   // Use centralized order details hook (transform-first)
   
@@ -1058,6 +1085,8 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
               <ActivityFeed
                 activities={formattedActivities}
                 hub="manager"
+                onOpenActionableOrder={(order) => setActionOrder(order)}
+                onOpenOrderModal={(order) => setSelectedOrderId(order?.orderId || order?.id || null)}
                 isLoading={activitiesLoading}
                 error={activitiesError}
                 onError={(msg) => toast.error(msg)}
@@ -1130,7 +1159,7 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
               >
                 {servicesTab === 'my' && (
                   <DataTable
-                    columns={MY_SERVICES_COLUMNS}
+                    columns={myServicesColumns}
                     data={myServicesData}
                     showSearch={false}
                     externalSearchQuery={servicesSearchQuery}
@@ -1365,8 +1394,39 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
         </div>
       </Scrollbar>
 
+      {/* Actionable order modal (OrderCard with inline buttons) */}
+      {actionOrder && (
+        <OrderActionModal
+          isOpen={!!actionOrder}
+          onClose={() => setActionOrder(null)}
+          order={{
+            orderId: actionOrder.orderId || actionOrder.id,
+            orderType: (actionOrder.orderType || actionOrder.order_type || 'product') as 'service' | 'product',
+            title: actionOrder.title || actionOrder.orderId || actionOrder.id,
+            requestedBy: actionOrder.requestedBy || null,
+            destination: actionOrder.destination || null,
+            requestedDate: actionOrder.requestedDate || actionOrder.orderDate || null,
+            expectedDate: actionOrder.expectedDate || null,
+            serviceStartDate: actionOrder.serviceStartDate || null,
+            deliveryDate: actionOrder.deliveryDate || null,
+            status: actionOrder.status || 'pending',
+            approvalStages: actionOrder.approvalStages || [],
+            availableActions: actionOrder.availableActions || [],
+            transformedId: actionOrder.transformedId || null,
+          }}
+          onAction={handleOrderAction}
+        />
+      )}
+
       {/* Order Details Modal */}
-      <OrderDetailsGateway orderId={selectedOrderId} onClose={() => setSelectedOrderId(null)} />
+      <ActivityModalGateway
+        isOpen={!!selectedOrderId}
+        orderId={selectedOrderId}
+        role="admin"
+        onClose={() => setSelectedOrderId(null)}
+        onEdit={() => {}}
+        onArchive={async () => {}}
+      />
 
       {/* Service Details Modal - for Active Services section */}
       <ServiceDetailsModal

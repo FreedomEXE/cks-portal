@@ -1,0 +1,241 @@
+/* Service Quick Actions - Admin view */
+
+.section {
+  background-color: #f9fafb;
+  border-radius: 6px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.sectionTitle {
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+  margin: 0 0 12px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Filters */
+.filters {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.filterSelect {
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  background: white;
+  cursor: pointer;
+  min-width: 150px;
+}
+
+.filterSelect:focus {
+  outline: none;
+  border-color: #6b7280;
+}
+
+.filterSearch {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.filterSearch:focus {
+  outline: none;
+  border-color: #6b7280;
+}
+
+.filterSearch::placeholder {
+  color: #9ca3af;
+}
+
+/* Scrollable dropdown lists */
+.scrollableList {
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  max-height: 300px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: white;
+}
+
+/* Custom scrollbar styling */
+.scrollableList::-webkit-scrollbar {
+  width: 8px;
+}
+
+.scrollableList::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+.scrollableList::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.scrollableList::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* View-only item (for certified users list) */
+.viewOnlyItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid #f3f4f6;
+  background-color: #f0fdf4;
+}
+
+.viewOnlyItem:last-child {
+  border-bottom: none;
+}
+
+.userItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid #f3f4f6;
+  transition: background-color 0.2s;
+}
+
+.userItem:last-child {
+  border-bottom: none;
+}
+
+.userItem:hover {
+  background-color: #f9fafb;
+}
+
+/* Certified user highlighting */
+.certifiedUser {
+  background-color: #f0fdf4;
+}
+
+.certifiedUser:hover {
+  background-color: #dcfce7;
+}
+
+.userInfo {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  flex: 1;
+}
+
+.userInfo > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.checkmark {
+  color: #10b981;
+  font-weight: bold;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.userName {
+  font-size: 14px;
+  font-weight: 500;
+  color: #111827;
+  display: block;
+}
+
+.userMeta {
+  font-size: 12px;
+  color: #6b7280;
+  display: block;
+}
+
+/* Certification buttons */
+.certButton {
+  padding: 6px 14px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.addButton {
+  background-color: #10b981;
+  color: white;
+}
+
+.addButton:hover {
+  background-color: #059669;
+}
+
+.removeButton {
+  background-color: #ef4444;
+  color: white;
+}
+
+.removeButton:hover {
+  background-color: #dc2626;
+}
+
+.emptyState {
+  padding: 30px 16px;
+  text-align: center;
+  color: #9ca3af;
+  font-size: 14px;
+}
+
+/* Actions section */
+.actionsSection {
+  background-color: #f9fafb;
+  border-radius: 6px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.actionButton {
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.actionButton:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.actionEdit {
+  background-color: #6b7280;
+  color: white;
+}
+
+.actionEdit:hover {
+  background-color: #4b5563;
+}
+
+.actionDelete {
+  background-color: #ef4444;
+  color: white;
+}
+
+.actionDelete:hover {
+  background-color: #dc2626;
+}

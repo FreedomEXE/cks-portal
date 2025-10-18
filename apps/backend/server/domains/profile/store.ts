@@ -142,6 +142,26 @@ async function loadManagerContact(managerId: string | null): Promise<HubRelatedC
   });
 }
 
+// Lightweight helper to read a manager's territory for related profiles
+async function loadManagerTerritory(managerId: string | null): Promise<string | null> {
+  if (!managerId) {
+    return null;
+  }
+  const normalized = normalizeIdentity(managerId);
+  if (!normalized) {
+    return null;
+  }
+  const result = await query<ManagerRow>(
+    `SELECT manager_id, name, email, phone, territory
+     FROM managers
+     WHERE UPPER(manager_id) = $1
+     LIMIT 1`,
+    [normalized],
+  );
+  const row = result.rows[0];
+  return row ? (row as any).territory ?? null : null;
+}
+
 async function loadContractorContact(contractorId: string | null): Promise<HubRelatedContact | null> {
   if (!contractorId) {
     return null;
@@ -401,6 +421,7 @@ async function getCrewProfile(cksCode: string): Promise<HubProfilePayload | null
 
   const centerDetails = await loadCenterDetails(row.assigned_center ?? null);
   const manager = centerDetails ? await loadManagerContact(centerDetails.managerId) : null;
+  const managerTerritory = centerDetails?.managerId ? await loadManagerTerritory(centerDetails.managerId) : null;
   const contractor = centerDetails ? await loadContractorContact(centerDetails.contractorId) : null;
   const customer = centerDetails ? await loadCustomerContact(centerDetails.customerId) : null;
 
@@ -423,6 +444,7 @@ async function getCrewProfile(cksCode: string): Promise<HubProfilePayload | null
       assignedCenter: row.assigned_center ?? null,
       emergencyContact: row.emergency_contact ?? null,
       centerAddress: centerDetails?.address ?? null,
+      territory: managerTerritory ?? null,
     },
   };
 }
@@ -441,7 +463,7 @@ async function getWarehouseProfile(cksCode: string): Promise<HubProfilePayload |
     return null;
   }
 
-  const manager = await loadManagerContact(row.manager_id);
+  // Warehouses do not have managers; keep related fields null
 
   return {
     role: "warehouse",
@@ -454,12 +476,14 @@ async function getWarehouseProfile(cksCode: string): Promise<HubProfilePayload |
     address: row.address ?? null,
     createdAt: toIso(row.created_at),
     updatedAt: toIso(row.updated_at),
-    manager,
+    manager: null,
     metadata: {
       managerId: row.manager_id ?? null,
       warehouseType: row.warehouse_type ?? null,
       capacity: toNumber(row.capacity),
       currentUtilization: toNumber(row.current_utilization),
+      // No territory linkage for warehouses; leave unset unless schema adds it later
+      territory: null,
     },
   };
 }

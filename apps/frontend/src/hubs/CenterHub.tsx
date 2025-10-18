@@ -27,12 +27,13 @@ import {
   type Activity,
   type TreeNode,
 } from '@cks/domain-widgets';
-import { Button, DataTable, ModalProvider, OrderDetailsModal, ServiceViewModal, PageHeader, PageWrapper, Scrollbar, TabSection } from '@cks/ui';
+import { Button, DataTable, ModalProvider, OrderDetailsModal, ServiceViewModal, PageHeader, PageWrapper, Scrollbar, TabSection, OrderActionModal } from '@cks/ui';
 import OrderDetailsGateway from '../components/OrderDetailsGateway';
 import { useAuth } from '@cks/auth';
 import { useSWRConfig } from 'swr';
 import { useFormattedActivities } from '../shared/activity/useFormattedActivities';
 import { ActivityFeed } from '../components/ActivityFeed';
+import ActivityModalGateway from '../components/ActivityModalGateway';
 
 import MyHubSection from '../components/MyHubSection';
 import {
@@ -154,6 +155,7 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
   const [servicesTab, setServicesTab] = useState<'active' | 'history'>('active');
   const [servicesSearchQuery, setServicesSearchQuery] = useState('');
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [actionOrder, setActionOrder] = useState<any | null>(null);
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
   const [fetchedServiceDetails, setFetchedServiceDetails] = useState<any>(null);
   const { code: authCode } = useAuth();
@@ -371,13 +373,15 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
   ], []);
 
   const profileCardData = useMemo(() => ({
-    name: profile?.name ?? '—',
-    centerId: normalizedCode ?? '—',
-    address: profile?.address ?? '—',
-    phone: profile?.phone ?? '—',
-    email: profile?.email ?? '—',
-    customerId: (dashboard as any)?.customerId ?? '—',
-    mainContact: profile?.mainContact ?? '—',
+    name: profile?.name ?? '-',
+    centerId: normalizedCode ?? '-',
+    address: profile?.address ?? '-',
+    phone: profile?.phone ?? '-',
+    email: profile?.email ?? '-',
+    // Website: pass null when missing so ProfileTab hides the row
+    website: getMetadataString(profile?.metadata ?? null, 'website') ?? null,
+    customerId: (dashboard as any)?.customerId ?? '-',
+    mainContact: profile?.mainContact ?? '-',
     startDate: formatDisplayDate(profile?.createdAt ?? null),
   }), [profile, normalizedCode, dashboard]);
 
@@ -438,6 +442,9 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
               <ActivityFeed
                 activities={activities}
                 hub="center"
+                onOpenActionableOrder={(order) => setActionOrder(order)}
+                onOpenOrderModal={(order) => setSelectedOrderId(order?.orderId || order?.id || null)}
+                onOpenServiceModal={setSelectedServiceId}
                 isLoading={activitiesLoading}
                 error={activitiesError}
                 onError={(msg) => toast.error(msg)}
@@ -741,7 +748,65 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
         </div>
       </Scrollbar>
 
-      <OrderDetailsGateway orderId={selectedOrderId} onClose={() => setSelectedOrderId(null)} />
+      {/* Actionable order modal (OrderCard with inline buttons) */}
+      {actionOrder && (
+        <OrderActionModal
+          isOpen={!!actionOrder}
+          onClose={() => setActionOrder(null)}
+          order={{
+            orderId: actionOrder.orderId || actionOrder.id,
+            orderType: (actionOrder.orderType || actionOrder.order_type || 'product') as 'service' | 'product',
+            title: actionOrder.title || actionOrder.orderId || actionOrder.id,
+            requestedBy: actionOrder.requestedBy || null,
+            destination: actionOrder.destination || null,
+            requestedDate: actionOrder.requestedDate || actionOrder.orderDate || null,
+            expectedDate: actionOrder.expectedDate || null,
+            serviceStartDate: actionOrder.serviceStartDate || null,
+            deliveryDate: actionOrder.deliveryDate || null,
+            status: actionOrder.status || 'pending',
+            approvalStages: actionOrder.approvalStages || [],
+            availableActions: actionOrder.availableActions || [],
+            transformedId: actionOrder.transformedId || null,
+          }}
+          onAction={async (orderId, action) => {
+            try {
+              if (action === 'Accept') {
+                await applyHubOrderAction(orderId, { action: 'accept' });
+                mutate(`/hub/orders/${normalizedCode}`);
+                return;
+              }
+              if (action === 'Decline' || action === 'Reject') {
+                const reason = window.prompt('Please provide a short reason')?.trim() || '';
+                if (!reason) { alert('A reason is required.'); return; }
+                await applyHubOrderAction(orderId, { action: 'reject', notes: reason });
+                mutate(`/hub/orders/${normalizedCode}`);
+                return;
+              }
+              if (action === 'Cancel') {
+                const confirmed = window.confirm('Are you sure you want to cancel this order?');
+                if (!confirmed) return;
+                const notes = window.prompt('Optional: provide a short reason')?.trim() || null;
+                await applyHubOrderAction(orderId, { action: 'cancel', ...(notes ? { notes } : {}) });
+                mutate(`/hub/orders/${normalizedCode}`);
+                return;
+              }
+              setSelectedOrderId(orderId);
+            } catch (err) {
+              console.error('[center] failed to process action', err);
+              alert('Failed to process action. Please try again.');
+            }
+          }}
+        />
+      )}
+
+      <ActivityModalGateway
+        isOpen={!!selectedOrderId}
+        orderId={selectedOrderId}
+        role="admin"
+        onClose={() => setSelectedOrderId(null)}
+        onEdit={() => {}}
+        onArchive={async () => {}}
+      />
 
       {/* Service View Modal */}
       {(() => {

@@ -1,0 +1,64 @@
+/* Actions Section - Styled container matching ActivityModal */
+.actionsSection {
+  background-color: #f9fafb;
+  border-radius: 6px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.sectionTitle {
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+  margin: 0 0 12px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.actionButton {
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.actionButton:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.actionApprove {
+  background-color: #10b981;
+  color: white;
+}
+
+.actionApprove:hover {
+  background-color: #059669;
+}
+
+.actionReject {
+  background-color: #ef4444;
+  color: white;
+}
+
+.actionReject:hover {
+  background-color: #dc2626;
+}
+
+.actionDefault {
+  background-color: #6b7280;
+  color: white;
+}
+
+.actionDefault:hover {
+  background-color: #4b5563;
+}

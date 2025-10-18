@@ -114,6 +114,24 @@
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
 }
 
+/* Embedded (compact) variant for use inside other modals */
+.embeddedCard {
+  box-shadow: none;
+  border: 1px solid #e5e7eb;
+  padding: 12px;
+  margin-bottom: 8px;
+}
+
+.embeddedCard:hover {
+  box-shadow: none;
+}
+
+.embeddedCard .cardHeader {
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #eef2f7;
+}
+
 .cardHeader {
   display: flex;
   justify-content: space-between;
@@ -424,6 +442,15 @@
 
 .actionDefault:hover {
   background-color: #4b5563;
+}
+
+/* Tabs nested inside card for embedded variant */
+.cardTabs {
+  padding: 8px 12px;
+  border-top: 1px solid #e5e7eb;
+  margin-top: 12px;
+  display: flex;
+  gap: 8px;
 }
 
 @media (max-width: 768px) {

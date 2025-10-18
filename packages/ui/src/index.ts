@@ -26,13 +26,22 @@ export * from './cards/OverviewCard';
 export { default as OverviewCard } from './cards/OverviewCard';
 
 export { default as OrderCard } from './cards/OrderCard';
-export type { ApprovalStage, OrderCardProps } from './cards/OrderCard';
+export type { OrderCardProps } from './cards/OrderCard';
+
+export { default as UserCard } from './cards/UserCard';
+export type { UserCardProps, UserAction } from './cards/UserCard';
+
+export { default as ServiceCard } from './cards/ServiceCard';
+export type { ServiceCardProps } from './cards/ServiceCard';
 
 export * from './Scrollbar';
 export { default as Scrollbar } from './Scrollbar';
 
 export * from './modals/ActionModal';
 export { default as ActionModal } from './modals/ActionModal';
+
+export { OrderActionModal } from './modals/OrderActionModal/OrderActionModal';
+export type { OrderActionModalProps } from './modals/OrderActionModal/OrderActionModal';
 
 export { default as OrderDetailsModal } from './modals/OrderDetailsModal';
 
@@ -64,6 +73,12 @@ export { default as ProductOrderModal } from './modals/ProductOrderModal/Product
 export * from './modals/ServiceOrderModal/ServiceOrderModal';
 export { default as ServiceOrderModal } from './modals/ServiceOrderModal/ServiceOrderModal';
 
+export { default as UserModal } from './modals/UserModal';
+export type { UserModalProps, User } from './modals/UserModal';
+
+export * from './modals/BaseViewModal';
+export { default as BaseViewModal } from './modals/BaseViewModal';
+
 export * from './modals/ServiceModal';
 export { default as ServiceModal } from './modals/ServiceModal';
 
@@ -77,3 +92,19 @@ export { default as ModalRoot } from './modals/ModalRoot';
 
 export * from './banners/DeletedBanner';
 export { DeletedBanner } from './banners/DeletedBanner';
+
+export * from './banners/ArchivedBanner';
+export { ArchivedBanner } from './banners/ArchivedBanner';
+
+// ActivityModal (progressive disclosure wrapper)
+export { default as ActivityModal } from './modals/ActivityModal/ActivityModal';
+export type { ActivityModalProps, ActivityAction } from './modals/ActivityModal/ActivityModal';
+export * from './utils/formatters';
+
+// Workflows
+export { default as ApprovalWorkflow } from './workflows/ApprovalWorkflow';
+export type { ApprovalWorkflowProps, ApprovalStage } from './workflows/ApprovalWorkflow';
+
+// Badges
+export { default as StatusBadge } from './badges/StatusBadge';
+export type { StatusBadgeProps } from './badges/StatusBadge';

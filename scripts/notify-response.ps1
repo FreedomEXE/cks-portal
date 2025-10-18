@@ -23,8 +23,8 @@ Write-Host "[Speaking] $fullMessage" -ForegroundColor Green
 $tempAudio = [System.IO.Path]::GetTempFileName() -replace '\.tmp$', '.mp3'
 
 try {
-    # Generate speech with edge-tts
-    python -m edge_tts --voice $Voice --text $fullMessage --write-media $tempAudio 2>&1 | Out-Null
+    # Generate speech with edge-tts (using SSL-bypass script)
+    python "scripts/edge-tts-fix.py" $Voice $fullMessage $tempAudio 2>&1 | Out-Null
 
     if (Test-Path $tempAudio) {
         # Play audio (Windows Media Player)

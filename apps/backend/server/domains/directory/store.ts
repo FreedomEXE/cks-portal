@@ -120,6 +120,7 @@ type WarehouseRow = {
   name: string | null;
   manager_id: string | null;
   manager: string | null;
+  manager_territory?: string | null;
   warehouse_type: string | null;
   main_contact: string | null;
   address: string | null;
@@ -384,7 +385,20 @@ async function listCenters(limit = DEFAULT_LIMIT): Promise<CenterDirectoryEntry[
 
 async function listCrew(limit = DEFAULT_LIMIT): Promise<CrewDirectoryEntry[]> {
   try {
-    const result = await query<CrewRow>('SELECT crew_id, name, emergency_contact, email, phone, address, assigned_center, status, created_at, updated_at, archived_at FROM crew WHERE archived_at IS NULL ORDER BY crew_id LIMIT $1', [limit]);
+    const result = await query<
+      CrewRow & { manager_territory: string | null }
+    >(
+      `SELECT c.crew_id, c.name, c.emergency_contact, c.email, c.phone, c.address, c.assigned_center, c.status,
+              c.created_at, c.updated_at, c.archived_at,
+              m.territory AS manager_territory
+       FROM crew c
+       LEFT JOIN centers ce ON UPPER(ce.center_id) = UPPER(c.assigned_center)
+       LEFT JOIN managers m ON UPPER(m.manager_id) = UPPER(ce.cks_manager)
+       WHERE c.archived_at IS NULL
+       ORDER BY c.crew_id
+       LIMIT $1`,
+      [limit]
+    );
     return result.rows.map((row) => ({
       id: formatPrefixedId(row.crew_id, 'CRW'),
       name: toNullableString(row.name),
@@ -393,6 +407,7 @@ async function listCrew(limit = DEFAULT_LIMIT): Promise<CrewDirectoryEntry[]> {
       phone: toNullableString(row.phone),
       address: toNullableString(row.address),
       assignedCenter: toNullableString(row.assigned_center),
+      territory: toNullableString((row as any).manager_territory ?? null),
       status: toNullableString(row.status),
       createdAt: toIso(row.created_at),
       updatedAt: toIso(row.updated_at),

@@ -1,250 +1,41 @@
-# Modal Consolidation Refactor Plan
+import React from 'react';
+import { ProductOrderModal, ServiceOrderModal } from '@cks/ui';
+import { useOrderDetails } from '../hooks/useOrderDetails';
 
-## Problem Statement
-
-**Symptom**: Simple changes to activity/modal functionality are difficult and don't work consistently across the codebase.
-
-**Root Cause**: Multiple implementations of the same UI patterns with inconsistent data structures and scattered business logic.
-
----
-
-## Current Issues (Evidence)
-
-### Issue 1: Three Different Views for Same Order
-
-**Same order (CRW-006-PO-107) displays differently depending on where it's opened:**
-
-1. **From Activity Feed** (Incomplete):
-   - ❌ No order ID in header (shows "Product Order Details" with no ID)
-   - ❌ No requestor details (address, phone, email show "—")
-   - ❌ No product items table
-   - ❌ No entity names (just codes like "CRW-006")
-
-2. **From Admin Directory** (More Complete):
-   - ✅ Order ID in header
-   - ✅ Requestor details present
-   - ✅ Product items table shown
-   - ❌ Still no entity names (just "CRW-006" not "CRW-006 - Wario")
-
-3. **From Other User Hubs** (Most Complete):
-   - ✅ Order ID in header
-   - ✅ Requestor details present
-   - ✅ Product items table shown
-   - ✅ Entity names enriched ("CRW-006 - Wario", "CEN-010 - Downtown")
-
-**Why**: Each code path prepares order data differently with different enrichment logic.
-
----
-
-### Issue 2: Two Different Archived Order Modals
-
-**Same archived order shows different UX depending on source:**
-
-1. **From Archive Section** (`ArchiveSection.tsx` lines 461-549):
-   ```
-   Archived Order
-   ID: CEN-010-PO-106
-   Name: CEN-010-PO-106
-   Archived by: ADMIN
-   Archived on: Oct 15, 2025, 12:40 AM
-   Reason: Manual archive
-   Scheduled for deletion: Nov 13, 2025, 08:40 PM
-
-   [Custom styled buttons - NOT using Button component]
-   📄 View Order Details
-   ✓ Restore to Unassigned
-   🔗 View Relationships
-   ⚠️ Permanently Delete
-   Cancel
-   ```
-
-2. **From Activity Feed** (Uses `ActionModal` component):
-   ```
-   Archived Order
-
-   [Uses Button component]
-   📄 View Order Details
-   ✓ Restore to Unassigned
-   🔗 View Relationships
-   ⚠️ Permanently Delete
-   Cancel
-   ```
-   - ❌ No archive metadata (Archived by, Archived on, Reason, Scheduled deletion)
-   - ✅ Uses proper Button component
-
-**Why**: Two completely separate modal implementations for the same entity state.
-
----
-
-### Issue 3: Scattered Data Enrichment Logic
-
-**Order data enrichment happens in multiple places:**
-
-1. **AdminHub.tsx** (lines 248-274, 350-430, 1893-2065):
-   - Fetches requestor profile with `useHubProfile`
-   - Fetches destination profile with `useHubProfile`
-   - Hydrates missing order fields from cache
-   - Fetches full order if items missing
-   - Massive transformation logic (~170 lines)
-
-2. **handleOrderActions** (lines 1342-1386):
-   - Different enrichment path for activity clicks
-   - Fetches full order if items missing
-   - Different data structure preparation
-
-3. **Each Hub File** has similar logic duplicated:
-   - ManagerHub.tsx
-   - CenterHub.tsx
-   - ContractorHub.tsx
-   - CustomerHub.tsx
-   - CrewHub.tsx
-   - WarehouseHub.tsx
-
-**Why**: No centralized data preparation layer, every hub reinvents the wheel.
-
----
-
-## Component Inventory
-
-### Order Detail Modals (packages/ui)
-1. `OrderDetailsModal.tsx` - Generic order details
-2. `ProductOrderModal.tsx` - Product-specific order details
-3. `ServiceOrderModal.tsx` - Service-specific order details
-
-**All three** expect same props structure:
-```typescript
-{
-  order: {
-    orderId: string;
-    title: string | null;
-    requestedBy: string | null;
-    destination: string | null;
-    status: string | null;
-    items?: OrderLineItem[];
-    isDeleted?: boolean;
-    deletedAt?: string;
-    deletedBy?: string;
-  };
-  requestorInfo?: {
-    name: string | null;     // Should include entity name like "CRW-006 - Wario"
-    address: string | null;
-    phone: string | null;
-    email: string | null;
-  };
-  destinationInfo?: {
-    name: string | null;     // Should include entity name like "CEN-010 - Downtown"
-    address: string | null;
-    phone: string | null;
-    email: string | null;
-  };
-  availability?: { ... };
-  cancellationReason?: string | null;
-  ...
+interface Props {
+  orderId: string | null;
+  onClose: () => void;
 }
-```
 
-**Problem**: The `requestorInfo.name` and `destinationInfo.name` are inconsistently enriched:
-- Activity feed path: Missing enrichment
-- Directory path (admin): Partial enrichment
-- Directory path (other users): Full enrichment
+export function OrderDetailsGateway({ orderId, onClose }: Props) {
+  const orderDetails = useOrderDetails({ orderId });
 
----
+  if (!orderId || !orderDetails.order) return null;
 
-### Action Modals
+  const isService = orderDetails.order.orderType === 'service';
+  const commonProps = {
+    isOpen: true,
+    onClose,
+    order: orderDetails.order,
+    availability: orderDetails.availability,
+    cancellationReason: orderDetails.cancellationInfo.cancellationReason,
+    cancelledBy: orderDetails.cancellationInfo.cancelledBy,
+    cancelledAt: orderDetails.cancellationInfo.cancelledAt,
+    rejectionReason: orderDetails.rejectionReason,
+    requestorInfo: orderDetails.requestorInfo,
+    destinationInfo: orderDetails.destinationInfo,
+    rejectedBy: orderDetails.rejectedBy,
+    rejectedAt: orderDetails.rejectedAt,
+    archiveMetadata: orderDetails.archiveMetadata,
+  } as const;
 
-1. **ActionModal** (`packages/ui/src/modals/ActionModal/ActionModal.tsx`):
-   - Generic, reusable
-   - Uses Button component
-   - Accepts `actions` array
-   - NO archive metadata display
+  return isService ? (
+    <ServiceOrderModal {...commonProps} />
+  ) : (
+    <ProductOrderModal {...commonProps} />
+  );
+}
 
-2. **Custom Archive Modal** (`packages/domain-widgets/src/admin/ArchiveSection.tsx`):
-   - Inline styled buttons (not using Button component)
-   - Shows archive metadata
-   - NOT reusable
-   - Duplicates ActionModal functionality
+export default OrderDetailsGateway;
 
----
 
-## Architecture Problems
-
-### 1. Hub Files Too Heavy
-
-All 7 hub files contain massive amounts of duplicated modal enrichment logic:
-
-| Hub | Lines | Modal Logic Pattern | Enrichment Source |
-|-----|-------|-------------------|-------------------|
-| **AdminHub.tsx** | 2,148 | `commonOrder` + `useHubProfile` hooks + hydration cache | Fetches requestor/destination profiles separately + cache fallback |
-| **ManagerHub.tsx** | 1,612 | `commonOrder` + metadata extraction | Gets enrichment from `metadata.contacts` directly |
-| **WarehouseHub.tsx** | 1,437 | `commonOrder` + metadata extraction | Gets enrichment from `metadata.contacts` directly |
-| **ContractorHub.tsx** | 1,106 | `commonOrder` + metadata extraction | Gets enrichment from `metadata.contacts` directly |
-| **CrewHub.tsx** | 971 | `commonOrder` + metadata extraction | Gets enrichment from `metadata.contacts` directly |
-| **CustomerHub.tsx** | 917 | `commonOrder` + metadata extraction | Gets enrichment from `metadata.contacts` directly |
-| **CenterHub.tsx** | 908 | `commonOrder` + metadata extraction | Gets enrichment from `metadata.contacts` directly |
-
-**All hubs contain**:
-- ~80-120 lines of `commonOrder`/`commonRequestorInfo`/`commonDestinationInfo` transformation logic
-- Identical modal rendering code (~100 lines)
-- Same pattern repeated 7 times
-
-**AdminHub is unique** with:
-- Additional ~200 lines for `useHubProfile` fetching
-- ~100 lines for hydration/caching logic
-- ~400 total lines of enrichment (vs ~100 in other hubs)
-
-**Total**: ~1,000+ lines of duplicated modal logic across all hubs
-
-**Result**: Hard to change, easy to introduce bugs, not maintainable.
-
----
-
-### 2. No Centralized Data Layer
-
-**Current flow**:
-```
-Activity Click → handleOrderActions (hub) → Fetch & enrich data → Set modal state → Open modal
-Directory Click → Different enrichment logic → Set modal state → Open modal
-Archive Click → Yet another enrichment logic → Set modal state → Open modal
-```
-
-**Should be**:
-```
-Any Click → useOrderDetails(orderId) → Centralized fetch & enrich → Modal receives consistent data
-```
-
----
-
-### 3. Modals Are Data-Dumb But Require Smart Data
-
-**Modals expect**:
-- Enriched entity names ("CRW-006 - Wario" not just "CRW-006")
-- Complete contact info
-- Full order with items
-- Archive metadata (when applicable)
-
-**But**:
-- Each caller prepares this data differently
-- No contract for what "complete data" means
-- Easy to miss enrichment steps
-
----
-
-## Proposed Solution
-
-### Phase 1: Create Centralized Data Enrichment Hook
-
-**New file**: `apps/frontend/src/hooks/useOrderDetails.ts`
-
-```typescript
-export function useOrderDetails(orderId: string | null) {
-  // Centralized logic to:
-  // 1. Fetch full order with items
-  // 2. Fetch entity state (active/archived/deleted)
-  // 3. Fetch requestor profile
-  // 4. Fetch destination profile
-  // 5. Enrich entity names ("CRW-006" → "CRW-006 - Wario")
-  // 6. Extract metadata (availability, cancellation, etc.)
-  // 7. Return consistent structure ready for modals
-
-  return {
-    order: enrichedOrder,

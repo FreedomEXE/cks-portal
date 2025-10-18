@@ -1,0 +1,119 @@
+/* Approval Workflow Container */
+.workflowContainer {
+  background-color: #f9fafb;
+  border-radius: 6px;
+  padding: 16px;
+}
+
+.workflowTitle {
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+  margin: 0 0 12px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.workflowStages {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px 0;
+}
+
+.stageContainer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stage {
+  min-width: 140px;
+  padding: 12px 16px;
+  border-radius: 6px;
+  text-align: center;
+  background: white;
+  border: 2px solid;
+}
+
+.stageGreen {
+  border-color: #10b981;
+  background-color: #f0fdf4;
+}
+
+.stageYellow {
+  border-color: #f59e0b;
+  background-color: #fffbeb;
+}
+
+.stageRed {
+  border-color: #ef4444;
+  background-color: #fef2f2;
+}
+
+.stageBlue {
+  border-color: #3b82f6;
+  background-color: #eff6ff;
+}
+
+.stageGray {
+  border-color: #d1d5db;
+  background-color: #f9fafb;
+}
+
+.pulsingStage {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  position: relative;
+  min-width: 100px !important;
+  padding: 8px 12px !important;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.7);
+  }
+  50% {
+    opacity: 0.9;
+    box-shadow: 0 0 0 8px rgba(251, 191, 36, 0);
+  }
+}
+
+.stageRole {
+  font-size: 12px;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 2px;
+}
+
+.stageStatus {
+  font-size: 11px;
+  color: #6b7280;
+  text-transform: capitalize;
+}
+
+.stageUser {
+  font-size: 11px;
+  color: #4b5563;
+  margin-top: 2px;
+  font-style: italic;
+}
+
+.stageArrow {
+  color: #9ca3af;
+  font-size: 20px;
+  line-height: 1;
+}
+
+@media (max-width: 768px) {
+  .workflowStages {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .stageArrow {
+    transform: rotate(90deg);
+    margin: 4px 0;
+  }
+}

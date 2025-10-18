@@ -27,13 +27,14 @@ import {
   type Activity,
   type TreeNode,
 } from '@cks/domain-widgets';
-import { Button, DataTable, ModalProvider, OrderDetailsModal, ServiceViewModal, PageHeader, PageWrapper, Scrollbar, TabSection } from '@cks/ui';
+import { Button, DataTable, ModalProvider, OrderDetailsModal, ServiceViewModal, PageHeader, PageWrapper, Scrollbar, TabSection, OrderActionModal } from '@cks/ui';
 import OrderDetailsGateway from '../components/OrderDetailsGateway';
 import { useSWRConfig } from 'swr';
 import { createReport as apiCreateReport, createFeedback as apiCreateFeedback, acknowledgeItem as apiAcknowledgeItem, resolveReport as apiResolveReport, fetchServicesForReports, fetchProceduresForReports, fetchOrdersForReports } from '../shared/api/hub';
 import { useAuth } from '@cks/auth';
 import { useFormattedActivities } from '../shared/activity/useFormattedActivities';
 import { ActivityFeed } from '../components/ActivityFeed';
+import ActivityModalGateway from '../components/ActivityModalGateway';
 
 import MyHubSection from '../components/MyHubSection';
 import {
@@ -195,6 +196,7 @@ export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHu
   const [servicesTab, setServicesTab] = useState<'my' | 'active' | 'history'>('my');
   const [servicesSearchQuery, setServicesSearchQuery] = useState('');
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [actionOrder, setActionOrder] = useState<any | null>(null);
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
   const [fetchedServiceDetails, setFetchedServiceDetails] = useState<any>(null);
   const { code: authCode } = useAuth();
@@ -468,14 +470,49 @@ export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHu
 
   // Catalog-backed "My Services" list (MVP): show all catalog services to contractors
   const { data: catalogData } = useCatalogItems({ type: 'service', pageSize: 500 });
+
+  // Column definitions for My Services
+  const MY_SERVICES_COLUMNS_BASE = [
+    { key: 'serviceId', label: 'SERVICE ID', clickable: true },
+    { key: 'serviceName', label: 'SERVICE NAME' },
+    { key: 'category', label: 'CATEGORY' },
+  ];
+
+  const MY_SERVICES_COLUMNS_CERTIFIED = [
+    ...MY_SERVICES_COLUMNS_BASE,
+    { key: 'certified', label: 'CERTIFIED' },
+    { key: 'certificationDate', label: 'CERTIFICATION DATE' },
+    { key: 'expires', label: 'EXPIRES' },
+  ];
+
   const myCatalogServices = useMemo(() => {
     const items = catalogData?.items || [];
-    return items.map((svc: any) => ({
-      serviceId: svc.code ?? 'CAT-SRV',
-      serviceName: svc.name ?? 'Service',
-      category: (svc.tags && svc.tags[0]) || null,
-    }));
-  }, [catalogData]);
+    return items.map((svc: any) => {
+      const certifications = svc.metadata?.certifications || {};
+      const contractorCerts = certifications.contractor || [];
+      const isCertified = contractorCerts.includes(contractorCode);
+
+      return {
+        serviceId: svc.code ?? 'CAT-SRV',
+        serviceName: svc.name ?? 'Service',
+        category: (svc.tags && svc.tags[0]) || null,
+        certified: isCertified ? 'Yes' : 'No',
+        certificationDate: isCertified ? '-' : null,
+        expires: isCertified ? '-' : null,
+        _isCertified: isCertified,
+      };
+    });
+  }, [catalogData, contractorCode]);
+
+  // Check if any service has the user certified to determine columns
+  const hasAnyCertification = useMemo(
+    () => myCatalogServices.some((s: any) => s._isCertified),
+    [myCatalogServices]
+  );
+
+  const myServicesColumns = hasAnyCertification
+    ? MY_SERVICES_COLUMNS_CERTIFIED
+    : MY_SERVICES_COLUMNS_BASE;
 
   const tabs = useMemo(() => [
     { id: 'dashboard', label: 'Dashboard', path: '/contractor/dashboard' },
@@ -533,7 +570,8 @@ export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHu
     address: profile?.address ?? EMPTY_VALUE,
     phone: profile?.phone ?? EMPTY_VALUE,
     email: profile?.email ?? EMPTY_VALUE,
-    website: getMetadataString(profile?.metadata ?? null, 'website') ?? EMPTY_VALUE,
+    // Website: pass null when missing so ProfileTab hides the row
+    website: getMetadataString(profile?.metadata ?? null, 'website') ?? null,
     mainContact: profile?.mainContact ?? managerReference?.name ?? EMPTY_VALUE,
     startDate: profile?.createdAt ? formatDisplayDate(profile.createdAt) : null,
   }), [profile, contractorCode, managerReference]);
@@ -597,6 +635,9 @@ export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHu
               <ActivityFeed
                 activities={formattedActivities}
                 hub="contractor"
+                onOpenActionableOrder={(order) => setActionOrder(order)}
+                onOpenOrderModal={(order) => setSelectedOrderId(order?.orderId || order?.id || null)}
+                onOpenServiceModal={setSelectedServiceId}
                 isLoading={activitiesLoading}
                 error={activitiesError}
                 onError={(msg) => toast.error(msg)}
@@ -683,11 +724,7 @@ export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHu
               >
                 {servicesTab === 'my' && (
                   <DataTable
-                    columns={[
-                      { key: 'serviceId', label: 'SERVICE ID', clickable: true },
-                      { key: 'serviceName', label: 'SERVICE NAME' },
-                      { key: 'category', label: 'CATEGORY' },
-                    ]}
+                    columns={myServicesColumns}
                     data={myCatalogServices.filter((row) => {
                       if (!servicesSearchQuery) {
                         return true;
@@ -931,7 +968,64 @@ export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHu
         </div>
       </Scrollbar>
 
-      <OrderDetailsGateway orderId={selectedOrderId} onClose={() => setSelectedOrderId(null)} />
+      {/* Actionable order modal (OrderCard with inline buttons) */}
+      {actionOrder && (
+        <OrderActionModal
+          isOpen={!!actionOrder}
+          onClose={() => setActionOrder(null)}
+          order={{
+            orderId: actionOrder.orderId || actionOrder.id,
+            orderType: (actionOrder.orderType || actionOrder.order_type || 'product') as 'service' | 'product',
+            title: actionOrder.title || actionOrder.orderId || actionOrder.id,
+            requestedBy: actionOrder.requestedBy || null,
+            destination: actionOrder.destination || null,
+            requestedDate: actionOrder.requestedDate || actionOrder.orderDate || null,
+            expectedDate: actionOrder.expectedDate || null,
+            serviceStartDate: actionOrder.serviceStartDate || null,
+            deliveryDate: actionOrder.deliveryDate || null,
+            status: actionOrder.status || 'pending',
+            approvalStages: actionOrder.approvalStages || [],
+            availableActions: actionOrder.availableActions || [],
+            transformedId: actionOrder.transformedId || null,
+          }}
+          onAction={async (orderId, action) => {
+            try {
+              if (action === 'Accept') {
+                await applyHubOrderAction(orderId, { action: 'accept' });
+                mutate(`/hub/orders/${normalizedCode}`);
+                return;
+              }
+              if (action === 'Decline' || action === 'Reject') {
+                const reason = window.prompt('Please provide a short reason')?.trim() || '';
+                if (!reason) { alert('A reason is required.'); return; }
+                await applyHubOrderAction(orderId, { action: 'reject', notes: reason });
+                mutate(`/hub/orders/${normalizedCode}`);
+                return;
+              }
+              if (action === 'Cancel') {
+                const confirmed = window.confirm('Are you sure you want to cancel this order?');
+                if (!confirmed) return;
+                const notes = window.prompt('Optional: provide a short reason')?.trim() || null;
+                await applyHubOrderAction(orderId, { action: 'cancel', ...(notes ? { notes } : {}) });
+                mutate(`/hub/orders/${normalizedCode}`);
+                return;
+              }
+              setSelectedOrderId(orderId);
+            } catch (err) {
+              console.error('[contractor] failed to process action', err);
+              alert('Failed to process action. Please try again.');
+            }
+          }}
+        />
+      )}
+
+      <ActivityModalGateway
+        isOpen={!!selectedOrderId}
+        onClose={() => setSelectedOrderId(null)}
+        orderId={selectedOrderId}
+        role="user"
+        userAvailableActions={[]}
+      />
 
       {/* Service View Modal */}
       {(() => {
