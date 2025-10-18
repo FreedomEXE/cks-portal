@@ -17,7 +17,12 @@ export default defineConfig(({ mode }) => ({
     },
     outDir: 'dist',
     rollupOptions: {
-      external: ['react', 'react-dom'],
+      external: [
+        'react',
+        'react-dom',
+        'react/jsx-runtime',
+        'react/jsx-dev-runtime',
+      ],
       output: {
         format: 'es',
         preserveModules: true,

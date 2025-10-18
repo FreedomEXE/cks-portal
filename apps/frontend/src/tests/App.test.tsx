@@ -3,21 +3,20 @@ import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { renderToString } from 'react-dom/server';
 import { MemoryRouter } from 'react-router-dom';
 
-const mockUseAuth = vi.fn();
-
-vi.mock('@cks/auth/hooks/useAuth', () => ({
-  useAuth: mockUseAuth,
+vi.mock('@cks/auth', () => ({
+  useAuth: vi.fn(),
+  Login: () => <div>login page</div>,
+  RoleGuard: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
 vi.mock('../hubs/AdminHub', () => ({
   default: () => <div>admin hub view</div>,
 }));
 
-vi.mock('@cks/auth/pages/Login', () => ({
-  default: () => <div>login page</div>,
-}));
-
 import { AuthenticatedApp, UnauthenticatedApp } from '../App';
+import { useAuth } from '@cks/auth';
+
+const mockUseAuth = useAuth as ReturnType<typeof vi.fn>;
 
 describe('App routing', () => {
   beforeEach(() => {
