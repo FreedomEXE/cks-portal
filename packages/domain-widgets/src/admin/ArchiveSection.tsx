@@ -91,7 +91,8 @@ function formatDate(dateString?: string): string {
 
 export default function ArchiveSection({
   archiveAPI,
-  onViewOrderDetails
+  onViewOrderDetails,
+  onViewServiceDetails,
 }: ArchiveSectionProps) {
   console.log('[ArchiveSection] Component rendering with archiveAPI:', !!archiveAPI);
   console.log('[ArchiveSection] archiveAPI methods:', archiveAPI ? Object.getOwnPropertyNames(Object.getPrototypeOf(archiveAPI)) : 'No API');
