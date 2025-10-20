@@ -28,13 +28,15 @@ import {
   type TreeNode,
 } from '@cks/domain-widgets';
 import { centerOverviewCards } from '@cks/domain-widgets';
-import { Button, DataTable, ModalProvider, OrderDetailsModal, ServiceViewModal, PageHeader, PageWrapper, Scrollbar, TabSection, OrderActionModal } from '@cks/ui';
+import { Button, DataTable, ModalProvider, OrderDetailsModal, ServiceViewModal, ReportModal, PageHeader, PageWrapper, Scrollbar, TabSection, OrderActionModal } from '@cks/ui';
 import OrderDetailsGateway from '../components/OrderDetailsGateway';
 import { useAuth } from '@cks/auth';
 import { useSWRConfig } from 'swr';
 import { useFormattedActivities } from '../shared/activity/useFormattedActivities';
 import { ActivityFeed } from '../components/ActivityFeed';
 import ActivityModalGateway from '../components/ActivityModalGateway';
+import { useReportDetails } from '../hooks/useReportDetails';
+import { useEntityActions } from '../hooks/useEntityActions';
 
 import MyHubSection from '../components/MyHubSection';
 import {
@@ -43,9 +45,7 @@ import {
   useHubProfile,
   useHubReports,
   useHubRoleScope,
-  applyHubOrderAction,
   type HubOrderItem,
-  type OrderActionRequest,
 } from '../shared/api/hub';
 import { createReport as apiCreateReport, createFeedback as apiCreateFeedback, acknowledgeItem as apiAcknowledgeItem, resolveReport as apiResolveReport, fetchServicesForReports, fetchProceduresForReports, fetchOrdersForReports } from '../shared/api/hub';
 
@@ -160,10 +160,12 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
   const [actionOrder, setActionOrder] = useState<any | null>(null);
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
   const [fetchedServiceDetails, setFetchedServiceDetails] = useState<any>(null);
+  const [selectedReportFromActivity, setSelectedReportFromActivity] = useState<{ id: string; type: 'report' | 'feedback' } | null>(null);
   const { code: authCode } = useAuth();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
   const { setHubLoading } = useHubLoading();
   const { mutate } = useSWRConfig();
+  const { handleAction } = useEntityActions();
 
 
   // Fetch fresh service details when modal is opened
@@ -202,6 +204,12 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
     error: ordersError,
   } = useHubOrders(normalizedCode);
   const { data: reportsData, isLoading: reportsLoading, mutate: mutateReports } = useHubReports(normalizedCode);
+
+    const { report: selectedReportFromActivityFull } = useReportDetails({
+    reportId: selectedReportFromActivity?.id || null,
+    reportType: selectedReportFromActivity?.type || null,
+    reportsData,
+  });
 
   const {
     data: scopeData,
@@ -441,6 +449,7 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
                 onOpenActionableOrder={(order) => setActionOrder(order)}
                 onOpenOrderModal={(order) => setSelectedOrderId(order?.orderId || order?.id || null)}
                 onOpenServiceModal={setSelectedServiceId}
+                onOpenReportModal={setSelectedReportFromActivity}
                 isLoading={activitiesLoading}
                 error={activitiesError}
                 onError={(msg) => toast.error(msg)}
@@ -635,29 +644,12 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
                 productOrders={productOrders}
                 onCreateServiceOrder={() => navigate('/catalog?mode=services')}
                 onCreateProductOrder={() => navigate('/catalog?mode=products')}
-                onOrderAction={(orderId, action) => {
+                onOrderAction={async (orderId, action) => {
                   if (action === 'View Details') {
                     setSelectedOrderId(orderId);
                     return;
                   }
-                  // Map UI labels to backend actions
-                  const label = (action || '').toLowerCase();
-                  let act: OrderActionRequest['action'] | null = null;
-                  if (label.includes('cancel')) act = 'cancel';
-                  if (label.includes('accept') && !act) act = 'accept';
-                  if (label.includes('reject') || label.includes('deny')) act = 'reject';
-                  if (!act) return;
-                  const notes = label === 'cancel' ? (window.prompt('Optional: reason for cancellation?')?.trim() || null) : null;
-                  let payload: OrderActionRequest = { action: act } as OrderActionRequest;
-                  if (typeof notes === 'string' && notes.trim().length > 0) {
-                    payload.notes = notes;
-                  }
-                  applyHubOrderAction(orderId, payload)
-                    .then(() => {
-                      console.log('[center] action applied', { orderId, action: act });
-                      mutate(`/hub/orders/${normalizedCode}`);
-                    })
-                    .catch((err) => console.error('[center] failed to apply action', err));
+                  await handleAction(orderId, action);
                 }}
                 showServiceOrders={true}
                 showProductOrders={true}
@@ -729,6 +721,9 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
                   }
                   console.log('[CenterHub] AFTER resolve mutate');
                 }}
+                onReportClick={(reportId, reportType) => {
+                  setSelectedReportFromActivity({ id: reportId, type: reportType });
+                }}
               />
             </PageWrapper>
           ) : activeTab === 'support' ? (
@@ -765,32 +760,11 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
             transformedId: actionOrder.transformedId || null,
           }}
           onAction={async (orderId, action) => {
-            try {
-              if (action === 'Accept') {
-                await applyHubOrderAction(orderId, { action: 'accept' });
-                mutate(`/hub/orders/${normalizedCode}`);
-                return;
-              }
-              if (action === 'Decline' || action === 'Reject') {
-                const reason = window.prompt('Please provide a short reason')?.trim() || '';
-                if (!reason) { alert('A reason is required.'); return; }
-                await applyHubOrderAction(orderId, { action: 'reject', notes: reason });
-                mutate(`/hub/orders/${normalizedCode}`);
-                return;
-              }
-              if (action === 'Cancel') {
-                const confirmed = window.confirm('Are you sure you want to cancel this order?');
-                if (!confirmed) return;
-                const notes = window.prompt('Optional: provide a short reason')?.trim() || null;
-                await applyHubOrderAction(orderId, { action: 'cancel', ...(notes ? { notes } : {}) });
-                mutate(`/hub/orders/${normalizedCode}`);
-                return;
-              }
+            if (action === 'View Details') {
               setSelectedOrderId(orderId);
-            } catch (err) {
-              console.error('[center] failed to process action', err);
-              alert('Failed to process action. Please try again.');
+              return;
             }
+            await handleAction(orderId, action);
           }}
         />
       )}
@@ -859,6 +833,15 @@ export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) 
           />
         );
       })()}
+
+      {/* ReportModal - for reports/feedback opened from Activity Feed */}
+      <ReportModal
+        isOpen={!!selectedReportFromActivity}
+        onClose={() => setSelectedReportFromActivity(null)}
+        report={selectedReportFromActivityFull}
+        currentUser={normalizedCode || ''}
+        showQuickActions={true}
+      />
       </div>
     </ModalProvider>
   );

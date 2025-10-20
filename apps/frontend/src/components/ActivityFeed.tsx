@@ -31,6 +31,7 @@ export interface ActivityFeedProps {
   onOpenOrderActions?: (data: { entity: any; state: string; deletedAt?: string; deletedBy?: string }) => void;
   onOpenOrderModal?: (order: any) => void;
   onOpenServiceModal?: (service: any) => void;
+  onOpenReportModal?: (report: any) => void;
   onOpenActionableOrder?: (order: any) => void;
   onError?: (message: string) => void;
 }
@@ -47,6 +48,7 @@ export function ActivityFeed({
   onOpenOrderActions,
   onOpenOrderModal,
   onOpenServiceModal,
+  onOpenReportModal,
   onOpenActionableOrder,
   onError,
 }: ActivityFeedProps) {
@@ -128,11 +130,25 @@ export function ActivityFeed({
         return;
       }
 
+      // Handle report and feedback activities
+      if (targetType === 'report' || targetType === 'feedback') {
+        if (!onOpenReportModal) {
+          console.warn('[ActivityFeed] onOpenReportModal not provided, ignoring click');
+          return;
+        }
+
+        // For now, pass the activity metadata as the report data
+        // The modal will need to fetch full details if needed
+        console.log('[ActivityFeed] Opening report/feedback modal:', { targetId, targetType });
+        onOpenReportModal({ id: targetId, type: targetType });
+        return;
+      }
+
       // Handle other entity types (future implementation)
       console.warn('[ActivityFeed] Unsupported entity type:', targetType);
       onError?.(`Cannot open ${targetType} entities yet`);
     },
-    [onOpenOrderActions, onOpenOrderModal, onOpenServiceModal, onError]
+    [onOpenOrderActions, onOpenOrderModal, onOpenServiceModal, onOpenReportModal, onOpenActionableOrder, onError]
   );
 
   // Map activities with onClick handlers

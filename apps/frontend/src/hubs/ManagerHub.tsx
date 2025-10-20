@@ -10,6 +10,8 @@ import { EcosystemTree } from '@cks/domain-widgets';
 import { useFormattedActivities } from '../shared/activity/useFormattedActivities';
 import { ActivityFeed } from '../components/ActivityFeed';
 import ActivityModalGateway from '../components/ActivityModalGateway';
+import { useReportDetails } from '../hooks/useReportDetails';
+import { useEntityActions } from '../hooks/useEntityActions';
 import { OrderActionModal } from '@cks/ui';
 import {
   MemosPreview,
@@ -31,6 +33,7 @@ import {
   ServiceDetailsModal,
   ServiceViewModal,
   CatalogServiceModal,
+  ReportModal,
   PageHeader,
   PageWrapper,
   Scrollbar,
@@ -70,10 +73,8 @@ import {
   useHubOrders,
   useHubProfile,
   useHubDashboard,
-  applyHubOrderAction,
   type HubReportItem,
   type HubOrderItem,
-  type OrderActionRequest,
 } from '../shared/api/hub';
 import { createReport as apiCreateReport, createFeedback as apiCreateFeedback, acknowledgeItem as apiAcknowledgeItem, resolveReport as apiResolveReport, fetchServicesForReports, fetchProceduresForReports, fetchOrdersForReports } from '../shared/api/hub';
 import { useSWRConfig } from 'swr';
@@ -575,6 +576,12 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
 
   // Fetch reports data
   const { data: reportsData, isLoading: reportsLoading, mutate: mutateReports } = useHubReports(managerCode);
+
+    const { report: selectedReportFromActivityFull } = useReportDetails({
+    reportId: selectedReportFromActivity?.id || null,
+    reportType: selectedReportFromActivity?.type || null,
+    reportsData,
+  });
   // IMPORTANT: Pass through structured fields from backend (reportCategory, relatedEntityId, reportReason, priority)
   // WarehouseHub already passes raw items; align ManagerHub to preserve all fields
   const managerReports = useMemo<ReportFeedback[]>(
@@ -918,102 +925,10 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
 
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [actionOrder, setActionOrder] = useState<any | null>(null);
+  const [selectedReportFromActivity, setSelectedReportFromActivity] = useState<{ id: string; type: 'report' | 'feedback' } | null>(null);
 
-  // Use centralized order details hook (transform-first)
-  
-  const handleOrderAction = useCallback(async (orderId: string, action: string) => {
-    if (action === 'View Details') {
-      // Use centralized hook - just set the order ID
-      setSelectedOrderId(orderId);
-      return;
-    }
-
-    if (action === 'Cancel') {
-      const confirmed = window.confirm('Are you sure you want to cancel this order?');
-      if (!confirmed) return;
-      const notes = window.prompt('Optional: provide a short reason for cancellation');
-      const payload: OrderActionRequest = {
-        action: 'cancel',
-        ...(notes && notes.trim().length > 0 ? { notes: notes.trim() } : {}),
-      };
-      try {
-        await applyHubOrderAction(orderId, payload);
-        mutate(`/hub/orders/${managerCode}`, undefined, { revalidate: true });
-        console.log('[manager] order cancelled', { orderId });
-      } catch (error) {
-        console.error('[manager] failed to cancel order', error);
-      }
-      return;
-    }
-
-    // Handle service order manager actions
-    const order = ordersData?.orders?.find((o: any) => (o.orderId || o.id) === orderId);
-
-    if (action === 'Accept') {
-      const target = ordersData?.orders?.find((o: any) => (o.orderId || o.id) === orderId) as any;
-      const nextRole = (target?.nextActorRole || '').toLowerCase();
-      if (nextRole && nextRole !== 'manager') {
-        setNotice(`This order is now pending ${nextRole}. Refreshing...`);
-        setTimeout(() => setNotice(null), 2000);
-        mutate(`/hub/orders/${managerCode}`, undefined, { revalidate: true });
-        return;
-      }
-      try {
-        const payload: OrderActionRequest = { action: 'accept' };
-        await applyHubOrderAction(orderId, payload);
-        setNotice('Success'); setTimeout(() => setNotice(null), 1200); mutate(`/hub/orders/${managerCode}`, undefined, { revalidate: true });
-        console.log('[manager] accepted order', { orderId });
-      } catch (err) {
-        console.error('[manager] failed to accept order', err);
-        alert(err instanceof Error ? err.message : 'Failed to accept order');
-      }
-      return;
-    }
-
-    if (action === 'Reject') {
-      const reason = window.prompt('Please provide a short reason for rejection (required)')?.trim() || '';
-      if (!reason) {
-        alert('Rejection requires a short reason.');
-        return;
-      }
-      try {
-        const payload: OrderActionRequest = { action: 'reject', notes: reason };
-        const target = ordersData?.orders?.find((o: any) => (o.orderId || o.id) === orderId) as any;
-        const nextRole = (target?.nextActorRole || '').toLowerCase();
-        if (nextRole && nextRole !== 'manager') {
-          setNotice(`This order is now pending ${nextRole}. Refreshing...`);
-          setTimeout(() => setNotice(null), 2000);
-          mutate(`/hub/orders/${managerCode}`, undefined, { revalidate: true });
-          return;
-        }
-        await applyHubOrderAction(orderId, payload);
-        setNotice('Success'); setTimeout(() => setNotice(null), 1200); mutate(`/hub/orders/${managerCode}`, undefined, { revalidate: true });
-        console.log('[manager] rejected order', { orderId });
-      } catch (err) {
-        console.error('[manager] failed to reject order', err);
-        alert(err instanceof Error ? err.message : 'Failed to reject order');
-      }
-      return;
-    }
-
-    // Note: Add Crew, Create Service, Add Training, Add Procedure are now managed from Active Services section
-    // These actions are no longer available on orders after policy update
-
-    try {
-      // Apply other order actions
-      const payload: OrderActionRequest = {
-        action: action as any,
-      };
-      await applyHubOrderAction(orderId, payload);
-
-      // Refresh the orders list
-      mutate(`/hub/orders/${managerCode}`, undefined, { revalidate: true });
-
-      console.log('[manager] order action applied', { orderId, action });
-    } catch (error) {
-      console.error('[manager] failed to apply order action', error);
-    }
-  }, [managerCode, mutate, ordersData]);
+  // Centralized entity action handler (replaces handleOrderAction)
+  const { handleAction } = useEntityActions();
 
   const handleNodeClick = useCallback((userId: string) => {
     console.log('[manager] view ecosystem node', userId);
@@ -1055,6 +970,7 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
                 hub="manager"
                 onOpenActionableOrder={(order) => setActionOrder(order)}
                 onOpenOrderModal={(order) => setSelectedOrderId(order?.orderId || order?.id || null)}
+                onOpenReportModal={setSelectedReportFromActivity}
                 isLoading={activitiesLoading}
                 error={activitiesError}
                 onError={(msg) => toast.error(msg)}
@@ -1190,7 +1106,7 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
                 serviceOrders={managerServiceOrderCards}
                 productOrders={managerProductOrderCards}
                 onCreateProductOrder={() => navigate('/catalog?mode=products')}
-                onOrderAction={handleOrderAction}
+                onOrderAction={handleAction}
                 showServiceOrders
                 showProductOrders
                 primaryColor={MANAGER_PRIMARY_COLOR}
@@ -1360,6 +1276,9 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
                 await mutateReports();
                 console.log('[ManagerHub] onResolve complete');
               }}
+              onReportClick={(reportId, reportType) => {
+                setSelectedReportFromActivity({ id: reportId, type: reportType });
+              }}
             />
           </PageWrapper>
           ) : (
@@ -1391,7 +1310,7 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
             availableActions: actionOrder.availableActions || [],
             transformedId: actionOrder.transformedId || null,
           }}
-          onAction={handleOrderAction}
+          onAction={handleAction}
         />
       )}
 
@@ -1535,6 +1454,15 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
           {toast}
         </div>
       )}
+
+      {/* ReportModal - for reports/feedback opened from Activity Feed */}
+      <ReportModal
+        isOpen={!!selectedReportFromActivity}
+        onClose={() => setSelectedReportFromActivity(null)}
+        report={selectedReportFromActivityFull}
+        currentUser={managerCode || ''}
+        showQuickActions={true}
+      />
       </div>
     </ModalProvider>
   );

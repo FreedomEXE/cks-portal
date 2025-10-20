@@ -29,6 +29,7 @@ export interface ArchiveSectionProps {
   archiveAPI?: ArchiveAPI;
   onViewOrderDetails?: (orderId: string, orderType: 'product' | 'service') => void;
   onViewServiceDetails?: (serviceId: string) => void;
+  onViewReportDetails?: (reportId: string, reportType: 'report' | 'feedback') => void;
 }
 
 const ARCHIVE_TABS = [
@@ -93,6 +94,7 @@ export default function ArchiveSection({
   archiveAPI,
   onViewOrderDetails,
   onViewServiceDetails,
+  onViewReportDetails,
 }: ArchiveSectionProps) {
   console.log('[ArchiveSection] Component rendering with archiveAPI:', !!archiveAPI);
   console.log('[ArchiveSection] archiveAPI methods:', archiveAPI ? Object.getOwnPropertyNames(Object.getPrototypeOf(archiveAPI)) : 'No API');
@@ -446,6 +448,13 @@ export default function ArchiveSection({
             // For services: open service modal directly if provided
             if ((effectiveTab === 'catalog-services' || effectiveTab === 'active-services') && onViewServiceDetails) {
               onViewServiceDetails(row.id);
+              return;
+            }
+
+            // For reports/feedback: open report modal directly if provided
+            if ((effectiveTab === 'report' || effectiveTab === 'feedback') && onViewReportDetails) {
+              const reportType = effectiveTab === 'report' ? 'report' : 'feedback';
+              onViewReportDetails(row.id, reportType);
               return;
             }
 

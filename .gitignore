@@ -32,6 +32,7 @@ build/
 .env
 .env.local
 .env.*.local
+.env.test
 
 # IDE
 .vscode/settings.local.json
@@ -49,3 +50,8 @@ Thumbs.db
 coverage/
 .nyc_output/
 apps/backend/nul
+
+# Playwright
+test-results/
+playwright-report/
+playwright/.cache/

@@ -28,8 +28,10 @@ import {
   type TreeNode,
 } from '@cks/domain-widgets';
 import { crewOverviewCards } from '@cks/domain-widgets';
-import { Button, DataTable, ModalProvider, OrderDetailsModal, ServiceViewModal, CatalogServiceModal, PageHeader, PageWrapper, Scrollbar, TabSection } from '@cks/ui';
+import { Button, DataTable, ModalProvider, OrderDetailsModal, ServiceViewModal, CatalogServiceModal, ReportModal, PageHeader, PageWrapper, Scrollbar, TabSection } from '@cks/ui';
 import ActivityModalGateway from '../components/ActivityModalGateway';
+import { useReportDetails } from '../hooks/useReportDetails';
+import { useEntityActions } from '../hooks/useEntityActions';
 import { useAuth } from '@cks/auth';
 import { useCatalogItems } from '../shared/api/catalog';
 import { useCertifiedServices } from '../hooks/useCertifiedServices';
@@ -44,9 +46,7 @@ import {
   useHubProfile,
   useHubReports,
   useHubRoleScope,
-  applyHubOrderAction,
   type HubOrderItem,
-  type OrderActionRequest,
 } from '../shared/api/hub';
 import { useSWRConfig } from 'swr';
 import { createFeedback as apiCreateFeedback, acknowledgeItem as apiAcknowledgeItem, fetchServicesForReports, fetchProceduresForReports, fetchOrdersForReports } from '../shared/api/hub';
@@ -161,14 +161,19 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
   const [showCatalogServiceModal, setShowCatalogServiceModal] = useState(false);
   const [selectedCatalogService, setSelectedCatalogService] = useState<{ serviceId: string; name: string; category: string | null; status?: string } | null>(null);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [selectedOrderData, setSelectedOrderData] = useState<any | null>(null);
   const [actionOrder, setActionOrder] = useState<any | null>(null);
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
   const [fetchedServiceDetails, setFetchedServiceDetails] = useState<any>(null);
+  const [selectedReportFromActivity, setSelectedReportFromActivity] = useState<{ id: string; type: 'report' | 'feedback' } | null>(null);
 
   const { code: authCode } = useAuth();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
   const { mutate } = useSWRConfig();
   const { setHubLoading } = useHubLoading();
+
+  // Centralized entity action handler (replaces handleOrderAction)
+  const { handleAction } = useEntityActions();
 
 
 
@@ -208,6 +213,12 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
     error: ordersError,
   } = useHubOrders(normalizedCode);
   const { data: reportsData, isLoading: reportsLoading } = useHubReports(normalizedCode);
+
+    const { report: selectedReportFromActivityFull } = useReportDetails({
+    reportId: selectedReportFromActivity?.id || null,
+    reportType: selectedReportFromActivity?.type || null,
+    reportsData,
+  });
 
   const {
     data: scopeData,
@@ -456,43 +467,6 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
 
   const myServicesColumns = MY_SERVICES_COLUMNS_BASE;
 
-  // Centralized handler for actionable orders from ActivityFeed
-  const handleOrderAction = useCallback(async (orderId: string, action: string) => {
-    try {
-      if (action === 'Accept') {
-        const payload: OrderActionRequest = { action: 'accept' };
-        await applyHubOrderAction(orderId, payload);
-        mutate(`/hub/orders/${normalizedCode}`);
-        return;
-      }
-      if (action === 'Decline' || action === 'Reject') {
-        const reason = window.prompt('Please provide a short reason')?.trim() || '';
-        if (!reason) {
-          alert('A reason is required.');
-          return;
-        }
-        const payload: OrderActionRequest = { action: 'reject', notes: reason };
-        await applyHubOrderAction(orderId, payload);
-        mutate(`/hub/orders/${normalizedCode}`);
-        return;
-      }
-      if (action === 'Cancel') {
-        const confirmed = window.confirm('Are you sure you want to cancel this order?');
-        if (!confirmed) return;
-        const notes = window.prompt('Optional: provide a short reason')?.trim() || null;
-        const payload: OrderActionRequest = { action: 'cancel', ...(notes ? { notes } : {}) };
-        await applyHubOrderAction(orderId, payload);
-        mutate(`/hub/orders/${normalizedCode}`);
-        return;
-      }
-      // Default: if action not recognized, open details
-      setSelectedOrderId(orderId);
-    } catch (err) {
-      console.error('[crew] failed to process action', err);
-      alert('Failed to process action. Please try again.');
-    }
-  }, [normalizedCode, mutate]);
-
   // Don't render anything until we have critical data
   if (!profile || !dashboard) {
     console.log('[CrewHub] Waiting for critical data...');
@@ -532,6 +506,7 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
         onOpenActionableOrder={(order) => setActionOrder(order)}
                 onOpenOrderModal={(order) => setSelectedOrderId(order?.orderId || order?.id || null)}
                 onOpenServiceModal={setSelectedServiceId}
+                onOpenReportModal={setSelectedReportFromActivity}
                 isLoading={activitiesLoading}
                 error={activitiesError}
                 onError={(msg) => toast.error(msg)}
@@ -760,7 +735,11 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
                 onCreateProductOrder={() => navigate('/catalog?mode=products')}
                 onOrderAction={async (orderId, action) => {
                   if (action === 'View Details') {
+                    // Find the full order object for instant modal rendering
+                    const allOrders = [...(serviceOrders || []), ...(productOrders || [])];
+                    const orderData = allOrders.find((o: any) => (o.orderId || o.id) === orderId);
                     setSelectedOrderId(orderId);
+                    setSelectedOrderData(orderData || null);
                     return;
                   }
                   const label = (action || '').toLowerCase();
@@ -797,17 +776,15 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
 
                       mutate(`/hub/orders/${normalizedCode}`);
                     } else {
-                      // Regular order actions (cancel, etc.)
-                      const notes = act === 'cancel' ? (window.prompt('Optional: reason for cancellation?')?.trim() || null) : null;
-                      let payload: OrderActionRequest = { action: act } as OrderActionRequest;
-                      if (typeof notes === 'string' && notes.trim().length > 0) {
-                        payload.notes = notes;
+                      // Regular order actions (cancel, etc.) - use centralized handler
+                      const success = await handleAction(orderId, action);
+                      if (success) {
+                        // Action succeeded - cache already invalidated by handler
+                        console.log('[crew] Order action succeeded via centralized handler');
                       }
-                      await applyHubOrderAction(orderId, payload);
-                      mutate(`/hub/orders/${normalizedCode}`);
                     }
                   } catch (err) {
-                    console.error('[crew] failed to apply action', err);
+                    console.error('[crew] Failed to apply action:', err);
                     alert('Failed to process action. Please try again.');
                   }
                 }}
@@ -848,6 +825,9 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
                   await (mutate as any)(`/hub/reports/${normalizedCode}`);
                   console.log('[CrewHub] AFTER acknowledge mutate');
                 }}
+                onReportClick={(reportId, reportType) => {
+                  setSelectedReportFromActivity({ id: reportId, type: reportType });
+                }}
               />
             </PageWrapper>
           ) : activeTab === 'support' ? (
@@ -870,12 +850,10 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
           isOpen={!!actionOrder}
           onClose={() => setActionOrder(null)}
           orderId={(actionOrder.orderId || actionOrder.id) as string}
+          initialOrderData={actionOrder}
           role="user"
           userAvailableActions={(actionOrder.availableActions || []) as string[]}
-          onAction={(orderId, action) => {
-            handleOrderAction(orderId, action);
-            // keep modal open; details remain visible if user expands
-          }}
+          onAction={(orderId, action) => handleAction(orderId, action)}
         />
       )}
 
@@ -883,11 +861,15 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
       {selectedOrderId && (
         <ActivityModalGateway
           isOpen={!!selectedOrderId}
-          onClose={() => setSelectedOrderId(null)}
+          onClose={() => {
+            setSelectedOrderId(null);
+            setSelectedOrderData(null);
+          }}
           orderId={selectedOrderId}
+          initialOrderData={selectedOrderData}
           role="user"
           userAvailableActions={[]}
-          onAction={(orderId, action) => handleOrderAction(orderId, action)}
+          onAction={(orderId, action) => handleAction(orderId, action)}
         />
       )}
 
@@ -954,6 +936,15 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
           setSelectedCatalogService(null);
         }}
         service={selectedCatalogService}
+      />
+
+      {/* ReportModal - for reports/feedback opened from Activity Feed */}
+      <ReportModal
+        isOpen={!!selectedReportFromActivity}
+        onClose={() => setSelectedReportFromActivity(null)}
+        report={selectedReportFromActivityFull}
+        currentUser={normalizedCode || ''}
+        showQuickActions={true}
       />
       </div>
     </ModalProvider>

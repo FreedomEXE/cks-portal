@@ -1,0 +1,92 @@
+/* Report Card - Following OrderCard Pattern */
+
+.reportCard {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  padding: 20px;
+  margin-bottom: 16px;
+  transition: box-shadow 0.3s ease;
+}
+
+.reportCard:hover {
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
+}
+
+/* Embedded (compact) variant for use inside modals */
+.embeddedCard {
+  box-shadow: none;
+  border: 1px solid #e5e7eb;
+  padding: 12px;
+  margin-bottom: 8px;
+}
+
+.embeddedCard:hover {
+  box-shadow: none;
+}
+
+.embeddedCard .cardHeader {
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #eef2f7;
+}
+
+/* Header: ID left, Status right */
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.reportInfo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.reportId {
+  font-weight: 600;
+  font-size: 14px;
+  color: #1f2937;
+}
+
+/* Body: Title and metadata */
+.cardBody {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #111827;
+  margin: 0;
+}
+
+.metadata {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  font-size: 14px;
+}
+
+/* Tabs nested inside card for embedded variant */
+.cardTabs {
+  padding: 8px 12px;
+  border-top: 1px solid #e5e7eb;
+  margin-top: 12px;
+  display: flex;
+  gap: 8px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .metadata {
+    flex-direction: column;
+    gap: 8px;
+  }
+}

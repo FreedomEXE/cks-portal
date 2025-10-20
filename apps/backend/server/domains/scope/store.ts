@@ -103,6 +103,8 @@ const activityTypeCategory: Record<string, string> = {
   warehouse_created: 'action',
   order_created: 'action',
   service_created: 'action',
+  report_created: 'warning',
+  feedback_created: 'info',
 
   // Success/completion activities
   order_delivered: 'success',
@@ -110,6 +112,7 @@ const activityTypeCategory: Record<string, string> = {
   service_completed: 'success',
   order_accepted: 'success',
   order_approved: 'success',
+  report_resolved: 'success',
 
   // Warning/error activities
   order_cancelled: 'warning',
@@ -122,6 +125,8 @@ const activityTypeCategory: Record<string, string> = {
   order_updated: 'info',
   service_updated: 'info',
   profile_updated: 'info',
+  report_acknowledged: 'info',
+  feedback_acknowledged: 'info',
 };
 
 type ActivityRow = {

@@ -10,6 +10,12 @@
     "changeset": "changeset",
     "build": "pnpm -r build",
     "test": "pnpm run -r test",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:debug": "playwright test --debug",
+    "test:e2e:perf": "playwright test tests/e2e/crew/performance.spec.ts tests/e2e/manager/performance.spec.ts tests/e2e/warehouse/performance.spec.ts",
+    "test:e2e:report": "playwright show-report",
     "codegen": "node scripts/prebuild-codegen.mjs",
     "typecheck": "pnpm -r --if-present typecheck",
     "lint": "pnpm -r --if-present lint",
@@ -20,6 +26,7 @@
     "dev:gateway": "pnpm --filter ./apps/gateway dev"
   },
   "devDependencies": {
+    "@playwright/test": "^1.56.1",
     "@types/node": "^20.0.0",
     "husky": "9",
     "typescript": "^5.9.2"

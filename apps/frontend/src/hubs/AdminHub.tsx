@@ -18,7 +18,6 @@ import {
   MemosPreview,
   NewsPreview,
   OverviewSection,
-  ReportDetailsModal,
   ProfileTab,
   adminOverviewCards,
   type Activity,
@@ -37,6 +36,7 @@ import {
   TabContainer,
   CatalogServiceModal,
   CatalogProductModal,
+  ReportModal,
   UserModal,
   type UserAction,
 } from '@cks/ui';
@@ -65,15 +65,15 @@ import {
   useContractors,
   useCrew,
   useCustomers,
-  useFeedback,
   useManagers,
   useOrders,
   useProcedures,
   useProducts,
-  useReports,
   useServices,
   useTraining,
   useWarehouses,
+  useReports,
+  useFeedback,
 } from '../shared/api/directory';
 import {
   applyHubOrderAction,
@@ -84,6 +84,7 @@ import {
   type UpdateOrderFieldsRequest,
 } from '../shared/api/hub';
 import { ActivityFeed } from '../components/ActivityFeed';
+import { useReportDetails } from '../hooks/useReportDetails';
 
 // Removed unused: const MILLIS_PER_DAY = 1000 * 60 * 60 * 24;
 
@@ -237,7 +238,7 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
   // merged assign flow into CatalogServiceModal
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [selectedOrderForEdit, setSelectedOrderForEdit] = useState<HubOrderItem | null>(null);
-  const [selectedReportForDetails, setSelectedReportForDetails] = useState<any | null>(null);
+  const [selectedReportFromActivity, setSelectedReportFromActivity] = useState<{ id: string; type: 'report' | 'feedback' } | null>(null);
   const [selectedUser, setSelectedUser] = useState<Record<string, any> | null>(null);
   const [showUserModal, setShowUserModal] = useState(false);
   const logout = useLogout();
@@ -255,11 +256,27 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
   const { data: products, isLoading: productsLoading, error: productsError } = useProducts();
   const { data: trainingRecords, isLoading: trainingLoading, error: trainingError } = useTraining();
   const { data: procedures, isLoading: proceduresLoading, error: proceduresError } = useProcedures();
-  const { data: reports, isLoading: reportsLoading, error: reportsError } = useReports();
-  const { data: feedbackEntries, isLoading: feedbackLoading, error: feedbackError } = useFeedback();
+  // AdminHub is global-scope: fetch reports/feedback via directory endpoints
+  const { data: directoryReports, isLoading: reportsLoading } = useReports();
+  const { data: directoryFeedback, isLoading: feedbackLoading } = useFeedback();
+
+  // Unify shape to match useReportDetails expectations { reports, feedback }
+  const reportsData = useMemo(
+    () => ({
+      reports: directoryReports ?? [],
+      feedback: directoryFeedback ?? [],
+    }),
+    [directoryReports, directoryFeedback],
+  );
   const { data: activityItems, isLoading: activitiesLoading, error: activitiesError } = useActivities();
 
   const [activityFeed, setActivityFeed] = useState<Activity[]>([]);
+
+  const { report: selectedReportFromActivityFull } = useReportDetails({
+    reportId: selectedReportFromActivity?.id || null,
+    reportType: selectedReportFromActivity?.type || null,
+    reportsData,
+  });
 
   // Signal when critical data is loaded
   useEffect(() => {
@@ -539,10 +556,10 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
       centers,
       crew,
       warehouses,
-      reports,
+      reports: reportsData?.reports || [],
       goLiveTimestamp: GO_LIVE_TIMESTAMP,
     }),
-  [adminUsers, managers, contractors, customers, centers, crew, warehouses, reports]);
+  [adminUsers, managers, contractors, customers, centers, crew, warehouses, reportsData]);
 
   const adminRows = useMemo(
     () =>
@@ -771,37 +788,37 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
     [procedures],
   );
 
-  const reportRows = useMemo(
-    () =>
-      reports.map((report) => ({
-        id: report.id,
-        title: report.title,
-        severity: formatText(report.severity),
-        customerId: formatText(report.customerId),
-        centerId: formatText(report.centerId),
-        status: formatText(report.status),
-        createdAt: formatDate(report.createdAt),
-        // Store full report data for modal
-        _fullReport: report,
-        _entityType: 'report',
-      })),
-    [reports],
-  );
+  const reportRows = useMemo(() => {
+    return (reportsData?.reports || []).map((report: any) => ({
+      id: report.id,
+      title: report.title,
+      severity: formatText(report.severity),
+      customerId: formatText((report as any).customerId),
+      centerId: formatText((report as any).centerId),
+      status: formatText(report.status),
+      // Admin directory uses createdAt; hub uses submittedDate
+      createdAt: formatDate((report as any).createdAt ?? (report as any).submittedDate),
+      // Store full report data for modal
+      _fullReport: report,
+      _entityType: 'report',
+    }));
+  }, [reportsData]);
 
   const feedbackRows = useMemo(
     () =>
-      feedbackEntries.map((entry) => ({
+      (reportsData?.feedback || []).map((entry: any) => ({
         id: entry.id,
-        kind: formatText(entry.kind),
+        kind: formatText(entry.kind || (entry as any).category),
         title: entry.title,
-        customerId: formatText(entry.customerId),
-        centerId: formatText(entry.centerId),
-        createdAt: formatDate(entry.createdAt),
+        customerId: formatText((entry as any).customerId),
+        centerId: formatText((entry as any).centerId),
+        // Admin directory uses createdAt; hub uses submittedDate
+        createdAt: formatDate((entry as any).createdAt ?? (entry as any).submittedDate),
         // Store full feedback data for modal
         _fullFeedback: entry,
         _entityType: 'feedback',
       })),
-    [feedbackEntries],
+    [reportsData],
   );
 
   const renderActions = useCallback(
@@ -1031,8 +1048,8 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
       data: reportRows,
       emptyMessage: 'No reports filed.',
       onRowClick: (row: any) => {
-        // Open ReportDetailsModal directly (skip ActionModal)
-        setSelectedReportForDetails(row._fullReport || row);
+        // Open new ReportModal (same as Activity Feed)
+        setSelectedReportFromActivity({ id: row.id, type: 'report' });
       },
     },
     feedback: {
@@ -1047,8 +1064,8 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
       data: feedbackRows,
       emptyMessage: 'No feedback submitted.',
       onRowClick: (row: any) => {
-        // Open ReportDetailsModal directly (skip ActionModal)
-        setSelectedReportForDetails(row._fullFeedback || row);
+        // Open new ReportModal (same as Activity Feed)
+        setSelectedReportFromActivity({ id: row.id, type: 'feedback' });
       },
     },
   }) satisfies Record<string, DirectorySectionConfig>, [
@@ -1097,9 +1114,7 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
     ordersError ||
     productsError ||
     trainingError ||
-    proceduresError ||
-    reportsError ||
-    feedbackError;
+    proceduresError;
   const renderDirectoryBody = () => {
     if (directoryLoading) {
       return <div style={{ color: '#2563eb', fontSize: 14 }}>Loading directory data.</div>;
@@ -1263,6 +1278,7 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
             searchPlaceholder={`Search ${reportsSubTab === 'reports' ? 'reports' : 'feedback'}...`}
             maxItems={25}
             showSearch
+            onRowClick={section.onRowClick}
           />
         </>
       );
@@ -1386,6 +1402,7 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
                 onClear={handleClearActivity}
                 onOpenOrderModal={(order) => setSelectedOrderId(order?.orderId || order?.id || null)}
                 onOpenServiceModal={setSelectedServiceCatalog}
+                onOpenReportModal={setSelectedReportFromActivity}
                 isLoading={activitiesLoading}
                 error={activitiesError}
                 onError={(message) => {
@@ -1437,6 +1454,9 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
             metadata: null,
           });
           setShowServiceCatalogModal(true);
+        }}
+        onViewReportDetails={(reportId: string, reportType: 'report' | 'feedback') => {
+          setSelectedReportFromActivity({ id: reportId, type: reportType });
         }}
       />
           ) : activeTab === 'support' ? (
@@ -2046,32 +2066,13 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
         }}
       />
 
-      <ReportDetailsModal
-        isOpen={!!selectedReportForDetails}
-        onClose={() => setSelectedReportForDetails(null)}
-        report={selectedReportForDetails ? {
-          id: selectedReportForDetails.id || selectedReportForDetails.report_id,
-          type: selectedReportForDetails._entityType === 'feedback' ? 'feedback' : 'report',
-          submittedBy: selectedReportForDetails.created_by_id || selectedReportForDetails.customerId || selectedReportForDetails.centerId,
-          submittedDate: selectedReportForDetails.createdAt || selectedReportForDetails.created_at,
-          status: selectedReportForDetails.status,
-          description: selectedReportForDetails.description || selectedReportForDetails.message,
-          reportCategory: selectedReportForDetails.report_category,
-          relatedEntityId: selectedReportForDetails.related_entity_id,
-          reportReason: selectedReportForDetails.report_reason,
-          priority: selectedReportForDetails.priority,
-          rating: selectedReportForDetails.rating,
-          acknowledgments: selectedReportForDetails.acknowledgments || [],
-          resolvedBy: selectedReportForDetails.resolved_by_id,
-          resolvedAt: selectedReportForDetails.resolved_at,
-          resolution: {
-            notes: selectedReportForDetails.resolution_notes,
-            actionTaken: selectedReportForDetails.action_taken
-          },
-          resolution_notes: selectedReportForDetails.resolution_notes
-        } : null}
+      {/* ReportModal - for reports/feedback from Activity Feed AND Directory */}
+      <ReportModal
+        isOpen={!!selectedReportFromActivity}
+        onClose={() => setSelectedReportFromActivity(null)}
+        report={selectedReportFromActivityFull}
         currentUser={code || ''}
-        userRole="admin"
+        showQuickActions={true}
       />
 
       <UserModal

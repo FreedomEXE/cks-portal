@@ -28,7 +28,7 @@ import {
   type TreeNode,
 } from '@cks/domain-widgets';
 import { customerOverviewCards } from '@cks/domain-widgets';
-import { Button, DataTable, ModalProvider, OrderDetailsModal, ServiceViewModal, PageHeader, PageWrapper, Scrollbar, TabSection, OrderActionModal } from '@cks/ui';
+import { Button, DataTable, ModalProvider, OrderDetailsModal, ServiceViewModal, ReportModal, PageHeader, PageWrapper, Scrollbar, TabSection, OrderActionModal } from '@cks/ui';
 import OrderDetailsGateway from '../components/OrderDetailsGateway';
 import { useAuth } from '@cks/auth';
 import { useSWRConfig } from 'swr';
@@ -36,6 +36,8 @@ import { createReport as apiCreateReport, createFeedback as apiCreateFeedback, a
 import { useFormattedActivities } from '../shared/activity/useFormattedActivities';
 import { ActivityFeed } from '../components/ActivityFeed';
 import ActivityModalGateway from '../components/ActivityModalGateway';
+import { useReportDetails } from '../hooks/useReportDetails';
+import { useEntityActions } from '../hooks/useEntityActions';
 
 import MyHubSection from '../components/MyHubSection';
 import {
@@ -44,9 +46,7 @@ import {
   useHubProfile,
   useHubReports,
   useHubRoleScope,
-  applyHubOrderAction,
   type HubOrderItem,
-  type OrderActionRequest,
 } from '../shared/api/hub';
 import { useCertifiedServices } from '../hooks/useCertifiedServices';
 
@@ -161,6 +161,7 @@ export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubPro
   const [actionOrder, setActionOrder] = useState<any | null>(null);
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
   const [fetchedServiceDetails, setFetchedServiceDetails] = useState<any>(null);
+  const [selectedReportFromActivity, setSelectedReportFromActivity] = useState<{ id: string; type: 'report' | 'feedback' } | null>(null);
   const { code: authCode } = useAuth();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
   const { setHubLoading } = useHubLoading();
@@ -187,11 +188,19 @@ export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubPro
     data: reportsData,
     isLoading: reportsLoading,
   mutate: mutateReports } = useHubReports(normalizedCode);
+
+    const { report: selectedReportFromActivityFull } = useReportDetails({
+    reportId: selectedReportFromActivity?.id || null,
+    reportType: selectedReportFromActivity?.type || null,
+    reportsData,
+  });
+
   const {
     data: scopeData,
   } = useHubRoleScope(normalizedCode);
   const { data: certifiedServicesData, isLoading: certifiedServicesLoading } = useCertifiedServices(normalizedCode, 'customer', 500);
   const { mutate } = useSWRConfig();
+  const { handleAction } = useEntityActions();
   const [notice, setNotice] = useState<string | null>(null);
 
   // Signal when critical data is loaded (but only if not highlighting an order)
@@ -437,6 +446,7 @@ export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubPro
                 onOpenActionableOrder={(order) => setActionOrder(order)}
                 onOpenOrderModal={(order) => setSelectedOrderId(order?.orderId || order?.id || null)}
                 onOpenServiceModal={setSelectedServiceId}
+                onOpenReportModal={setSelectedReportFromActivity}
                 isLoading={activitiesLoading}
                 error={activitiesError}
                 onError={(msg) => toast.error(msg)}
@@ -635,48 +645,12 @@ export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubPro
                 productOrders={productOrders}
                 onCreateServiceOrder={() => navigate('/catalog?mode=services')}
                 onCreateProductOrder={() => navigate('/catalog?mode=products')}
-                onOrderAction={(orderId, action) => {
+                onOrderAction={async (orderId, action) => {
                   if (action === 'View Details') {
                     setSelectedOrderId(orderId);
                     return;
                   }
-                  const target = orders?.orders?.find((o: any) => (o.orderId || o.id) === orderId) as any;
-                  const label = (action || '').toLowerCase();
-                  let act: OrderActionRequest['action'] | null = null;
-                  if (label.includes('cancel')) act = 'cancel';
-                  if (label.includes('accept') && !act) act = 'accept';
-                  if ((label.includes('reject') || label.includes('deny')) && !act) act = 'reject';
-                  if (!act) return;
-                  const nextRole = (target?.nextActorRole || '').toLowerCase();
-                  if ((act === 'accept' || act === 'reject') && nextRole && nextRole !== 'customer') {
-                    setNotice(`This order is now pending ${nextRole}. Refreshing...`);
-                    setTimeout(() => setNotice(null), 2000);
-                    mutate(`/hub/orders/${normalizedCode}`);
-                    return;
-                  }
-                  let notes: string | null = null;
-                  if (act === 'cancel') {
-                    notes = window.prompt('Optional: reason for cancellation?')?.trim() || null;
-                  } else if (act === 'reject') {
-                    const reason = window.prompt('Please provide a short reason for rejection (required)')?.trim() || '';
-                    if (!reason) {
-                      alert('Rejection requires a short reason.');
-                      return;
-                    }
-                    notes = reason;
-                  }
-                  let payload: OrderActionRequest = { action: act } as OrderActionRequest;
-                  if (typeof notes === 'string' && notes.trim().length > 0) {
-                    payload.notes = notes;
-                  }
-                  applyHubOrderAction(orderId, payload)
-                    .then(() => { setNotice('Success'); setTimeout(() => setNotice(null), 1200); mutate(`/hub/orders/${normalizedCode}`); })
-                    .catch((err) => {
-                      console.error('[customer] failed to apply action', err);
-                      const msg = err instanceof Error ? err.message : 'Failed to apply action';
-                      setNotice(msg);
-                      setTimeout(() => setNotice(null), 2200);
-                    });
+                  await handleAction(orderId, action);
                 }}
                 showServiceOrders={true}
                 showProductOrders={true}
@@ -739,6 +713,9 @@ export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubPro
                   await mutate(`/hub/reports/${normalizedCode}`);
                   console.log('[CustomerHub] AFTER resolve mutate');
                 }}
+                onReportClick={(reportId, reportType) => {
+                  setSelectedReportFromActivity({ id: reportId, type: reportType });
+                }}
               />
             </PageWrapper>
           ) : activeTab === 'support' ? (
@@ -775,32 +752,11 @@ export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubPro
             transformedId: actionOrder.transformedId || null,
           }}
           onAction={async (orderId, action) => {
-            try {
-              if (action === 'Accept') {
-                await applyHubOrderAction(orderId, { action: 'accept' });
-                mutate(`/hub/orders/${normalizedCode}`);
-                return;
-              }
-              if (action === 'Decline' || action === 'Reject') {
-                const reason = window.prompt('Please provide a short reason')?.trim() || '';
-                if (!reason) { alert('A reason is required.'); return; }
-                await applyHubOrderAction(orderId, { action: 'reject', notes: reason });
-                mutate(`/hub/orders/${normalizedCode}`);
-                return;
-              }
-              if (action === 'Cancel') {
-                const confirmed = window.confirm('Are you sure you want to cancel this order?');
-                if (!confirmed) return;
-                const notes = window.prompt('Optional: provide a short reason')?.trim() || null;
-                await applyHubOrderAction(orderId, { action: 'cancel', ...(notes ? { notes } : {}) });
-                mutate(`/hub/orders/${normalizedCode}`);
-                return;
-              }
+            if (action === 'View Details') {
               setSelectedOrderId(orderId);
-            } catch (err) {
-              console.error('[customer] failed to process action', err);
-              alert('Failed to process action. Please try again.');
+              return;
             }
+            await handleAction(orderId, action);
           }}
         />
       )}
@@ -868,6 +824,15 @@ export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubPro
           />
         );
       })()}
+
+      {/* ReportModal - for reports/feedback opened from Activity Feed */}
+      <ReportModal
+        isOpen={!!selectedReportFromActivity}
+        onClose={() => setSelectedReportFromActivity(null)}
+        report={selectedReportFromActivityFull}
+        currentUser={normalizedCode || ''}
+        showQuickActions={true}
+      />
       </div>
     </ModalProvider>
   );

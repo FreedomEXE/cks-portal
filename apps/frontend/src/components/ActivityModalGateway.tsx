@@ -10,6 +10,9 @@ export interface ActivityModalGatewayProps {
   // Optional explicit state; otherwise derived from details
   orderState?: 'active' | 'archived' | 'deleted';
 
+  // Optional initial order data for instant rendering (performance optimization)
+  initialOrderData?: any;
+
   // Admin callbacks
   onEdit?: (order: any) => void;
   onArchive?: (orderId: string, reason?: string) => Promise<void> | void;
@@ -29,6 +32,7 @@ export function ActivityModalGateway({
   orderId,
   role,
   orderState,
+  initialOrderData,
   onEdit,
   onArchive,
   onRestore,
@@ -36,7 +40,16 @@ export function ActivityModalGateway({
   onAction,
   userAvailableActions,
 }: ActivityModalGatewayProps) {
-  const details = useOrderDetails({ orderId });
+  const details = useOrderDetails({ orderId, initial: initialOrderData });
+
+  // Shared behavior: Auto-close modal after successful action
+  const handleActionWithAutoClose = React.useCallback(async (orderId: string, action: string) => {
+    if (onAction) {
+      await onAction(orderId, action);
+      // Auto-close after any action (centralized behavior)
+      onClose();
+    }
+  }, [onAction, onClose]);
 
   const derivedState: 'active' | 'archived' | 'deleted' = useMemo(() => {
     if (orderState) return orderState;
@@ -97,9 +110,9 @@ export function ActivityModalGateway({
     return list.map((label) => ({
       label,
       variant: /accept|approve|create service/i.test(label) ? 'primary' : /reject|decline|cancel/i.test(label) ? 'danger' : 'secondary',
-      onClick: () => onAction?.(order.orderId, label),
+      onClick: () => handleActionWithAutoClose(order.orderId, label),
     }));
-  }, [order, role, derivedState, userAvailableActions, onAction, onEdit, onArchive, onRestore, onDelete, details.order]);
+  }, [order, role, derivedState, userAvailableActions, handleActionWithAutoClose, onEdit, onArchive, onRestore, onDelete, details.order]);
 
   return (
     <ActivityModal

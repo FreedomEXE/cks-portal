@@ -27,7 +27,7 @@ import {
   type Activity,
 } from '@cks/domain-widgets';
 import { warehouseOverviewCards } from '@cks/domain-widgets';
-import { Button, DataTable, ModalProvider, PageHeader, PageWrapper, Scrollbar, TabSection, OrderActionModal, CatalogServiceModal, ServiceViewModal } from '@cks/ui';
+import { Button, DataTable, ModalProvider, PageHeader, PageWrapper, Scrollbar, TabSection, OrderActionModal, CatalogServiceModal, ReportModal, ServiceViewModal } from '@cks/ui';
 import OrderDetailsGateway from '../components/OrderDetailsGateway';
 import { useAuth } from '@cks/auth';
 import { useSWRConfig } from 'swr';
@@ -45,27 +45,16 @@ import {
   useHubReports,
   useHubRoleScope,
   useHubInventory,
-  applyHubOrderAction,
   type HubOrderItem,
   type HubInventoryItem,
-  type OrderActionRequest,
-  type OrderActionType,
 } from '../shared/api/hub';
 import { useFormattedActivities } from '../shared/activity/useFormattedActivities';
 import { ActivityFeed } from '../components/ActivityFeed';
 import ActivityModalGateway from '../components/ActivityModalGateway';
+import { useReportDetails } from '../hooks/useReportDetails';
+import { useEntityActions } from '../hooks/useEntityActions';
 import { createFeedback as apiCreateFeedback, acknowledgeItem as apiAcknowledgeItem, resolveReport as apiResolveReport, fetchServicesForReports, fetchProceduresForReports, fetchOrdersForReports } from '../shared/api/hub';
 
-const ACTION_LABEL_MAP: Record<string, OrderActionType> = {
-  Accept: 'accept',
-  Approve: 'accept',
-  Deny: 'reject',
-  Reject: 'reject',
-  'Start Delivery': 'start-delivery',
-  'Mark Delivered': 'deliver',
-  'Create Service': 'create-service',
-  Cancel: 'cancel',
-};
 interface WarehouseHubProps {
   initialTab?: string;
 }
@@ -161,6 +150,7 @@ function normalizeOrderStatus(value?: string | null): HubOrderItem['status'] {
 export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubProps) {
   const navigate = useNavigate();
   const { mutate } = useSWRConfig();
+  const { handleAction } = useEntityActions();
 
   const [activeTab, setActiveTab] = useState(initialTab);
   const [servicesTab, setServicesTab] = useState<'my' | 'active' | 'history'>('active');
@@ -172,11 +162,11 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
   const [inventoryTab, setInventoryTab] = useState<'active' | 'archive'>('active');
   const [inventorySearchQuery, setInventorySearchQuery] = useState('');
   const [inventoryFilter, setInventoryFilter] = useState<string>('');
-  const [pendingAction, setPendingAction] = useState<{ orderId: string; action: OrderActionType } | null>(null);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [actionOrder, setActionOrder] = useState<any | null>(null);
   // Removed old ServiceViewModal path; service details modals will be added later when designed
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
+  const [selectedReportFromActivity, setSelectedReportFromActivity] = useState<{ id: string; type: 'report' | 'feedback' } | null>(null);
 
   
 
@@ -204,6 +194,13 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
     mutate: refreshOrders,
   } = useHubOrders(normalizedCode);
   const { data: reportsData, isLoading: reportsLoading, mutate: mutateReports } = useHubReports(normalizedCode);
+
+    const { report: selectedReportFromActivityFull } = useReportDetails({
+    reportId: selectedReportFromActivity?.id || null,
+    reportType: selectedReportFromActivity?.type || null,
+    reportsData,
+  });
+
   const {
     data: inventory,
     isLoading: inventoryLoading,
@@ -541,73 +538,11 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
   // Cards provided by shared domain widgets
 
   const handleOrderAction = async (orderId: string, actionLabel: string, providedReason?: string) => {
-    console.log('[WAREHOUSE] Order action triggered:', { orderId, actionLabel, providedReason });
-
     if (actionLabel === 'View Details') {
       setSelectedOrderId(orderId);
       return;
     }
-
-    const mapped = ACTION_LABEL_MAP[actionLabel];
-    if (!mapped) {
-      console.error('[WAREHOUSE] Unknown action label:', actionLabel);
-      return;
-    }
-
-    console.log('[WAREHOUSE] Mapped action:', mapped);
-
-    if (pendingAction && pendingAction.orderId === orderId && pendingAction.action === mapped) {
-      console.log('[WAREHOUSE] Action already pending, skipping');
-      return;
-    }
-
-    const request: OrderActionRequest = {
-      action: mapped,
-    };
-
-    if (mapped === 'reject') {
-      const notes = window.prompt('Please share a short reason for rejecting this order.');
-      const trimmed = notes?.trim();
-      if (!trimmed) {
-        return;
-      }
-      request.notes = trimmed;
-    }
-
-    if (mapped === 'cancel' && providedReason) {
-      request.notes = providedReason;
-    }
-
-    if (mapped === 'create-service') {
-      const transformedId = window.prompt('Enter a service tracking ID (optional). Leave blank to auto-generate.');
-      const trimmed = transformedId?.trim();
-      if (trimmed) {
-        request.transformedId = trimmed;
-      }
-    }
-
-    setPendingAction({ orderId, action: mapped });
-    console.log('[WAREHOUSE] Sending order action request:', request);
-
-    try {
-      const result = await applyHubOrderAction(orderId, request);
-      console.log('[WAREHOUSE] Order action successful:', result);
-
-      // Show success message
-      const successMessage = mapped === 'accept' ? 'Order accepted successfully!' :
-                           mapped === 'deliver' ? 'Order marked as delivered!' :
-                           mapped === 'reject' ? 'Order rejected.' :
-                           'Order updated successfully!';
-      window.alert(successMessage);
-
-      await refreshOrders();
-      console.log('[WAREHOUSE] Orders refreshed');
-    } catch (error) {
-      console.error('[WAREHOUSE] Failed to update order:', error);
-      window.alert('Unable to update the order. Please try again.');
-    } finally {
-      setPendingAction(null);
-    }
+    await handleAction(orderId, actionLabel);
   };
   const profileCardData = useMemo(() => ({
     name: profile?.name ?? '-',
@@ -672,6 +607,7 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
                 onOpenActionableOrder={(order) => setActionOrder(order)}
                 onOpenOrderModal={(order) => setSelectedOrderId(order?.orderId || order?.id || null)}
                 onOpenServiceModal={setSelectedServiceId}
+                onOpenReportModal={setSelectedReportFromActivity}
                 isLoading={activitiesLoading}
                 error={activitiesError}
                 onError={(msg) => toast.error(msg)}
@@ -1241,6 +1177,9 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
                   await mutateReports();
                   console.log('[WarehouseHub] AFTER resolve mutateReports');
                 }}
+                onReportClick={(reportId, reportType) => {
+                  setSelectedReportFromActivity({ id: reportId, type: reportType });
+                }}
               />
             </PageWrapper>
           ) : activeTab === 'support' ? (
@@ -1311,6 +1250,15 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
           showProductsSection={true}
         />
       )}
+
+      {/* ReportModal - for reports/feedback opened from Activity Feed */}
+      <ReportModal
+        isOpen={!!selectedReportFromActivity}
+        onClose={() => setSelectedReportFromActivity(null)}
+        report={selectedReportFromActivityFull}
+        currentUser={normalizedCode || ''}
+        showQuickActions={true}
+      />
       </div>
     </ModalProvider>
   );

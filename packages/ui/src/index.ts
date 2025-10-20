@@ -37,6 +37,9 @@ export type { ServiceCardProps } from './cards/ServiceCard';
 export { default as ProductCard } from './cards/ProductCard';
 export type { ProductCardProps } from './cards/ProductCard';
 
+export { default as ReportCard } from './cards/ReportCard';
+export type { ReportCardProps } from './cards/ReportCard';
+
 export * from './Scrollbar';
 export { default as Scrollbar } from './Scrollbar';
 
@@ -63,6 +66,9 @@ export { default as CatalogServiceModal } from './modals/CatalogServiceModal/Cat
 
 export * from './modals/CatalogProductModal/CatalogProductModal';
 export { default as CatalogProductModal } from './modals/CatalogProductModal/CatalogProductModal';
+
+export * from './modals/ReportModal/ReportModal';
+export { default as ReportModal } from './modals/ReportModal/ReportModal';
 
 export * from './modals/AssignServiceModal/AssignServiceModal';
 export { default as AssignServiceModal } from './modals/AssignServiceModal/AssignServiceModal';

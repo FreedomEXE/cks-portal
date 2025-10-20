@@ -76,6 +76,27 @@ export async function reportsRoutes(fastify: FastifyInstance) {
       reportReason: payload.reportReason ?? null,
       priority: payload.priority ?? null,
     });
+
+    // Create activity record
+    await query(
+      `INSERT INTO system_activity (description, activity_type, actor_id, actor_role, target_id, target_type, metadata)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [
+        `${account.role} filed a report: ${title || 'Untitled Report'}`,
+        'report_created',
+        account.cksCode ?? '',
+        account.role,
+        created.id,
+        'report',
+        JSON.stringify({
+          reportCategory: payload.reportCategory,
+          relatedEntityId: payload.relatedEntityId,
+          reportReason: payload.reportReason,
+          priority: payload.priority,
+        }),
+      ]
+    );
+
     reply.code(201).send({ data: { id: created.id } });
   });
 
@@ -118,6 +139,27 @@ export async function reportsRoutes(fastify: FastifyInstance) {
       reportReason: payload.reportReason ?? null,
       rating: payload.rating ?? null,
     });
+
+    // Create activity record
+    await query(
+      `INSERT INTO system_activity (description, activity_type, actor_id, actor_role, target_id, target_type, metadata)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [
+        `${account.role} submitted feedback: ${payload.title}`,
+        'feedback_created',
+        account.cksCode ?? '',
+        account.role,
+        created.id,
+        'feedback',
+        JSON.stringify({
+          kind: payload.kind,
+          reportCategory: payload.reportCategory,
+          relatedEntityId: payload.relatedEntityId,
+          rating: payload.rating,
+        }),
+      ]
+    );
+
     reply.code(201).send({ data: { id: created.id } });
   });
 
@@ -142,6 +184,22 @@ export async function reportsRoutes(fastify: FastifyInstance) {
 
     // Add acknowledgment for this user instead of changing global status
     await acknowledgeReport(params.data.id, account.cksCode ?? '', account.role);
+
+    // Create activity record
+    await query(
+      `INSERT INTO system_activity (description, activity_type, actor_id, actor_role, target_id, target_type, metadata)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [
+        `${account.role} acknowledged report ${params.data.id}`,
+        'report_acknowledged',
+        account.cksCode ?? '',
+        account.role,
+        params.data.id,
+        'report',
+        JSON.stringify({}),
+      ]
+    );
+
     reply.send({ data: { id: params.data.id, acknowledged: true } });
   });
 
@@ -213,6 +271,25 @@ export async function reportsRoutes(fastify: FastifyInstance) {
     const actionTaken = body.success ? body.data.action_taken : undefined;
 
     await updateReportStatus(params.data.id, 'resolved', account.cksCode ?? '', resolutionNotes, actionTaken);
+
+    // Create activity record
+    await query(
+      `INSERT INTO system_activity (description, activity_type, actor_id, actor_role, target_id, target_type, metadata)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [
+        `${account.role} resolved report ${params.data.id}`,
+        'report_resolved',
+        account.cksCode ?? '',
+        account.role,
+        params.data.id,
+        'report',
+        JSON.stringify({
+          resolution_notes: resolutionNotes,
+          action_taken: actionTaken,
+        }),
+      ]
+    );
+
     reply.send({ data: { id: params.data.id, status: 'resolved' } });
   });
 
@@ -235,6 +312,22 @@ export async function reportsRoutes(fastify: FastifyInstance) {
 
     // Add acknowledgment for this user instead of changing global status
     await acknowledgeFeedback(params.data.id, account.cksCode ?? '', account.role);
+
+    // Create activity record
+    await query(
+      `INSERT INTO system_activity (description, activity_type, actor_id, actor_role, target_id, target_type, metadata)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [
+        `${account.role} acknowledged feedback ${params.data.id}`,
+        'feedback_acknowledged',
+        account.cksCode ?? '',
+        account.role,
+        params.data.id,
+        'feedback',
+        JSON.stringify({}),
+      ]
+    );
+
     reply.send({ data: { id: params.data.id, acknowledged: true } });
   });
 

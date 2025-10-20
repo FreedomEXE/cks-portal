@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
 import { TabSection } from '@cks/ui';
 import ReportCard, { type ReportFeedback } from './ReportCard';
-import ReportDetailsModal from './ReportDetailsModal';
 import { getReasonsForCategory, type ReportCategory, CATEGORY_LABELS } from './reportReasons';
 
 interface ReportsSectionProps {
@@ -19,6 +18,8 @@ interface ReportsSectionProps {
   fetchServices?: () => Promise<any[]>;
   fetchProcedures?: () => Promise<any[]>;
   fetchOrders?: () => Promise<any[]>;
+  // NEW: Callback when user clicks a report/feedback
+  onReportClick?: (reportId: string, reportType: 'report' | 'feedback') => void;
 }
 
 const ReportsSection: React.FC<ReportsSectionProps> = ({
@@ -34,10 +35,10 @@ const ReportsSection: React.FC<ReportsSectionProps> = ({
   fetchServices,
   fetchProcedures,
   fetchOrders,
+  onReportClick,
 }) => {
   const [activeTab, setActiveTab] = useState('reports');
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedReport, setSelectedReport] = useState<ReportFeedback | null>(null);
 
   // Determine if user can create reports/feedback at all
   const canCreate = ['contractor', 'customer', 'center', 'manager'].includes(role.toLowerCase());
@@ -564,8 +565,10 @@ const ReportsSection: React.FC<ReportsSectionProps> = ({
               onResolve={handleResolve}
               onViewDetails={(id) => {
                 const reportToView = allReports.find(r => r.id === id);
-                if (reportToView) {
-                  setSelectedReport(reportToView);
+                if (reportToView && onReportClick) {
+                  // Use new modal callback if provided
+                  const reportType = reportToView.type || (reports.find(r => r.id === id) ? 'report' : 'feedback');
+                  onReportClick(id, reportType);
                 }
               }}
             />
@@ -606,15 +609,6 @@ const ReportsSection: React.FC<ReportsSectionProps> = ({
         {activeTab === 'create' && canCreate && renderSubmitForm()}
         {activeTab !== 'create' && renderReportsList()}
       </TabSection>
-
-      {/* Report Details Modal */}
-      <ReportDetailsModal
-        isOpen={!!selectedReport}
-        onClose={() => setSelectedReport(null)}
-        report={selectedReport}
-        currentUser={userId}
-        userRole={role}
-      />
     </>
   );
 };
