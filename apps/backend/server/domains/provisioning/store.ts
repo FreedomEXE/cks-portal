@@ -234,7 +234,7 @@ export async function createManager(
   await recordActivity({
     actor,
     activityType: 'manager_created',
-    description: `Manager ${id} created`,
+    description: `Created Manager ${id}`,
     targetId: id,
     targetType: 'manager',
     metadata: {
@@ -345,7 +345,7 @@ export async function createContractor(
   await recordActivity({
     actor,
     activityType: 'contractor_created',
-    description: `Contractor ${id} created`,
+    description: `Created Contractor ${id}`,
     targetId: id,
     targetType: 'contractor',
     metadata: {
@@ -455,7 +455,7 @@ export async function createCustomer(
   await recordActivity({
     actor,
     activityType: 'customer_created',
-    description: `Customer ${id} created`,
+    description: `Created Customer ${id}`,
     targetId: id,
     targetType: 'customer',
     metadata: { name: payload.name.trim(), clerkUserId: row.clerk_user_id },
@@ -563,7 +563,7 @@ export async function createCenter(
   await recordActivity({
     actor,
     activityType: 'center_created',
-    description: `Center ${id} created`,
+    description: `Created Center ${id}`,
     targetId: id,
     targetType: 'center',
     metadata: { name: payload.name.trim(), clerkUserId: row.clerk_user_id },
@@ -669,7 +669,7 @@ export async function createCrew(
   await recordActivity({
     actor,
     activityType: 'crew_created',
-    description: `Crew ${id} created`,
+    description: `Created Crew ${id}`,
     targetId: id,
     targetType: 'crew',
     metadata: { name: payload.name.trim(), clerkUserId: row.clerk_user_id },
@@ -779,7 +779,7 @@ export async function createWarehouse(
   await recordActivity({
     actor,
     activityType: 'warehouse_created',
-    description: `Warehouse ${id} created`,
+    description: `Created Warehouse ${id}`,
     targetId: id,
     targetType: 'warehouse',
     metadata: { name: payload.name.trim(), clerkUserId: row.clerk_user_id },

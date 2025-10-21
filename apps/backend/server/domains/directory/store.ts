@@ -811,7 +811,7 @@ async function listFeedback(limit = DEFAULT_LIMIT): Promise<FeedbackDirectoryEnt
 }
 
 async function listActivities(limit = DEFAULT_LIMIT): Promise<ActivityEntry[]> {
-  const result = await query<ActivityRow>('SELECT activity_id, description, activity_type, actor_id, actor_role, target_id, target_type, metadata, created_at FROM system_activity ORDER BY created_at DESC', []);
+  const result = await query<ActivityRow>('SELECT activity_id, description, activity_type, actor_id, actor_role, target_id, target_type, metadata, created_at FROM system_activity WHERE cleared_at IS NULL ORDER BY created_at DESC', []);
   return result.rows.map((row) => ({
     id: String(row.activity_id),
     description: row.description,
@@ -823,6 +823,16 @@ async function listActivities(limit = DEFAULT_LIMIT): Promise<ActivityEntry[]> {
     metadata: row.metadata ?? null,
     createdAt: toIso(row.created_at) ?? new Date().toISOString(),
   }));
+}
+
+export async function clearActivity(activityId: number, userId: string): Promise<boolean> {
+  const result = await query('UPDATE system_activity SET cleared_at = NOW(), cleared_by = $1 WHERE activity_id = $2 AND cleared_at IS NULL', [userId, activityId]);
+  return (result.rowCount ?? 0) > 0;
+}
+
+export async function clearAllActivities(userId: string): Promise<number> {
+  const result = await query('UPDATE system_activity SET cleared_at = NOW(), cleared_by = $1 WHERE cleared_at IS NULL', [userId]);
+  return result.rowCount ?? 0;
 }
 
 type DirectoryLoaderMap = {

@@ -82,7 +82,7 @@ export async function reportsRoutes(fastify: FastifyInstance) {
       `INSERT INTO system_activity (description, activity_type, actor_id, actor_role, target_id, target_type, metadata)
        VALUES ($1, $2, $3, $4, $5, $6, $7)`,
       [
-        `${account.role} filed a report: ${title || 'Untitled Report'}`,
+        `Filed Report ${created.id}`,
         'report_created',
         account.cksCode ?? '',
         account.role,
@@ -145,7 +145,7 @@ export async function reportsRoutes(fastify: FastifyInstance) {
       `INSERT INTO system_activity (description, activity_type, actor_id, actor_role, target_id, target_type, metadata)
        VALUES ($1, $2, $3, $4, $5, $6, $7)`,
       [
-        `${account.role} submitted feedback: ${payload.title}`,
+        `Submitted Feedback ${created.id}`,
         'feedback_created',
         account.cksCode ?? '',
         account.role,
@@ -190,7 +190,7 @@ export async function reportsRoutes(fastify: FastifyInstance) {
       `INSERT INTO system_activity (description, activity_type, actor_id, actor_role, target_id, target_type, metadata)
        VALUES ($1, $2, $3, $4, $5, $6, $7)`,
       [
-        `${account.role} acknowledged report ${params.data.id}`,
+        `Acknowledged Report ${params.data.id}`,
         'report_acknowledged',
         account.cksCode ?? '',
         account.role,
@@ -277,7 +277,7 @@ export async function reportsRoutes(fastify: FastifyInstance) {
       `INSERT INTO system_activity (description, activity_type, actor_id, actor_role, target_id, target_type, metadata)
        VALUES ($1, $2, $3, $4, $5, $6, $7)`,
       [
-        `${account.role} resolved report ${params.data.id}`,
+        `Resolved Report ${params.data.id}`,
         'report_resolved',
         account.cksCode ?? '',
         account.role,
@@ -318,7 +318,7 @@ export async function reportsRoutes(fastify: FastifyInstance) {
       `INSERT INTO system_activity (description, activity_type, actor_id, actor_role, target_id, target_type, metadata)
        VALUES ($1, $2, $3, $4, $5, $6, $7)`,
       [
-        `${account.role} acknowledged feedback ${params.data.id}`,
+        `Acknowledged Feedback ${params.data.id}`,
         'feedback_acknowledged',
         account.cksCode ?? '',
         account.role,

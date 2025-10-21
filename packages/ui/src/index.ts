@@ -49,6 +49,9 @@ export { default as ActionModal } from './modals/ActionModal';
 export { OrderActionModal } from './modals/OrderActionModal/OrderActionModal';
 export type { OrderActionModalProps } from './modals/OrderActionModal/OrderActionModal';
 
+export { ActivityHistoryModal } from './modals/ActivityHistoryModal';
+export type { ActivityHistoryModalProps, ActivityHistoryItem } from './modals/ActivityHistoryModal';
+
 export { default as OrderDetailsModal } from './modals/OrderDetailsModal';
 
 export { default as EditOrderModal } from './modals/EditOrderModal';

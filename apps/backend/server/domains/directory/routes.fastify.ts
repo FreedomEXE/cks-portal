@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import z from 'zod';
 import { requireActiveAdmin } from '../adminUsers/guards';
-import { listDirectoryResource } from './store';
+import { listDirectoryResource, clearActivity, clearAllActivities } from './store';
 import { directoryResourceSchemas } from './validators';
 import type { DirectoryResourceKey } from './types';
 
@@ -60,6 +60,54 @@ export async function registerDirectoryRoutes(server: FastifyInstance) {
     } catch (error) {
       request.log.error({ err: error, resource }, "directory resource fetch failed");
       reply.code(500).send({ error: 'Failed to load directory data' });
+    }
+  });
+
+  // Clear individual activity
+  server.post('/api/admin/activities/:activityId/clear', async (request, reply) => {
+    const admin = await requireActiveAdmin(request, reply);
+    if (!admin) {
+      return;
+    }
+
+    const activityIdSchema = z.object({
+      activityId: z.coerce.number().int().positive(),
+    });
+
+    const paramsResult = activityIdSchema.safeParse(request.params);
+    if (!paramsResult.success) {
+      reply.code(400).send({ error: 'Invalid activity ID' });
+      return;
+    }
+
+    const { activityId } = paramsResult.data;
+
+    try {
+      const success = await clearActivity(activityId, admin.userId);
+      if (success) {
+        reply.send({ success: true, message: 'Activity cleared' });
+      } else {
+        reply.code(404).send({ error: 'Activity not found or already cleared' });
+      }
+    } catch (error) {
+      request.log.error({ err: error, activityId }, "Failed to clear activity");
+      reply.code(500).send({ error: 'Failed to clear activity' });
+    }
+  });
+
+  // Clear all activities
+  server.post('/api/admin/activities/clear-all', async (request, reply) => {
+    const admin = await requireActiveAdmin(request, reply);
+    if (!admin) {
+      return;
+    }
+
+    try {
+      const count = await clearAllActivities(admin.userId);
+      reply.send({ success: true, count, message: `Cleared ${count} activities` });
+    } catch (error) {
+      request.log.error({ err: error }, "Failed to clear all activities");
+      reply.code(500).send({ error: 'Failed to clear all activities' });
     }
   });
 }

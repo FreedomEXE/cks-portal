@@ -21,13 +21,14 @@
 import { RecentActivity, type Activity } from '@cks/domain-widgets';
 import { useCallback, useMemo } from 'react';
 import { fetchOrderForActivity, parseActivityError } from '../shared/utils/activityHelpers';
+import { useModals } from '../contexts/ModalProvider';
 
 export interface ActivityFeedProps {
   activities: Activity[];
   hub?: 'admin' | 'manager' | 'center' | 'contractor' | 'customer' | 'crew' | 'warehouse';
   isLoading?: boolean;
   error?: Error | null;
-  onClear?: () => void;
+  onClearActivity?: (activityId: string) => void;
   onOpenOrderActions?: (data: { entity: any; state: string; deletedAt?: string; deletedBy?: string }) => void;
   onOpenOrderModal?: (order: any) => void;
   onOpenServiceModal?: (service: any) => void;
@@ -44,7 +45,7 @@ export function ActivityFeed({
   activities,
   isLoading = false,
   error = null,
-  onClear,
+  onClearActivity,
   onOpenOrderActions,
   onOpenOrderModal,
   onOpenServiceModal,
@@ -52,6 +53,8 @@ export function ActivityFeed({
   onOpenActionableOrder,
   onError,
 }: ActivityFeedProps) {
+  const modals = useModals();
+
   const handleActivityClick = useCallback(
     async (activity: Activity) => {
       console.log('[ActivityFeed] Activity clicked:', activity);
@@ -132,15 +135,9 @@ export function ActivityFeed({
 
       // Handle report and feedback activities
       if (targetType === 'report' || targetType === 'feedback') {
-        if (!onOpenReportModal) {
-          console.warn('[ActivityFeed] onOpenReportModal not provided, ignoring click');
-          return;
-        }
-
-        // For now, pass the activity metadata as the report data
-        // The modal will need to fetch full details if needed
+        // Use modal context directly - no callback needed
         console.log('[ActivityFeed] Opening report/feedback modal:', { targetId, targetType });
-        onOpenReportModal({ id: targetId, type: targetType });
+        modals.openReportModal(targetId, targetType as 'report' | 'feedback');
         return;
       }
 
@@ -148,17 +145,21 @@ export function ActivityFeed({
       console.warn('[ActivityFeed] Unsupported entity type:', targetType);
       onError?.(`Cannot open ${targetType} entities yet`);
     },
-    [onOpenOrderActions, onOpenOrderModal, onOpenServiceModal, onOpenReportModal, onOpenActionableOrder, onError]
+    [onOpenOrderActions, onOpenOrderModal, onOpenServiceModal, onOpenReportModal, onOpenActionableOrder, onError, modals]
   );
 
-  // Map activities with onClick handlers
+  // Map activities with onClick and onClear handlers
   const activitiesWithHandlers = useMemo(
     () =>
       activities.map((activity) => ({
         ...activity,
         onClick: () => handleActivityClick(activity),
+        onClear: onClearActivity ? () => {
+          console.log('[ActivityFeed] Clearing activity:', activity.id);
+          onClearActivity(activity.id);
+        } : undefined,
       })),
-    [activities, handleActivityClick]
+    [activities, handleActivityClick, onClearActivity]
   );
 
   return (
@@ -166,7 +167,6 @@ export function ActivityFeed({
       activities={activitiesWithHandlers}
       isLoading={isLoading}
       error={error}
-      onClear={onClear}
       emptyMessage={
         error
           ? 'Failed to load activity feed.'

@@ -1911,7 +1911,7 @@ export async function createOrder(input: CreateOrderInput): Promise<HubOrderItem
   // Record activity: order_created
   await recordActivity({
     activityType: 'order_created',
-    description: `${input.orderType === 'product' ? 'Product' : 'Service'} order ${orderId} created`,
+    description: `Created ${input.orderType === 'product' ? 'Product' : 'Service'} Order ${orderId}`,
     actorId: creatorCode,
     actorRole: input.creator.role,
     targetId: orderId,
@@ -2489,23 +2489,23 @@ export async function applyOrderAction(input: OrderActionInput): Promise<HubOrde
   switch (input.action) {
     case "start-delivery":
       activityType = 'delivery_started';
-      activityDescription = `Delivery started for ${orderType === 'product' ? 'product' : 'service'} order ${input.orderId}`;
+      activityDescription = `Started Delivery for ${orderType === 'product' ? 'Product' : 'Service'} Order ${input.orderId}`;
       break;
     case "deliver":
       activityType = 'order_delivered';
-      activityDescription = `${orderType === 'product' ? 'Product' : 'Service'} order ${input.orderId} delivered`;
+      activityDescription = `Delivered ${orderType === 'product' ? 'Product' : 'Service'} Order ${input.orderId}`;
       break;
     case "complete":
       activityType = 'order_completed';
-      activityDescription = `Service order ${input.orderId} completed`;
+      activityDescription = `Completed Service Order ${input.orderId}`;
       break;
     case "cancel":
       activityType = 'order_cancelled';
-      activityDescription = `${orderType === 'product' ? 'Product' : 'Service'} order ${input.orderId} cancelled`;
+      activityDescription = `Cancelled ${orderType === 'product' ? 'Product' : 'Service'} Order ${input.orderId}`;
       break;
     case "reject":
       activityType = 'order_rejected';
-      activityDescription = `${orderType === 'product' ? 'Product' : 'Service'} order ${input.orderId} rejected`;
+      activityDescription = `Rejected ${orderType === 'product' ? 'Product' : 'Service'} Order ${input.orderId}`;
       break;
   }
 

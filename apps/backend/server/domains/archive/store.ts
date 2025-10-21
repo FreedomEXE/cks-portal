@@ -98,6 +98,13 @@ function redactPII(entityType: string, snapshot: any): any {
   return redacted;
 }
 
+/**
+ * Capitalize entity type for display in activity descriptions
+ */
+function capitalizeEntityType(entityType: string): string {
+  return entityType.charAt(0).toUpperCase() + entityType.slice(1);
+}
+
 async function recordActivity(
   activityType: string,
   description: string,
@@ -546,7 +553,7 @@ export async function archiveEntity(operation: ArchiveOperation): Promise<{ succ
 
   await recordActivity(
     `${operation.entityType}_archived`,
-    `Archived ${operation.entityType} ${normalizedId}`,
+    `Archived ${capitalizeEntityType(operation.entityType)} ${normalizedId}`,
     normalizedId,
     operation.entityType,
     operation.actor,
@@ -638,7 +645,7 @@ export async function restoreEntity(operation: RestoreOperation): Promise<{ succ
 
   await recordActivity(
     `${operation.entityType}_restored`,
-    `Restored ${operation.entityType} ${normalizedId} from archive`,
+    `Restored ${capitalizeEntityType(operation.entityType)} ${normalizedId}`,
     normalizedId,
     operation.entityType,
     operation.actor
@@ -918,7 +925,7 @@ export async function hardDeleteEntity(
     // This ensures snapshot is saved before entity disappears
     await recordActivity(
       `${operation.entityType}_hard_deleted`,
-      `Permanently deleted ${operation.entityType} ${normalizedId}`,
+      `Permanently Deleted ${capitalizeEntityType(operation.entityType)} ${normalizedId}`,
       normalizedId,
       operation.entityType,
       operation.actor,

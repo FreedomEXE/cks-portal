@@ -337,7 +337,7 @@ export async function assignContractorToManager(
   await recordActivity({
     actor,
     activityType: 'contractor_assigned_to_manager',
-    description: `Assigned ${contractor.contractor_id} to manager ${manager.manager_id}`,
+    description: `Assigned Contractor ${contractor.contractor_id} to Manager ${manager.manager_id}`,
     targetId: contractor.contractor_id,
     targetType: 'contractor',
     metadata: {
@@ -409,7 +409,7 @@ export async function assignCustomerToContractor(
   await recordActivity({
     actor,
     activityType: 'customer_assigned_to_contractor',
-    description: `Assigned ${customer.customer_id} to contractor ${contractor.contractor_id}`,
+    description: `Assigned Customer ${customer.customer_id} to Contractor ${contractor.contractor_id}`,
     targetId: customer.customer_id,
     targetType: 'customer',
     metadata: {
@@ -474,7 +474,7 @@ export async function assignCenterToCustomer(
   await recordActivity({
     actor,
     activityType: 'center_assigned_to_customer',
-    description: `Assigned ${center.center_id} to customer ${customer.customer_id}`,
+    description: `Assigned Center ${center.center_id} to Customer ${customer.customer_id}`,
     targetId: center.center_id,
     targetType: 'center',
     metadata: {
@@ -527,7 +527,7 @@ export async function assignCrewToCenter(
   await recordActivity({
     actor,
     activityType: 'crew_assigned_to_center',
-    description: `Assigned ${crew.crew_id} to center ${center.center_id}`,
+    description: `Assigned Crew ${crew.crew_id} to Center ${center.center_id}`,
     targetId: crew.crew_id,
     targetType: 'crew',
     metadata: {
@@ -572,7 +572,7 @@ export async function unassignContractorFromManager(
   await recordActivity({
     actor,
     activityType: 'contractor_unassigned_from_manager',
-    description: `Unassigned contractor ${contractor.contractor_id} from manager`,
+    description: `Unassigned Contractor ${contractor.contractor_id}`,
     targetId: contractor.contractor_id,
     targetType: 'contractor',
     metadata: {
@@ -613,7 +613,7 @@ export async function unassignCustomerFromContractor(
   await recordActivity({
     actor,
     activityType: 'customer_unassigned_from_contractor',
-    description: `Unassigned customer ${customer.customer_id} from contractor`,
+    description: `Unassigned Customer ${customer.customer_id}`,
     targetId: customer.customer_id,
     targetType: 'customer',
     metadata: {
@@ -655,7 +655,7 @@ export async function unassignCenterFromCustomer(
   await recordActivity({
     actor,
     activityType: 'center_unassigned_from_customer',
-    description: `Unassigned center ${center.center_id} from customer`,
+    description: `Unassigned Center ${center.center_id}`,
     targetId: center.center_id,
     targetType: 'center',
     metadata: {
@@ -696,7 +696,7 @@ export async function unassignCrewFromCenter(
   await recordActivity({
     actor,
     activityType: 'crew_unassigned_from_center',
-    description: `Unassigned crew member ${crew.crew_id} from center`,
+    description: `Unassigned Crew ${crew.crew_id}`,
     targetId: crew.crew_id,
     targetType: 'crew',
     metadata: {

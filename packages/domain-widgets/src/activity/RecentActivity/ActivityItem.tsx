@@ -7,6 +7,7 @@ interface ActivityItemProps {
   role?: string; // Role that generated this activity
   title?: string; // Optional title for the activity
   onClick?: () => void; // Optional click handler for activity routing
+  onClear?: () => void; // Optional clear handler for individual activity
 }
 
 // Role-based color schemes
@@ -76,7 +77,8 @@ export function ActivityItem({
   type = 'info',
   role = 'default',
   title,
-  onClick
+  onClick,
+  onClear
 }: ActivityItemProps) {
   const colors = roleColors[role] || roleColors.default;
   const relativeTime = getRelativeTime(timestamp);
@@ -91,11 +93,13 @@ export function ActivityItem({
     <div
       style={{
         padding: '14px 16px',
+        paddingRight: onClear ? '48px' : '16px',
         backgroundColor: colors.bg,
         borderRadius: '6px',
         marginBottom: '8px',
         transition: 'transform 0.2s, box-shadow 0.2s',
         cursor: isClickable ? 'pointer' : 'default',
+        position: 'relative',
       }}
       onClick={onClick}
       onMouseEnter={(e) => {
@@ -112,6 +116,45 @@ export function ActivityItem({
         e.currentTarget.style.boxShadow = 'none';
       }}
     >
+      {onClear && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onClear();
+          }}
+          style={{
+            position: 'absolute',
+            top: '50%',
+            right: '20px',
+            transform: 'translateY(-50%)',
+            background: 'transparent',
+            border: 'none',
+            cursor: 'pointer',
+            padding: '4px',
+            borderRadius: '3px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            opacity: 0.25,
+            transition: 'opacity 0.2s, background 0.2s',
+            fontSize: '14px',
+            lineHeight: 1,
+            color: '#6b7280',
+            fontWeight: 400,
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.opacity = '0.6';
+            e.currentTarget.style.background = 'rgba(0, 0, 0, 0.04)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.opacity = '0.25';
+            e.currentTarget.style.background = 'transparent';
+          }}
+          title="Clear this activity"
+        >
+          ✕
+        </button>
+      )}
       {title && (
         <div
           style={{
