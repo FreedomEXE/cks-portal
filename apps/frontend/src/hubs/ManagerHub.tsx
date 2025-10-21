@@ -10,7 +10,6 @@ import { EcosystemTree } from '@cks/domain-widgets';
 import { useFormattedActivities } from '../shared/activity/useFormattedActivities';
 import { ActivityFeed } from '../components/ActivityFeed';
 import ActivityModalGateway from '../components/ActivityModalGateway';
-import { useReportDetails } from '../hooks/useReportDetails';
 import { useEntityActions } from '../hooks/useEntityActions';
 import { OrderActionModal } from '@cks/ui';
 import {
@@ -28,17 +27,16 @@ import { managerOverviewCards } from '@cks/domain-widgets';
 import {
   Button,
   DataTable,
-  ModalProvider,
   OrderDetailsModal,
   ServiceDetailsModal,
   ServiceViewModal,
   CatalogServiceModal,
-  ReportModal,
   PageHeader,
   PageWrapper,
   Scrollbar,
   TabSection,
 } from '@cks/ui';
+import { ModalProvider, useModals } from '../contexts';
 import OrderDetailsGateway from '../components/OrderDetailsGateway';
 import MyHubSection from '../components/MyHubSection';
 import { useCatalogItems } from '../shared/api/catalog';
@@ -442,7 +440,66 @@ function formatReportsTo(value: string | null | undefined): string | null {
 
 // Sorting is handled within the shared ecosystem builder where applicable
 
+// Main wrapper component that sets up ModalProvider
 export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps) {
+  const { code } = useAuth();
+  const managerCode = useMemo(() => normalizeId(code), [code]);
+  const { data: reportsData } = useHubReports(managerCode);
+  const { data: ordersData } = useHubOrders(managerCode);
+  const { data: scopeData } = useHubRoleScope(managerCode);
+  const { mutate } = useSWRConfig();
+
+  // Get available crew from scope
+  const availableCrew = useMemo(() => {
+    if (!scopeData || scopeData.role !== 'manager') return [];
+    const crewEntries = scopeData.relationships?.crew || [];
+    return crewEntries.map((c: any) => ({ code: c.id, name: c.name || c.id }));
+  }, [scopeData]);
+
+  // Service action handlers
+  const handleServiceSave = useCallback(async (serviceId: string, updates: any) => {
+    const { apiFetch } = await import('../shared/api/client');
+    await apiFetch(`/services/${encodeURIComponent(serviceId)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates),
+    });
+    mutate(`/hub/orders/${managerCode}`, undefined, { revalidate: true });
+  }, [managerCode, mutate]);
+
+  const handleServiceAction = useCallback(async (serviceId: string, action: 'start' | 'complete' | 'cancel') => {
+    const { applyServiceAction } = await import('../shared/api/hub');
+    await applyServiceAction(serviceId, action);
+    mutate(`/hub/orders/${managerCode}`, undefined, { revalidate: true });
+  }, [managerCode, mutate]);
+
+  const handleSendCrewRequest = useCallback(async (serviceId: string, crewCodes: string[]) => {
+    const { apiFetch } = await import('../shared/api/client');
+    await apiFetch(`/services/${encodeURIComponent(serviceId)}/crew-requests`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ crewCodes }),
+    });
+    mutate(`/hub/orders/${managerCode}`, undefined, { revalidate: true });
+  }, [managerCode, mutate]);
+
+  return (
+    <ModalProvider
+      currentUser={managerCode || ''}
+      reportsData={reportsData}
+      ordersData={ordersData}
+      availableCrew={availableCrew}
+      onServiceSave={handleServiceSave}
+      onServiceAction={handleServiceAction}
+      onSendCrewRequest={handleSendCrewRequest}
+    >
+      <ManagerHubContent initialTab={initialTab} />
+    </ModalProvider>
+  );
+}
+
+// Inner component that has access to modal context
+function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
   const navigate = useNavigate();
 
   const [activeTab, setActiveTab] = useState(initialTab);
@@ -450,9 +507,7 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
   const [servicesSearchQuery, setServicesSearchQuery] = useState('');
   const [toast, setToast] = useState<string | null>(null);
 
-  // Service modal state (for Active Services section)
-  const [showServiceDetails, setShowServiceDetails] = useState(false);
-  const [serviceDetails, setServiceDetails] = useState<any>(null);
+  // Catalog service modal state (for My Services section)
   const [showCatalogServiceModal, setShowCatalogServiceModal] = useState(false);
   const [selectedCatalogService, setSelectedCatalogService] = useState<{ serviceId: string; name: string; category: string | null; status?: string } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -485,7 +540,8 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
   const logout = useLogout();
   const { setHubLoading } = useHubLoading();
 
-
+  // Access modal context
+  const modals = useModals();
 
   const managerCode = useMemo(() => normalizeId(code), [code]);
 
@@ -577,11 +633,6 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
   // Fetch reports data
   const { data: reportsData, isLoading: reportsLoading, mutate: mutateReports } = useHubReports(managerCode);
 
-    const { report: selectedReportFromActivityFull } = useReportDetails({
-    reportId: selectedReportFromActivity?.id || null,
-    reportType: selectedReportFromActivity?.type || null,
-    reportsData,
-  });
   // IMPORTANT: Pass through structured fields from backend (reportCategory, relatedEntityId, reportReason, priority)
   // WarehouseHub already passes raw items; align ManagerHub to preserve all fields
   const managerReports = useMemo<ReportFeedback[]>(
@@ -737,18 +788,9 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
               alert(err instanceof Error ? err.message : 'Failed to verify service');
             }
           };
-          const onViewDetails = async () => {
-            try {
-              const { apiFetch } = await import('../shared/api/client');
-              const res = await apiFetch(`/services/${encodeURIComponent(rawServiceId)}`);
-              if (res && res.data) {
-                setServiceDetails(res.data);
-                setShowServiceDetails(true);
-              }
-            } catch (err) {
-              console.error('[manager] failed to load service details', err);
-              alert('Failed to load service details. Please try again.');
-            }
+          const onViewDetails = () => {
+            // Open service modal in editable mode (manager has full control)
+            modals.openServiceModal(rawServiceId, true);
           };
 
           const svcStatus = (meta?.serviceStatus || '').toLowerCase().replace(/\s+/g, '_');
@@ -925,7 +967,6 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
 
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [actionOrder, setActionOrder] = useState<any | null>(null);
-  const [selectedReportFromActivity, setSelectedReportFromActivity] = useState<{ id: string; type: 'report' | 'feedback' } | null>(null);
 
   // Centralized entity action handler (replaces handleOrderAction)
   const { handleAction } = useEntityActions();
@@ -945,7 +986,6 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
   }
 
   return (
-    <ModalProvider>
       <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: '#f9fafb' }}>
         <MyHubSection
           hubName="Manager Hub"
@@ -970,7 +1010,6 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
                 hub="manager"
                 onOpenActionableOrder={(order) => setActionOrder(order)}
                 onOpenOrderModal={(order) => setSelectedOrderId(order?.orderId || order?.id || null)}
-                onOpenReportModal={setSelectedReportFromActivity}
                 isLoading={activitiesLoading}
                 error={activitiesError}
                 onError={(msg) => toast.error(msg)}
@@ -1068,17 +1107,9 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
                     showSearch={false}
                     externalSearchQuery={servicesSearchQuery}
                     maxItems={10}
-                    onRowClick={async (row: any) => {
-                      try {
-                        const { apiFetch } = await import('../shared/api/client');
-                        const payload = await apiFetch(`/services/${encodeURIComponent(row.serviceId)}`);
-                        if (payload && (payload as any).data) {
-                          setServiceDetails((payload as any).data);
-                          setShowServiceDetails(true);
-                        }
-                      } catch (err) {
-                        console.error('[manager] failed to load service details', err);
-                      }
+                    onRowClick={(row: any) => {
+                      // Open service modal in editable mode for active services
+                      modals.openServiceModal(row.serviceId, true);
                     }}
                   />
                 )}
@@ -1091,6 +1122,10 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
                     externalSearchQuery={servicesSearchQuery}
                     maxItems={10}
                     modalType="service-history"
+                    onRowClick={(row: any) => {
+                      // Open service modal in read-only mode for history
+                      modals.openServiceModal(row.serviceId, false);
+                    }}
                   />
                 )}
               </TabSection>
@@ -1277,7 +1312,7 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
                 console.log('[ManagerHub] onResolve complete');
               }}
               onReportClick={(reportId, reportType) => {
-                setSelectedReportFromActivity({ id: reportId, type: reportType });
+                modals.openReportModal(reportId, reportType);
               }}
             />
           </PageWrapper>
@@ -1324,109 +1359,6 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
         onArchive={async () => {}}
       />
 
-      {/* Service Details Modal - for Active Services section */}
-      <ServiceDetailsModal
-        isOpen={showServiceDetails}
-        onClose={() => { setShowServiceDetails(false); setServiceDetails(null); }}
-        service={serviceDetails ? { serviceId: serviceDetails.serviceId, title: serviceDetails.title, centerId: serviceDetails.centerId, metadata: serviceDetails.metadata } : null}
-        editable
-        availableCrew={crewEntries.map((c: any) => ({ code: c.id, name: c.name || c.id }))}
-        serviceStatus={serviceDetails?.metadata?.serviceStatus || 'created'}
-        serviceType={serviceDetails?.metadata?.serviceType || 'one-time'}
-        productOrders={(() => {
-          if (!serviceDetails?.serviceId) return [];
-          // Filter product orders linked to this service
-          return managerProductOrders
-            .filter((order) => {
-              const meta = (order as any).metadata || {};
-              return meta.serviceId === serviceDetails.serviceId;
-            })
-            .map((order) => {
-              const items = (order as any).items || [];
-              const productName = items.length > 0 ? items.map((i: any) => i.name).join(', ') : 'Product Order';
-              const totalQty = items.reduce((sum: number, i: any) => sum + (i.quantity || 0), 0);
-              return {
-                orderId: order.orderId,
-                productName,
-                quantity: totalQty,
-                status: order.status || 'pending',
-                requestedDate: order.requestedDate || order.orderDate || null,
-              };
-            });
-        })()}
-        onSendCrewRequest={async (crewCodes: string[]) => {
-          try {
-            if (!serviceDetails?.serviceId) return;
-            const { apiFetch } = await import('../shared/api/client');
-            await apiFetch(`/services/${encodeURIComponent(serviceDetails.serviceId)}/crew-requests`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ crewCodes }),
-            });
-            mutate(`/hub/orders/${managerCode}`, undefined, { revalidate: true });
-          } catch (err) {
-            console.error('[manager] failed to send crew request', err);
-            alert('Failed to send crew requests. Please try again.');
-            throw err;
-          }
-        }}
-        onSave={async (updates) => {
-          try {
-            if (!serviceDetails?.serviceId) return;
-            const { apiFetch } = await import('../shared/api/client');
-            await apiFetch(`/services/${encodeURIComponent(serviceDetails.serviceId)}`, {
-              method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(updates),
-            });
-            setShowServiceDetails(false);
-            setServiceDetails(null);
-            mutate(`/hub/orders/${managerCode}`, undefined, { revalidate: true });
-          } catch (err) {
-            console.error('[manager] failed to update service', err);
-          }
-        }}
-        onStartService={async () => {
-          try {
-            if (!serviceDetails?.serviceId) return;
-            const { applyServiceAction } = await import('../shared/api/hub');
-            await applyServiceAction(serviceDetails.serviceId, 'start');
-            mutate(`/hub/orders/${managerCode}`, undefined, { revalidate: true });
-            setToast('Service started');
-            setTimeout(() => setToast(null), 1800);
-          } catch (err) {
-            console.error('[manager] failed to start service', err);
-            alert(err instanceof Error ? err.message : 'Failed to start service');
-          }
-        }}
-        onCompleteService={async () => {
-          try {
-            if (!serviceDetails?.serviceId) return;
-            const { applyServiceAction } = await import('../shared/api/hub');
-            await applyServiceAction(serviceDetails.serviceId, 'complete');
-            mutate(`/hub/orders/${managerCode}`, undefined, { revalidate: true });
-            setToast('Service completed');
-            setTimeout(() => setToast(null), 1800);
-          } catch (err) {
-            console.error('[manager] failed to complete service', err);
-            alert(err instanceof Error ? err.message : 'Failed to complete service');
-          }
-        }}
-        onCancelService={async () => {
-          try {
-            if (!serviceDetails?.serviceId) return;
-            const reason = window.prompt('Please provide a reason for cancellation:');
-            if (!reason) return;
-            const { applyServiceAction } = await import('../shared/api/hub');
-            await applyServiceAction(serviceDetails.serviceId, 'cancel');
-            mutate(`/hub/orders/${managerCode}`, undefined, { revalidate: true });
-          } catch (err) {
-            console.error('[manager] failed to cancel service', err);
-            alert(err instanceof Error ? err.message : 'Failed to cancel service');
-          }
-        }}
-      />
-
       {/* Catalog Service Modal - for My Services section (view-only) */}
       <CatalogServiceModal
         isOpen={showCatalogServiceModal}
@@ -1454,17 +1386,7 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
           {toast}
         </div>
       )}
-
-      {/* ReportModal - for reports/feedback opened from Activity Feed */}
-      <ReportModal
-        isOpen={!!selectedReportFromActivity}
-        onClose={() => setSelectedReportFromActivity(null)}
-        report={selectedReportFromActivityFull}
-        currentUser={managerCode || ''}
-        showQuickActions={true}
-      />
       </div>
-    </ModalProvider>
   );
 }
 

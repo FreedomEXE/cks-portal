@@ -36,10 +36,10 @@ import {
   TabContainer,
   CatalogServiceModal,
   CatalogProductModal,
-  ReportModal,
   UserModal,
   type UserAction,
 } from '@cks/ui';
+import { ModalProvider, useModals } from '../contexts';
 import ActivityModalGateway from '../components/ActivityModalGateway';
 import type { ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -84,7 +84,6 @@ import {
   type UpdateOrderFieldsRequest,
 } from '../shared/api/hub';
 import { ActivityFeed } from '../components/ActivityFeed';
-import { useReportDetails } from '../hooks/useReportDetails';
 
 // Removed unused: const MILLIS_PER_DAY = 1000 * 60 * 60 * 24;
 
@@ -215,7 +214,30 @@ interface DirectorySectionConfig {
   emptyMessage: string;
 }
 
+// Main wrapper component that sets up ModalProvider
 export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
+  const { data: directoryReports } = useReports();
+  const { data: directoryFeedback } = useFeedback();
+  const { code } = useAuth();
+
+  // Unify shape to match useReportDetails expectations { reports, feedback }
+  const reportsData = useMemo(
+    () => ({
+      reports: directoryReports ?? [],
+      feedback: directoryFeedback ?? [],
+    }),
+    [directoryReports, directoryFeedback],
+  );
+
+  return (
+    <ModalProvider currentUser={code || ''} reportsData={reportsData}>
+      <AdminHubContent initialTab={initialTab} />
+    </ModalProvider>
+  );
+}
+
+// Inner component that has access to modal context
+function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
   const { code, firstName, fullName } = useAuth();
   const { setHubLoading } = useHubLoading();
 
@@ -238,7 +260,6 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
   // merged assign flow into CatalogServiceModal
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [selectedOrderForEdit, setSelectedOrderForEdit] = useState<HubOrderItem | null>(null);
-  const [selectedReportFromActivity, setSelectedReportFromActivity] = useState<{ id: string; type: 'report' | 'feedback' } | null>(null);
   const [selectedUser, setSelectedUser] = useState<Record<string, any> | null>(null);
   const [showUserModal, setShowUserModal] = useState(false);
   const logout = useLogout();
@@ -272,11 +293,8 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
 
   const [activityFeed, setActivityFeed] = useState<Activity[]>([]);
 
-  const { report: selectedReportFromActivityFull } = useReportDetails({
-    reportId: selectedReportFromActivity?.id || null,
-    reportType: selectedReportFromActivity?.type || null,
-    reportsData,
-  });
+  // Access modal context
+  const modals = useModals();
 
   // Signal when critical data is loaded
   useEffect(() => {
@@ -1049,7 +1067,7 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
       emptyMessage: 'No reports filed.',
       onRowClick: (row: any) => {
         // Open new ReportModal (same as Activity Feed)
-        setSelectedReportFromActivity({ id: row.id, type: 'report' });
+        modals.openReportModal(row.id, 'report');
       },
     },
     feedback: {
@@ -1065,7 +1083,7 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
       emptyMessage: 'No feedback submitted.',
       onRowClick: (row: any) => {
         // Open new ReportModal (same as Activity Feed)
-        setSelectedReportFromActivity({ id: row.id, type: 'feedback' });
+        modals.openReportModal(row.id, 'feedback');
       },
     },
   }) satisfies Record<string, DirectorySectionConfig>, [
@@ -1337,7 +1355,11 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
     );
   };
 
-  const handleClearActivity = () => setActivityFeed([]);
+  // Clear individual activity
+  const handleClearActivity = (activityId: string) => {
+    console.log('[AdminHub] Clearing activity:', activityId, '(UI only - no backend)');
+    setActivityFeed((prev) => prev.filter((a) => a.id !== activityId));
+  };
 
   const handleOrderActions = useCallback((data: { entity: any; state: string; deletedAt?: string; deletedBy?: string }) => {
     const { entity, state } = data;
@@ -1399,10 +1421,9 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
               <ActivityFeed
                 activities={activityFeed}
                 hub="admin"
-                onClear={handleClearActivity}
+                onClearActivity={handleClearActivity}
                 onOpenOrderModal={(order) => setSelectedOrderId(order?.orderId || order?.id || null)}
                 onOpenServiceModal={setSelectedServiceCatalog}
-                onOpenReportModal={setSelectedReportFromActivity}
                 isLoading={activitiesLoading}
                 error={activitiesError}
                 onError={(message) => {
@@ -1456,7 +1477,7 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
           setShowServiceCatalogModal(true);
         }}
         onViewReportDetails={(reportId: string, reportType: 'report' | 'feedback') => {
-          setSelectedReportFromActivity({ id: reportId, type: reportType });
+          modals.openReportModal(reportId, reportType);
         }}
       />
           ) : activeTab === 'support' ? (
@@ -2064,15 +2085,6 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
             alert(`Failed to update order: ${error instanceof Error ? error.message : 'Unknown error'}`);
           }
         }}
-      />
-
-      {/* ReportModal - for reports/feedback from Activity Feed AND Directory */}
-      <ReportModal
-        isOpen={!!selectedReportFromActivity}
-        onClose={() => setSelectedReportFromActivity(null)}
-        report={selectedReportFromActivityFull}
-        currentUser={code || ''}
-        showQuickActions={true}
       />
 
       <UserModal

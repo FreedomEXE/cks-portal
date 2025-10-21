@@ -27,7 +27,8 @@ import {
   type Activity,
 } from '@cks/domain-widgets';
 import { warehouseOverviewCards } from '@cks/domain-widgets';
-import { Button, DataTable, ModalProvider, PageHeader, PageWrapper, Scrollbar, TabSection, OrderActionModal, CatalogServiceModal, ReportModal, ServiceViewModal } from '@cks/ui';
+import { Button, DataTable, PageHeader, PageWrapper, Scrollbar, TabSection, OrderActionModal, CatalogServiceModal, ServiceViewModal } from '@cks/ui';
+import { ModalProvider, useModals } from '../contexts';
 import OrderDetailsGateway from '../components/OrderDetailsGateway';
 import { useAuth } from '@cks/auth';
 import { useSWRConfig } from 'swr';
@@ -51,7 +52,6 @@ import {
 import { useFormattedActivities } from '../shared/activity/useFormattedActivities';
 import { ActivityFeed } from '../components/ActivityFeed';
 import ActivityModalGateway from '../components/ActivityModalGateway';
-import { useReportDetails } from '../hooks/useReportDetails';
 import { useEntityActions } from '../hooks/useEntityActions';
 import { createFeedback as apiCreateFeedback, acknowledgeItem as apiAcknowledgeItem, resolveReport as apiResolveReport, fetchServicesForReports, fetchProceduresForReports, fetchOrdersForReports } from '../shared/api/hub';
 
@@ -147,7 +147,22 @@ function normalizeOrderStatus(value?: string | null): HubOrderItem['status'] {
 
 // Activities are now sourced from the backend via useFormattedActivities
 
+// Main wrapper component that sets up ModalProvider
 export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubProps) {
+  const { code: authCode } = useAuth();
+  const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
+  const { data: reportsData } = useHubReports(normalizedCode);
+  const { data: ordersData } = useHubOrders(normalizedCode);
+
+  return (
+    <ModalProvider currentUser={normalizedCode || ''} reportsData={reportsData} ordersData={ordersData}>
+      <WarehouseHubContent initialTab={initialTab} />
+    </ModalProvider>
+  );
+}
+
+// Inner component that has access to modal context
+function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
   const navigate = useNavigate();
   const { mutate } = useSWRConfig();
   const { handleAction } = useEntityActions();
@@ -164,11 +179,6 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
   const [inventoryFilter, setInventoryFilter] = useState<string>('');
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [actionOrder, setActionOrder] = useState<any | null>(null);
-  // Removed old ServiceViewModal path; service details modals will be added later when designed
-  const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
-  const [selectedReportFromActivity, setSelectedReportFromActivity] = useState<{ id: string; type: 'report' | 'feedback' } | null>(null);
-
-  
 
   const { code: authCode } = useAuth();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
@@ -195,11 +205,8 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
   } = useHubOrders(normalizedCode);
   const { data: reportsData, isLoading: reportsLoading, mutate: mutateReports } = useHubReports(normalizedCode);
 
-    const { report: selectedReportFromActivityFull } = useReportDetails({
-    reportId: selectedReportFromActivity?.id || null,
-    reportType: selectedReportFromActivity?.type || null,
-    reportsData,
-  });
+  // Access modal context
+  const modals = useModals();
 
   const {
     data: inventory,
@@ -575,7 +582,6 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
   }
 
   return (
-    <ModalProvider>
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#f8fafc' }}>
         <MyHubSection
           hubName="Warehouse Hub"
@@ -606,8 +612,7 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
                 hub="warehouse"
                 onOpenActionableOrder={(order) => setActionOrder(order)}
                 onOpenOrderModal={(order) => setSelectedOrderId(order?.orderId || order?.id || null)}
-                onOpenServiceModal={setSelectedServiceId}
-                onOpenReportModal={setSelectedReportFromActivity}
+                onOpenServiceModal={(serviceId) => modals.openServiceModal(serviceId, false)}
                 isLoading={activitiesLoading}
                 error={activitiesError}
                 onError={(msg) => toast.error(msg)}
@@ -1038,7 +1043,7 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
                                 roleColor="#8b5cf6"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  setSelectedServiceId(row.serviceId);
+                                  modals.openServiceModal(row.serviceId, false);
                                 }}
                               >
                                 View
@@ -1178,7 +1183,7 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
                   console.log('[WarehouseHub] AFTER resolve mutateReports');
                 }}
                 onReportClick={(reportId, reportType) => {
-                  setSelectedReportFromActivity({ id: reportId, type: reportType });
+                  modals.openReportModal(reportId, reportType);
                 }}
               />
             </PageWrapper>
@@ -1240,26 +1245,7 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
         service={selectedCatalogService}
       />
 
-      {/* Active Service View Modal (read-only for warehouse) */}
-      {selectedServiceId && (
-        <ServiceViewModal
-          isOpen={!!selectedServiceId}
-          onClose={() => setSelectedServiceId(null)}
-          serviceId={selectedServiceId}
-          role="warehouse"
-          showProductsSection={true}
-        />
-      )}
 
-      {/* ReportModal - for reports/feedback opened from Activity Feed */}
-      <ReportModal
-        isOpen={!!selectedReportFromActivity}
-        onClose={() => setSelectedReportFromActivity(null)}
-        report={selectedReportFromActivityFull}
-        currentUser={normalizedCode || ''}
-        showQuickActions={true}
-      />
-      </div>
-    </ModalProvider>
+    </div>
   );
 }

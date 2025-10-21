@@ -28,7 +28,8 @@ import {
   type TreeNode,
 } from '@cks/domain-widgets';
 import { customerOverviewCards } from '@cks/domain-widgets';
-import { Button, DataTable, ModalProvider, OrderDetailsModal, ServiceViewModal, ReportModal, PageHeader, PageWrapper, Scrollbar, TabSection, OrderActionModal } from '@cks/ui';
+import { Button, DataTable, OrderDetailsModal, ServiceViewModal, PageHeader, PageWrapper, Scrollbar, TabSection, OrderActionModal } from '@cks/ui';
+import { ModalProvider, useModals } from '../contexts';
 import OrderDetailsGateway from '../components/OrderDetailsGateway';
 import { useAuth } from '@cks/auth';
 import { useSWRConfig } from 'swr';
@@ -36,7 +37,6 @@ import { createReport as apiCreateReport, createFeedback as apiCreateFeedback, a
 import { useFormattedActivities } from '../shared/activity/useFormattedActivities';
 import { ActivityFeed } from '../components/ActivityFeed';
 import ActivityModalGateway from '../components/ActivityModalGateway';
-import { useReportDetails } from '../hooks/useReportDetails';
 import { useEntityActions } from '../hooks/useEntityActions';
 
 import MyHubSection from '../components/MyHubSection';
@@ -152,22 +152,31 @@ function normalizeOrderStatus(value?: string | null): HubOrderItem['status'] {
 }
 
 
+// Main wrapper component that sets up ModalProvider
 export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubProps) {
+  const { code: authCode } = useAuth();
+  const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
+  const { data: reportsData } = useHubReports(normalizedCode);
+  const { data: ordersData } = useHubOrders(normalizedCode);
+
+  return (
+    <ModalProvider currentUser={normalizedCode || ''} reportsData={reportsData} ordersData={ordersData}>
+      <CustomerHubContent initialTab={initialTab} />
+    </ModalProvider>
+  );
+}
+
+// Inner component that has access to modal context
+function CustomerHubContent({ initialTab = 'dashboard' }: CustomerHubProps) {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState(initialTab);
   const [servicesTab, setServicesTab] = useState<'my' | 'history'>('my');
   const [servicesSearchQuery, setServicesSearchQuery] = useState('');
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [actionOrder, setActionOrder] = useState<any | null>(null);
-  const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
-  const [fetchedServiceDetails, setFetchedServiceDetails] = useState<any>(null);
-  const [selectedReportFromActivity, setSelectedReportFromActivity] = useState<{ id: string; type: 'report' | 'feedback' } | null>(null);
   const { code: authCode } = useAuth();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
   const { setHubLoading } = useHubLoading();
-
-
-
 
   const {
     data: profile,
@@ -189,11 +198,8 @@ export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubPro
     isLoading: reportsLoading,
   mutate: mutateReports } = useHubReports(normalizedCode);
 
-    const { report: selectedReportFromActivityFull } = useReportDetails({
-    reportId: selectedReportFromActivity?.id || null,
-    reportType: selectedReportFromActivity?.type || null,
-    reportsData,
-  });
+  // Access modal context
+  const modals = useModals();
 
   const {
     data: scopeData,
@@ -211,26 +217,6 @@ export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubPro
       setHubLoading(false);
     }
   }, [profile, dashboard, setHubLoading]);
-
-  // Fetch fresh service details when modal is opened
-  useEffect(() => {
-    if (!selectedServiceId) {
-      setFetchedServiceDetails(null);
-      return;
-    }
-
-    (async () => {
-      try {
-        const { apiFetch } = await import('../shared/api/client');
-        const res = await apiFetch(`/services/${encodeURIComponent(selectedServiceId)}`);
-        if (res && res.data) {
-          setFetchedServiceDetails(res.data);
-        }
-      } catch (err) {
-        console.error('[customer] failed to load service details', err);
-      }
-    })();
-  }, [selectedServiceId]);
 
   useEffect(() => {
     const style = document.createElement('style');
@@ -414,7 +400,6 @@ export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubPro
   }
 
   return (
-    <ModalProvider>
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#f8fafc' }}>
         <MyHubSection
           hubName="Customer Hub"
@@ -445,8 +430,7 @@ export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubPro
                 hub="customer"
                 onOpenActionableOrder={(order) => setActionOrder(order)}
                 onOpenOrderModal={(order) => setSelectedOrderId(order?.orderId || order?.id || null)}
-                onOpenServiceModal={setSelectedServiceId}
-                onOpenReportModal={setSelectedReportFromActivity}
+                onOpenServiceModal={(serviceId) => modals.openServiceModal(serviceId, false)}
                 isLoading={activitiesLoading}
                 error={activitiesError}
                 onError={(msg) => toast.error(msg)}
@@ -556,7 +540,7 @@ export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubPro
                             roleColor="#eab308"
                             onClick={(e) => {
                               e.stopPropagation();
-                              setSelectedServiceId(row.serviceId);
+                              modals.openServiceModal(row.serviceId, false);
                             }}
                           >
                             View Details
@@ -714,7 +698,7 @@ export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubPro
                   console.log('[CustomerHub] AFTER resolve mutate');
                 }}
                 onReportClick={(reportId, reportType) => {
-                  setSelectedReportFromActivity({ id: reportId, type: reportType });
+                  modals.openReportModal(reportId, reportType);
                 }}
               />
             </PageWrapper>
@@ -769,72 +753,8 @@ export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubPro
         userAvailableActions={[]}
       />
 
-      {/* Service View Modal */}
-      {(() => {
-        if (!selectedServiceId || !fetchedServiceDetails) return null;
 
-        // Get product orders for this service
-        const serviceProductOrders = (orders?.orders || [])
-          .filter((order: any) => {
-            if (order.orderType !== 'product') return false;
-            const orderMeta = order.metadata || {};
-            return orderMeta.serviceId === selectedServiceId;
-          })
-          .map((order: any) => {
-            const items = order.items || [];
-            const productName = items.length > 0 ? items.map((i: any) => i.name).join(', ') : 'Product Order';
-            const totalQty = items.reduce((sum: number, i: any) => sum + (i.quantity || 0), 0);
-            return {
-              orderId: order.orderId,
-              productName,
-              quantity: totalQty,
-              status: order.status || 'pending',
-            };
-          });
-
-        const metadata = fetchedServiceDetails.metadata || {};
-        const serviceData = {
-          serviceId: fetchedServiceDetails.serviceId,
-          serviceName: fetchedServiceDetails.title || fetchedServiceDetails.serviceId,
-          serviceType: metadata.serviceType === 'recurring' ? 'recurring' as const : 'one-time' as const,
-          serviceStatus: metadata.serviceStatus || fetchedServiceDetails.status || 'Active',
-          centerId: fetchedServiceDetails.centerId || null,
-          centerName: metadata.centerName || null,
-          managerId: metadata.managerId || null,
-          managerName: metadata.managerName || null,
-          warehouseId: metadata.warehouseId || null,
-          warehouseName: metadata.warehouseName || null,
-          managedBy: metadata.serviceManagedBy || null,
-          startDate: metadata.actualStartDate || metadata.serviceStartDate || null,
-          crew: metadata.crew || [],
-          procedures: metadata.procedures || [],
-          training: metadata.training || [],
-          notes: fetchedServiceDetails.notes || metadata.notes || null,
-          serviceStartNotes: metadata.serviceStartNotes || null,
-          serviceCompleteNotes: metadata.serviceCompleteNotes || null,
-          products: serviceProductOrders,
-        };
-
-        return (
-          <ServiceViewModal
-            isOpen={!!selectedServiceId}
-            onClose={() => setSelectedServiceId(null)}
-            service={serviceData}
-            showProductsSection={true}
-          />
-        );
-      })()}
-
-      {/* ReportModal - for reports/feedback opened from Activity Feed */}
-      <ReportModal
-        isOpen={!!selectedReportFromActivity}
-        onClose={() => setSelectedReportFromActivity(null)}
-        report={selectedReportFromActivityFull}
-        currentUser={normalizedCode || ''}
-        showQuickActions={true}
-      />
-      </div>
-    </ModalProvider>
+    </div>
   );
 }
 
