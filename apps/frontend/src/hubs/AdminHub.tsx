@@ -1450,26 +1450,14 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
           ) : activeTab === 'archive' ? (
       <ArchiveSection
         archiveAPI={archiveAPI}
-        onViewOrderDetails={(orderId: string, orderType: 'product' | 'service') => {
-          setSelectedOrderId(orderId);
+        onViewOrderDetails={(orderId: string) => {
+          modals.openById(orderId);
         }}
         onViewServiceDetails={(serviceId: string) => {
-          setSelectedServiceCatalog({
-            serviceId,
-            name: null,
-            category: null,
-            status: null,
-            description: null,
-            metadata: null,
-          });
-          setShowServiceCatalogModal(true);
+          modals.openById(serviceId);
         }}
-        onViewReportDetails={(reportId: string, reportType: 'report' | 'feedback') => {
-          // ModalGateway will auto-detect 'archived' state from data.archivedAt
-          modals.openEntityModal(
-            reportType === 'feedback' ? 'feedback' : 'report',
-            reportId
-          );
+        onViewReportDetails={(reportId: string) => {
+          modals.openById(reportId);
         }}
       />
           ) : activeTab === 'support' ? (
