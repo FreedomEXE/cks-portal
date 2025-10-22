@@ -583,7 +583,7 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
                 hub="contractor"
                 onOpenActionableOrder={(order) => setActionOrder(order)}
                 onOpenOrderModal={(order) => setSelectedOrderId(order?.orderId || order?.id || null)}
-                onOpenServiceModal={(serviceId) => modals.openServiceModal(serviceId, false)}
+                onOpenServiceModal={(serviceId) => modals.openById(serviceId)}
                 isLoading={activitiesLoading}
                 error={activitiesError}
                 onError={(msg) => toast.error(msg)}
@@ -735,7 +735,7 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
                             roleColor="#22c55e"
                             onClick={(e) => {
                               e.stopPropagation();
-                              modals.openServiceModal(row.serviceId, false);
+                              modals.openById(row.serviceId);
                             }}
                           >
                             View Details
@@ -872,8 +872,8 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
                   await (mutate as any)(`/hub/reports/${contractorCode}`);
                   console.log('[ContractorHub] AFTER resolve mutate');
                 }}
-                onReportClick={(reportId, reportType) => {
-                  modals.openReportModal(reportId, reportType);
+                onReportClick={(reportId) => {
+                  modals.openById(reportId);
                 }}
               />
             </PageWrapper>

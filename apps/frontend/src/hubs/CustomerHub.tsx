@@ -430,7 +430,7 @@ function CustomerHubContent({ initialTab = 'dashboard' }: CustomerHubProps) {
                 hub="customer"
                 onOpenActionableOrder={(order) => setActionOrder(order)}
                 onOpenOrderModal={(order) => setSelectedOrderId(order?.orderId || order?.id || null)}
-                onOpenServiceModal={(serviceId) => modals.openServiceModal(serviceId, false)}
+                onOpenServiceModal={(serviceId) => modals.openById(serviceId)}
                 isLoading={activitiesLoading}
                 error={activitiesError}
                 onError={(msg) => toast.error(msg)}
@@ -540,7 +540,7 @@ function CustomerHubContent({ initialTab = 'dashboard' }: CustomerHubProps) {
                             roleColor="#eab308"
                             onClick={(e) => {
                               e.stopPropagation();
-                              modals.openServiceModal(row.serviceId, false);
+                              modals.openById(row.serviceId);
                             }}
                           >
                             View Details
@@ -697,8 +697,8 @@ function CustomerHubContent({ initialTab = 'dashboard' }: CustomerHubProps) {
                   await mutate(`/hub/reports/${normalizedCode}`);
                   console.log('[CustomerHub] AFTER resolve mutate');
                 }}
-                onReportClick={(reportId, reportType) => {
-                  modals.openReportModal(reportId, reportType);
+                onReportClick={(reportId) => {
+                  modals.openById(reportId);
                 }}
               />
             </PageWrapper>

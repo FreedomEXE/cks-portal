@@ -789,8 +789,8 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
             }
           };
           const onViewDetails = () => {
-            // Open service modal in editable mode (manager has full control)
-            modals.openServiceModal(rawServiceId, true);
+            // Open service modal (RBAC determines edit permissions)
+            modals.openById(rawServiceId);
           };
 
           const svcStatus = (meta?.serviceStatus || '').toLowerCase().replace(/\s+/g, '_');
@@ -1108,8 +1108,8 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
                     externalSearchQuery={servicesSearchQuery}
                     maxItems={10}
                     onRowClick={(row: any) => {
-                      // Open service modal in editable mode for active services
-                      modals.openServiceModal(row.serviceId, true);
+                      // Open service modal (RBAC determines edit permissions)
+                      modals.openById(row.serviceId);
                     }}
                   />
                 )}
@@ -1123,8 +1123,8 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
                     maxItems={10}
                     modalType="service-history"
                     onRowClick={(row: any) => {
-                      // Open service modal in read-only mode for history
-                      modals.openServiceModal(row.serviceId, false);
+                      // Open service modal (RBAC determines edit permissions)
+                      modals.openById(row.serviceId);
                     }}
                   />
                 )}
@@ -1312,7 +1312,7 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
                 console.log('[ManagerHub] onResolve complete');
               }}
               onReportClick={(reportId, reportType) => {
-                modals.openReportModal(reportId, reportType);
+                modals.openById(reportId);
               }}
             />
           </PageWrapper>

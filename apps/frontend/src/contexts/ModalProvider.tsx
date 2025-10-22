@@ -30,14 +30,6 @@ export interface ModalContextValue {
 
   /** Close current modal */
   closeModal: () => void;
-
-  /** @deprecated Use openById() instead - Backwards-compat wrappers */
-  openOrderModal: (orderId: string) => void;
-  closeOrderModal: () => void;
-  openReportModal: (reportId: string, reportType: 'report' | 'feedback') => void;
-  closeReportModal: () => void;
-  openServiceModal: (serviceId: string) => void;
-  closeServiceModal: () => void;
 }
 
 const ModalContext = createContext<ModalContextValue | null>(null);
@@ -108,37 +100,10 @@ export function ModalProvider({
     }
   }, [currentModal]);
 
-  // Backwards-compat wrappers
-  const openOrderModal = useCallback(
-    (orderId: string) => openEntityModal('order', orderId),
-    [openEntityModal]
-  );
-
-  const openReportModal = useCallback(
-    (reportId: string, reportType: 'report' | 'feedback') => {
-      const entityType = reportType === 'feedback' ? 'feedback' : 'report';
-      openEntityModal(entityType, reportId, {
-        context: { reportType },
-      });
-    },
-    [openEntityModal]
-  );
-
-  const openServiceModal = useCallback(
-    (serviceId: string) => openEntityModal('service', serviceId),
-    [openEntityModal]
-  );
-
   const value: ModalContextValue = {
     openById,
     openEntityModal,
     closeModal,
-    openOrderModal,
-    closeOrderModal: closeModal,
-    openReportModal,
-    closeReportModal: closeModal,
-    openServiceModal,
-    closeServiceModal: closeModal,
   };
 
   return (

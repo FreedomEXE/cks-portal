@@ -612,7 +612,7 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
                 hub="warehouse"
                 onOpenActionableOrder={(order) => setActionOrder(order)}
                 onOpenOrderModal={(order) => setSelectedOrderId(order?.orderId || order?.id || null)}
-                onOpenServiceModal={(serviceId) => modals.openServiceModal(serviceId, false)}
+                onOpenServiceModal={(serviceId) => modals.openById(serviceId)}
                 isLoading={activitiesLoading}
                 error={activitiesError}
                 onError={(msg) => toast.error(msg)}
@@ -1043,7 +1043,7 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
                                 roleColor="#8b5cf6"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  modals.openServiceModal(row.serviceId, false);
+                                  modals.openById(row.serviceId);
                                 }}
                               >
                                 View
@@ -1182,8 +1182,8 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
                   await mutateReports();
                   console.log('[WarehouseHub] AFTER resolve mutateReports');
                 }}
-                onReportClick={(reportId, reportType) => {
-                  modals.openReportModal(reportId, reportType);
+                onReportClick={(reportId) => {
+                  modals.openById(reportId);
                 }}
               />
             </PageWrapper>

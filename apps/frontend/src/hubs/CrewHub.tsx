@@ -491,7 +491,7 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
                 hub="crew"
         onOpenActionableOrder={(order) => setActionOrder(order)}
                 onOpenOrderModal={(order) => setSelectedOrderId(order?.orderId || order?.id || null)}
-                onOpenServiceModal={(serviceId) => modals.openServiceModal(serviceId, false)}
+                onOpenServiceModal={(serviceId) => modals.openById(serviceId)}
                 isLoading={activitiesLoading}
                 error={activitiesError}
                 onError={(msg) => toast.error(msg)}
@@ -631,7 +631,7 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
                               roleColor="#ef4444"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                modals.openServiceModal(row.serviceId, false);
+                                modals.openById(row.serviceId);
                               }}
                             >
                               View Details
@@ -700,8 +700,8 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
                     maxItems={10}
                     modalType="service-history"
                     onRowClick={(row: any) => {
-                      // Open service modal in read-only mode for history
-                      modals.openServiceModal(row.serviceId, false);
+                      // Open service modal (RBAC determines permissions)
+                      modals.openById(row.serviceId);
                     }}
                   />
                 )}
@@ -815,7 +815,7 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
                   console.log('[CrewHub] AFTER acknowledge mutate');
                 }}
                 onReportClick={(reportId, reportType) => {
-                  modals.openReportModal(reportId, reportType);
+                  modals.openById(reportId);
                 }}
               />
             </PageWrapper>

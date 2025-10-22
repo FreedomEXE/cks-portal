@@ -434,7 +434,7 @@ function CenterHubContent({ initialTab = 'dashboard' }: CenterHubProps) {
                 hub="center"
                 onOpenActionableOrder={(order) => setActionOrder(order)}
                 onOpenOrderModal={(order) => setSelectedOrderId(order?.orderId || order?.id || null)}
-                onOpenServiceModal={(serviceId) => modals.openServiceModal(serviceId, false)}
+                onOpenServiceModal={(serviceId) => modals.openById(serviceId)}
                 isLoading={activitiesLoading}
                 error={activitiesError}
                 onError={(msg) => toast.error(msg)}
@@ -544,7 +544,7 @@ function CenterHubContent({ initialTab = 'dashboard' }: CenterHubProps) {
                             roleColor="#f97316"
                             onClick={(e) => {
                               e.stopPropagation();
-                              modals.openServiceModal(row.serviceId, false);
+                              modals.openById(row.serviceId);
                             }}
                           >
                             View Details
@@ -706,8 +706,8 @@ function CenterHubContent({ initialTab = 'dashboard' }: CenterHubProps) {
                   }
                   console.log('[CenterHub] AFTER resolve mutate');
                 }}
-                onReportClick={(reportId, reportType) => {
-                  modals.openReportModal(reportId, reportType);
+                onReportClick={(reportId) => {
+                  modals.openById(reportId);
                 }}
               />
             </PageWrapper>
