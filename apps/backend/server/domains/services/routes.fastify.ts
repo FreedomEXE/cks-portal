@@ -44,6 +44,24 @@ export async function registerServicesRoutes(server: FastifyInstance) {
     }
   });
 
+  // Get service details by ID (on-demand fetching for modals)
+  // Session-based auth pattern (matches reports/orders)
+  server.get('/api/services/:serviceId/details', async (request, reply) => {
+    const user = await requireActiveRole(request, reply, {});
+    if (!user) {
+      return;
+    }
+
+    const { serviceId } = request.params as { serviceId: string };
+
+    const service = await getServiceById(serviceId);
+    if (!service) {
+      return reply.code(404).send({ error: 'Service not found or access denied' });
+    }
+
+    return reply.send({ data: service });
+  });
+
   server.get('/api/services/:serviceId', async (request, reply) => {
     const paramsResult = paramsSchema.safeParse(request.params);
     if (!paramsResult.success) {

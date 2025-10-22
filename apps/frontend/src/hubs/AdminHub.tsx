@@ -50,6 +50,7 @@ import { useAuth } from '@cks/auth';
 import { getArchiveMetadataFromEntity } from '../hooks/useOrderDetails';
 import { archiveAPI, type EntityType } from '../shared/api/archive';
 import '../shared/api/test-archive'; // Temporary test import
+import { isFeatureEnabled } from '../config/featureFlags';
 import AdminAssignSection from './components/AdminAssignSection';
 import AdminCreateSection from './components/AdminCreateSection';
 import { useHubLoading } from '../contexts/HubLoadingContext';
@@ -1045,7 +1046,14 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
       data: reportRows,
       emptyMessage: 'No reports filed.',
       onRowClick: (row: any) => {
-        modals.openReportModal(row.id, 'report');
+        // Phase 2: ID-first modal opening (with feature flag)
+        if (isFeatureEnabled('ID_FIRST_MODALS')) {
+          console.log('[AdminHub Directory] Phase 2: Opening report via openById():', row.id);
+          modals.openById(row.id);
+        } else {
+          // Legacy path (backwards compatibility)
+          modals.openReportModal(row.id, 'report');
+        }
       },
     },
     feedback: {
@@ -1057,7 +1065,14 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
       data: feedbackRows,
       emptyMessage: 'No feedback submitted.',
       onRowClick: (row: any) => {
-        modals.openReportModal(row.id, 'feedback');
+        // Phase 2: ID-first modal opening (with feature flag)
+        if (isFeatureEnabled('ID_FIRST_MODALS')) {
+          console.log('[AdminHub Directory] Phase 2: Opening feedback via openById():', row.id);
+          modals.openById(row.id);
+        } else {
+          // Legacy path (backwards compatibility)
+          modals.openReportModal(row.id, 'feedback');
+        }
       },
     },
   }) satisfies Record<string, DirectorySectionConfig>, [

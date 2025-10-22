@@ -1,55 +1,120 @@
-import { useMemo } from 'react';
+/**
+ * useServiceDetails - Service Details Hook
+ *
+ * ON-DEMAND FETCHING PATTERN (Proper Modular Architecture):
+ * - Fetches service by ID using session-based auth (matches reports/orders)
+ * - No user code needed - backend determines permissions from session
+ * - Normalizes into UI-friendly format for modals
+ * - Handles loading/error states
+ * - Works identically from Activity Feed, Directory, Archive, etc.
+ */
 
-export interface UseServiceDetailsOptions {
-  serviceId: string | null;
-  ordersData?: any; // SWR data containing service orders
+import useSWR from 'swr';
+import { apiFetch, type ApiResponse } from '../shared/api/client';
+
+// ============================================================================
+// TypeScript Interfaces
+// ============================================================================
+
+export interface NormalizedService {
+  serviceId: string;
+  title: string;
+  centerId?: string;
+  metadata?: {
+    serviceStatus?: string;
+    serviceType?: string;
+    crew?: any[];
+    crewRequests?: any[];
+    procedures?: any[];
+    training?: any[];
+    notes?: string;
+    serviceStartDate?: string;
+    centerName?: string;
+    managerName?: string;
+    managerId?: string;
+    warehouseId?: string;
+    warehouseName?: string;
+  };
 }
 
+export interface UseServiceDetailsReturn {
+  service: NormalizedService | null;
+  isLoading: boolean;
+  error: Error | null;
+}
+
+export interface UseServiceDetailsParams {
+  serviceId: string | null;
+}
+
+// ============================================================================
+// Normalization Utilities
+// ============================================================================
+
 /**
- * Hook to fetch service details from hub orders data
- * Similar pattern to useReportDetails
+ * Normalize backend service into UI-friendly shape for modals
  */
-export function useServiceDetails({ serviceId, ordersData }: UseServiceDetailsOptions) {
-  const service = useMemo(() => {
-    if (!serviceId || !ordersData?.serviceOrders) {
-      return null;
+function normalizeService(entity: any): NormalizedService {
+  const metadata = entity.metadata || {};
+
+  return {
+    serviceId: entity.serviceId || entity.id,
+    title: entity.title || entity.name || entity.serviceId,
+    centerId: entity.centerId || metadata.centerId,
+    metadata: {
+      serviceStatus: metadata.serviceStatus || entity.status,
+      serviceType: metadata.serviceType || entity.serviceType || 'one-time',
+      crew: metadata.crew || entity.crew || [],
+      crewRequests: metadata.crewRequests || entity.crewRequests || [],
+      procedures: metadata.procedures || entity.procedures || [],
+      training: metadata.training || entity.training || [],
+      notes: metadata.notes || entity.notes || '',
+      serviceStartDate: metadata.serviceStartDate || metadata.actualStartDate || entity.startDate,
+      centerName: metadata.centerName || entity.centerName,
+      managerName: metadata.managerName || entity.managerName,
+      managerId: metadata.managerId || entity.managerId,
+      warehouseId: metadata.warehouseId || entity.warehouseId,
+      warehouseName: metadata.warehouseName || entity.warehouseName,
+    },
+  };
+}
+
+// ============================================================================
+// Main Hook
+// ============================================================================
+
+/**
+ * Hook to get normalized service details by fetching on-demand
+ *
+ * @param params - serviceId
+ * @returns Normalized service data with loading/error states
+ */
+export function useServiceDetails(params: UseServiceDetailsParams): UseServiceDetailsReturn {
+  const { serviceId } = params;
+
+  // Construct SWR key: only fetch if we have serviceId
+  // Session-based auth pattern (matches how reports/orders work)
+  const shouldFetch = !!serviceId;
+  const swrKey = shouldFetch ? `/services/${serviceId}/details` : null;
+
+  // Fetch on-demand from backend (uses apiFetch for proper /api prefix)
+  const { data, error, isLoading } = useSWR<ApiResponse<any>>(
+    swrKey,
+    async (url) => {
+      return await apiFetch<ApiResponse<any>>(url);
+    },
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
     }
+  );
 
-    // Find the service order that matches this serviceId
-    const serviceOrder = ordersData.serviceOrders.find((order: any) => {
-      const orderServiceId = order.serviceId || order.transformedId;
-      return orderServiceId === serviceId;
-    });
+  // Normalize the fetched data
+  const service = data?.data ? normalizeService(data.data) : null;
 
-    if (!serviceOrder) {
-      return null;
-    }
-
-    // Transform to service details format
-    const metadata = serviceOrder.metadata || {};
-
-    return {
-      serviceId: serviceOrder.serviceId || serviceOrder.transformedId,
-      title: serviceOrder.title || serviceOrder.serviceId,
-      centerId: serviceOrder.centerId || metadata.centerId,
-      metadata: {
-        ...metadata,
-        serviceStatus: metadata.serviceStatus || serviceOrder.status,
-        serviceType: metadata.serviceType || 'one-time',
-        crew: metadata.crew || [],
-        crewRequests: metadata.crewRequests || [],
-        procedures: metadata.procedures || [],
-        training: metadata.training || [],
-        notes: metadata.notes || '',
-        serviceStartDate: metadata.serviceStartDate || metadata.actualStartDate,
-        centerName: metadata.centerName,
-        managerName: metadata.managerName,
-        managerId: metadata.managerId,
-        warehouseId: metadata.warehouseId,
-        warehouseName: metadata.warehouseName,
-      },
-    };
-  }, [serviceId, ordersData]);
-
-  return { service };
+  return {
+    service,
+    isLoading,
+    error: error || null,
+  };
 }

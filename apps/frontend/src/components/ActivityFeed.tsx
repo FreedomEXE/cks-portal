@@ -22,6 +22,7 @@ import { RecentActivity, type Activity } from '@cks/domain-widgets';
 import { useCallback, useMemo } from 'react';
 import { fetchOrderForActivity, parseActivityError } from '../shared/utils/activityHelpers';
 import { useModals } from '../contexts/ModalProvider';
+import { isFeatureEnabled } from '../config/featureFlags';
 
 export interface ActivityFeedProps {
   activities: Activity[];
@@ -133,7 +134,14 @@ export function ActivityFeed({
 
       // Handle report and feedback activities
       if (targetType === 'report' || targetType === 'feedback') {
-        modals.openReportModal(targetId, targetType as 'report' | 'feedback');
+        // Phase 2: ID-first modal opening (with feature flag)
+        if (isFeatureEnabled('ID_FIRST_MODALS')) {
+          console.log('[ActivityFeed] Phase 2: Opening via openById():', targetId);
+          modals.openById(targetId);
+        } else {
+          // Legacy path (backwards compatibility)
+          modals.openReportModal(targetId, targetType as 'report' | 'feedback');
+        }
         return;
       }
 

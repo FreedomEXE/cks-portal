@@ -48,15 +48,12 @@ export interface ModalProviderProps {
   currentUserId: string;
   /** Current user's role */
   role: UserRole;
-  /** Hub data for orders (optional - required for service modals) */
-  ordersData?: any;
 }
 
 export function ModalProvider({
   children,
   currentUserId,
   role,
-  ordersData,
 }: ModalProviderProps) {
   // Single state for current modal
   const [currentModal, setCurrentModal] = useState<{
@@ -157,7 +154,6 @@ export function ModalProvider({
         role={role}
         currentUserId={currentUserId}
         options={currentModal?.options}
-        ordersData={ordersData}
       />
     </ModalContext.Provider>
   );

@@ -50,9 +50,6 @@ export interface ModalGatewayProps {
 
   /** Additional options */
   options?: OpenEntityModalOptions;
-
-  /** Hub data for orders (passed through from ModalProvider) */
-  ordersData?: any;
 }
 
 export function ModalGateway({
@@ -63,7 +60,6 @@ export function ModalGateway({
   role,
   currentUserId,
   options,
-  ordersData,
 }: ModalGatewayProps) {
 
   // ===== STEP 1: Call ALL hooks unconditionally (React requirement) =====
@@ -83,7 +79,6 @@ export function ModalGateway({
 
   const serviceDetails = useServiceDetails({
     serviceId: entityType === 'service' ? entityId : null,
-    ordersData: ordersData,
   });
 
   // ===== STEP 2: Select the right data based on entityType =====
@@ -109,8 +104,8 @@ export function ModalGateway({
     },
     service: {
       data: serviceDetails.service,
-      isLoading: false, // useServiceDetails doesn't return isLoading
-      error: null, // useServiceDetails doesn't return error
+      isLoading: serviceDetails.isLoading || false,
+      error: serviceDetails.error || null,
       state: 'active' as EntityState, // Services don't have isDeleted/archivedAt yet
     },
   };
