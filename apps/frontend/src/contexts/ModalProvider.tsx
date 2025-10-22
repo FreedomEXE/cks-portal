@@ -80,8 +80,10 @@ export function ModalProvider({
         return;
       }
 
-      // Use subtype if available (e.g., 'feedback' instead of 'report')
-      const entityType = (subtype || type) as EntityType;
+      // For orders, always use 'order' type (subtype is just metadata: product/service)
+      // For reports, use subtype ('feedback' vs 'report')
+      // Everything else uses type
+      const entityType = (type === 'order' ? type : (subtype || type)) as EntityType;
 
       console.log(`[ModalProvider] Opening ${entityType} modal for ID: ${id}`);
 
