@@ -8,9 +8,20 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 import ModalGateway from '../components/ModalGateway';
 import type { EntityType, UserRole, OpenEntityModalOptions } from '../types/entities';
+import { parseEntityId, isValidId } from '../shared/utils/parseEntityId';
 
 export interface ModalContextValue {
-  /** Open any entity modal */
+  /**
+   * Open modal by ID only - type detected automatically
+   * This is the ID-first architecture entrypoint
+   *
+   * @param id - The entity ID (e.g., "CON-010-FBK-001")
+   * @param options - Optional modal configuration
+   * @example modals.openById('CON-010-FBK-001')
+   */
+  openById: (id: string, options?: OpenEntityModalOptions) => void;
+
+  /** Open any entity modal (internal - use openById instead) */
   openEntityModal: (
     entityType: EntityType,
     entityId: string,
@@ -20,7 +31,7 @@ export interface ModalContextValue {
   /** Close current modal */
   closeModal: () => void;
 
-  /** Backwards-compat wrappers */
+  /** @deprecated Use openById() instead - Backwards-compat wrappers */
   openOrderModal: (orderId: string) => void;
   closeOrderModal: () => void;
   openReportModal: (reportId: string, reportType: 'report' | 'feedback') => void;
@@ -62,6 +73,35 @@ export function ModalProvider({
     []
   );
 
+  // ID-first open function - automatic type detection
+  const openById = useCallback(
+    (id: string, options?: OpenEntityModalOptions) => {
+      // Validate ID format
+      if (!isValidId(id)) {
+        console.error(`[ModalProvider] Invalid ID format: "${id}"`);
+        return;
+      }
+
+      // Parse ID to determine type
+      const { type, subtype } = parseEntityId(id);
+
+      // Handle unknown types
+      if (type === 'unknown') {
+        console.error(`[ModalProvider] Unknown entity type for ID: "${id}"`);
+        return;
+      }
+
+      // Use subtype if available (e.g., 'feedback' instead of 'report')
+      const entityType = (subtype || type) as EntityType;
+
+      console.log(`[ModalProvider] Opening ${entityType} modal for ID: ${id}`);
+
+      // Delegate to openEntityModal
+      openEntityModal(entityType, id, options);
+    },
+    [openEntityModal]
+  );
+
   // Close function
   const closeModal = useCallback(() => {
     setCurrentModal(null);
@@ -93,6 +133,7 @@ export function ModalProvider({
   );
 
   const value: ModalContextValue = {
+    openById,
     openEntityModal,
     closeModal,
     openOrderModal,
