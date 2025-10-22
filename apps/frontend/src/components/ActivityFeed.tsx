@@ -57,12 +57,10 @@ export function ActivityFeed({
 
   const handleActivityClick = useCallback(
     async (activity: Activity) => {
-      console.log('[ActivityFeed] Activity clicked:', activity);
       const { targetType, targetId } = activity.metadata || {};
 
       // Guard: Missing target information
       if (!targetType || !targetId) {
-        console.error('[ActivityFeed] Missing target info:', { targetType, targetId });
         onError?.('Cannot open: missing target information');
         return;
       }
@@ -135,8 +133,6 @@ export function ActivityFeed({
 
       // Handle report and feedback activities
       if (targetType === 'report' || targetType === 'feedback') {
-        // Use modal context directly - no callback needed
-        console.log('[ActivityFeed] Opening report/feedback modal:', { targetId, targetType });
         modals.openReportModal(targetId, targetType as 'report' | 'feedback');
         return;
       }

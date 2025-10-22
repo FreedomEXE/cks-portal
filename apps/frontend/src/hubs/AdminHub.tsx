@@ -40,7 +40,6 @@ import {
   type UserAction,
 } from '@cks/ui';
 import { ModalProvider, useModals } from '../contexts';
-import ActivityModalGateway from '../components/ActivityModalGateway';
 import type { ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSWRConfig } from 'swr';
@@ -72,13 +71,12 @@ import {
   useServices,
   useTraining,
   useWarehouses,
-  useReports,
-  useFeedback,
 } from '../shared/api/directory';
 import {
   applyHubOrderAction,
   updateOrderFields,
   useHubProfile,
+  useHubReports,
   type HubOrderItem,
   type OrderActionRequest,
   type UpdateOrderFieldsRequest,
@@ -216,21 +214,10 @@ interface DirectorySectionConfig {
 
 // Main wrapper component that sets up ModalProvider
 export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
-  const { data: directoryReports } = useReports();
-  const { data: directoryFeedback } = useFeedback();
   const { code } = useAuth();
 
-  // Unify shape to match useReportDetails expectations { reports, feedback }
-  const reportsData = useMemo(
-    () => ({
-      reports: directoryReports ?? [],
-      feedback: directoryFeedback ?? [],
-    }),
-    [directoryReports, directoryFeedback],
-  );
-
   return (
-    <ModalProvider currentUser={code || ''} reportsData={reportsData}>
+    <ModalProvider currentUserId={code || ''} role="admin">
       <AdminHubContent initialTab={initialTab} />
     </ModalProvider>
   );
@@ -277,18 +264,8 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
   const { data: products, isLoading: productsLoading, error: productsError } = useProducts();
   const { data: trainingRecords, isLoading: trainingLoading, error: trainingError } = useTraining();
   const { data: procedures, isLoading: proceduresLoading, error: proceduresError } = useProcedures();
-  // AdminHub is global-scope: fetch reports/feedback via directory endpoints
-  const { data: directoryReports, isLoading: reportsLoading } = useReports();
-  const { data: directoryFeedback, isLoading: feedbackLoading } = useFeedback();
-
-  // Unify shape to match useReportDetails expectations { reports, feedback }
-  const reportsData = useMemo(
-    () => ({
-      reports: directoryReports ?? [],
-      feedback: directoryFeedback ?? [],
-    }),
-    [directoryReports, directoryFeedback],
-  );
+  // Use hub endpoint for complete report data (same as all other roles)
+  const { data: reportsData, isLoading: reportsLoading } = useHubReports(code || 'ADMIN');
   const { data: activityItems, isLoading: activitiesLoading, error: activitiesError } = useActivities();
 
   const [activityFeed, setActivityFeed] = useState<Activity[]>([]);
@@ -306,6 +283,11 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
   }, [activityItems, activitiesLoading, setHubLoading]);
 
   useEffect(() => {
+    console.log('[AdminHub] Activity items received:', activityItems);
+    if (activityItems && activityItems.length > 0) {
+      console.log('[AdminHub] First activity sample:', activityItems[0]);
+      console.log('[AdminHub] First activity metadata:', activityItems[0]?.metadata);
+    }
     setActivityFeed(activityItems);
   }, [activityItems]);
 
@@ -1057,32 +1039,24 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
       columns: [
         { key: 'id', label: 'REPORT ID', clickable: true },
         { key: 'title', label: 'TITLE' },
-        { key: 'severity', label: 'SEVERITY' },
-        { key: 'customerId', label: 'CUSTOMER' },
-        { key: 'centerId', label: 'CENTER' },
         { key: 'status', label: 'STATUS', render: renderStatusBadge },
         { key: 'createdAt', label: 'CREATED' },
       ],
       data: reportRows,
       emptyMessage: 'No reports filed.',
       onRowClick: (row: any) => {
-        // Open new ReportModal (same as Activity Feed)
         modals.openReportModal(row.id, 'report');
       },
     },
     feedback: {
       columns: [
         { key: 'id', label: 'FEEDBACK ID', clickable: true },
-        { key: 'kind', label: 'KIND' },
         { key: 'title', label: 'TITLE' },
-        { key: 'customerId', label: 'CUSTOMER' },
-        { key: 'centerId', label: 'CENTER' },
         { key: 'createdAt', label: 'CREATED' },
       ],
       data: feedbackRows,
       emptyMessage: 'No feedback submitted.',
       onRowClick: (row: any) => {
-        // Open new ReportModal (same as Activity Feed)
         modals.openReportModal(row.id, 'feedback');
       },
     },
@@ -1117,8 +1091,7 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
     productsLoading ||
     trainingLoading ||
     proceduresLoading ||
-    reportsLoading ||
-    feedbackLoading;
+    reportsLoading;
 
   const directoryError =
     adminUsersError ||
@@ -1477,7 +1450,11 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
           setShowServiceCatalogModal(true);
         }}
         onViewReportDetails={(reportId: string, reportType: 'report' | 'feedback') => {
-          modals.openReportModal(reportId, reportType);
+          // ModalGateway will auto-detect 'archived' state from data.archivedAt
+          modals.openEntityModal(
+            reportType === 'feedback' ? 'feedback' : 'report',
+            reportId
+          );
         }}
       />
           ) : activeTab === 'support' ? (
@@ -2009,8 +1986,8 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
 
       {/* merged assign flow into CatalogServiceModal */}
 
-      {/* Activity Modal Gateway - progressive disclosure for orders (Admin) */}
-      <ActivityModalGateway
+      {/* Activity Modal Gateway - DISABLED - now using ModalProvider + ModalGateway */}
+      {false && <ActivityModalGateway
         isOpen={!!selectedOrderId}
         orderId={selectedOrderId}
         role="admin"
@@ -2059,7 +2036,7 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
             alert('Failed to delete order');
           }
         }}
-      />
+      />}
 
       <EditOrderModal
         isOpen={!!selectedOrderForEdit}

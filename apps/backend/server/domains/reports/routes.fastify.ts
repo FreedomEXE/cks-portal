@@ -1,12 +1,34 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { requireActiveRole } from '../../core/auth/guards';
-import { getHubReports } from './store';
+import { getHubReports, getReportById } from './store';
 import { createReport, createFeedback, updateReportStatus, updateFeedbackStatus, acknowledgeReport, acknowledgeFeedback, getServicesForReports, getOrdersForReports, getProceduresForReports } from './repository';
 import type { HubRole } from '../profile/types';
 import { query } from '../../db/connection';
 
 export async function reportsRoutes(fastify: FastifyInstance) {
+  // Get single report/feedback by ID (on-demand fetching for modals)
+  // Session-based auth pattern (matches how orders work)
+  fastify.get('/reports/:reportId/details', async (request, reply) => {
+    const user = await requireActiveRole(request, reply);
+    if (!user) {
+      return;
+    }
+
+    const { reportId } = request.params as { reportId: string };
+
+    // Use session user's code for permission checking
+    const cksCode = user.cksCode || 'UNKNOWN';
+
+    const report = await getReportById(user.role as HubRole, cksCode, reportId);
+    if (!report) {
+      return reply.code(404).send({ error: 'Report/Feedback not found or access denied' });
+    }
+
+    return reply.send({ data: report });
+  });
+
+  // Get all reports/feedback for a hub (list for Directory)
   fastify.get('/hub/reports/:cksCode', async (request, reply) => {
     const user = await requireActiveRole(request, reply);
     if (!user) {

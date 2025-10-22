@@ -24,12 +24,22 @@ export interface Report {
   resolution_notes?: string;
 }
 
+export interface ReportAction {
+  label: string;
+  variant: 'primary' | 'secondary' | 'danger';
+  onClick: () => void | Promise<void>;
+  disabled?: boolean;
+  loading?: boolean;
+}
+
 export interface ReportModalProps {
   isOpen: boolean;
   onClose: () => void;
   report: Report | null;
   currentUser?: string;
   showQuickActions?: boolean; // true from Activity Feed, false from Reports section
+  actions?: ReportAction[]; // Action buttons (archive, delete, etc.)
+  role?: 'user' | 'admin';
 }
 
 const ReportModal: React.FC<ReportModalProps> = ({
@@ -38,6 +48,8 @@ const ReportModal: React.FC<ReportModalProps> = ({
   report,
   currentUser,
   showQuickActions = true, // Default to true (Activity Feed behavior)
+  actions = [],
+  role,
 }) => {
   // Tab state - default tab depends on showQuickActions
   const [activeTab, setActiveTab] = useState(showQuickActions ? 'quick-actions' : 'details');
@@ -81,6 +93,7 @@ const ReportModal: React.FC<ReportModalProps> = ({
           resolution={report.resolution}
           resolution_notes={report.resolution_notes}
           currentUser={currentUser}
+          actions={actions}
         />
       )}
 

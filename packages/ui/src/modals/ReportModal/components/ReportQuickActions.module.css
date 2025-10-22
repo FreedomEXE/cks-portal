@@ -3,6 +3,67 @@
   padding: 16px;
 }
 
+/* Actions Section - Consistent with other modals */
+.actionsSection {
+  background-color: #f9fafb;
+  border-radius: 6px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.actionsGrid {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.actionButton {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: #ffffff;
+}
+
+.actionButton:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  opacity: 0.9;
+}
+
+.actionButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.actionPrimary {
+  background-color: #3b82f6;
+}
+
+.actionPrimary:hover:not(:disabled) {
+  background-color: #2563eb;
+}
+
+.actionSecondary {
+  background-color: #6b7280;
+}
+
+.actionSecondary:hover:not(:disabled) {
+  background-color: #4b5563;
+}
+
+.actionDanger {
+  background-color: #dc2626;
+}
+
+.actionDanger:hover:not(:disabled) {
+  background-color: #b91c1c;
+}
+
 /* Lifecycle Section - Yellow Box */
 .lifecycleSection {
   background-color: #fefce8;

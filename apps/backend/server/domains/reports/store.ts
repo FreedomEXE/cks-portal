@@ -24,6 +24,11 @@ export interface ReportItem {
   priority?: 'LOW' | 'MEDIUM' | 'HIGH' | null;
   rating?: number | null;
   serviceManagedBy?: string | null;
+  // Archive metadata (for single-entity fetches)
+  archivedAt?: string;
+  archivedBy?: string;
+  archiveReason?: string;
+  deletionScheduled?: string;
 }
 
 export interface HubReportsPayload {
@@ -462,4 +467,173 @@ export async function getHubReports(role: HubRole, cksCode: string): Promise<Hub
 
   // All other roles use the ecosystem-based query
   return getEcosystemReports(normalizedCode, role);
+}
+
+/**
+ * Get a single report or feedback by ID with proper permission scoping.
+ * Checks both reports and feedback tables.
+ */
+export async function getReportById(role: HubRole, cksCode: string, reportId: string): Promise<ReportItem | null> {
+  const normalizedCode = normalizeIdentity(cksCode);
+  const normalizedReportId = normalizeIdentity(reportId);
+
+  if (!normalizedCode || !normalizedReportId) {
+    return null;
+  }
+
+  // Check if it's a report or feedback by looking at the ID prefix
+  const isReport = normalizedReportId.includes('-RPT-');
+  const isFeedback = normalizedReportId.includes('-FBK-');
+
+  if (!isReport && !isFeedback) {
+    return null; // Invalid ID format
+  }
+
+  if (isReport) {
+    // Query report with service join
+    const result = await query<any>(
+      `SELECT r.report_id, r.type, r.severity, r.title, r.description, r.service_id, r.center_id, r.customer_id,
+              r.status, r.created_by_id, r.created_by_role, r.created_at, r.tags, r.resolution_notes, r.resolved_by_id, r.resolved_at,
+              r.report_category, r.related_entity_id, r.report_reason, r.priority, r.cks_manager,
+              r.archived_at, r.archived_by, r.archive_reason, r.deletion_scheduled,
+              s.managed_by as service_managed_by
+       FROM reports r
+       LEFT JOIN services s ON r.report_category = 'service' AND UPPER(s.service_id) = UPPER(r.related_entity_id)
+       WHERE UPPER(r.report_id) = UPPER($1)`,
+      [normalizedReportId]
+    );
+
+    if (result.rows.length === 0) {
+      return null;
+    }
+
+    const report = result.rows[0];
+
+    // Permission check
+    if (role.toLowerCase() === 'admin') {
+      // Admin can see all reports
+    } else if (role.toLowerCase() === 'warehouse') {
+      // Warehouse can only see reports about their assigned orders/services
+      const ordersResult = await query<{ order_id: string }>(
+        'SELECT order_id FROM orders WHERE UPPER(assigned_warehouse) = UPPER($1)',
+        [normalizedCode]
+      );
+      const orderIds = ordersResult.rows.map(r => r.order_id);
+
+      const servicesResult = await query<{ service_id: string }>(
+        `SELECT DISTINCT transformed_id as service_id
+         FROM orders
+         WHERE UPPER(assigned_warehouse) = UPPER($1) AND transformed_id IS NOT NULL`,
+        [normalizedCode]
+      );
+      const serviceIds = servicesResult.rows.map(r => r.service_id).filter(Boolean);
+      const entityIds = [...orderIds, ...serviceIds];
+
+      const canAccess = report.created_by_id?.toUpperCase() === normalizedCode.toUpperCase() ||
+                        (report.related_entity_id && entityIds.includes(report.related_entity_id));
+
+      if (!canAccess) {
+        return null; // Permission denied
+      }
+    } else {
+      // Other roles: must be in same ecosystem
+      const managerCode = await getManagerForUser(normalizedCode, role);
+      if (!managerCode || report.cks_manager?.toUpperCase() !== managerCode.toUpperCase()) {
+        return null; // Permission denied
+      }
+    }
+
+    // Load acknowledgments
+    const acksResult = await query<any>(
+      `SELECT acknowledged_by_id, acknowledged_at
+       FROM report_acknowledgments
+       WHERE UPPER(report_id) = UPPER($1)
+       ORDER BY acknowledged_at ASC`,
+      [normalizedReportId]
+    );
+
+    const acknowledgments = acksResult.rows.map(ack => ({
+      userId: ack.acknowledged_by_id,
+      date: ack.acknowledged_at,
+    }));
+
+    return {
+      ...mapReportRow(report, acknowledgments),
+      archivedAt: report.archived_at || undefined,
+      archivedBy: report.archived_by || undefined,
+      archiveReason: report.archive_reason || undefined,
+      deletionScheduled: report.deletion_scheduled || undefined,
+    };
+  } else {
+    // Query feedback (has archived_at but not other archive metadata columns)
+    const result = await query<any>(
+      `SELECT feedback_id, kind, title, message, center_id, customer_id,
+              status, created_by_id, created_by_role, created_at, resolution_notes,
+              report_category, related_entity_id, report_reason, rating, cks_manager,
+              archived_at
+       FROM feedback
+       WHERE UPPER(feedback_id) = UPPER($1)`,
+      [normalizedReportId]
+    );
+
+    if (result.rows.length === 0) {
+      return null;
+    }
+
+    const feedback = result.rows[0];
+
+    // Permission check (same logic as reports)
+    if (role.toLowerCase() === 'admin') {
+      // Admin can see all feedback
+    } else if (role.toLowerCase() === 'warehouse') {
+      // Warehouse can only see feedback about their assigned orders/services
+      const ordersResult = await query<{ order_id: string }>(
+        'SELECT order_id FROM orders WHERE UPPER(assigned_warehouse) = UPPER($1)',
+        [normalizedCode]
+      );
+      const orderIds = ordersResult.rows.map(r => r.order_id);
+
+      const servicesResult = await query<{ service_id: string }>(
+        `SELECT DISTINCT transformed_id as service_id
+         FROM orders
+         WHERE UPPER(assigned_warehouse) = UPPER($1) AND transformed_id IS NOT NULL`,
+        [normalizedCode]
+      );
+      const serviceIds = servicesResult.rows.map(r => r.service_id).filter(Boolean);
+      const entityIds = [...orderIds, ...serviceIds];
+
+      const canAccess = feedback.created_by_id?.toUpperCase() === normalizedCode.toUpperCase() ||
+                        (feedback.related_entity_id && entityIds.includes(feedback.related_entity_id));
+
+      if (!canAccess) {
+        return null; // Permission denied
+      }
+    } else {
+      // Other roles: must be in same ecosystem
+      const managerCode = await getManagerForUser(normalizedCode, role);
+      if (!managerCode || feedback.cks_manager?.toUpperCase() !== managerCode.toUpperCase()) {
+        return null; // Permission denied
+      }
+    }
+
+    // Load acknowledgments
+    const acksResult = await query<any>(
+      `SELECT acknowledged_by_id, acknowledged_at
+       FROM feedback_acknowledgments
+       WHERE UPPER(feedback_id) = UPPER($1)
+       ORDER BY acknowledged_at ASC`,
+      [normalizedReportId]
+    );
+
+    const acknowledgments = acksResult.rows.map(ack => ({
+      userId: ack.acknowledged_by_id,
+      date: ack.acknowledged_at,
+    }));
+
+    // Feedback table only has archived_at (not full archive metadata)
+    return {
+      ...mapFeedbackRow(feedback, acknowledgments),
+      archivedAt: feedback.archived_at || undefined,
+    };
+  }
 }

@@ -11,6 +11,14 @@ export interface ReportResolution {
   actionTaken?: string;
 }
 
+export interface ReportAction {
+  label: string;
+  variant: 'primary' | 'secondary' | 'danger';
+  onClick: () => void | Promise<void>;
+  disabled?: boolean;
+  loading?: boolean;
+}
+
 export interface ReportQuickActionsProps {
   type: 'report' | 'feedback';
   status: 'open' | 'resolved' | 'closed';
@@ -20,6 +28,7 @@ export interface ReportQuickActionsProps {
   resolution?: ReportResolution;
   resolution_notes?: string;
   currentUser?: string;
+  actions?: ReportAction[];
 }
 
 // Helper to get user-friendly role name from ID
@@ -59,11 +68,39 @@ const ReportQuickActions: React.FC<ReportQuickActionsProps> = ({
   resolution,
   resolution_notes,
   currentUser,
+  actions = [],
 }) => {
   const isReport = type === 'report';
 
   return (
     <div className={styles.container}>
+      {/* Action Buttons Section */}
+      {actions.length > 0 && (
+        <div className={styles.actionsSection}>
+          <h3 className={styles.sectionTitle}>Actions</h3>
+          <div className={styles.actionsGrid}>
+            {actions.map((action, index) => {
+              const buttonClass = `${styles.actionButton} ${
+                action.variant === 'danger' ? styles.actionDanger :
+                action.variant === 'primary' ? styles.actionPrimary :
+                styles.actionSecondary
+              }`;
+
+              return (
+                <button
+                  key={index}
+                  onClick={action.onClick}
+                  disabled={action.disabled || action.loading}
+                  className={buttonClass}
+                >
+                  {action.loading ? 'Loading...' : action.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Lifecycle Section - Yellow Box */}
       <div className={styles.lifecycleSection}>
         <h3 className={styles.sectionTitle}>

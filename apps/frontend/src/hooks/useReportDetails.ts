@@ -1,14 +1,16 @@
 /**
  * useReportDetails - Unified Report/Feedback Details Hook
  *
- * Follows the same pattern as useOrderDetails:
- * - Fetches report/feedback data from hub's useHubReports
+ * ON-DEMAND FETCHING PATTERN (Proper Modular Architecture):
+ * - Fetches report/feedback by ID using session-based auth (matches orders)
+ * - No user code needed - backend determines permissions from session
  * - Normalizes into UI-friendly format for modals
  * - Handles loading/error states
- * - No client-side enrichment; backend is source of truth
+ * - Works identically from Activity Feed, Directory, Archive, etc.
  */
 
-import { useMemo } from 'react';
+import useSWR from 'swr';
+import { apiFetch, type ApiResponse } from '../shared/api/client';
 
 // ============================================================================
 // TypeScript Interfaces
@@ -42,6 +44,11 @@ export interface NormalizedReport {
   resolvedAt?: string;
   resolution?: ReportResolution;
   resolution_notes?: string;
+  // Archive metadata (for state detection)
+  archivedAt?: string;
+  archivedBy?: string;
+  archiveReason?: string;
+  deletionScheduled?: string;
 }
 
 export interface UseReportDetailsReturn {
@@ -53,7 +60,6 @@ export interface UseReportDetailsReturn {
 export interface UseReportDetailsParams {
   reportId: string | null;
   reportType: 'report' | 'feedback' | null;
-  reportsData: { reports: any[]; feedback: any[] } | null | undefined;
 }
 
 // ============================================================================
@@ -83,6 +89,11 @@ function normalizeReport(entity: any, type: 'report' | 'feedback'): NormalizedRe
       resolvedAt: entity.resolvedAt,
       resolution: entity.resolution,
       resolution_notes: entity.resolution_notes,
+      // Archive metadata
+      archivedAt: entity.archivedAt,
+      archivedBy: entity.archivedBy,
+      archiveReason: entity.archiveReason,
+      deletionScheduled: entity.deletionScheduled,
     };
   }
 
@@ -105,6 +116,11 @@ function normalizeReport(entity: any, type: 'report' | 'feedback'): NormalizedRe
     resolvedAt: entity.resolvedAt,
     resolution: entity.resolution,
     resolution_notes: entity.resolution_notes,
+    // Archive metadata
+    archivedAt: entity.archivedAt,
+    archivedBy: entity.archivedBy,
+    archiveReason: entity.archiveReason,
+    deletionScheduled: entity.deletionScheduled,
   };
 }
 
@@ -113,37 +129,37 @@ function normalizeReport(entity: any, type: 'report' | 'feedback'): NormalizedRe
 // ============================================================================
 
 /**
- * Hook to get normalized report/feedback details
+ * Hook to get normalized report/feedback details by fetching on-demand
  *
- * @param params - reportId, reportType, and reportsData from useHubReports
- * @returns Normalized report data for modal consumption
+ * @param params - reportId and reportType
+ * @returns Normalized report data with loading/error states
  */
 export function useReportDetails(params: UseReportDetailsParams): UseReportDetailsReturn {
-  const { reportId, reportType, reportsData } = params;
+  const { reportId, reportType } = params;
 
-  const report = useMemo(() => {
-    if (!reportId || !reportType || !reportsData) return null;
+  // Construct SWR key: only fetch if we have reportId
+  // Session-based auth pattern (matches how orders work)
+  const shouldFetch = !!(reportId && reportType);
+  const swrKey = shouldFetch ? `/reports/${reportId}/details` : null;
 
-    if (reportType === 'report') {
-      const entity = reportsData.reports.find((r: any) => r.id === reportId);
-      if (!entity) return null;
-      return normalizeReport(entity, 'report');
+  // Fetch on-demand from backend (uses apiFetch for proper /api prefix)
+  const { data, error, isLoading } = useSWR<ApiResponse<any>>(
+    swrKey,
+    async (url) => {
+      return await apiFetch<ApiResponse<any>>(url);
+    },
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
     }
+  );
 
-    if (reportType === 'feedback') {
-      const entity = reportsData.feedback.find((f: any) => f.id === reportId);
-      if (!entity) return null;
-      return normalizeReport(entity, 'feedback');
-    }
+  // Normalize the fetched data
+  const report = data?.data ? normalizeReport(data.data, reportType) : null;
 
-    return null;
-  }, [reportId, reportType, reportsData]);
-
-  // No loading/error states needed since we're using hub's already-loaded data
-  // If we need to fetch individual reports later, we can add that here
   return {
     report,
-    isLoading: false,
-    error: null,
+    isLoading,
+    error: error || null,
   };
 }

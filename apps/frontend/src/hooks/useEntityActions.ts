@@ -166,8 +166,8 @@ async function handleOrderAction(
     console.log(`[useEntityActions] Order action "${actionId}" completed successfully`);
 
     // Show success toast
-    const actionLabel = action.charAt(0).toUpperCase() + action.slice(1).toLowerCase();
-    toast.success(`Order ${backendAction}ed successfully`);
+    const actionLabel = actionId.charAt(0).toUpperCase() + actionId.slice(1).toLowerCase();
+    toast.success(`Order ${actionLabel}ed successfully`);
 
     return true;
 
@@ -181,29 +181,192 @@ async function handleOrderAction(
 
 /**
  * Handle Service Actions
- * TODO: Implement when service actions are needed
  */
 async function handleServiceAction(
-  _serviceId: string,
-  _actionId: string,
-  _options: EntityActionOptions,
-  _mutate: any
+  serviceId: string,
+  actionId: string,
+  options: EntityActionOptions,
+  mutate: any
 ): Promise<boolean> {
-  console.warn('[useEntityActions] Service actions not yet implemented');
-  return false;
+  // Import archive API
+  const { archiveAPI } = await import('../shared/api/archive');
+
+  try {
+    switch (actionId) {
+      case 'archive': {
+        // Use reason from options (ModalGateway already prompted)
+        const reason = options.notes;
+
+        console.log('[useEntityActions] Archiving service:', serviceId);
+        await archiveAPI.archiveEntity('service', serviceId, reason || undefined);
+
+        // Invalidate caches
+        mutate((key: any) => {
+          if (typeof key === 'string') {
+            return key.includes('/admin/directory/services') || key.includes(serviceId);
+          }
+          return false;
+        });
+
+        toast.success('Service archived successfully');
+        options.onSuccess?.();
+        return true;
+      }
+
+      case 'restore': {
+        console.log('[useEntityActions] Restoring service:', serviceId);
+        await archiveAPI.restoreEntity('service', serviceId);
+
+        // Invalidate caches
+        mutate((key: any) => {
+          if (typeof key === 'string') {
+            return key.includes('/admin/directory/services') ||
+                   key.includes('/archive') ||
+                   key.includes(serviceId);
+          }
+          return false;
+        });
+
+        toast.success('Service restored successfully');
+        options.onSuccess?.();
+        return true;
+      }
+
+      case 'delete': {
+        // Use reason from options (ModalGateway already prompted and confirmed)
+        const reason = options.notes;
+
+        console.log('[useEntityActions] Permanently deleting service:', serviceId);
+        await archiveAPI.hardDelete('service', serviceId, reason);
+
+        // Invalidate caches
+        mutate((key: any) => {
+          if (typeof key === 'string') {
+            return key.includes('/archive') || key.includes(serviceId);
+          }
+          return false;
+        });
+
+        toast.success('Service permanently deleted');
+        options.onSuccess?.();
+        return true;
+      }
+
+      case 'start':
+      case 'complete':
+      case 'assign_crew':
+        // TODO: Implement when backend endpoints are ready
+        console.warn(`[useEntityActions] ${actionId} action not yet implemented for services`);
+        toast.error(`${actionId} action not yet implemented`);
+        return false;
+
+      default:
+        console.warn('[useEntityActions] Unknown action for service:', actionId);
+        return false;
+    }
+  } catch (error) {
+    console.error(`[useEntityActions] Service action "${actionId}" failed:`, error);
+    toast.error(`Failed to ${actionId} service`);
+    throw error;
+  }
 }
 
 /**
  * Handle Report/Feedback Actions
- * TODO: Implement when report actions are needed
  */
 async function handleReportAction(
-  _reportId: string,
-  _actionId: string,
-  _subtype: string | undefined,
-  _options: EntityActionOptions,
-  _mutate: any
+  reportId: string,
+  actionId: string,
+  subtype: string | undefined,
+  options: EntityActionOptions,
+  mutate: any
 ): Promise<boolean> {
-  console.warn('[useEntityActions] Report actions not yet implemented');
-  return false;
+  // Import archive API
+  const { archiveAPI } = await import('../shared/api/archive');
+
+  // Determine entity type (report vs feedback)
+  const entityType = subtype === 'feedback' ? 'feedback' : 'report';
+  const entityLabel = entityType === 'feedback' ? 'Feedback' : 'Report';
+
+  try {
+    switch (actionId) {
+      case 'archive': {
+        // Use reason from options (ModalGateway already prompted)
+        const reason = options.notes;
+
+        console.log(`[useEntityActions] Archiving ${entityType}:`, reportId);
+        await archiveAPI.archiveEntity(entityType, reportId, reason || undefined);
+
+        // Invalidate caches
+        mutate((key: any) => {
+          if (typeof key === 'string') {
+            return key.includes('/admin/directory/reports') ||
+                   key.includes('/admin/directory/feedback') ||
+                   key.includes(reportId);
+          }
+          return false;
+        });
+
+        toast.success(`${entityLabel} archived successfully`);
+        options.onSuccess?.();
+        return true;
+      }
+
+      case 'restore': {
+        console.log(`[useEntityActions] Restoring ${entityType}:`, reportId);
+        await archiveAPI.restoreEntity(entityType, reportId);
+
+        // Invalidate caches
+        mutate((key: any) => {
+          if (typeof key === 'string') {
+            return key.includes('/admin/directory/reports') ||
+                   key.includes('/admin/directory/feedback') ||
+                   key.includes('/archive') ||
+                   key.includes(reportId);
+          }
+          return false;
+        });
+
+        toast.success(`${entityLabel} restored successfully`);
+        options.onSuccess?.();
+        return true;
+      }
+
+      case 'delete': {
+        // Use reason from options (ModalGateway already prompted and confirmed)
+        const reason = options.notes;
+
+        console.log(`[useEntityActions] Permanently deleting ${entityType}:`, reportId);
+        await archiveAPI.hardDelete(entityType, reportId, reason);
+
+        // Invalidate caches
+        mutate((key: any) => {
+          if (typeof key === 'string') {
+            return key.includes('/archive') || key.includes(reportId);
+          }
+          return false;
+        });
+
+        toast.success(`${entityLabel} permanently deleted`);
+        options.onSuccess?.();
+        return true;
+      }
+
+      case 'acknowledge':
+      case 'resolve':
+      case 'close':
+        // TODO: Implement when backend endpoints are ready
+        console.warn(`[useEntityActions] ${actionId} action not yet implemented for reports`);
+        toast.error(`${actionId} action not yet implemented`);
+        return false;
+
+      default:
+        console.warn(`[useEntityActions] Unknown action for ${entityType}:`, actionId);
+        return false;
+    }
+  } catch (error) {
+    console.error(`[useEntityActions] ${entityLabel} action "${actionId}" failed:`, error);
+    toast.error(`Failed to ${actionId} ${entityLabel.toLowerCase()}`);
+    throw error;
+  }
 }
