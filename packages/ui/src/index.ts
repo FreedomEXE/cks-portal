@@ -123,3 +123,7 @@ export type { ApprovalWorkflowProps, ApprovalStage } from './workflows/ApprovalW
 // Badges
 export { default as StatusBadge } from './badges/StatusBadge';
 export type { StatusBadgeProps } from './badges/StatusBadge';
+
+// Tabs
+export { default as HistoryTab } from './tabs/HistoryTab';
+export type { HistoryTabProps } from './tabs/HistoryTab';
