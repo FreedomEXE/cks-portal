@@ -57,7 +57,8 @@
       "Bash(del \"packages\\ui\\src\\cards\\ServiceCard\\ServiceHeader.tsx\")",
       "Bash(pnpm build:domain-widgets:*)",
       "Bash(pnpm --filter @cks/domain-widgets build)",
-      "Bash(pnpm --filter frontend build)"
+      "Bash(pnpm --filter frontend build)",
+      "Bash(pnpm --filter frontend test:ci)"
     ],
     "deny": [],
     "ask": []

@@ -44,9 +44,12 @@ function parseDetailEndpoint(path: string): { entityType: string; entityId: stri
     return null;
   }
 
+  // Strip /api prefix for uniform matching
+  const normalizedPath = path.replace(/^\/api/, '');
+
   // Try to match against catalog patterns
   // Patterns: /order/{id}/details, /reports/{id}/details, /services/{id}/details
-  const match = path.match(/^\/([^\/]+)\/([^\/]+)\/details$/);
+  const match = normalizedPath.match(/^\/([^\/]+)\/([^\/]+)\/details$/);
   if (!match) {
     return null;
   }
@@ -63,7 +66,7 @@ function parseDetailEndpoint(path: string): { entityType: string; entityId: stri
     // Build expected endpoint and compare (strip /api prefix for comparison)
     const expectedPath = definition.detailsEndpoint(entityId);
     const normalizedExpected = expectedPath.replace(/^\/api/, '');
-    if (path === normalizedExpected || path.startsWith(normalizedExpected)) {
+    if (normalizedPath === normalizedExpected || normalizedPath.startsWith(normalizedExpected)) {
       return { entityType, entityId };
     }
   }
