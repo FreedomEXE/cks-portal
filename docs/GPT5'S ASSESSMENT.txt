@@ -1,0 +1,44 @@
+GPT5'S ASSESSMENT OF YOUR PREVIOUS SUGGESTIONS 
+
+You’re right — I got stuck poking the repo. Here are my concise thoughts and the path forward without tooling.
+
+Assessment
+
+Root cause is correct: hooks are called inside adapter functions, which are invoked from within useMemo. Violates React hook rules and crashes on re-render. References: apps/frontend/src/config/entityRegistry.tsx:125, apps/frontend/src/components/ModalGateway.tsx:135.
+Your “descriptors in adapters, bind in gateway” design fixes the fault line while keeping the single ModalGateway architecture.
+Fix Validation
+
+Move all hooks (e.g., useEntityActions, use*Details) to the top level of ModalGateway.
+Adapters expose pure getActionDescriptors(context) — no hooks, no DOM.
+Gateway binds onClick by calling handleAction(entityId, desc.key, payload) and handles confirm/prompt UI centrally.
+Force remount via key={${entityType}:${entityId}} to keep hook order stable on entity switches.
+This aligns with React’s rules and makes adapters deterministic and testable.
+Refinements To Consider
+
+Confirm/prompt: window dialogs are fine for POC, but prefer a shared Confirm/Prompt modal integrated with ModalRoot for consistency and telemetry.
+Prop shaping: have adapter.mapToProps(data, actions) return only entity-specific props; let ModalGateway supply isOpen, onClose, role to avoid duplication.
+Action keys: define a typed EntityActionKey union for safety ('archive'|'restore'|'delete'|'accept'|'reject'|'create_service'|'acknowledge'|'resolve'|...).
+Success flow: add closeOnSuccess?: boolean to EntityActionDescriptor; default true for destructive actions, false for non-destructive (e.g., acknowledge).
+Loading state: expose getLoading(actionKey, entityId) or a keyed isLoading map from useEntityActions so buttons can show spinners/disable during in-flight operations.
+Permissions: keep can(entityType, action, role, context) pure and centralized; adapters should only decide which descriptors to surface.
+Feedback vs report: keep one 'report' entityType and infer label via entityData.type ('feedback'|'report') as you proposed — simplifies registry.
+POC Plan (Reports First)
+
+Add types/entities.ts with EntityActionDescriptor, EntityAction, and updated EntityAdapter (pure getActionDescriptors, mapToProps signature).
+Refactor apps/frontend/src/config/entityRegistry.tsx:
+Rename buildActions → getActionDescriptors for reportAdapter.
+Remove all hook calls; use can(...) and pure state checks to build descriptors.
+Update apps/frontend/src/components/ModalGateway.tsx:
+Call useEntityActions once at top.
+Compute descriptors via adapter.getActionDescriptors(...) (pure).
+Bind to actions with confirm/prompt and handleAction.
+Pass key={${entityType}:${entityId}}, isOpen, onClose, role.
+Wire open calls:
+Add openEntityModal(entityType, id, opts?) to apps/frontend/src/contexts/ModalProvider.tsx for a single entrypoint.
+Update apps/frontend/src/hubs/AdminHub.tsx to use modals.openEntityModal('report', row.id) and same for feedback.
+Sanity checks:
+Opening CEN-010-RPT-017 / FBK-009 / FBK-010 shows quick actions and details; archive works; archived items can be permanently deleted from Archive.
+No hook-order errors; activity feed items render properly again.
+Decision
+
+I recommend Option B (report-first POC), then apply to orders/services once verified. If you give the word, I’ll implement exactly this POC, keeping changes tight and isolated.

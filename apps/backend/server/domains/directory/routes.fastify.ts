@@ -83,7 +83,7 @@ export async function registerDirectoryRoutes(server: FastifyInstance) {
     const { activityId } = paramsResult.data;
 
     try {
-      const success = await clearActivity(activityId, admin.userId);
+      const success = await clearActivity(activityId, admin.cksCode);
       if (success) {
         reply.send({ success: true, message: 'Activity cleared' });
       } else {
@@ -103,7 +103,7 @@ export async function registerDirectoryRoutes(server: FastifyInstance) {
     }
 
     try {
-      const count = await clearAllActivities(admin.userId);
+      const count = await clearAllActivities(admin.cksCode);
       reply.send({ success: true, count, message: `Cleared ${count} activities` });
     } catch (error) {
       request.log.error({ err: error }, "Failed to clear all activities");

@@ -38,7 +38,16 @@
       "WebSearch",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:skywork.ai)",
-      "Bash(where npx)"
+      "Bash(where npx)",
+      "Bash(pnpm typecheck:*)",
+      "Bash(pnpm --filter @cks/portal build)",
+      "Bash(pnpm --filter @cks/ui build)",
+      "Bash(pnpm typecheck:frontend:*)",
+      "Bash(copy:*)",
+      "Bash(pnpm --filter @cks/portal typecheck)",
+      "WebFetch(domain:www.reddit.com)",
+      "Bash(git reset:*)",
+      "Bash(npx vitest run:*)"
     ],
     "deny": [],
     "ask": []

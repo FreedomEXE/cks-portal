@@ -1,0 +1,715 @@
+COMMON REDDIT POSTS SURROUNDING THIS IDEA (IF YOU SEE LINKS RECOMMNEDED BY USERS IN THESE THREADS PLEASE READ THEM
+
+1. Creating reusable modal
+Needs Help
+flowery zonked cover domineering faulty innocent heavy truck pocket clumsy
+
+This post was mass deleted and anonymized with Redact
+
+
+Upvote
+1
+
+Downvote
+
+5
+Go to comments
+
+
+Share
+Add your reply
+Sort by:
+
+Best
+
+Search Comments
+Expand comment search
+Comments Section
+u/lelarentaka avatar
+lelarentaka
+•
+3y ago
+Headless components necessarily has to be verbose because they need to be completely customizable. You're not supposed to use them directly in your UI, instead you're supposed to write your own component library on top of the headless components with a simpler interface.
+
+Instead of
+
+MyApp -> MUI
+
+You do
+
+MyApp -> MyComponent -> RadixUI
+
+
+Upvote
+3
+
+Downvote
+
+Reply
+
+Award
+
+Share
+
+jlemrond
+•
+3y ago
+Headless UI has a great modal you can import. Or if you don’t want to import it you can at least explore their GitHub to see how they setup their modal.
+
+https://headlessui.com/react/dialog
+
+
+Upvote
+1
+
+Downvote
+
+Reply
+
+Award
+
+Share
+
+mykesx
+•
+3y ago
+Make a Modal component in your shared components directory. Pass it props: show, mode, onClose.
+
+Show, if false, the dialog returns null, so nothing is rendered. You pass true to show the modal.
+
+The mode prop is the mode, “create,” “read”, “update,” or “delete.”
+
+In the component, switch on mode and render the dialog as you want for that mode.
+
+Parent uses useState() for the show variable to be passed.
+
+You always render the dialog as well as the UI without the dialog, passing show. You can import and use the dialog in many places.
+
+In your UI, user clicks button, you call setState show to true and the dialog shows.
+
+The dialog calls onClose prop when user clicks OK or Cancel button in the dialog. Parent provides onClose which sets show to false.
+
+You probably need to pass a prop that has the record to be operated on, too.
+
+
+
+Upvote
+1
+
+Downvote
+
+Reply
+
+Award
+
+Share
+
+[deleted]
+OP
+•
+3y ago
+•
+Edited 1y ago
+nose rustic strong outgoing handle knee chase marry squalid soft
+
+This post was mass deleted and anonymized with Redact
+
+
+Upvote
+1
+
+Downvote
+
+Reply
+
+Award
+
+Share
+
+u/Emergency_Froyo8155 avatar
+Emergency_Froyo8155
+•
+2y ago
+If you have a problem managing modal state, how about using
+
+https://github.com/rkdrnf/react-modal-state
+
+which I authored recently.
+
+It enables you declare modals and pass appropriate data to it easily.
+
+Though it does not targets on creating "dynamic" modal component, dynamic modal component might be implemented in modal component by conditionally rendering depending on the data it received or it can even receive component you want to render as a data.
+
+I hope it helps you and it would be really nice if you can give me feedback :)
+
+
+Upvote
+1
+
+Downvote
+
+Reply
+
+Award
+
+Share
+
+2. How to centralize and reuse modals across pages in a Next.js app?
+Question
+I’m facing an issue in my Next.js application where every page includes confirmation modals and edit modals. These modals mostly share the same design and structure.
+
+I’m wondering if there’s a simple and effective way to centralize all my modals in one file or component, and have them show up based on a pre-passed configuration or context, instead of repeating the same modal logic across different pages.
+
+Has anyone implemented something like this before? What would be the best approach?
+
+
+Upvote
+24
+
+Downvote
+
+17
+Go to comments
+
+
+Share
+u/Warp_DotDev avatar
+Warp_DotDev
+•
+Promoted
+
+Deploy AI agents across your everyday tools. Get requirements from Linear, fix Sentry errors, resolve GitHub comments... you name it.
+Sign Up
+warp.dev
+Thumbnail image: Deploy AI agents across your everyday tools. Get requirements from Linear, fix Sentry errors, resolve GitHub comments... you name it.
+Add your reply
+Sort by:
+
+Best
+
+Search Comments
+Expand comment search
+Comments Section
+u/Morel_ avatar
+Morel_
+•
+4mo ago
+This is what they mean when they say learn React before jumping to Next. Component reusability is a very basic thing to know.
+
+
+
+Upvote
+80
+
+Downvote
+
+Reply
+
+Award
+
+Share
+
+Razgriz80
+•
+4mo ago
+My thought too, this isn’t like a NextJs thing, it’s just a programming thing (or react/Js if you are figuring out syntax and folder structure).
+
+
+Upvote
+4
+
+Downvote
+
+Reply
+
+Award
+
+Share
+
+
+abdushkur
+•
+4mo ago
+•
+Edited 4mo ago
+u/Hasan3a avatar
+Hasan3a
+•
+4mo ago
+Your question is valid. Do not care about people who mock it. Managing modals is a pain in React without utilizing some re-usable solution. I've been using ebay's nice-modal-react package for 2 years, and I can't imagine handling modals without it.
+
+https://github.com/eBay/nice-modal-react
+
+
+
+Upvote
+8
+
+Downvote
+
+Reply
+
+Award
+
+Share
+
+unheard-thoughts
+•
+4mo ago
+They have a nice article about it too(5-10 min read): https://innovation.ebayinc.com/stories/rethink-modals-management-in-react/
+
+
+Upvote
+1
+
+Downvote
+
+Reply
+
+Award
+
+Share
+
+burnedpotato21
+•
+4mo ago
+If it’s the same modal for every page, I’ll probably do it using React Context pass to the layout. I’ll just trigger it in the component level to get values.
+
+
+Upvote
+2
+
+Downvote
+
+Reply
+
+Award
+
+Share
+
+Codingwithmr-m
+•
+4mo ago
+you can create a single ModalProvider component that manages the state and rendering of all modals in your application. This provider can use React Context to allow any component to trigger modals with specific configurations (e.g., type, content, or props). The modals themselves can be reusable components, and their visibility and behavior can be controlled through a centralized state.
+
+Create a Modal Context
+
+Create Reusable Modal Component
+
+Define Individual Modal Components
+
+Wrap Your App with the ModalProvider
+
+Trigger Modals from Any Component
+
+
+Upvote
+2
+
+Downvote
+
+Reply
+
+Award
+
+Share
+
+u/RevenueCat avatar
+RevenueCat
+•
+Promoted
+
+Build features instead of in-app purchase plumbing.
+Learn More
+revenuecat.com
+Thumbnail image: Build features instead of in-app purchase plumbing.
+u/cosileone avatar
+cosileone
+•
+4mo ago
+Don’t centralize modals, just reuse a generic modal component like shadcn has and instantiate it anywhere you need it. For really generic yes/no/ok/areyousure modals you can use https://github.com/desko27/react-call
+
+
+
+Upvote
+5
+
+Downvote
+
+Reply
+
+Award
+
+Share
+
+Senior-Safety-9139
+•
+4mo ago
+I would honestly look at making something like this yourself so you at least learn something instead of just using packages everywhere.
+
+
+Upvote
+2
+
+Downvote
+
+Reply
+
+Award
+
+Share
+
+u/joneath avatar
+joneath
+•
+4mo ago
+For the past four years or so I like to build a useModal custom hook, modal-store, and ModalRenderer.
+
+useModal returns two methods, openModal(modalName: ModalName, props: ModalProps) and closeModal(modalId: string).
+
+modal-store keeps an array of currently opened modals (allows for infinite modal on modal action) and passes the onClose callback to each opened modal (this is so a modal can close itself). modal-store also keeps the registry of all the app's modals (simple object mapping string name to ModalComponent). Originally I would just import all modals at the top of this file at module level but I switched to dynamic imports to lower the initial bundle size; a helper useEffect initiates the imports on app boot so the modals are cached and open instantly.
+
+ModalRenderer is a simple component that maps over the array of open modals provided by modal-store and passes the props. This is placed high up but inside of any providers you have so you have any contexts you might need inside the modal body.
+
+
+Upvote
+4
+
+Downvote
+
+Reply
+
+Award
+
+Share
+
+reazonlucky
+•
+4mo ago
+it's not good practice todo it that way, sometimes you might need modal inside modal that stacks. if you reuse one modal globally, this will messed things up. just make a custom component of that modal and re use it in any page that you need.
+
+
+Upvote
+2
+
+Downvote
+
+Reply
+
+Award
+
+Share
+
+happybday90
+•
+4mo ago
+Here is my strategy
+
+I have all my modals or reusable components in the layout.tsx file
+
+I use jotai for state management (you can use app context as well)
+
+The central state takes 2 things a type (confirmation, add something, etc etc and a data which has config about the modal, callback function etc)
+
+Then from anywhere else I just set the state
+
+Eg
+
+setShowModal({type: 'CONFIRMATION', data: {title: 'Are you sure', callback: fn}})
+
+To remove setShowModal(undefined)
+
+
+
+Upvote
+0
+
+Downvote
+
+Reply
+
+Award
+
+Share
+
+computang
+•
+4mo ago
+This is not a great pattern to follow for everything. Sure, an app sidebar, but all of your modals?
+
+It’s much better to just create a confirmation dialog component that you can pass props to
+
+
+
+Upvote
+2
+
+Downvote
+
+Reply
+
+Award
+
+Share
+
+happybday90
+•
+4mo ago
+Just for my understanding why is that ? Would love to learn what I might be doing wrong.
+
+
+Upvote
+2
+
+Downvote
+
+Reply
+
+Award
+
+Share
+
+u/yksvaan avatar
+yksvaan
+•
+4mo ago
+Profile Badge for the Achievement Top 1% Commenter Top 1% Commenter
+Put the modal somewhere in the page, get a ref to it or use broadcast a message to it to toggle it. 
+
+
+Upvote
+-1
+
+Downvote
+
+Reply
+
+Award
+
+Share
+
+u/Kindly_Wish8514 avatar
+Kindly_Wish8514
+•
+4mo ago
+Pass a type prop. <Component type="model, alert"> then in the component return model based of type if type == modal return modal, else alet.
+
+That's why u need to learn React first. Components reusability is basic of React
+
+3. Best design pattern for handling multiple modals in a large app?
+Hey everyone! In the past I've always handled modals by:
+
+Creating one master <Modal /> component that is rendered onto the root component
+
+That <Modal /> component has a large switch statement that reads from props.modalName
+
+That switch statement returns the appropriate content based on props.modalName.
+
+Otherwise it returns null if props.modalName is null.
+
+So for example, if I had a toggleModal() redux action and called toggleModal('pricing'), it would render a <Pricing /> component within <Modal />. When <Modal /> is closed, props.modalName is set to null which causes <Modal /> to return as null.
+
+I'll store 30+ different modals within here, all called throughout the app with toggleModal(modalName).
+
+This has worked fine but I've never known if this is an ideal design pattern for handling many modals in a large app within React or if there's a better way. Thanks for any input!
+
+
+Upvote
+17
+
+Downvote
+
+12
+Go to comments
+
+
+Share
+u/anchorBrowser avatar
+anchorBrowser
+•
+Promoted
+
+The Browser Infrastructure Revolution
+Try our agentic browser API for free
+Try our agentic browser API for free
+Try our agentic browser API for free
+anchorbrowser.io
+Sign Up
+Add your reply
+Sort by:
+
+Best
+Comments Section
+IAmWhoISayImNot
+•
+7y ago
+You might want to use a portal.
+
+
+
+Upvote
+8
+
+Downvote
+
+Reply
+
+Award
+
+Share
+
+meisteronimo
+•
+7y ago
+Yes portal is easy. You open the modal at the place most able to deal with the user input from the modal. The modal stays dumb and its logic is handled in some parent.
+
+
+Upvote
+2
+
+Downvote
+
+Reply
+
+Award
+
+Share
+
+u/cheese_wizard avatar
+cheese_wizard
+•
+7y ago
+I like to have a setup where at any moment I can say:
+
+modalService.openModal(<Pricing />);
+modalService.openDialog(<ConfirmDialog onConfirm={this.onConfirm}/>);
+
+And really just have this be a service that put these modals on a stack so you can just call a generic modalService.close() and it will pop modals off the stack. I like to just hide visually modals that are lower in the stack rather than remove them, so they keep their state.
+
+
+Upvote
+3
+
+Downvote
+
+Reply
+
+Award
+
+Share
+
+
+[deleted]
+•
+7y ago
+u/Vaadin_official avatar
+Vaadin_official
+•
+Promoted
+
+One language. Full-stack web apps. With Vaadin, you build secure, modern web apps — end to end — in 100% Java.
+Learn More
+vaadin.com
+Thumbnail image: One language. Full-stack web apps. With Vaadin, you build secure, modern web apps — end to end — in 100% Java.
+u/chrispardy avatar
+chrispardy
+•
+7y ago
+If you need to have a single global "modal" in your markup I'd recommend either using a portal, or use the context API. We just use some static positioning on our modals and render them near related components.
+
+
+Upvote
+1
+
+Downvote
+
+Reply
+
+Award
+
+Share
+
+weigel23
+•
+7y ago
+I also have a master modal in the root component, but i set its content via context:
+
+<ModalContextConsumer> {({ modal, setModal }) => modal && (<ModalonClose={() => setModal(null)}{...modal.props}>{modal.content}</Modal>)}</ModalContextConsumer>
+
+
+Edit: how do I format this right?!
+
+
+Upvote
+1
+
+Downvote
+
+Reply
+
+Award
+
+Share
+
+u/azmenak avatar
+azmenak
+•
+7y ago
+I would recommend rethinking this approach, others have mentioned using Portals, that’s a good start.
+
+There’s really no need to pre-define all the modals though, you could just render them with the content they need next to their controls.
+
+A modal only really needs two props, open for its “open” status and another “onClose” callback you can use to change the open status
+
+
+
+Upvote
+1
+
+Downvote
+
+Reply
+
+Award
+
+Share
+
+u/azmenak avatar
+azmenak
+•
+7y ago
+Also, and I cannot stress this enough, NOT EVERYTHING SHOULD BE A REDUX ACTION
+
+No Redux needed to make this work.
+
+
+Upvote
+2
+
+Downvote
+
+Reply
+
+Award
+
+Share
+
+thatzacdavis
+•
+7y ago
+Without looking at the code, it sounds like you have a lot of logic to determine what should be passed in as children instead.
+
+For my popout functionality (we try to avoid modals), I have a super generic component that can be passed any arbitrary children.
+
+
+Upvote
+6
+
+Downvote
+
+Reply
+
+Award
+
+Share
+

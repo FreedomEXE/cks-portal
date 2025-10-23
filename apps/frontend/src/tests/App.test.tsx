@@ -1,7 +1,7 @@
 import React from 'react';
 import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { renderToString } from 'react-dom/server';
-import { MemoryRouter } from 'react-router-dom';
+import { ProvidersWrapper } from './renderWithProviders';
 
 vi.mock('@cks/auth', () => ({
   useAuth: vi.fn(),
@@ -32,9 +32,9 @@ describe('App routing', () => {
 
   it('renders admin hub at /hub for admin users', () => {
     const html = renderToString(
-      <MemoryRouter initialEntries={['/hub']}>
+      <ProvidersWrapper route="/hub" currentUserId="TEST-ADMIN" role="admin">
         <AuthenticatedApp />
-      </MemoryRouter>
+      </ProvidersWrapper>
     );
 
     expect(html).toContain('admin hub view');
@@ -50,9 +50,9 @@ describe('App routing', () => {
     });
 
     const html = renderToString(
-      <MemoryRouter initialEntries={['/hub']}>
+      <ProvidersWrapper route="/hub" currentUserId="TEST-CONTRACTOR" role="contractor">
         <AuthenticatedApp />
-      </MemoryRouter>
+      </ProvidersWrapper>
     );
 
     expect(html).toContain('Coming soon');
@@ -60,9 +60,9 @@ describe('App routing', () => {
 
   it('routes unknown signed-out paths to the login page', () => {
     const html = renderToString(
-      <MemoryRouter initialEntries={['/unknown']}>
+      <ProvidersWrapper route="/unknown">
         <UnauthenticatedApp />
-      </MemoryRouter>
+      </ProvidersWrapper>
     );
 
     expect(html).toContain('login page');
