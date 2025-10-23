@@ -283,6 +283,58 @@ await logActivity({
 });
 ```
 
+## API Endpoints & Tombstone Pattern
+
+### Detail Endpoints (Catalog-Backed)
+
+**Pattern:** `/api/{entityType}/{id}/details`
+
+**Examples:**
+- `/api/order/SO-123/details`
+- `/api/reports/RPT-456/details`
+- `/api/services/SRV-789/details`
+
+**Tombstone Support:** ✅ Automatic via `apiFetch`
+
+These endpoints use centralized tombstone fallback logic in `apps/frontend/src/shared/api/client.ts`:
+- On 404, `parseDetailEndpoint()` validates against catalog
+- If validated, `fetchTombstoneSnapshot()` attempts to fetch deleted snapshot
+- Returns `ApiResponse<T>` with `meta.isTombstone` flag
+- **No hook-level tombstone code needed** - `apiFetch` handles it automatically
+
+**✅ DO:** Use detail endpoints for all entity fetch operations
+**❌ DON'T:** Implement tombstone logic in hooks - it's already in `apiFetch`
+
+### Legacy Entity Endpoint
+
+**Pattern:** `/api/entity/:type/:id?includeDeleted=1`
+
+**Status:** ⚠️ Legacy (used by Activity click handlers)
+
+**Implementation:**
+- Backend: `apps/backend/server/domains/entities/routes.fastify.ts`
+- Has its own tombstone fallback via `getEntityWithFallback()`
+- Requires `includeDeleted=1` query parameter
+- Admin-only access for deleted entities
+
+**Files using legacy pattern:**
+- `apps/frontend/src/shared/utils/activityHelpers.ts`
+- `apps/frontend/src/shared/utils/activityRouter.ts`
+- `apps/frontend/src/shared/utils/adminActivityRouter.ts`
+
+**🔄 Future Migration (Post-Bake):**
+
+After bake period confirms `apiFetch` tombstone logic is stable:
+1. Verify detail endpoints have equivalent ecosystem scoping
+2. Migrate Activity helpers to use catalog-backed detail endpoints
+3. Deprecate `/api/entity/` endpoint
+4. Remove `getEntityWithFallback()` backend logic
+
+**Why wait?**
+- Detail endpoints need scoping parity confirmation
+- Avoid churn during bake period
+- Focus on delivering HistoryTab feature first
+
 ## ID Pattern Rules
 
 ### Pattern Design Principles

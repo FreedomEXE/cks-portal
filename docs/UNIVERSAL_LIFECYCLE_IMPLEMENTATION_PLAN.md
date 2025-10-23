@@ -630,13 +630,52 @@ export function useOrderDetails({ orderId }: UseOrderDetailsProps) {
 ```
 
 ### 4.2: Phase 4 Tasks
-- [ ] Update useOrderDetails with tombstone fallback
-- [ ] Update useReportDetails with tombstone fallback
-- [ ] Update useServiceDetails with tombstone fallback (when supported)
-- [ ] Test opening deleted order from activity feed
-- [ ] Verify DeletedBanner shows with isTombstone message
-- [ ] Verify no Quick Actions available (read-only)
-- [ ] Test graceful degradation if snapshot missing
+- [x] Update useOrderDetails with tombstone fallback
+- [x] Update useReportDetails with tombstone fallback
+- [x] Update useServiceDetails with tombstone fallback (when supported)
+- [x] Test opening deleted order from activity feed
+- [x] Verify DeletedBanner shows with isTombstone message
+- [x] Verify no Quick Actions available (read-only)
+- [x] Test graceful degradation if snapshot missing
+
+### 4.3: Centralized Implementation (COMPLETED)
+
+**Status:** ✅ Shipped (commit `47b5efc`)
+
+**Implementation:** Instead of duplicating tombstone logic in each hook, we centralized it in `apiFetch` with catalog validation:
+
+**Changes:**
+- Enhanced `apps/frontend/src/shared/api/client.ts`:
+  - `parseDetailEndpoint()` validates catalog-backed detail endpoints
+  - `fetchTombstoneSnapshot()` fetches deleted snapshots
+  - Enhanced 404 handler with conditional tombstone fallback
+  - Only attempts fallback on validated detail endpoints (prevents false positives)
+- Removed 90+ lines of duplicated code from detail hooks
+- Added 13 comprehensive tests in `client.test.ts`
+
+**Benefits:**
+- All 12 entity types with detail endpoints inherit tombstone support automatically
+- Future detail hooks get it for free - no manual duplication needed
+- Consistent `ApiResponse<T>` shape with `meta.isTombstone` flag
+- Catalog-based validation prevents tombstone attempts on non-detail endpoints
+
+**⚠️ Legacy Endpoint Pattern:**
+
+`/api/entity/:type/:id?includeDeleted=1` is a legacy pattern still used by Activity click handlers. This endpoint has its own tombstone fallback via `getEntityWithFallback()` in the backend.
+
+**Files using legacy pattern:**
+- `apps/frontend/src/shared/utils/activityHelpers.ts`
+- `apps/frontend/src/shared/utils/activityRouter.ts`
+- `apps/frontend/src/shared/utils/adminActivityRouter.ts`
+- `apps/backend/server/domains/entities/routes.fastify.ts`
+
+**⚠️ DO NOT implement tombstone logic in hooks** - `apiFetch` handles all detail endpoint 404s automatically.
+
+**🔄 Future Migration (Post-Bake):**
+Migrate Activity helpers to use catalog-backed detail endpoints instead of `/api/entity/` once:
+1. Detail endpoints have equivalent ecosystem scoping
+2. Bake period confirms apiFetch tombstone logic is stable
+3. Backend `/api/entity/` endpoint can be deprecated
 
 ---
 
