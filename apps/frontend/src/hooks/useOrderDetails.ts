@@ -283,13 +283,54 @@ export function useOrderDetails(params: UseOrderDetailsParams): UseOrderDetailsR
         let entity: any = initial || null;
 
         // Fetch canonical details
-        const fresh = await fetchOrderDetails(orderId);
-        entity = fresh || entity;
+        try {
+          const fresh = await fetchOrderDetails(orderId);
+          entity = fresh || entity;
+        } catch (fetchErr: any) {
+          // TOMBSTONE FALLBACK: If 404, try to fetch deleted snapshot
+          if (fetchErr?.status === 404 || fetchErr?.message?.includes('404')) {
+            console.log('[useOrderDetails] Order not found, attempting tombstone fallback...');
+            try {
+              const snapshotResponse = await fetch(`/api/deleted/order/${orderId}/snapshot`);
+              if (snapshotResponse.ok) {
+                const snapshotData = await snapshotResponse.json();
+                if (snapshotData.success && snapshotData.data) {
+                  // Reconstruct entity from snapshot
+                  entity = {
+                    ...snapshotData.data.snapshot,
+                    isDeleted: true,
+                    deletedAt: snapshotData.data.deletedAt,
+                    deletedBy: snapshotData.data.deletedBy,
+                    deletionReason: snapshotData.data.deletionReason,
+                    isTombstone: true,
+                  };
+                  console.log('[useOrderDetails] Tombstone loaded successfully');
+                } else {
+                  throw fetchErr; // No snapshot available, throw original error
+                }
+              } else {
+                throw fetchErr; // Snapshot fetch failed, throw original error
+              }
+            } catch (snapshotErr) {
+              console.error('[useOrderDetails] Tombstone fallback failed:', snapshotErr);
+              throw fetchErr; // Throw original 404 error
+            }
+          } else {
+            throw fetchErr; // Not a 404, throw original error
+          }
+        }
 
         if (cancelled) return;
 
         // Normalize
         const normalizedOrder = normalizeOrder(entity);
+
+        // Preserve deletion metadata
+        if (entity.isDeleted) {
+          normalizedOrder.isDeleted = true;
+          normalizedOrder.deletedAt = entity.deletedAt;
+          normalizedOrder.deletedBy = entity.deletedBy;
+        }
 
         if (cancelled) return;
 

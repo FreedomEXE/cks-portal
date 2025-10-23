@@ -35,6 +35,12 @@ export interface NormalizedService {
     warehouseId?: string;
     warehouseName?: string;
   };
+  // Deletion metadata (tombstone)
+  isDeleted?: boolean;
+  deletedAt?: string;
+  deletedBy?: string;
+  deletionReason?: string;
+  isTombstone?: boolean;
 }
 
 export interface UseServiceDetailsReturn {
@@ -76,6 +82,12 @@ function normalizeService(entity: any): NormalizedService {
       warehouseId: metadata.warehouseId || entity.warehouseId,
       warehouseName: metadata.warehouseName || entity.warehouseName,
     },
+    // Deletion metadata (tombstone)
+    isDeleted: entity.isDeleted,
+    deletedAt: entity.deletedAt,
+    deletedBy: entity.deletedBy,
+    deletionReason: entity.deletionReason,
+    isTombstone: entity.isTombstone,
   };
 }
 
@@ -98,10 +110,41 @@ export function useServiceDetails(params: UseServiceDetailsParams): UseServiceDe
   const swrKey = shouldFetch ? `/services/${serviceId}/details` : null;
 
   // Fetch on-demand from backend (uses apiFetch for proper /api prefix)
+  // With tombstone fallback on 404
   const { data, error, isLoading } = useSWR<ApiResponse<any>>(
     swrKey,
     async (url) => {
-      return await apiFetch<ApiResponse<any>>(url);
+      try {
+        return await apiFetch<ApiResponse<any>>(url);
+      } catch (fetchErr: any) {
+        // TOMBSTONE FALLBACK: If 404, try to fetch deleted snapshot
+        if (fetchErr?.status === 404 || fetchErr?.message?.includes('404')) {
+          console.log('[useServiceDetails] Service not found, attempting tombstone fallback...');
+          try {
+            const snapshotResponse = await fetch(`/api/deleted/service/${serviceId}/snapshot`);
+            if (snapshotResponse.ok) {
+              const snapshotData = await snapshotResponse.json();
+              if (snapshotData.success && snapshotData.data) {
+                // Return snapshot as if it came from normal endpoint
+                return {
+                  success: true,
+                  data: {
+                    ...snapshotData.data.snapshot,
+                    isDeleted: true,
+                    deletedAt: snapshotData.data.deletedAt,
+                    deletedBy: snapshotData.data.deletedBy,
+                    deletionReason: snapshotData.data.deletionReason,
+                    isTombstone: true,
+                  },
+                };
+              }
+            }
+          } catch (snapshotErr) {
+            console.error('[useServiceDetails] Tombstone fallback failed:', snapshotErr);
+          }
+        }
+        throw fetchErr; // Re-throw if not 404 or tombstone failed
+      }
     },
     {
       revalidateOnFocus: false,
