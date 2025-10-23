@@ -160,43 +160,10 @@ export function useReportDetails(params: UseReportDetailsParams): UseReportDetai
   const shouldFetch = !!(reportId && reportType);
   const swrKey = shouldFetch ? `/reports/${reportId}/details` : null;
 
-  // Fetch on-demand from backend (uses apiFetch for proper /api prefix)
-  // With tombstone fallback on 404
+  // Fetch on-demand from backend (apiFetch handles tombstone fallback on 404)
   const { data, error, isLoading } = useSWR<ApiResponse<any>>(
     swrKey,
-    async (url) => {
-      try {
-        return await apiFetch<ApiResponse<any>>(url);
-      } catch (fetchErr: any) {
-        // TOMBSTONE FALLBACK: If 404, try to fetch deleted snapshot
-        if (fetchErr?.status === 404 || fetchErr?.message?.includes('404')) {
-          console.log(`[useReportDetails] ${reportType} not found, attempting tombstone fallback...`);
-          try {
-            const snapshotResponse = await fetch(`/api/deleted/${reportType}/${reportId}/snapshot`);
-            if (snapshotResponse.ok) {
-              const snapshotData = await snapshotResponse.json();
-              if (snapshotData.success && snapshotData.data) {
-                // Return snapshot as if it came from normal endpoint
-                return {
-                  success: true,
-                  data: {
-                    ...snapshotData.data.snapshot,
-                    isDeleted: true,
-                    deletedAt: snapshotData.data.deletedAt,
-                    deletedBy: snapshotData.data.deletedBy,
-                    deletionReason: snapshotData.data.deletionReason,
-                    isTombstone: true,
-                  },
-                };
-              }
-            }
-          } catch (snapshotErr) {
-            console.error('[useReportDetails] Tombstone fallback failed:', snapshotErr);
-          }
-        }
-        throw fetchErr; // Re-throw if not 404 or tombstone failed
-      }
-    },
+    (url) => apiFetch<ApiResponse<any>>(url),
     {
       revalidateOnFocus: false,
       revalidateOnReconnect: false,

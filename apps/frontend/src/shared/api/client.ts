@@ -1,6 +1,7 @@
 import { useAuth as useClerkAuth } from '@clerk/clerk-react';
 import { useCallback } from 'react';
 import * as LoadingService from '../loading';
+import { ENTITY_CATALOG } from '../constants/entityCatalog';
 
 // Prefer Vite dev proxy by default. Allow override via env.
 const DEV_PROXY_BASE = '/api';
@@ -16,7 +17,12 @@ declare global {
 }
 const DEV_AUTH_ENABLED = ((import.meta as any).env?.VITE_CKS_ENABLE_DEV_AUTH ?? 'false') === 'true';
 
-export type ApiResponse<T> = { data: T };
+export type ApiResponse<T> = {
+  data: T;
+  meta?: {
+    isTombstone?: boolean;
+  };
+};
 
 export type ApiFetchInit = RequestInit & {
   getToken?: () => Promise<string | null>;
@@ -27,6 +33,85 @@ export type ApiFetchInit = RequestInit & {
 };
 
 const DEFAULT_TIMEOUT_MS = Number(((import.meta as any).env?.VITE_API_TIMEOUT_MS as string | undefined) || '25000');
+
+/**
+ * Check if a URL path matches a catalog-backed detail endpoint
+ * Returns { entityType, entityId } if match, null otherwise
+ */
+function parseDetailEndpoint(path: string): { entityType: string; entityId: string } | null {
+  // Detail endpoints end with /details
+  if (!path.endsWith('/details')) {
+    return null;
+  }
+
+  // Try to match against catalog patterns
+  // Patterns: /api/order/{id}/details, /api/reports/{id}/details, /api/services/{id}/details
+  const match = path.match(/\/api\/([^\/]+)\/([^\/]+)\/details$/);
+  if (!match) {
+    return null;
+  }
+
+  const [, pathSegment, entityId] = match;
+
+  // Find matching entity type in catalog
+  for (const [entityType, definition] of Object.entries(ENTITY_CATALOG)) {
+    // Check if this entity has a details endpoint
+    if (!definition.detailsEndpoint) {
+      continue;
+    }
+
+    // Build expected endpoint and compare
+    const expectedPath = definition.detailsEndpoint(entityId);
+    if (path === expectedPath || path.startsWith(expectedPath)) {
+      return { entityType, entityId };
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Attempt to fetch tombstone snapshot for a deleted entity
+ */
+async function fetchTombstoneSnapshot(
+  entityType: string,
+  entityId: string,
+  headers: Headers
+): Promise<any> {
+  const snapshotUrl = `${API_BASE}/api/deleted/${entityType}/${entityId}/snapshot`;
+
+  console.log(`[apiFetch:tombstone] Attempting fallback for ${entityType} ${entityId}`);
+
+  const snapshotResponse = await fetch(snapshotUrl, {
+    credentials: 'include',
+    headers,
+  });
+
+  if (!snapshotResponse.ok) {
+    throw new Error(`Tombstone snapshot not available (${snapshotResponse.status})`);
+  }
+
+  const snapshotData = await snapshotResponse.json();
+
+  if (!snapshotData.success || !snapshotData.data) {
+    throw new Error('Invalid snapshot response format');
+  }
+
+  // Reconstruct ApiResponse with tombstone flag
+  return {
+    data: {
+      ...snapshotData.data.snapshot,
+      isDeleted: true,
+      deletedAt: snapshotData.data.deletedAt,
+      deletedBy: snapshotData.data.deletedBy,
+      deletionReason: snapshotData.data.deletionReason,
+      isTombstone: true,
+    },
+    meta: {
+      isTombstone: true,
+    },
+  };
+}
 
 export async function apiFetch<T>(path: string, init?: ApiFetchInit): Promise<T> {
   const { getToken: providedGetToken, headers: initHeaders, blocking, timeoutMs, ...restInit } = (init ?? {}) as ApiFetchInit;
@@ -117,7 +202,7 @@ export async function apiFetch<T>(path: string, init?: ApiFetchInit): Promise<T>
       if (providedSignal.aborted) controller.abort();
       else providedSignal.addEventListener('abort', () => controller.abort(), { once: true });
     }
-    const t = window.setTimeout(() => controller.abort(), Number(timeoutMs ?? DEFAULT_TIMEOUT_MS)) as unknown as number;
+    const t = globalThis.setTimeout(() => controller.abort(), Number(timeoutMs ?? DEFAULT_TIMEOUT_MS)) as unknown as number;
     try {
       response = await fetch(url, {
         credentials: 'include',
@@ -134,7 +219,7 @@ export async function apiFetch<T>(path: string, init?: ApiFetchInit): Promise<T>
       }
       throw error;
     } finally {
-      window.clearTimeout(t);
+      globalThis.clearTimeout(t);
     }
   } finally {
     end();
@@ -150,10 +235,34 @@ export async function apiFetch<T>(path: string, init?: ApiFetchInit): Promise<T>
     throw Object.assign(new Error('Forbidden'), { status: response.status });
   }
 
+  // TOMBSTONE FALLBACK: Handle 404 on detail endpoints
+  if (response.status === 404) {
+    const detailEndpoint = parseDetailEndpoint(normalizedPath);
+
+    if (detailEndpoint) {
+      const { entityType, entityId } = detailEndpoint;
+
+      try {
+        console.log(`[apiFetch:tombstone] 404 on ${entityType} details, trying snapshot...`);
+        const tombstoneData = await fetchTombstoneSnapshot(entityType, entityId, headers);
+        console.log(`[apiFetch:tombstone] ✓ Tombstone loaded for ${entityType} ${entityId}`);
+        return tombstoneData as T;
+      } catch (tombstoneErr) {
+        console.log('[apiFetch:tombstone] Snapshot unavailable, re-throwing 404');
+        // Fall through to normal 404 handling
+      }
+    }
+
+    // No detail endpoint match or tombstone failed - throw 404
+    const message = await response.text();
+    console.error('[apiFetch] 404 Not Found:', path);
+    throw Object.assign(new Error(message || 'Not Found'), { status: 404 });
+  }
+
   if (!response.ok) {
     const message = await response.text();
     console.error('[apiFetch] Request failed:', response.status, message);
-    throw new Error(message || 'Request failed with ' + response.status);
+    throw Object.assign(new Error(message || 'Request failed with ' + response.status), { status: response.status });
   }
 
   const data = await response.json();
