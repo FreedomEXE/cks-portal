@@ -47,7 +47,9 @@
       "Bash(pnpm --filter @cks/portal typecheck)",
       "WebFetch(domain:www.reddit.com)",
       "Bash(git reset:*)",
-      "Bash(npx vitest run:*)"
+      "Bash(npx vitest run:*)",
+      "Bash(pnpm typecheck:backend:*)",
+      "Bash(Select-String -Pattern \"backend|error TS\" -Context 0,2)"
     ],
     "deny": [],
     "ask": []

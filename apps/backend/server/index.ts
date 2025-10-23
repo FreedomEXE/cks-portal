@@ -18,6 +18,7 @@ import { registerAssignmentRoutes } from "./domains/assignments";
 import { registerDirectoryRoutes } from "./domains/directory/routes.fastify";
 import { registerProvisioningRoutes } from "./domains/provisioning";
 import { registerArchiveRoutes } from "./domains/archive/routes.fastify";
+import { registerActivityRoutes } from "./domains/activity/routes.fastify";
 import { registerProfileRoutes } from "./domains/profile/routes.fastify";
 import { registerDashboardRoutes } from "./domains/dashboard/routes.fastify";
 import { registerScopeRoutes } from "./domains/scope/routes.fastify";
@@ -253,6 +254,7 @@ export async function buildServer() {
   await registerAssignmentRoutes(server);
   await registerDirectoryRoutes(server);
   await registerArchiveRoutes(server);
+  await registerActivityRoutes(server);
   await registerProfileRoutes(server);
   await registerDashboardRoutes(server);
   await registerScopeRoutes(server);
