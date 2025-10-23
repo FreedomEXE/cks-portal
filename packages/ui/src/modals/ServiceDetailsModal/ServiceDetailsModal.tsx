@@ -1,6 +1,21 @@
 import React, { useEffect, useState } from 'react';
 import Button from '../../buttons/Button';
 import { ModalRoot } from '../ModalRoot';
+import { ArchivedBanner } from '../../banners/ArchivedBanner';
+import { DeletedBanner } from '../../banners/DeletedBanner';
+
+// Lifecycle interface (matches frontend types)
+interface Lifecycle {
+  state: 'active' | 'archived' | 'deleted';
+  archivedAt?: string;
+  archivedBy?: string;
+  archiveReason?: string;
+  scheduledDeletion?: string;
+  deletedAt?: string;
+  deletedBy?: string;
+  deletionReason?: string;
+  isTombstone?: boolean;
+}
 
 export interface ServiceDetails {
   serviceId: string;
@@ -23,6 +38,11 @@ export interface ServiceDetailsModalProps {
   serviceStatus?: string; // 'created', 'in_progress', 'completed', 'cancelled'
   serviceType?: string; // 'one-time', 'ongoing'
   productOrders?: Array<{ orderId: string; productName: string; quantity: number; status: string; requestedDate?: string }>;
+  // NEW: Universal lifecycle support
+  lifecycle?: Lifecycle;
+  entityType?: string;
+  entityId?: string;
+  actions?: Array<{ label: string; onClick: () => void; variant?: 'primary' | 'secondary' | 'danger'; disabled?: boolean }>;
 }
 
 export default function ServiceDetailsModal({
@@ -38,7 +58,11 @@ export default function ServiceDetailsModal({
   onCancelService,
   serviceStatus = 'created',
   serviceType = 'one-time',
-  productOrders = []
+  productOrders = [],
+  lifecycle,
+  entityType = 'service',
+  entityId,
+  actions = []
 }: ServiceDetailsModalProps) {
   const [activeTab, setActiveTab] = useState<'overview' | 'crew' | 'products' | 'procedures' | 'training' | 'notes'>('overview');
   const [crewSelected, setCrewSelected] = useState<string[]>([]);
@@ -169,6 +193,31 @@ export default function ServiceDetailsModal({
             )}
           </div>
         </div>
+
+        {/* UNIVERSAL LIFECYCLE BANNER - renders for ANY entity */}
+        {lifecycle && lifecycle.state !== 'active' && (
+          <div style={{ padding: '0 24px', marginTop: 16 }}>
+            {lifecycle.state === 'archived' && (
+              <ArchivedBanner
+                archivedAt={lifecycle.archivedAt}
+                archivedBy={lifecycle.archivedBy}
+                reason={lifecycle.archiveReason}
+                scheduledDeletion={lifecycle.scheduledDeletion}
+                entityType={entityType}
+                entityId={entityId || service.serviceId}
+              />
+            )}
+            {lifecycle.state === 'deleted' && (
+              <DeletedBanner
+                deletedAt={lifecycle.deletedAt}
+                deletedBy={lifecycle.deletedBy}
+                entityType={entityType}
+                entityId={entityId || service.serviceId}
+                isTombstone={lifecycle.isTombstone}
+              />
+            )}
+          </div>
+        )}
 
         {/* Tabs */}
         <div style={{ borderBottom: '1px solid #e5e7eb', display: 'flex', gap: 8, paddingLeft: 24 }}>

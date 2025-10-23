@@ -1,6 +1,21 @@
 import React, { ReactNode } from 'react';
 import styles from './BaseViewModal.module.css';
 import { ModalRoot } from '../ModalRoot';
+import { ArchivedBanner } from '../../banners/ArchivedBanner';
+import { DeletedBanner } from '../../banners/DeletedBanner';
+
+// Lifecycle interface (matches frontend types)
+interface Lifecycle {
+  state: 'active' | 'archived' | 'deleted';
+  archivedAt?: string;
+  archivedBy?: string;
+  archiveReason?: string;
+  scheduledDeletion?: string;
+  deletedAt?: string;
+  deletedBy?: string;
+  deletionReason?: string;
+  isTombstone?: boolean;
+}
 
 export interface BaseViewModalProps {
   isOpen: boolean;
@@ -9,6 +24,12 @@ export interface BaseViewModalProps {
   card: ReactNode;
   /** Tab content rendered based on activeTab */
   children: ReactNode;
+  /** Lifecycle metadata for universal banner rendering */
+  lifecycle?: Lifecycle;
+  /** Entity type for banner context */
+  entityType?: string;
+  /** Entity ID for banner context */
+  entityId?: string;
 }
 
 /**
@@ -40,6 +61,9 @@ export default function BaseViewModal({
   onClose,
   card,
   children,
+  lifecycle,
+  entityType = 'entity',
+  entityId,
 }: BaseViewModalProps) {
   if (!isOpen) return null;
 
@@ -53,6 +77,31 @@ export default function BaseViewModal({
         <div className={styles.header}>
           {card}
         </div>
+
+        {/* UNIVERSAL LIFECYCLE BANNER - renders for ANY entity */}
+        {lifecycle && lifecycle.state !== 'active' && (
+          <div style={{ padding: '0 16px', marginTop: '16px' }}>
+            {lifecycle.state === 'archived' && (
+              <ArchivedBanner
+                archivedAt={lifecycle.archivedAt}
+                archivedBy={lifecycle.archivedBy}
+                reason={lifecycle.archiveReason}
+                scheduledDeletion={lifecycle.scheduledDeletion}
+                entityType={entityType}
+                entityId={entityId}
+              />
+            )}
+            {lifecycle.state === 'deleted' && (
+              <DeletedBanner
+                deletedAt={lifecycle.deletedAt}
+                deletedBy={lifecycle.deletedBy}
+                entityType={entityType}
+                entityId={entityId}
+                isTombstone={lifecycle.isTombstone}
+              />
+            )}
+          </div>
+        )}
 
         <div className={styles.tabContent}>
           {children}

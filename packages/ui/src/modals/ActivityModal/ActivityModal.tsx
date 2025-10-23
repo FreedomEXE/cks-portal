@@ -6,6 +6,8 @@ import Button from '../../buttons/Button';
 import ProductOrderContent from '../ProductOrderModal/ProductOrderContent';
 import ServiceOrderContent from '../ServiceOrderModal/ServiceOrderContent';
 import ApprovalWorkflow from '../../workflows/ApprovalWorkflow';
+import { ArchivedBanner } from '../../banners/ArchivedBanner';
+import { DeletedBanner } from '../../banners/DeletedBanner';
 
 export type ActivityActionVariant = 'primary' | 'secondary' | 'danger' | 'ghost';
 
@@ -34,6 +36,19 @@ export interface ArchiveMetadata {
   archivedAt: string | null;
   reason: string | null;
   scheduledDeletion: string | null;
+}
+
+// Lifecycle interface (matches frontend types)
+interface Lifecycle {
+  state: 'active' | 'archived' | 'deleted';
+  archivedAt?: string;
+  archivedBy?: string;
+  archiveReason?: string;
+  scheduledDeletion?: string;
+  deletedAt?: string;
+  deletedBy?: string;
+  deletionReason?: string;
+  isTombstone?: boolean;
 }
 
 export interface ActivityModalOrder {
@@ -92,6 +107,11 @@ export interface ActivityModalProps {
   rejectedBy?: string | null;
   rejectedAt?: string | null;
   archiveMetadata?: ArchiveMetadata | null;
+
+  // NEW: Universal lifecycle support
+  lifecycle?: Lifecycle;
+  entityType?: string;
+  entityId?: string;
 }
 
 export default function ActivityModal({
@@ -114,6 +134,9 @@ export default function ActivityModal({
   rejectedBy,
   rejectedAt,
   archiveMetadata,
+  lifecycle,
+  entityType = 'order',
+  entityId,
 }: ActivityModalProps) {
   // Early return BEFORE any hooks to satisfy Rules of Hooks
   if (!isOpen || !order) return null;
@@ -174,6 +197,31 @@ export default function ActivityModal({
         <div className={styles.header}>
           {summary}
         </div>
+
+        {/* UNIVERSAL LIFECYCLE BANNER - renders for ANY entity */}
+        {lifecycle && lifecycle.state !== 'active' && (
+          <div style={{ padding: '0 16px', marginTop: '16px' }}>
+            {lifecycle.state === 'archived' && (
+              <ArchivedBanner
+                archivedAt={lifecycle.archivedAt}
+                archivedBy={lifecycle.archivedBy}
+                reason={lifecycle.archiveReason}
+                scheduledDeletion={lifecycle.scheduledDeletion}
+                entityType={entityType}
+                entityId={entityId || order.orderId}
+              />
+            )}
+            {lifecycle.state === 'deleted' && (
+              <DeletedBanner
+                deletedAt={lifecycle.deletedAt}
+                deletedBy={lifecycle.deletedBy}
+                entityType={entityType}
+                entityId={entityId || order.orderId}
+                isTombstone={lifecycle.isTombstone}
+              />
+            )}
+          </div>
+        )}
 
         <div className={styles.tabContent}>
           {activeTab === 'actions' && (

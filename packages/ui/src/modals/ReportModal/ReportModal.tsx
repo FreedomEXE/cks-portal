@@ -32,6 +32,19 @@ export interface ReportAction {
   loading?: boolean;
 }
 
+// Lifecycle interface (matches frontend types)
+interface Lifecycle {
+  state: 'active' | 'archived' | 'deleted';
+  archivedAt?: string;
+  archivedBy?: string;
+  archiveReason?: string;
+  scheduledDeletion?: string;
+  deletedAt?: string;
+  deletedBy?: string;
+  deletionReason?: string;
+  isTombstone?: boolean;
+}
+
 export interface ReportModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -40,6 +53,10 @@ export interface ReportModalProps {
   showQuickActions?: boolean; // true from Activity Feed, false from Reports section
   actions?: ReportAction[]; // Action buttons (archive, delete, etc.)
   role?: 'user' | 'admin';
+  // NEW: Universal lifecycle support
+  lifecycle?: Lifecycle;
+  entityType?: string;
+  entityId?: string;
 }
 
 const ReportModal: React.FC<ReportModalProps> = ({
@@ -50,6 +67,9 @@ const ReportModal: React.FC<ReportModalProps> = ({
   showQuickActions = true, // Default to true (Activity Feed behavior)
   actions = [],
   role,
+  lifecycle,
+  entityType = 'report',
+  entityId,
 }) => {
   // Tab state - default tab depends on showQuickActions
   const [activeTab, setActiveTab] = useState(showQuickActions ? 'quick-actions' : 'details');
@@ -82,7 +102,14 @@ const ReportModal: React.FC<ReportModalProps> = ({
   );
 
   return (
-    <BaseViewModal isOpen={isOpen} onClose={onClose} card={card}>
+    <BaseViewModal
+      isOpen={isOpen}
+      onClose={onClose}
+      card={card}
+      lifecycle={lifecycle}
+      entityType={entityType}
+      entityId={entityId || report?.id}
+    >
       {activeTab === 'quick-actions' && showQuickActions && (
         <ReportQuickActions
           type={report.type}
