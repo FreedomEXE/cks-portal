@@ -53,6 +53,76 @@ export interface Lifecycle {
 }
 
 /**
+ * Tab identifiers for entity modals
+ */
+export type TabId =
+  | 'details'
+  | 'history'
+  | 'actions'
+  | 'participants'
+  | 'crew'
+  | 'products'
+  | 'procedures'
+  | 'training'
+  | 'notes'
+  | 'overview'
+  | 'audit';
+
+/**
+ * Context for determining tab visibility
+ */
+export interface TabVisibilityContext {
+  role: UserRole;
+  lifecycle: Lifecycle;
+  entityType: EntityType;
+  entityData?: any;
+  hasActions: boolean;
+}
+
+/**
+ * Tab descriptor - defines a single tab in an entity modal
+ */
+export interface TabDescriptor {
+  id: TabId;
+  label: string;
+  content: React.ReactNode;
+}
+
+/**
+ * Header field - a single metadata field in the entity header
+ */
+export interface HeaderField {
+  label: string;
+  value: string | React.ReactNode;
+}
+
+/**
+ * Header configuration - data-only description of entity header
+ *
+ * This is a pure data structure that describes what to show in the header.
+ * EntityHeader component renders this configuration.
+ */
+export interface HeaderConfig {
+  /** Entity ID (e.g., "PO-001", "CEN-010-RPT-001") */
+  id: string;
+
+  /** Type label (e.g., "Product Order", "Feedback", "Service") */
+  type?: string;
+
+  /** Status value for StatusBadge */
+  status: string;
+
+  /** Optional custom status text override */
+  statusText?: string;
+
+  /** Metadata fields to display */
+  fields: HeaderField[];
+
+  /** Optional badges (priority, rating, etc.) */
+  badges?: React.ReactNode[];
+}
+
+/**
  * Role types for permission checking
  */
 export type UserRole =
@@ -121,15 +191,34 @@ export interface EntityActionContext {
 }
 
 /**
+ * Section Descriptor (imported from @cks/ui)
+ *
+ * Re-export for convenience in adapters.
+ * The actual type is defined in @cks/ui/sections
+ */
+export type { SectionDescriptor } from '@cks/ui';
+
+/**
  * Entity Adapter - Contract for all entity types
  *
  * Each entity type must provide an adapter that implements:
  * 1. What actions are available (based on role + permissions) - PURE function
- * 2. Which modal component to render
- * 3. How to map data to modal props
+ * 2. What the header summary looks like - PURE function
+ * 3. What tabs are available for this entity - PURE function
+ * 4. What sections compose the Details tab - PURE function (Phase 7)
  *
  * IMPORTANT: Adapters must be PURE - no hooks, no side effects
  * Data fetching is handled by ModalGateway calling hooks at top level
+ *
+ * NEW PATTERN (Phase 7 - Universal Details Composition):
+ * - getHeaderConfig: Returns data config for EntityHeader
+ * - getDetailsSections: Returns section descriptors for DetailsComposer
+ * - getTabDescriptors: Returns tab descriptors (Details tab uses DetailsComposer)
+ * - No Component or mapToProps needed (EntityModalView is the universal shell)
+ *
+ * LEGACY PATTERN (Deprecated, for backward compat):
+ * - Component: Wrapper modal component
+ * - mapToProps: Props mapping
  */
 export interface EntityAdapter<TData = any, TModalProps = any> {
   /**
@@ -141,14 +230,49 @@ export interface EntityAdapter<TData = any, TModalProps = any> {
   getActionDescriptors: (context: EntityActionContext) => EntityActionDescriptor[];
 
   /**
-   * The modal component to render
+   * Returns header configuration (data-only)
+   *
+   * MUST BE A PURE FUNCTION - No hooks allowed!
+   * Returns a data configuration for the universal EntityHeader component.
+   * No JSX - just data describing what to show.
    */
-  Component: React.ComponentType<TModalProps>;
+  getHeaderConfig: (context: TabVisibilityContext) => HeaderConfig;
 
   /**
+   * Returns section descriptors for Details tab (Phase 7)
+   *
+   * MUST BE A PURE FUNCTION - No hooks allowed!
+   * Returns ordered list of section descriptors that compose the Details tab.
+   * DetailsComposer will render these using section primitives.
+   * Section visibility filtering happens via section policy.
+   */
+  getDetailsSections: (context: TabVisibilityContext) => import('@cks/ui').SectionDescriptor[];
+
+  /**
+   * @deprecated Legacy - use getHeaderConfig instead
+   * Returns header summary (the "card" region)
+   */
+  getHeader?: (context: TabVisibilityContext) => React.ReactNode;
+
+  /**
+   * Returns base tab descriptors for this entity type
+   *
+   * MUST BE A PURE FUNCTION - No hooks allowed!
+   * Returns all possible tabs for this entity. Visibility filtering happens in policy layer.
+   */
+  getTabDescriptors: (context: TabVisibilityContext, actions: EntityAction[]) => TabDescriptor[];
+
+  /**
+   * @deprecated Legacy - use getHeader + getTabDescriptors instead
+   * The modal component to render
+   */
+  Component?: React.ComponentType<TModalProps>;
+
+  /**
+   * @deprecated Legacy - use getHeader + getTabDescriptors instead
    * Maps fetched data to modal props
    */
-  mapToProps: (data: TData | null, actions: EntityAction[], onClose: () => void, lifecycle: Lifecycle) => TModalProps;
+  mapToProps?: (data: TData | null, actions: EntityAction[], onClose: () => void, lifecycle: Lifecycle) => TModalProps;
 }
 
 /**

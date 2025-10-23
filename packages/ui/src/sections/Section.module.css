@@ -1,0 +1,167 @@
+/**
+ * Section Styles - Shared styling for all section primitives
+ *
+ * Consistent spacing, typography, and layout for detail sections.
+ */
+
+/* Section Container */
+.section {
+  margin-bottom: 24px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.section:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+/* Section Title */
+.sectionTitle {
+  font-size: 16px;
+  font-weight: 600;
+  color: #111827;
+  margin: 0 0 16px 0;
+}
+
+/* Field List (Vertical) */
+.fieldList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.fieldItem {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fieldLabel {
+  font-size: 13px;
+  font-weight: 500;
+  color: #6b7280;
+}
+
+.fieldValue {
+  font-size: 14px;
+  color: #111827;
+}
+
+/* Grid Layout (2-4 columns) */
+.grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #6b7280;
+}
+
+.value {
+  font-size: 14px;
+  color: #111827;
+}
+
+/* Table Layout */
+.tableWrapper {
+  overflow-x: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.table thead {
+  background-color: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.table th {
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  color: #374151;
+  font-size: 13px;
+}
+
+.table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid #f3f4f6;
+  color: #111827;
+}
+
+.table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.table tbody tr:hover {
+  background-color: #f9fafb;
+}
+
+/* Rich Text */
+.richText {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #374151;
+}
+
+.richText p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+/* Notes */
+.notes {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #374151;
+  padding: 12px;
+  background-color: #f9fafb;
+  border-left: 3px solid #e5e7eb;
+  border-radius: 4px;
+  white-space: pre-wrap;
+}
+
+.notesMetadata {
+  display: flex;
+  gap: 16px;
+  margin-top: 8px;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.notesAuthor,
+.notesTimestamp {
+  font-weight: 500;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .tableWrapper {
+    font-size: 13px;
+  }
+
+  .table th,
+  .table td {
+    padding: 10px 12px;
+  }
+}

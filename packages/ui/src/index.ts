@@ -127,3 +127,17 @@ export type { StatusBadgeProps } from './badges/StatusBadge';
 // Tabs
 export { default as HistoryTab } from './tabs/HistoryTab';
 export type { HistoryTabProps } from './tabs/HistoryTab';
+
+// Tab Content Components (presentational)
+export { default as OrderActionsContent } from './modals/ActivityModal/OrderActionsContent';
+export type { OrderActionsContentProps } from './modals/ActivityModal/OrderActionsContent';
+
+export { default as ReportQuickActions } from './modals/ReportModal/components/ReportQuickActions';
+export type { ReportQuickActionsProps } from './modals/ReportModal/components/ReportQuickActions';
+
+// Components
+export * from './components/EntityHeader';
+export { default as EntityHeader } from './components/EntityHeader';
+
+// Sections (Detail primitives)
+export * from './sections';

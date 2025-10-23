@@ -14,6 +14,7 @@
  * Adapters only define action building and prop mapping logic.
  */
 
+import React from 'react';
 import type {
   EntityAdapter,
   EntityRegistry,
@@ -21,10 +22,162 @@ import type {
   EntityAction,
   EntityActionDescriptor,
   Lifecycle,
+  TabDescriptor,
+  TabVisibilityContext,
+  HeaderConfig,
+  HeaderField,
 } from '../types/entities';
 import { can } from '../policies/permissions';
-import { ActivityModal, ReportModal, ServiceDetailsModal } from '@cks/ui';
+import {
+  ActivityModal,
+  ReportModal,
+  ServiceDetailsModal,
+  HistoryTab,
+  OrderActionsContent,
+  ReportQuickActions,
+} from '@cks/ui';
 import type { ActivityModalProps } from '@cks/ui';
+import { DetailsComposer } from '@cks/domain-widgets';
+import { filterVisibleSections } from '../policies/sections';
+
+/**
+ * Order Details Sections Builder
+ */
+function buildOrderDetailsSections(context: TabVisibilityContext): import('@cks/ui').SectionDescriptor[] {
+  const { entityData } = context;
+  const sections: import('@cks/ui').SectionDescriptor[] = [];
+  const isProduct = entityData?.orderType === 'product';
+
+  // Related Service section (if linked to service)
+  if (entityData?.serviceId) {
+    sections.push({
+      id: 'related-service',
+      type: 'key-value-grid',
+      title: 'Related Service',
+      columns: 2,
+      fields: [
+        { label: 'Service ID', value: entityData.serviceId },
+      ],
+    });
+  }
+
+  // Fulfilled By section (if fulfilled)
+  if (entityData?.fulfilledById || entityData?.fulfilledByName) {
+    sections.push({
+      id: 'fulfilled-by',
+      type: 'key-value-grid',
+      title: 'Fulfilled By',
+      columns: 2,
+      fields: [
+        { label: 'ID', value: entityData.fulfilledById || '-' },
+        { label: 'Name', value: entityData.fulfilledByName || '-' },
+      ],
+    });
+  }
+
+  // Requestor Information section
+  if (entityData?.requestorInfo) {
+    sections.push({
+      id: 'requestor-info',
+      type: 'contact-info',
+      title: 'Requestor Information',
+      contact: {
+        name: entityData.requestedBy,
+        address: entityData.requestorInfo.address,
+        phone: entityData.requestorInfo.phone,
+        email: entityData.requestorInfo.email,
+      },
+    });
+  }
+
+  // Delivery/Destination Information section
+  if (entityData?.destinationInfo) {
+    sections.push({
+      id: 'destination-info',
+      type: 'contact-info',
+      title: 'Delivery Information',
+      contact: {
+        name: entityData.destination,
+        address: entityData.destinationInfo.address,
+        phone: entityData.destinationInfo.phone,
+        email: entityData.destinationInfo.email,
+      },
+    });
+  }
+
+  // Availability section
+  if (entityData?.availability) {
+    sections.push({
+      id: 'availability',
+      type: 'availability',
+      title: 'Availability',
+      availability: {
+        tz: entityData.availability.tz,
+        days: entityData.availability.days,
+        window: entityData.availability.window,
+      },
+    });
+  }
+
+  // Product Items table (for product orders)
+  if (isProduct && entityData?.items && entityData.items.length > 0) {
+    sections.push({
+      id: 'items',
+      type: 'items-table',
+      title: 'Product Items',
+      columns: [
+        { key: 'code', label: 'Product Code' },
+        { key: 'name', label: 'Product Name' },
+        { key: 'description', label: 'Description' },
+        { key: 'quantity', label: 'Quantity' },
+        { key: 'unitOfMeasure', label: 'Unit' },
+      ],
+      rows: entityData.items.map((item: any) => ({
+        code: item.code || '-',
+        name: item.name,
+        description: item.description || '-',
+        quantity: item.quantity,
+        unitOfMeasure: item.unitOfMeasure || 'EA',
+      })),
+    });
+  }
+
+  // Special Instructions section
+  if (entityData?.notes) {
+    sections.push({
+      id: 'special-instructions',
+      type: 'rich-text',
+      title: 'Special Instructions',
+      content: entityData.notes,
+    });
+  }
+
+  // Cancellation Reason section
+  if (entityData?.status === 'cancelled' && entityData?.cancellationReason) {
+    sections.push({
+      id: 'cancellation-reason',
+      type: 'notes',
+      title: 'Cancellation Reason',
+      content: entityData.cancellationReason,
+      author: entityData.cancelledBy,
+      timestamp: entityData.cancelledAt,
+    });
+  }
+
+  // Rejection Reason section
+  if (entityData?.status === 'rejected' && entityData?.rejectionReason) {
+    sections.push({
+      id: 'rejection-reason',
+      type: 'notes',
+      title: 'Rejection Reason',
+      content: entityData.rejectionReason,
+      author: entityData.rejectedBy,
+      timestamp: entityData.rejectedAt,
+    });
+  }
+
+  return sections;
+}
 
 /**
  * Order Adapter
@@ -108,6 +261,108 @@ const orderAdapter: EntityAdapter = {
     return descriptors;
   },
 
+  getHeaderConfig: (context: TabVisibilityContext): HeaderConfig => {
+    const { entityData } = context;
+
+    const formatDateTime = (value?: string) => {
+      if (!value) return '—';
+      const d = new Date(value);
+      if (Number.isNaN(d.getTime())) return value;
+      const date = d.toLocaleDateString('en-CA');
+      const time = d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
+      return `${date} - ${time}`;
+    };
+
+    const fields: HeaderField[] = [];
+
+    if (entityData?.title) {
+      fields.push({ label: 'Title', value: entityData.title });
+    }
+
+    if (entityData?.requestedBy) {
+      fields.push({ label: 'Requested By', value: entityData.requestedBy });
+    }
+
+    if (entityData?.destination) {
+      fields.push({ label: 'Destination', value: entityData.destination });
+    }
+
+    fields.push({ label: 'Requested', value: formatDateTime(entityData?.requestedDate) });
+
+    if (entityData?.expectedDate) {
+      fields.push({ label: 'Expected', value: formatDateTime(entityData.expectedDate) });
+    }
+
+    if (entityData?.serviceStartDate) {
+      fields.push({ label: 'Service Start', value: formatDateTime(entityData.serviceStartDate) });
+    }
+
+    if (entityData?.deliveryDate) {
+      fields.push({ label: 'Delivered', value: formatDateTime(entityData.deliveryDate) });
+    }
+
+    if (entityData?.transformedId) {
+      fields.push({ label: 'Transformed To', value: entityData.transformedId });
+    }
+
+    return {
+      id: entityData?.orderId || '',
+      type: entityData?.orderType === 'service' ? 'Service Order' : 'Product Order',
+      status: entityData?.status || 'pending',
+      fields,
+    };
+  },
+
+  getDetailsSections: buildOrderDetailsSections,
+
+  getTabDescriptors: (context: TabVisibilityContext, actions: EntityAction[]): TabDescriptor[] => {
+    const { entityData } = context;
+
+    // Get sections for Details tab
+    const detailsSections = buildOrderDetailsSections(context);
+
+    // Build tab descriptors with content
+    const tabs: TabDescriptor[] = [
+      {
+        id: 'details',
+        label: 'Details',
+        content: (
+          <DetailsComposer
+            sections={filterVisibleSections(detailsSections, {
+              entityType: context.entityType,
+              role: context.role,
+              lifecycle: context.lifecycle,
+              entityData,
+            })}
+          />
+        ),
+      },
+      {
+        id: 'history',
+        label: 'History',
+        content: (
+          <HistoryTab
+            entityType={context.entityType}
+            entityId={entityData?.orderId}
+          />
+        ),
+      },
+      {
+        id: 'actions',
+        label: 'Quick Actions',
+        content: (
+          <OrderActionsContent
+            actions={actions}
+            approvalStages={entityData?.approvalStages}
+          />
+        ),
+      },
+    ];
+
+    return tabs;
+  },
+
+  // LEGACY: Deprecated, kept for backward compatibility
   Component: ActivityModal,
 
   mapToProps: (data: any, actions: EntityAction[], onClose: () => void, lifecycle: Lifecycle): ActivityModalProps => {
@@ -125,6 +380,119 @@ const orderAdapter: EntityAdapter = {
     };
   },
 };
+
+/**
+ * Report Details Sections Builder
+ */
+function buildReportDetailsSections(context: TabVisibilityContext): import('@cks/ui').SectionDescriptor[] {
+  const { entityData } = context;
+  const sections: import('@cks/ui').SectionDescriptor[] = [];
+  const isReport = entityData?.type === 'report';
+
+  // Helper to get role name from ID
+  const getRoleName = (userId: string): string => {
+    const prefix = userId?.split('-')[0]?.toUpperCase();
+    const roleMap: Record<string, string> = {
+      'CUS': 'Customer',
+      'CEN': 'Center',
+      'CON': 'Contractor',
+      'CRW': 'Crew',
+      'MGR': 'Manager',
+      'WHS': 'Warehouse',
+      'ADM': 'Administrator'
+    };
+    return roleMap[prefix] || 'User';
+  };
+
+  // Helper to format date
+  const formatDate = (dateString?: string): string => {
+    if (!dateString) return '-';
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return dateString;
+    return date.toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
+  };
+
+  // Helper to get category display
+  const getCategoryDisplay = (category?: string): string => {
+    const map: Record<string, string> = {
+      'service': 'Service',
+      'order': 'Product Order',
+      'procedure': 'Procedure'
+    };
+    return category ? (map[category] || category) : 'General';
+  };
+
+  // Helper to check if service is warehouse managed
+  const isWarehouseManaged = (managed?: string | null): boolean => {
+    if (!managed) return false;
+    const val = managed.toString();
+    return val.toLowerCase() === 'warehouse' || val.toUpperCase().startsWith('WHS-');
+  };
+
+  // Report Summary section
+  const summaryFields: Array<{ label: string; value: string }> = [];
+
+  summaryFields.push({
+    label: 'Type',
+    value: getCategoryDisplay(entityData?.reportCategory)
+  });
+
+  summaryFields.push({
+    label: 'Submitted By',
+    value: `${getRoleName(entityData?.submittedBy)} (${entityData?.submittedBy})`
+  });
+
+  if (entityData?.relatedEntityId) {
+    summaryFields.push({
+      label: entityData.reportCategory === 'order' ? 'Order' : entityData.reportCategory === 'service' ? 'Service' : 'Related To',
+      value: entityData.relatedEntityId
+    });
+
+    summaryFields.push({
+      label: 'Managed By',
+      value: entityData.reportCategory === 'order' || isWarehouseManaged(entityData?.serviceManagedBy) ? 'Warehouse' : 'Manager'
+    });
+  }
+
+  if (entityData?.reportReason) {
+    summaryFields.push({
+      label: isReport ? 'Issue' : 'Feedback',
+      value: entityData.reportReason
+    });
+  }
+
+  summaryFields.push({
+    label: 'Date Submitted',
+    value: formatDate(entityData?.submittedDate)
+  });
+
+  sections.push({
+    id: 'report-summary',
+    type: 'key-value-grid',
+    title: `${isReport ? 'Report' : 'Feedback'} Summary`,
+    columns: 2,
+    fields: summaryFields,
+  });
+
+  // Full Description section
+  if (entityData?.description) {
+    sections.push({
+      id: 'description',
+      type: 'rich-text',
+      title: 'Full Description',
+      content: entityData.description,
+    });
+  }
+
+  return sections;
+}
 
 /**
  * Report/Feedback Adapter
@@ -206,6 +574,126 @@ const reportAdapter: EntityAdapter = {
     return descriptors;
   },
 
+  getHeaderConfig: (context: TabVisibilityContext): HeaderConfig => {
+    const { entityData } = context;
+
+    const fields: HeaderField[] = [];
+
+    if (entityData?.reportReason) {
+      fields.push({ label: 'Reason', value: entityData.reportReason });
+    }
+
+    const badges: React.ReactNode[] = [];
+
+    // Priority badge
+    if (entityData?.priority) {
+      const priorityColors = {
+        HIGH: { bg: '#fee2e2', text: '#991b1b' },
+        MEDIUM: { bg: '#fef3c7', text: '#92400e' },
+        LOW: { bg: '#dbeafe', text: '#1e40af' },
+      };
+      const color = priorityColors[entityData.priority];
+      badges.push(
+        <span
+          style={{
+            padding: '2px 8px',
+            borderRadius: '4px',
+            fontSize: '11px',
+            fontWeight: 600,
+            backgroundColor: color.bg,
+            color: color.text,
+          }}
+        >
+          {entityData.priority}
+        </span>
+      );
+    }
+
+    // Rating stars (for feedback)
+    if (entityData?.rating) {
+      badges.push(
+        <div style={{ display: 'flex', gap: '2px' }}>
+          {[1, 2, 3, 4, 5].map((star) => (
+            <span
+              key={star}
+              style={{
+                color: star <= entityData.rating ? '#fbbf24' : '#d1d5db',
+                fontSize: '16px',
+              }}
+            >
+              ★
+            </span>
+          ))}
+        </div>
+      );
+    }
+
+    return {
+      id: entityData?.id || '',
+      type: entityData?.type === 'feedback' ? 'Feedback' : 'Report',
+      status: entityData?.status || 'open',
+      fields,
+      badges: badges.length > 0 ? badges : undefined,
+    };
+  },
+
+  getDetailsSections: buildReportDetailsSections,
+
+  getTabDescriptors: (context: TabVisibilityContext, actions: EntityAction[]): TabDescriptor[] => {
+    const { entityData } = context;
+
+    // Get sections for Details tab
+    const detailsSections = buildReportDetailsSections(context);
+
+    // Build tab descriptors with content
+    const tabs: TabDescriptor[] = [
+      {
+        id: 'details',
+        label: 'Details',
+        content: (
+          <DetailsComposer
+            sections={filterVisibleSections(detailsSections, {
+              entityType: context.entityType,
+              role: context.role,
+              lifecycle: context.lifecycle,
+              entityData,
+            })}
+          />
+        ),
+      },
+      {
+        id: 'history',
+        label: 'History',
+        content: (
+          <HistoryTab
+            entityType={context.entityType}
+            entityId={entityData?.id}
+          />
+        ),
+      },
+      {
+        id: 'actions',
+        label: 'Quick Actions',
+        content: (
+          <ReportQuickActions
+            type={entityData?.type}
+            status={entityData?.status}
+            acknowledgments={entityData?.acknowledgments}
+            resolvedBy={entityData?.resolvedBy}
+            resolvedAt={entityData?.resolvedAt}
+            resolution={entityData?.resolution}
+            resolution_notes={entityData?.resolution_notes}
+            currentUser={undefined} // Will be set by ModalGateway
+            actions={actions}
+          />
+        ),
+      },
+    ];
+
+    return tabs;
+  },
+
+  // LEGACY: Deprecated, kept for backward compatibility
   Component: ReportModal,
 
   mapToProps: (data: any, actions: EntityAction[], onClose: () => void, lifecycle: Lifecycle) => {
@@ -222,6 +710,57 @@ const reportAdapter: EntityAdapter = {
     };
   },
 };
+
+/**
+ * Service Section Builder
+ */
+function buildServiceDetailsSections(context: TabVisibilityContext): import('@cks/ui').SectionDescriptor[] {
+  const { entityData } = context;
+  const sections: import('@cks/ui').SectionDescriptor[] = [];
+
+  // Service Overview section
+  const overviewFields: Array<{ label: string; value: string }> = [];
+
+  overviewFields.push({ label: 'Service Name', value: entityData?.serviceName || '-' });
+  overviewFields.push({ label: 'Service Type', value: entityData?.serviceType || '-' });
+  overviewFields.push({ label: 'Status', value: entityData?.status || '-' });
+
+  if (entityData?.assignedTo) {
+    overviewFields.push({ label: 'Assigned To', value: entityData.assignedTo });
+  }
+
+  if (entityData?.managedBy) {
+    overviewFields.push({ label: 'Managed By', value: entityData.managedBy });
+  }
+
+  sections.push({
+    id: 'service-overview',
+    type: 'key-value-grid',
+    title: 'Service Overview',
+    columns: 2,
+    fields: overviewFields,
+  });
+
+  // Description section (if available)
+  if (entityData?.description) {
+    sections.push({
+      id: 'description',
+      type: 'rich-text',
+      title: 'Description',
+      content: entityData.description,
+    });
+  }
+
+  // NOTE: Complex service sections (crew, procedures, training, schedule)
+  // can be added as either:
+  // 1. New section primitives in @cks/ui/sections
+  // 2. Custom sections passed through (for entity-specific complex layouts)
+  //
+  // For now, ServiceDetailsModal handles these with its own custom tabs.
+  // Future: Migrate those to composable sections as needed.
+
+  return sections;
+}
 
 /**
  * Service Adapter
@@ -300,6 +839,92 @@ const serviceAdapter: EntityAdapter = {
     return descriptors;
   },
 
+  getHeaderConfig: (context: TabVisibilityContext): HeaderConfig => {
+    const { entityData } = context;
+
+    const formatDateTime = (value?: string) => {
+      if (!value) return '—';
+      const d = new Date(value);
+      if (Number.isNaN(d.getTime())) return value;
+      const date = d.toLocaleDateString('en-CA');
+      const time = d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
+      return `${date} - ${time}`;
+    };
+
+    const fields: HeaderField[] = [];
+
+    fields.push({ label: 'Service', value: entityData?.serviceName || '—' });
+
+    if (entityData?.serviceType) {
+      fields.push({ label: 'Type', value: entityData.serviceType });
+    }
+
+    if (entityData?.assignedTo) {
+      fields.push({ label: 'Assigned To', value: entityData.assignedTo });
+    }
+
+    if (entityData?.managedBy) {
+      fields.push({ label: 'Managed By', value: entityData.managedBy });
+    }
+
+    if (entityData?.startDate) {
+      fields.push({ label: 'Start Date', value: formatDateTime(entityData.startDate) });
+    }
+
+    if (entityData?.completionDate) {
+      fields.push({ label: 'Completion', value: formatDateTime(entityData.completionDate) });
+    }
+
+    return {
+      id: entityData?.serviceId || '',
+      type: 'Service',
+      status: entityData?.status || 'pending',
+      fields,
+    };
+  },
+
+  getDetailsSections: buildServiceDetailsSections,
+
+  getTabDescriptors: (context: TabVisibilityContext, actions: EntityAction[]): TabDescriptor[] => {
+    const { entityData } = context;
+
+    // Get sections for Details/Overview tab
+    const detailsSections = buildServiceDetailsSections(context);
+
+    const tabs: TabDescriptor[] = [
+      {
+        id: 'details',
+        label: 'Overview',
+        content: (
+          <DetailsComposer
+            sections={filterVisibleSections(detailsSections, {
+              entityType: context.entityType,
+              role: context.role,
+              lifecycle: context.lifecycle,
+              entityData,
+            })}
+          />
+        ),
+      },
+      {
+        id: 'history',
+        label: 'History',
+        content: (
+          <HistoryTab
+            entityType={context.entityType}
+            entityId={entityData?.serviceId}
+          />
+        ),
+      },
+    ];
+
+    // NOTE: ServiceDetailsModal has additional custom tabs (crew, procedures, training)
+    // that are entity-specific. These can be migrated to composable sections in the future.
+
+    return tabs;
+  },
+
+  // LEGACY: Deprecated, kept for backward compatibility
   Component: ServiceDetailsModal,
 
   mapToProps: (data: any, actions: EntityAction[], onClose: () => void, lifecycle: Lifecycle) => {

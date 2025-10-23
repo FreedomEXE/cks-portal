@@ -1,0 +1,65 @@
+/* EntityHeader - Universal header styles for all entity modals */
+
+.entityHeader {
+  padding: 16px;
+  background: white;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.headerRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.entityInfo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.entityId {
+  font-size: 18px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.entityType {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  background-color: #f3f4f6;
+  color: #374151;
+}
+
+.badgeContainer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fieldsContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.field {
+  display: flex;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.fieldLabel {
+  color: #6b7280;
+  font-weight: 500;
+  min-width: 120px;
+}
+
+.fieldValue {
+  color: #111827;
+  flex: 1;
+}

@@ -45,8 +45,8 @@ function parseDetailEndpoint(path: string): { entityType: string; entityId: stri
   }
 
   // Try to match against catalog patterns
-  // Patterns: /api/order/{id}/details, /api/reports/{id}/details, /api/services/{id}/details
-  const match = path.match(/\/api\/([^\/]+)\/([^\/]+)\/details$/);
+  // Patterns: /order/{id}/details, /reports/{id}/details, /services/{id}/details
+  const match = path.match(/^\/([^\/]+)\/([^\/]+)\/details$/);
   if (!match) {
     return null;
   }
@@ -60,9 +60,10 @@ function parseDetailEndpoint(path: string): { entityType: string; entityId: stri
       continue;
     }
 
-    // Build expected endpoint and compare
+    // Build expected endpoint and compare (strip /api prefix for comparison)
     const expectedPath = definition.detailsEndpoint(entityId);
-    if (path === expectedPath || path.startsWith(expectedPath)) {
+    const normalizedExpected = expectedPath.replace(/^\/api/, '');
+    if (path === normalizedExpected || path.startsWith(normalizedExpected)) {
       return { entityType, entityId };
     }
   }
@@ -78,7 +79,7 @@ async function fetchTombstoneSnapshot(
   entityId: string,
   headers: Headers
 ): Promise<any> {
-  const snapshotUrl = `${API_BASE}/api/deleted/${entityType}/${entityId}/snapshot`;
+  const snapshotUrl = `${API_BASE}/deleted/${entityType}/${entityId}/snapshot`;
 
   console.log(`[apiFetch:tombstone] Attempting fallback for ${entityType} ${entityId}`);
 
@@ -237,7 +238,9 @@ export async function apiFetch<T>(path: string, init?: ApiFetchInit): Promise<T>
 
   // TOMBSTONE FALLBACK: Handle 404 on detail endpoints
   if (response.status === 404) {
+    console.log(`[apiFetch:tombstone] Got 404, checking if tombstone-eligible. Path: ${normalizedPath}`);
     const detailEndpoint = parseDetailEndpoint(normalizedPath);
+    console.log(`[apiFetch:tombstone] parseDetailEndpoint result:`, detailEndpoint);
 
     if (detailEndpoint) {
       const { entityType, entityId } = detailEndpoint;
@@ -248,9 +251,11 @@ export async function apiFetch<T>(path: string, init?: ApiFetchInit): Promise<T>
         console.log(`[apiFetch:tombstone] ✓ Tombstone loaded for ${entityType} ${entityId}`);
         return tombstoneData as T;
       } catch (tombstoneErr) {
-        console.log('[apiFetch:tombstone] Snapshot unavailable, re-throwing 404');
+        console.log('[apiFetch:tombstone] Snapshot unavailable, re-throwing 404', tombstoneErr);
         // Fall through to normal 404 handling
       }
+    } else {
+      console.log('[apiFetch:tombstone] Not a detail endpoint, skipping tombstone fallback');
     }
 
     // No detail endpoint match or tombstone failed - throw 404

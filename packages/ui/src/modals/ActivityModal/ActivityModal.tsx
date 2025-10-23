@@ -8,6 +8,7 @@ import ServiceOrderContent from '../ServiceOrderModal/ServiceOrderContent';
 import ApprovalWorkflow from '../../workflows/ApprovalWorkflow';
 import { ArchivedBanner } from '../../banners/ArchivedBanner';
 import { DeletedBanner } from '../../banners/DeletedBanner';
+import HistoryTab from '../../tabs/HistoryTab';
 
 export type ActivityActionVariant = 'primary' | 'secondary' | 'danger' | 'ghost';
 
@@ -142,14 +143,15 @@ export default function ActivityModal({
   if (!isOpen || !order) return null;
 
   // defaultExpanded kept only for compatibility; no logic uses it now
-  const [activeTab, setActiveTab] = useState<string>('actions');
+  const [activeTab, setActiveTab] = useState<string>('details');
 
   const isService = order.orderType === 'service';
 
-  // Default tabs based on whether actions exist
+  // Default tabs: Details → History → Quick Actions
   const defaultTabs = useMemo(() => [
-    { id: 'actions', label: 'Quick Actions', visible: actions.length > 0 },
     { id: 'details', label: 'Details', visible: true },
+    { id: 'history', label: 'History', visible: true },
+    { id: 'actions', label: 'Quick Actions', visible: actions.length > 0 },
   ], [actions.length]);
 
   const visibleTabs = useMemo(() => (tabs || defaultTabs).filter((t) => t.visible), [tabs, defaultTabs]);
@@ -284,6 +286,13 @@ export default function ActivityModal({
                 />
               )}
             </div>
+          )}
+
+          {activeTab === 'history' && (
+            <HistoryTab
+              entityType={entityType}
+              entityId={entityId || order.orderId}
+            />
           )}
         </div>
       </div>

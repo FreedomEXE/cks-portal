@@ -3,6 +3,7 @@ import BaseViewModal from '../BaseViewModal';
 import ReportCard from '../../cards/ReportCard';
 import ReportQuickActions, { type ReportAcknowledgment, type ReportResolution } from './components/ReportQuickActions';
 import ReportDetails from './components/ReportDetails';
+import HistoryTab from '../../tabs/HistoryTab';
 
 export interface Report {
   id: string;
@@ -71,16 +72,20 @@ const ReportModal: React.FC<ReportModalProps> = ({
   entityType = 'report',
   entityId,
 }) => {
-  // Tab state - default tab depends on showQuickActions
-  const [activeTab, setActiveTab] = useState(showQuickActions ? 'quick-actions' : 'details');
+  // Tab state - default tab is details
+  const [activeTab, setActiveTab] = useState('details');
 
-  // Build tabs based on showQuickActions prop
+  // Build tabs: Details → History → Quick Actions
   const tabs = showQuickActions
     ? [
-        { id: 'quick-actions', label: 'Quick Actions' },
         { id: 'details', label: 'Details' },
+        { id: 'history', label: 'History' },
+        { id: 'quick-actions', label: 'Quick Actions' },
       ]
-    : [{ id: 'details', label: 'Details' }];
+    : [
+        { id: 'details', label: 'Details' },
+        { id: 'history', label: 'History' },
+      ];
 
   // Early return AFTER all hooks
   if (!isOpen || !report) return null;
@@ -110,6 +115,26 @@ const ReportModal: React.FC<ReportModalProps> = ({
       entityType={entityType}
       entityId={entityId || report?.id}
     >
+      {activeTab === 'details' && (
+        <ReportDetails
+          type={report.type}
+          reportCategory={report.reportCategory}
+          submittedBy={report.submittedBy}
+          submittedDate={report.submittedDate}
+          relatedEntityId={report.relatedEntityId}
+          serviceManagedBy={report.serviceManagedBy}
+          reportReason={report.reportReason}
+          description={report.description}
+        />
+      )}
+
+      {activeTab === 'history' && (
+        <HistoryTab
+          entityType={entityType}
+          entityId={entityId || report?.id}
+        />
+      )}
+
       {activeTab === 'quick-actions' && showQuickActions && (
         <ReportQuickActions
           type={report.type}
@@ -121,19 +146,6 @@ const ReportModal: React.FC<ReportModalProps> = ({
           resolution_notes={report.resolution_notes}
           currentUser={currentUser}
           actions={actions}
-        />
-      )}
-
-      {activeTab === 'details' && (
-        <ReportDetails
-          type={report.type}
-          reportCategory={report.reportCategory}
-          submittedBy={report.submittedBy}
-          submittedDate={report.submittedDate}
-          relatedEntityId={report.relatedEntityId}
-          serviceManagedBy={report.serviceManagedBy}
-          reportReason={report.reportReason}
-          description={report.description}
         />
       )}
     </BaseViewModal>

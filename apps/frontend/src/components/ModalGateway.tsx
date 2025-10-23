@@ -28,6 +28,8 @@ import { useOrderDetails } from '../hooks/useOrderDetails';
 import { useReportDetails } from '../hooks/useReportDetails';
 import { useServiceDetails } from '../hooks/useServiceDetails';
 import { useEntityActions } from '../hooks/useEntityActions';
+import { filterVisibleTabs } from '../policies/tabs';
+import { EntityModalView } from '@cks/domain-widgets';
 
 /**
  * Extract lifecycle metadata from entity data and archive metadata
@@ -208,13 +210,61 @@ export function ModalGateway({
     });
   }, [descriptors, handleAction, entityId, onClose]);
 
-  // Map data to component props (MUST be called unconditionally)
-  const componentProps = useMemo(() => {
-    if (!adapter) return {};
-    return adapter.mapToProps(data, actions, onClose, lifecycle);
-  }, [adapter, data, actions, onClose, lifecycle]);
+  // ===== STEP 5: Build tabs from adapter and filter via RBAC policy =====
+  const visibleTabs = useMemo(() => {
+    if (!adapter || !data || !entityType || !entityId) return [];
 
-  // ===== STEP 3: Early returns AFTER all hooks =====
+    // Get tab descriptors from adapter
+    const allTabs = adapter.getTabDescriptors({
+      role,
+      lifecycle,
+      entityType,
+      entityData: data,
+      hasActions: actions.length > 0,
+    }, actions);
+
+    // Filter tabs based on RBAC policy
+    const filtered = filterVisibleTabs(allTabs, {
+      role,
+      lifecycle,
+      entityType,
+      entityData: data,
+      hasActions: actions.length > 0,
+    });
+
+    return filtered;
+  }, [adapter, role, lifecycle, entityType, data, actions, entityId]);
+
+  // ===== STEP 6: Get header config from adapter =====
+  const headerConfig = useMemo(() => {
+    if (!adapter || !data || !entityType || !entityId) return null;
+
+    if (adapter.getHeaderConfig) {
+      return adapter.getHeaderConfig({
+        role,
+        lifecycle,
+        entityType,
+        entityData: data,
+        hasActions: actions.length > 0,
+      });
+    }
+
+    // Legacy fallback (deprecated)
+    return null;
+  }, [adapter, role, lifecycle, entityType, data, actions, entityId]);
+
+  // LEGACY: Map data to component props (for backward compatibility with old modals)
+  const componentProps = useMemo(() => {
+    if (!adapter || !adapter.mapToProps) return {};
+    const props = adapter.mapToProps(data, actions, onClose, lifecycle);
+    // Add visibleTabs to props for universal tab composition
+    return {
+      ...props,
+      tabs: visibleTabs,
+    };
+  }, [adapter, data, actions, onClose, lifecycle, visibleTabs]);
+
+  // ===== STEP 7: Early returns AFTER all hooks =====
   if (!isOpen || !entityType || !entityId) {
     return null;
   }
@@ -224,10 +274,38 @@ export function ModalGateway({
     return null;
   }
 
-  // Get the modal component
+  // Handle error state
+  if (error) {
+    console.error(`[ModalGateway] Error loading ${entityType}:`, error);
+    // Still render modal with error state
+  }
+
+  // ===== NEW PATTERN: Render EntityModalView directly =====
+  if (adapter.getHeaderConfig) {
+    return (
+      <EntityModalView
+        key={`${entityType}:${entityId}`}
+        isOpen={isOpen}
+        onClose={onClose}
+        entityType={entityType}
+        entityId={entityId}
+        lifecycle={lifecycle}
+        headerConfig={headerConfig || { id: '', status: 'pending', fields: [] }}
+        tabs={visibleTabs}
+      />
+    );
+  }
+
+  // ===== LEGACY FALLBACK: Render old wrapper modals =====
+  // This path will be removed after cleanup
   const Component = adapter.Component;
 
-  // Handle loading state
+  if (!Component) {
+    console.error(`[ModalGateway] No Component or getHeader found for entity type: ${entityType}`);
+    return null;
+  }
+
+  // Handle loading state (legacy)
   if (isLoading) {
     return (
       <Component
@@ -238,13 +316,7 @@ export function ModalGateway({
     );
   }
 
-  // Handle error state
-  if (error) {
-    console.error(`[ModalGateway] Error loading ${entityType}:`, error);
-    // Still render modal with error state
-  }
-
-  // Render the modal component with all prepared props
+  // Render the modal component with all prepared props (legacy)
   // key prop forces remount when entity changes (keeps hook order consistent)
   return (
     <Component

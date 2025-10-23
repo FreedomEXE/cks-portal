@@ -3,6 +3,7 @@ import Button from '../../buttons/Button';
 import { ModalRoot } from '../ModalRoot';
 import { ArchivedBanner } from '../../banners/ArchivedBanner';
 import { DeletedBanner } from '../../banners/DeletedBanner';
+import HistoryTab from '../../tabs/HistoryTab';
 
 // Lifecycle interface (matches frontend types)
 interface Lifecycle {
@@ -64,7 +65,7 @@ export default function ServiceDetailsModal({
   entityId,
   actions = []
 }: ServiceDetailsModalProps) {
-  const [activeTab, setActiveTab] = useState<'overview' | 'crew' | 'products' | 'procedures' | 'training' | 'notes'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'history' | 'crew' | 'products' | 'procedures' | 'training' | 'notes'>('overview');
   const [crewSelected, setCrewSelected] = useState<string[]>([]);
   const [pendingCrewRequests, setPendingCrewRequests] = useState<string[]>([]);
   const [proceduresInput, setProceduresInput] = useState('');
@@ -222,6 +223,7 @@ export default function ServiceDetailsModal({
         {/* Tabs */}
         <div style={{ borderBottom: '1px solid #e5e7eb', display: 'flex', gap: 8, paddingLeft: 24 }}>
           <TabButton tab="overview" label="Overview" />
+          <TabButton tab="history" label="History" />
           <TabButton tab="crew" label="Crew" />
           <TabButton tab="products" label="Products" />
           <TabButton tab="procedures" label="Procedures" />
@@ -249,6 +251,13 @@ export default function ServiceDetailsModal({
                 </div>
               </div>
             </div>
+          )}
+
+          {activeTab === 'history' && (
+            <HistoryTab
+              entityType={entityType}
+              entityId={entityId || service.serviceId}
+            />
           )}
 
           {activeTab === 'crew' && (

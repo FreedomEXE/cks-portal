@@ -50,7 +50,14 @@
       "Bash(npx vitest run:*)",
       "Bash(pnpm typecheck:backend:*)",
       "Bash(Select-String -Pattern \"backend|error TS\" -Context 0,2)",
-      "Bash(Select-Object -First 30)"
+      "Bash(Select-Object -First 30)",
+      "Bash(pnpm test:ci:*)",
+      "Bash(del \"packages\\ui\\src\\cards\\OrderCard\\OrderHeader.tsx\")",
+      "Bash(del \"packages\\ui\\src\\cards\\ReportCard\\ReportHeader.tsx\")",
+      "Bash(del \"packages\\ui\\src\\cards\\ServiceCard\\ServiceHeader.tsx\")",
+      "Bash(pnpm build:domain-widgets:*)",
+      "Bash(pnpm --filter @cks/domain-widgets build)",
+      "Bash(pnpm --filter frontend build)"
     ],
     "deny": [],
     "ask": []
