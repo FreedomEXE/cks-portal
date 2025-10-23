@@ -20,6 +20,7 @@ import type {
   EntityActionContext,
   EntityAction,
   EntityActionDescriptor,
+  Lifecycle,
 } from '../types/entities';
 import { can } from '../policies/permissions';
 import { ActivityModal, ReportModal, ServiceDetailsModal } from '@cks/ui';
@@ -109,7 +110,7 @@ const orderAdapter: EntityAdapter = {
 
   Component: ActivityModal,
 
-  mapToProps: (data: any, actions: EntityAction[], onClose: () => void): ActivityModalProps => {
+  mapToProps: (data: any, actions: EntityAction[], onClose: () => void, lifecycle: Lifecycle): ActivityModalProps => {
     return {
       isOpen: !!data,
       onClose,
@@ -117,6 +118,9 @@ const orderAdapter: EntityAdapter = {
       order: data,
       actions,
       defaultExpanded: false,
+      lifecycle, // NEW: Pass lifecycle metadata
+      entityType: 'order',
+      entityId: data?.orderId,
       // Additional order-specific props will be passed by ModalGateway
     };
   },
@@ -204,7 +208,7 @@ const reportAdapter: EntityAdapter = {
 
   Component: ReportModal,
 
-  mapToProps: (data: any, actions: EntityAction[], onClose: () => void) => {
+  mapToProps: (data: any, actions: EntityAction[], onClose: () => void, lifecycle: Lifecycle) => {
     return {
       isOpen: !!data,
       onClose,
@@ -212,6 +216,9 @@ const reportAdapter: EntityAdapter = {
       actions,
       currentUser: undefined, // Will be set by ModalGateway
       showQuickActions: true,
+      lifecycle, // NEW: Pass lifecycle metadata
+      entityType: data?.type || 'report',
+      entityId: data?.id,
     };
   },
 };
@@ -295,13 +302,16 @@ const serviceAdapter: EntityAdapter = {
 
   Component: ServiceDetailsModal,
 
-  mapToProps: (data: any, actions: EntityAction[], onClose: () => void) => {
+  mapToProps: (data: any, actions: EntityAction[], onClose: () => void, lifecycle: Lifecycle) => {
     return {
       isOpen: !!data,
       onClose,
       service: data,
       actions,
       editable: false, // Will be determined by ModalGateway based on role
+      lifecycle, // NEW: Pass lifecycle metadata
+      entityType: 'service',
+      entityId: data?.serviceId,
     };
   },
 };

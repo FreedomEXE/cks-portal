@@ -22,12 +22,45 @@
  */
 
 import { useMemo } from 'react';
-import type { EntityType, UserRole, EntityState, OpenEntityModalOptions } from '../types/entities';
+import type { EntityType, UserRole, EntityState, Lifecycle, OpenEntityModalOptions } from '../types/entities';
 import { entityRegistry } from '../config/entityRegistry';
 import { useOrderDetails } from '../hooks/useOrderDetails';
 import { useReportDetails } from '../hooks/useReportDetails';
 import { useServiceDetails } from '../hooks/useServiceDetails';
 import { useEntityActions } from '../hooks/useEntityActions';
+
+/**
+ * Extract lifecycle metadata from entity data and archive metadata
+ *
+ * Unifies lifecycle detection across all entity types.
+ * Priority: Deleted > Archived > Active
+ */
+function extractLifecycle(data: any, archiveMetadata: any): Lifecycle {
+  // Priority 1: Deleted state
+  if (data?.isDeleted || data?.deletedAt) {
+    return {
+      state: 'deleted',
+      deletedAt: data.deletedAt,
+      deletedBy: data.deletedBy,
+      deletionReason: data.deletionReason,
+      isTombstone: data.isTombstone || false
+    };
+  }
+
+  // Priority 2: Archived state
+  if (archiveMetadata?.archivedAt || data?.archivedAt) {
+    return {
+      state: 'archived',
+      archivedAt: archiveMetadata?.archivedAt || data.archivedAt,
+      archivedBy: archiveMetadata?.archivedBy || data.archivedBy,
+      archiveReason: archiveMetadata?.reason || data.archiveReason,
+      scheduledDeletion: archiveMetadata?.scheduledDeletion
+    };
+  }
+
+  // Default: Active
+  return { state: 'active' };
+}
 
 export interface ModalGatewayProps {
   /** Whether modal is open */
@@ -82,43 +115,42 @@ export function ModalGateway({
   });
 
   // ===== STEP 2: Select the right data based on entityType =====
-  const detailsMap: Record<string, { data: any; isLoading: boolean; error: Error | null; state: EntityState }> = {
+  const detailsMap: Record<string, { data: any; isLoading: boolean; error: Error | null; lifecycle: Lifecycle }> = {
     order: {
       data: orderDetails.order,
       isLoading: orderDetails.isLoading,
       error: orderDetails.error || null,
-      state: (orderDetails.order?.isDeleted ? 'deleted' :
-              orderDetails.archiveMetadata?.archivedAt ? 'archived' : 'active') as EntityState,
+      lifecycle: extractLifecycle(orderDetails.order, orderDetails.archiveMetadata),
     },
     report: {
       data: reportDetails.report,
       isLoading: reportDetails.isLoading || false,
       error: reportDetails.error || null,
-      state: (reportDetails.report?.archivedAt ? 'archived' : 'active') as EntityState,
+      lifecycle: extractLifecycle(reportDetails.report, null),
     },
     feedback: {
       data: reportDetails.report,
       isLoading: reportDetails.isLoading || false,
       error: reportDetails.error || null,
-      state: (reportDetails.report?.archivedAt ? 'archived' : 'active') as EntityState,
+      lifecycle: extractLifecycle(reportDetails.report, null),
     },
     service: {
       data: serviceDetails.service,
       isLoading: serviceDetails.isLoading || false,
       error: serviceDetails.error || null,
-      state: 'active' as EntityState, // Services don't have isDeleted/archivedAt yet
+      lifecycle: extractLifecycle(serviceDetails.service, null),
     },
   };
 
-  const { data, isLoading, error, state: detectedState } = (entityType && detailsMap[entityType]) || {
+  const { data, isLoading, error, lifecycle } = (entityType && detailsMap[entityType]) || {
     data: null,
     isLoading: false,
     error: null,
-    state: 'active' as EntityState,
+    lifecycle: { state: 'active' } as Lifecycle,
   };
 
-  // Determine final state (explicit override or detected)
-  const state: EntityState = options?.state || detectedState;
+  // Determine final state (explicit override or detected from lifecycle)
+  const state: EntityState = options?.state || lifecycle.state;
 
   // Get adapter from registry (before useMemo hooks!)
   const adapter = entityType ? entityRegistry[entityType] : null;
@@ -179,8 +211,8 @@ export function ModalGateway({
   // Map data to component props (MUST be called unconditionally)
   const componentProps = useMemo(() => {
     if (!adapter) return {};
-    return adapter.mapToProps(data, actions, onClose);
-  }, [adapter, data, actions, onClose]);
+    return adapter.mapToProps(data, actions, onClose, lifecycle);
+  }, [adapter, data, actions, onClose, lifecycle]);
 
   // ===== STEP 3: Early returns AFTER all hooks =====
   if (!isOpen || !entityType || !entityId) {

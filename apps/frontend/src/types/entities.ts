@@ -30,6 +30,29 @@ export type EntityType =
 export type EntityState = 'active' | 'archived' | 'deleted';
 
 /**
+ * Complete lifecycle metadata for an entity
+ *
+ * Contains all information about entity's lifecycle state
+ * including archive and deletion metadata.
+ */
+export interface Lifecycle {
+  /** Current lifecycle state */
+  state: EntityState;
+
+  // Archive metadata (when state === 'archived')
+  archivedAt?: string;
+  archivedBy?: string;
+  archiveReason?: string;
+  scheduledDeletion?: string;
+
+  // Deletion metadata (when state === 'deleted')
+  deletedAt?: string;
+  deletedBy?: string;
+  deletionReason?: string;
+  isTombstone?: boolean;  // True if loaded from snapshot
+}
+
+/**
  * Role types for permission checking
  */
 export type UserRole =
@@ -125,7 +148,7 @@ export interface EntityAdapter<TData = any, TModalProps = any> {
   /**
    * Maps fetched data to modal props
    */
-  mapToProps: (data: TData | null, actions: EntityAction[], onClose: () => void) => TModalProps;
+  mapToProps: (data: TData | null, actions: EntityAction[], onClose: () => void, lifecycle: Lifecycle) => TModalProps;
 }
 
 /**
