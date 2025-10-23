@@ -64,8 +64,9 @@ export function parseEntityId(id: string | null | undefined): ParsedEntityId {
     return { type: 'training', id, scope };
   }
 
-  // Product Catalog IDs: PROD-###
-  if (normalizedId.startsWith('PROD-')) {
+  // Product Catalog IDs: PRD-### (NOT PROD)
+  // NOTE: Product ORDERS use PO- token and are handled above
+  if (normalizedId.startsWith('PRD-')) {
     return { type: 'product', id, scope };
   }
 
