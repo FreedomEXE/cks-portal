@@ -86,6 +86,29 @@ vi.mock('../services/LoadingService', () => ({
 }));
 
 // ============================================================================
+// Mock: Clerk Authentication
+// ============================================================================
+
+vi.mock('@clerk/clerk-react', () => ({
+  ClerkProvider: ({ children }: { children: React.ReactNode }) => children,
+  useAuth: () => ({
+    isSignedIn: true,
+    userId: 'user_test',
+    getToken: async () => 'TEST_TOKEN',
+    signOut: vi.fn(),
+  }),
+  useUser: () => ({
+    user: {
+      id: 'user_test',
+      fullName: 'Test User',
+      primaryEmailAddress: { emailAddress: 'test@example.com' },
+    },
+  }),
+  SignedIn: ({ children }: { children: React.ReactNode }) => children,
+  SignedOut: () => null,
+}));
+
+// ============================================================================
 // Feature Flags (Stable Path for Tests)
 // ============================================================================
 
