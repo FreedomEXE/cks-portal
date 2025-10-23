@@ -75,7 +75,7 @@ interface EntityDefinition {
 | **report** | `RPT-123`, `CEN-010-RPT-456` | `reports` | Archive, Delete, Restore, History, Tombstone, Details |
 | **feedback** | `FBK-123`, `CEN-010-FBK-456` | `reports` | Archive, Delete, Restore, History, Tombstone, Details |
 | **service** | `SRV-123` | `services` | Archive, Delete, Restore, History *(Details/Tombstone pending)* |
-| **product** | `PROD-123`, `PRD-00000123` | `product_catalog` | Archive, Delete, Restore |
+| **product** | `PRD-123`, `PRD-00000123` | `product_catalog` | Archive, Delete, Restore |
 | **manager** | `MGR-123` | `managers` | Archive, Delete, Restore |
 | **contractor** | `CON-123` | `contractors` | Archive, Delete, Restore |
 | **customer** | `CUS-123` | `customers` | Archive, Delete, Restore |
@@ -301,15 +301,16 @@ Matches:
 ❌ ORDER-123
 ❌ S-123
 
-// Product: Supports PROD/PRD with padding
-idPattern: /^PRO?D-\d{1,8}$/i
+// Product: Only PRD (product catalog items)
+// NOTE: Product ORDERS use 'PO' token (e.g., CRW-001-PO-010)
+idPattern: /^PRD-\d{1,8}$/i
 
 Matches:
-✅ PROD-123
+✅ PRD-001
 ✅ PRD-123
 ✅ PRD-00000123 (padded)
-❌ PRODUCT-123
-❌ PRD-123456789 (too many digits)
+❌ PROD-123 (wrong token)
+❌ PO-123 (that's a product ORDER, not a product)
 ```
 
 ## Synchronization Requirements

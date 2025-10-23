@@ -47,7 +47,7 @@ test(getEntityByIdPattern('PO-456').type === 'order', 'PO-456 → order');
 test(getEntityByIdPattern('RPT-789').type === 'report', 'RPT-789 → report');
 test(getEntityByIdPattern('FBK-101').type === 'feedback', 'FBK-101 → feedback');
 test(getEntityByIdPattern('SRV-202').type === 'service', 'SRV-202 → service');
-test(getEntityByIdPattern('PROD-303').type === 'product', 'PROD-303 → product');
+test(getEntityByIdPattern('PRD-303').type === 'product', 'PRD-303 → product');
 test(getEntityByIdPattern('MGR-404').type === 'manager', 'MGR-404 → manager');
 test(getEntityByIdPattern('CEN-010-SO-123').type === 'order', 'Scoped order works');
 test(getEntityByIdPattern('INVALID-999').type === 'unknown', 'Invalid → unknown');

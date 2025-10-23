@@ -142,9 +142,9 @@ export const ENTITY_CATALOG: Record<string, EntityDefinition> = {
     type: 'product',
     displayName: 'Product',
     displayNamePlural: 'Products',
-    idToken: ['PROD', 'PRD'],  // Both variants + padded backend format
-    // Pattern: Handles PROD-123 and PRD-00000123 (padded)
-    idPattern: /^PRO?D-\d{1,8}$/i,
+    idToken: 'PRD',  // Product catalog items (NOT product orders - those use 'PO')
+    // Pattern: Handles PRD-123 and PRD-00000123 (padded format)
+    idPattern: /^PRD-\d{1,8}$/i,
     backendTable: 'product_catalog',
     backendIdColumn: 'product_id',
     supportsDetailFetch: false,
