@@ -10,6 +10,7 @@
     "changeset": "changeset",
     "build": "pnpm -r build",
     "test": "pnpm run -r test",
+    "test:ci": "pnpm run -r test:ci",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",
