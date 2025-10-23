@@ -127,6 +127,21 @@ export default function ArchiveSection({
     loadArchivedData();
   }, [activeTab, servicesSubTab, ordersSubTab, reportsSubTab]);
 
+  // Listen for archive updates from other components (e.g., modal actions)
+  useEffect(() => {
+    const handleArchiveUpdate = (event: Event) => {
+      const customEvent = event as CustomEvent<{ entityType: string; entityId: string; action: string }>;
+      console.log('[ArchiveSection] Archive updated event received:', customEvent.detail);
+      // Re-fetch the current tab's data
+      loadArchivedData();
+    };
+
+    window.addEventListener('cks:archive:updated', handleArchiveUpdate);
+    return () => {
+      window.removeEventListener('cks:archive:updated', handleArchiveUpdate);
+    };
+  }, [activeTab, servicesSubTab, ordersSubTab, reportsSubTab]);
+
   const loadArchivedData = async () => {
     setLoading(true);
     setError(null);

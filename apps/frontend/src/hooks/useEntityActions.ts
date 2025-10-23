@@ -87,6 +87,113 @@ async function handleOrderAction(
   options: EntityActionOptions,
   mutate: any
 ): Promise<boolean> {
+  // Import archive API for archive/restore/delete actions
+  const { archiveAPI } = await import('../shared/api/archive');
+
+  // Handle archive/restore/delete actions (admin only)
+  if (actionId === 'archive' || actionId === 'restore' || actionId === 'delete') {
+    try {
+      switch (actionId) {
+        case 'archive': {
+          const reason = options.notes;
+          console.log('[useEntityActions] Archiving order:', orderId);
+          await archiveAPI.archiveEntity('order', orderId, reason || undefined);
+
+          // Invalidate caches
+          mutate((key: any) => {
+            if (typeof key === 'string') {
+              return key.includes('/hub/orders/') ||
+                     key.includes('/admin/directory/orders') ||
+                     key.includes('/admin/directory/activities') ||
+                     key.includes('/api/hub/activities') ||
+                     key.includes('/hub/activities') ||
+                     key.includes('/api/archive/list') ||
+                     key.includes('/archive/list') ||
+                     key.includes(orderId);
+            }
+            return false;
+          });
+
+          // Dispatch event for non-SWR components (e.g., ArchiveSection)
+          window.dispatchEvent(new CustomEvent('cks:archive:updated', {
+            detail: { entityType: 'order', entityId: orderId, action: 'archive' }
+          }));
+
+          console.log('[useEntityActions] Order archive: success');
+          toast.success('Order archived successfully');
+          options.onSuccess?.();
+          return true;
+        }
+
+        case 'restore': {
+          console.log('[useEntityActions] Restoring order:', orderId);
+          await archiveAPI.restoreEntity('order', orderId);
+
+          // Invalidate caches
+          mutate((key: any) => {
+            if (typeof key === 'string') {
+              return key.includes('/hub/orders/') ||
+                     key.includes('/admin/directory/orders') ||
+                     key.includes('/admin/directory/activities') ||
+                     key.includes('/api/hub/activities') ||
+                     key.includes('/hub/activities') ||
+                     key.includes('/api/archive/list') ||
+                     key.includes('/archive/list') ||
+                     key.includes('/archive') ||
+                     key.includes(orderId);
+            }
+            return false;
+          });
+
+          // Dispatch event for non-SWR components (e.g., ArchiveSection)
+          window.dispatchEvent(new CustomEvent('cks:archive:updated', {
+            detail: { entityType: 'order', entityId: orderId, action: 'restore' }
+          }));
+
+          console.log('[useEntityActions] Order restore: success');
+          toast.success('Order restored successfully');
+          options.onSuccess?.();
+          return true;
+        }
+
+        case 'delete': {
+          const reason = options.notes;
+          console.log('[useEntityActions] Permanently deleting order:', orderId);
+          await archiveAPI.hardDelete('order', orderId, reason);
+
+          // Invalidate caches
+          mutate((key: any) => {
+            if (typeof key === 'string') {
+              return key.includes('/archive') ||
+                     key.includes('/admin/directory/activities') ||
+                     key.includes('/api/hub/activities') ||
+                     key.includes('/hub/activities') ||
+                     key.includes('/api/archive/list') ||
+                     key.includes('/archive/list') ||
+                     key.includes('/api/archive/relationships') ||
+                     key.includes(orderId);
+            }
+            return false;
+          });
+
+          // Dispatch event for non-SWR components (e.g., ArchiveSection)
+          window.dispatchEvent(new CustomEvent('cks:archive:updated', {
+            detail: { entityType: 'order', entityId: orderId, action: 'hard_delete' }
+          }));
+
+          console.log('[useEntityActions] Order delete: success');
+          toast.success('Order permanently deleted');
+          options.onSuccess?.();
+          return true;
+        }
+      }
+    } catch (error) {
+      console.error(`[useEntityActions] Order ${actionId} failed:`, error);
+      toast.error(`Failed to ${actionId} order`);
+      throw error;
+    }
+  }
+
   // Map common action labels to backend actions
   let backendAction = actionId;
 
@@ -203,11 +310,22 @@ async function handleServiceAction(
         // Invalidate caches
         mutate((key: any) => {
           if (typeof key === 'string') {
-            return key.includes('/admin/directory/services') || key.includes(serviceId);
+            return key.includes('/admin/directory/services') ||
+                   key.includes('/api/hub/activities') ||
+                   key.includes('/hub/activities') ||
+                   key.includes('/api/archive/list') ||
+                   key.includes('/archive/list') ||
+                   key.includes(serviceId);
           }
           return false;
         });
 
+        // Dispatch event for non-SWR components (e.g., ArchiveSection)
+        window.dispatchEvent(new CustomEvent('cks:archive:updated', {
+          detail: { entityType: 'service', entityId: serviceId, action: 'archive' }
+        }));
+
+        console.log('[useEntityActions] Service archive: success');
         toast.success('Service archived successfully');
         options.onSuccess?.();
         return true;
@@ -221,12 +339,22 @@ async function handleServiceAction(
         mutate((key: any) => {
           if (typeof key === 'string') {
             return key.includes('/admin/directory/services') ||
+                   key.includes('/api/hub/activities') ||
+                   key.includes('/hub/activities') ||
+                   key.includes('/api/archive/list') ||
+                   key.includes('/archive/list') ||
                    key.includes('/archive') ||
                    key.includes(serviceId);
           }
           return false;
         });
 
+        // Dispatch event for non-SWR components (e.g., ArchiveSection)
+        window.dispatchEvent(new CustomEvent('cks:archive:updated', {
+          detail: { entityType: 'service', entityId: serviceId, action: 'restore' }
+        }));
+
+        console.log('[useEntityActions] Service restore: success');
         toast.success('Service restored successfully');
         options.onSuccess?.();
         return true;
@@ -242,11 +370,23 @@ async function handleServiceAction(
         // Invalidate caches
         mutate((key: any) => {
           if (typeof key === 'string') {
-            return key.includes('/archive') || key.includes(serviceId);
+            return key.includes('/archive') ||
+                   key.includes('/api/hub/activities') ||
+                   key.includes('/hub/activities') ||
+                   key.includes('/api/archive/list') ||
+                   key.includes('/archive/list') ||
+                   key.includes('/api/archive/relationships') ||
+                   key.includes(serviceId);
           }
           return false;
         });
 
+        // Dispatch event for non-SWR components (e.g., ArchiveSection)
+        window.dispatchEvent(new CustomEvent('cks:archive:updated', {
+          detail: { entityType: 'service', entityId: serviceId, action: 'hard_delete' }
+        }));
+
+        console.log('[useEntityActions] Service delete: success');
         toast.success('Service permanently deleted');
         options.onSuccess?.();
         return true;
@@ -302,11 +442,21 @@ async function handleReportAction(
           if (typeof key === 'string') {
             return key.includes('/admin/directory/reports') ||
                    key.includes('/admin/directory/feedback') ||
+                   key.includes('/api/hub/activities') ||
+                   key.includes('/hub/activities') ||
+                   key.includes('/api/archive/list') ||
+                   key.includes('/archive/list') ||
                    key.includes(reportId);
           }
           return false;
         });
 
+        // Dispatch event for non-SWR components (e.g., ArchiveSection)
+        window.dispatchEvent(new CustomEvent('cks:archive:updated', {
+          detail: { entityType, entityId: reportId, action: 'archive' }
+        }));
+
+        console.log(`[useEntityActions] ${entityLabel} archive: success`);
         toast.success(`${entityLabel} archived successfully`);
         options.onSuccess?.();
         return true;
@@ -321,12 +471,22 @@ async function handleReportAction(
           if (typeof key === 'string') {
             return key.includes('/admin/directory/reports') ||
                    key.includes('/admin/directory/feedback') ||
+                   key.includes('/api/hub/activities') ||
+                   key.includes('/hub/activities') ||
+                   key.includes('/api/archive/list') ||
+                   key.includes('/archive/list') ||
                    key.includes('/archive') ||
                    key.includes(reportId);
           }
           return false;
         });
 
+        // Dispatch event for non-SWR components (e.g., ArchiveSection)
+        window.dispatchEvent(new CustomEvent('cks:archive:updated', {
+          detail: { entityType, entityId: reportId, action: 'restore' }
+        }));
+
+        console.log(`[useEntityActions] ${entityLabel} restore: success`);
         toast.success(`${entityLabel} restored successfully`);
         options.onSuccess?.();
         return true;
@@ -342,11 +502,23 @@ async function handleReportAction(
         // Invalidate caches
         mutate((key: any) => {
           if (typeof key === 'string') {
-            return key.includes('/archive') || key.includes(reportId);
+            return key.includes('/archive') ||
+                   key.includes('/api/hub/activities') ||
+                   key.includes('/hub/activities') ||
+                   key.includes('/api/archive/list') ||
+                   key.includes('/archive/list') ||
+                   key.includes('/api/archive/relationships') ||
+                   key.includes(reportId);
           }
           return false;
         });
 
+        // Dispatch event for non-SWR components (e.g., ArchiveSection)
+        window.dispatchEvent(new CustomEvent('cks:archive:updated', {
+          detail: { entityType, entityId: reportId, action: 'hard_delete' }
+        }));
+
+        console.log(`[useEntityActions] ${entityLabel} delete: success`);
         toast.success(`${entityLabel} permanently deleted`);
         options.onSuccess?.();
         return true;

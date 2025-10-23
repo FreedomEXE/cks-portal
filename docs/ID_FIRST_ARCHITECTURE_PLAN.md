@@ -4,6 +4,13 @@
 
 **Goal**: Complete the transformation to a fully ID-first modal architecture where any entity can be opened from anywhere using only its ID.
 
+### Current Status Snapshot (updated)
+- Reports/Feedback: COMPLETE (ID-first; on‑demand details)
+- Orders: COMPLETE (ID-first; on‑demand details; provider decoupled)
+- Services: FRONTEND DONE (new on‑demand hook); BACKEND ENDPOINT `/services/:serviceId/details` PENDING
+- Phase 2 (call sites): ActivityFeed and AdminHub migrated behind `ID_FIRST_MODALS`; legacy fallbacks remain only for safety and will be removed after bake
+- Phase 4 (props cleanup): COMPLETE — `ordersData` removed from provider/gateway
+
 **Benefits**:
 - Zero props passed through ModalProvider (fully modular)
 - All modals work identically from Activity Feed, Directory, Archive, Search

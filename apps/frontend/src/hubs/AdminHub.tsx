@@ -1051,8 +1051,8 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
           console.log('[AdminHub Directory] Phase 2: Opening report via openById():', row.id);
           modals.openById(row.id);
         } else {
-          // Legacy path (backwards compatibility)
-          modals.openReportModal(row.id, 'report');
+          // Legacy path (backwards compatibility) - use openEntityModal directly
+          modals.openEntityModal('report', row.id, { context: { reportType: 'report' } });
         }
       },
     },
@@ -1070,8 +1070,8 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
           console.log('[AdminHub Directory] Phase 2: Opening feedback via openById():', row.id);
           modals.openById(row.id);
         } else {
-          // Legacy path (backwards compatibility)
-          modals.openReportModal(row.id, 'feedback');
+          // Legacy path (backwards compatibility) - use openEntityModal directly
+          modals.openEntityModal('feedback', row.id, { context: { reportType: 'feedback' } });
         }
       },
     },
@@ -1451,13 +1451,13 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
       <ArchiveSection
         archiveAPI={archiveAPI}
         onViewOrderDetails={(orderId: string) => {
-          modals.openById(orderId);
+          modals.openById(orderId, { state: 'archived' });
         }}
         onViewServiceDetails={(serviceId: string) => {
-          modals.openById(serviceId);
+          modals.openById(serviceId, { state: 'archived' });
         }}
         onViewReportDetails={(reportId: string) => {
-          modals.openById(reportId);
+          modals.openById(reportId, { state: 'archived' });
         }}
       />
           ) : activeTab === 'support' ? (

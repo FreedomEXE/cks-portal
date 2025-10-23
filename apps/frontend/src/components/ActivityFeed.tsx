@@ -68,6 +68,14 @@ export function ActivityFeed({
 
       // Handle order activities
       if (targetType === 'order') {
+        // Phase 2: ID-first modal opening (with feature flag)
+        if (isFeatureEnabled('ID_FIRST_MODALS')) {
+          console.log('[ActivityFeed] Phase 2: Opening order via openById():', targetId);
+          modals.openById(targetId);
+          return;
+        }
+
+        // Legacy path (backwards compatibility)
         try {
           // Fetch order with state detection
           const result = await fetchOrderForActivity(targetId);
@@ -121,13 +129,23 @@ export function ActivityFeed({
         return;
       }
 
-      // Handle service activities (future implementation)
+      // Handle service activities
       if (targetType === 'service') {
-        if (!onOpenServiceModal) {
-          console.warn('[ActivityFeed] onOpenServiceModal not provided, ignoring click');
+        // Phase 3: ID-first modal opening (requires BOTH flags)
+        // Only proceed if backend /services/:serviceId/details endpoint is ready
+        if (isFeatureEnabled('ID_FIRST_MODALS') && isFeatureEnabled('SERVICE_DETAIL_FETCH')) {
+          console.log('[ActivityFeed] Phase 3: Opening service via openById():', targetId);
+          modals.openById(targetId);
           return;
         }
-        // TODO: Implement service fetching
+
+        // Legacy path (or gated until backend ready)
+        if (!onOpenServiceModal) {
+          console.warn('[ActivityFeed] Service modals not yet available');
+          onError?.('Service activities not yet implemented');
+          return;
+        }
+        // TODO: Implement legacy service fetching if needed
         onError?.('Service activities not yet implemented');
         return;
       }
@@ -139,8 +157,8 @@ export function ActivityFeed({
           console.log('[ActivityFeed] Phase 2: Opening via openById():', targetId);
           modals.openById(targetId);
         } else {
-          // Legacy path (backwards compatibility)
-          modals.openReportModal(targetId, targetType as 'report' | 'feedback');
+          // Legacy path (backwards compatibility) - use openEntityModal directly
+          modals.openEntityModal(targetType, targetId, { context: { reportType: targetType } });
         }
         return;
       }
@@ -149,7 +167,7 @@ export function ActivityFeed({
       console.warn('[ActivityFeed] Unsupported entity type:', targetType);
       onError?.(`Cannot open ${targetType} entities yet`);
     },
-    [onOpenOrderActions, onOpenOrderModal, onOpenServiceModal, onOpenReportModal, onOpenActionableOrder, onError, modals]
+    [onOpenOrderActions, onOpenOrderModal, onOpenServiceModal, onOpenActionableOrder, onError, modals]
   );
 
   // Map activities with onClick and onClear handlers
