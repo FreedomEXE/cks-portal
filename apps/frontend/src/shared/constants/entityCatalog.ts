@@ -139,8 +139,10 @@ export const ENTITY_CATALOG: Record<string, EntityDefinition> = {
     type: 'service',
     displayName: 'Service',
     displayNamePlural: 'Services',
-    idToken: 'SRV',  // Canonical (not SVC)
-    idPattern: /^SRV-\d+$/i,
+    idToken: 'SRV',  // Active service instances (scoped)
+    // Pattern: Scoped IDs only (CEN-010-SRV-001)
+    // Active services created from service orders via transformation
+    idPattern: /^(?:[A-Z]{3}-\d{3}-)SRV-\d+$/i,
     backendTable: 'services',
     backendIdColumn: 'service_id',
     detailsEndpoint: (id) => `/api/services/${id}/details`,
@@ -157,6 +159,32 @@ export const ENTITY_CATALOG: Record<string, EntityDefinition> = {
       archived: 'service_archived',
       restored: 'service_restored',
       deleted: 'service_hard_deleted'
+    }
+  },
+
+  catalogService: {
+    type: 'catalogService',
+    displayName: 'Service Definition',
+    displayNamePlural: 'Service Definitions',
+    idToken: 'SRV',  // Catalog service definitions (unscoped)
+    // Pattern: Unscoped SRV-### only (catalog definitions)
+    idPattern: /^SRV-\d+$/i,
+    backendTable: 'catalog_services',
+    backendIdColumn: 'service_id',
+    detailsEndpoint: undefined,  // Catalog services have no detail endpoint
+    supportsDetailFetch: false,
+    supportsArchive: false,  // Catalog definitions not archived
+    supportsDelete: false,
+    supportsRestore: false,
+    supportsHistory: false,
+    supportsTombstone: false,
+    modalComponent: 'CatalogServiceModal',
+    defaultTabOrder: ['details'],
+    activityTypes: {
+      created: 'catalog_service_created',
+      archived: 'catalog_service_archived',
+      restored: 'catalog_service_restored',
+      deleted: 'catalog_service_deleted'
     }
   },
 
@@ -383,11 +411,31 @@ export function getEntityDefinition(type: string): EntityDefinition {
 /**
  * Find entity type by parsing ID pattern
  * Returns 'unknown' entity if no pattern matches
+ *
+ * Special handling for SRV token (service vs catalogService):
+ * - Scoped (CEN-010-SRV-001) → service (active instance)
+ * - Unscoped (SRV-123) → catalogService (catalog definition)
  */
 export function getEntityByIdPattern(id: string): EntityDefinition {
-  // Try each pattern (excluding unknown)
+  const normalizedId = id.toUpperCase();
+
+  // Special case: SRV token needs disambiguation
+  if (normalizedId.includes('SRV-')) {
+    // Check if scoped (has prefix like CEN-010-)
+    const hasScope = /^[A-Z]{3}-\d{3}-/.test(normalizedId);
+
+    if (hasScope) {
+      // Scoped = active service instance
+      return ENTITY_CATALOG.service;
+    } else {
+      // Unscoped = catalog service definition
+      return ENTITY_CATALOG.catalogService;
+    }
+  }
+
+  // Try each pattern (excluding unknown and catalogService - handled above)
   const match = Object.values(ENTITY_CATALOG)
-    .filter(def => def.type !== 'unknown')
+    .filter(def => def.type !== 'unknown' && def.type !== 'catalogService')
     .find(def => def.idPattern.test(id));
 
   if (!match) {

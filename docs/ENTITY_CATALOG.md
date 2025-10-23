@@ -74,7 +74,8 @@ interface EntityDefinition {
 | **order** | `SO-123`, `PO-456`, `CEN-010-SO-789` | `orders` | Archive, Delete, Restore, History, Tombstone, Details |
 | **report** | `RPT-123`, `CEN-010-RPT-456` | `reports` | Archive, Delete, Restore, History, Tombstone, Details |
 | **feedback** | `FBK-123`, `CEN-010-FBK-456` | `reports` | Archive, Delete, Restore, History, Tombstone, Details |
-| **service** | `SRV-123` | `services` | Archive, Delete, Restore, History *(Details/Tombstone pending)* |
+| **service** (active) | `CEN-010-SRV-001` (scoped) | `services` | Archive, Delete, Restore, History *(Details/Tombstone pending)* |
+| **catalogService** | `SRV-001` (unscoped) | `catalog_services` | None (view-only) |
 | **product** | `PRD-123`, `PRD-00000123` | `product_catalog` | Archive, Delete, Restore |
 | **manager** | `MGR-123` | `managers` | Archive, Delete, Restore |
 | **contractor** | `CON-123` | `contractors` | Archive, Delete, Restore |
@@ -88,11 +89,16 @@ interface EntityDefinition {
 Some entities support **scoped IDs** with prefixes:
 
 ```
-CEN-010-SO-123    → Order scoped to center CEN-010
-CEN-010-RPT-456   → Report scoped to center CEN-010
-MGR-123           → Manager (uses MGR- as scope prefix)
-CON-456           → Contractor (uses CON- as scope prefix)
+CEN-010-SO-123      → Order scoped to center CEN-010
+CEN-010-RPT-456     → Report scoped to center CEN-010
+CEN-010-SRV-001     → Active service instance (scoped)
+MGR-123             → Manager (uses MGR- as scope prefix)
+CON-456             → Contractor (uses CON- as scope prefix)
 ```
+
+**Service Disambiguation:**
+- **Scoped** (`CEN-010-SRV-001`) = Active service instance (lifecycle actions)
+- **Unscoped** (`SRV-001`) = Catalog service definition (view-only)
 
 ## Usage Examples
 
