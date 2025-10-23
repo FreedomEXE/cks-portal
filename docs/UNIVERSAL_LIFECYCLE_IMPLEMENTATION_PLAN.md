@@ -832,20 +832,252 @@ const componentProps = adapter.mapToProps(
 - Others: `['details', 'history', 'actions']` (details first)
 
 ### 5.5: Phase 5 Tasks
-- [ ] Create HistoryTab component
-- [ ] Create useEntityHistory hook
+- [x] Create HistoryTab component
+- [ ] Create useEntityHistory hook (NOT NEEDED - HistoryTab fetches directly)
 - [ ] Update BaseViewModal to support tabs
 - [ ] Update ActivityModal to support tabs
 - [ ] Update ModalGateway to fetch history
 - [ ] Update adapters to pass history
-- [ ] Test history tab for orders
-- [ ] Test history tab for reports
-- [ ] Verify chronological order
-- [ ] Verify events show correct metadata
+- [x] Test history tab for orders
+- [x] Test history tab for reports
+- [x] Verify chronological order
+- [x] Verify events show correct metadata
+
+### 5.6: Phase 5 Status (PARTIALLY COMPLETE)
+
+**✅ What's Done:**
+- HistoryTab component created and working (`packages/ui/src/tabs/HistoryTab.tsx`)
+- HistoryTab fetches data directly via `/api/activity/entity/:type/:id` (no hook needed)
+- Backend history endpoint working (`/api/activity/entity/:entityType/:entityId`)
+- Lifecycle banners working universally
+
+**❌ What's NOT Done:**
+- Tab composition is STILL per-modal (ActivityModal, ReportModal, ServiceDetailsModal each define tabs locally)
+- Adding HistoryTab required editing 3 separate modal files
+- Tab order hardcoded in each modal
+- No RBAC visibility logic for tabs
+
+**🔥 Problem Identified:**
+After 48 hours of making lifecycle/tombstone/banners universal, tab composition is still per-modal. This defeats the purpose of modularity. Adding a new tab = touching N modal files.
+
+**➡️ Solution:** Phase 6 - Universal Tab Composition
 
 ---
 
-## Phase 6: Comprehensive Testing
+## Phase 6: Universal Tab Composition with RBAC
+
+**Status:** 🚧 IN PROGRESS (2025-10-23)
+
+### Problem Statement
+
+Current architecture requires editing multiple modal files to add a tab:
+- `ActivityModal` defines tabs locally
+- `ReportModal` defines tabs locally
+- `ServiceDetailsModal` defines tabs locally
+
+**What we want:**
+1. **ONE place** to define tab composition for all entities
+2. **RBAC visibility** - tabs shown based on user role + entity state
+3. **Entity-specific overrides** - some entities have custom tabs/ordering
+
+### Solution Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ ModalGateway/Adapter                                        │
+│ • Builds tab descriptors in ONE place                       │
+│ • Applies RBAC visibility logic                             │
+│ • Passes tab descriptors to BaseViewModal                   │
+└─────────────────────────────────────────────────────────────┘
+                            ↓
+┌─────────────────────────────────────────────────────────────┐
+│ BaseViewModal                                               │
+│ • Renders tabs from descriptors                             │
+│ • Filters based on visible(role, lifecycle)                 │
+│ • Renders active tab content                                │
+└─────────────────────────────────────────────────────────────┘
+                            ↓
+┌─────────────────────────────────────────────────────────────┐
+│ Entity Content Components (Extracted)                       │
+│ • OrderDetailsContent, OrderActionsContent                  │
+│ • ReportDetailsContent, ReportActionsContent                │
+│ • ServiceDetailsContent, ServiceActionsContent              │
+│ • NO tab management logic - pure content rendering          │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 6.1: Tab Descriptor Contract
+
+**File:** `packages/ui/src/modals/types.ts` (new)
+
+```typescript
+export interface TabDescriptor {
+  id: string;
+  label: string;
+  visible: (context: TabVisibilityContext) => boolean;
+  content: ReactNode;
+}
+
+export interface TabVisibilityContext {
+  role: string;
+  lifecycle: Lifecycle;
+  hasActions: boolean; // For conditional Quick Actions tab
+}
+
+// Default tab order (can be overridden per entity in catalog)
+export const DEFAULT_TAB_ORDER = ['details', 'history', 'actions'];
+```
+
+### 6.2: Update BaseViewModal
+
+**Changes:**
+1. Accept `tabs: TabDescriptor[]` prop
+2. Accept `role: string` and `lifecycle: Lifecycle` for visibility filtering
+3. Manage active tab state internally
+4. Render tabs and content generically
+
+```typescript
+export interface BaseViewModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  card: ReactNode;
+  tabs: TabDescriptor[];  // NEW
+  role: string;            // NEW
+  lifecycle?: Lifecycle;
+  entityType?: string;
+  entityId?: string;
+}
+
+export default function BaseViewModal({
+  isOpen,
+  onClose,
+  card,
+  tabs,
+  role,
+  lifecycle,
+  entityType,
+  entityId,
+}: BaseViewModalProps) {
+  // Filter tabs based on visibility
+  const visibleTabs = tabs.filter(tab =>
+    tab.visible({ role, lifecycle, hasActions: true })
+  );
+
+  const [activeTab, setActiveTab] = useState(visibleTabs[0]?.id || 'details');
+
+  // Render tab buttons and active content
+}
+```
+
+### 6.3: Extract Content Components
+
+**From ActivityModal → Extract to:**
+- `packages/ui/src/modals/ActivityModal/OrderDetailsContent.tsx`
+- `packages/ui/src/modals/ActivityModal/OrderActionsContent.tsx`
+
+**From ReportModal → Extract to:**
+- `packages/ui/src/modals/ReportModal/ReportDetailsContent.tsx`
+- `packages/ui/src/modals/ReportModal/ReportActionsContent.tsx`
+
+**From ServiceDetailsModal → Extract to:**
+- `packages/ui/src/modals/ServiceDetailsModal/ServiceDetailsContent.tsx`
+
+**ServiceDetailsModal keeps its custom tabs** (overview, crew, products, procedures, training, notes) but adds History as a shared tab.
+
+### 6.4: Update Adapters to Build Tab Descriptors
+
+**File:** `apps/frontend/src/config/entityRegistry.tsx`
+
+```typescript
+// Order adapter
+mapToProps: (data: any, actions: EntityAction[], onClose: () => void, lifecycle: Lifecycle, role: string) => {
+  const tabs: TabDescriptor[] = [
+    {
+      id: 'details',
+      label: 'Details',
+      visible: () => true,
+      content: <OrderDetailsContent order={data} />
+    },
+    {
+      id: 'history',
+      label: 'History',
+      visible: () => true,
+      content: <HistoryTab entityType="order" entityId={data.orderId} />
+    },
+    {
+      id: 'actions',
+      label: 'Quick Actions',
+      visible: ({ hasActions, lifecycle }) =>
+        hasActions && lifecycle?.state !== 'deleted', // No actions on tombstones
+      content: <OrderActionsContent actions={actions} order={data} />
+    }
+  ];
+
+  return {
+    isOpen: !!data,
+    onClose,
+    card: <OrderCard {...cardProps} />,
+    tabs,
+    role,
+    lifecycle,
+    entityType: 'order',
+    entityId: data?.orderId
+  };
+}
+```
+
+### 6.5: RBAC Visibility Examples
+
+```typescript
+// Quick Actions tab - only visible if:
+// 1. There are actions available
+// 2. Entity is not deleted (tombstones are read-only)
+{
+  id: 'actions',
+  label: 'Quick Actions',
+  visible: ({ hasActions, lifecycle }) =>
+    hasActions && lifecycle?.state !== 'deleted'
+}
+
+// Admin-only tab example (future):
+{
+  id: 'audit',
+  label: 'Audit Log',
+  visible: ({ role }) => role === 'admin'
+}
+
+// History tab - visible to all users for all entities
+{
+  id: 'history',
+  label: 'History',
+  visible: () => true
+}
+```
+
+### 6.6: Phase 6 Tasks
+
+**Current Status:** 🚧 IN PROGRESS
+
+- [x] Document problem and solution architecture
+- [ ] Create TabDescriptor type definitions
+- [ ] Update BaseViewModal to accept and render tab descriptors
+- [ ] Extract OrderDetailsContent and OrderActionsContent from ActivityModal
+- [ ] Extract ReportDetailsContent and ReportActionsContent from ReportModal
+- [ ] Update ServiceDetailsModal to add History tab alongside custom tabs
+- [ ] Update adapters in entityRegistry to build tab descriptors
+- [ ] Remove old tab management code from ActivityModal
+- [ ] Remove old tab management code from ReportModal
+- [ ] Build UI package
+- [ ] Typecheck
+- [ ] Test tab visibility for different roles
+- [ ] Test tombstone read-only behavior (no Quick Actions)
+- [ ] Commit universal tab composition refactor
+
+**Result:** Adding a new tab = **ONE line** in adapter config. RBAC visibility built-in. Zero per-modal duplication.
+
+---
+
+## Phase 7: Comprehensive Testing
 
 ### 6.1: Entity Catalog Tests
 
