@@ -199,7 +199,7 @@ export const ENTITY_CATALOG: Record<string, EntityDefinition> = {
     supportsArchive: true,
     supportsDelete: true,
     supportsRestore: true,
-    supportsHistory: false,
+    supportsHistory: true,  // ✅ Enabled for user modal History tab
     supportsTombstone: false,
     activityTypes: {
       created: 'manager_created',
@@ -222,7 +222,7 @@ export const ENTITY_CATALOG: Record<string, EntityDefinition> = {
     supportsArchive: true,
     supportsDelete: true,
     supportsRestore: true,
-    supportsHistory: false,
+    supportsHistory: true,  // ✅ Enabled for user modal History tab
     supportsTombstone: false,
     activityTypes: {
       created: 'contractor_created',
@@ -245,7 +245,7 @@ export const ENTITY_CATALOG: Record<string, EntityDefinition> = {
     supportsArchive: true,
     supportsDelete: true,
     supportsRestore: true,
-    supportsHistory: false,
+    supportsHistory: true,  // ✅ Enabled for user modal History tab
     supportsTombstone: false,
     activityTypes: {
       created: 'customer_created',
@@ -268,7 +268,7 @@ export const ENTITY_CATALOG: Record<string, EntityDefinition> = {
     supportsArchive: true,
     supportsDelete: true,
     supportsRestore: true,
-    supportsHistory: false,
+    supportsHistory: true,  // ✅ Enabled for user modal History tab
     supportsTombstone: false,
     activityTypes: {
       created: 'center_created',
@@ -291,7 +291,7 @@ export const ENTITY_CATALOG: Record<string, EntityDefinition> = {
     supportsArchive: true,
     supportsDelete: true,
     supportsRestore: true,
-    supportsHistory: false,
+    supportsHistory: true,  // ✅ Enabled for user modal History tab
     supportsTombstone: false,
     activityTypes: {
       created: 'crew_created',
@@ -314,7 +314,7 @@ export const ENTITY_CATALOG: Record<string, EntityDefinition> = {
     supportsArchive: true,
     supportsDelete: true,
     supportsRestore: true,
-    supportsHistory: false,
+    supportsHistory: true,  // ✅ Enabled for user modal History tab
     supportsTombstone: false,
     activityTypes: {
       created: 'warehouse_created',

@@ -3,6 +3,8 @@ import styles from './BaseViewModal.module.css';
 import { ModalRoot } from '../ModalRoot';
 import { ArchivedBanner } from '../../banners/ArchivedBanner';
 import { DeletedBanner } from '../../banners/DeletedBanner';
+import { TabContainer } from '../../navigation/TabContainer';
+import { NavigationTab } from '../../navigation/NavigationTab';
 
 // Lifecycle interface (matches frontend types)
 interface Lifecycle {
@@ -42,6 +44,8 @@ export interface BaseViewModalProps {
   entityType?: string;
   /** Entity ID for banner context */
   entityId?: string;
+  /** Accent color for active tab underline (optional, defaults to blue) */
+  accentColor?: string;
 }
 
 /**
@@ -77,22 +81,23 @@ export default function BaseViewModal({
   lifecycle,
   entityType = 'entity',
   entityId,
+  accentColor = '#3b82f6',
 }: BaseViewModalProps) {
   // Universal tab state management
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
 
-  // Initialize activeTabId when tabs change
+  // Consolidated tab state effect: guards against transient empty tabs
   useEffect(() => {
-    if (tabs && tabs.length > 0) {
+    // Guard: ignore transient empty tabs array (mid-render churn)
+    if (!tabs || tabs.length === 0) return;
+
+    // Only set activeTabId if:
+    // 1. It's null (first init), OR
+    // 2. Current tab no longer exists in tabs array
+    if (!activeTabId || !tabs.some((t) => t.id === activeTabId)) {
       setActiveTabId(tabs[0].id);
     }
-  }, [tabs]);
-
-  // Ensure activeTab remains valid when tabs change
-  useEffect(() => {
-    if (tabs && activeTabId && !tabs.find((t) => t.id === activeTabId)) {
-      setActiveTabId(tabs[0]?.id || null);
-    }
+    // Otherwise: leave activeTabId unchanged (prevents snap-back glitch)
   }, [tabs, activeTabId]);
 
   if (!isOpen) return null;
@@ -138,26 +143,18 @@ export default function BaseViewModal({
 
         {/* Universal Tab Buttons (if tabs provided) */}
         {tabs && tabs.length > 0 && (
-          <div style={{ borderBottom: '1px solid #e5e7eb', display: 'flex', gap: 8, paddingLeft: 24 }}>
+          <TabContainer>
             {tabs.map((tab) => (
-              <button
+              <NavigationTab
                 key={tab.id}
+                label={tab.label}
+                isActive={activeTabId === tab.id}
                 onClick={() => setActiveTabId(tab.id)}
-                style={{
-                  padding: '8px 16px',
-                  border: 'none',
-                  borderBottom: activeTabId === tab.id ? '2px solid #3b82f6' : '2px solid transparent',
-                  background: 'none',
-                  color: activeTabId === tab.id ? '#3b82f6' : '#6b7280',
-                  fontWeight: activeTabId === tab.id ? 600 : 400,
-                  cursor: 'pointer',
-                  fontSize: '14px',
-                }}
-              >
-                {tab.label}
-              </button>
+                variant="underline"
+                activeColor={accentColor}
+              />
             ))}
-          </div>
+          </TabContainer>
         )}
 
         <div className={styles.tabContent}>

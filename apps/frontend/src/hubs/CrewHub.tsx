@@ -300,8 +300,32 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
   // Find selected order from hub data for transform-first approach
   
   // Use centralized order details hook (transform-first)
-  
-  const { activities, isLoading: activitiesLoading, error: activitiesError } = useFormattedActivities(normalizedCode, { limit: 20 });
+
+  const { activities, isLoading: activitiesLoading, error: activitiesError, mutate: mutateActivities } = useFormattedActivities(normalizedCode, { limit: 20 });
+
+  // Handle activity dismissal
+  const handleClearActivity = useCallback(async (activityId: string) => {
+    try {
+      const { dismissActivity } = await import('../shared/api/directory');
+      await dismissActivity(activityId);
+      mutateActivities();
+      console.log('[CrewHub] Activity dismissed:', activityId);
+    } catch (error) {
+      console.error('[CrewHub] Failed to dismiss activity:', error);
+    }
+  }, [mutateActivities]);
+
+  // Clear ALL activities for current user
+  const handleClearAll = useCallback(async () => {
+    try {
+      const { dismissAllActivities } = await import('../shared/api/directory');
+      const result = await dismissAllActivities();
+      mutateActivities();
+      console.log(`[CrewHub] ${result.count} activities dismissed`);
+    } catch (error) {
+      console.error('[CrewHub] Failed to clear all activities:', error);
+    }
+  }, [mutateActivities]);
 
   const overviewData = useMemo(() =>
     buildCrewOverviewData({
@@ -489,7 +513,9 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
               <ActivityFeed
                 activities={activities}
                 hub="crew"
-        onOpenActionableOrder={(order) => setActionOrder(order)}
+                onClearActivity={handleClearActivity}
+                onClearAll={handleClearAll}
+                onOpenActionableOrder={(order) => setActionOrder(order)}
                 onOpenOrderModal={(order) => setSelectedOrderId(order?.orderId || order?.id || null)}
                 onOpenServiceModal={(serviceId) => modals.openById(serviceId)}
                 isLoading={activitiesLoading}

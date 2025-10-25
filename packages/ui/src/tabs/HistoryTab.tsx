@@ -9,6 +9,7 @@
  * <HistoryTab
  *   entityType="order"
  *   entityId="PO-001"
+ *   getAuthToken={() => clerk.session.getToken()}  // Optional auth
  * />
  * ```
  */
@@ -35,6 +36,12 @@ export interface HistoryTabProps {
 
   /** Optional limit for number of events to display */
   limit?: number;
+
+  /** Optional pre-loaded events (if provided, skips API fetch) */
+  events?: LifecycleEvent[];
+
+  /** Optional function to get auth token for API calls */
+  getAuthToken?: () => Promise<string | null>;
 }
 
 /**
@@ -81,12 +88,42 @@ function formatEventType(type: string): string {
   return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
 }
 
-export function HistoryTab({ entityType, entityId, limit }: HistoryTabProps) {
-  const [events, setEvents] = useState<LifecycleEvent[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+/**
+ * Format actor display for event metadata
+ * Admin → "Admin"
+ * User with ID → "MGR-012" (uppercase)
+ * User without ID → "Manager" (title-cased role)
+ * No info → "System"
+ */
+function formatActor(actorId?: string | null, actorRole?: string | null): string {
+  const role = (actorRole || '').trim().toLowerCase();
+  const id = (actorId || '').trim();
+
+  if (role === 'admin') return 'Admin';
+  if (id) return id.toUpperCase();
+  if (role) return role.charAt(0).toUpperCase() + role.slice(1);
+  return 'System';
+}
+
+export function HistoryTab({ entityType, entityId, limit, events: providedEvents, getAuthToken }: HistoryTabProps) {
+  const [fetchedEvents, setFetchedEvents] = useState<LifecycleEvent[]>([]);
+  const [isLoading, setIsLoading] = useState(!providedEvents);
   const [error, setError] = useState<string | null>(null);
 
+  // Use provided events if available, otherwise use fetched events
+  const rawEvents = providedEvents || fetchedEvents;
+
+  // Sort events descending by timestamp (newest → oldest)
+  const events = [...rawEvents].sort((a, b) => {
+    return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+  });
+
   useEffect(() => {
+    // Skip fetch if events were provided
+    if (providedEvents) {
+      return;
+    }
+
     let cancelled = false;
 
     const fetchHistory = async () => {
@@ -95,7 +132,24 @@ export function HistoryTab({ entityType, entityId, limit }: HistoryTabProps) {
 
       try {
         const url = `/api/activity/entity/${entityType}/${entityId}${limit ? `?limit=${limit}` : ''}`;
-        const response = await fetch(url);
+
+        // Build fetch options with auth if available
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+        };
+
+        if (getAuthToken) {
+          try {
+            const token = await getAuthToken();
+            if (token) {
+              headers['Authorization'] = `Bearer ${token}`;
+            }
+          } catch (authErr) {
+            console.warn('[HistoryTab] Failed to get auth token:', authErr);
+          }
+        }
+
+        const response = await fetch(url, { headers });
 
         if (!response.ok) {
           throw new Error(`Failed to fetch history: ${response.statusText}`);
@@ -106,7 +160,7 @@ export function HistoryTab({ entityType, entityId, limit }: HistoryTabProps) {
         if (cancelled) return;
 
         if (data.success && Array.isArray(data.data)) {
-          setEvents(data.data);
+          setFetchedEvents(data.data);
         } else {
           throw new Error('Invalid response format');
         }
@@ -125,7 +179,7 @@ export function HistoryTab({ entityType, entityId, limit }: HistoryTabProps) {
     return () => {
       cancelled = true;
     };
-  }, [entityType, entityId, limit]);
+  }, [entityType, entityId, limit, providedEvents, getAuthToken]);
 
   if (isLoading) {
     return (
@@ -230,10 +284,9 @@ export function HistoryTab({ entityType, entityId, limit }: HistoryTabProps) {
 
                   {/* Event metadata */}
                   <div style={{ fontSize: '12px', color: '#6b7280', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                    {event.actor && (
+                    {(event.actor || event.actorRole) && (
                       <span>
-                        <strong>By:</strong> {event.actor}
-                        {event.actorRole && ` (${event.actorRole})`}
+                        <strong>By:</strong> {formatActor(event.actor, event.actorRole)}
                       </span>
                     )}
                     {event.reason && (

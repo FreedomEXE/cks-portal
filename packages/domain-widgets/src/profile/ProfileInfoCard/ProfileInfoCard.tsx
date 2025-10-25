@@ -37,6 +37,12 @@ export interface ProfileInfoCardProps {
   onUpdatePhoto?: () => void;
   onContactManager?: () => void;
   onScheduleMeeting?: () => void;
+  /** When true, hides the internal tab navigation */
+  hideTabs?: boolean;
+  /** Optional list of enabled internal tabs; defaults to role-based */
+  enabledTabs?: Array<'profile' | 'accountManager' | 'settings'>;
+  /** When true, removes card border and shadow */
+  borderless?: boolean;
 }
 
 export function ProfileInfoCard({
@@ -46,16 +52,20 @@ export function ProfileInfoCard({
   primaryColor,
   onUpdatePhoto,
   onContactManager,
-  onScheduleMeeting
+  onScheduleMeeting,
+  hideTabs = false,
+  enabledTabs,
+  borderless = false,
 }: ProfileInfoCardProps) {
   const [activeTab, setActiveTab] = useState('profile');
 
   // Manager and Warehouse roles have only Profile and Settings tabs
   // All other roles have Profile, Account Manager, and Settings tabs
   const hasNoAccountManager = role === 'manager' || role === 'warehouse';
-  const tabs = hasNoAccountManager
-    ? ['profile', 'settings']
-    : ['profile', 'accountManager', 'settings'];
+  const defaultTabs = hasNoAccountManager
+    ? (['profile', 'settings'] as Array<'profile' | 'settings'>)
+    : (['profile', 'accountManager', 'settings'] as Array<'profile' | 'accountManager' | 'settings'>);
+  const tabs = (enabledTabs && enabledTabs.length ? enabledTabs : defaultTabs) as string[];
 
   const getTabLabel = (tab: string) => {
     switch (tab) {
@@ -102,30 +112,35 @@ export function ProfileInfoCard({
   return (
     <div>
 
-      {/* Tabs - Outside the card */}
-      <div style={{ marginBottom: 24 }}>
-        <TabContainer variant="pills" spacing="normal">
-          {tabs.map((tab) => (
-            <NavigationTab
-              key={tab}
-              label={getTabLabel(tab)}
-              isActive={activeTab === tab}
-              onClick={() => setActiveTab(tab)}
-              variant="pills"
-              activeColor={primaryColor}
-            />
-          ))}
-        </TabContainer>
-      </div>
+      {/* Tabs - Outside the card (optional) */}
+      {!hideTabs && (
+        <div style={{ marginBottom: 24 }}>
+          <TabContainer variant="pills" spacing="normal">
+            {tabs.map((tab) => (
+              <NavigationTab
+                key={tab}
+                label={getTabLabel(tab)}
+                isActive={activeTab === tab}
+                onClick={() => setActiveTab(tab)}
+                variant="pills"
+                activeColor={primaryColor}
+              />
+            ))}
+          </TabContainer>
+        </div>
+      )}
 
       {/* Card Content */}
-      <div className="ui-card" style={{
-        backgroundColor: '#ffffff',
-        borderRadius: '8px',
-        border: '1px solid #e5e7eb',
-        padding: 24,
-        boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)'
-      }}>
+      <div
+        className={borderless ? undefined : 'ui-card'}
+        style={{
+          backgroundColor: '#ffffff',
+          borderRadius: '8px',
+          border: borderless ? 'none' : '1px solid #e5e7eb',
+          padding: 24,
+          boxShadow: borderless ? 'none' : '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)'
+        }}
+      >
         {renderTabContent()}
       </div>
     </div>

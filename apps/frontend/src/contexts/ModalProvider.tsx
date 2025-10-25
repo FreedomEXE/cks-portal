@@ -9,6 +9,7 @@ import React, { createContext, useContext, useState, useCallback, ReactNode } fr
 import ModalGateway from '../components/ModalGateway';
 import type { EntityType, UserRole, OpenEntityModalOptions } from '../types/entities';
 import { parseEntityId, isValidId } from '../shared/utils/parseEntityId';
+import { apiFetch } from '../shared/api/client';
 
 export interface ModalContextValue {
   /**
@@ -64,7 +65,7 @@ export function ModalProvider({
 
   // ID-first open function - automatic type detection
   const openById = useCallback(
-    (id: string, options?: OpenEntityModalOptions) => {
+    async (id: string, options?: OpenEntityModalOptions) => {
       // Validate ID format
       if (!isValidId(id)) {
         console.error(`[ModalProvider] Invalid ID format: "${id}"`);
@@ -82,13 +83,53 @@ export function ModalProvider({
 
       // For orders, always use 'order' type (subtype is just metadata: product/service)
       // For reports, use subtype ('feedback' vs 'report')
+      // For users, fetch from backend and use subtype (manager/contractor/etc.)
       // Everything else uses type
-      const entityType = (type === 'order' ? type : (subtype || type)) as EntityType;
+      let entityType: EntityType;
+      let enrichedOptions = options;
+
+      if (type === 'user' && subtype) {
+        // User entities: fetch fresh from database
+        entityType = subtype as EntityType;
+
+        console.log(`[ModalProvider] Fetching ${entityType} profile for ID: ${id}`);
+
+        try {
+          const response = await apiFetch<{
+            data: any;
+            state: 'active' | 'archived' | 'deleted';
+            deletedAt?: string;
+            deletedBy?: string;
+            archivedAt?: string;
+            archivedBy?: string;
+          }>(
+            `/profile/${entityType}/${id}`
+          );
+
+          console.log(`[ModalProvider] Fetched ${entityType} data:`, response);
+
+          // Pass fetched data via options with lifecycle metadata
+          enrichedOptions = {
+            ...options,
+            data: response.data,
+            state: response.state,
+            deletedAt: response.deletedAt,
+            deletedBy: response.deletedBy,
+            archivedAt: response.archivedAt,
+            archivedBy: response.archivedBy,
+          } as any;
+        } catch (error) {
+          console.error(`[ModalProvider] Failed to fetch ${entityType} ${id}:`, error);
+          // Continue with modal open - ModalGateway will show error state
+        }
+      } else {
+        entityType = (type === 'order' ? type : (subtype || type)) as EntityType;
+      }
 
       console.log(`[ModalProvider] Opening ${entityType} modal for ID: ${id}`);
 
       // Delegate to openEntityModal
-      openEntityModal(entityType, id, options);
+      openEntityModal(entityType, id, enrichedOptions);
     },
     [openEntityModal]
   );

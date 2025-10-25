@@ -59,6 +59,7 @@ export type TabId =
   | 'details'
   | 'history'
   | 'actions'
+  | 'profile'
   | 'participants'
   | 'crew'
   | 'products'

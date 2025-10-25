@@ -91,6 +91,9 @@ export { default as ServiceOrderModal } from './modals/ServiceOrderModal/Service
 export { default as UserModal } from './modals/UserModal';
 export type { UserModalProps, User } from './modals/UserModal';
 
+export { default as UserQuickActions } from './modals/UserModal/UserQuickActions';
+export type { UserQuickActionsProps } from './modals/UserModal/UserQuickActions';
+
 export * from './modals/BaseViewModal';
 export { default as BaseViewModal } from './modals/BaseViewModal';
 
@@ -138,6 +141,10 @@ export type { ReportQuickActionsProps } from './modals/ReportModal/components/Re
 // Components
 export * from './components/EntityHeader';
 export { default as EntityHeader } from './components/EntityHeader';
+
+// Modal Components
+export * from './modals/EntityHeaderCard';
+export { default as EntityHeaderCard } from './modals/EntityHeaderCard';
 
 // Sections (Detail primitives)
 export * from './sections';

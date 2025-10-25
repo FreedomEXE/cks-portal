@@ -248,8 +248,6 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
   // merged assign flow into CatalogServiceModal
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [selectedOrderForEdit, setSelectedOrderForEdit] = useState<HubOrderItem | null>(null);
-  const [selectedUser, setSelectedUser] = useState<Record<string, any> | null>(null);
-  const [showUserModal, setShowUserModal] = useState(false);
   const logout = useLogout();
   const { mutate } = useSWRConfig();
 
@@ -291,6 +289,7 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
     }
     setActivityFeed(activityItems);
   }, [activityItems]);
+
 
   // Find selected order for modal (no pre-enrichment needed - hook handles it)
   const selectedOrder = useMemo(() => {
@@ -506,6 +505,9 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
         // Also refresh the archive list
         mutate('/admin/archive/list');
 
+        // Refresh the activity feed (Recent Activity section)
+        mutate('/admin/directory/activities');
+
         // Show success message
         const message = `${entityType} ${entityId} has been archived.` +
           (result.unassignedChildren ? `${result.unassignedChildren} children were moved to unassigned.` : '');
@@ -522,31 +524,7 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
     [handleModalClose, directoryTab, servicesSubTab, ordersSubTab, reportsSubTab, mutate],
   );
 
-  // User action handlers
-  const handleUserInvite = useCallback(() => {
-    console.log('Send Invite clicked for:', selectedUser);
-    // TODO: Implement invite logic
-  }, [selectedUser]);
-
-  const handleUserEdit = useCallback(() => {
-    console.log('Edit User Profile clicked for:', selectedUser);
-    // TODO: Implement edit logic
-  }, [selectedUser]);
-
-  const handleUserPause = useCallback(() => {
-    console.log('Pause Account clicked for:', selectedUser);
-    // TODO: Implement pause logic
-  }, [selectedUser]);
-
-  const userActions: UserAction[] = useMemo(() => {
-    if (!selectedUser) return [];
-    return [
-      { label: 'Invite', variant: 'primary', onClick: handleUserInvite },
-      { label: 'Edit', variant: 'secondary', onClick: handleUserEdit },
-      { label: 'Pause', variant: 'secondary', onClick: handleUserPause },
-      { label: 'Delete', variant: 'danger', onClick: () => handleDelete(selectedUser) },
-    ];
-  }, [selectedUser, handleUserInvite, handleUserEdit, handleUserPause, handleDelete]);
+  // User actions are now handled by the universal modal system via entity registry
 
   const overviewData = useMemo(() =>
     buildAdminOverviewData({
@@ -847,9 +825,9 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
       data: adminRows,
       emptyMessage: 'No admin users found yet.',
       onRowClick: (row: any) => {
-        // Open UserModal for admins (consistent with other user types)
-        setSelectedUser({ id: row.code, role: 'admin' });
-        setShowUserModal(true);
+        // Open admin user modal via universal modal system
+        // Admins don't have a specific adapter yet, so skip for now
+        console.log('[AdminHub] Admin user modals not yet migrated:', row.code);
       },
     },
     managers: {
@@ -1304,6 +1282,8 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
       // Resolve the full directory object so fields like reportsTo
       // (not included in table rows) are available in the modal
       let full: any = row;
+      let entityType = directoryTabToRole(directoryTab);
+
       try {
         if (directoryTab === 'managers') {
           const found = (managers || []).find((m) => m.id === row.id);
@@ -1326,8 +1306,11 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
         }
       } catch {}
 
-      setSelectedUser(full);
-      setShowUserModal(true);
+      // Open via universal modal system with pre-loaded data
+      modals.openEntityModal(entityType, row.id, {
+        data: full,
+        context: { source: 'directory' }
+      });
     } : undefined);
 
     return (
@@ -1343,11 +1326,42 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
     );
   };
 
-  // Clear individual activity
-  const handleClearActivity = (activityId: string) => {
-    console.log('[AdminHub] Clearing activity:', activityId, '(UI only - no backend)');
-    setActivityFeed((prev) => prev.filter((a) => a.id !== activityId));
-  };
+  // Clear individual activity (CTO-corrected: calls backend + invalidates cache)
+  const handleClearActivity = useCallback(async (activityId: string) => {
+    try {
+      const { dismissActivity } = await import('../shared/api/directory');
+      await dismissActivity(activityId);
+
+      // Immediately remove from local state for instant feedback
+      setActivityFeed((prev) => prev.filter((a) => a.id !== activityId));
+
+      // Invalidate cache to ensure fresh data on next load
+      mutate('/admin/directory/activities');
+
+      console.log('[AdminHub] Activity dismissed:', activityId);
+    } catch (error) {
+      console.error('[AdminHub] Failed to dismiss activity:', error);
+      // TODO: Show error toast to user
+    }
+  }, [mutate]);
+
+  // Clear ALL activities for current user
+  const handleClearAll = useCallback(async () => {
+    try {
+      const { dismissAllActivities } = await import('../shared/api/directory');
+      const result = await dismissAllActivities();
+
+      // Clear local state immediately
+      setActivityFeed([]);
+
+      // Invalidate cache
+      mutate('/admin/directory/activities');
+
+      console.log(`[AdminHub] ${result.count} activities dismissed`);
+    } catch (error) {
+      console.error('[AdminHub] Failed to clear all activities:', error);
+    }
+  }, [mutate]);
 
   const handleOrderActions = useCallback((data: { entity: any; state: string; deletedAt?: string; deletedBy?: string }) => {
     const { entity, state } = data;
@@ -1410,6 +1424,7 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
                 activities={activityFeed}
                 hub="admin"
                 onClearActivity={handleClearActivity}
+                onClearAll={handleClearAll}
                 onOpenOrderModal={(order) => setSelectedOrderId(order?.orderId || order?.id || null)}
                 onOpenServiceModal={setSelectedServiceCatalog}
                 isLoading={activitiesLoading}
@@ -1458,6 +1473,9 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
         }}
         onViewReportDetails={(reportId: string) => {
           modals.openById(reportId, { state: 'archived' });
+        }}
+        onViewUserDetails={(userId: string, userType) => {
+          modals.openEntityModal(userType, userId, { state: 'archived' });
         }}
       />
           ) : activeTab === 'support' ? (
@@ -2067,31 +2085,7 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
         }}
       />
 
-      <UserModal
-        isOpen={showUserModal}
-        onClose={() => {
-          setShowUserModal(false);
-          setSelectedUser(null);
-        }}
-        user={selectedUser ? {
-          id: selectedUser.id,
-          name: selectedUser.name,
-          status: selectedUser.status,
-          role: directoryTabToRole(directoryTab),
-        } : null}
-        actions={userActions}
-        profileData={selectedUser ? (() => {
-          const role = directoryTabToRole(directoryTab) as DirectoryRole;
-          const mapped = mapProfileDataForRole(role, selectedUser);
-          return (
-            <ProfileTab
-              role={role}
-              profileData={mapped}
-              primaryColor="#6366f1"
-            />
-          );
-        })() : null}
-      />
+      {/* User modals now handled by universal modal system via ModalProvider */}
     </div>
   );
 

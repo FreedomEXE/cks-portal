@@ -375,6 +375,7 @@ async function getManagerActivities(cksCode: string): Promise<HubRoleActivitiesP
        OR
        -- Show other activity types (orders, services, etc.) for ecosystem
        -- SAFE: Only if target is in ecosystem OR actor is self OR metadata references self
+       -- EXCLUDE user creations (only show self-creation above, not ecosystem creations)
        (
          activity_type NOT IN ('manager_created', 'contractor_created', 'customer_created', 'center_created', 'crew_created', 'warehouse_created')
          AND activity_type NOT LIKE '%assigned%'
@@ -386,6 +387,10 @@ async function getManagerActivities(cksCode: string): Promise<HubRoleActivitiesP
          OR (metadata ? 'managerId' AND UPPER(metadata->>'managerId') = $2)
          OR (metadata ? 'cksManager' AND UPPER(metadata->>'cksManager') = $2)
        )
+     )
+     AND NOT EXISTS (
+       SELECT 1 FROM activity_dismissals ad
+       WHERE ad.activity_id = system_activity.activity_id AND ad.user_id = $2
      )
      ORDER BY created_at DESC
      LIMIT 50`,
@@ -1007,6 +1012,7 @@ async function getContractorActivities(cksCode: string): Promise<HubRoleActiviti
        OR
        -- Show other activity types (orders, services, etc.) for ecosystem
        -- SAFE: Only if target is in ecosystem OR actor is self OR metadata references self
+       -- EXCLUDE user creations (only show self-creation above, not ecosystem creations)
        (
          activity_type NOT IN ('manager_created', 'contractor_created', 'customer_created', 'center_created', 'crew_created', 'warehouse_created')
          AND activity_type NOT LIKE '%assigned%'
@@ -1017,6 +1023,10 @@ async function getContractorActivities(cksCode: string): Promise<HubRoleActiviti
          OR (actor_id IS NOT NULL AND UPPER(actor_id) = $2)
          OR (metadata ? 'contractorId' AND UPPER(metadata->>'contractorId') = $2)
        )
+     )
+     AND NOT EXISTS (
+       SELECT 1 FROM activity_dismissals ad
+       WHERE ad.activity_id = system_activity.activity_id AND ad.user_id = $2
      )
      ORDER BY created_at DESC
      LIMIT 50`,
@@ -1086,6 +1096,7 @@ async function getCustomerActivities(cksCode: string): Promise<HubRoleActivities
        OR
        -- Show other activity types (orders, services, etc.) for ecosystem
        -- SAFE: Only if target is in ecosystem OR actor is self OR metadata references self
+       -- EXCLUDE user creations (only show self-creation above, not ecosystem creations)
        (
          activity_type NOT IN ('manager_created', 'contractor_created', 'customer_created', 'center_created', 'crew_created', 'warehouse_created')
          AND activity_type NOT LIKE '%assigned%'
@@ -1096,6 +1107,10 @@ async function getCustomerActivities(cksCode: string): Promise<HubRoleActivities
          OR (actor_id IS NOT NULL AND UPPER(actor_id) = $2)
          OR (metadata ? 'customerId' AND UPPER(metadata->>'customerId') = $2)
        )
+     )
+     AND NOT EXISTS (
+       SELECT 1 FROM activity_dismissals ad
+       WHERE ad.activity_id = system_activity.activity_id AND ad.user_id = $2
      )
      ORDER BY created_at DESC
      LIMIT 50`,
@@ -1158,6 +1173,7 @@ async function getCenterActivities(cksCode: string): Promise<HubRoleActivitiesPa
        OR
        -- Show other activity types (orders, services, etc.) for ecosystem
        -- SAFE: Only if target is in ecosystem OR actor is self OR metadata references self
+       -- EXCLUDE user creations (only show self-creation above, not ecosystem creations)
        (
          activity_type NOT IN ('manager_created', 'contractor_created', 'customer_created', 'center_created', 'crew_created', 'warehouse_created')
          AND activity_type NOT LIKE '%assigned%'
@@ -1168,6 +1184,10 @@ async function getCenterActivities(cksCode: string): Promise<HubRoleActivitiesPa
          OR (actor_id IS NOT NULL AND UPPER(actor_id) = $2)
          OR (metadata ? 'centerId' AND UPPER(metadata->>'centerId') = $2)
        )
+     )
+     AND NOT EXISTS (
+       SELECT 1 FROM activity_dismissals ad
+       WHERE ad.activity_id = system_activity.activity_id AND ad.user_id = $2
      )
      ORDER BY created_at DESC
      LIMIT 50`,
@@ -1223,8 +1243,12 @@ async function getCrewActivities(cksCode: string): Promise<HubRoleActivitiesPayl
        -- Show assignments where YOU are being assigned (target is self)
        (activity_type LIKE '%_assigned%' AND UPPER(target_id) = $2)
        OR
+       -- Show assignments where you are assigned to a center (crew is in metadata)
+       (activity_type = 'crew_assigned_to_center' AND metadata ? 'crewId' AND UPPER(metadata->>'crewId') = $2)
+       OR
        -- Show other activity types (orders, services, etc.) for ecosystem
        -- SAFE: Only if target is in ecosystem OR actor is self OR metadata references self
+       -- EXCLUDE user creations (only show self-creation above, not ecosystem creations)
        (
          activity_type NOT IN ('manager_created', 'contractor_created', 'customer_created', 'center_created', 'crew_created', 'warehouse_created')
          AND activity_type NOT LIKE '%assigned%'
@@ -1235,6 +1259,10 @@ async function getCrewActivities(cksCode: string): Promise<HubRoleActivitiesPayl
          OR (actor_id IS NOT NULL AND UPPER(actor_id) = $2)
          OR (metadata ? 'crewId' AND UPPER(metadata->>'crewId') = $2)
        )
+     )
+     AND NOT EXISTS (
+       SELECT 1 FROM activity_dismissals ad
+       WHERE ad.activity_id = system_activity.activity_id AND ad.user_id = $2
      )
      ORDER BY created_at DESC
      LIMIT 50`,
@@ -1297,6 +1325,7 @@ async function getWarehouseActivities(cksCode: string): Promise<HubRoleActivitie
        OR
        -- Show other activity types (orders, services, etc.) for ecosystem
        -- SAFE: Only if target is in ecosystem OR actor is self OR metadata references self
+       -- EXCLUDE user creations (only show self-creation above, not ecosystem creations)
        (
          activity_type NOT IN ('manager_created', 'contractor_created', 'customer_created', 'center_created', 'crew_created', 'warehouse_created')
          AND activity_type NOT LIKE '%assigned%'
@@ -1307,6 +1336,10 @@ async function getWarehouseActivities(cksCode: string): Promise<HubRoleActivitie
          OR (actor_id IS NOT NULL AND UPPER(actor_id) = $2)
          OR (metadata ? 'warehouseId' AND UPPER(metadata->>'warehouseId') = $2)
        )
+     )
+     AND NOT EXISTS (
+       SELECT 1 FROM activity_dismissals ad
+       WHERE ad.activity_id = system_activity.activity_id AND ad.user_id = $2
      )
      ORDER BY created_at DESC
      LIMIT 50`,

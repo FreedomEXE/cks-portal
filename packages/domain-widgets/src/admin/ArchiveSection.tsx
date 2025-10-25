@@ -30,6 +30,7 @@ export interface ArchiveSectionProps {
   onViewOrderDetails?: (orderId: string, orderType: 'product' | 'service') => void;
   onViewServiceDetails?: (serviceId: string) => void;
   onViewReportDetails?: (reportId: string, reportType: 'report' | 'feedback') => void;
+  onViewUserDetails?: (userId: string, userType: 'manager' | 'contractor' | 'customer' | 'center' | 'crew' | 'warehouse') => void;
 }
 
 const ARCHIVE_TABS = [
@@ -95,6 +96,7 @@ export default function ArchiveSection({
   onViewOrderDetails,
   onViewServiceDetails,
   onViewReportDetails,
+  onViewUserDetails,
 }: ArchiveSectionProps) {
   console.log('[ArchiveSection] Component rendering with archiveAPI:', !!archiveAPI);
   console.log('[ArchiveSection] archiveAPI methods:', archiveAPI ? Object.getOwnPropertyNames(Object.getPrototypeOf(archiveAPI)) : 'No API');
@@ -473,7 +475,14 @@ export default function ArchiveSection({
               return;
             }
 
-            // Default: open action modal
+            // For user entities: open user modal via universal system if provided
+            const userEntityTypes = ['manager', 'contractor', 'customer', 'center', 'crew', 'warehouse'];
+            if (userEntityTypes.includes(effectiveTab) && onViewUserDetails) {
+              onViewUserDetails(row.id, effectiveTab as any);
+              return;
+            }
+
+            // Default: open action modal (for legacy support or product entities)
             const entity = archivedData.find((e) => e.id === row.id);
             if (entity) handleView(entity);
           }}

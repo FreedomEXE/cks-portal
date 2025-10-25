@@ -549,10 +549,34 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
   const { data: profileData } = useHubProfile(managerCode);
   const { data: dashboardData } = useHubDashboard(managerCode);
   const { data: scopeData } = useHubRoleScope(managerCode);
-  const { activities: formattedActivities, isLoading: activitiesLoading, error: activitiesError } = useFormattedActivities(managerCode, { limit: 20 });
+  const { activities: formattedActivities, isLoading: activitiesLoading, error: activitiesError, mutate: mutateActivities } = useFormattedActivities(managerCode, { limit: 20 });
 
   const { data: ordersData } = useHubOrders(managerCode);
   const { mutate } = useSWRConfig();
+
+  // Handle activity dismissal
+  const handleClearActivity = useCallback(async (activityId: string) => {
+    try {
+      const { dismissActivity } = await import('../shared/api/directory');
+      await dismissActivity(activityId);
+      mutateActivities(); // Refresh activities
+      console.log('[ManagerHub] Activity dismissed:', activityId);
+    } catch (error) {
+      console.error('[ManagerHub] Failed to dismiss activity:', error);
+    }
+  }, [mutateActivities]);
+
+  // Clear ALL activities for current user
+  const handleClearAll = useCallback(async () => {
+    try {
+      const { dismissAllActivities } = await import('../shared/api/directory');
+      const result = await dismissAllActivities();
+      mutateActivities();
+      console.log(`[ManagerHub] ${result.count} activities dismissed`);
+    } catch (error) {
+      console.error('[ManagerHub] Failed to clear all activities:', error);
+    }
+  }, [mutateActivities]);
 
   // Signal when critical data is loaded (but only if NOT showing new order)
   useEffect(() => {
@@ -1008,6 +1032,8 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
               <ActivityFeed
                 activities={formattedActivities}
                 hub="manager"
+                onClearActivity={handleClearActivity}
+                onClearAll={handleClearAll}
                 onOpenActionableOrder={(order) => setActionOrder(order)}
                 onOpenOrderModal={(order) => setSelectedOrderId(order?.orderId || order?.id || null)}
                 isLoading={activitiesLoading}

@@ -35,10 +35,13 @@ import {
   HistoryTab,
   OrderActionsContent,
   ReportQuickActions,
+  UserModal,
+  UserQuickActions,
 } from '@cks/ui';
 import type { ActivityModalProps } from '@cks/ui';
-import { DetailsComposer } from '@cks/domain-widgets';
+import { DetailsComposer, ProfileInfoCard, getEntityAccentColor } from '@cks/domain-widgets';
 import { filterVisibleSections } from '../policies/sections';
+import { mapProfileDataForRole } from '../shared/utils/profileMapping';
 
 /**
  * Order Details Sections Builder
@@ -942,6 +945,303 @@ const serviceAdapter: EntityAdapter = {
 };
 
 /**
+ * User Details Sections Builder
+ */
+function buildUserDetailsSections(context: TabVisibilityContext): import('@cks/ui').SectionDescriptor[] {
+  const { entityData, entityType } = context;
+  const sections: import('@cks/ui').SectionDescriptor[] = [];
+
+  // Map entity type to user role
+  const roleMap: Record<string, string> = {
+    manager: 'manager',
+    contractor: 'contractor',
+    customer: 'customer',
+    center: 'center',
+    crew: 'crew',
+    warehouse: 'warehouse',
+  };
+  const userRole = roleMap[entityType] || entityType;
+
+  // Map raw entity data to profile format
+  const profileData = mapProfileDataForRole(userRole as any, entityData);
+
+  // Contact Information section
+  const contactFields: Array<{ label: string; value: string }> = [];
+
+  if (profileData.fullName || profileData.name) {
+    contactFields.push({ label: 'Full Name', value: profileData.fullName || profileData.name || '—' });
+  }
+
+  if (profileData.managerId || profileData.contractorId || profileData.customerId || profileData.centerId || profileData.crewId || profileData.warehouseId) {
+    const idValue = profileData.managerId || profileData.contractorId || profileData.customerId || profileData.centerId || profileData.crewId || profileData.warehouseId;
+    contactFields.push({ label: `${userRole.charAt(0).toUpperCase() + userRole.slice(1)} ID`, value: idValue || '—' });
+  }
+
+  if (profileData.address) {
+    contactFields.push({ label: 'Address', value: profileData.address });
+  }
+
+  if (profileData.phone) {
+    contactFields.push({ label: 'Phone', value: profileData.phone });
+  }
+
+  if (profileData.email) {
+    contactFields.push({ label: 'Email', value: profileData.email });
+  }
+
+  if (profileData.website) {
+    contactFields.push({ label: 'Website', value: profileData.website });
+  }
+
+  if (profileData.mainContact) {
+    contactFields.push({ label: 'Main Contact', value: profileData.mainContact });
+  }
+
+  if (profileData.emergencyContact) {
+    contactFields.push({ label: 'Emergency Contact', value: profileData.emergencyContact });
+  }
+
+  sections.push({
+    id: 'contact-info',
+    type: 'key-value-grid',
+    title: 'Contact Information',
+    columns: 2,
+    fields: contactFields,
+  });
+
+  // Role & Organization section (for managers)
+  if (userRole === 'manager' && (profileData.territory || profileData.role || profileData.reportsTo)) {
+    const roleFields: Array<{ label: string; value: string }> = [];
+
+    if (profileData.territory) {
+      roleFields.push({ label: 'Territory', value: profileData.territory });
+    }
+
+    if (profileData.role) {
+      roleFields.push({ label: 'Role', value: profileData.role });
+    }
+
+    if (profileData.reportsTo) {
+      roleFields.push({ label: 'Reports To', value: profileData.reportsTo });
+    }
+
+    if (roleFields.length > 0) {
+      sections.push({
+        id: 'role-organization',
+        type: 'key-value-grid',
+        title: 'Role & Organization',
+        columns: 2,
+        fields: roleFields,
+      });
+    }
+  }
+
+  // Start Date section
+  if (profileData.startDate) {
+    sections.push({
+      id: 'timeline',
+      type: 'key-value-grid',
+      title: 'Timeline',
+      columns: 2,
+      fields: [{ label: 'Start Date', value: profileData.startDate }],
+    });
+  }
+
+  return sections;
+}
+
+/**
+ * User Quick Actions Content Component
+ */
+function UserQuickActionsContent({ actions }: { actions: EntityAction[] }) {
+  return <UserQuickActions actions={actions} />;
+}
+
+/**
+ * User Adapter (for manager, contractor, customer, center, crew, warehouse)
+ */
+const userAdapter: EntityAdapter = {
+  getActionDescriptors: (context: EntityActionContext): EntityActionDescriptor[] => {
+    const { role, state, entityData } = context;
+    const descriptors: EntityActionDescriptor[] = [];
+
+    // Admin actions only
+    if (role === 'admin') {
+      if (state === 'active') {
+        // Invite action
+        descriptors.push({
+          key: 'invite',
+          label: 'Invite',
+          variant: 'primary',
+          closeOnSuccess: false,
+        });
+
+        // Edit action
+        descriptors.push({
+          key: 'edit',
+          label: 'Edit',
+          variant: 'secondary',
+          closeOnSuccess: false,
+        });
+
+        // Pause action
+        descriptors.push({
+          key: 'pause',
+          label: 'Pause',
+          variant: 'secondary',
+          confirm: 'Are you sure you want to pause this account?',
+          closeOnSuccess: false,
+        });
+
+        // Archive action
+        if (can(context.entityType, 'archive', role, { state, entityData })) {
+          descriptors.push({
+            key: 'archive',
+            label: 'Archive',
+            variant: 'secondary',
+            prompt: 'Optional: Provide a reason for archiving this user',
+            closeOnSuccess: true,
+          });
+        }
+      } else if (state === 'archived') {
+        if (can(context.entityType, 'restore', role, { state, entityData })) {
+          descriptors.push({
+            key: 'restore',
+            label: 'Restore',
+            variant: 'secondary',
+            closeOnSuccess: true,
+          });
+        }
+        if (can(context.entityType, 'delete', role, { state, entityData })) {
+          descriptors.push({
+            key: 'delete',
+            label: 'Permanently Delete',
+            variant: 'danger',
+            confirm: 'Are you sure you want to PERMANENTLY delete this user? This cannot be undone.',
+            prompt: 'Provide a deletion reason (optional):',
+            closeOnSuccess: true,
+          });
+        }
+      }
+    }
+
+    return descriptors;
+  },
+
+  getHeaderConfig: (context: TabVisibilityContext): HeaderConfig => {
+    const { entityData, entityType } = context;
+
+    // Map entity type to user role
+    const roleMap: Record<string, string> = {
+      manager: 'Manager',
+      contractor: 'Contractor',
+      customer: 'Customer',
+      center: 'Center',
+      crew: 'Crew',
+      warehouse: 'Warehouse',
+    };
+    const displayRole = roleMap[entityType] || entityType;
+
+    const profileData = mapProfileDataForRole(entityType as any, entityData);
+
+    const fields: HeaderField[] = [];
+
+    // Add role-specific ID
+    const userId = profileData.managerId || profileData.contractorId || profileData.customerId ||
+                   profileData.centerId || profileData.crewId || profileData.warehouseId ||
+                   entityData?.id || '';
+
+    // Add name field (used by EntityHeaderCard)
+    if (profileData.fullName || profileData.name) {
+      fields.push({ label: 'Name', value: profileData.fullName || profileData.name || '' });
+    }
+
+    return {
+      id: userId,
+      type: displayRole,
+      status: context.lifecycle?.state || 'active',
+      fields,
+    };
+  },
+
+  getDetailsSections: buildUserDetailsSections,
+
+  getTabDescriptors: (context: TabVisibilityContext, actions: EntityAction[]): TabDescriptor[] => {
+    const { entityData, entityType } = context;
+
+    // Get profile data for Profile tab
+    const profileData = mapProfileDataForRole(entityType as any, entityData);
+
+    // Get accent color for this entity type (centralized)
+    const accentColor = getEntityAccentColor(entityType);
+
+    // Get user ID for History tab fetch
+    const userId = profileData.managerId || profileData.contractorId || profileData.customerId ||
+                   profileData.centerId || profileData.crewId || profileData.warehouseId ||
+                   entityData?.id || '';
+
+    // Build tab descriptors (final order): Profile, Quick Actions, History
+    const tabs: TabDescriptor[] = [
+      {
+        id: 'profile',
+        label: 'Profile',
+        content: (
+          <ProfileInfoCard
+            role={entityType as any}
+            profileData={profileData}
+            accountManager={null}
+            primaryColor={accentColor}
+            hideTabs
+            borderless
+            enabledTabs={['profile']}
+          />
+        ),
+      },
+      {
+        id: 'actions',
+        label: 'Quick Actions',
+        content: (
+          <UserQuickActionsContent actions={actions} />
+        ),
+      },
+      {
+        id: 'history',
+        label: 'History',
+        content: (
+          <HistoryTab
+            entityId={userId}
+            entityType={entityType}
+          />
+        ),
+      },
+    ];
+
+    return tabs;
+  },
+
+  // LEGACY: Deprecated, kept for backward compatibility
+  Component: UserModal,
+
+  mapToProps: (data: any, actions: EntityAction[], onClose: () => void, lifecycle: Lifecycle) => {
+    return {
+      isOpen: !!data,
+      onClose,
+      user: {
+        id: data?.id,
+        name: data?.name || data?.fullName,
+        status: data?.status,
+        role: data?.role,
+      },
+      actions,
+      profileData: data,
+      lifecycle,
+      entityType: data?.entityType || 'manager',
+      entityId: data?.id,
+    };
+  },
+};
+
+/**
  * Entity Registry - Add new entity types here
  */
 export const entityRegistry: EntityRegistry = {
@@ -949,4 +1249,10 @@ export const entityRegistry: EntityRegistry = {
   report: reportAdapter,
   feedback: reportAdapter, // Feedback uses same adapter as report
   service: serviceAdapter,
+  manager: userAdapter,
+  contractor: userAdapter,
+  customer: userAdapter,
+  center: userAdapter,
+  crew: userAdapter,
+  warehouse: userAdapter,
 };

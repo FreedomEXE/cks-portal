@@ -53,7 +53,17 @@ export async function registerDirectoryRoutes(server: FastifyInstance) {
     const limit = queryResult.data.limit;
 
     try {
-      const items = await listDirectoryResource(resource, limit);
+      // Pass userId for activities to enable per-user filtering (CTO requirement)
+      const items = resource === 'activities'
+        ? await listDirectoryResource('activities', limit, admin.cksCode)
+        : await listDirectoryResource(resource, limit);
+
+      // DEBUG: Log what user code we're using
+      if (resource === 'activities') {
+        console.log('[directory] Fetching activities for user:', admin.cksCode);
+        console.log('[directory] Found items:', items.length);
+      }
+
       const schema = directoryResourceSchemas[resource];
       const payload = schema.array().parse(items);
       reply.send({ data: payload });

@@ -30,6 +30,7 @@ export interface ActivityFeedProps {
   isLoading?: boolean;
   error?: Error | null;
   onClearActivity?: (activityId: string) => void;
+  onClearAll?: () => void;
   onOpenOrderActions?: (data: { entity: any; state: string; deletedAt?: string; deletedBy?: string }) => void;
   onOpenOrderModal?: (order: any) => void;
   onOpenServiceModal?: (service: any) => void;
@@ -47,6 +48,7 @@ export function ActivityFeed({
   isLoading = false,
   error = null,
   onClearActivity,
+  onClearAll,
   onOpenOrderActions,
   onOpenOrderModal,
   onOpenServiceModal,
@@ -163,6 +165,18 @@ export function ActivityFeed({
         return;
       }
 
+      // Handle user activities (manager, contractor, customer, center, crew, warehouse)
+      const userTypes = ['manager', 'contractor', 'customer', 'center', 'crew', 'warehouse'];
+      if (userTypes.includes(targetType)) {
+        console.log('[ActivityFeed] Opening user modal via openById():', { targetType, targetId });
+        // openById() will:
+        // 1. Parse ID to get concrete type (MGR-012 → manager)
+        // 2. Fetch fresh from /api/profile/manager/MGR-012
+        // 3. Pass data to modal (no stale directory cache!)
+        modals.openById(targetId);
+        return;
+      }
+
       // Handle other entity types (future implementation)
       console.warn('[ActivityFeed] Unsupported entity type:', targetType);
       onError?.(`Cannot open ${targetType} entities yet`);
@@ -189,6 +203,7 @@ export function ActivityFeed({
       activities={activitiesWithHandlers}
       isLoading={isLoading}
       error={error}
+      onClearAll={onClearAll}
       emptyMessage={
         error
           ? 'Failed to load activity feed.'

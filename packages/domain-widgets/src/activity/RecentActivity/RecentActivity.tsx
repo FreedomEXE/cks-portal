@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { ActivityItem } from './ActivityItem';
 import { Button } from '@cks/ui';
 
@@ -25,6 +25,7 @@ interface RecentActivityProps {
   emptyMessage?: string;
   isLoading?: boolean;
   error?: Error | null;
+  onClearAll?: () => void;
 }
 
 export function RecentActivity({
@@ -34,6 +35,7 @@ export function RecentActivity({
   emptyMessage = 'No recent activity',
   isLoading = false,
   error = null,
+  onClearAll,
 }: RecentActivityProps) {
   // Filter state
   const [typeFilter, setTypeFilter] = useState<string>('all');
@@ -41,6 +43,28 @@ export function RecentActivity({
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isFilterOpen, setIsFilterOpen] = useState<boolean>(false);
   const [isFilterHover, setIsFilterHover] = useState<boolean>(false);
+  const [isClearAllHover, setIsClearAllHover] = useState<boolean>(false);
+  const [showConfirmDialog, setShowConfirmDialog] = useState<boolean>(false);
+
+  // Account for vertical scrollbar so right-aligned header controls visually align with the list below
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const [scrollbarGutter, setScrollbarGutter] = useState<number>(0);
+  useEffect(() => {
+    const el = listRef.current;
+    if (!el) return;
+    const update = () => {
+      const sw = el.offsetWidth - el.clientWidth;
+      setScrollbarGutter(sw > 0 ? sw : 0);
+    };
+    update();
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(update) : null;
+    if (ro) ro.observe(el);
+    window.addEventListener('resize', update);
+    return () => {
+      if (ro) ro.disconnect();
+      window.removeEventListener('resize', update);
+    };
+  }, []);
 
   // Extract unique types and users from activities
   const { activityTypes, users } = useMemo(() => {
@@ -112,7 +136,7 @@ export function RecentActivity({
       >
         {/* Minimal Filter Control - Hidden until hover/click */}
         {activities.length > 0 && (
-          <div style={{ position: 'relative', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ position: 'relative', marginBottom: 16, marginLeft: -16, marginRight: -16, paddingLeft: 16, paddingRight: 16 + scrollbarGutter, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             {/* Filter icon button on LEFT */}
             <button
               onClick={() => setIsFilterOpen(!isFilterOpen)}
@@ -151,6 +175,51 @@ export function RecentActivity({
               <span style={{ fontSize: '16px', display: 'inline-block', transition: 'transform 0.5s ease', transform: isFilterHover ? 'rotate(180deg)' : 'none' }}>⚙</span>
               <span style={{ fontSize: '13px', display: (isFilterHover || isFilterOpen) ? 'inline' : 'none' }}>Customize View</span>
             </button>
+
+            {/* Clear All button on RIGHT */}
+            {onClearAll && (
+              <button
+                onClick={() => setShowConfirmDialog(true)}
+                style={{
+                  background: 'transparent',
+                  border: '1px solid transparent',
+                  cursor: 'pointer',
+                  padding: '8px 14px',
+                  borderRadius: '6px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  flexDirection: 'row-reverse',
+                  justifyContent: 'flex-end',
+                  gap: 8,
+                  opacity: 0.5,
+                  transition: 'all 0.2s',
+                  fontSize: '13px',
+                  color: '#374151',
+                  fontWeight: 500,
+                }}
+                onMouseEnter={(e) => {
+                  setIsClearAllHover(true);
+                  e.currentTarget.style.opacity = '0.8';
+                  e.currentTarget.style.borderColor = '#e5e7eb';
+                }}
+                onMouseLeave={(e) => {
+                  setIsClearAllHover(false);
+                  e.currentTarget.style.opacity = '0.5';
+                  e.currentTarget.style.borderColor = 'transparent';
+                  e.currentTarget.style.background = 'transparent';
+                }}
+                title="Clear all recent activity"
+              >
+                <svg aria-hidden width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block' }}>
+                  <polyline points="3 6 5 6 21 6" />
+                  <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                  <path d="M10 11v6" />
+                  <path d="M14 11v6" />
+                  <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
+                </svg>
+                <span style={{ fontSize: '13px', whiteSpace: 'nowrap', visibility: isClearAllHover ? 'visible' : 'hidden' }}>Clear All</span>
+              </button>
+            )}
 
             {/* Expandable filter panel */}
             {isFilterOpen && (
@@ -263,6 +332,7 @@ export function RecentActivity({
             overflowY: 'auto',
             overflowX: 'hidden',
           }}
+          ref={listRef}
         >
         {isLoading ? (
           <div
@@ -380,6 +450,92 @@ export function RecentActivity({
         )}
         </div>
       </div>
+
+      {/* Confirmation Dialog for Clear All */}
+      {showConfirmDialog && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+          }}
+          onClick={() => setShowConfirmDialog(false)}
+        >
+          <div
+            style={{
+              background: 'white',
+              borderRadius: '12px',
+              padding: '24px',
+              maxWidth: '400px',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ fontSize: '18px', fontWeight: 600, color: '#111827', marginBottom: 8 }}>
+              Clear All Activity?
+            </div>
+            <div style={{ fontSize: '14px', color: '#6b7280', marginBottom: 24 }}>
+              Are you sure you want to clear all recent activity? This action cannot be undone.
+            </div>
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setShowConfirmDialog(false)}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '6px',
+                  border: '1px solid #d1d5db',
+                  background: 'white',
+                  color: '#374151',
+                  fontSize: '14px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#f9fafb';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'white';
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setShowConfirmDialog(false);
+                  onClearAll?.();
+                }}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  background: '#dc2626',
+                  color: 'white',
+                  fontSize: '14px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#b91c1c';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = '#dc2626';
+                }}
+              >
+                Clear All
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -8,6 +8,8 @@ import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { query } from '../../db/connection';
 import { getEntityDefinition, supportsLifecycleAction, getActivityType } from '../../shared/entityCatalog';
+import { requireActiveRole } from '../../core/auth/guards';
+import { dismissActivity } from '../directory/store';
 
 const EntityTypeSchema = z.enum([
   'manager', 'contractor', 'customer', 'center', 'crew', 'warehouse',
@@ -163,6 +165,66 @@ export function registerActivityRoutes(fastify: FastifyInstance) {
         getActivityType(validatedType, 'deleted'),
       ];
 
+      // Build related assignment event filter based on entity type
+      // This allows parent entities to see assignment events logged against children
+      let relatedAssignmentClause = '';
+
+      switch (validatedType) {
+        case 'manager':
+          // Include contractor assignments where this manager is referenced
+          relatedAssignmentClause = `
+            OR (
+              activity_type = 'contractor_assigned_to_manager'
+              AND metadata ? 'managerId'
+              AND UPPER(metadata->>'managerId') = UPPER($1)
+            )
+          `;
+          break;
+        case 'contractor':
+          // Include customer assignments where this contractor is referenced
+          relatedAssignmentClause = `
+            OR (
+              activity_type = 'customer_assigned_to_contractor'
+              AND metadata ? 'contractorId'
+              AND UPPER(metadata->>'contractorId') = UPPER($1)
+            )
+          `;
+          break;
+        case 'customer':
+          // Include center assignments where this customer is referenced
+          relatedAssignmentClause = `
+            OR (
+              activity_type = 'center_assigned_to_customer'
+              AND metadata ? 'customerId'
+              AND UPPER(metadata->>'customerId') = UPPER($1)
+            )
+          `;
+          break;
+        case 'center':
+          // Include crew assignments where this center is referenced
+          relatedAssignmentClause = `
+            OR (
+              activity_type = 'crew_assigned_to_center'
+              AND metadata ? 'centerId'
+              AND UPPER(metadata->>'centerId') = UPPER($1)
+            )
+          `;
+          break;
+        case 'warehouse':
+          // Include order assignments where this warehouse is referenced
+          relatedAssignmentClause = `
+            OR (
+              activity_type = 'order_assigned_to_warehouse'
+              AND metadata ? 'warehouseId'
+              AND UPPER(metadata->>'warehouseId') = UPPER($1)
+            )
+          `;
+          break;
+        default:
+          // No related assignments for other entity types
+          relatedAssignmentClause = '';
+      }
+
       // Query activity log for all matching events
       const queryText = `
         SELECT
@@ -176,12 +238,17 @@ export function registerActivityRoutes(fastify: FastifyInstance) {
           metadata,
           created_at
         FROM system_activity
-        WHERE UPPER(target_id) = UPPER($1)
-          AND target_type = $2
-          AND (
-            activity_type = ANY($3)
-            OR activity_type LIKE $4
+        WHERE (
+          (
+            UPPER(target_id) = UPPER($1)
+            AND target_type = $2
+            AND (
+              activity_type = ANY($3)
+              OR activity_type LIKE $4
+            )
           )
+          ${relatedAssignmentClause}
+        )
         ORDER BY created_at ASC
         ${limit ? `LIMIT ${parseInt(limit)}` : ''}
       `;
@@ -230,6 +297,126 @@ export function registerActivityRoutes(fastify: FastifyInstance) {
       return reply.status(500).send({
         success: false,
         error: error instanceof Error ? error.message : 'Failed to retrieve entity history'
+      });
+    }
+  });
+
+  /**
+   * POST /api/activities/:activityId/dismiss
+   *
+   * Dismiss an activity from the current user's feed (per-user hiding).
+   * CTO requirement: Use requireActiveRole (not admin-only), catch FK violations.
+   */
+  fastify.post('/api/activities/:activityId/dismiss', async (request, reply) => {
+    // Extract authenticated user (works for all roles, not just admin)
+    const account = await requireActiveRole(request, reply);
+    if (!account) {
+      return;
+    }
+
+    const activityIdSchema = z.object({
+      activityId: z.coerce.number().int().positive(),
+    });
+
+    const paramsResult = activityIdSchema.safeParse(request.params);
+    if (!paramsResult.success) {
+      return reply.status(400).send({
+        success: false,
+        error: 'Invalid activity ID'
+      });
+    }
+
+    const { activityId } = paramsResult.data;
+
+    try {
+      // Pre-check: Verify activity exists to avoid FK violation 500
+      const activityCheck = await query(
+        'SELECT 1 FROM system_activity WHERE activity_id = $1',
+        [activityId]
+      );
+
+      if (activityCheck.rows.length === 0) {
+        return reply.status(404).send({
+          success: false,
+          error: 'Activity not found'
+        });
+      }
+
+      // Idempotent insert with ON CONFLICT DO NOTHING
+      const success = await dismissActivity(activityId, account.cksCode);
+
+      if (success) {
+        return reply.send({
+          success: true,
+          message: 'Activity dismissed'
+        });
+      } else {
+        return reply.status(500).send({
+          success: false,
+          error: 'Failed to dismiss activity'
+        });
+      }
+
+    } catch (error) {
+      console.error('[activity] Failed to dismiss activity:', error);
+      return reply.status(500).send({
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to dismiss activity'
+      });
+    }
+  });
+
+  /**
+   * POST /api/activities/dismiss-all
+   *
+   * Dismiss ALL visible activities for the current user (bulk per-user hiding).
+   */
+  fastify.post('/api/activities/dismiss-all', async (request, reply) => {
+    const account = await requireActiveRole(request, reply);
+    if (!account) {
+      return;
+    }
+
+    try {
+      // Get all non-dismissed activity IDs for this user
+      const activitiesResult = await query(
+        `SELECT activity_id FROM system_activity sa
+         WHERE NOT EXISTS (
+           SELECT 1 FROM activity_dismissals ad
+           WHERE ad.activity_id = sa.activity_id AND ad.user_id = $1
+         )`,
+        [account.cksCode]
+      );
+
+      const activityIds = activitiesResult.rows.map(row => row.activity_id);
+
+      if (activityIds.length === 0) {
+        return reply.send({
+          success: true,
+          message: 'No activities to dismiss',
+          count: 0
+        });
+      }
+
+      // Bulk insert dismissals (idempotent with ON CONFLICT)
+      const values = activityIds.map(id => `(${id}, '${account.cksCode}')`).join(',');
+      const insertResult = await query(
+        `INSERT INTO activity_dismissals (activity_id, user_id)
+         VALUES ${values}
+         ON CONFLICT (activity_id, user_id) DO NOTHING`
+      );
+
+      return reply.send({
+        success: true,
+        message: `${activityIds.length} activities dismissed`,
+        count: activityIds.length
+      });
+
+    } catch (error) {
+      console.error('[activity] Failed to dismiss all activities:', error);
+      return reply.status(500).send({
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to dismiss all activities'
       });
     }
   });

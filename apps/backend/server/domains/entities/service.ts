@@ -10,6 +10,8 @@ export interface EntityResult {
   state: EntityState;
   deletedAt?: string;
   deletedBy?: string;
+  archivedAt?: string;
+  archivedBy?: string;
 }
 
 /**
@@ -156,9 +158,12 @@ export async function getEntityWithFallback(
   );
 
   if (archivedResult.rowCount && archivedResult.rowCount > 0) {
+    const archivedRow = archivedResult.rows[0];
     return {
-      entity: archivedResult.rows[0],
-      state: 'archived'
+      entity: archivedRow,
+      state: 'archived',
+      archivedAt: archivedRow.archived_at,
+      archivedBy: archivedRow.archived_by
     };
   }
 

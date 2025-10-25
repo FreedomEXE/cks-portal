@@ -95,6 +95,15 @@ export function canSeeTab(tabId: TabId, context: TabVisibilityContext): boolean 
     case 'audit':
       return role === 'admin';
 
+    // ===== PROFILE TAB =====
+    // User-specific: visible to all roles for user entities
+    // Everyone can view user profiles (for their assignments and ecosystem)
+    case 'profile':
+      return (
+        entityType === 'manager' || entityType === 'contractor' || entityType === 'customer' ||
+        entityType === 'crew' || entityType === 'center' || entityType === 'warehouse'
+      );
+
     // Default: hide unknown tabs
     default:
       console.warn(`[TabPolicy] Unknown tab "${tabId}" - defaulting to hidden`);

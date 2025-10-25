@@ -19,7 +19,7 @@
 export interface ParsedEntityId {
   type: 'order' | 'service' | 'report' | 'user' | 'procedure' | 'training' | 'product' | 'unknown';
   id: string;
-  subtype?: 'product' | 'service' | 'report' | 'feedback';
+  subtype?: 'product' | 'service' | 'report' | 'feedback' | 'manager' | 'contractor' | 'customer' | 'center' | 'crew' | 'warehouse';
   scope?: string; // e.g., "CON-010" from "CON-010-FBK-001"
 }
 
@@ -71,15 +71,25 @@ export function parseEntityId(id: string | null | undefined): ParsedEntityId {
   }
 
   // User IDs: Role prefix followed by number
-  const userPrefixes = ['MGR-', 'CON-', 'CUS-', 'CEN-', 'CRW-', 'WAR-', 'ADM-'];
-  for (const prefix of userPrefixes) {
+  // Map prefix to subtype for concrete entity type resolution
+  const userPrefixMap: Record<string, 'manager' | 'contractor' | 'customer' | 'center' | 'crew' | 'warehouse'> = {
+    'MGR-': 'manager',
+    'CON-': 'contractor',
+    'CUS-': 'customer',
+    'CEN-': 'center',
+    'CRW-': 'crew',
+    'WAR-': 'warehouse',
+    'WHS-': 'warehouse', // Support both WAR and WHS prefixes
+  };
+
+  for (const [prefix, subtype] of Object.entries(userPrefixMap)) {
     if (normalizedId.startsWith(prefix)) {
       // Make sure it's not an order/report (those have additional segments)
       const segments = normalizedId.split('-');
       // User IDs are exactly 2 segments: PREFIX-NUMBER
       // Orders are 4+ segments: PREFIX-NUMBER-TYPE-NUMBER
       if (segments.length === 2) {
-        return { type: 'user', id, scope };
+        return { type: 'user', id, subtype, scope };
       }
     }
   }

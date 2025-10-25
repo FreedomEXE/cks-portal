@@ -1,203 +1,22 @@
-import React, { useMemo, useState } from 'react';
-import styles from './ActivityModal.module.css';
-import { ModalRoot } from '../ModalRoot';
-import OrderCard from '../../cards/OrderCard';
-import Button from '../../buttons/Button';
-import ProductOrderContent from '../ProductOrderModal/ProductOrderContent';
-import ServiceOrderContent from '../ServiceOrderModal/ServiceOrderContent';
-
-export type ActivityActionVariant = 'primary' | 'secondary' | 'danger' | 'ghost';
-
-export interface ActivityAction {
-  label: string;
-  onClick: () => void;
-  variant?: ActivityActionVariant;
-  disabled?: boolean;
-}
-
-export interface ContactInfo {
-  name: string | null;
-  address: string | null;
-  phone: string | null;
-  email: string | null;
-}
-
-export interface AvailabilityWindow {
-  tz: string | null;
-  days: string[];
-  window: { start: string; end: string } | null;
-}
-
-export interface ArchiveMetadata {
-  archivedBy: string | null;
-  archivedAt: string | null;
-  reason: string | null;
-  scheduledDeletion: string | null;
-}
-
-export interface ActivityModalOrder {
-  orderId: string;
-  orderType: 'service' | 'product';
-  title: string | null;
-  requestedBy: string | null;
-  destination: string | null;
-  requestedDate: string | null;
-  expectedDate?: string | null;
-  serviceStartDate?: string | null;
-  deliveryDate?: string | null;
-  status: string | null;
-  notes?: string | null;
-  approvalStages?: Array<{
-    role: string;
-    status: string;
-    user?: string | null;
-    timestamp?: string | null;
-  }>;
-  transformedId?: string | null;
-  isDeleted?: boolean;
-}
-
-export interface ActivityModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  role: 'user' | 'admin';
-  order: ActivityModalOrder | null;
-
-  // Action bar
-  actions: ActivityAction[];
-  defaultExpanded?: boolean;
-
-  // Detail sections
-  requestorInfo?: ContactInfo | null;
-  destinationInfo?: ContactInfo | null;
-  availability?: AvailabilityWindow | null;
-  cancellationReason?: string | null;
-  cancelledBy?: string | null;
-  cancelledAt?: string | null;
-  rejectionReason?: string | null;
-  rejectedBy?: string | null;
-  rejectedAt?: string | null;
-  archiveMetadata?: ArchiveMetadata | null;
-}
-
-export default function ActivityModal({
-  isOpen,
-  onClose,
-  role,
-  order,
-  actions,
-  defaultExpanded = false,
-  requestorInfo,
-  destinationInfo,
-  availability,
-  cancellationReason,
-  cancelledBy,
-  cancelledAt,
-  rejectionReason,
-  rejectedBy,
-  rejectedAt,
-  archiveMetadata,
-}: ActivityModalProps) {
-  const [expanded, setExpanded] = useState(!!defaultExpanded);
-
-  const summary = useMemo(() => {
-    if (!order) return null;
-    return (
-      <OrderCard
-        orderId={order.orderId}
-        orderType={(order.orderType || 'product') as any}
-        title={order.title || order.orderId}
-        requestedBy={order.requestedBy || undefined}
-        destination={order.destination || undefined}
-        requestedDate={order.requestedDate || new Date().toISOString()}
-        expectedDate={order.expectedDate || undefined}
-        serviceStartDate={order.serviceStartDate || undefined}
-        deliveryDate={order.deliveryDate || undefined}
-        status={(order.status || 'pending') as any}
-        approvalStages={(order.approvalStages as any) || []}
-        onAction={undefined}
-        actions={[]}
-        showWorkflow={true}
-        collapsible={false}
-        defaultExpanded={false}
-        transformedId={order.transformedId || undefined}
-        variant="embedded"
-      />
-    );
-  }, [order]);
-
-  if (!isOpen || !order) return null;
-
-  const isService = order.orderType === 'service';
-
-  return (
-    <ModalRoot isOpen={isOpen} onClose={onClose}>
-      <div className={styles.modalContainer}>
-        {/* Section A: Header */}
-        <div className={styles.header}>
-          <button className={styles.closeX} aria-label="Close" onClick={onClose}>×</button>
-          {summary}
-        </div>
-
-        {/* Section B: Quick Actions */}
-        <div className={styles.actionsSection}>
-          <div className={styles.actionsSectionTitle}>Quick Actions</div>
-          <div className={styles.actionsRow}>
-            {actions.map((a, idx) => (
-              <Button
-                key={idx}
-                variant={(a.variant || 'secondary') as any}
-                className={styles.bigButton}
-                onClick={a.onClick}
-                disabled={a.disabled}
+                title="Clear all recent activity"
               >
-                {a.label}
-              </Button>
-            ))}
-          </div>
-        </div>
+                <span style={{ fontSize: '18px', fontWeight: 500 }}>×</span>
+                <span style={{ fontSize: '13px', display: isClearAllHover ? 'inline' : 'none' }}>Clear All</span>
+              </button>
+            )}
 
-        {/* Section C: Details Toggle */}
-        <div className={styles.detailsToggle} onClick={() => setExpanded((v) => !v)}>
-          <span>{expanded ? '▲ Hide Details' : '▼ Click to View Details'}</span>
-        </div>
-
-        {/* Details Content */}
-        <div className={`${styles.detailsContent} ${expanded ? '' : styles.collapsed}`}>
-          {expanded && (
-            isService ? (
-              <ServiceOrderContent
-                order={order as any}
-                requestorInfo={requestorInfo}
-                destinationInfo={destinationInfo}
-                availability={availability as any}
-                cancellationReason={cancellationReason}
-                cancelledBy={cancelledBy}
-                cancelledAt={cancelledAt}
-                rejectionReason={rejectionReason}
-                rejectedBy={rejectedBy}
-                rejectedAt={rejectedAt}
-                archiveMetadata={archiveMetadata as any}
-              />
-            ) : (
-              <ProductOrderContent
-                order={order as any}
-                requestorInfo={requestorInfo}
-                destinationInfo={destinationInfo}
-                availability={availability as any}
-                cancellationReason={cancellationReason}
-                cancelledBy={cancelledBy}
-                cancelledAt={cancelledAt}
-                rejectionReason={rejectionReason}
-                rejectedBy={rejectedBy}
-                rejectedAt={rejectedAt}
-                archiveMetadata={archiveMetadata as any}
-              />
-            )
-          )}
-        </div>
-      </div>
-    </ModalRoot>
-  );
-}
-
+            {/* Expandable filter panel */}
+            {isFilterOpen && (
+              <div
+                style={{
+              Are you sure you want to clear all recent activity? This action cannot be undone.
+            </div>
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setShowConfirmDialog(false)}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '6px',
+                  border: '1px solid #d1d5db',
+                  background: 'white',
+                  color: '#374151',

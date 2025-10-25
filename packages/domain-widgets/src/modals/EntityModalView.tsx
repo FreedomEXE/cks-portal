@@ -26,7 +26,8 @@
  */
 
 import React, { ReactNode, useState, useEffect } from 'react';
-import { BaseViewModal, EntityHeader, type HeaderConfig } from '@cks/ui';
+import { BaseViewModal, EntityHeader, EntityHeaderCard, type HeaderConfig } from '@cks/ui';
+import { getEntityAccentColor } from '../shared/colors';
 
 // Lifecycle interface (matches frontend types)
 interface Lifecycle {
@@ -104,9 +105,28 @@ export function EntityModalView({
   header, // Legacy support
   tabs,
 }: EntityModalViewProps) {
-  // Render EntityHeader from configuration (new pattern)
-  // Fall back to header prop for backward compatibility
-  const headerContent = headerConfig ? <EntityHeader config={headerConfig} /> : header;
+  // Get accent color for this entity type
+  const accentColor = getEntityAccentColor(entityType);
+
+  // Render EntityHeaderCard from configuration (new pattern)
+  // Fall back to legacy EntityHeader or header prop for backward compatibility
+  const nameField = headerConfig?.fields?.find(f => f.label === 'Name');
+  const nameValue = nameField?.value;
+  const nameString = typeof nameValue === 'string' ? nameValue : undefined;
+
+  const headerContent = headerConfig ? (
+    <EntityHeaderCard
+      id={headerConfig.id}
+      typeLabel={headerConfig.type?.toUpperCase() || entityType.toUpperCase()}
+      name={nameString}
+      accentColor={accentColor}
+      status={
+        headerConfig.status
+          ? { value: headerConfig.status, text: headerConfig.status.toUpperCase() }
+          : undefined
+      }
+    />
+  ) : header;
 
   return (
     <BaseViewModal
@@ -117,6 +137,7 @@ export function EntityModalView({
       lifecycle={lifecycle}
       entityType={entityType}
       entityId={entityId}
+      accentColor={accentColor}
     />
   );
 }

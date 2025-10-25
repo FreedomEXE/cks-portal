@@ -810,8 +810,42 @@ async function listFeedback(limit = DEFAULT_LIMIT): Promise<FeedbackDirectoryEnt
   }));
 }
 
-async function listActivities(limit = DEFAULT_LIMIT): Promise<ActivityEntry[]> {
-  const result = await query<ActivityRow>('SELECT activity_id, description, activity_type, actor_id, actor_role, target_id, target_type, metadata, created_at FROM system_activity WHERE cleared_at IS NULL ORDER BY created_at DESC', []);
+async function listActivities(limit = DEFAULT_LIMIT, userId?: string): Promise<ActivityEntry[]> {
+  let queryText: string;
+  let params: any[];
+
+  if (userId) {
+    // Per-user filtering: exclude dismissed activities (CTO-recommended NOT EXISTS)
+    queryText = `
+      SELECT sa.activity_id, sa.description, sa.activity_type,
+             sa.actor_id, sa.actor_role, sa.target_id, sa.target_type,
+             sa.metadata, sa.created_at
+      FROM system_activity sa
+      WHERE sa.cleared_at IS NULL
+        AND NOT EXISTS (
+          SELECT 1 FROM activity_dismissals ad
+          WHERE ad.activity_id = sa.activity_id AND ad.user_id = $1
+        )
+      ORDER BY sa.created_at DESC
+      LIMIT $2
+    `;
+    params = [userId, limit];
+  } else {
+    // Fallback: show all non-cleared activities (backward compatibility)
+    queryText = `
+      SELECT activity_id, description, activity_type,
+             actor_id, actor_role, target_id, target_type,
+             metadata, created_at
+      FROM system_activity
+      WHERE cleared_at IS NULL
+      ORDER BY created_at DESC
+      LIMIT $1
+    `;
+    params = [limit];
+  }
+
+  const result = await query<ActivityRow>(queryText, params);
+
   return result.rows.map((row) => ({
     id: String(row.activity_id),
     description: row.description,
@@ -835,6 +869,25 @@ export async function clearAllActivities(userId: string): Promise<number> {
   return result.rowCount ?? 0;
 }
 
+/**
+ * Dismiss an activity for a specific user (per-user hiding)
+ * CTO-recommended: idempotent with ON CONFLICT DO NOTHING
+ */
+export async function dismissActivity(activityId: number, userId: string): Promise<boolean> {
+  try {
+    await query(
+      `INSERT INTO activity_dismissals (activity_id, user_id)
+       VALUES ($1, $2)
+       ON CONFLICT (activity_id, user_id) DO NOTHING`,
+      [activityId, userId]
+    );
+    return true;
+  } catch (error) {
+    console.error('[dismissActivity] Failed:', error);
+    return false;
+  }
+}
+
 type DirectoryLoaderMap = {
   [K in DirectoryResourceKey]: (limit?: number) => Promise<DirectoryResourceMap[K][]>;
 };
@@ -856,7 +909,15 @@ const loaders: DirectoryLoaderMap = {
   activities: listActivities,
 };
 
-export async function listDirectoryResource<K extends DirectoryResourceKey>(key: K, limit?: number): Promise<DirectoryResourceMap[K][]> {
+export async function listDirectoryResource<K extends DirectoryResourceKey>(
+  key: K,
+  limit?: number,
+  userId?: string
+): Promise<DirectoryResourceMap[K][]> {
   const loader = loaders[key];
+  // Pass userId to activities loader for per-user filtering (CTO requirement)
+  if (key === 'activities' && userId) {
+    return (loader as any)(limit, userId);
+  }
   return loader(limit);
 }

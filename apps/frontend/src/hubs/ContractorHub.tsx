@@ -247,7 +247,31 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
   const modals = useModals();
 
   const { data: scopeData } = useHubRoleScope(normalizedCode);
-  const { activities: formattedActivities, isLoading: activitiesLoading, error: activitiesError } = useFormattedActivities(normalizedCode, { limit: 20 });
+  const { activities: formattedActivities, isLoading: activitiesLoading, error: activitiesError, mutate: mutateActivities } = useFormattedActivities(normalizedCode, { limit: 20 });
+
+  // Handle activity dismissal
+  const handleClearActivity = useCallback(async (activityId: string) => {
+    try {
+      const { dismissActivity } = await import('../shared/api/directory');
+      await dismissActivity(activityId);
+      mutateActivities();
+      console.log('[ContractorHub] Activity dismissed:', activityId);
+    } catch (error) {
+      console.error('[ContractorHub] Failed to dismiss activity:', error);
+    }
+  }, [mutateActivities]);
+
+  // Clear ALL activities for current user
+  const handleClearAll = useCallback(async () => {
+    try {
+      const { dismissAllActivities } = await import('../shared/api/directory');
+      const result = await dismissAllActivities();
+      mutateActivities();
+      console.log(`[ContractorHub] ${result.count} activities dismissed`);
+    } catch (error) {
+      console.error('[ContractorHub] Failed to clear all activities:', error);
+    }
+  }, [mutateActivities]);
 
   const contractorCode = useMemo(() => profile?.cksCode ?? normalizedCode, [profile?.cksCode, normalizedCode]);
   const welcomeName = profile?.mainContact ?? profile?.name ?? undefined;
@@ -581,6 +605,8 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
               <ActivityFeed
                 activities={formattedActivities}
                 hub="contractor"
+                onClearActivity={handleClearActivity}
+                onClearAll={handleClearAll}
                 onOpenActionableOrder={(order) => setActionOrder(order)}
                 onOpenOrderModal={(order) => setSelectedOrderId(order?.orderId || order?.id || null)}
                 onOpenServiceModal={(serviceId) => modals.openById(serviceId)}

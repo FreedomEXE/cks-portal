@@ -58,7 +58,12 @@
       "Bash(pnpm build:domain-widgets:*)",
       "Bash(pnpm --filter @cks/domain-widgets build)",
       "Bash(pnpm --filter frontend build)",
-      "Bash(pnpm --filter frontend test:ci)"
+      "Bash(pnpm --filter frontend test:ci)",
+      "Bash(Select-String -Pattern \"activity|dismiss\" -Context 0,2)",
+      "Bash(pnpm --filter frontend typecheck)",
+      "Bash(Select-String -Pattern \"error TS|Build failed\" -Context 0,2)",
+      "Bash(Select-Object -First 50)",
+      "Bash(Select-String -Pattern \"frontend|error TS\" -Context 0,2)"
     ],
     "deny": [],
     "ask": []

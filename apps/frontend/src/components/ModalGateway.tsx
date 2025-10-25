@@ -117,6 +117,9 @@ export function ModalGateway({
   });
 
   // ===== STEP 2: Select the right data based on entityType =====
+  // NOTE: User entities (manager/contractor/customer/center/crew/warehouse) are now
+  // fetched by ModalProvider.openById and passed via options?.data.
+  // No hooks needed for users!
   const detailsMap: Record<string, { data: any; isLoading: boolean; error: Error | null; lifecycle: Lifecycle }> = {
     order: {
       data: orderDetails.order,
@@ -144,12 +147,56 @@ export function ModalGateway({
     },
   };
 
-  const { data, isLoading, error, lifecycle } = (entityType && detailsMap[entityType]) || {
-    data: null,
-    isLoading: false,
-    error: null,
-    lifecycle: { state: 'active' } as Lifecycle,
-  };
+  // Check if we have fetched data OR pre-loaded data
+  let dataDetails: { data: any; isLoading: boolean; error: Error | null; lifecycle: Lifecycle };
+
+  if (entityType && detailsMap[entityType]) {
+    // Use fetched data (order, report, service)
+    dataDetails = detailsMap[entityType];
+  } else if (options?.data) {
+    // Use pre-loaded data (users, products, etc.)
+    console.log('[ModalGateway] Using pre-loaded data for', entityType, options.data);
+
+    // Build lifecycle from options metadata (for users fetched by ModalProvider)
+    let lifecycle: Lifecycle;
+    const opts = options as any; // Type assertion to access lifecycle fields
+
+    if (opts.deletedAt) {
+      lifecycle = {
+        state: 'deleted',
+        deletedAt: opts.deletedAt,
+        deletedBy: opts.deletedBy,
+        isTombstone: false
+      };
+    } else if (opts.archivedAt) {
+      lifecycle = {
+        state: 'archived',
+        archivedAt: opts.archivedAt,
+        archivedBy: opts.archivedBy,
+      };
+    } else {
+      lifecycle = { state: 'active' };
+    }
+
+    dataDetails = {
+      data: options.data,
+      isLoading: false,
+      error: null,
+      lifecycle,
+    };
+  } else {
+    // No data available
+    console.warn('[ModalGateway] No data available for', entityType, entityId);
+    dataDetails = {
+      data: null,
+      isLoading: false,
+      error: null,
+      lifecycle: { state: 'active' } as Lifecycle,
+    };
+  }
+
+  const { data, isLoading, error, lifecycle } = dataDetails;
+  console.log('[ModalGateway] Final data:', { entityType, entityId, data, lifecycle });
 
   // Determine final state (explicit override or detected from lifecycle)
   const state: EntityState = options?.state || lifecycle.state;

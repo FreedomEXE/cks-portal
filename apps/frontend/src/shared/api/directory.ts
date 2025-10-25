@@ -297,9 +297,13 @@ function mapActivities(items: ActivityApiItem[]): Activity[] {
   return items.map((item) => {
     const timestamp = item.createdAt ? new Date(item.createdAt) : new Date();
     const metadata: Record<string, unknown> = {};
+
+    // Merge backend metadata first
     if (item.metadata) {
       Object.assign(metadata, item.metadata);
     }
+
+    // Add actor information
     if (item.actorRole) {
       metadata.role = item.actorRole.toLowerCase();
       metadata.title = formatRoleLabel(item.actorRole);
@@ -307,14 +311,20 @@ function mapActivities(items: ActivityApiItem[]): Activity[] {
     if (item.actorId) {
       metadata.actorId = item.actorId;
     }
+
+    // CRITICAL: Ensure targetId and targetType are always populated
+    // These are required for ActivityFeed click-through
     if (item.targetId) {
       metadata.targetId = item.targetId;
     }
     if (item.targetType) {
       metadata.targetType = item.targetType;
     }
-    metadata.category = item.category;
 
+    // Set category for filtering
+    metadata.category = item.category || 'info';
+
+    // Normalize category for Activity type
     const category = item.category === 'action' || item.category === 'warning' || item.category === 'success'
       ? item.category
       : item.category === 'danger'
@@ -323,7 +333,7 @@ function mapActivities(items: ActivityApiItem[]): Activity[] {
 
     return {
       id: item.id,
-      message: item.description,
+      message: item.description || '(no description)',  // Fallback for missing description
       timestamp: Number.isNaN(timestamp.getTime()) ? new Date() : timestamp,
       type: category as Activity['type'],
       metadata,
@@ -377,3 +387,23 @@ export const useFeedback = feedbackResource.useResource;
 export const fetchFeedback = feedbackResource.fetchResource;
 export const useActivities = activitiesResource.useResource;
 export const fetchActivities = activitiesResource.fetchResource;
+
+/**
+ * Dismiss an activity from the current user's feed (per-user hiding)
+ * CTO requirement: Works for all roles, not just admin
+ */
+export async function dismissActivity(activityId: string): Promise<void> {
+  await apiFetch(`/activities/${activityId}/dismiss`, {
+    method: 'POST',
+  });
+}
+
+/**
+ * Dismiss ALL activities from the current user's feed (bulk per-user hiding)
+ * Returns the number of activities dismissed
+ */
+export async function dismissAllActivities(): Promise<{ success: boolean; count: number; message: string }> {
+  return await apiFetch<{ success: boolean; count: number; message: string }>(`/activities/dismiss-all`, {
+    method: 'POST',
+  });
+}
