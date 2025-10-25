@@ -16,7 +16,8 @@
  * - Primary profile component for all roles except Admin
  *
  * Notes:
- * Manager and Warehouse have 2 tabs, all other roles have 3 tabs
+ * Manager and Warehouse have 3 tabs (Profile, History, Settings)
+ * All other roles have 4 tabs (Profile, Account Manager, History, Settings)
  */
 /*───────────────────────────────────────────────
   Manifested by Freedom_EXE
@@ -27,6 +28,7 @@ import { NavigationTab, TabContainer } from '@cks/ui';
 
 import { ProfileTab } from '../ProfileTab';
 import { AccountManagerTab, type AccountManagerInfo } from '../AccountManagerTab';
+import { TimelineTab } from '../TimelineTab';
 import { SettingsTab } from '../SettingsTab';
 
 export interface ProfileInfoCardProps {
@@ -40,7 +42,7 @@ export interface ProfileInfoCardProps {
   /** When true, hides the internal tab navigation */
   hideTabs?: boolean;
   /** Optional list of enabled internal tabs; defaults to role-based */
-  enabledTabs?: Array<'profile' | 'accountManager' | 'settings'>;
+  enabledTabs?: Array<'profile' | 'accountManager' | 'timeline' | 'settings'>;
   /** When true, removes card border and shadow */
   borderless?: boolean;
 }
@@ -59,12 +61,12 @@ export function ProfileInfoCard({
 }: ProfileInfoCardProps) {
   const [activeTab, setActiveTab] = useState('profile');
 
-  // Manager and Warehouse roles have only Profile and Settings tabs
-  // All other roles have Profile, Account Manager, and Settings tabs
+  // Manager and Warehouse roles: Profile, Timeline, Settings
+  // All other roles: Profile, Account Manager, Timeline, Settings
   const hasNoAccountManager = role === 'manager' || role === 'warehouse';
   const defaultTabs = hasNoAccountManager
-    ? (['profile', 'settings'] as Array<'profile' | 'settings'>)
-    : (['profile', 'accountManager', 'settings'] as Array<'profile' | 'accountManager' | 'settings'>);
+    ? (['profile', 'timeline', 'settings'] as Array<'profile' | 'timeline' | 'settings'>)
+    : (['profile', 'accountManager', 'timeline', 'settings'] as Array<'profile' | 'accountManager' | 'timeline' | 'settings'>);
   const tabs = (enabledTabs && enabledTabs.length ? enabledTabs : defaultTabs) as string[];
 
   const getTabLabel = (tab: string) => {
@@ -73,6 +75,8 @@ export function ProfileInfoCard({
         return 'Profile';
       case 'accountManager':
         return 'Account Manager';
+      case 'timeline':
+        return 'History';
       case 'settings':
         return 'Settings';
       default:
@@ -98,6 +102,14 @@ export function ProfileInfoCard({
             primaryColor={primaryColor}
             onContactManager={onContactManager}
             onScheduleMeeting={onScheduleMeeting}
+          />
+        );
+      case 'timeline':
+        return (
+          <TimelineTab
+            role={role}
+            profileData={profileData}
+            primaryColor={primaryColor}
           />
         );
       case 'settings':

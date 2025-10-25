@@ -196,11 +196,9 @@ function normalizeOrderStatus(value?: string | null): HubOrderItem['status'] {
 export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHubProps) {
   const { code: authCode } = useAuth();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
-  const { data: reportsData } = useHubReports(normalizedCode);
-  const { data: ordersData } = useHubOrders(normalizedCode);
 
   return (
-    <ModalProvider currentUser={normalizedCode || ''} reportsData={reportsData} ordersData={ordersData}>
+    <ModalProvider currentUserId={normalizedCode || ''} role="contractor">
       <ContractorHubContent initialTab={initialTab} />
     </ModalProvider>
   );
@@ -605,6 +603,7 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
               <ActivityFeed
                 activities={formattedActivities}
                 hub="contractor"
+                viewerId={normalizedCode || undefined}
                 onClearActivity={handleClearActivity}
                 onClearAll={handleClearAll}
                 onOpenActionableOrder={(order) => setActionOrder(order)}

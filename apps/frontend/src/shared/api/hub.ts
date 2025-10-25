@@ -416,6 +416,7 @@ export type HubRoleScopeResponse =
 export interface HubActivityItem {
   id: string;
   description: string;
+  activityType: string; // Specific type like "crew_assigned_to_center"
   category: string;
   actorId: string | null;
   actorRole: string | null;

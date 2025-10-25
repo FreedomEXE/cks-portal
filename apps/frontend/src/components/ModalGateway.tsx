@@ -267,6 +267,8 @@ export function ModalGateway({
       lifecycle,
       entityType,
       entityData: data,
+      entityId,
+      viewerId: currentUserId,
       hasActions: actions.length > 0,
     }, actions);
 
@@ -276,11 +278,13 @@ export function ModalGateway({
       lifecycle,
       entityType,
       entityData: data,
+      entityId,
+      viewerId: currentUserId,
       hasActions: actions.length > 0,
     });
 
     return filtered;
-  }, [adapter, role, lifecycle, entityType, data, actions, entityId]);
+  }, [adapter, role, lifecycle, entityType, data, actions, entityId, currentUserId]);
 
   // ===== STEP 6: Get header config from adapter =====
   const headerConfig = useMemo(() => {

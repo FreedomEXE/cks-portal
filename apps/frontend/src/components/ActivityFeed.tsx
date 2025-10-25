@@ -27,6 +27,7 @@ import { isFeatureEnabled } from '../config/featureFlags';
 export interface ActivityFeedProps {
   activities: Activity[];
   hub?: 'admin' | 'manager' | 'center' | 'contractor' | 'customer' | 'crew' | 'warehouse';
+  viewerId?: string; // Current user's CKS code for viewer-relative clicks
   isLoading?: boolean;
   error?: Error | null;
   onClearActivity?: (activityId: string) => void;
@@ -45,6 +46,7 @@ export interface ActivityFeedProps {
  */
 export function ActivityFeed({
   activities,
+  viewerId,
   isLoading = false,
   error = null,
   onClearActivity,
@@ -60,6 +62,18 @@ export function ActivityFeed({
 
   const handleActivityClick = useCallback(
     async (activity: Activity) => {
+      // 🔍 DEBUG: Log everything at click time
+      console.log('[ActivityFeed CLICK DEBUG]', {
+        viewerId,
+        activityType: activity.metadata?.activityType,
+        category: activity.metadata?.category,
+        keys: Object.keys(activity.metadata || {}),
+        actorId: activity.metadata?.crewId,        // for crew_assigned_to_center
+        targetEntityId: activity.metadata?.centerId,
+        targetType: activity.metadata?.targetType,
+        targetId: activity.metadata?.targetId,
+      });
+
       const { targetType, targetId } = activity.metadata || {};
 
       // Guard: Missing target information
@@ -165,6 +179,68 @@ export function ActivityFeed({
         return;
       }
 
+      // Handle assignment activities with viewer-relative clicks
+      const activityType = activity.metadata?.activityType || activity.metadata?.category;
+      const assignmentTypes = [
+        'crew_assigned_to_center',
+        'contractor_assigned_to_manager',
+        'customer_assigned_to_contractor',
+        'center_assigned_to_customer',
+        'order_assigned_to_warehouse'
+      ];
+
+      if (activityType && assignmentTypes.includes(activityType) && viewerId) {
+        const metadata = activity.metadata;
+
+        // Extract actor ID (the entity being assigned) and target ID (the recipient)
+        let actorId: string | undefined;
+        let targetEntityId: string | undefined;
+
+        switch (activityType) {
+          case 'crew_assigned_to_center':
+            actorId = metadata?.crewId as string;
+            targetEntityId = metadata?.centerId as string;
+            break;
+          case 'contractor_assigned_to_manager':
+            actorId = metadata?.contractorId as string;
+            targetEntityId = metadata?.managerId as string;
+            break;
+          case 'customer_assigned_to_contractor':
+            actorId = metadata?.customerId as string;
+            targetEntityId = metadata?.contractorId as string;
+            break;
+          case 'center_assigned_to_customer':
+            actorId = metadata?.centerId as string;
+            targetEntityId = metadata?.customerId as string;
+            break;
+          case 'order_assigned_to_warehouse':
+            actorId = targetId; // Order ID
+            targetEntityId = metadata?.warehouseId as string;
+            break;
+        }
+
+        // Viewer-relative click logic
+        const normalizedViewerId = viewerId?.toUpperCase();
+        const normalizedActorId = actorId?.toUpperCase();
+        const normalizedTargetId = targetEntityId?.toUpperCase();
+
+        if (normalizedViewerId === normalizedActorId) {
+          // Actor viewing: "You have been assigned to..." → Open target entity
+          console.log('[ActivityFeed] Assignment: Actor viewing, opening target:', targetEntityId);
+          modals.openById(targetEntityId!);
+        } else if (normalizedViewerId === normalizedTargetId) {
+          // Target viewing: "X has been assigned to you!" → Open actor entity
+          console.log('[ActivityFeed] Assignment: Target viewing, opening actor:', actorId);
+          modals.openById(actorId!);
+        } else {
+          // Admin/others: Default to opening target entity (recipient)
+          console.log('[ActivityFeed] Assignment: Admin viewing, opening target:', targetEntityId);
+          modals.openById(targetEntityId!);
+        }
+
+        return;
+      }
+
       // Handle user activities (manager, contractor, customer, center, crew, warehouse)
       const userTypes = ['manager', 'contractor', 'customer', 'center', 'crew', 'warehouse'];
       if (userTypes.includes(targetType)) {
@@ -181,7 +257,7 @@ export function ActivityFeed({
       console.warn('[ActivityFeed] Unsupported entity type:', targetType);
       onError?.(`Cannot open ${targetType} entities yet`);
     },
-    [onOpenOrderActions, onOpenOrderModal, onOpenServiceModal, onOpenActionableOrder, onError, modals]
+    [onOpenOrderActions, onOpenOrderModal, onOpenServiceModal, onOpenActionableOrder, onError, modals, viewerId]
   );
 
   // Map activities with onClick and onClear handlers

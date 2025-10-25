@@ -20,7 +20,7 @@ import { TabId, TabVisibilityContext, UserRole, EntityType } from '../types/enti
  * @returns true if tab should be visible, false otherwise
  */
 export function canSeeTab(tabId: TabId, context: TabVisibilityContext): boolean {
-  const { role, lifecycle, entityType, hasActions } = context;
+  const { role, lifecycle, entityType, entityId, viewerId, hasActions } = context;
 
   // Universal tab visibility rules
   switch (tabId) {
@@ -31,9 +31,32 @@ export function canSeeTab(tabId: TabId, context: TabVisibilityContext): boolean 
       return true;
 
     // ===== HISTORY TAB =====
-    // Visible to all roles for all entities (audit trail)
-    case 'history':
+    // User entities: only show history for your own profile (privacy)
+    // Non-user entities: show history to everyone (audit trail)
+    case 'history': {
+      const userEntityTypes: EntityType[] = ['manager', 'contractor', 'customer', 'center', 'crew', 'warehouse'];
+
+      // If it's a user entity, only show history if viewing your own profile
+      if (userEntityTypes.includes(entityType)) {
+        console.log('[TabPolicy] History tab check:', {
+          entityType,
+          entityId,
+          viewerId,
+          match: entityId?.toUpperCase() === viewerId?.toUpperCase()
+        });
+
+        // If viewerId is not available, allow history (fallback to old behavior)
+        if (!viewerId) {
+          console.warn('[TabPolicy] viewerId not provided, showing history tab');
+          return true;
+        }
+
+        return entityId?.toUpperCase() === viewerId?.toUpperCase();
+      }
+
+      // Non-user entities (orders, services, reports): everyone can see history
       return true;
+    }
 
     // ===== ACTIONS TAB =====
     // Visible if:

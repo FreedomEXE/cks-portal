@@ -151,11 +151,9 @@ function normalizeOrderStatus(value?: string | null): HubOrderItem['status'] {
 export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubProps) {
   const { code: authCode } = useAuth();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
-  const { data: reportsData } = useHubReports(normalizedCode);
-  const { data: ordersData } = useHubOrders(normalizedCode);
 
   return (
-    <ModalProvider currentUser={normalizedCode || ''} reportsData={reportsData} ordersData={ordersData}>
+    <ModalProvider currentUserId={normalizedCode || ''} role="warehouse">
       <WarehouseHubContent initialTab={initialTab} />
     </ModalProvider>
   );
@@ -634,6 +632,7 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
               <ActivityFeed
                 activities={activities}
                 hub="warehouse"
+                viewerId={normalizedCode || undefined}
                 onClearActivity={handleClearActivity}
                 onClearAll={handleClearAll}
                 onOpenActionableOrder={(order) => setActionOrder(order)}

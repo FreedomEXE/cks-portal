@@ -145,6 +145,7 @@ function mapActivityRow(row: ActivityRow): HubActivityItem {
   return {
     id: String(row.activity_id),
     description: row.description,
+    activityType: row.activity_type, // Preserve specific type like "crew_assigned_to_center"
     category: activityTypeCategory[row.activity_type] ?? 'info',
     actorId: toNullableString(row.actor_id),
     actorRole: toNullableString(row.actor_role),

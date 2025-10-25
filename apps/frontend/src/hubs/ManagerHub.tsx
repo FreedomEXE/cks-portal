@@ -484,15 +484,7 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
   }, [managerCode, mutate]);
 
   return (
-    <ModalProvider
-      currentUser={managerCode || ''}
-      reportsData={reportsData}
-      ordersData={ordersData}
-      availableCrew={availableCrew}
-      onServiceSave={handleServiceSave}
-      onServiceAction={handleServiceAction}
-      onSendCrewRequest={handleSendCrewRequest}
-    >
+    <ModalProvider currentUserId={managerCode || ''} role="manager">
       <ManagerHubContent initialTab={initialTab} />
     </ModalProvider>
   );
@@ -1032,6 +1024,7 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
               <ActivityFeed
                 activities={formattedActivities}
                 hub="manager"
+                viewerId={managerCode || undefined}
                 onClearActivity={handleClearActivity}
                 onClearAll={handleClearAll}
                 onOpenActionableOrder={(order) => setActionOrder(order)}

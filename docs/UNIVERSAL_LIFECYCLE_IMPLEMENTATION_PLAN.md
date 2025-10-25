@@ -1077,9 +1077,190 @@ mapToProps: (data: any, actions: EntityAction[], onClose: () => void, lifecycle:
 
 ---
 
-## Phase 7: Comprehensive Testing
+## Phase 7: Hub Activity Feeds with User Profile Modal Support
 
-### 6.1: Entity Catalog Tests
+**Status:** 🟡 IN PROGRESS (2025-10-24)
+
+### Problem Statement
+
+Non-admin users (manager, contractor, customer, center, crew, warehouse) need to see their creation and assignment activities in their hub's "Recent Activity" section. When clicking these activities, profile modals should open via openById() with fresh database fetches.
+
+**User Requirements:**
+- Users should ONLY see their own creation event and their own assignment events
+- Users should NOT see ecosystem user creations (e.g., crew shouldn't see "center_created")
+- Clicking activities should open profile modals with Profile + History tabs
+- All roles should be able to view profiles of their assigned entities
+
+### 7.1: Backend Activity Query Fixes
+
+**File:** `apps/backend/server/domains/scope/store.ts`
+
+**Changes Applied:**
+
+1. **Crew Assignment Metadata Check** (lines 1246-1247)
+   - Problem: crew_assigned_to_center has target_id = center, crew ID in metadata
+   - Solution: Added metadata-based filtering
+   ```sql
+   OR
+   (activity_type = 'crew_assigned_to_center' AND metadata ? 'crewId' AND UPPER(metadata->>'crewId') = $2)
+   ```
+
+2. **Activity Dismissals Support**
+   - Problem: Backend queries ignored activity_dismissals table
+   - Solution: Added filter to all 6 role queries
+   ```sql
+   AND NOT EXISTS (
+     SELECT 1 FROM activity_dismissals ad
+     WHERE ad.activity_id = system_activity.activity_id AND ad.user_id = $2
+   )
+   ```
+
+3. **User Creation Exclusions Maintained** (lines 1251-1255)
+   - Problem: Users would see entire ecosystem's user creations
+   - Solution: Keep exclusions in ecosystem clause
+   - Users ONLY see their own creation (when target_id = self)
+   - Users do NOT see ecosystem creations
+   ```sql
+   -- EXCLUDE user creations (only show self-creation above, not ecosystem creations)
+   (
+     activity_type NOT IN ('manager_created', 'contractor_created', 'customer_created', 'center_created', 'crew_created', 'warehouse_created')
+     AND activity_type NOT LIKE '%assigned%'
+     AND activity_type != 'assignment_made'
+   )
+   ```
+
+### 7.2: Frontend Tab Policy Updates
+
+**File:** `apps/frontend/src/policies/tabs.ts`
+
+**Change:** Profile tab now visible to all roles (lines 98-106)
+
+**Before:**
+```typescript
+case 'profile':
+  return (
+    (entityType === 'manager' || entityType === 'contractor' || ...) &&
+    (role === 'admin' || role === 'manager')  // ❌ Only admin/manager
+  );
+```
+
+**After:**
+```typescript
+case 'profile':
+  return (
+    entityType === 'manager' || entityType === 'contractor' || entityType === 'customer' ||
+    entityType === 'crew' || entityType === 'center' || entityType === 'warehouse'
+  );  // ✅ All roles
+```
+
+**Reason:** Users need to see profiles of their assignments (crew sees center, contractor sees customers, etc.)
+
+### 7.3: Database Restoration
+
+**Problem:** 240 user creation/assignment activities were dismissed (user clicked "Clear All")
+
+**Solution:** Created restore script
+
+**File:** `apps/backend/scripts/restore-user-activities.js`
+
+**Activity Types Restored:**
+- User creations: manager_created, contractor_created, customer_created, center_created, crew_created, warehouse_created
+- User assignments: contractor_assigned_to_manager, customer_assigned_to_contractor, center_assigned_to_customer, crew_assigned_to_center, order_assigned_to_warehouse
+
+### 7.4: Architecture Patterns
+
+#### Metadata-Based Assignment Filtering
+
+Assignment activities often have target_id pointing to parent entity, with assigned user ID in metadata:
+
+```sql
+-- Example: crew_assigned_to_center
+-- target_id = CEN-010 (the center)
+-- metadata->>'crewId' = CRW-006 (the crew)
+
+-- Visibility check:
+(activity_type = 'crew_assigned_to_center' AND metadata ? 'crewId' AND UPPER(metadata->>'crewId') = $2)
+```
+
+**Pattern Applies To:**
+- contractor_assigned_to_manager (metadata->>'contractorId')
+- customer_assigned_to_contractor (metadata->>'customerId')
+- center_assigned_to_customer (metadata->>'centerId')
+- order_assigned_to_warehouse (metadata->>'warehouseId')
+
+#### OpenById Pattern with Fresh DB Fetches
+
+**Flow:** Activity click → parseEntityId() → openById() → Fetch /api/profile/:type/:id → Pass to modal
+
+**Files Involved:**
+- `apps/frontend/src/components/ActivityFeed.tsx` (lines 168-178) - Click handler
+- `apps/frontend/src/contexts/ModalProvider.tsx` (lines 91-135) - openById implementation
+
+**Benefits:**
+- No stale directory cache
+- Always shows latest database state
+- Works for deleted entities (tombstone fallback)
+
+### 7.5: Phase 7 Tasks
+
+**Status:** 🟡 IN PROGRESS
+
+- [x] Identify why user activities not showing in hubs
+- [x] Add crew assignment metadata filtering
+- [x] Add activity_dismissals support to all 6 queries
+- [x] Maintain user creation exclusions (only self, not ecosystem)
+- [x] Update Profile tab visibility for all roles
+- [x] Restore dismissed user creation/assignment activities
+- [x] Test warehouse hub shows creation activity
+- [x] Test crew backend query returns correct scope
+- [ ] Test all 6 user hubs (manager, contractor, customer, center, crew, warehouse)
+- [ ] Test all assignment activity clicks open correct profiles
+- [ ] Test Profile + History tabs visible for all roles
+- [ ] Verify no regressions in existing flows
+- [ ] Add automated tests for hub activity feeds
+
+### 7.6: Testing Status
+
+**✅ Verified Working:**
+- Warehouse hub shows warehouse_created activity
+- Warehouse profile modal opens with Profile + History tabs
+- Crew backend query returns only self-creation + assignment (not ecosystem)
+- 240 activities successfully restored from dismissals
+
+**⚠️ Limited Testing:**
+User explicitly noted: "I HAVE NOT TESTED ALL POSSIBLE FLOWS TO SEE IF THE FIXES/CODE WE APPLIED MAY HAVE BROKEN ANYTHING OR HAS BUGS"
+
+**Not Yet Tested:**
+- Manager, Contractor, Customer, Center hubs
+- Assignment activity clicks (contractor_assigned_to_manager, etc.)
+- Profile modals opening from other user types
+- Edge cases (deleted users, missing metadata, etc.)
+
+### 7.7: Known Issues
+
+1. **No Automated Tests** - Hub activity feed logic not covered by tests
+2. **Incomplete Manual Testing** - Only 2 of 6 user hubs verified
+3. **Activity Dismissal UX** - Should certain activity types be non-dismissible?
+
+### 7.8: Next Steps
+
+**Immediate:**
+1. Systematic testing of all 6 user hubs
+2. Test all assignment activity types
+3. Add integration tests for activity scoping logic
+
+**Future (User's Stated Goal):**
+> "then we can move on to services and products"
+
+- Service creation activities
+- Product creation activities
+- Service/product relationship activities
+
+---
+
+## Phase 8: Comprehensive Testing
+
+### 8.1: Entity Catalog Tests
 
 **File:** `apps/frontend/src/tests/entityCatalog.test.ts`
 
@@ -1332,8 +1513,20 @@ describe('Entity Catalog', () => {
 
 ---
 
-**Document Version:** 1.0
-**Last Updated:** 2025-10-22
-**Status:** Ready for Implementation
+**Document Version:** 1.1
+**Last Updated:** 2025-10-24
+**Status:** Phase 7 In Progress
 **Estimated Effort:** 4-5 weeks
 **Risk Level:** Medium (well-scoped, incremental phases)
+
+---
+
+## Recent Updates
+
+### 2025-10-24: Phase 7 - Hub Activity Feeds
+- Added Phase 7 documentation for Hub Activity Feeds with User Profile Modal Support
+- Backend: Fixed crew assignment visibility, added activity dismissals support
+- Frontend: Updated Profile tab policy for all roles
+- Database: Restored 240 dismissed user activities
+- Status: In progress - partial testing complete, comprehensive testing needed
+- See: `docs/sessions/SESSION WITH-CLAUDE-2025-10-24.md` for full details

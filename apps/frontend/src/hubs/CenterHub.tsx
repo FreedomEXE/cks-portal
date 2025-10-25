@@ -154,11 +154,9 @@ function normalizeOrderStatus(value?: string | null): HubOrderItem['status'] {
 export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) {
   const { code: authCode } = useAuth();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
-  const { data: reportsData } = useHubReports(normalizedCode);
-  const { data: ordersData } = useHubOrders(normalizedCode);
 
   return (
-    <ModalProvider currentUser={normalizedCode || ''} reportsData={reportsData} ordersData={ordersData}>
+    <ModalProvider currentUserId={normalizedCode || ''} role="center">
       <CenterHubContent initialTab={initialTab} />
     </ModalProvider>
   );
@@ -456,6 +454,7 @@ function CenterHubContent({ initialTab = 'dashboard' }: CenterHubProps) {
               <ActivityFeed
                 activities={activities}
                 hub="center"
+                viewerId={normalizedCode || undefined}
                 onClearActivity={handleClearActivity}
                 onClearAll={handleClearAll}
                 onOpenActionableOrder={(order) => setActionOrder(order)}

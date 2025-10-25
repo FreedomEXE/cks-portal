@@ -157,11 +157,9 @@ function normalizeOrderStatus(value?: string | null): HubOrderItem['status'] {
 export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
   const { code: authCode } = useAuth();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
-  const { data: reportsData } = useHubReports(normalizedCode);
-  const { data: ordersData } = useHubOrders(normalizedCode);
 
   return (
-    <ModalProvider currentUser={normalizedCode || ''} reportsData={reportsData} ordersData={ordersData}>
+    <ModalProvider currentUserId={normalizedCode || ''} role="crew">
       <CrewHubContent initialTab={initialTab} />
     </ModalProvider>
   );
@@ -513,6 +511,7 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
               <ActivityFeed
                 activities={activities}
                 hub="crew"
+                viewerId={normalizedCode || undefined}
                 onClearActivity={handleClearActivity}
                 onClearAll={handleClearAll}
                 onOpenActionableOrder={(order) => setActionOrder(order)}

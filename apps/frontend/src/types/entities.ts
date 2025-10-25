@@ -77,6 +77,8 @@ export interface TabVisibilityContext {
   lifecycle: Lifecycle;
   entityType: EntityType;
   entityData?: any;
+  entityId?: string; // The ID of the entity being viewed
+  viewerId?: string; // The ID of the current user viewing
   hasActions: boolean;
 }
 

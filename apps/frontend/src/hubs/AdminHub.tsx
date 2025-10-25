@@ -1423,6 +1423,7 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
               <ActivityFeed
                 activities={activityFeed}
                 hub="admin"
+                viewerId={code || undefined}
                 onClearActivity={handleClearActivity}
                 onClearAll={handleClearAll}
                 onOpenOrderModal={(order) => setSelectedOrderId(order?.orderId || order?.id || null)}
