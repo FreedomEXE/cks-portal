@@ -37,6 +37,8 @@ import {
   ReportQuickActions,
   UserModal,
   UserQuickActions,
+  ServiceDetails,
+  ServiceQuickActions,
 } from '@cks/ui';
 import type { ActivityModalProps } from '@cks/ui';
 import { DetailsComposer, ProfileInfoCard, getEntityAccentColor } from '@cks/domain-widgets';
@@ -856,7 +858,8 @@ const serviceAdapter: EntityAdapter = {
 
     const fields: HeaderField[] = [];
 
-    fields.push({ label: 'Service', value: entityData?.serviceName || '—' });
+    // Name-first convention for header card subtitle
+    fields.push({ label: 'Name', value: entityData?.serviceName || entityData?.name || '-' });
 
     if (entityData?.serviceType) {
       fields.push({ label: 'Type', value: entityData.serviceType });
@@ -1242,6 +1245,300 @@ const userAdapter: EntityAdapter = {
 };
 
 /**
+ * Catalog Service Section Builder
+ */
+function buildCatalogServiceDetailsSections(context: TabVisibilityContext): import('@cks/ui').SectionDescriptor[] {
+  const { entityData } = context;
+  const sections: import('@cks/ui').SectionDescriptor[] = [];
+
+  // Service Information section
+  const infoFields: Array<{ label: string; value: string }> = [];
+
+  infoFields.push({ label: 'Service ID', value: entityData?.serviceId || '-' });
+  infoFields.push({ label: 'Name', value: entityData?.name || '-' });
+
+  if (entityData?.category) {
+    infoFields.push({ label: 'Category', value: entityData.category });
+  }
+
+  if (entityData?.status) {
+    infoFields.push({ label: 'Status', value: entityData.status });
+  }
+
+  if (entityData?.managedBy) {
+    infoFields.push({ label: 'Managed By', value: entityData.managedBy });
+  }
+
+  sections.push({
+    id: 'service-info',
+    type: 'key-value-grid',
+    title: 'Service Information',
+    columns: 2,
+    fields: infoFields,
+  });
+
+  // Description section (if available)
+  if (entityData?.description) {
+    sections.push({
+      id: 'description',
+      type: 'rich-text',
+      title: 'Description',
+      content: entityData.description,
+    });
+  }
+
+  // Additional details (if available)
+  const additionalFields: Array<{ label: string; value: string }> = [];
+
+  if (entityData?.durationMinutes) {
+    additionalFields.push({ label: 'Duration', value: `${entityData.durationMinutes} minutes` });
+  }
+
+  if (entityData?.serviceWindow) {
+    additionalFields.push({ label: 'Service Window', value: entityData.serviceWindow });
+  }
+
+  if (entityData?.crewRequired) {
+    additionalFields.push({ label: 'Crew Required', value: String(entityData.crewRequired) });
+  }
+
+  if (additionalFields.length > 0) {
+    sections.push({
+      id: 'additional-details',
+      type: 'key-value-grid',
+      title: 'Additional Details',
+      columns: 2,
+      fields: additionalFields,
+    });
+  }
+
+  return sections;
+}
+
+/**
+ * Catalog Service Adapter
+ * For catalog service definitions (unscoped SRV-XXX like SRV-001, SRV-123)
+ */
+const catalogServiceAdapter: EntityAdapter = {
+  getActionDescriptors: (context: EntityActionContext): EntityActionDescriptor[] => {
+    const { role, state } = context;
+    const descriptors: EntityActionDescriptor[] = [];
+
+    console.log('[CatalogServiceAdapter] getActionDescriptors:', { role, state });
+
+    // Admin-only actions
+    if (role === 'admin') {
+      if (state === 'active') {
+        console.log('[CatalogServiceAdapter] Adding Edit + Archive actions for active state');
+        // Edit action
+        descriptors.push({
+          key: 'edit',
+          label: 'Edit',
+          variant: 'secondary',
+          closeOnSuccess: false,
+        });
+
+        // Archive action for catalog services (not hard delete)
+        descriptors.push({
+          key: 'archive',
+          label: 'Archive',
+          variant: 'secondary',
+          prompt: 'Are you sure you want to archive this catalog service? It will be hidden from active lists but can be restored later.',
+          closeOnSuccess: true,
+        });
+      } else if (state === 'archived') {
+        console.log('[CatalogServiceAdapter] Adding Restore + Delete actions for archived state');
+        // Restore action
+        descriptors.push({
+          key: 'restore',
+          label: 'Restore',
+          variant: 'secondary',
+          closeOnSuccess: true,
+        });
+
+        // Delete action (permanent)
+        descriptors.push({
+          key: 'delete',
+          label: 'Permanently Delete',
+          variant: 'danger',
+          confirm: 'Are you sure you want to PERMANENTLY delete this catalog service? This cannot be undone.',
+          closeOnSuccess: true,
+        });
+      }
+    }
+
+    return descriptors;
+  },
+
+  getHeaderConfig: (context: TabVisibilityContext): HeaderConfig => {
+    const { entityData } = context;
+    const fields: HeaderField[] = [];
+
+    // Name-first convention: EntityModalView extracts label 'Name' as header subtitle
+    fields.push({ label: 'Name', value: entityData?.name || '-' });
+
+    if (entityData?.serviceId) {
+      fields.push({ label: 'ID', value: entityData.serviceId });
+    }
+
+    if (entityData?.category) {
+      fields.push({ label: 'Category', value: entityData.category });
+    }
+
+    return {
+      id: entityData?.serviceId || '',
+      type: 'Service',
+      status: entityData?.status || 'active',
+      fields,
+    };
+  },
+
+  getDetailsSections: buildCatalogServiceDetailsSections,
+
+  getTabDescriptors: (context: TabVisibilityContext, actions: EntityAction[]): TabDescriptor[] => {
+    const { role, entityData, entityType } = context;
+    const tabs: TabDescriptor[] = [];
+
+    console.log('[CatalogServiceAdapter] getTabDescriptors called:', {
+      role,
+      entityType,
+      hasEntityData: !!entityData,
+      hasPeopleManagers: !!entityData?.peopleManagers,
+      peopleManagersCount: entityData?.peopleManagers?.length,
+      certifiedManagersCount: entityData?.certifiedManagers?.length
+    });
+
+    // Details tab - using ServiceDetails component from @cks/ui
+    tabs.push({
+      id: 'details',
+      label: 'Details',
+      content: (
+        <ServiceDetails
+          serviceId={entityData?.serviceId || ''}
+          serviceName={entityData?.name || 'Unnamed Service'}
+          category={entityData?.category}
+          status={entityData?.status || 'active'}
+          managedBy={entityData?.managedBy || 'manager'}
+          description={entityData?.description}
+        />
+      ),
+    });
+
+    // Admin-only: Quick Actions tab for certification management
+    console.log('[CatalogServiceAdapter] Checking admin condition:', { role, isAdmin: role === 'admin' });
+    if (role === 'admin') {
+      console.log('[CatalogServiceAdapter] Adding Quick Actions tab for admin');
+      // Build CertifiedUser arrays (mark who's certified)
+      const certifiedSet = {
+        manager: new Set(entityData?.certifiedManagers || []),
+        contractor: new Set(entityData?.certifiedContractors || []),
+        crew: new Set(entityData?.certifiedCrew || []),
+        warehouse: new Set(entityData?.certifiedWarehouses || []),
+      };
+
+      const managersData = (entityData?.peopleManagers || []).map((u: any) => ({
+        code: u.code,
+        name: u.name,
+        isCertified: certifiedSet.manager.has(u.code),
+      }));
+
+      const contractorsData = (entityData?.peopleContractors || []).map((u: any) => ({
+        code: u.code,
+        name: u.name,
+        isCertified: certifiedSet.contractor.has(u.code),
+      }));
+
+      const crewData = (entityData?.peopleCrew || []).map((u: any) => ({
+        code: u.code,
+        name: u.name,
+        isCertified: certifiedSet.crew.has(u.code),
+      }));
+
+      const warehousesData = (entityData?.peopleWarehouses || []).map((u: any) => ({
+        code: u.code,
+        name: u.name,
+        isCertified: certifiedSet.warehouse.has(u.code),
+      }));
+
+      tabs.unshift({
+        id: 'quick-actions',
+        label: 'Quick Actions',
+        content: (
+          <ServiceQuickActions
+            managers={managersData}
+            contractors={contractorsData}
+            crew={crewData}
+            warehouses={warehousesData}
+            managedBy={entityData?.managedBy || 'manager'}
+            category={entityData?.category || ''}
+            onSave={async (changes) => {
+              const serviceId = entityData?.serviceId;
+              if (!serviceId) {
+                console.error('[CatalogService] No serviceId available for saving certifications');
+                return;
+              }
+
+              try {
+                // Import admin API
+                const { patchServiceAssignments } = await import('../shared/api/admin');
+
+                // Calculate add/remove for each role
+                const roles: Array<'manager' | 'contractor' | 'crew' | 'warehouse'> = [
+                  'manager',
+                  'contractor',
+                  'crew',
+                  'warehouse',
+                ];
+
+                const initialState = {
+                  manager: new Set(entityData?.certifiedManagers || []),
+                  contractor: new Set(entityData?.certifiedContractors || []),
+                  crew: new Set(entityData?.certifiedCrew || []),
+                  warehouse: new Set(entityData?.certifiedWarehouses || []),
+                };
+
+                // Send updates for each role that has changes
+                for (const role of roles) {
+                  const currentSet = new Set(changes[role]);
+                  const initial = initialState[role];
+
+                  const add = changes[role].filter((code: string) => !initial.has(code));
+                  const remove = Array.from(initial).filter((code) => !currentSet.has(code));
+
+                  if (add.length > 0 || remove.length > 0) {
+                    console.log(`[CatalogService] Updating ${role} certifications:`, { add, remove });
+                    await patchServiceAssignments(serviceId, { role, add, remove });
+                  }
+                }
+
+                console.log('[CatalogService] Certifications saved successfully');
+              } catch (error) {
+                console.error('[CatalogService] Failed to save certifications:', error);
+                throw error; // Let ServiceQuickActions show error
+              }
+            }}
+            onEdit={() => {
+              // Edit is handled via the action button (Archive), not Quick Actions
+              console.log('[CatalogService] Edit via Quick Actions not implemented');
+            }}
+            onDelete={() => {
+              // Delete renamed to Archive, handled via action button
+              console.log('[CatalogService] Archive via Quick Actions not implemented (use action button)');
+            }}
+          />
+        ),
+      });
+    }
+
+    // No History tab for catalog services (they don't have activity history)
+
+    return tabs;
+  },
+
+  // No legacy component support for catalog services
+};
+
+/**
  * Entity Registry - Add new entity types here
  */
 export const entityRegistry: EntityRegistry = {
@@ -1249,6 +1546,7 @@ export const entityRegistry: EntityRegistry = {
   report: reportAdapter,
   feedback: reportAdapter, // Feedback uses same adapter as report
   service: serviceAdapter,
+  catalogService: catalogServiceAdapter, // ✅ Catalog service definitions (SRV-XXX unscoped)
   manager: userAdapter,
   contractor: userAdapter,
   customer: userAdapter,

@@ -34,12 +34,11 @@ import {
   PageWrapper,
   Scrollbar,
   TabContainer,
-  CatalogServiceModal,
   CatalogProductModal,
   UserModal,
   type UserAction,
 } from '@cks/ui';
-import { ModalProvider, useModals } from '../contexts';
+import { useModals } from '../contexts';
 import type { ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSWRConfig } from 'swr';
@@ -213,15 +212,9 @@ interface DirectorySectionConfig {
   emptyMessage: string;
 }
 
-// Main wrapper component that sets up ModalProvider
+// AdminHub now renders directly - ModalProvider is at app level
 export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
-  const { code } = useAuth();
-
-  return (
-    <ModalProvider currentUserId={code || ''} role="admin">
-      <AdminHubContent initialTab={initialTab} />
-    </ModalProvider>
-  );
+  return <AdminHubContent initialTab={initialTab} />;
 }
 
 // Inner component that has access to modal context
@@ -238,14 +231,10 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
 
   const [showActionModal, setShowActionModal] = useState(false);
   const [selectedEntity, setSelectedEntity] = useState<Record<string, any> | null>(null);
-  const [showServiceCatalogModal, setShowServiceCatalogModal] = useState(false);
-  const [selectedServiceCatalog, setSelectedServiceCatalog] = useState<{ serviceId: string; name: string | null; category: string | null; status?: string | null; description?: string | null; metadata?: any } | null>(null);
   const [showProductCatalogModal, setShowProductCatalogModal] = useState(false);
   const [selectedProductCatalog, setSelectedProductCatalog] = useState<{ productId: string; name: string | null; category: string | null; status?: string | null; description?: string | null; unitOfMeasure?: string | null; minimumOrderQuantity?: number | null; leadTimeDays?: number | null; metadata?: any } | null>(null);
   const [productInventoryData, setProductInventoryData] = useState<Array<{ warehouseId: string; warehouseName: string; quantityOnHand: number; minStockLevel: number | null; location: string | null }>>([]);
-  const [serviceCertifications, setServiceCertifications] = useState<{ managers: string[]; contractors: string[]; crew: string[]; warehouses: string[] }>({ managers: [], contractors: [], crew: [], warehouses: [] });
   const [toast, setToast] = useState<string | null>(null);
-  // merged assign flow into CatalogServiceModal
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [selectedOrderForEdit, setSelectedOrderForEdit] = useState<HubOrderItem | null>(null);
   const logout = useLogout();
@@ -312,24 +301,6 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
 
   // Use centralized order details hook (with directory context for enrichment)
   // OrderDetails are now handled via OrderDetailsGateway
-
-  // Fetch certifications when service catalog modal opens
-  useEffect(() => {
-    if (selectedServiceCatalog && showServiceCatalogModal) {
-      (async () => {
-        try {
-          const { getServiceCertifications } = await import('../shared/api/admin');
-          const result = await getServiceCertifications(selectedServiceCatalog.serviceId);
-          if (result.success && result.data) {
-            setServiceCertifications(result.data);
-          }
-        } catch (error) {
-          console.error('[ADMIN] Failed to fetch certifications:', error);
-          setServiceCertifications({ managers: [], contractors: [], crew: [], warehouses: [] });
-        }
-      })();
-    }
-  }, [selectedServiceCatalog, showServiceCatalogModal]);
 
   // Fetch inventory when product catalog modal opens
   useEffect(() => {
@@ -1144,15 +1115,8 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
             maxItems={25}
             showSearch
             onRowClick={(row) => {
-              setSelectedServiceCatalog({
-                serviceId: row.id,
-                name: row.name ?? null,
-                category: row.category ?? null,
-                status: row.status ?? null,
-                description: row.description ?? null,
-                metadata: (row as any).metadata ?? null,
-              });
-              setShowServiceCatalogModal(true);
+              // Use openById for all services to fetch full details (including admin lists)
+              modals.openById(row.id);
             }}
           />
         </>
@@ -1427,7 +1391,7 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
                 onClearActivity={handleClearActivity}
                 onClearAll={handleClearAll}
                 onOpenOrderModal={(order) => setSelectedOrderId(order?.orderId || order?.id || null)}
-                onOpenServiceModal={setSelectedServiceCatalog}
+                onOpenServiceModal={(service) => modals.openById(service?.serviceId || service?.id || null)}
                 isLoading={activitiesLoading}
                 error={activitiesError}
                 onError={(message) => {
@@ -1721,15 +1685,7 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
                 variant: 'secondary' as const,
                 onClick: () => {
                   if (!selectedEntity) return;
-                  setSelectedServiceCatalog({
-                    serviceId: selectedEntity.id,
-                    name: selectedEntity.name ?? null,
-                    category: selectedEntity.category ?? null,
-                    status: selectedEntity.status ?? null,
-                    description: selectedEntity.description ?? null,
-                    metadata: (selectedEntity as any).metadata ?? null,
-                  });
-                  setShowServiceCatalogModal(true);
+                  modals.openById(selectedEntity.id);
                 },
               },
               {
@@ -1820,119 +1776,6 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
         }
       />
 
-      <CatalogServiceModal
-        isOpen={showServiceCatalogModal}
-        onClose={() => {
-          setShowServiceCatalogModal(false);
-          setSelectedServiceCatalog(null);
-        }}
-        service={selectedServiceCatalog}
-        peopleManagers={(managers || []).map((m) => ({ code: m.id, name: m.name || m.id }))}
-        peopleContractors={(contractors || []).map((c) => ({ code: c.id, name: c.name || c.id }))}
-        peopleCrew={(crew || []).map((c) => ({ code: c.id, name: c.name || c.id }))}
-        peopleWarehouses={(warehouses || []).map((w) => ({ code: w.id, name: w.name || w.id }))}
-        certifiedManagers={serviceCertifications.managers || []}
-        certifiedContractors={serviceCertifications.contractors || []}
-        certifiedCrew={serviceCertifications.crew || []}
-        certifiedWarehouses={serviceCertifications.warehouses || []}
-        onSave={async (changes) => {
-          if (!selectedServiceCatalog) return;
-          try {
-            const { patchServiceAssignments } = await import('../shared/api/admin');
-            const serviceId = selectedServiceCatalog.serviceId;
-
-            console.log('[ADMIN] Saving certification changes:', changes);
-
-            // Get current certifications from state
-            const currentCerts = {
-              manager: serviceCertifications.managers || [],
-              contractor: serviceCertifications.contractors || [],
-              crew: serviceCertifications.crew || [],
-              warehouse: serviceCertifications.warehouses || []
-            };
-
-            // Calculate diff for each role and call /assign endpoint
-            const roles: Array<'manager' | 'contractor' | 'crew' | 'warehouse'> = ['manager', 'contractor', 'crew', 'warehouse'];
-
-            for (const role of roles) {
-              const currentSet = new Set(currentCerts[role] || []);
-              const newSet = new Set(changes[role] || []);
-
-              const toAdd: string[] = [];
-              const toRemove: string[] = [];
-
-              // Find additions
-              for (const code of newSet) {
-                if (!currentSet.has(code)) {
-                  toAdd.push(code);
-                }
-              }
-
-              // Find removals
-              for (const code of currentSet) {
-                if (!newSet.has(code)) {
-                  toRemove.push(code);
-                }
-              }
-
-              // Only call API if there are changes for this role
-              if (toAdd.length > 0 || toRemove.length > 0) {
-                console.log(`[ADMIN] ${role}: adding ${toAdd.length}, removing ${toRemove.length}`);
-                await patchServiceAssignments(serviceId, {
-                  role,
-                  add: toAdd,
-                  remove: toRemove
-                });
-              }
-            }
-
-            console.log('[ADMIN] All certification changes saved');
-
-            // Update local certifications state
-            setServiceCertifications({
-              managers: changes.manager || [],
-              contractors: changes.contractor || [],
-              crew: changes.crew || [],
-              warehouses: changes.warehouse || []
-            });
-
-            // Revalidate
-            mutate('/admin/directory/services');
-            setToast('Certifications saved successfully!');
-            setTimeout(() => setToast(null), 2500);
-
-            // Close modal after successful save
-            setShowServiceCatalogModal(false);
-            setSelectedServiceCatalog(null);
-          } catch (error) {
-            console.error('[ADMIN] save certifications failed', error);
-            throw error; // Re-throw so ServiceQuickActions can handle it
-          }
-        }}
-        onEdit={() => {
-          console.log('Edit service:', selectedServiceCatalog);
-          // TODO: Open edit modal
-          alert('Edit functionality to be implemented');
-        }}
-        onDelete={async () => {
-          if (!selectedServiceCatalog) return;
-          if (!confirm(`Are you sure you want to delete service "${selectedServiceCatalog.name}"?`)) return;
-
-          try {
-            const { archiveEntity } = await import('../shared/api/admin');
-            await archiveEntity('service', selectedServiceCatalog.serviceId);
-
-            setShowServiceCatalogModal(false);
-            setSelectedServiceCatalog(null);
-            mutate('/admin/directory/services');
-            setToast('Service deleted');
-            setTimeout(() => setToast(null), 1800);
-          } catch (error) {
-            console.error('[admin] delete service failed', error);
-            alert(error instanceof Error ? error.message : 'Failed to delete service');
-          }
-        }}
-      />
 
       <CatalogProductModal
         isOpen={showProductCatalogModal}

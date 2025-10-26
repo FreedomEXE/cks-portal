@@ -28,8 +28,8 @@ import {
   type TreeNode,
 } from '@cks/domain-widgets';
 import { crewOverviewCards } from '@cks/domain-widgets';
-import { Button, DataTable, OrderDetailsModal, ServiceViewModal, CatalogServiceModal, PageHeader, PageWrapper, Scrollbar, TabSection } from '@cks/ui';
-import { ModalProvider, useModals } from '../contexts';
+import { Button, DataTable, OrderDetailsModal, ServiceViewModal, PageHeader, PageWrapper, Scrollbar, TabSection } from '@cks/ui';
+import { useModals } from '../contexts';
 import ActivityModalGateway from '../components/ActivityModalGateway';
 import { useEntityActions } from '../hooks/useEntityActions';
 import { useAuth } from '@cks/auth';
@@ -158,11 +158,7 @@ export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
   const { code: authCode } = useAuth();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
 
-  return (
-    <ModalProvider currentUserId={normalizedCode || ''} role="crew">
-      <CrewHubContent initialTab={initialTab} />
-    </ModalProvider>
-  );
+  return <CrewHubContent initialTab={initialTab} />;
 }
 
 // Inner component that has access to modal context
@@ -171,8 +167,6 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
   const [activeTab, setActiveTab] = useState(initialTab);
   const [servicesTab, setServicesTab] = useState<'my' | 'active' | 'history'>('active');
   const [servicesSearchQuery, setServicesSearchQuery] = useState('');
-  const [showCatalogServiceModal, setShowCatalogServiceModal] = useState(false);
-  const [selectedCatalogService, setSelectedCatalogService] = useState<{ serviceId: string; name: string; category: string | null; status?: string } | null>(null);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [selectedOrderData, setSelectedOrderData] = useState<any | null>(null);
   const [actionOrder, setActionOrder] = useState<any | null>(null);
@@ -599,13 +593,7 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
                     maxItems={10}
                     modalType="service-my-services"
                     onRowClick={(row: any) => {
-                      setSelectedCatalogService({
-                        serviceId: row.serviceId,
-                        name: row.serviceName,
-                        category: null,
-                        status: 'active',
-                      });
-                      setShowCatalogServiceModal(true);
+                      modals.openById(row.serviceId);
                     }}
                   />
                 )}
@@ -887,15 +875,6 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
         />
       )}
 
-      {/* Catalog Service Modal - for My Services section (view-only) */}
-      <CatalogServiceModal
-        isOpen={showCatalogServiceModal}
-        onClose={() => {
-          setShowCatalogServiceModal(false);
-          setSelectedCatalogService(null);
-        }}
-        service={selectedCatalogService}
-      />
       </div>
   );
 }

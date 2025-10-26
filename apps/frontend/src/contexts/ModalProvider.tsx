@@ -6,6 +6,7 @@
  */
 
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import { useAuth } from '@cks/auth';
 import ModalGateway from '../components/ModalGateway';
 import type { EntityType, UserRole, OpenEntityModalOptions } from '../types/entities';
 import { parseEntityId, isValidId } from '../shared/utils/parseEntityId';
@@ -37,17 +38,16 @@ const ModalContext = createContext<ModalContextValue | null>(null);
 
 export interface ModalProviderProps {
   children: ReactNode;
-  /** Current user's ID */
-  currentUserId: string;
-  /** Current user's role */
-  role: UserRole;
 }
 
-export function ModalProvider({
-  children,
-  currentUserId,
-  role,
-}: ModalProviderProps) {
+export function ModalProvider({ children }: ModalProviderProps) {
+  // Get current auth state (reactive to changes)
+  const { code, role: authRole } = useAuth();
+  const currentUserId = code || '';
+  const role = (authRole?.toLowerCase() as UserRole) || 'crew';
+
+  console.log('[ModalProvider] Current auth state:', { code, authRole, resolvedRole: role });
+
   // Single state for current modal
   const [currentModal, setCurrentModal] = useState<{
     entityType: EntityType;
@@ -74,6 +74,7 @@ export function ModalProvider({
 
       // Parse ID to determine type
       const { type, subtype } = parseEntityId(id);
+      console.log(`[ModalProvider] Parsed ID "${id}":`, { type, subtype });
 
       // Handle unknown types
       if (type === 'unknown') {
@@ -121,6 +122,83 @@ export function ModalProvider({
         } catch (error) {
           console.error(`[ModalProvider] Failed to fetch ${entityType} ${id}:`, error);
           // Continue with modal open - ModalGateway will show error state
+        }
+      } else if (type === 'catalogService') {
+        // Catalog Service entities: fetch from catalog endpoint
+        entityType = 'catalogService' as EntityType;
+
+        console.log(`[ModalProvider] Fetching catalogService for ID: ${id}`);
+
+        try {
+          const response = await apiFetch<{
+            data: any;
+          }>(
+            `/catalog/services/${id}/details`
+          );
+
+          console.log(`[ModalProvider] Fetched catalogService data:`, response);
+          console.log(`[ModalProvider] catalogService data keys:`, Object.keys(response.data || {}));
+          console.log(`[ModalProvider] Admin lists present:`, {
+            hasPeopleManagers: !!response.data?.peopleManagers,
+            hasPeopleContractors: !!response.data?.peopleContractors,
+            hasPeopleCrew: !!response.data?.peopleCrew,
+            hasPeopleWarehouses: !!response.data?.peopleWarehouses,
+            hasCertifiedManagers: !!response.data?.certifiedManagers,
+            managersCount: response.data?.peopleManagers?.length,
+            certifiedManagersCount: response.data?.certifiedManagers?.length,
+          });
+
+          // Pass fetched data via options (derive state from status)
+          // Backend returns status: 'active' | 'inactive'
+          // Map inactive → archived for lifecycle consistency
+          const state = response.data?.status === 'inactive' ? 'archived' : 'active';
+          enrichedOptions = {
+            ...options,
+            data: response.data,
+            state,
+          } as any;
+        } catch (error) {
+          console.error(`[ModalProvider] Failed to fetch catalogService ${id}:`, error);
+
+          // Soft fallback: attempt to locate from catalog list API so modal can still open
+          try {
+            const listResp = await apiFetch<{
+              data: { items: any[] };
+            }>(`/catalog/items?type=service&q=${encodeURIComponent(id)}`);
+
+            const match = (listResp?.data?.items || []).find((it: any) =>
+              (it?.code || '').toUpperCase() === id.toUpperCase()
+            );
+
+            if (match) {
+              const fallbackData = {
+                serviceId: match.code,
+                name: match.name,
+                category: match.category || (Array.isArray(match.tags) ? match.tags[0] : null),
+                description: match.description,
+                tags: match.tags || [],
+                status: 'active',
+                metadata: match.metadata || {},
+                imageUrl: match.imageUrl || null,
+                price: match.price || null,
+                durationMinutes: match.service?.durationMinutes ?? null,
+                serviceWindow: match.service?.serviceWindow ?? null,
+                attributes: match.service?.attributes ?? null,
+                crewRequired: match.crewRequired ?? null,
+                managedBy: match.managedBy || 'manager',
+              };
+
+              enrichedOptions = {
+                ...options,
+                data: fallbackData,
+                state: 'active',
+              } as any;
+
+              console.warn('[ModalProvider] Using catalog items fallback for catalogService', id);
+            }
+          } catch (fallbackErr) {
+            console.error('[ModalProvider] Fallback catalog items lookup failed', fallbackErr);
+          }
         }
       } else {
         entityType = (type === 'order' ? type : (subtype || type)) as EntityType;

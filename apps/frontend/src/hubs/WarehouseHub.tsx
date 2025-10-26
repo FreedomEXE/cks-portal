@@ -27,8 +27,8 @@ import {
   type Activity,
 } from '@cks/domain-widgets';
 import { warehouseOverviewCards } from '@cks/domain-widgets';
-import { Button, DataTable, PageHeader, PageWrapper, Scrollbar, TabSection, OrderActionModal, CatalogServiceModal, ServiceViewModal } from '@cks/ui';
-import { ModalProvider, useModals } from '../contexts';
+import { Button, DataTable, PageHeader, PageWrapper, Scrollbar, TabSection, OrderActionModal, ServiceViewModal } from '@cks/ui';
+import { useModals } from '../contexts';
 import OrderDetailsGateway from '../components/OrderDetailsGateway';
 import { useAuth } from '@cks/auth';
 import { useSWRConfig } from 'swr';
@@ -152,11 +152,7 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
   const { code: authCode } = useAuth();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
 
-  return (
-    <ModalProvider currentUserId={normalizedCode || ''} role="warehouse">
-      <WarehouseHubContent initialTab={initialTab} />
-    </ModalProvider>
-  );
+  return <WarehouseHubContent initialTab={initialTab} />;
 }
 
 // Inner component that has access to modal context
@@ -168,8 +164,6 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
   const [activeTab, setActiveTab] = useState(initialTab);
   const [servicesTab, setServicesTab] = useState<'my' | 'active' | 'history'>('active');
   const [servicesSearchQuery, setServicesSearchQuery] = useState('');
-  const [showCatalogServiceModal, setShowCatalogServiceModal] = useState(false);
-  const [selectedCatalogService, setSelectedCatalogService] = useState<{ serviceId: string; name: string; category: string | null; status?: string } | null>(null);
   const [deliveriesTab, setDeliveriesTab] = useState<'pending' | 'completed'>('pending');
   const [deliveriesSearchQuery, setDeliveriesSearchQuery] = useState('');
   const [inventoryTab, setInventoryTab] = useState<'active' | 'archive'>('active');
@@ -1005,13 +999,7 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
                     maxItems={10}
                     modalType="service-my-services"
                     onRowClick={(row: any) => {
-                      setSelectedCatalogService({
-                        serviceId: row.serviceId,
-                        name: row.serviceName,
-                        category: null,
-                        status: 'active',
-                      });
-                      setShowCatalogServiceModal(true);
+                      modals.openById(row.serviceId);
                     }}
                   />
                 )}
@@ -1259,17 +1247,6 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
         role="user"
         userAvailableActions={[]}
       />
-
-      {/* Catalog Service Modal - for My Services section (view-only) */}
-      <CatalogServiceModal
-        isOpen={showCatalogServiceModal}
-        onClose={() => {
-          setShowCatalogServiceModal(false);
-          setSelectedCatalogService(null);
-        }}
-        service={selectedCatalogService}
-      />
-
 
     </div>
   );

@@ -30,13 +30,12 @@ import {
   OrderDetailsModal,
   ServiceDetailsModal,
   ServiceViewModal,
-  CatalogServiceModal,
   PageHeader,
   PageWrapper,
   Scrollbar,
   TabSection,
 } from '@cks/ui';
-import { ModalProvider, useModals } from '../contexts';
+import { useModals } from '../contexts';
 import OrderDetailsGateway from '../components/OrderDetailsGateway';
 import MyHubSection from '../components/MyHubSection';
 import { useCatalogItems } from '../shared/api/catalog';
@@ -483,11 +482,7 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
     mutate(`/hub/orders/${managerCode}`, undefined, { revalidate: true });
   }, [managerCode, mutate]);
 
-  return (
-    <ModalProvider currentUserId={managerCode || ''} role="manager">
-      <ManagerHubContent initialTab={initialTab} />
-    </ModalProvider>
-  );
+  return <ManagerHubContent initialTab={initialTab} />;
 }
 
 // Inner component that has access to modal context
@@ -499,9 +494,6 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
   const [servicesSearchQuery, setServicesSearchQuery] = useState('');
   const [toast, setToast] = useState<string | null>(null);
 
-  // Catalog service modal state (for My Services section)
-  const [showCatalogServiceModal, setShowCatalogServiceModal] = useState(false);
-  const [selectedCatalogService, setSelectedCatalogService] = useState<{ serviceId: string; name: string; category: string | null; status?: string } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
@@ -1108,13 +1100,7 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
                     maxItems={10}
                     modalType="service-my-services"
                     onRowClick={(row: any) => {
-                      setSelectedCatalogService({
-                        serviceId: row.serviceId,
-                        name: row.serviceName,
-                        category: row.category === '-' ? null : row.category,
-                        status: 'active',
-                      });
-                      setShowCatalogServiceModal(true);
+                      modals.openById(row.serviceId);
                     }}
                   />
                 )}
@@ -1376,16 +1362,6 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
         onClose={() => setSelectedOrderId(null)}
         onEdit={() => {}}
         onArchive={async () => {}}
-      />
-
-      {/* Catalog Service Modal - for My Services section (view-only) */}
-      <CatalogServiceModal
-        isOpen={showCatalogServiceModal}
-        onClose={() => {
-          setShowCatalogServiceModal(false);
-          setSelectedCatalogService(null);
-        }}
-        service={selectedCatalogService}
       />
 
       {toast && (

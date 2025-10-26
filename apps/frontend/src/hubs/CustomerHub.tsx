@@ -29,7 +29,7 @@ import {
 } from '@cks/domain-widgets';
 import { customerOverviewCards } from '@cks/domain-widgets';
 import { Button, DataTable, OrderDetailsModal, ServiceViewModal, PageHeader, PageWrapper, Scrollbar, TabSection, OrderActionModal } from '@cks/ui';
-import { ModalProvider, useModals } from '../contexts';
+import { useModals } from '../contexts';
 import OrderDetailsGateway from '../components/OrderDetailsGateway';
 import { useAuth } from '@cks/auth';
 import { useSWRConfig } from 'swr';
@@ -157,11 +157,7 @@ export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubPro
   const { code: authCode } = useAuth();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
 
-  return (
-    <ModalProvider currentUserId={normalizedCode || ''} role="customer">
-      <CustomerHubContent initialTab={initialTab} />
-    </ModalProvider>
-  );
+  return <CustomerHubContent initialTab={initialTab} />;
 }
 
 // Inner component that has access to modal context

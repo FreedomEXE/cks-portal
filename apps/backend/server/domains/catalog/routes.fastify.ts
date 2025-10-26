@@ -59,6 +59,173 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
     reply.send({ data: result });
   });
 
+  // Get catalog service details by ID (on-demand fetching for modals)
+  // Session-based auth pattern (matches services/routes pattern)
+  server.get('/api/catalog/services/:serviceId/details', async (request, reply) => {
+    const user = await requireActiveRole(request, reply, {});
+    if (!user) {
+      return;
+    }
+
+    console.log('[CATALOG_DETAILS] User authenticated:', { role: user.role });
+
+    const paramsSchema = z.object({ serviceId: z.string().min(1) });
+    const p = paramsSchema.safeParse(request.params);
+    if (!p.success) {
+      reply.code(400).send({ error: 'Invalid service ID' });
+      return;
+    }
+
+    const { serviceId } = p.data;
+    const normalizedId = serviceId.toUpperCase();
+
+    console.log('[CATALOG_DETAILS] Fetching service:', normalizedId);
+
+    try {
+      // Fetch service from catalog_services table
+      console.log('[CATALOG_DETAILS] Step 1: Querying catalog_services table');
+      const result = await query<{
+        service_id: string;
+        name: string;
+        category: string | null;
+        description: string | null;
+        tags: string[] | null;
+        is_active: boolean;
+        metadata: any;
+        image_url: string | null;
+        base_price: string | null;
+        currency: string | null;
+        unit_of_measure: string | null;
+        duration_minutes: number | null;
+        service_window: string | null;
+        attributes: any;
+        crew_required: number | null;
+        managed_by: string | null;
+        created_at: Date;
+        updated_at: Date;
+      }>(
+        `SELECT
+          service_id,
+          name,
+          category,
+          description,
+          tags,
+          is_active,
+          metadata,
+          image_url,
+          base_price,
+          currency,
+          unit_of_measure,
+          duration_minutes,
+          service_window,
+          attributes,
+          crew_required,
+          managed_by,
+          created_at,
+          updated_at
+         FROM catalog_services
+         WHERE UPPER(service_id) = $1
+         LIMIT 1`,
+        [normalizedId]
+      );
+
+      console.log('[CATALOG_DETAILS] Step 1 complete: Found service, rowCount:', result.rowCount);
+
+      if (result.rowCount === 0) {
+        return reply.code(404).send({ error: 'Service not found' });
+      }
+
+      const row = result.rows[0];
+
+      // Build response data
+      const data: any = {
+        serviceId: row.service_id,
+        name: row.name,
+        category: row.category,
+        description: row.description,
+        tags: row.tags || [],
+        status: row.is_active ? 'active' : 'inactive',
+        metadata: row.metadata || {},
+        imageUrl: row.image_url,
+        price: row.base_price ? {
+          amount: row.base_price,
+          currency: row.currency || 'USD',
+          unitOfMeasure: row.unit_of_measure
+        } : null,
+        durationMinutes: row.duration_minutes,
+        serviceWindow: row.service_window,
+        attributes: row.attributes,
+        crewRequired: row.crew_required,
+        managedBy: row.managed_by || 'manager',
+        createdAt: row.created_at?.toISOString(),
+        updatedAt: row.updated_at?.toISOString()
+      };
+
+      // If admin, include certifications AND full directory lists
+      const isAdmin = (user.role || '').toLowerCase() === 'admin';
+      console.log('[CATALOG_DETAILS] Admin check:', { userRole: user.role, isAdmin });
+
+      if (isAdmin) {
+        console.log('[CATALOG_DETAILS] Step 2: Fetching certifications');
+        // Get certifications
+        const certResult = await query<{ user_id: string; role: string }>(
+          `SELECT user_id, role FROM service_certifications WHERE service_id = $1 AND archived_at IS NULL`,
+          [normalizedId]
+        );
+        console.log('[CATALOG_DETAILS] Step 2 complete: Certifications count:', certResult.rowCount);
+
+        const certifiedManagers: string[] = [];
+        const certifiedContractors: string[] = [];
+        const certifiedCrew: string[] = [];
+        const certifiedWarehouses: string[] = [];
+
+        for (const cert of certResult.rows) {
+          if (cert.role === 'manager') certifiedManagers.push(cert.user_id);
+          else if (cert.role === 'contractor') certifiedContractors.push(cert.user_id);
+          else if (cert.role === 'crew') certifiedCrew.push(cert.user_id);
+          else if (cert.role === 'warehouse') certifiedWarehouses.push(cert.user_id);
+        }
+
+        // Get ALL directory lists (for certification UI)
+        console.log('[CATALOG_DETAILS] Step 3: Fetching directory lists (managers, contractors, crew, warehouses)');
+        const [managersResult, contractorsResult, crewResult, warehousesResult] = await Promise.all([
+          query<{ manager_id: string; name: string }>(`SELECT manager_id, name FROM managers WHERE status = 'active' ORDER BY name`),
+          query<{ contractor_id: string; name: string }>(`SELECT contractor_id, name FROM contractors WHERE status = 'active' ORDER BY name`),
+          query<{ crew_id: string; name: string }>(`SELECT crew_id, name FROM crew WHERE status = 'active' ORDER BY name`),
+          query<{ warehouse_id: string; name: string }>(`SELECT warehouse_id, name FROM warehouses WHERE status = 'active' ORDER BY name`)
+        ]);
+        console.log('[CATALOG_DETAILS] Step 3 complete: Directory counts:', {
+          managers: managersResult.rowCount,
+          contractors: contractorsResult.rowCount,
+          crew: crewResult.rowCount,
+          warehouses: warehousesResult.rowCount
+        });
+
+        data.peopleManagers = managersResult.rows.map(r => ({ code: r.manager_id, name: r.name }));
+        data.peopleContractors = contractorsResult.rows.map(r => ({ code: r.contractor_id, name: r.name }));
+        data.peopleCrew = crewResult.rows.map(r => ({ code: r.crew_id, name: r.name }));
+        data.peopleWarehouses = warehousesResult.rows.map(r => ({ code: r.warehouse_id, name: r.name }));
+
+        data.certifiedManagers = certifiedManagers;
+        data.certifiedContractors = certifiedContractors;
+        data.certifiedCrew = certifiedCrew;
+        data.certifiedWarehouses = certifiedWarehouses;
+
+        console.log('[CATALOG_DETAILS] Admin data attached:', {
+          peopleManagersCount: data.peopleManagers.length,
+          certifiedManagersCount: certifiedManagers.length
+        });
+      }
+
+      console.log('[CATALOG_DETAILS] Sending response with data keys:', Object.keys(data));
+      return reply.send({ data });
+    } catch (error) {
+      console.error('[CATALOG_DETAILS] ERROR:', error);
+      request.log.error({ err: error, serviceId }, 'Failed to fetch catalog service details');
+      reply.code(500).send({ error: 'Failed to fetch service details' });
+    }
+  });
+
   // Admin: update catalog service metadata/fields
   server.patch('/api/admin/catalog/services/:serviceId', async (request, reply) => {
     const admin = await requireActiveAdmin(request, reply);

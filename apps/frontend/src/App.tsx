@@ -3,6 +3,7 @@ import { useEffect, useRef, type ComponentType } from 'react';
 import { Navigate, Route, Routes, useSearchParams } from 'react-router-dom';
 import { useLoading } from './contexts/LoadingContext';
 import { HubLoadingProvider, useHubLoading } from './contexts/HubLoadingContext';
+import { ModalProvider } from './contexts/ModalProvider';
 
 import AdminHub from './hubs/AdminHub';
 import CenterHub from './hubs/CenterHub';
@@ -96,15 +97,19 @@ function RoleHubRoute(): JSX.Element {
 }
 
 export function AuthenticatedApp(): JSX.Element {
+  console.log('[AuthenticatedApp] Rendering authenticated app');
+
   return (
     <HubLoadingProvider>
-      <Routes>
-        <Route path="/" element={<Navigate to="/hub" replace />} />
-        <Route path="/hub" element={<RoleHubRoute />} />
-        <Route path="/catalog" element={<CKSCatalog />} />
-        <Route path="/hub/*" element={<Navigate to="/hub" replace />} />
-        <Route path="*" element={<Navigate to="/hub" replace />} />
-      </Routes>
+      <ModalProvider>
+        <Routes>
+          <Route path="/" element={<Navigate to="/hub" replace />} />
+          <Route path="/hub" element={<RoleHubRoute />} />
+          <Route path="/catalog" element={<CKSCatalog />} />
+          <Route path="/hub/*" element={<Navigate to="/hub" replace />} />
+          <Route path="*" element={<Navigate to="/hub" replace />} />
+        </Routes>
+      </ModalProvider>
     </HubLoadingProvider>
   );
 }

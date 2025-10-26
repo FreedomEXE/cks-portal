@@ -59,6 +59,10 @@ export function useEntityActions(): UseEntityActionsReturn {
           return await handleReportAction(entityId, actionId, subtype, options, mutate);
         }
 
+        if (type === 'catalogService') {
+          return await handleCatalogServiceAction(entityId, actionId, options, mutate);
+        }
+
         // Unsupported entity type
         console.warn(`[useEntityActions] Unsupported entity type: ${type}`);
         return false;
@@ -407,6 +411,87 @@ async function handleServiceAction(
   } catch (error) {
     console.error(`[useEntityActions] Service action "${actionId}" failed:`, error);
     toast.error(`Failed to ${actionId} service`);
+    throw error;
+  }
+}
+
+/**
+ * Handle Catalog Service Actions
+ */
+async function handleCatalogServiceAction(
+  serviceId: string,
+  actionId: string,
+  options: EntityActionOptions,
+  mutate: any
+): Promise<boolean> {
+  try {
+    switch (actionId) {
+      case 'edit': {
+        // TODO: Implement edit form/modal for catalog services
+        console.warn('[useEntityActions] Edit action not yet implemented for catalog services');
+        toast.error('Edit functionality coming soon');
+        return false;
+      }
+
+      case 'archive': {
+        const { updateCatalogService } = await import('../shared/api/admin');
+
+        console.log('[useEntityActions] Archiving catalog service:', serviceId);
+        await updateCatalogService(serviceId, { isActive: false });
+
+        // Invalidate caches
+        mutate((key: any) => {
+          if (typeof key === 'string') {
+            return key.includes('/catalog') ||
+                   key.includes('/admin/directory') ||
+                   key.includes(serviceId);
+          }
+          return false;
+        });
+
+        console.log('[useEntityActions] Catalog service archive: success');
+        toast.success('Catalog service archived successfully');
+        options.onSuccess?.();
+        return true;
+      }
+
+      case 'restore': {
+        const { updateCatalogService } = await import('../shared/api/admin');
+
+        console.log('[useEntityActions] Restoring catalog service:', serviceId);
+        await updateCatalogService(serviceId, { isActive: true });
+
+        // Invalidate caches
+        mutate((key: any) => {
+          if (typeof key === 'string') {
+            return key.includes('/catalog') ||
+                   key.includes('/admin/directory') ||
+                   key.includes(serviceId);
+          }
+          return false;
+        });
+
+        console.log('[useEntityActions] Catalog service restore: success');
+        toast.success('Catalog service restored successfully');
+        options.onSuccess?.();
+        return true;
+      }
+
+      case 'delete': {
+        // TODO: Implement permanent delete endpoint in backend
+        console.warn('[useEntityActions] Delete action not yet implemented for catalog services');
+        toast.error('Permanent delete functionality coming soon');
+        return false;
+      }
+
+      default:
+        console.warn('[useEntityActions] Unknown action for catalogService:', actionId);
+        toast.error(`Action "${actionId}" not supported for catalog services`);
+        return false;
+    }
+  } catch (error) {
+    console.error(`[useEntityActions] Catalog service action "${actionId}" failed:`, error);
+    toast.error(`Failed to ${actionId} catalog service`);
     throw error;
   }
 }

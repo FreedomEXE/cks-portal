@@ -28,8 +28,8 @@ import {
   type TreeNode,
 } from '@cks/domain-widgets';
 import { contractorOverviewCards } from '@cks/domain-widgets';
-import { Button, DataTable, OrderDetailsModal, ServiceViewModal, CatalogServiceModal, PageHeader, PageWrapper, Scrollbar, TabSection, OrderActionModal } from '@cks/ui';
-import { ModalProvider, useModals } from '../contexts';
+import { Button, DataTable, OrderDetailsModal, ServiceViewModal, PageHeader, PageWrapper, Scrollbar, TabSection, OrderActionModal } from '@cks/ui';
+import { useModals } from '../contexts';
 import OrderDetailsGateway from '../components/OrderDetailsGateway';
 import { useSWRConfig } from 'swr';
 import { createReport as apiCreateReport, createFeedback as apiCreateFeedback, acknowledgeItem as apiAcknowledgeItem, resolveReport as apiResolveReport, fetchServicesForReports, fetchProceduresForReports, fetchOrdersForReports } from '../shared/api/hub';
@@ -197,11 +197,7 @@ export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHu
   const { code: authCode } = useAuth();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
 
-  return (
-    <ModalProvider currentUserId={normalizedCode || ''} role="contractor">
-      <ContractorHubContent initialTab={initialTab} />
-    </ModalProvider>
-  );
+  return <ContractorHubContent initialTab={initialTab} />;
 }
 
 // Inner component that has access to modal context
@@ -210,8 +206,6 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
   const [activeTab, setActiveTab] = useState(initialTab);
   const [servicesTab, setServicesTab] = useState<'my' | 'active' | 'history'>('my');
   const [servicesSearchQuery, setServicesSearchQuery] = useState('');
-  const [showCatalogServiceModal, setShowCatalogServiceModal] = useState(false);
-  const [selectedCatalogService, setSelectedCatalogService] = useState<{ serviceId: string; name: string; category: string | null; status?: string } | null>(null);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [actionOrder, setActionOrder] = useState<any | null>(null);
   const { code: authCode } = useAuth();
@@ -710,13 +704,7 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
                     maxItems={10}
                     modalType="service-my-services"
                     onRowClick={(row: any) => {
-                      setSelectedCatalogService({
-                        serviceId: row.serviceId,
-                        name: row.serviceName,
-                        category: row.category === '-' ? null : row.category,
-                        status: 'active',
-                      });
-                      setShowCatalogServiceModal(true);
+                      modals.openById(row.serviceId);
                     }}
                   />
                 )}
@@ -953,16 +941,6 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
         userAvailableActions={[]}
       />
 
-
-      {/* Catalog Service Modal - for My Services section (view-only) */}
-      <CatalogServiceModal
-        isOpen={showCatalogServiceModal}
-        onClose={() => {
-          setShowCatalogServiceModal(false);
-          setSelectedCatalogService(null);
-        }}
-        service={selectedCatalogService}
-      />
 
       </div>
   );

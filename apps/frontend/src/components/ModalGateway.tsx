@@ -153,6 +153,7 @@ export function ModalGateway({
   if (entityType && detailsMap[entityType]) {
     // Use fetched data (order, report, service)
     dataDetails = detailsMap[entityType];
+    console.log('[ModalGateway] Using detailsMap for', entityType, ':', dataDetails);
   } else if (options?.data) {
     // Use pre-loaded data (users, products, etc.)
     console.log('[ModalGateway] Using pre-loaded data for', entityType, options.data);
@@ -200,6 +201,14 @@ export function ModalGateway({
 
   // Determine final state (explicit override or detected from lifecycle)
   const state: EntityState = options?.state || lifecycle.state;
+
+  console.log('[ModalGateway] STATE DETERMINATION:', {
+    entityType,
+    optionsState: options?.state,
+    lifecycleState: lifecycle.state,
+    finalState: state,
+    dataStatus: data?.status
+  });
 
   // Get adapter from registry (before useMemo hooks!)
   const adapter = entityType ? entityRegistry[entityType] : null;
