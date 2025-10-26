@@ -149,7 +149,7 @@ export const ENTITY_CATALOG: Record<string, EntityDefinition> = {
     idPattern: /^SRV-\d+$/i,
     backendTable: 'catalog_services',
     backendIdColumn: 'service_id',
-    supportsDetailFetch: false,
+    supportsDetailFetch: true,  // ✅ Endpoint now available: /api/catalog/services/:serviceId/details
     supportsArchive: false,  // Catalog definitions not archived
     supportsDelete: false,
     supportsRestore: false,

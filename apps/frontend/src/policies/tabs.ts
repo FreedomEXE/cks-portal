@@ -38,6 +38,9 @@ export function canSeeTab(tabId: TabId, context: TabVisibilityContext): boolean 
 
       // If it's a user entity, only show history if viewing your own profile
       if (userEntityTypes.includes(entityType)) {
+        // Admin override: admins can see all user timelines
+        if (role === 'admin') return true;
+
         console.log('[TabPolicy] History tab check:', {
           entityType,
           entityId,
@@ -64,6 +67,14 @@ export function canSeeTab(tabId: TabId, context: TabVisibilityContext): boolean 
     // 2. Entity is NOT deleted (tombstones are read-only)
     case 'actions':
       return hasActions && lifecycle.state !== 'deleted';
+
+    // ===== QUICK ACTIONS TAB =====
+    // Admin-only for catalog services (unified catalog view)
+    case 'quick-actions': {
+      const canSee = role === 'admin' && entityType === 'catalogService';
+      console.log('[TabPolicy] quick-actions visibility check:', { role, entityType, canSee });
+      return canSee;
+    }
 
     // ===== CREW TAB =====
     // Service-specific: visible to admin, manager, contractor

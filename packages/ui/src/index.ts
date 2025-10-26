@@ -66,6 +66,9 @@ export { default as ServiceDetailsModal } from './modals/ServiceDetailsModal/Ser
 
 export * from './modals/CatalogServiceModal/CatalogServiceModal';
 export { default as CatalogServiceModal } from './modals/CatalogServiceModal/CatalogServiceModal';
+export { default as ServiceDetails } from './modals/CatalogServiceModal/components/ServiceDetails';
+export { default as ServiceQuickActions } from './modals/CatalogServiceModal/components/ServiceQuickActions';
+export type { CertifiedUser, CertificationChanges } from './modals/CatalogServiceModal/components/ServiceQuickActions';
 
 export * from './modals/CatalogProductModal/CatalogProductModal';
 export { default as CatalogProductModal } from './modals/CatalogProductModal/CatalogProductModal';

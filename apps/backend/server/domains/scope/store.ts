@@ -374,12 +374,11 @@ async function getManagerActivities(cksCode: string): Promise<HubRoleActivitiesP
          (activity_type = 'contractor_assigned_to_manager' AND metadata ? 'managerId' AND UPPER(metadata->>'managerId') = $2)
        )
        OR
-       -- Show other activity types (orders, services, etc.) for ecosystem
+       -- Show other activity types (orders, services, creations, etc.) for ecosystem
        -- SAFE: Only if target is in ecosystem OR actor is self OR metadata references self
-       -- EXCLUDE user creations (only show self-creation above, not ecosystem creations)
+       -- Creation events now visible for ecosystem (scoped by idArray + dismissals)
        (
-         activity_type NOT IN ('manager_created', 'contractor_created', 'customer_created', 'center_created', 'crew_created', 'warehouse_created')
-         AND activity_type NOT LIKE '%assigned%'
+         activity_type NOT LIKE '%assigned%'
          AND activity_type != 'assignment_made'
        )
        AND (
@@ -1011,12 +1010,11 @@ async function getContractorActivities(cksCode: string): Promise<HubRoleActiviti
          (activity_type = 'customer_assigned_to_contractor' AND metadata ? 'contractorId' AND UPPER(metadata->>'contractorId') = $2)
        )
        OR
-       -- Show other activity types (orders, services, etc.) for ecosystem
+       -- Show other activity types (orders, services, creations, etc.) for ecosystem
        -- SAFE: Only if target is in ecosystem OR actor is self OR metadata references self
-       -- EXCLUDE user creations (only show self-creation above, not ecosystem creations)
+       -- Creation events now visible for ecosystem (scoped by idArray + dismissals)
        (
-         activity_type NOT IN ('manager_created', 'contractor_created', 'customer_created', 'center_created', 'crew_created', 'warehouse_created')
-         AND activity_type NOT LIKE '%assigned%'
+         activity_type NOT LIKE '%assigned%'
          AND activity_type != 'assignment_made'
        )
        AND (
@@ -1095,12 +1093,11 @@ async function getCustomerActivities(cksCode: string): Promise<HubRoleActivities
          (activity_type = 'center_assigned_to_customer' AND metadata ? 'customerId' AND UPPER(metadata->>'customerId') = $2)
        )
        OR
-       -- Show other activity types (orders, services, etc.) for ecosystem
+       -- Show other activity types (orders, services, creations, etc.) for ecosystem
        -- SAFE: Only if target is in ecosystem OR actor is self OR metadata references self
-       -- EXCLUDE user creations (only show self-creation above, not ecosystem creations)
+       -- Creation events now visible for ecosystem (scoped by idArray + dismissals)
        (
-         activity_type NOT IN ('manager_created', 'contractor_created', 'customer_created', 'center_created', 'crew_created', 'warehouse_created')
-         AND activity_type NOT LIKE '%assigned%'
+         activity_type NOT LIKE '%assigned%'
          AND activity_type != 'assignment_made'
        )
        AND (
@@ -1172,12 +1169,11 @@ async function getCenterActivities(cksCode: string): Promise<HubRoleActivitiesPa
          (activity_type = 'crew_assigned_to_center' AND metadata ? 'centerId' AND UPPER(metadata->>'centerId') = $2)
        )
        OR
-       -- Show other activity types (orders, services, etc.) for ecosystem
+       -- Show other activity types (orders, services, creations, etc.) for ecosystem
        -- SAFE: Only if target is in ecosystem OR actor is self OR metadata references self
-       -- EXCLUDE user creations (only show self-creation above, not ecosystem creations)
+       -- Creation events now visible for ecosystem (scoped by idArray + dismissals)
        (
-         activity_type NOT IN ('manager_created', 'contractor_created', 'customer_created', 'center_created', 'crew_created', 'warehouse_created')
-         AND activity_type NOT LIKE '%assigned%'
+         activity_type NOT LIKE '%assigned%'
          AND activity_type != 'assignment_made'
        )
        AND (
@@ -1247,12 +1243,11 @@ async function getCrewActivities(cksCode: string): Promise<HubRoleActivitiesPayl
        -- Show assignments where you are assigned to a center (crew is in metadata)
        (activity_type = 'crew_assigned_to_center' AND metadata ? 'crewId' AND UPPER(metadata->>'crewId') = $2)
        OR
-       -- Show other activity types (orders, services, etc.) for ecosystem
+       -- Show other activity types (orders, services, creations, etc.) for ecosystem
        -- SAFE: Only if target is in ecosystem OR actor is self OR metadata references self
-       -- EXCLUDE user creations (only show self-creation above, not ecosystem creations)
+       -- Creation events now visible for ecosystem (scoped by idArray + dismissals)
        (
-         activity_type NOT IN ('manager_created', 'contractor_created', 'customer_created', 'center_created', 'crew_created', 'warehouse_created')
-         AND activity_type NOT LIKE '%assigned%'
+         activity_type NOT LIKE '%assigned%'
          AND activity_type != 'assignment_made'
        )
        AND (
@@ -1324,12 +1319,11 @@ async function getWarehouseActivities(cksCode: string): Promise<HubRoleActivitie
          (activity_type = 'order_assigned_to_warehouse' AND metadata ? 'warehouseId' AND UPPER(metadata->>'warehouseId') = $2)
        )
        OR
-       -- Show other activity types (orders, services, etc.) for ecosystem
+       -- Show other activity types (orders, services, creations, etc.) for ecosystem
        -- SAFE: Only if target is in ecosystem OR actor is self OR metadata references self
-       -- EXCLUDE user creations (only show self-creation above, not ecosystem creations)
+       -- Creation events now visible for ecosystem (scoped by idArray + dismissals)
        (
-         activity_type NOT IN ('manager_created', 'contractor_created', 'customer_created', 'center_created', 'crew_created', 'warehouse_created')
-         AND activity_type NOT LIKE '%assigned%'
+         activity_type NOT LIKE '%assigned%'
          AND activity_type != 'assignment_made'
        )
        AND (

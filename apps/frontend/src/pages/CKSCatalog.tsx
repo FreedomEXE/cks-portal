@@ -10,7 +10,8 @@ import { useAuth as useCksAuth } from "@cks/auth";
 import { useHubRoleScope } from "../shared/api/hub";
 import { useLoading } from "../contexts/LoadingContext";
 import { useHubLoading } from "../contexts/HubLoadingContext";
-import { CatalogProductModal, CatalogServiceModal, Button } from "@cks/ui";
+import { useModals } from "../contexts/ModalProvider";
+import { CatalogProductModal, Button } from "@cks/ui";
 
 type CatalogKind = "products" | "services";
 
@@ -769,6 +770,7 @@ export default function CKSCatalog() {
   const { mutate } = useSWRConfig();
   const { start } = useLoading();
   const { setHubLoading } = useHubLoading();
+  const modals = useModals();
 
   // Read mode from URL params: ?mode=products or ?mode=services
   const [searchParams] = useState(() => new URLSearchParams(window.location.search));
@@ -1106,7 +1108,13 @@ export default function CKSCatalog() {
               <Card
                 key={item.code}
                 item={item}
-                onView={() => setSelectedViewItem(item)}
+                onView={() => {
+                  if (item.type === 'service') {
+                    modals.openById(item.code);
+                  } else {
+                    setSelectedViewItem(item);
+                  }
+                }}
                 onAdd={() => item.type === "product" ? handleAddProduct(item) : handleAddService(item)}
                 isInCart={cart.isInCart(item.code)}
               />
@@ -1302,20 +1310,6 @@ export default function CKSCatalog() {
             minimumOrderQuantity: selectedViewItem.product?.minimumOrderQuantity || null,
             leadTimeDays: selectedViewItem.product?.leadTimeDays || null,
             metadata: selectedViewItem.metadata || null,
-          }}
-        />
-      )}
-
-      {/* View Service Modal */}
-      {selectedViewItem && selectedViewItem.type === 'service' && (
-        <CatalogServiceModal
-          isOpen={true}
-          onClose={() => setSelectedViewItem(null)}
-          service={{
-            serviceId: selectedViewItem.code,
-            name: selectedViewItem.name,
-            category: selectedViewItem.category || null,
-            status: selectedViewItem.status || 'active',
           }}
         />
       )}

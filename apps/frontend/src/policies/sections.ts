@@ -31,6 +31,10 @@ export type SectionId =
   | 'report-summary'
   | 'description'
   | 'attachments'
+  // Catalog Service sections
+  | 'service-info'
+  | 'additional-details'
+  | 'pricing'
   // Service sections
   | 'service-overview'
   | 'crew-assignments'
@@ -89,6 +93,12 @@ export function canSeeSection(
 
     case 'attachments':
       return entityData?.attachments && entityData.attachments.length > 0;
+
+    // Catalog Service-specific sections
+    case 'service-info':
+    case 'additional-details':
+    case 'pricing':
+      return entityType === 'catalogService';
 
     // Service-specific sections (restricted)
     case 'service-overview':

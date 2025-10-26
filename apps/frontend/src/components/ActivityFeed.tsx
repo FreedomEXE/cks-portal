@@ -253,6 +253,13 @@ export function ActivityFeed({
         return;
       }
 
+      // Handle catalog service activities
+      if (targetType === 'catalogService') {
+        console.log('[ActivityFeed] Opening catalog service modal via openById():', targetId);
+        modals.openById(targetId);
+        return;
+      }
+
       // Handle other entity types (future implementation)
       console.warn('[ActivityFeed] Unsupported entity type:', targetType);
       onError?.(`Cannot open ${targetType} entities yet`);

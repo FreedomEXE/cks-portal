@@ -17,7 +17,7 @@
  */
 
 export interface ParsedEntityId {
-  type: 'order' | 'service' | 'report' | 'user' | 'procedure' | 'training' | 'product' | 'unknown';
+  type: 'order' | 'service' | 'catalogService' | 'report' | 'user' | 'procedure' | 'training' | 'product' | 'unknown';
   id: string;
   subtype?: 'product' | 'service' | 'report' | 'feedback' | 'manager' | 'contractor' | 'customer' | 'center' | 'crew' | 'warehouse';
   scope?: string; // e.g., "CON-010" from "CON-010-FBK-001"
@@ -40,8 +40,18 @@ export function parseEntityId(id: string | null | undefined): ParsedEntityId {
   }
 
   // Service IDs: SRV-###
-  if (normalizedId.startsWith('SRV-')) {
-    return { type: 'service', id, scope };
+  // Distinguish between catalog services (unscoped) and active services (scoped)
+  if (normalizedId.includes('SRV-')) {
+    // Check if scoped (has prefix like CEN-010-)
+    const hasScope = /^[A-Z]{3}-\d{3}-/.test(normalizedId);
+
+    if (hasScope) {
+      // Scoped = active service instance (e.g., CEN-010-SRV-001)
+      return { type: 'service', id, scope };
+    } else {
+      // Unscoped = catalog service definition (e.g., SRV-001)
+      return { type: 'catalogService', id, scope };
+    }
   }
 
   // Report IDs: RPT-### or ###-RPT-###
@@ -105,6 +115,7 @@ export function getEntityTypeName(type: ParsedEntityId['type']): string {
   const names: Record<ParsedEntityId['type'], string> = {
     order: 'Order',
     service: 'Service',
+    catalogService: 'Service',
     report: 'Report/Feedback',
     user: 'User',
     procedure: 'Procedure',
