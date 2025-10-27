@@ -170,7 +170,7 @@ export default function ArchiveSection({
         entityType = 'order';
         orderTypeFilter = 'service';
       } else if (effectiveTab === 'catalog-services') {
-        entityType = 'catalogService';
+        entityType = 'catalogService' as EntityType;
       } else if (effectiveTab === 'active-services') {
         entityType = 'service';
       } else if (effectiveTab === 'report' || effectiveTab === 'feedback') {
@@ -224,11 +224,11 @@ export default function ArchiveSection({
     })();
 
     // Determine the actual entityType for API call
-    const actualEntityType = (() => {
+    const actualEntityType: EntityType = (() => {
       if (effectiveTab === 'product-orders' || effectiveTab === 'service-orders') return 'order';
-      if (effectiveTab === 'catalog-services') return 'catalogService';
+      if (effectiveTab === 'catalog-services') return 'catalogService' as EntityType;
       if (effectiveTab === 'active-services') return 'service';
-      if (effectiveTab === 'report' || effectiveTab === 'feedback') return effectiveTab;
+      if (effectiveTab === 'report' || effectiveTab === 'feedback') return effectiveTab as EntityType;
       return selectedEntity.entityType;
     })();
 
@@ -258,11 +258,11 @@ export default function ArchiveSection({
     })();
 
     // Determine the actual entityType for API call
-    const actualEntityType = (() => {
+    const actualEntityType: EntityType = (() => {
       if (effectiveTab === 'product-orders' || effectiveTab === 'service-orders') return 'order';
-      if (effectiveTab === 'catalog-services') return 'catalogService';
+      if (effectiveTab === 'catalog-services') return 'catalogService' as EntityType;
       if (effectiveTab === 'active-services') return 'service';
-      if (effectiveTab === 'report' || effectiveTab === 'feedback') return effectiveTab;
+      if (effectiveTab === 'report' || effectiveTab === 'feedback') return effectiveTab as EntityType;
       return selectedEntity.entityType;
     })();
 
@@ -535,9 +535,9 @@ export default function ArchiveSection({
                   })();
 
                   // Determine the actual entityType for API call
-                  const actualEntityType = (() => {
+                  const actualEntityType: EntityType = (() => {
                     if (effectiveTab === 'product-orders' || effectiveTab === 'service-orders') return 'order';
-                    if (effectiveTab === 'catalog-services') return 'catalogService';
+                    if (effectiveTab === 'catalog-services') return 'catalogService' as EntityType;
                     if (effectiveTab === 'active-services') return 'service';
                     return selectedEntity.entityType;
                   })();
