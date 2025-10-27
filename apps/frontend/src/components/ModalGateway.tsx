@@ -215,15 +215,30 @@ export function ModalGateway({
 
   // ===== STEP 3: Get pure descriptors from adapter (NO HOOKS in adapter!) =====
   const descriptors = useMemo(() => {
-    if (!adapter || !data || !entityType || !entityId) return [];
+    console.log('[ModalGateway] getActionDescriptors check:', {
+      hasAdapter: !!adapter,
+      hasData: !!data,
+      entityType,
+      entityId,
+      role,
+      state,
+    });
 
-    return adapter.getActionDescriptors({
+    if (!adapter || !data || !entityType || !entityId) {
+      console.warn('[ModalGateway] Skipping getActionDescriptors - missing required data');
+      return [];
+    }
+
+    console.log('[ModalGateway] Calling adapter.getActionDescriptors for', entityType);
+    const descriptors = adapter.getActionDescriptors({
       role,
       state,
       entityId,
       entityType,
       entityData: data,
     });
+    console.log('[ModalGateway] Action descriptors generated:', descriptors);
+    return descriptors;
   }, [adapter, role, state, entityId, entityType, data]);
 
   // ===== STEP 4: Bind descriptors to handlers (hooks called HERE, not in adapters) =====

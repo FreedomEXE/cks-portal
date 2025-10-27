@@ -5,7 +5,7 @@ import { recordActivity as writeActivity } from '../activity/writer';
 
 export interface ArchivedEntity {
   id: string;
-  entityType: 'manager' | 'contractor' | 'customer' | 'center' | 'crew' | 'warehouse' | 'service' | 'product' | 'order' | 'report' | 'feedback';
+  entityType: 'manager' | 'contractor' | 'customer' | 'center' | 'crew' | 'warehouse' | 'service' | 'catalogService' | 'product' | 'order' | 'report' | 'feedback';
   name: string;
   archivedAt: Date;
   archivedBy: string;
@@ -19,14 +19,14 @@ export interface ArchivedEntity {
 }
 
 interface ArchiveOperation {
-  entityType: 'manager' | 'contractor' | 'customer' | 'center' | 'crew' | 'warehouse' | 'service' | 'product' | 'order' | 'report' | 'feedback';
+  entityType: 'manager' | 'contractor' | 'customer' | 'center' | 'crew' | 'warehouse' | 'service' | 'catalogService' | 'product' | 'order' | 'report' | 'feedback';
   entityId: string;
   reason?: string;
   actor: AuditContext;
 }
 
 interface RestoreOperation {
-  entityType: 'manager' | 'contractor' | 'customer' | 'center' | 'crew' | 'warehouse' | 'service' | 'product' | 'order' | 'report' | 'feedback';
+  entityType: 'manager' | 'contractor' | 'customer' | 'center' | 'crew' | 'warehouse' | 'service' | 'catalogService' | 'product' | 'order' | 'report' | 'feedback';
   entityId: string;
   actor: AuditContext;
 }
@@ -445,6 +445,10 @@ export async function archiveEntity(operation: ArchiveOperation): Promise<{ succ
       tableName = 'services';
       idColumn = 'service_id';
       break;
+    case 'catalogService':
+      tableName = 'catalog_services';
+      idColumn = 'service_id';
+      break;
     case 'product':
       tableName = 'inventory_items';
       idColumn = 'item_id';
@@ -588,6 +592,10 @@ export async function restoreEntity(operation: RestoreOperation): Promise<{ succ
       tableName = 'services';
       idColumn = 'service_id';
       break;
+    case 'catalogService':
+      tableName = 'catalog_services';
+      idColumn = 'service_id';
+      break;
     case 'product':
       tableName = 'inventory_items';
       idColumn = 'item_id';
@@ -610,29 +618,40 @@ export async function restoreEntity(operation: RestoreOperation): Promise<{ succ
       break;
   }
 
-  // Restore the entity (it goes to unassigned bucket)
-  const restoreResult = await query(
-    `UPDATE ${tableName}
-     SET archived_at = NULL,
-         archived_by = NULL,
-         archive_reason = NULL,
-         deletion_scheduled = NULL,
-         restored_at = NOW(),
-         restored_by = $1,
-         updated_at = NOW()
-     WHERE ${idColumn} = $2`,
-    [actorId, normalizedId]
-  );
-
-  // Fallback for services: reactivate in catalog_services if legacy services row not found
-  if ((!restoreResult || (restoreResult.rowCount ?? 0) === 0) && operation.entityType === 'service') {
+  // For catalogService, just set is_active = TRUE
+  if (operation.entityType === 'catalogService') {
     await query(
-      `UPDATE catalog_services
+      `UPDATE ${tableName}
        SET is_active = TRUE,
            updated_at = NOW()
-       WHERE service_id = $1`,
+       WHERE ${idColumn} = $1`,
       [normalizedId]
     );
+  } else {
+    // Restore the entity (it goes to unassigned bucket)
+    const restoreResult = await query(
+      `UPDATE ${tableName}
+       SET archived_at = NULL,
+           archived_by = NULL,
+           archive_reason = NULL,
+           deletion_scheduled = NULL,
+           restored_at = NOW(),
+           restored_by = $1,
+           updated_at = NOW()
+       WHERE ${idColumn} = $2`,
+      [actorId, normalizedId]
+    );
+
+    // Fallback for services: reactivate in catalog_services if legacy services row not found
+    if ((!restoreResult || (restoreResult.rowCount ?? 0) === 0) && operation.entityType === 'service') {
+      await query(
+        `UPDATE catalog_services
+         SET is_active = TRUE,
+             updated_at = NOW()
+         WHERE service_id = $1`,
+        [normalizedId]
+      );
+    }
   }
 
   // Mark relationships as potentially restorable
@@ -655,7 +674,7 @@ export async function restoreEntity(operation: RestoreOperation): Promise<{ succ
 }
 
 export async function listArchivedEntities(
-  entityType?: 'manager' | 'contractor' | 'customer' | 'center' | 'crew' | 'warehouse' | 'service' | 'product' | 'order' | 'report' | 'feedback',
+  entityType?: 'manager' | 'contractor' | 'customer' | 'center' | 'crew' | 'warehouse' | 'service' | 'catalogService' | 'product' | 'order' | 'report' | 'feedback',
   limit = 100
 ): Promise<ArchivedEntity[]> {
   let queryText: string;
@@ -681,6 +700,11 @@ export async function listArchivedEntities(
         tableName = 'services';
         idColumn = 'service_id';
         nameColumn = 'service_name';
+        break;
+      case 'catalogService':
+        tableName = 'catalog_services';
+        idColumn = 'service_id';
+        nameColumn = 'name';
         break;
     case 'product':
       tableName = 'inventory_items';
@@ -722,22 +746,41 @@ export async function listArchivedEntities(
     // For orders, also include order_type to support filtering by product/service
     const orderTypeSelect = entityType === 'order' ? ', order_type' : '';
 
-    queryText = `
-      SELECT
-        ${idColumn} as id,
-        '${entityType}' as entity_type,
-        ${nameColumn} as name,
-        archived_at,
-        archived_by,
-        archive_reason,
-        deletion_scheduled
-        ${orderTypeSelect}
-      FROM ${tableName}
-      WHERE archived_at IS NOT NULL
-      ORDER BY archived_at DESC
-      LIMIT $1
-    `;
-    params = [limit];
+    // catalogService uses is_active flag instead of archived_at
+    if (entityType === 'catalogService') {
+      queryText = `
+        SELECT
+          ${idColumn} as id,
+          '${entityType}' as entity_type,
+          ${nameColumn} as name,
+          updated_at as archived_at,
+          NULL as archived_by,
+          NULL as archive_reason,
+          NULL as deletion_scheduled
+        FROM ${tableName}
+        WHERE is_active = FALSE
+        ORDER BY updated_at DESC
+        LIMIT $1
+      `;
+      params = [limit];
+    } else {
+      queryText = `
+        SELECT
+          ${idColumn} as id,
+          '${entityType}' as entity_type,
+          ${nameColumn} as name,
+          archived_at,
+          archived_by,
+          archive_reason,
+          deletion_scheduled
+          ${orderTypeSelect}
+        FROM ${tableName}
+        WHERE archived_at IS NOT NULL
+        ORDER BY archived_at DESC
+        LIMIT $1
+      `;
+      params = [limit];
+    }
   } else {
     queryText = `
       SELECT
@@ -820,6 +863,9 @@ export async function hardDeleteEntity(
   } else if (operation.entityType === 'service') {
     tableName = 'services';
     idColumn = 'service_id';
+  } else if (operation.entityType === 'catalogService') {
+    tableName = 'catalog_services';
+    idColumn = 'service_id';
   } else if (operation.entityType === 'order') {
     tableName = 'orders';
     idColumn = 'order_id';
@@ -835,13 +881,22 @@ export async function hardDeleteEntity(
   }
 
   // Check if entity is archived
-  const checkResult = await query(
-    `SELECT archived_at FROM ${tableName} WHERE ${idColumn} = $1`,
-    [normalizedId]
-  );
-
-  if (!checkResult.rows[0]?.archived_at) {
-    throw new Error('Entity must be archived before hard deletion');
+  if (operation.entityType === 'catalogService') {
+    const checkResult = await query(
+      `SELECT is_active FROM ${tableName} WHERE ${idColumn} = $1`,
+      [normalizedId]
+    );
+    if (checkResult.rows[0]?.is_active !== false) {
+      throw new Error('Entity must be archived before hard deletion');
+    }
+  } else {
+    const checkResult = await query(
+      `SELECT archived_at FROM ${tableName} WHERE ${idColumn} = $1`,
+      [normalizedId]
+    );
+    if (!checkResult.rows[0]?.archived_at) {
+      throw new Error('Entity must be archived before hard deletion');
+    }
   }
 
   // Check for any active children

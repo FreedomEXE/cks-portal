@@ -7,6 +7,7 @@
 
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 import { useAuth } from '@cks/auth';
+import { useEffect } from 'react';
 import ModalGateway from '../components/ModalGateway';
 import type { EntityType, UserRole, OpenEntityModalOptions } from '../types/entities';
 import { parseEntityId, isValidId } from '../shared/utils/parseEntityId';
@@ -44,7 +45,27 @@ export function ModalProvider({ children }: ModalProviderProps) {
   // Get current auth state (reactive to changes)
   const { code, role: authRole } = useAuth();
   const currentUserId = code || '';
-  const role = (authRole?.toLowerCase() as UserRole) || 'crew';
+
+  // Normalize external auth roles to our internal union
+  const normalizeRole = (r?: string): UserRole => {
+    const raw = (r || '').toLowerCase();
+    const map: Record<string, UserRole> = {
+      administrator: 'admin',
+      admin: 'admin',
+      mgr: 'manager',
+      manager: 'manager',
+      contractor: 'contractor',
+      crew: 'crew',
+      customer: 'customer',
+      center: 'center',
+      warehouse: 'warehouse',
+      war: 'warehouse',
+      whs: 'warehouse',
+    };
+    return map[raw] || (raw as UserRole) || 'crew';
+  };
+
+  const role = normalizeRole(authRole);
 
   console.log('[ModalProvider] Current auth state:', { code, authRole, resolvedRole: role });
 
@@ -57,7 +78,47 @@ export function ModalProvider({ children }: ModalProviderProps) {
 
   // Generic open function
   const openEntityModal = useCallback(
-    (entityType: EntityType, entityId: string, options?: OpenEntityModalOptions) => {
+    async (entityType: EntityType, entityId: string, options?: OpenEntityModalOptions) => {
+      // For user entities, fetch data from profile endpoint (especially for archived state)
+      const userEntityTypes: EntityType[] = ['manager', 'contractor', 'customer', 'center', 'crew', 'warehouse'];
+
+      if (userEntityTypes.includes(entityType)) {
+        console.log(`[ModalProvider] Fetching ${entityType} profile for ID: ${entityId}`);
+
+        try {
+          const response = await apiFetch<{
+            data: any;
+            state: 'active' | 'archived' | 'deleted';
+            deletedAt?: string;
+            deletedBy?: string;
+            archivedAt?: string;
+            archivedBy?: string;
+          }>(
+            `/profile/${entityType}/${entityId}`
+          );
+
+          console.log(`[ModalProvider] Fetched ${entityType} data:`, response);
+
+          // Pass fetched data via options with lifecycle metadata
+          const enrichedOptions = {
+            ...options,
+            data: response.data,
+            state: response.state,
+            deletedAt: response.deletedAt,
+            deletedBy: response.deletedBy,
+            archivedAt: response.archivedAt,
+            archivedBy: response.archivedBy,
+          } as any;
+
+          setCurrentModal({ entityType, entityId, options: enrichedOptions });
+          return;
+        } catch (error) {
+          console.error(`[ModalProvider] Failed to fetch ${entityType} ${entityId}:`, error);
+          // Continue with modal open - ModalGateway will show error state
+        }
+      }
+
+      // For non-user entities, just open with provided options
       setCurrentModal({ entityType, entityId, options });
     },
     []
@@ -200,6 +261,51 @@ export function ModalProvider({ children }: ModalProviderProps) {
             console.error('[ModalProvider] Fallback catalog items lookup failed', fallbackErr);
           }
         }
+      } else if (type === 'product') {
+        // Product catalog items: fetch from catalog list + admin inventory (if admin)
+        entityType = 'product' as EntityType;
+
+        console.log(`[ModalProvider] Fetching product for ID: ${id}`);
+
+        try {
+          // Fetch from catalog list
+          const listResp = await apiFetch<{
+            data: { items: any[] };
+          }>(`/catalog/items?type=product&q=${encodeURIComponent(id)}`);
+
+          const match = (listResp?.data?.items || []).find((it: any) => (it?.code || '').toUpperCase() === id.toUpperCase());
+
+          if (match) {
+            const data: any = {
+              productId: match.code,
+              name: match.name,
+              category: match.category || null,
+              description: match.description || null,
+              unitOfMeasure: match.unitOfMeasure || null,
+              price: match.price || null,
+              metadata: match.metadata || null,
+              status: 'active',
+            };
+
+            // If admin, fetch inventory
+            try {
+              const inv = await apiFetch<{ success: boolean; data: any[] }>(`/admin/catalog/products/${encodeURIComponent(id)}/inventory`);
+              if (inv?.success && Array.isArray(inv.data)) {
+                data.inventoryData = inv.data;
+              }
+            } catch (invErr) {
+              console.warn('[ModalProvider] Inventory fetch failed (non-fatal)', invErr);
+            }
+
+            enrichedOptions = {
+              ...options,
+              data,
+              state: 'active',
+            } as any;
+          }
+        } catch (error) {
+          console.error(`[ModalProvider] Failed to fetch product ${id}:`, error);
+        }
       } else {
         entityType = (type === 'order' ? type : (subtype || type)) as EntityType;
       }
@@ -226,6 +332,13 @@ export function ModalProvider({ children }: ModalProviderProps) {
     openEntityModal,
     closeModal,
   };
+
+  // Allow content inside adapters to request closing the modal without wiring changes
+  useEffect(() => {
+    const handler = () => closeModal();
+    window.addEventListener('cks:modal:close', handler as EventListener);
+    return () => window.removeEventListener('cks:modal:close', handler as EventListener);
+  }, [closeModal]);
 
   return (
     <ModalContext.Provider value={value}>

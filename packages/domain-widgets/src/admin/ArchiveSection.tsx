@@ -169,7 +169,9 @@ export default function ArchiveSection({
       } else if (effectiveTab === 'service-orders') {
         entityType = 'order';
         orderTypeFilter = 'service';
-      } else if (effectiveTab === 'catalog-services' || effectiveTab === 'active-services') {
+      } else if (effectiveTab === 'catalog-services') {
+        entityType = 'catalogService';
+      } else if (effectiveTab === 'active-services') {
         entityType = 'service';
       } else if (effectiveTab === 'report' || effectiveTab === 'feedback') {
         // For reports subtab, use the specific entity type
@@ -179,26 +181,16 @@ export default function ArchiveSection({
       const data = await api.listArchived(entityType);
       console.log('[ArchiveSection] Data received:', data?.length, 'items');
 
-      // Filter by order type or service type if needed
+      // Filter by order type if needed
       let filteredData = data;
       if (orderTypeFilter) {
         filteredData = data.filter((item: any) => {
           return item.orderType === orderTypeFilter;
         });
         console.log('[ArchiveSection] Filtered to', orderTypeFilter, 'orders:', filteredData.length);
-      } else if (effectiveTab === 'catalog-services') {
-        // Filter for catalog services (srv-001 pattern)
-        filteredData = data.filter((item: any) => {
-          return item.id && /^srv-\d+$/i.test(item.id);
-        });
-        console.log('[ArchiveSection] Filtered to catalog services:', filteredData.length);
-      } else if (effectiveTab === 'active-services') {
-        // Filter for active services (cen-001-srv-001 pattern)
-        filteredData = data.filter((item: any) => {
-          return item.id && /^[a-z]{3}-\d+-srv-\d+$/i.test(item.id);
-        });
-        console.log('[ArchiveSection] Filtered to active services:', filteredData.length);
       }
+      // Note: No client-side filtering for catalog-services or active-services anymore
+      // Backend now returns correct data based on entityType
 
       setArchivedData(filteredData);
     } catch (err) {
@@ -234,7 +226,8 @@ export default function ArchiveSection({
     // Determine the actual entityType for API call
     const actualEntityType = (() => {
       if (effectiveTab === 'product-orders' || effectiveTab === 'service-orders') return 'order';
-      if (effectiveTab === 'catalog-services' || effectiveTab === 'active-services') return 'service';
+      if (effectiveTab === 'catalog-services') return 'catalogService';
+      if (effectiveTab === 'active-services') return 'service';
       if (effectiveTab === 'report' || effectiveTab === 'feedback') return effectiveTab;
       return selectedEntity.entityType;
     })();
@@ -267,7 +260,8 @@ export default function ArchiveSection({
     // Determine the actual entityType for API call
     const actualEntityType = (() => {
       if (effectiveTab === 'product-orders' || effectiveTab === 'service-orders') return 'order';
-      if (effectiveTab === 'catalog-services' || effectiveTab === 'active-services') return 'service';
+      if (effectiveTab === 'catalog-services') return 'catalogService';
+      if (effectiveTab === 'active-services') return 'service';
       if (effectiveTab === 'report' || effectiveTab === 'feedback') return effectiveTab;
       return selectedEntity.entityType;
     })();
@@ -543,7 +537,8 @@ export default function ArchiveSection({
                   // Determine the actual entityType for API call
                   const actualEntityType = (() => {
                     if (effectiveTab === 'product-orders' || effectiveTab === 'service-orders') return 'order';
-                    if (effectiveTab === 'catalog-services' || effectiveTab === 'active-services') return 'service';
+                    if (effectiveTab === 'catalog-services') return 'catalogService';
+                    if (effectiveTab === 'active-services') return 'service';
                     return selectedEntity.entityType;
                   })();
 
