@@ -52,6 +52,7 @@ import { createReport as apiCreateReport, createFeedback as apiCreateFeedback, a
 import { buildEcosystemTree, DEFAULT_ROLE_COLOR_MAP } from '../shared/utils/ecosystem';
 import { useHubLoading } from '../contexts/HubLoadingContext';
 import { buildCenterOverviewData } from '../shared/overview/builders';
+import { dismissActivity, dismissAllActivities } from '../shared/api/directory';
 
 interface CenterHubProps {
   initialTab?: string;
@@ -260,7 +261,6 @@ function CenterHubContent({ initialTab = 'dashboard' }: CenterHubProps) {
   // Handle activity dismissal
   const handleClearActivity = useCallback(async (activityId: string) => {
     try {
-      const { dismissActivity } = await import('../shared/api/directory');
       await dismissActivity(activityId);
       mutateActivities();
       console.log('[CenterHub] Activity dismissed:', activityId);
@@ -272,7 +272,6 @@ function CenterHubContent({ initialTab = 'dashboard' }: CenterHubProps) {
   // Clear ALL activities for current user
   const handleClearAll = useCallback(async () => {
     try {
-      const { dismissAllActivities } = await import('../shared/api/directory');
       const result = await dismissAllActivities();
       mutateActivities();
       console.log(`[CenterHub] ${result.count} activities dismissed`);

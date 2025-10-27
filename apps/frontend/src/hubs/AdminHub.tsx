@@ -58,6 +58,7 @@ import { mapProfileDataForRole, type DirectoryRole, directoryTabToRole } from '.
 import { buildAdminOverviewData } from '../shared/overview/builders';
 
 import { useAdminUsers, updateInventory, fetchAdminOrderById } from '../shared/api/admin';
+import { getProductInventory } from '../shared/api/admin';
 import {
   useActivities,
   useCenters,
@@ -72,6 +73,7 @@ import {
   useTraining,
   useWarehouses,
 } from '../shared/api/directory';
+import { dismissActivity, dismissAllActivities } from '../shared/api/directory';
 import {
   applyHubOrderAction,
   updateOrderFields,
@@ -307,7 +309,6 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
     if (selectedProductCatalog && showProductCatalogModal) {
       (async () => {
         try {
-          const { getProductInventory } = await import('../shared/api/admin');
           const result = await getProductInventory(selectedProductCatalog.productId);
           if (result.success && result.data) {
             setProductInventoryData(result.data);
@@ -1293,7 +1294,6 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
   // Clear individual activity (CTO-corrected: calls backend + invalidates cache)
   const handleClearActivity = useCallback(async (activityId: string) => {
     try {
-      const { dismissActivity } = await import('../shared/api/directory');
       await dismissActivity(activityId);
 
       // Immediately remove from local state for instant feedback
@@ -1312,7 +1312,6 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
   // Clear ALL activities for current user
   const handleClearAll = useCallback(async () => {
     try {
-      const { dismissAllActivities } = await import('../shared/api/directory');
       const result = await dismissAllActivities();
 
       // Clear local state immediately
@@ -1804,7 +1803,6 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
             console.log('[ADMIN] All inventory changes saved');
 
             // Refresh inventory data
-            const { getProductInventory } = await import('../shared/api/admin');
             const result = await getProductInventory(selectedProductCatalog.productId);
             if (result.success && result.data) {
               setProductInventoryData(result.data);

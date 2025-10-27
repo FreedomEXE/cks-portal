@@ -53,6 +53,7 @@ import { useCertifiedServices } from '../hooks/useCertifiedServices';
 import { buildEcosystemTree, DEFAULT_ROLE_COLOR_MAP } from '../shared/utils/ecosystem';
 import { buildCustomerOverviewData } from '../shared/overview/builders';
 import { useHubLoading } from '../contexts/HubLoadingContext';
+import { dismissActivity, dismissAllActivities } from '../shared/api/directory';
 
 interface CustomerHubProps {
   initialTab?: string;
@@ -267,7 +268,6 @@ function CustomerHubContent({ initialTab = 'dashboard' }: CustomerHubProps) {
   // Handle activity dismissal
   const handleClearActivity = useCallback(async (activityId: string) => {
     try {
-      const { dismissActivity } = await import('../shared/api/directory');
       await dismissActivity(activityId);
       mutateActivities();
       console.log('[CustomerHub] Activity dismissed:', activityId);
@@ -279,7 +279,6 @@ function CustomerHubContent({ initialTab = 'dashboard' }: CustomerHubProps) {
   // Clear ALL activities for current user
   const handleClearAll = useCallback(async () => {
     try {
-      const { dismissAllActivities } = await import('../shared/api/directory');
       const result = await dismissAllActivities();
       mutateActivities();
       console.log(`[CustomerHub] ${result.count} activities dismissed`);

@@ -20,6 +20,8 @@ import { useSWRConfig } from 'swr';
 import toast from 'react-hot-toast';
 import { parseEntityId } from '../shared/utils/parseEntityId';
 import { applyHubOrderAction, type OrderActionRequest } from '../shared/api/hub';
+import { archiveAPI } from '../shared/api/archive';
+import { updateCatalogService } from '../shared/api/admin';
 
 export interface EntityActionOptions {
   notes?: string;
@@ -59,6 +61,15 @@ export function useEntityActions(): UseEntityActionsReturn {
           return await handleReportAction(entityId, actionId, subtype, options, mutate);
         }
 
+        // User entities: manager | contractor | customer | center | crew | warehouse
+        if (type === 'user') {
+          return await handleUserAction(entityId, actionId, subtype, options, mutate);
+        }
+
+        if (type === 'product') {
+          return await handleProductAction(entityId, actionId, options, mutate);
+        }
+
         if (type === 'catalogService') {
           return await handleCatalogServiceAction(entityId, actionId, options, mutate);
         }
@@ -91,8 +102,7 @@ async function handleOrderAction(
   options: EntityActionOptions,
   mutate: any
 ): Promise<boolean> {
-  // Import archive API for archive/restore/delete actions
-  const { archiveAPI } = await import('../shared/api/archive');
+  // Archive API (statically imported)
 
   // Handle archive/restore/delete actions (admin only)
   if (actionId === 'archive' || actionId === 'restore' || actionId === 'delete') {
@@ -291,6 +301,104 @@ async function handleOrderAction(
 }
 
 /**
+ * Handle Product Actions (admin)
+ */
+async function handleProductAction(
+  productId: string,
+  actionId: string,
+  options: EntityActionOptions,
+  mutate: any
+): Promise<boolean> {
+  try {
+    switch (actionId) {
+      case 'archive': {
+        const reason = options.notes;
+        await archiveAPI.archiveEntity('product', productId, reason || undefined);
+        mutate((key: any) => typeof key === 'string' && (key.includes('/admin/directory/products') || key.includes('/catalog') || key.includes(productId)));
+        toast.success('Product archived successfully');
+        options.onSuccess?.();
+        return true;
+      }
+      case 'restore': {
+        await archiveAPI.restoreEntity('product', productId);
+        mutate((key: any) => typeof key === 'string' && (key.includes('/admin/directory/products') || key.includes('/catalog') || key.includes(productId)));
+        toast.success('Product restored successfully');
+        options.onSuccess?.();
+        return true;
+      }
+      case 'delete': {
+        const reason = options.notes;
+        await archiveAPI.hardDelete('product', productId, reason);
+        mutate((key: any) => typeof key === 'string' && (key.includes('/admin/directory/products') || key.includes('/catalog') || key.includes(productId)));
+        toast.success('Product permanently deleted');
+        options.onSuccess?.();
+        return true;
+      }
+      default:
+        console.warn('[useEntityActions] Unknown action for product:', actionId);
+        return false;
+    }
+  } catch (error) {
+    console.error(`[useEntityActions] Product action "${actionId}" failed:`, error);
+    toast.error(`Failed to ${actionId} product`);
+    throw error;
+  }
+}
+
+/**
+ * Handle User Actions (admin)
+ */
+async function handleUserAction(
+  userId: string,
+  actionId: string,
+  subtype: string | undefined,
+  options: EntityActionOptions,
+  mutate: any
+): Promise<boolean> {
+  // Map subtype to archive entity type
+  const validUserTypes = new Set(['manager', 'contractor', 'customer', 'center', 'crew', 'warehouse']);
+  const entityType = (subtype || '').toLowerCase();
+  if (!validUserTypes.has(entityType)) {
+    console.warn('[useEntityActions] Unsupported user subtype for archive:', subtype);
+    return false;
+  }
+
+  try {
+    switch (actionId) {
+      case 'archive': {
+        const reason = options.notes;
+        await archiveAPI.archiveEntity(entityType as any, userId, reason || undefined);
+        mutate((key: any) => typeof key === 'string' && (key.includes('/admin/directory') || key.includes(userId)));
+        toast.success('User archived successfully');
+        options.onSuccess?.();
+        return true;
+      }
+      case 'restore': {
+        await archiveAPI.restoreEntity(entityType as any, userId);
+        mutate((key: any) => typeof key === 'string' && (key.includes('/admin/directory') || key.includes(userId)));
+        toast.success('User restored successfully');
+        options.onSuccess?.();
+        return true;
+      }
+      case 'delete': {
+        const reason = options.notes;
+        await archiveAPI.hardDelete(entityType as any, userId, reason);
+        mutate((key: any) => typeof key === 'string' && (key.includes('/admin/directory') || key.includes(userId)));
+        toast.success('User permanently deleted');
+        options.onSuccess?.();
+        return true;
+      }
+      default:
+        console.warn('[useEntityActions] Unknown action for user:', actionId);
+        return false;
+    }
+  } catch (error) {
+    console.error(`[useEntityActions] User action "${actionId}" failed:`, error);
+    toast.error(`Failed to ${actionId} user`);
+    throw error;
+  }
+}
+/**
  * Handle Service Actions
  */
 async function handleServiceAction(
@@ -299,8 +407,7 @@ async function handleServiceAction(
   options: EntityActionOptions,
   mutate: any
 ): Promise<boolean> {
-  // Import archive API
-  const { archiveAPI } = await import('../shared/api/archive');
+  // Archive API (statically imported)
 
   try {
     switch (actionId) {
@@ -434,16 +541,24 @@ async function handleCatalogServiceAction(
       }
 
       case 'archive': {
-        const { updateCatalogService } = await import('../shared/api/admin');
+        const reason = options.notes;
 
         console.log('[useEntityActions] Archiving catalog service:', serviceId);
-        await updateCatalogService(serviceId, { isActive: false });
+        await archiveAPI.archiveEntity('catalogService', serviceId, reason || undefined);
+
+        // Also set isActive flag for immediate visibility
+        try {
+          await updateCatalogService(serviceId, { isActive: false });
+        } catch (e) {
+          console.warn('[useEntityActions] Failed to update isActive flag:', e);
+        }
 
         // Invalidate caches
         mutate((key: any) => {
           if (typeof key === 'string') {
             return key.includes('/catalog') ||
                    key.includes('/admin/directory') ||
+                   key.includes('/archive') ||
                    key.includes(serviceId);
           }
           return false;
@@ -456,16 +571,23 @@ async function handleCatalogServiceAction(
       }
 
       case 'restore': {
-        const { updateCatalogService } = await import('../shared/api/admin');
 
         console.log('[useEntityActions] Restoring catalog service:', serviceId);
-        await updateCatalogService(serviceId, { isActive: true });
+        await archiveAPI.restoreEntity('catalogService', serviceId);
+
+        // Also set isActive flag for immediate visibility
+        try {
+          await updateCatalogService(serviceId, { isActive: true });
+        } catch (e) {
+          console.warn('[useEntityActions] Failed to update isActive flag:', e);
+        }
 
         // Invalidate caches
         mutate((key: any) => {
           if (typeof key === 'string') {
             return key.includes('/catalog') ||
                    key.includes('/admin/directory') ||
+                   key.includes('/archive') ||
                    key.includes(serviceId);
           }
           return false;
@@ -478,10 +600,26 @@ async function handleCatalogServiceAction(
       }
 
       case 'delete': {
-        // TODO: Implement permanent delete endpoint in backend
-        console.warn('[useEntityActions] Delete action not yet implemented for catalog services');
-        toast.error('Permanent delete functionality coming soon');
-        return false;
+        const reason = options.notes;
+
+        console.log('[useEntityActions] Hard deleting catalog service:', serviceId);
+        await archiveAPI.hardDelete('catalogService', serviceId, reason || undefined);
+
+        // Invalidate caches
+        mutate((key: any) => {
+          if (typeof key === 'string') {
+            return key.includes('/catalog') ||
+                   key.includes('/admin/directory') ||
+                   key.includes('/archive') ||
+                   key.includes(serviceId);
+          }
+          return false;
+        });
+
+        console.log('[useEntityActions] Catalog service hard delete: success');
+        toast.success('Catalog service permanently deleted');
+        options.onSuccess?.();
+        return true;
       }
 
       default:
@@ -506,8 +644,7 @@ async function handleReportAction(
   options: EntityActionOptions,
   mutate: any
 ): Promise<boolean> {
-  // Import archive API
-  const { archiveAPI } = await import('../shared/api/archive');
+  // Archive API (statically imported)
 
   // Determine entity type (report vs feedback)
   const entityType = subtype === 'feedback' ? 'feedback' : 'report';

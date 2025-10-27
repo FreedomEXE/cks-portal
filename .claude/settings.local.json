@@ -8,7 +8,19 @@
       "Bash(netstat:*)",
       "Bash(findstr:*)",
       "Bash(git add:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nchore: Add remaining files from catalog service work session\n\n## Documentation\n- Added catalog service fix investigation docs\n- Added modal header name convention docs\n- Added migration documentation\n- Added GPT5 investigation prompt\n- Archived old screenshots\n\n## New Files\n- test-catalog-service-endpoint.js script\n- useCatalogServiceDetails.ts hook\n- Migration docs for catalog services and universal modal\n\n## Policy Updates\n- Updated tabs.ts: Admin override for user history visibility\n- Updated sections.ts: Latest section visibility rules\n- Updated parseEntityId.ts: Catalog service type detection\n\n## Misc Changes\n- Updated scope store and types\n- Updated entity catalog\n- Updated ActivityFeed component\n- Updated CKSCatalog page\n- Updated UI package exports\n- Cleaned up screenshot organization\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash($env:PORT=4000)",
+      "Bash(pnpm dev:backend:*)",
+      "Bash(timeout:*)",
+      "Bash(pnpm dev:*)",
+      "Bash(node:*)",
+      "Bash(curl:*)",
+      "Bash(pnpm typecheck:*)",
+      "Bash(Select-String \"error TS|Successfully|Build failed\")",
+      "Bash(pnpm build:ui:*)",
+      "Bash(Select-String \"error TS|Successfully|Build failed\" -Context 0,2)",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": []

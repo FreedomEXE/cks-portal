@@ -12,6 +12,7 @@ import { useLoading } from "../contexts/LoadingContext";
 import { useHubLoading } from "../contexts/HubLoadingContext";
 import { useModals } from "../contexts/ModalProvider";
 import { CatalogProductModal, Button } from "@cks/ui";
+import { fetchHubOrders } from "../shared/api/hub";
 
 type CatalogKind = "products" | "services";
 
@@ -803,7 +804,6 @@ export default function CKSCatalog() {
     // Fetch orders and derive active services
     (async () => {
       try {
-        const { fetchHubOrders } = await import('../shared/api/hub');
         const ordersData = await fetchHubOrders(normalizedCode);
         const serviceOrders = ordersData.serviceOrders || [];
 

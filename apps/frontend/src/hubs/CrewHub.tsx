@@ -30,6 +30,7 @@ import {
 import { crewOverviewCards } from '@cks/domain-widgets';
 import { Button, DataTable, OrderDetailsModal, ServiceViewModal, PageHeader, PageWrapper, Scrollbar, TabSection } from '@cks/ui';
 import { useModals } from '../contexts';
+import { apiFetch } from '../shared/api/client';
 import ActivityModalGateway from '../components/ActivityModalGateway';
 import { useEntityActions } from '../hooks/useEntityActions';
 import { useAuth } from '@cks/auth';
@@ -38,6 +39,7 @@ import { useCertifiedServices } from '../hooks/useCertifiedServices';
 import { useServices as useDirectoryServices } from '../shared/api/directory';
 import { useFormattedActivities } from '../shared/activity/useFormattedActivities';
 import { ActivityFeed } from '../components/ActivityFeed';
+import { dismissActivity, dismissAllActivities } from '../shared/api/directory';
 
 import MyHubSection from '../components/MyHubSection';
 import {
@@ -298,7 +300,6 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
   // Handle activity dismissal
   const handleClearActivity = useCallback(async (activityId: string) => {
     try {
-      const { dismissActivity } = await import('../shared/api/directory');
       await dismissActivity(activityId);
       mutateActivities();
       console.log('[CrewHub] Activity dismissed:', activityId);
@@ -310,7 +311,6 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
   // Clear ALL activities for current user
   const handleClearAll = useCallback(async () => {
     try {
-      const { dismissAllActivities } = await import('../shared/api/directory');
       const result = await dismissAllActivities();
       mutateActivities();
       console.log(`[CrewHub] ${result.count} activities dismissed`);
@@ -754,7 +754,6 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
                   try {
                     // For crew assignment responses (accept/reject crew invites)
                     if (act === 'accept' || act === 'reject') {
-                      const { apiFetch } = await import('../shared/api/client');
 
                       // Find the order to get serviceId/transformedId
                       const targetOrder = orders?.orders?.find((o: any) => (o.orderId || o.id) === orderId);

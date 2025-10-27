@@ -35,6 +35,10 @@ export interface NormalizedService {
     warehouseId?: string;
     warehouseName?: string;
   };
+  // Archive metadata
+  archivedAt?: string;
+  archivedBy?: string;
+  archiveReason?: string;
   // Deletion metadata (tombstone)
   isDeleted?: boolean;
   deletedAt?: string;
@@ -82,6 +86,10 @@ function normalizeService(entity: any): NormalizedService {
       warehouseId: metadata.warehouseId || entity.warehouseId,
       warehouseName: metadata.warehouseName || entity.warehouseName,
     },
+    // Archive metadata (support snake_case from backend)
+    archivedAt: entity.archivedAt || entity.archived_at || metadata.archivedAt,
+    archivedBy: entity.archivedBy || entity.archived_by || metadata.archivedBy,
+    archiveReason: entity.archiveReason || entity.archive_reason || metadata.archiveReason,
     // Deletion metadata (tombstone)
     isDeleted: entity.isDeleted,
     deletedAt: entity.deletedAt,

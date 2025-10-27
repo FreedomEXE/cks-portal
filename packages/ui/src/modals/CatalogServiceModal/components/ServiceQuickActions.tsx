@@ -24,8 +24,14 @@ export interface ServiceQuickActionsProps {
   managedBy?: 'manager' | 'warehouse';
   category?: string;
   onSave?: (changes: CertificationChanges) => Promise<void>;
-  onEdit?: () => void;
-  onDelete?: () => void;
+  onEdit?: () => void;  // Legacy prop for old CatalogServiceModal (unused in universal modal)
+  onDelete?: () => void;  // Legacy prop for old CatalogServiceModal (unused in universal modal)
+  adminActions?: Array<{
+    label: string;
+    onClick: () => void | Promise<void>;
+    variant?: 'primary' | 'secondary' | 'danger';
+    disabled?: boolean;
+  }>;
 }
 
 const ServiceQuickActions: React.FC<ServiceQuickActionsProps> = ({
@@ -36,8 +42,7 @@ const ServiceQuickActions: React.FC<ServiceQuickActionsProps> = ({
   managedBy = 'manager',
   category = '',
   onSave,
-  onEdit,
-  onDelete,
+  adminActions = [],
 }) => {
   const [addUserType, setAddUserType] = useState<UserRole | 'all'>('all');
   const [addSearchQuery, setAddSearchQuery] = useState('');
@@ -321,22 +326,24 @@ const ServiceQuickActions: React.FC<ServiceQuickActionsProps> = ({
         </div>
       </div>
 
-      {/* ACTIONS Section */}
-      {(onSave || onEdit || onDelete) && (
+      {/* ACTIONS Section - Admin actions on left, Save on right */}
+      {(onSave || (adminActions && adminActions.length > 0)) ? (
         <div className={styles.actionsSection}>
           <h4 className={styles.sectionTitle}>ACTIONS</h4>
           <div className={styles.actions}>
             <div className={styles.leftActions}>
-              {onEdit && (
-                <button className={`${styles.actionButton} ${styles.actionEdit}`} onClick={onEdit}>
-                  Edit
-                </button>
-              )}
-              {onDelete && (
-                <button className={`${styles.actionButton} ${styles.actionDelete}`} onClick={onDelete}>
-                  Delete
-                </button>
-              )}
+              {adminActions.map((a, i) => {
+                const cls = a.variant === 'danger'
+                  ? `${styles.actionButton} ${styles.actionDelete}`
+                  : a.variant === 'primary'
+                    ? `${styles.actionButton} ${styles.actionSave}`
+                    : `${styles.actionButton} ${styles.actionEdit}`;
+                return (
+                  <button key={i} className={cls} onClick={() => a.onClick()} disabled={a.disabled}>
+                    {a.label}
+                  </button>
+                );
+              })}
             </div>
             <div className={styles.rightActions}>
               {onSave && (
@@ -351,7 +358,7 @@ const ServiceQuickActions: React.FC<ServiceQuickActionsProps> = ({
             </div>
           </div>
         </div>
-      )}
+      ) : null}
     </div>
   );
 };

@@ -4,6 +4,7 @@ import { requireActiveRole } from '../../core/auth/guards';
 import { requireActiveAdmin } from '../adminUsers/guards';
 import { query } from '../../db/connection';
 import { getCatalogItems } from './service';
+import { recordActivity } from '../activity/writer';
 
 const querySchema = z.object({
   type: z.enum(['product', 'service']).optional(),
@@ -343,7 +344,7 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
     const { serviceId } = p.data;
     const { role, add, remove } = b.data;
 
-    // Insert new certifications
+    // Insert new certifications and write activity per user
     for (const raw of add) {
       const uid = (raw || '').toString().trim().toUpperCase();
       if (!uid) continue;
@@ -353,6 +354,19 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
          ON CONFLICT (service_id, user_id, role) DO UPDATE SET archived_at = NULL, created_at = NOW()`,
         [serviceId, uid, role],
       );
+
+      // Recent Activity: User certified for this catalog service
+      try {
+        await recordActivity({
+          activityType: 'catalog_service_certified',
+          description: `${uid} certified for catalog service ${serviceId} (${role})`,
+          actorId: admin.cksCode || 'ADMIN',
+          actorRole: 'admin',
+          targetId: serviceId,
+          targetType: 'catalogService',
+          metadata: { userId: uid, role },
+        });
+      } catch {}
     }
     // Archive removed ones
     if (remove.length) {
@@ -364,6 +378,21 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
          WHERE service_id = $1 AND role = $2 AND user_id = ANY($3::text[])`,
         [serviceId, role, removeIds],
       );
+
+      // Recent Activity: User certification removed
+      for (const uid of removeIds) {
+        try {
+          await recordActivity({
+            activityType: 'catalog_service_decertified',
+            description: `${uid} removed from certifications for catalog service ${serviceId} (${role})`,
+            actorId: admin.cksCode || 'ADMIN',
+            actorRole: 'admin',
+            targetId: serviceId,
+            targetType: 'catalogService',
+            metadata: { userId: uid, role },
+          });
+        } catch {}
+      }
       }
     }
     reply.send({ success: true });

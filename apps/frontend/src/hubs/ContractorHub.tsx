@@ -52,6 +52,7 @@ import { buildEcosystemTree } from '../shared/utils/ecosystem';
 import { useCatalogItems } from '../shared/api/catalog';
 import { useCertifiedServices } from '../hooks/useCertifiedServices';
 import { useHubLoading } from '../contexts/HubLoadingContext';
+import { dismissActivity, dismissAllActivities } from '../shared/api/directory';
 import { buildContractorOverviewData } from '../shared/overview/builders';
 
 interface ContractorHubProps {
@@ -244,7 +245,6 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
   // Handle activity dismissal
   const handleClearActivity = useCallback(async (activityId: string) => {
     try {
-      const { dismissActivity } = await import('../shared/api/directory');
       await dismissActivity(activityId);
       mutateActivities();
       console.log('[ContractorHub] Activity dismissed:', activityId);
@@ -256,7 +256,6 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
   // Clear ALL activities for current user
   const handleClearAll = useCallback(async () => {
     try {
-      const { dismissAllActivities } = await import('../shared/api/directory');
       const result = await dismissAllActivities();
       mutateActivities();
       console.log(`[ContractorHub] ${result.count} activities dismissed`);

@@ -69,9 +69,9 @@ export function canSeeTab(tabId: TabId, context: TabVisibilityContext): boolean 
       return hasActions && lifecycle.state !== 'deleted';
 
     // ===== QUICK ACTIONS TAB =====
-    // Admin-only for catalog services (unified catalog view)
+    // Admin-only for catalog services and products (unified catalog view)
     case 'quick-actions': {
-      const canSee = role === 'admin' && entityType === 'catalogService';
+      const canSee = role === 'admin' && (entityType === 'catalogService' || entityType === 'product');
       console.log('[TabPolicy] quick-actions visibility check:', { role, entityType, canSee });
       return canSee;
     }

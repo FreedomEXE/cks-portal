@@ -15,6 +15,7 @@
  */
 
 import React from 'react';
+import toast from 'react-hot-toast';
 import type {
   EntityAdapter,
   EntityRegistry,
@@ -40,10 +41,14 @@ import {
   ServiceDetails,
   ServiceQuickActions,
 } from '@cks/ui';
+// Deep import for product quick actions (not exported at package root)
+import { ProductQuickActions } from '@cks/ui';
 import type { ActivityModalProps } from '@cks/ui';
 import { DetailsComposer, ProfileInfoCard, getEntityAccentColor } from '@cks/domain-widgets';
 import { filterVisibleSections } from '../policies/sections';
 import { mapProfileDataForRole } from '../shared/utils/profileMapping';
+import { patchServiceAssignments } from '../shared/api/admin';
+import { updateInventory, getProductInventory } from '../shared/api/admin';
 
 /**
  * Order Details Sections Builder
@@ -200,6 +205,7 @@ const orderAdapter: EntityAdapter = {
             key: 'archive',
             label: 'Archive Order',
             variant: 'secondary',
+            confirm: 'Are you sure you want to archive this order? You can restore it later.',
             prompt: 'Optional: Provide a reason for archiving this order',
             closeOnSuccess: true,
           });
@@ -783,6 +789,7 @@ const serviceAdapter: EntityAdapter = {
             key: 'archive',
             label: 'Archive Service',
             variant: 'secondary',
+            confirm: 'Are you sure you want to archive this service? You can restore it later.',
             prompt: 'Optional: Provide a reason for archiving this service',
             closeOnSuccess: true,
           });
@@ -920,6 +927,13 @@ const serviceAdapter: EntityAdapter = {
             entityType={context.entityType}
             entityId={entityData?.serviceId}
           />
+        ),
+      },
+      {
+        id: 'actions',
+        label: 'Actions',
+        content: (
+          <UserQuickActionsContent actions={actions} />
         ),
       },
     ];
@@ -1102,6 +1116,7 @@ const userAdapter: EntityAdapter = {
             key: 'archive',
             label: 'Archive',
             variant: 'secondary',
+            confirm: 'Are you sure you want to archive this user? You can restore it later.',
             prompt: 'Optional: Provide a reason for archiving this user',
             closeOnSuccess: true,
           });
@@ -1343,7 +1358,8 @@ const catalogServiceAdapter: EntityAdapter = {
           key: 'archive',
           label: 'Archive',
           variant: 'secondary',
-          prompt: 'Are you sure you want to archive this catalog service? It will be hidden from active lists but can be restored later.',
+          confirm: 'Are you sure you want to archive this catalog service? You can restore it later.',
+          prompt: 'Optional: Provide a reason for archiving this catalog service',
           closeOnSuccess: true,
         });
       } else if (state === 'archived') {
@@ -1424,6 +1440,8 @@ const catalogServiceAdapter: EntityAdapter = {
       ),
     });
 
+    // Note: No separate Actions tab for catalog services; admin actions render inside Quick Actions
+
     // Admin-only: Quick Actions tab for certification management
     console.log('[CatalogServiceAdapter] Checking admin condition:', { role, isAdmin: role === 'admin' });
     if (role === 'admin') {
@@ -1479,9 +1497,6 @@ const catalogServiceAdapter: EntityAdapter = {
               }
 
               try {
-                // Import admin API
-                const { patchServiceAssignments } = await import('../shared/api/admin');
-
                 // Calculate add/remove for each role
                 const roles: Array<'manager' | 'contractor' | 'crew' | 'warehouse'> = [
                   'manager',
@@ -1512,19 +1527,19 @@ const catalogServiceAdapter: EntityAdapter = {
                 }
 
                 console.log('[CatalogService] Certifications saved successfully');
+                toast.success('Certifications saved');
+                window.dispatchEvent(new CustomEvent('cks:modal:close'));
               } catch (error) {
                 console.error('[CatalogService] Failed to save certifications:', error);
                 throw error; // Let ServiceQuickActions show error
               }
             }}
-            onEdit={() => {
-              // Edit is handled via the action button (Archive), not Quick Actions
-              console.log('[CatalogService] Edit via Quick Actions not implemented');
-            }}
-            onDelete={() => {
-              // Delete renamed to Archive, handled via action button
-              console.log('[CatalogService] Archive via Quick Actions not implemented (use action button)');
-            }}
+            adminActions={actions.map(a => ({
+              label: a.label,
+              onClick: a.onClick,
+              variant: a.variant as any,
+              disabled: a.disabled,
+            }))}
           />
         ),
       });
@@ -1536,6 +1551,169 @@ const catalogServiceAdapter: EntityAdapter = {
   },
 
   // No legacy component support for catalog services
+};
+
+/**
+ * Product Details Sections Builder (unified)
+ */
+function buildProductDetailsSections(context: TabVisibilityContext): import('@cks/ui').SectionDescriptor[] {
+  const { entityData } = context;
+  const sections: import('@cks/ui').SectionDescriptor[] = [];
+
+  // Product Information
+  const infoFields: Array<{ label: string; value: string }> = [];
+  infoFields.push({ label: 'Product ID', value: entityData?.productId || '-' });
+  infoFields.push({ label: 'Name', value: entityData?.name || '-' });
+  if (entityData?.category) infoFields.push({ label: 'Category', value: entityData.category });
+  if (entityData?.unitOfMeasure) infoFields.push({ label: 'Unit', value: entityData.unitOfMeasure });
+  if (entityData?.price != null) infoFields.push({ label: 'Price', value: String(entityData.price) });
+
+  sections.push({
+    id: 'product-info',
+    type: 'key-value-grid',
+    title: 'Product Information',
+    columns: 2,
+    fields: infoFields,
+  });
+
+  // Description
+  if (entityData?.description) {
+    sections.push({
+      id: 'description',
+      type: 'rich-text',
+      title: 'Description',
+      content: entityData.description,
+    });
+  }
+
+  // Inventory snapshot (read-only in Details)
+  if (Array.isArray(entityData?.inventoryData) && entityData.inventoryData.length > 0) {
+    sections.push({
+      id: 'inventory',
+      type: 'items-table',
+      title: 'Inventory',
+      columns: [
+        { key: 'warehouse', label: 'Warehouse' },
+        { key: 'onHand', label: 'On Hand' },
+        { key: 'minLevel', label: 'Min Level' },
+        { key: 'location', label: 'Location' },
+      ],
+      rows: entityData.inventoryData.map((inv: any) => ({
+        warehouse: `${inv.warehouseName || '-'} (${inv.warehouseId || '-'})`,
+        onHand: inv.quantityOnHand ?? '-',
+        minLevel: inv.minStockLevel ?? '-',
+        location: inv.location ?? '-',
+      })),
+    });
+  }
+
+  return sections;
+}
+
+/**
+ * Product Adapter - unified modal system
+ */
+const productAdapter: EntityAdapter = {
+  getActionDescriptors: (context: EntityActionContext): EntityActionDescriptor[] => {
+    const { role, state } = context;
+    const descriptors: EntityActionDescriptor[] = [];
+    if (role === 'admin') {
+      if (state === 'active') {
+        descriptors.push({ key: 'archive', label: 'Archive Product', variant: 'secondary', confirm: 'Are you sure you want to archive this product? You can restore it later.', prompt: 'Optional: Provide a reason for archiving this product', closeOnSuccess: true });
+      } else if (state === 'archived') {
+        descriptors.push({ key: 'restore', label: 'Restore Product', variant: 'secondary', closeOnSuccess: true });
+        descriptors.push({ key: 'delete', label: 'Permanently Delete Product', variant: 'danger', confirm: 'Are you sure you want to PERMANENTLY delete this product? This cannot be undone.', prompt: 'Provide a deletion reason (optional):', closeOnSuccess: true });
+      }
+    }
+    return descriptors;
+  },
+
+  getHeaderConfig: (context: TabVisibilityContext): HeaderConfig => {
+    const { entityData } = context;
+    const fields: HeaderField[] = [];
+
+    // Name-first convention for header card
+    fields.push({ label: 'Name', value: entityData?.name || '-' });
+    if (entityData?.category) fields.push({ label: 'Category', value: entityData.category });
+    if (entityData?.unitOfMeasure) fields.push({ label: 'Unit', value: entityData.unitOfMeasure });
+
+    return {
+      id: entityData?.productId || '',
+      type: 'Product',
+      status: entityData?.status || 'active',
+      fields,
+    };
+  },
+
+  getDetailsSections: buildProductDetailsSections,
+
+  getTabDescriptors: (context: TabVisibilityContext, actions: EntityAction[]): TabDescriptor[] => {
+    const { entityData, role } = context;
+
+    const detailsSections = buildProductDetailsSections(context);
+
+    const tabs: TabDescriptor[] = [
+      {
+        id: 'details',
+        label: 'Details',
+        content: (
+          <DetailsComposer
+            sections={filterVisibleSections(detailsSections, {
+              entityType: context.entityType,
+              role: context.role,
+              lifecycle: context.lifecycle,
+              entityData,
+            })}
+          />
+        ),
+      },
+      {
+        id: 'actions',
+        label: 'Actions',
+        content: (
+          // Reuse generic quick actions renderer (button list)
+          <UserQuickActions actions={actions} />
+        ),
+      },
+    ];
+
+    // Admin-only: Inventory management quick actions
+    if (role === 'admin') {
+      tabs.unshift({
+        id: 'quick-actions',
+        label: 'Quick Actions',
+        content: (
+          <ProductQuickActions
+            inventoryData={entityData?.inventoryData || []}
+            onSave={async (changes) => {
+              const productId = entityData?.productId;
+              if (!productId) return;
+              for (const change of changes) {
+                await updateInventory({
+                  warehouseId: change.warehouseId,
+                  itemId: productId,
+                  quantityChange: change.quantityChange,
+                  reason: 'Admin adjustment via product quick actions',
+                });
+              }
+              try {
+                const result = await getProductInventory(productId);
+                if (result?.success && Array.isArray(result.data)) {
+                  (entityData as any).inventoryData = result.data;
+                }
+              } catch (e) {
+                console.warn('[ProductAdapter] Failed to refresh inventory', e);
+              }
+              toast.success('Inventory saved');
+            }}
+            // Deletion handled via Actions tab (to keep flow consistent)
+          />
+        ),
+      });
+    }
+
+    return tabs;
+  },
 };
 
 /**
@@ -1552,5 +1730,6 @@ export const entityRegistry: EntityRegistry = {
   customer: userAdapter,
   center: userAdapter,
   crew: userAdapter,
+  product: productAdapter,
   warehouse: userAdapter,
 };

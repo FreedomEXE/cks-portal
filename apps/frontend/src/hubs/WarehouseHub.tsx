@@ -15,6 +15,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useHubLoading } from '../contexts/HubLoadingContext';
+import { dismissActivity, dismissAllActivities } from '../shared/api/directory';
+import { applyServiceAction } from '../shared/api/hub';
 import {
   MemosPreview,
   NewsPreview,
@@ -280,7 +282,6 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
   // Handle activity dismissal
   const handleClearActivity = useCallback(async (activityId: string) => {
     try {
-      const { dismissActivity } = await import('../shared/api/directory');
       await dismissActivity(activityId);
       mutateActivities();
       console.log('[WarehouseHub] Activity dismissed:', activityId);
@@ -292,7 +293,6 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
   // Clear ALL activities for current user
   const handleClearAll = useCallback(async () => {
     try {
-      const { dismissAllActivities } = await import('../shared/api/directory');
       const result = await dismissAllActivities();
       mutateActivities();
       console.log(`[WarehouseHub] ${result.count} activities dismissed`);
@@ -445,7 +445,6 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
         try {
           const notes = window.prompt('Add notes for starting this service (optional):');
           if (notes === null) return; // User cancelled
-          const { applyServiceAction } = await import('../shared/api/hub');
           await applyServiceAction(rawServiceId, 'start', notes || undefined);
           refreshOrders();
         } catch (err) {
@@ -458,7 +457,6 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
         try {
           const notes = window.prompt('Add notes for completing this service (describe work performed):');
           if (notes === null) return; // User cancelled
-          const { applyServiceAction } = await import('../shared/api/hub');
           await applyServiceAction(rawServiceId, 'complete', notes || undefined);
           refreshOrders();
         } catch (err) {
@@ -471,7 +469,6 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
         try {
           const reason = window.prompt('Please provide a reason for cancellation:');
           if (!reason) return;
-          const { applyServiceAction } = await import('../shared/api/hub');
           await applyServiceAction(rawServiceId, 'cancel');
           refreshOrders();
         } catch (err) {

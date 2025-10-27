@@ -72,6 +72,8 @@ export type { CertifiedUser, CertificationChanges } from './modals/CatalogServic
 
 export * from './modals/CatalogProductModal/CatalogProductModal';
 export { default as CatalogProductModal } from './modals/CatalogProductModal/CatalogProductModal';
+export { default as ProductQuickActions } from './modals/CatalogProductModal/components/ProductQuickActions';
+export type { WarehouseInventory, InventoryChange } from './modals/CatalogProductModal/components/ProductQuickActions';
 
 export * from './modals/ReportModal/ReportModal';
 export { default as ReportModal } from './modals/ReportModal/ReportModal';

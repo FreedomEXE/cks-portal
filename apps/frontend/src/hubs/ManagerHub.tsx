@@ -77,6 +77,9 @@ import { createReport as apiCreateReport, createFeedback as apiCreateFeedback, a
 import { useSWRConfig } from 'swr';
 import { buildEcosystemTree } from '../shared/utils/ecosystem';
 import { useHubLoading } from '../contexts/HubLoadingContext';
+import { dismissActivity, dismissAllActivities } from '../shared/api/directory';
+import { apiFetch } from '../shared/api/client';
+import { applyServiceAction } from '../shared/api/hub';
 
 interface ManagerHubProps {
   initialTab?: string;
@@ -457,7 +460,6 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
 
   // Service action handlers
   const handleServiceSave = useCallback(async (serviceId: string, updates: any) => {
-    const { apiFetch } = await import('../shared/api/client');
     await apiFetch(`/services/${encodeURIComponent(serviceId)}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -467,13 +469,11 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
   }, [managerCode, mutate]);
 
   const handleServiceAction = useCallback(async (serviceId: string, action: 'start' | 'complete' | 'cancel') => {
-    const { applyServiceAction } = await import('../shared/api/hub');
     await applyServiceAction(serviceId, action);
     mutate(`/hub/orders/${managerCode}`, undefined, { revalidate: true });
   }, [managerCode, mutate]);
 
   const handleSendCrewRequest = useCallback(async (serviceId: string, crewCodes: string[]) => {
-    const { apiFetch } = await import('../shared/api/client');
     await apiFetch(`/services/${encodeURIComponent(serviceId)}/crew-requests`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -541,7 +541,6 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
   // Handle activity dismissal
   const handleClearActivity = useCallback(async (activityId: string) => {
     try {
-      const { dismissActivity } = await import('../shared/api/directory');
       await dismissActivity(activityId);
       mutateActivities(); // Refresh activities
       console.log('[ManagerHub] Activity dismissed:', activityId);
@@ -553,7 +552,6 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
   // Clear ALL activities for current user
   const handleClearAll = useCallback(async () => {
     try {
-      const { dismissAllActivities } = await import('../shared/api/directory');
       const result = await dismissAllActivities();
       mutateActivities();
       console.log(`[ManagerHub] ${result.count} activities dismissed`);
@@ -762,7 +760,6 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
           const meta: any = (order as any).metadata || {};
           const onStart = async () => {
             try {
-              const { applyServiceAction } = await import('../shared/api/hub');
               await applyServiceAction(rawServiceId, 'start');
               mutate(`/hub/orders/${managerCode}`, undefined, { revalidate: true });
               setToast('Service started');
@@ -775,7 +772,6 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
           
           const onComplete = async () => {
             try {
-              const { applyServiceAction } = await import('../shared/api/hub');
               await applyServiceAction(rawServiceId, 'complete');
               mutate(`/hub/orders/${managerCode}`, undefined, { revalidate: true });
               setToast('Service completed');
@@ -788,7 +784,6 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
 
           const onVerify = async () => {
             try {
-              const { applyServiceAction } = await import('../shared/api/hub');
               await applyServiceAction(rawServiceId, 'verify');
               mutate(`/hub/orders/${managerCode}`, undefined, { revalidate: true });
             } catch (err) {
@@ -1384,9 +1379,6 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
       </div>
   );
 }
-
-
-
 
 
 
