@@ -51,6 +51,55 @@ export async function seedCatalogData() {
     const serviceCount = await query(`SELECT COUNT(*) as count FROM catalog_services`, []);
 
     console.log(`Catalog seeded with ${finalProductCount.rows[0].count} products and ${serviceCount.rows[0].count} services`);
+
+    // Record creation activities for any new rows (idempotent)
+    await query(
+      `INSERT INTO system_activity (
+         activity_type, description, actor_id, actor_role,
+         target_id, target_type, metadata, created_at
+       )
+       SELECT
+         'product_created',
+         'Seeded ' || p.product_id,
+         'ADMIN',
+         'admin',
+         p.product_id,
+         'product',
+         jsonb_build_object('productName', p.name, 'origin', 'seed'),
+         COALESCE(p.created_at, NOW())
+       FROM catalog_products p
+       WHERE NOT EXISTS (
+         SELECT 1 FROM system_activity sa
+         WHERE sa.activity_type = 'product_created'
+           AND UPPER(sa.target_id) = UPPER(p.product_id)
+           AND sa.target_type = 'product'
+       )`,
+      [],
+    );
+
+    await query(
+      `INSERT INTO system_activity (
+         activity_type, description, actor_id, actor_role,
+         target_id, target_type, metadata, created_at
+       )
+       SELECT
+         'catalog_service_created',
+         'Seeded ' || s.service_id,
+         'ADMIN',
+         'admin',
+         s.service_id,
+         'catalogService',
+         jsonb_build_object('serviceName', s.name, 'origin', 'seed'),
+         COALESCE(s.created_at, NOW())
+       FROM catalog_services s
+       WHERE NOT EXISTS (
+         SELECT 1 FROM system_activity sa
+         WHERE sa.activity_type = 'catalog_service_created'
+           AND UPPER(sa.target_id) = UPPER(s.service_id)
+           AND sa.target_type = 'catalogService'
+       )`,
+      [],
+    );
   } catch (error) {
     console.error('Error seeding catalog data:', error);
     // Don't throw - allow the app to start even if seeding fails

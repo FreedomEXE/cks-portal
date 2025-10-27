@@ -344,6 +344,13 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
     const { serviceId } = p.data;
     const { role, add, remove } = b.data;
 
+    // Fetch service name for activity descriptions
+    const serviceResult = await query<{ name: string }>(
+      `SELECT name FROM catalog_services WHERE service_id = $1 LIMIT 1`,
+      [serviceId]
+    );
+    const serviceName = serviceResult.rows[0]?.name || serviceId;
+
     // Insert new certifications and write activity per user
     for (const raw of add) {
       const uid = (raw || '').toString().trim().toUpperCase();
@@ -359,14 +366,16 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
       try {
         await recordActivity({
           activityType: 'catalog_service_certified',
-          description: `${uid} certified for catalog service ${serviceId} (${role})`,
+          description: `Certified ${uid} for ${serviceId}`,
           actorId: admin.cksCode || 'ADMIN',
           actorRole: 'admin',
           targetId: serviceId,
           targetType: 'catalogService',
-          metadata: { userId: uid, role },
+          metadata: { userId: uid, role, serviceName, serviceId },
         });
-      } catch {}
+      } catch (err) {
+        console.warn('[catalog] failed to record catalog_service_certified', { serviceId, uid, err: (err as Error)?.message });
+      }
     }
     // Archive removed ones
     if (remove.length) {
@@ -384,14 +393,16 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
         try {
           await recordActivity({
             activityType: 'catalog_service_decertified',
-            description: `${uid} removed from certifications for catalog service ${serviceId} (${role})`,
+            description: `Uncertified ${uid} for ${serviceId}`,
             actorId: admin.cksCode || 'ADMIN',
             actorRole: 'admin',
             targetId: serviceId,
             targetType: 'catalogService',
-            metadata: { userId: uid, role },
+            metadata: { userId: uid, role, serviceName, serviceId },
           });
-        } catch {}
+        } catch (err) {
+          console.warn('[catalog] failed to record catalog_service_decertified', { serviceId, uid, err: (err as Error)?.message });
+        }
       }
       }
     }

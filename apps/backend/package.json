@@ -6,7 +6,13 @@
     "dev": "cross-env NODE_ENV=development TS_NODE_TRANSPILE_ONLY=1 tsx -r dotenv/config server/index.ts",
     "build": "tsc",
     "test": "echo 'Tests disabled for backend'",
-    "migrate": "node scripts/migrate.js"
+    "migrate": "node scripts/migrate.js",
+    "backfill:catalog-activities": "tsx -r dotenv/config scripts/backfill-catalog-activities.ts",
+    "normalize:created-activities": "tsx -r dotenv/config scripts/normalize-created-activities.ts",
+    "backfill:assignments-and-certs": "tsx -r dotenv/config scripts/backfill-assignments-and-certifications.ts",
+    "backfill:all-activities": "pnpm -s backfill:catalog-activities && pnpm -s normalize:created-activities && pnpm -s backfill:assignments-and-certs",
+    "migrate:activity-descriptions": "tsx -r dotenv/config scripts/migrate-activity-descriptions.ts",
+    "normalize:cert-targets": "tsx -r dotenv/config scripts/normalize-cert-activity-targets.ts"
   },
   "devDependencies": {
     "@types/pg": "^8.15.5",

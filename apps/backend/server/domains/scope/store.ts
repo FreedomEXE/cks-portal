@@ -144,10 +144,30 @@ type ActivityRow = {
   created_at: Date | string | null;
 };
 
-function mapActivityRow(row: ActivityRow): HubActivityItem {
+function mapActivityRow(row: ActivityRow, viewerId?: string): HubActivityItem {
+  let description = row.description;
+
+  // Personalize certification activity descriptions for the viewer
+  if (viewerId && row.metadata) {
+    const metadata = row.metadata as Record<string, any>;
+    const affectedUserId = metadata.userId?.toString().trim().toUpperCase();
+    const normalizedViewerId = viewerId.trim().toUpperCase();
+
+    if (affectedUserId === normalizedViewerId) {
+      // Extract service ID from target_id (more reliable than metadata.serviceName)
+      const serviceId = row.target_id || metadata.serviceName || 'this service';
+
+      if (row.activity_type === 'catalog_service_certified') {
+        description = `Certified you for ${serviceId}`;
+      } else if (row.activity_type === 'catalog_service_decertified') {
+        description = `Uncertified you for ${serviceId}`;
+      }
+    }
+  }
+
   return {
     id: String(row.activity_id),
-    description: row.description,
+    description,
     activityType: row.activity_type, // Preserve specific type like "crew_assigned_to_center"
     category: activityTypeCategory[row.activity_type] ?? 'info',
     actorId: toNullableString(row.actor_id),
@@ -365,25 +385,35 @@ async function getManagerActivities(cksCode: string): Promise<HubRoleActivitiesP
        AND activity_type NOT LIKE '%_deleted'
        AND activity_type NOT LIKE '%_hard_deleted'
        AND activity_type NOT LIKE '%_restored'
-     ) AND (
-       -- Show creation activities ONLY if target is self
-       (activity_type LIKE '%_created' AND UPPER(target_id) = $2)
-       OR
-       -- Show assignments where YOU are being assigned (target is self)
-       (activity_type LIKE '%_assigned%' AND UPPER(target_id) = $2)
-       OR
-       -- Show assignments where someone is assigned TO you (you're the parent)
-       (
-         (activity_type = 'contractor_assigned_to_manager' AND metadata ? 'managerId' AND UPPER(metadata->>'managerId') = $2)
-       )
-       OR
-       -- Show other activity types (orders, services, creations, etc.) for ecosystem
+      ) AND (
+        -- Show creation activities ONLY if target is self
+        (activity_type LIKE '%_created' AND UPPER(target_id) = $2)
+        OR
+        -- Show assignments where YOU are being assigned (target is self)
+        (activity_type LIKE '%_assigned%' AND UPPER(target_id) = $2)
+        OR
+        -- Show assignments where someone is assigned TO you (you're the parent)
+        (
+          (activity_type = 'contractor_assigned_to_manager' AND metadata ? 'managerId' AND UPPER(metadata->>'managerId') = $2)
+        )
+        OR
+        -- Catalog service certifications affecting YOU (viewer)
+        (
+          activity_type IN ('catalog_service_certified','catalog_service_decertified','catalogService_certified','catalogService_decertified')
+          AND metadata ? 'userId' AND UPPER(metadata->>'userId') = $2
+        )
+        OR
+        -- Catalog service creation events (visible to all users)
+        (activity_type = 'catalog_service_created')
+        OR
+        -- Show other activity types (orders, services, creations, etc.) for ecosystem
        -- SAFE: Only if target is in ecosystem OR actor is self OR metadata references self
        -- Creation events now visible for ecosystem (scoped by idArray + dismissals)
-       (
-         activity_type NOT LIKE '%assigned%'
-         AND activity_type != 'assignment_made'
-       )
+        (
+          activity_type NOT LIKE '%assigned%'
+          AND activity_type != 'assignment_made'
+          AND activity_type NOT LIKE '%_created'
+        )
        AND (
          (target_id IS NOT NULL AND UPPER(target_id) = ANY($1::text[]))
          OR (actor_id IS NOT NULL AND UPPER(actor_id) = $2)
@@ -400,7 +430,7 @@ async function getManagerActivities(cksCode: string): Promise<HubRoleActivitiesP
     [idArray, scope.cksCode],
   );
 
-  const activities = activitiesResult.rows.map(mapActivityRow);
+  const activities = activitiesResult.rows.map(row => mapActivityRow(row, scope.cksCode));
 
   return {
     role: 'manager',
@@ -593,17 +623,19 @@ async function getCustomerRoleScope(cksCode: string): Promise<CustomerRoleScopeP
        ORDER BY c.crew_id`,
       [normalizedCode],
     ),
-    // Services - simplified query since services table structure is different
+    // Services - catalog services certified for this customer
     query<{
       service_id: string;
       name: string | null;
       category: string | null;
       status: string | null;
     }>(
-      `SELECT service_id, service_name AS name, category, status
-       FROM services
-       WHERE 1=0`,  // Temporary: return empty until we understand the correct relationships
-      [],
+      `SELECT cs.service_id, cs.name, cs.category, cs.is_active::text AS status
+       FROM catalog_services cs
+       INNER JOIN service_certifications sc ON cs.service_id = sc.service_id
+       WHERE UPPER(sc.user_id) = $1 AND sc.role = 'customer'
+       ORDER BY cs.name`,
+      [normalizedCode],
     ),
   ]);
 
@@ -695,17 +727,19 @@ async function getCenterRoleScope(cksCode: string): Promise<CenterRoleScopePaylo
        ORDER BY crew_id`,
       [normalizedCode],
     ),
-    // Services - simplified query since services table structure is different
+    // Services - catalog services certified for this center
     query<{
       service_id: string;
       name: string | null;
       category: string | null;
       status: string | null;
     }>(
-      `SELECT service_id, service_name AS name, category, status
-       FROM services
-       WHERE 1=0`,  // Temporary: return empty until we understand the correct relationships
-      [],
+      `SELECT cs.service_id, cs.name, cs.category, cs.is_active::text AS status
+       FROM catalog_services cs
+       INNER JOIN service_certifications sc ON cs.service_id = sc.service_id
+       WHERE UPPER(sc.user_id) = $1 AND sc.role = 'center'
+       ORDER BY cs.name`,
+      [normalizedCode],
     ),
     // Pending requests - simplified for now
     query<{ count: string }>(
@@ -790,17 +824,19 @@ async function getCrewRoleScope(cksCode: string): Promise<CrewRoleScopePayload |
        LIMIT 1`,
       [centerCode],
     ) : Promise.resolve({ rows: [], rowCount: 0 }),
-    // Services - simplified query since services table structure is different
+    // Services - catalog services certified for this crew member
     query<{
       service_id: string;
       name: string | null;
       category: string | null;
       status: string | null;
     }>(
-      `SELECT service_id, service_name AS name, category, status
-       FROM services
-       WHERE 1=0`,  // Temporary: return empty until we understand the correct relationships
-      [],
+      `SELECT cs.service_id, cs.name, cs.category, cs.is_active::text AS status
+       FROM catalog_services cs
+       INNER JOIN service_certifications sc ON cs.service_id = sc.service_id
+       WHERE UPPER(sc.user_id) = $1 AND sc.role = 'crew'
+       ORDER BY cs.name`,
+      [normalizedCode],
     ),
     // Completed today - simplified for now
     query<{ count: string }>(
@@ -1001,25 +1037,35 @@ async function getContractorActivities(cksCode: string): Promise<HubRoleActiviti
        AND activity_type NOT LIKE '%_deleted'
        AND activity_type NOT LIKE '%_hard_deleted'
        AND activity_type NOT LIKE '%_restored'
-     ) AND (
-       -- Show creation activities ONLY if target is self
-       (activity_type LIKE '%_created' AND UPPER(target_id) = $2)
-       OR
-       -- Show assignments where YOU are being assigned (target is self)
-       (activity_type LIKE '%_assigned%' AND UPPER(target_id) = $2)
-       OR
-       -- Show assignments where someone is assigned TO you (you're the parent)
-       (
-         (activity_type = 'customer_assigned_to_contractor' AND metadata ? 'contractorId' AND UPPER(metadata->>'contractorId') = $2)
-       )
-       OR
-       -- Show other activity types (orders, services, creations, etc.) for ecosystem
+      ) AND (
+        -- Show creation activities ONLY if target is self
+        (activity_type LIKE '%_created' AND UPPER(target_id) = $2)
+        OR
+        -- Show assignments where YOU are being assigned (target is self)
+        (activity_type LIKE '%_assigned%' AND UPPER(target_id) = $2)
+        OR
+        -- Show assignments where someone is assigned TO you (you're the parent)
+        (
+          (activity_type = 'customer_assigned_to_contractor' AND metadata ? 'contractorId' AND UPPER(metadata->>'contractorId') = $2)
+        )
+        OR
+        -- Catalog service certifications affecting YOU (viewer)
+        (
+          activity_type IN ('catalog_service_certified','catalog_service_decertified','catalogService_certified','catalogService_decertified')
+          AND metadata ? 'userId' AND UPPER(metadata->>'userId') = $2
+        )
+        OR
+        -- Catalog service creation events (visible to all users)
+        (activity_type = 'catalog_service_created')
+        OR
+        -- Show other activity types (orders, services, creations, etc.) for ecosystem
        -- SAFE: Only if target is in ecosystem OR actor is self OR metadata references self
        -- Creation events now visible for ecosystem (scoped by idArray + dismissals)
-       (
-         activity_type NOT LIKE '%assigned%'
-         AND activity_type != 'assignment_made'
-       )
+        (
+          activity_type NOT LIKE '%assigned%'
+          AND activity_type != 'assignment_made'
+          AND activity_type NOT LIKE '%_created'
+        )
        AND (
          (target_id IS NOT NULL AND UPPER(target_id) = ANY($1::text[]))
          OR (actor_id IS NOT NULL AND UPPER(actor_id) = $2)
@@ -1035,7 +1081,7 @@ async function getContractorActivities(cksCode: string): Promise<HubRoleActiviti
     [idArray, scope.cksCode],
   );
 
-  const activities = activitiesResult.rows.map(mapActivityRow);
+  const activities = activitiesResult.rows.map(row => mapActivityRow(row, scope.cksCode));
 
   return {
     role: 'contractor',
@@ -1084,25 +1130,35 @@ async function getCustomerActivities(cksCode: string): Promise<HubRoleActivities
        AND activity_type NOT LIKE '%_deleted'
        AND activity_type NOT LIKE '%_hard_deleted'
        AND activity_type NOT LIKE '%_restored'
-     ) AND (
-       -- Show creation activities ONLY if target is self
-       (activity_type LIKE '%_created' AND UPPER(target_id) = $2)
-       OR
-       -- Show assignments where YOU are being assigned (target is self)
-       (activity_type LIKE '%_assigned%' AND UPPER(target_id) = $2)
-       OR
-       -- Show assignments where someone is assigned TO you (you're the parent)
-       (
-         (activity_type = 'center_assigned_to_customer' AND metadata ? 'customerId' AND UPPER(metadata->>'customerId') = $2)
-       )
-       OR
-       -- Show other activity types (orders, services, creations, etc.) for ecosystem
+      ) AND (
+        -- Show creation activities ONLY if target is self
+        (activity_type LIKE '%_created' AND UPPER(target_id) = $2)
+        OR
+        -- Show assignments where YOU are being assigned (target is self)
+        (activity_type LIKE '%_assigned%' AND UPPER(target_id) = $2)
+        OR
+        -- Show assignments where someone is assigned TO you (you're the parent)
+        (
+          (activity_type = 'center_assigned_to_customer' AND metadata ? 'customerId' AND UPPER(metadata->>'customerId') = $2)
+        )
+        OR
+        -- Catalog service certifications affecting YOU (viewer)
+        (
+          activity_type IN ('catalog_service_certified','catalog_service_decertified','catalogService_certified','catalogService_decertified')
+          AND metadata ? 'userId' AND UPPER(metadata->>'userId') = $2
+        )
+        OR
+        -- Catalog service creation events (visible to all users)
+        (activity_type = 'catalog_service_created')
+        OR
+        -- Show other activity types (orders, services, creations, etc.) for ecosystem
        -- SAFE: Only if target is in ecosystem OR actor is self OR metadata references self
        -- Creation events now visible for ecosystem (scoped by idArray + dismissals)
-       (
-         activity_type NOT LIKE '%assigned%'
-         AND activity_type != 'assignment_made'
-       )
+        (
+          activity_type NOT LIKE '%assigned%'
+          AND activity_type != 'assignment_made'
+          AND activity_type NOT LIKE '%_created'
+        )
        AND (
          (target_id IS NOT NULL AND UPPER(target_id) = ANY($1::text[]))
          OR (actor_id IS NOT NULL AND UPPER(actor_id) = $2)
@@ -1118,7 +1174,7 @@ async function getCustomerActivities(cksCode: string): Promise<HubRoleActivities
     [idArray, scope.cksCode],
   );
 
-  const activities = activitiesResult.rows.map(mapActivityRow);
+  const activities = activitiesResult.rows.map(row => mapActivityRow(row, scope.cksCode));
 
   return {
     role: 'customer',
@@ -1160,25 +1216,35 @@ async function getCenterActivities(cksCode: string): Promise<HubRoleActivitiesPa
        AND activity_type NOT LIKE '%_deleted'
        AND activity_type NOT LIKE '%_hard_deleted'
        AND activity_type NOT LIKE '%_restored'
-     ) AND (
-       -- Show creation activities ONLY if target is self
-       (activity_type LIKE '%_created' AND UPPER(target_id) = $2)
-       OR
-       -- Show assignments where YOU are being assigned (target is self)
-       (activity_type LIKE '%_assigned%' AND UPPER(target_id) = $2)
-       OR
-       -- Show assignments where someone is assigned TO you (you're the parent)
-       (
-         (activity_type = 'crew_assigned_to_center' AND metadata ? 'centerId' AND UPPER(metadata->>'centerId') = $2)
-       )
-       OR
-       -- Show other activity types (orders, services, creations, etc.) for ecosystem
+      ) AND (
+        -- Show creation activities ONLY if target is self
+        (activity_type LIKE '%_created' AND UPPER(target_id) = $2)
+        OR
+        -- Show assignments where YOU are being assigned (target is self)
+        (activity_type LIKE '%_assigned%' AND UPPER(target_id) = $2)
+        OR
+        -- Show assignments where someone is assigned TO you (you're the parent)
+        (
+          (activity_type = 'crew_assigned_to_center' AND metadata ? 'centerId' AND UPPER(metadata->>'centerId') = $2)
+        )
+        OR
+        -- Catalog service certifications affecting YOU (viewer)
+        (
+          activity_type IN ('catalog_service_certified','catalog_service_decertified','catalogService_certified','catalogService_decertified')
+          AND metadata ? 'userId' AND UPPER(metadata->>'userId') = $2
+        )
+        OR
+        -- Catalog service creation events (visible to all users)
+        (activity_type = 'catalog_service_created')
+        OR
+        -- Show other activity types (orders, services, creations, etc.) for ecosystem
        -- SAFE: Only if target is in ecosystem OR actor is self OR metadata references self
        -- Creation events now visible for ecosystem (scoped by idArray + dismissals)
-       (
-         activity_type NOT LIKE '%assigned%'
-         AND activity_type != 'assignment_made'
-       )
+        (
+          activity_type NOT LIKE '%assigned%'
+          AND activity_type != 'assignment_made'
+          AND activity_type NOT LIKE '%_created'
+        )
        AND (
          (target_id IS NOT NULL AND UPPER(target_id) = ANY($1::text[]))
          OR (actor_id IS NOT NULL AND UPPER(actor_id) = $2)
@@ -1194,7 +1260,7 @@ async function getCenterActivities(cksCode: string): Promise<HubRoleActivitiesPa
     [idArray, scope.cksCode],
   );
 
-  const activities = activitiesResult.rows.map(mapActivityRow);
+  const activities = activitiesResult.rows.map(row => mapActivityRow(row, scope.cksCode));
 
   return {
     role: 'center',
@@ -1236,23 +1302,33 @@ async function getCrewActivities(cksCode: string): Promise<HubRoleActivitiesPayl
        AND activity_type NOT LIKE '%_deleted'
        AND activity_type NOT LIKE '%_hard_deleted'
        AND activity_type NOT LIKE '%_restored'
-     ) AND (
-       -- Show creation activities ONLY if target is self
-       (activity_type LIKE '%_created' AND UPPER(target_id) = $2)
-       OR
-       -- Show assignments where YOU are being assigned (target is self)
-       (activity_type LIKE '%_assigned%' AND UPPER(target_id) = $2)
-       OR
-       -- Show assignments where you are assigned to a center (crew is in metadata)
-       (activity_type = 'crew_assigned_to_center' AND metadata ? 'crewId' AND UPPER(metadata->>'crewId') = $2)
-       OR
-       -- Show other activity types (orders, services, creations, etc.) for ecosystem
+      ) AND (
+        -- Show creation activities ONLY if target is self
+        (activity_type LIKE '%_created' AND UPPER(target_id) = $2)
+        OR
+        -- Show assignments where YOU are being assigned (target is self)
+        (activity_type LIKE '%_assigned%' AND UPPER(target_id) = $2)
+        OR
+        -- Show assignments where you are assigned to a center (crew is in metadata)
+        (activity_type = 'crew_assigned_to_center' AND metadata ? 'crewId' AND UPPER(metadata->>'crewId') = $2)
+        OR
+        -- Catalog service certifications affecting YOU (viewer)
+        (
+          activity_type IN ('catalog_service_certified','catalog_service_decertified','catalogService_certified','catalogService_decertified')
+          AND metadata ? 'userId' AND UPPER(metadata->>'userId') = $2
+        )
+        OR
+        -- Catalog service creation events (visible to all users)
+        (activity_type = 'catalog_service_created')
+        OR
+        -- Show other activity types (orders, services, creations, etc.) for ecosystem
        -- SAFE: Only if target is in ecosystem OR actor is self OR metadata references self
        -- Creation events now visible for ecosystem (scoped by idArray + dismissals)
-       (
-         activity_type NOT LIKE '%assigned%'
-         AND activity_type != 'assignment_made'
-       )
+        (
+          activity_type NOT LIKE '%assigned%'
+          AND activity_type != 'assignment_made'
+          AND activity_type NOT LIKE '%_created'
+        )
        AND (
          (target_id IS NOT NULL AND UPPER(target_id) = ANY($1::text[]))
          OR (actor_id IS NOT NULL AND UPPER(actor_id) = $2)
@@ -1268,7 +1344,7 @@ async function getCrewActivities(cksCode: string): Promise<HubRoleActivitiesPayl
     [idArray, scope.cksCode],
   );
 
-  const activities = activitiesResult.rows.map(mapActivityRow);
+  const activities = activitiesResult.rows.map(row => mapActivityRow(row, scope.cksCode));
 
   return {
     role: 'crew',
@@ -1310,25 +1386,35 @@ async function getWarehouseActivities(cksCode: string): Promise<HubRoleActivitie
        AND activity_type NOT LIKE '%_deleted'
        AND activity_type NOT LIKE '%_hard_deleted'
        AND activity_type NOT LIKE '%_restored'
-     ) AND (
-       -- Show creation activities ONLY if target is self
-       (activity_type LIKE '%_created' AND UPPER(target_id) = $2)
-       OR
-       -- Show assignments where YOU are being assigned (target is self)
-       (activity_type LIKE '%_assigned%' AND UPPER(target_id) = $2)
-       OR
-       -- Show assignments where someone is assigned TO you (warehouse might have order assignments)
-       (
-         (activity_type = 'order_assigned_to_warehouse' AND metadata ? 'warehouseId' AND UPPER(metadata->>'warehouseId') = $2)
-       )
-       OR
-       -- Show other activity types (orders, services, creations, etc.) for ecosystem
+      ) AND (
+        -- Show creation activities ONLY if target is self
+        (activity_type LIKE '%_created' AND UPPER(target_id) = $2)
+        OR
+        -- Show assignments where YOU are being assigned (target is self)
+        (activity_type LIKE '%_assigned%' AND UPPER(target_id) = $2)
+        OR
+        -- Show assignments where someone is assigned TO you (warehouse might have order assignments)
+        (
+          (activity_type = 'order_assigned_to_warehouse' AND metadata ? 'warehouseId' AND UPPER(metadata->>'warehouseId') = $2)
+        )
+        OR
+        -- Catalog service certifications affecting YOU (viewer)
+        (
+          activity_type IN ('catalog_service_certified','catalog_service_decertified','catalogService_certified','catalogService_decertified')
+          AND metadata ? 'userId' AND UPPER(metadata->>'userId') = $2
+        )
+        OR
+        -- Catalog service creation events (visible to all users)
+        (activity_type = 'catalog_service_created')
+        OR
+        -- Show other activity types (orders, services, creations, etc.) for ecosystem
        -- SAFE: Only if target is in ecosystem OR actor is self OR metadata references self
        -- Creation events now visible for ecosystem (scoped by idArray + dismissals)
-       (
-         activity_type NOT LIKE '%assigned%'
-         AND activity_type != 'assignment_made'
-       )
+        (
+          activity_type NOT LIKE '%assigned%'
+          AND activity_type != 'assignment_made'
+          AND activity_type NOT LIKE '%_created'
+        )
        AND (
          (target_id IS NOT NULL AND UPPER(target_id) = ANY($1::text[]))
          OR (actor_id IS NOT NULL AND UPPER(actor_id) = $2)
@@ -1344,7 +1430,7 @@ async function getWarehouseActivities(cksCode: string): Promise<HubRoleActivitie
     [idArray, scope.cksCode],
   );
 
-  const activities = activitiesResult.rows.map(mapActivityRow);
+  const activities = activitiesResult.rows.map(row => mapActivityRow(row, scope.cksCode));
 
   return {
     role: 'warehouse',
@@ -1390,4 +1476,5 @@ export async function getRoleScope(role: HubRole, cksCode: string): Promise<HubR
       return null;
   }
 }
+
 

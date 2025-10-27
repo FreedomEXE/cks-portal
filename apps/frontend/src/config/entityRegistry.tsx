@@ -1545,7 +1545,18 @@ const catalogServiceAdapter: EntityAdapter = {
       });
     }
 
-    // No History tab for catalog services (they don't have activity history)
+    // History tab - shows lifecycle events (created, archived, restored, deleted, certifications)
+    // Admin-only visibility enforced by tabs.ts policy
+    tabs.push({
+      id: 'history',
+      label: 'History',
+      content: (
+        <HistoryTab
+          entityType="catalogService"
+          entityId={entityData?.serviceId}
+        />
+      ),
+    });
 
     return tabs;
   },

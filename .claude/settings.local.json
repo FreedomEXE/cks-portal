@@ -20,7 +20,11 @@
       "Bash(Select-String \"error TS|Successfully|Build failed\")",
       "Bash(pnpm build:ui:*)",
       "Bash(Select-String \"error TS|Successfully|Build failed\" -Context 0,2)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(git rm:*)",
+      "Bash(taskkill:*)",
+      "Bash(ConvertFrom-Json)",
+      "Bash(ConvertTo-Json -Depth 10)"
     ],
     "deny": [],
     "ask": []

@@ -93,45 +93,49 @@ function personalizeMessage(item: HubActivityItem, viewerId?: string | null): st
   // Assignment activities: {entity}_assigned_to_{target}
   if (activityType === 'crew_assigned_to_center') {
     const crewId = metadata.crewId as string | undefined;
+    const centerId = (metadata as any).centerId as string | undefined;
 
     if (crewId?.toUpperCase() === normalizedViewerId) {
       return `You have been assigned to a center!`;
     }
-    if (item.targetId?.toUpperCase() === normalizedViewerId) {
+    if (centerId?.toUpperCase() === normalizedViewerId) {
       return `You have been assigned a crew member!`;
     }
   }
 
   if (activityType === 'contractor_assigned_to_manager') {
     const contractorId = metadata.contractorId as string | undefined;
+    const managerId = (metadata as any).managerId as string | undefined;
 
     if (contractorId?.toUpperCase() === normalizedViewerId) {
       return `You have been assigned to a manager!`;
     }
-    if (item.targetId?.toUpperCase() === normalizedViewerId) {
-      return `You have been assigned a contractor!`;
+    if (managerId?.toUpperCase() === normalizedViewerId) {
+      return `A contractor has been assigned to you!`;
     }
   }
 
   if (activityType === 'customer_assigned_to_contractor') {
     const customerId = metadata.customerId as string | undefined;
+    const contractorId = (metadata as any).contractorId as string | undefined;
 
     if (customerId?.toUpperCase() === normalizedViewerId) {
       return `You have been assigned to a contractor!`;
     }
-    if (item.targetId?.toUpperCase() === normalizedViewerId) {
-      return `You have been assigned a customer!`;
+    if (contractorId?.toUpperCase() === normalizedViewerId) {
+      return `A customer has been assigned to you!`;
     }
   }
 
   if (activityType === 'center_assigned_to_customer') {
     const centerId = metadata.centerId as string | undefined;
+    const customerId = (metadata as any).customerId as string | undefined;
 
     if (centerId?.toUpperCase() === normalizedViewerId) {
       return `You have been assigned to a customer!`;
     }
-    if (item.targetId?.toUpperCase() === normalizedViewerId) {
-      return `You have been assigned a center!`;
+    if (customerId?.toUpperCase() === normalizedViewerId) {
+      return `A center has been assigned to you!`;
     }
   }
 
@@ -217,9 +221,20 @@ export function useFormattedActivities(
 
   const activities: Activity[] = useMemo(() => {
     const items = data?.activities ?? [];
-    const filtered = normalizedCategories.length
+    const filteredByCategory = normalizedCategories.length
       ? items.filter((a) => normalizedCategories.includes((a.category || '').toLowerCase()))
       : items;
+
+    // Frontend guardrail (non-admin hubs):
+    // Hide other users' creation events while still showing own creation event.
+    const viewer = cksCode?.toUpperCase() ?? '';
+    const filtered = filteredByCategory.filter((a) => {
+      const type = (a.activityType || '').toLowerCase();
+      if (type.endsWith('_created')) {
+        return (a.targetId || '').toUpperCase() === viewer;
+      }
+      return true;
+    });
 
     const mapped = filtered.map((item) => mapHubItemToActivity(item, cksCode));
     mapped.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());

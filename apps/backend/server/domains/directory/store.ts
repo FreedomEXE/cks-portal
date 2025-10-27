@@ -280,6 +280,9 @@ const activityTypeCategory: Record<string, string> = {
   warehouse_created: 'action',
   order_created: 'action',
   service_created: 'action',
+  catalog_service_created: 'action',
+  catalog_service_certified: 'success',
+  catalog_service_decertified: 'warning',
 
   // Success/completion activities
   order_delivered: 'success',

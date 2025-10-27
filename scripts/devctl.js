@@ -26,9 +26,9 @@ const http = require('http');
 const https = require('https');
 const { URL } = require('url');
 
-function runService(name, cmd) {
+function runService(name, cmd, options = {}) {
   console.log(`Starting ${name}...`);
-  return spawn(cmd, { shell: true, stdio: 'inherit' });
+  return spawn(cmd, { shell: true, stdio: 'inherit', ...options });
 }
 
 function waitForUrl(rawUrl, {

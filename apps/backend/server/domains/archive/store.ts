@@ -493,27 +493,39 @@ export async function archiveEntity(operation: ArchiveOperation): Promise<{ succ
   const deletionScheduled = new Date();
   deletionScheduled.setDate(deletionScheduled.getDate() + 30); // Schedule for deletion in 30 days
 
-  const updateResult = idParamList
-    ? await query(
-        `UPDATE ${tableName}
-         SET archived_at = NOW(),
-             archived_by = $1,
-             archive_reason = $2,
-             deletion_scheduled = $3,
-             updated_at = NOW()
-         WHERE ${idColumn} = $4 OR ${idColumn} = $5`,
-        [actorId, operation.reason || 'Manual archive', deletionScheduled, idParamList[0], idParamList[1]]
-      )
-    : await query(
-        `UPDATE ${tableName}
-         SET archived_at = NOW(),
-             archived_by = $1,
-             archive_reason = $2,
-             deletion_scheduled = $3,
-             updated_at = NOW()
-         WHERE ${idColumn} = $4`,
-        [actorId, operation.reason || 'Manual archive', deletionScheduled, normalizedId]
-      );
+  // Special handling for catalogService: use is_active flag instead of archived_at timestamp
+  let updateResult;
+  if (operation.entityType === 'catalogService') {
+    updateResult = await query(
+      `UPDATE ${tableName}
+       SET is_active = FALSE,
+           updated_at = NOW()
+       WHERE ${idColumn} = $1`,
+      [normalizedId]
+    );
+  } else {
+    updateResult = idParamList
+      ? await query(
+          `UPDATE ${tableName}
+           SET archived_at = NOW(),
+               archived_by = $1,
+               archive_reason = $2,
+               deletion_scheduled = $3,
+               updated_at = NOW()
+           WHERE ${idColumn} = $4 OR ${idColumn} = $5`,
+          [actorId, operation.reason || 'Manual archive', deletionScheduled, idParamList[0], idParamList[1]]
+        )
+      : await query(
+          `UPDATE ${tableName}
+           SET archived_at = NOW(),
+               archived_by = $1,
+               archive_reason = $2,
+               deletion_scheduled = $3,
+               updated_at = NOW()
+           WHERE ${idColumn} = $4`,
+          [actorId, operation.reason || 'Manual archive', deletionScheduled, normalizedId]
+        );
+  }
 
   // Fallback: if archiving a product and no inventory_items updated, try products table
   if ((!updateResult || (updateResult.rowCount ?? 0) === 0) && operation.entityType === 'product') {
@@ -557,7 +569,7 @@ export async function archiveEntity(operation: ArchiveOperation): Promise<{ succ
 
   await recordActivity(
     `${operation.entityType}_archived`,
-    `Archived ${capitalizeEntityType(operation.entityType)} ${normalizedId}`,
+    `Archived ${normalizedId}`,
     normalizedId,
     operation.entityType,
     operation.actor,
@@ -664,7 +676,7 @@ export async function restoreEntity(operation: RestoreOperation): Promise<{ succ
 
   await recordActivity(
     `${operation.entityType}_restored`,
-    `Restored ${capitalizeEntityType(operation.entityType)} ${normalizedId}`,
+    `Restored ${normalizedId}`,
     normalizedId,
     operation.entityType,
     operation.actor
@@ -980,7 +992,7 @@ export async function hardDeleteEntity(
     // This ensures snapshot is saved before entity disappears
     await recordActivity(
       `${operation.entityType}_hard_deleted`,
-      `Permanently Deleted ${capitalizeEntityType(operation.entityType)} ${normalizedId}`,
+      `Deleted ${normalizedId}`,
       normalizedId,
       operation.entityType,
       operation.actor,

@@ -32,7 +32,7 @@ export function canSeeTab(tabId: TabId, context: TabVisibilityContext): boolean 
 
     // ===== HISTORY TAB =====
     // User entities: only show history for your own profile (privacy)
-    // Non-user entities: show history to everyone (audit trail)
+    // Non-user entities: varies by type
     case 'history': {
       const userEntityTypes: EntityType[] = ['manager', 'contractor', 'customer', 'center', 'crew', 'warehouse'];
 
@@ -57,7 +57,12 @@ export function canSeeTab(tabId: TabId, context: TabVisibilityContext): boolean 
         return entityId?.toUpperCase() === viewerId?.toUpperCase();
       }
 
-      // Non-user entities (orders, services, reports): everyone can see history
+      // Catalog services: admin-only (not shown in public CKS catalog view)
+      if (entityType === 'catalogService') {
+        return role === 'admin';
+      }
+
+      // Other non-user entities (orders, services, reports): everyone can see history
       return true;
     }
 

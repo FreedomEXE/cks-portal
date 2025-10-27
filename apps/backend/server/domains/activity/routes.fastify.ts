@@ -165,6 +165,11 @@ export function registerActivityRoutes(fastify: FastifyInstance) {
         getActivityType(validatedType, 'deleted'),
       ];
 
+      // Use the concrete snake_case activity key to derive a LIKE prefix
+      // Example: created key 'catalog_service_created' -> LIKE 'catalog_service_%'
+      const likePrefixSnake = getActivityType(validatedType, 'created').replace(/_created$/i, '_%');
+      const likePrefixCamel = `${validatedType}_%`;
+
       // Build related assignment event filter based on entity type
       // This allows parent entities to see assignment events logged against children
       let relatedAssignmentClause = '';
@@ -220,6 +225,18 @@ export function registerActivityRoutes(fastify: FastifyInstance) {
             )
           `;
           break;
+        case 'catalogService':
+          // Include certification events for this service (match by target_id OR metadata.serviceId)
+          relatedAssignmentClause = `
+            OR (
+              activity_type IN ('catalog_service_certified', 'catalog_service_decertified')
+              AND (
+                UPPER(target_id) = UPPER($1)
+                OR (metadata ? 'serviceId' AND UPPER(metadata->>'serviceId') = UPPER($1))
+              )
+            )
+          `;
+          break;
         default:
           // No related assignments for other entity types
           relatedAssignmentClause = '';
@@ -245,6 +262,7 @@ export function registerActivityRoutes(fastify: FastifyInstance) {
             AND (
               activity_type = ANY($3)
               OR activity_type LIKE $4
+              OR activity_type LIKE $5
             )
           )
           ${relatedAssignmentClause}
@@ -259,7 +277,8 @@ export function registerActivityRoutes(fastify: FastifyInstance) {
           entityId,
           validatedType,
           activityTypes,
-          `${validatedType}_%` // Catch any entity-specific events
+          likePrefixSnake, // snake_case (catalog_service_*)
+          likePrefixCamel, // camel prefix (catalogService_*)
         ]
       );
 

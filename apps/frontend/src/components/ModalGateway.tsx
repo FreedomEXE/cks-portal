@@ -249,29 +249,55 @@ export function ModalGateway({
         variant: desc.variant,
         disabled: desc.disabled,
         onClick: async () => {
+          console.log('[ModalGateway] Action onClick triggered:', {
+            key: desc.key,
+            label: desc.label,
+            hasConfirm: !!desc.confirm,
+            hasPrompt: !!desc.prompt,
+            confirm: desc.confirm,
+            prompt: desc.prompt
+          });
+
           // Handle confirmation dialog
-          if (desc.confirm && !window.confirm(desc.confirm)) {
-            return;
+          if (desc.confirm) {
+            console.log('[ModalGateway] Showing window.confirm:', desc.confirm);
+            const confirmed = window.confirm(desc.confirm);
+            console.log('[ModalGateway] Confirmation result:', confirmed);
+            if (!confirmed) {
+              console.log('[ModalGateway] User cancelled confirmation, aborting action');
+              return;
+            }
           }
 
           // Handle input prompt
           let userInput: string | undefined;
           if (desc.prompt) {
+            console.log('[ModalGateway] Showing window.prompt:', desc.prompt);
             const input = window.prompt(desc.prompt)?.trim();
+            console.log('[ModalGateway] Prompt input:', input);
             // Only proceed if user provided input OR prompt was optional
             if (!input && !desc.prompt.toLowerCase().includes('optional')) {
+              console.log('[ModalGateway] User cancelled required prompt, aborting action');
               return; // User cancelled or didn't provide required input
             }
             userInput = input || undefined;
           }
+
+          console.log('[ModalGateway] Calling handleAction with:', {
+            entityId: entityId!,
+            actionKey: desc.key,
+            notes: userInput
+          });
 
           // Call centralized action handler
           await handleAction(entityId!, desc.key, {
             notes: userInput,
             ...desc.payload,
             onSuccess: () => {
+              console.log('[ModalGateway] Action succeeded, closeOnSuccess:', desc.closeOnSuccess);
               // Close modal if closeOnSuccess is true (default behavior)
               if (desc.closeOnSuccess !== false) {
+                console.log('[ModalGateway] Closing modal');
                 onClose();
               }
             },

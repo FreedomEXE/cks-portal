@@ -71,6 +71,9 @@ function getEventColor(type: string): { bg: string; text: string } {
   if (type.includes('restored')) return { bg: '#d1fae5', text: '#065f46' };
   if (type.includes('deleted') || type.includes('hard_deleted')) return { bg: '#fee2e2', text: '#991b1b' };
   if (type.includes('approved') || type.includes('accepted')) return { bg: '#d1fae5', text: '#065f46' };
+  // Important: check decertified before certified because "decertified" contains "certified"
+  if (type.includes('decertified')) return { bg: '#fef3c7', text: '#92400e' };
+  if (type.includes('certified')) return { bg: '#d1fae5', text: '#065f46' };
   if (type.includes('rejected') || type.includes('cancelled')) return { bg: '#fef3c7', text: '#92400e' };
   return { bg: '#f3f4f6', text: '#374151' };
 }
@@ -86,6 +89,81 @@ function formatEventType(type: string): string {
   }
   const cleaned = parts.join(' ');
   return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+}
+
+// Strip leading verb for timeline descriptions
+function stripLeadingVerb(description: string): string {
+  const verbs = [
+    'Created', 'Seeded', 'Archived', 'Restored', 'Deleted', 'Completed',
+    'Cancelled', 'Delivered', 'Accepted', 'Approved', 'Rejected', 'Failed',
+    'Updated', 'Certified', 'Uncertified', 'Assigned'
+  ];
+  // Try multi-word first (e.g., Hard Deleted) if ever added
+  const multi = /^(Hard Deleted)\s+(.+)$/i;
+  const m = description.match(multi);
+  if (m) return m[2];
+  for (const v of verbs) {
+    const re = new RegExp('^' + v + '\\s+(.+)$');
+    const mm = description.match(re);
+    if (mm) return mm[1];
+  }
+  return description;
+}
+
+// For created-type events, prefer showing just the final ID token
+function extractLastIdToken(description: string): string | null {
+  const match = description.match(/([A-Z]{2,}-\d+)/gi);
+  if (!match || match.length === 0) return null;
+  return match[match.length - 1];
+}
+
+function extractFirstIdToken(description: string): string | null {
+  const match = description.match(/([A-Z]{2,}-\d+)/i);
+  return match ? match[1].toUpperCase() : null;
+}
+
+// Compute the ID-only timeline description for an event.
+function computeTimelineText(event: LifecycleEvent, fallbackEntityId?: string): string {
+  const type = event.type || '';
+  const metadata = (event.metadata || {}) as Record<string, any>;
+  const stripped = stripLeadingVerb(event.description || '');
+
+  // Assignment shapes
+  if (type === 'crew_assigned_to_center') {
+    const a = (metadata.crewId as string) || extractFirstIdToken(stripped);
+    const b = (metadata.centerId as string) || extractLastIdToken(stripped);
+    if (a && b) return `${a} to ${b}`;
+  }
+  if (type === 'contractor_assigned_to_manager') {
+    const a = (metadata.contractorId as string) || extractFirstIdToken(stripped);
+    const b = (metadata.managerId as string) || extractLastIdToken(stripped);
+    if (a && b) return `${a} to ${b}`;
+  }
+  if (type === 'customer_assigned_to_contractor') {
+    const a = (metadata.customerId as string) || extractFirstIdToken(stripped);
+    const b = (metadata.contractorId as string) || extractLastIdToken(stripped);
+    if (a && b) return `${a} to ${b}`;
+  }
+  if (type === 'center_assigned_to_customer') {
+    const a = (metadata.centerId as string) || extractFirstIdToken(stripped);
+    const b = (metadata.customerId as string) || extractLastIdToken(stripped);
+    if (a && b) return `${a} to ${b}`;
+  }
+  if (type === 'order_assigned_to_warehouse') {
+    const a = extractFirstIdToken(stripped); // order id may be in description
+    const b = (metadata.warehouseId as string) || extractLastIdToken(stripped);
+    if (a && b) return `${a} to ${b}`;
+  }
+
+  // Certifications
+  if (type === 'catalog_service_certified' || type === 'catalog_service_decertified') {
+    const userId = (metadata.userId as string) || extractFirstIdToken(stripped);
+    const serviceId = extractLastIdToken(stripped) || (fallbackEntityId || null);
+    if (userId && serviceId) return `${userId} for ${serviceId}`;
+  }
+
+  // Generic lifecycle/status: prefer the last ID token; else the entity id fallback
+  return extractLastIdToken(stripped) || extractFirstIdToken(stripped) || (fallbackEntityId || '');
 }
 
 /**
@@ -229,6 +307,19 @@ export function HistoryTab({ entityType, entityId, limit, events: providedEvents
           {events.map((event, index) => {
             const color = getEventColor(event.type);
             const formattedType = formatEventType(event.type);
+            const isCreated = /_created$/i.test(event.type);
+            let badgeLabel = (isCreated && (event.metadata?.origin === 'seed')) ? 'Seeded' : formattedType;
+            // Normalize assignment/certification labels
+            if (/_assigned_/.test(event.type)) {
+              badgeLabel = 'Assigned';
+            } else if (/decertified$/.test(event.type)) {
+              badgeLabel = 'Uncertified';
+            } else if (/certified$/.test(event.type)) {
+              badgeLabel = 'Certified';
+            }
+
+            // Compute timeline display description
+            const displayDescription = computeTimelineText(event, /*fallback*/ undefined);
 
             return (
               <div key={event.id || index} style={{ position: 'relative', paddingLeft: '36px' }}>
@@ -268,7 +359,7 @@ export function HistoryTab({ entityType, entityId, limit, events: providedEvents
                         color: color.text,
                       }}
                     >
-                      {formattedType}
+                      {badgeLabel}
                     </span>
                     <span style={{ fontSize: '13px', color: '#6b7280' }}>
                       {formatTimestamp(event.timestamp)}
@@ -276,9 +367,9 @@ export function HistoryTab({ entityType, entityId, limit, events: providedEvents
                   </div>
 
                   {/* Event description */}
-                  {event.description && (
+                  {displayDescription && (
                     <div style={{ fontSize: '14px', color: '#374151', marginBottom: '6px' }}>
-                      {event.description}
+                      {displayDescription}
                     </div>
                   )}
 

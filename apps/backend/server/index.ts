@@ -281,7 +281,16 @@ async function start() {
     await server.listen({ port, host });
     server.log.info(`Backend listening on http://${host}:${port}`);
   } catch (err) {
-    server.log.error(err);
+    const anyErr = err as any;
+    if (anyErr && anyErr.code === 'EADDRINUSE') {
+      server.log.error({ port, host }, `Port already in use: ${host}:${port}`);
+      console.error('\nPort is in use. To identify and stop the process:');
+      console.error(`- Windows PowerShell:\n    netstat -ano | findstr :${port}\n    taskkill /PID <pid> /F`);
+      console.error(`- macOS/Linux:\n    lsof -i :${port}\n    kill -9 <pid>\n`);
+      console.error('Alternatively, set PORT to a different free port and retry.');
+    } else {
+      server.log.error(anyErr);
+    }
     process.exit(1);
   }
 }

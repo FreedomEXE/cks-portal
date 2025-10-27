@@ -149,12 +149,12 @@ export const ENTITY_CATALOG: Record<string, EntityDefinition> = {
     idPattern: /^SRV-\d+$/i,
     backendTable: 'catalog_services',
     backendIdColumn: 'service_id',
-    supportsDetailFetch: true,  // ✅ Endpoint now available: /api/catalog/services/:serviceId/details
-    supportsArchive: false,  // Catalog definitions not archived
-    supportsDelete: false,
-    supportsRestore: false,
-    supportsHistory: false,
-    supportsTombstone: false,
+    supportsDetailFetch: true,  // ✅ Endpoint: /api/catalog/services/:serviceId/details
+    supportsArchive: true,      // ✅ Uses is_active flag instead of archived_at
+    supportsDelete: true,       // ✅ Can be hard-deleted
+    supportsRestore: true,      // ✅ Can restore archived services
+    supportsHistory: true,      // ✅ Tracks lifecycle + certification events
+    supportsTombstone: true,    // ✅ Deletion snapshots stored in activity log
     activityTypes: {
       created: 'catalog_service_created',
       archived: 'catalog_service_archived',
