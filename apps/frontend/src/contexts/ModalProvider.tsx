@@ -79,35 +79,50 @@ export function ModalProvider({ children }: ModalProviderProps) {
   // Generic open function
   const openEntityModal = useCallback(
     async (entityType: EntityType, entityId: string, options?: OpenEntityModalOptions) => {
-      // For user entities, fetch data from profile endpoint (especially for archived state)
+      // Entity types that need prefetching (profiles and products)
       const userEntityTypes: EntityType[] = ['manager', 'contractor', 'customer', 'center', 'crew', 'warehouse'];
+      const needsFetch = userEntityTypes.includes(entityType) || entityType === 'product';
 
-      if (userEntityTypes.includes(entityType)) {
-        console.log(`[ModalProvider] Fetching ${entityType} profile for ID: ${entityId}`);
+      if (needsFetch) {
+        // Determine endpoint per entity type
+        const endpoint = entityType === 'product'
+          ? `/catalog/products/${entityId}/details`
+          : `/profile/${entityType}/${entityId}`;
+
+        console.log(`[ModalProvider] Fetching ${entityType} data from: ${endpoint}`);
 
         try {
           const response = await apiFetch<{
             data: any;
-            state: 'active' | 'archived' | 'deleted';
+            state?: 'active' | 'archived' | 'deleted';
             deletedAt?: string;
             deletedBy?: string;
             archivedAt?: string;
             archivedBy?: string;
-          }>(
-            `/profile/${entityType}/${entityId}`
-          );
+          }>(endpoint);
 
           console.log(`[ModalProvider] Fetched ${entityType} data:`, response);
 
           // Pass fetched data via options with lifecycle metadata
+          // CRITICAL: Caller state ALWAYS wins (e.g., from Archive context)
           const enrichedOptions = {
             ...options,
             data: response.data,
-            state: response.state,
-            deletedAt: response.deletedAt,
-            deletedBy: response.deletedBy,
-            archivedAt: response.archivedAt,
-            archivedBy: response.archivedBy,
+            // Priority 1: Caller-provided state (from Archive, etc.) - NEVER OVERRIDE
+            ...( options?.state
+              ? { state: options.state }
+              // Priority 2: Backend explicit state
+              : response.state
+                ? { state: response.state }
+                // Priority 3: Derive from data.status (catalog entities)
+                : response.data?.status
+                  ? { state: response.data.status === 'inactive' || response.data.status === 'archived' ? 'archived' : 'active' }
+                  : {}
+            ),
+            archivedAt: response.archivedAt || options?.archivedAt,
+            archivedBy: response.archivedBy || options?.archivedBy,
+            deletedAt: response.deletedAt || options?.deletedAt,
+            deletedBy: response.deletedBy || options?.deletedBy,
           } as any;
 
           setCurrentModal({ entityType, entityId, options: enrichedOptions });
@@ -118,7 +133,7 @@ export function ModalProvider({ children }: ModalProviderProps) {
         }
       }
 
-      // For non-user entities, just open with provided options
+      // For non-fetching entities, just open with provided options
       setCurrentModal({ entityType, entityId, options });
     },
     []
@@ -171,14 +186,25 @@ export function ModalProvider({ children }: ModalProviderProps) {
           console.log(`[ModalProvider] Fetched ${entityType} data:`, response);
 
           // Pass fetched data via options with lifecycle metadata
+          // CRITICAL: Caller state ALWAYS wins (e.g., from Archive context)
           enrichedOptions = {
             ...options,
             data: response.data,
-            state: response.state,
-            deletedAt: response.deletedAt,
-            deletedBy: response.deletedBy,
-            archivedAt: response.archivedAt,
-            archivedBy: response.archivedBy,
+            // Priority 1: Caller-provided state (from Archive, etc.) - NEVER OVERRIDE
+            ...( options?.state
+              ? { state: options.state }
+              // Priority 2: Backend explicit state
+              : response.state
+                ? { state: response.state }
+                // Priority 3: Derive from data.status (catalog entities)
+                : response.data?.status
+                  ? { state: response.data.status === 'inactive' || response.data.status === 'archived' ? 'archived' : 'active' }
+                  : {}
+            ),
+            archivedAt: response.archivedAt || options?.archivedAt,
+            archivedBy: response.archivedBy || options?.archivedBy,
+            deletedAt: response.deletedAt || options?.deletedAt,
+            deletedBy: response.deletedBy || options?.deletedBy,
           } as any;
         } catch (error) {
           console.error(`[ModalProvider] Failed to fetch ${entityType} ${id}:`, error);
@@ -212,11 +238,21 @@ export function ModalProvider({ children }: ModalProviderProps) {
           // Pass fetched data via options (derive state from status)
           // Backend returns status: 'active' | 'inactive'
           // Map inactive → archived for lifecycle consistency
-          const state = response.data?.status === 'inactive' ? 'archived' : 'active';
+          // Preserve caller state if backend doesn't return explicit state
           enrichedOptions = {
             ...options,
             data: response.data,
-            state,
+            // Only override state if backend explicitly returns it
+            ...(response.data?.state && { state: response.data.state }),
+            // Fallback: derive from data.status if no explicit state
+            ...(!response.data?.state && !options?.state && response.data?.status && {
+              state: response.data.status === 'inactive' || response.data.status === 'archived' ? 'archived' : 'active'
+            }),
+            // Prefer top-level lifecycle metadata if provided by endpoint, else look under data
+            archivedAt: (response as any).archivedAt ?? (response as any).data?.archivedAt,
+            archivedBy: (response as any).archivedBy ?? (response as any).data?.archivedBy,
+            deletedAt: (response as any).deletedAt ?? (response as any).data?.deletedAt,
+            deletedBy: (response as any).deletedBy ?? (response as any).data?.deletedBy,
           } as any;
         } catch (error) {
           console.error(`[ModalProvider] Failed to fetch catalogService ${id}:`, error);
@@ -297,10 +333,11 @@ export function ModalProvider({ children }: ModalProviderProps) {
               console.warn('[ModalProvider] Inventory fetch failed (non-fatal)', invErr);
             }
 
+            // Preserve caller state; default to 'active' only if none provided
             enrichedOptions = {
               ...options,
               data,
-              state: 'active',
+              ...(options?.state ? {} : { state: 'active' }),
             } as any;
           }
         } catch (error) {

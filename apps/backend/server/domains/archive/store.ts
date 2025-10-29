@@ -493,15 +493,20 @@ export async function archiveEntity(operation: ArchiveOperation): Promise<{ succ
   const deletionScheduled = new Date();
   deletionScheduled.setDate(deletionScheduled.getDate() + 30); // Schedule for deletion in 30 days
 
-  // Special handling for catalogService: use is_active flag instead of archived_at timestamp
+  // Special handling for catalogService/catalog_products so archived metadata is persisted
   let updateResult;
   if (operation.entityType === 'catalogService') {
+    // Persist archived_at/archived_by/deletion_scheduled and deactivate for consistent lifecycle UX
     updateResult = await query(
       `UPDATE ${tableName}
        SET is_active = FALSE,
+           archived_at = NOW(),
+           archived_by = $2,
+           archive_reason = $3,
+           deletion_scheduled = $4,
            updated_at = NOW()
        WHERE ${idColumn} = $1`,
-      [normalizedId]
+      [normalizedId, actorId, operation.reason || 'Manual archive', deletionScheduled]
     );
   } else {
     updateResult = idParamList
@@ -525,6 +530,35 @@ export async function archiveEntity(operation: ArchiveOperation): Promise<{ succ
            WHERE ${idColumn} = $4`,
           [actorId, operation.reason || 'Manual archive', deletionScheduled, normalizedId]
         );
+  }
+
+  // Ensure catalog products reflect archived state for UI (independent of inventory tables)
+  if (operation.entityType === 'product') {
+    if (idParamList) {
+      await query(
+        `UPDATE catalog_products
+         SET archived_at = NOW(),
+             archived_by = $1,
+             archive_reason = $2,
+             deletion_scheduled = $3,
+             is_active = FALSE,
+             updated_at = NOW()
+         WHERE product_id = $4 OR product_id = $5`,
+        [actorId, operation.reason || 'Manual archive', deletionScheduled, idParamList[0], idParamList[1]]
+      );
+    } else {
+      await query(
+        `UPDATE catalog_products
+         SET archived_at = NOW(),
+             archived_by = $1,
+             archive_reason = $2,
+             deletion_scheduled = $3,
+             is_active = FALSE,
+             updated_at = NOW()
+         WHERE product_id = $4`,
+        [actorId, operation.reason || 'Manual archive', deletionScheduled, normalizedId]
+      );
+    }
   }
 
   // Fallback: if archiving a product and no inventory_items updated, try products table
@@ -630,14 +664,51 @@ export async function restoreEntity(operation: RestoreOperation): Promise<{ succ
       break;
   }
 
-  // For catalogService, just set is_active = TRUE
+  // For catalogService, set is_active = TRUE and clear archived metadata
   if (operation.entityType === 'catalogService') {
     await query(
       `UPDATE ${tableName}
        SET is_active = TRUE,
+           archived_at = NULL,
+           archived_by = NULL,
+           archive_reason = NULL,
+           deletion_scheduled = NULL,
+           restored_at = NOW(),
+           restored_by = $2,
            updated_at = NOW()
        WHERE ${idColumn} = $1`,
-      [normalizedId]
+      [normalizedId, actorId]
+    );
+  }
+  // For product, also restore in catalog_products
+  else if (operation.entityType === 'product') {
+    // Restore in inventory_items first
+    await query(
+      `UPDATE ${tableName}
+       SET archived_at = NULL,
+           archived_by = NULL,
+           archive_reason = NULL,
+           deletion_scheduled = NULL,
+           restored_at = NOW(),
+           restored_by = $2,
+           updated_at = NOW()
+       WHERE ${idColumn} = $1`,
+      [normalizedId, actorId]
+    );
+
+    // Also restore in catalog_products
+    await query(
+      `UPDATE catalog_products
+       SET archived_at = NULL,
+           archived_by = NULL,
+           archive_reason = NULL,
+           deletion_scheduled = NULL,
+           is_active = TRUE,
+           restored_at = NOW(),
+           restored_by = $2,
+           updated_at = NOW()
+       WHERE product_id = $1`,
+      [normalizedId, actorId]
     );
   } else {
     // Restore the entity (it goes to unassigned bucket)
@@ -664,6 +735,22 @@ export async function restoreEntity(operation: RestoreOperation): Promise<{ succ
         [normalizedId]
       );
     }
+  }
+
+  // Ensure catalog products reflect restored state for UI
+  if (operation.entityType === 'product') {
+    await query(
+      `UPDATE catalog_products
+       SET archived_at = NULL,
+           archived_by = NULL,
+           archive_reason = NULL,
+           is_active = TRUE,
+           restored_at = NOW(),
+           restored_by = $2,
+           updated_at = NOW()
+       WHERE product_id = $1`,
+      [normalizedId, actorId]
+    );
   }
 
   // Mark relationships as potentially restorable
@@ -758,20 +845,20 @@ export async function listArchivedEntities(
     // For orders, also include order_type to support filtering by product/service
     const orderTypeSelect = entityType === 'order' ? ', order_type' : '';
 
-    // catalogService uses is_active flag instead of archived_at
+    // catalogService prefers archived metadata when available; fall back to is_active
     if (entityType === 'catalogService') {
       queryText = `
         SELECT
           ${idColumn} as id,
           '${entityType}' as entity_type,
           ${nameColumn} as name,
-          updated_at as archived_at,
-          NULL as archived_by,
-          NULL as archive_reason,
+          COALESCE(archived_at, updated_at) as archived_at,
+          archived_by,
+          archive_reason,
           NULL as deletion_scheduled
         FROM ${tableName}
-        WHERE is_active = FALSE
-        ORDER BY updated_at DESC
+        WHERE (archived_at IS NOT NULL) OR (is_active = FALSE)
+        ORDER BY COALESCE(archived_at, updated_at) DESC
         LIMIT $1
       `;
       params = [limit];

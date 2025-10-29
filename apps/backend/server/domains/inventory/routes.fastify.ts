@@ -84,7 +84,11 @@ export async function registerInventoryRoutes(server: FastifyInstance) {
     }
 
     try {
-      await updateInventoryQuantity(parsed.data);
+      await updateInventoryQuantity({
+        ...parsed.data,
+        actorId: account.cksCode || 'ADMIN',
+        actorRole: 'admin',
+      });
       reply.send({ success: true, message: 'Inventory updated successfully' });
     } catch (error) {
       const err = error as Error;

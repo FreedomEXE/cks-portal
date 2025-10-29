@@ -272,6 +272,16 @@
   background-color: #dc2626;
 }
 
+/* Secondary/neutral action (Edit, Archive, Restore) */
+.actionEdit {
+  background-color: #6b7280; /* gray-600 */
+  color: white;
+}
+
+.actionEdit:hover {
+  background-color: #4b5563; /* gray-700 */
+}
+
 .emptyState {
   padding: 30px 16px;
   text-align: center;

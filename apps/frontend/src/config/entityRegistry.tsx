@@ -1443,9 +1443,16 @@ const catalogServiceAdapter: EntityAdapter = {
     // Note: No separate Actions tab for catalog services; admin actions render inside Quick Actions
 
     // Admin-only: Quick Actions tab for certification management
-    console.log('[CatalogServiceAdapter] Checking admin condition:', { role, isAdmin: role === 'admin' });
-    if (role === 'admin') {
-      console.log('[CatalogServiceAdapter] Adding Quick Actions tab for admin');
+    console.log('[CatalogServiceAdapter] Checking admin condition:', {
+      role,
+      isAdmin: role === 'admin',
+      hasPeopleManagers: !!entityData?.peopleManagers,
+      hasAdminData: !!(entityData?.peopleManagers || entityData?.certifiedManagers)
+    });
+
+    // Only show Quick Actions if we have admin data loaded (prevents missing tabs on first render)
+    if (role === 'admin' && (entityData?.peopleManagers || entityData?.certifiedManagers)) {
+      console.log('[CatalogServiceAdapter] Adding Quick Actions tab for admin (admin data present)');
       // Build CertifiedUser arrays (mark who's certified)
       const certifiedSet = {
         manager: new Set(entityData?.certifiedManagers || []),
@@ -1630,7 +1637,9 @@ const productAdapter: EntityAdapter = {
     const descriptors: EntityActionDescriptor[] = [];
     if (role === 'admin') {
       if (state === 'active') {
-        descriptors.push({ key: 'archive', label: 'Archive Product', variant: 'secondary', confirm: 'Are you sure you want to archive this product? You can restore it later.', prompt: 'Optional: Provide a reason for archiving this product', closeOnSuccess: true });
+        // Keep parity with services: Edit + Archive
+        descriptors.push({ key: 'edit', label: 'Edit', variant: 'secondary', closeOnSuccess: false });
+        descriptors.push({ key: 'archive', label: 'Archive', variant: 'secondary', confirm: 'Are you sure you want to archive this product? You can restore it later.', prompt: 'Optional: Provide a reason for archiving this product', closeOnSuccess: true });
       } else if (state === 'archived') {
         descriptors.push({ key: 'restore', label: 'Restore Product', variant: 'secondary', closeOnSuccess: true });
         descriptors.push({ key: 'delete', label: 'Permanently Delete Product', variant: 'danger', confirm: 'Are you sure you want to PERMANENTLY delete this product? This cannot be undone.', prompt: 'Provide a deletion reason (optional):', closeOnSuccess: true });
@@ -1679,11 +1688,14 @@ const productAdapter: EntityAdapter = {
         ),
       },
       {
-        id: 'actions',
-        label: 'Actions',
+        id: 'history',
+        label: 'History',
         content: (
-          // Reuse generic quick actions renderer (button list)
-          <UserQuickActions actions={actions} />
+          <HistoryTab
+            entityType={context.entityType}
+            entityId={entityData?.productId}
+            getAuthToken={context.getAuthToken}
+          />
         ),
       },
     ];
@@ -1717,7 +1729,12 @@ const productAdapter: EntityAdapter = {
               }
               toast.success('Inventory saved');
             }}
-            // Deletion handled via Actions tab (to keep flow consistent)
+            adminActions={actions.map(a => ({
+              label: a.label,
+              onClick: a.onClick,
+              variant: a.variant as any,
+              disabled: a.disabled,
+            }))}
           />
         ),
       });

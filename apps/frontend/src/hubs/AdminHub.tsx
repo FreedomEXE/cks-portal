@@ -34,7 +34,6 @@ import {
   PageWrapper,
   Scrollbar,
   TabContainer,
-  CatalogProductModal,
   UserModal,
   type UserAction,
 } from '@cks/ui';
@@ -58,7 +57,6 @@ import { mapProfileDataForRole, type DirectoryRole, directoryTabToRole } from '.
 import { buildAdminOverviewData } from '../shared/overview/builders';
 
 import { useAdminUsers, updateInventory, fetchAdminOrderById } from '../shared/api/admin';
-import { getProductInventory } from '../shared/api/admin';
 import {
   useActivities,
   useCenters,
@@ -233,9 +231,7 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
 
   const [showActionModal, setShowActionModal] = useState(false);
   const [selectedEntity, setSelectedEntity] = useState<Record<string, any> | null>(null);
-  const [showProductCatalogModal, setShowProductCatalogModal] = useState(false);
-  const [selectedProductCatalog, setSelectedProductCatalog] = useState<{ productId: string; name: string | null; category: string | null; status?: string | null; description?: string | null; unitOfMeasure?: string | null; minimumOrderQuantity?: number | null; leadTimeDays?: number | null; metadata?: any } | null>(null);
-  const [productInventoryData, setProductInventoryData] = useState<Array<{ warehouseId: string; warehouseName: string; quantityOnHand: number; minStockLevel: number | null; location: string | null }>>([]);
+  // Legacy product modal state removed in favor of universal modal
   const [toast, setToast] = useState<string | null>(null);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [selectedOrderForEdit, setSelectedOrderForEdit] = useState<HubOrderItem | null>(null);
@@ -305,21 +301,7 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
   // OrderDetails are now handled via OrderDetailsGateway
 
   // Fetch inventory when product catalog modal opens
-  useEffect(() => {
-    if (selectedProductCatalog && showProductCatalogModal) {
-      (async () => {
-        try {
-          const result = await getProductInventory(selectedProductCatalog.productId);
-          if (result.success && result.data) {
-            setProductInventoryData(result.data);
-          }
-        } catch (error) {
-          console.error('[ADMIN] Failed to fetch product inventory:', error);
-          setProductInventoryData([]);
-        }
-      })();
-    }
-  }, [selectedProductCatalog, showProductCatalogModal]);
+  // Product inventory fetching handled by modal adapter (universal modal)
 
   useEffect(() => {
     const style = document.createElement('style');
@@ -954,14 +936,11 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
       data: productRows,
       emptyMessage: 'No products available.',
       onRowClick: (row: any) => {
-        // Open CatalogProductModal for products
-        setSelectedProductCatalog({
-          productId: row.id,
-          name: row.originalName || null, // Use original, not formatted
-          category: row.originalCategory || null,
-          status: row.originalStatus || null,
-        });
-        setShowProductCatalogModal(true);
+        // Open universal product modal for products
+        const productId = row.id || row.productId || row.code;
+        if (productId) {
+          modals.openEntityModal('product', productId);
+        }
       },
     },
     training: {
@@ -1435,6 +1414,9 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
         onViewServiceDetails={(serviceId: string) => {
           modals.openById(serviceId, { state: 'archived' });
         }}
+        onViewProductDetails={(productId: string) => {
+          modals.openEntityModal('product', productId, { state: 'archived' });
+        }}
         onViewReportDetails={(reportId: string) => {
           modals.openById(reportId, { state: 'archived' });
         }}
@@ -1612,20 +1594,11 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
                 variant: 'secondary' as const,
                 onClick: () => {
                   if (selectedEntity) {
-                    const productId = selectedEntity.rawId || selectedEntity.id;
-                    setSelectedProductCatalog({
-                      productId: productId,
-                      name: selectedEntity.originalName || null,
-                      category: selectedEntity.originalCategory || null,
-                      status: selectedEntity.originalStatus || null,
-                      description: null,
-                      unitOfMeasure: null,
-                      minimumOrderQuantity: null,
-                      leadTimeDays: null,
-                      metadata: null,
-                    });
-                    setShowProductCatalogModal(true);
-                    setShowActionModal(false);
+                    const productId = (selectedEntity as any).rawId || (selectedEntity as any).id;
+                    if (productId) {
+                      modals.openEntityModal('product', productId);
+                      setShowActionModal(false);
+                    }
                   }
                 },
               },
@@ -1776,70 +1749,7 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
       />
 
 
-      <CatalogProductModal
-        isOpen={showProductCatalogModal}
-        onClose={() => {
-          setShowProductCatalogModal(false);
-          setSelectedProductCatalog(null);
-          setProductInventoryData([]);
-        }}
-        product={selectedProductCatalog}
-        inventoryData={productInventoryData}
-        onSave={async (changes) => {
-          if (!selectedProductCatalog) return;
-          try {
-            console.log('[ADMIN] Saving inventory changes:', changes);
-
-            // Apply each inventory change
-            for (const change of changes) {
-              await updateInventory({
-                warehouseId: change.warehouseId,
-                itemId: selectedProductCatalog.productId,
-                quantityChange: change.quantityChange,
-                reason: 'Admin adjustment via catalog modal',
-              });
-            }
-
-            console.log('[ADMIN] All inventory changes saved');
-
-            // Refresh inventory data
-            const result = await getProductInventory(selectedProductCatalog.productId);
-            if (result.success && result.data) {
-              setProductInventoryData(result.data);
-            }
-
-            // Revalidate
-            mutate('/admin/directory/products');
-            setToast('Inventory updated successfully!');
-            setTimeout(() => setToast(null), 2500);
-
-            // Close modal after successful save
-            setShowProductCatalogModal(false);
-            setSelectedProductCatalog(null);
-          } catch (error) {
-            console.error('[ADMIN] save inventory failed', error);
-            alert(error instanceof Error ? error.message : 'Failed to update inventory');
-            throw error; // Re-throw so ProductQuickActions can handle it
-          }
-        }}
-        onDelete={async () => {
-          if (!selectedProductCatalog) return;
-          if (!confirm(`Are you sure you want to delete product "${selectedProductCatalog.name}"?`)) return;
-
-          try {
-            await archiveAPI.archiveEntity('product', selectedProductCatalog.productId);
-
-            setShowProductCatalogModal(false);
-            setSelectedProductCatalog(null);
-            mutate('/admin/directory/products');
-            setToast('Product deleted');
-            setTimeout(() => setToast(null), 1800);
-          } catch (error) {
-            console.error('[admin] delete product failed', error);
-            alert(error instanceof Error ? error.message : 'Failed to delete product');
-          }
-        }}
-      />
+      {/* CatalogProductModal removed; universal product modal is used via modals.openEntityModal */}
 
       {toast && (
         <div style={{ position: 'fixed', top: 16, right: 16, background: '#ecfeff', color: '#0369a1', border: '1px solid #bae6fd', borderRadius: 8, padding: '10px 14px', zIndex: 10000, boxShadow: '0 8px 18px rgba(0,0,0,0.08)' }}>

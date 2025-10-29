@@ -35,7 +35,7 @@ import { EntityModalView } from '@cks/domain-widgets';
  * Extract lifecycle metadata from entity data and archive metadata
  *
  * Unifies lifecycle detection across all entity types.
- * Priority: Deleted > Archived > Active
+ * Priority: Deleted > Archived (explicit) > Archived (inferred from status) > Active
  */
 function extractLifecycle(data: any, archiveMetadata: any): Lifecycle {
   // Priority 1: Deleted state
@@ -49,7 +49,7 @@ function extractLifecycle(data: any, archiveMetadata: any): Lifecycle {
     };
   }
 
-  // Priority 2: Archived state
+  // Priority 2: Archived state (explicit metadata)
   if (archiveMetadata?.archivedAt || data?.archivedAt) {
     return {
       state: 'archived',
@@ -57,6 +57,16 @@ function extractLifecycle(data: any, archiveMetadata: any): Lifecycle {
       archivedBy: archiveMetadata?.archivedBy || data.archivedBy,
       archiveReason: archiveMetadata?.reason || data.archiveReason,
       scheduledDeletion: archiveMetadata?.scheduledDeletion
+    };
+  }
+
+  // Priority 3: Infer archived state from data.status (for catalog entities)
+  if (data?.status === 'inactive' || data?.status === 'archived') {
+    return {
+      state: 'archived',
+      archivedAt: data.archivedAt,
+      archivedBy: data.archivedBy,
+      archiveReason: data.archiveReason,
     };
   }
 
@@ -158,11 +168,32 @@ export function ModalGateway({
     // Use pre-loaded data (users, products, etc.)
     console.log('[ModalGateway] Using pre-loaded data for', entityType, options.data);
 
-    // Build lifecycle from options metadata (for users fetched by ModalProvider)
+    // Build lifecycle from options metadata (for users/products fetched by ModalProvider)
     let lifecycle: Lifecycle;
     const opts = options as any; // Type assertion to access lifecycle fields
 
-    if (opts.deletedAt) {
+    // Priority 1: Explicit state from options
+    if (opts.state) {
+      if (opts.state === 'deleted') {
+        lifecycle = {
+          state: 'deleted',
+          deletedAt: opts.deletedAt,
+          deletedBy: opts.deletedBy,
+          isTombstone: opts.isTombstone || false
+        };
+      } else if (opts.state === 'archived') {
+        lifecycle = {
+          state: 'archived',
+          archivedAt: opts.archivedAt,
+          archivedBy: opts.archivedBy,
+          archiveReason: opts.archiveReason,
+        };
+      } else {
+        lifecycle = { state: 'active' };
+      }
+    }
+    // Priority 2: Infer from metadata presence
+    else if (opts.deletedAt) {
       lifecycle = {
         state: 'deleted',
         deletedAt: opts.deletedAt,
@@ -174,6 +205,14 @@ export function ModalGateway({
         state: 'archived',
         archivedAt: opts.archivedAt,
         archivedBy: opts.archivedBy,
+      };
+    }
+    // Priority 3: Infer from data.status (for catalog entities)
+    else if (options.data?.status === 'inactive' || options.data?.status === 'archived') {
+      lifecycle = {
+        state: 'archived',
+        archivedAt: options.data.archivedAt,
+        archivedBy: options.data.archivedBy,
       };
     } else {
       lifecycle = { state: 'active' };
@@ -197,7 +236,14 @@ export function ModalGateway({
   }
 
   const { data, isLoading, error, lifecycle } = dataDetails;
-  console.log('[ModalGateway] Final data:', { entityType, entityId, data, lifecycle });
+  console.log('[ModalGateway] Final data:', {
+    entityType,
+    entityId,
+    hasData: !!data,
+    dataKeys: data ? Object.keys(data) : [],
+    hasPeopleManagers: !!(data as any)?.peopleManagers,
+    lifecycle
+  });
 
   // Determine final state (explicit override or detected from lifecycle)
   const state: EntityState = options?.state || lifecycle.state;

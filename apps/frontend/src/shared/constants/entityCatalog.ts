@@ -202,10 +202,10 @@ export const ENTITY_CATALOG: Record<string, EntityDefinition> = {
     supportsArchive: true,
     supportsDelete: true,
     supportsRestore: true,
-    supportsHistory: false,
+    supportsHistory: true,
     supportsTombstone: false,
     modalComponent: 'ProductModal',
-    defaultTabOrder: ['details', 'actions'],
+    defaultTabOrder: ['details', 'history', 'actions'],
     activityTypes: {
       created: 'product_created',
       archived: 'product_archived',

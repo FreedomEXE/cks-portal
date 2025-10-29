@@ -11,7 +11,7 @@ import { useHubRoleScope } from "../shared/api/hub";
 import { useLoading } from "../contexts/LoadingContext";
 import { useHubLoading } from "../contexts/HubLoadingContext";
 import { useModals } from "../contexts/ModalProvider";
-import { CatalogProductModal, Button } from "@cks/ui";
+import { Button } from "@cks/ui";
 import { fetchHubOrders } from "../shared/api/hub";
 
 type CatalogKind = "products" | "services";
@@ -786,7 +786,7 @@ export default function CKSCatalog() {
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [showCart, setShowCart] = useState(false);
   const [selectedService, setSelectedService] = useState<CatalogItem | null>(null);
-  const [selectedViewItem, setSelectedViewItem] = useState<CatalogItem | null>(null);
+  // Legacy product modal state removed; use universal modal
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [managerServices, setManagerServices] = useState<ServiceOption[]>([]);
 
@@ -1112,7 +1112,7 @@ export default function CKSCatalog() {
                   if (item.type === 'service') {
                     modals.openById(item.code);
                   } else {
-                    setSelectedViewItem(item);
+                    modals.openEntityModal('product', item.code);
                   }
                 }}
                 onAdd={() => item.type === "product" ? handleAddProduct(item) : handleAddService(item)}
@@ -1295,24 +1295,7 @@ export default function CKSCatalog() {
         />
       )}
 
-      {/* View Product Modal */}
-      {selectedViewItem && selectedViewItem.type === 'product' && (
-        <CatalogProductModal
-          isOpen={true}
-          onClose={() => setSelectedViewItem(null)}
-          product={{
-            productId: selectedViewItem.code,
-            name: selectedViewItem.name,
-            category: selectedViewItem.category || null,
-            status: selectedViewItem.status || 'active',
-            description: selectedViewItem.description || null,
-            unitOfMeasure: selectedViewItem.unitOfMeasure || null,
-            minimumOrderQuantity: selectedViewItem.product?.minimumOrderQuantity || null,
-            leadTimeDays: selectedViewItem.product?.leadTimeDays || null,
-            metadata: selectedViewItem.metadata || null,
-          }}
-        />
-      )}
+        {/* Product modal handled by universal modal via modals.openEntityModal */}
     </div>
   );
 }

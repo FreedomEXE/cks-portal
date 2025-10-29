@@ -179,6 +179,13 @@ export function ActivityFeed({
         return;
       }
 
+      // Handle product activities (universal modal)
+      if (targetType === 'product') {
+        // Open product modal by ID via ModalProvider
+        modals.openEntityModal('product', targetId);
+        return;
+      }
+
       // Handle assignment activities with viewer-relative clicks
       const activityType = activity.metadata?.activityType || activity.metadata?.category;
       const assignmentTypes = [

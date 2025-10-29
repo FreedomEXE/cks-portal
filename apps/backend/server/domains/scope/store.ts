@@ -104,6 +104,7 @@ const activityTypeCategory: Record<string, string> = {
   order_created: 'action',
   service_created: 'action',
   catalog_service_created: 'action',
+  product_created: 'action',
   report_created: 'warning',
   feedback_created: 'info',
 
@@ -130,6 +131,7 @@ const activityTypeCategory: Record<string, string> = {
   profile_updated: 'info',
   report_acknowledged: 'info',
   feedback_acknowledged: 'info',
+  product_inventory_adjusted: 'info',
 };
 
 type ActivityRow = {
@@ -144,7 +146,7 @@ type ActivityRow = {
   created_at: Date | string | null;
 };
 
-function mapActivityRow(row: ActivityRow, viewerId?: string): HubActivityItem {
+function mapActivityRow(row: ActivityRow, viewerId?: string, viewerRole?: string): HubActivityItem {
   let description = row.description;
 
   // Personalize certification activity descriptions for the viewer
@@ -162,6 +164,18 @@ function mapActivityRow(row: ActivityRow, viewerId?: string): HubActivityItem {
       } else if (row.activity_type === 'catalog_service_decertified') {
         description = `Uncertified you for ${serviceId}`;
       }
+    }
+  }
+
+  // Personalize catalog creation and inventory events for non-admin users
+  if (viewerRole && viewerRole !== 'admin') {
+    const targetId = row.target_id || undefined;
+    if (row.activity_type === 'catalog_service_created' && targetId) {
+      description = `New Service (${targetId}) added to the CKS Catalog!`;
+    } else if (row.activity_type === 'product_created' && targetId) {
+      description = `New Product (${targetId}) added to the CKS Catalog!`;
+    } else if (row.activity_type === 'product_inventory_adjusted' && viewerRole === 'warehouse' && targetId) {
+      description = `Inventory adjusted for ${targetId}`;
     }
   }
 
@@ -403,8 +417,11 @@ async function getManagerActivities(cksCode: string): Promise<HubRoleActivitiesP
           AND metadata ? 'userId' AND UPPER(metadata->>'userId') = $2
         )
         OR
-        -- Catalog service creation events (visible to all users)
+        -- Catalog service creation events (visible to MGR/CON/CUS/CEN)
         (activity_type = 'catalog_service_created')
+        OR
+        -- Product creation events (visible to all roles)
+        (activity_type = 'product_created')
         OR
         -- Show other activity types (orders, services, creations, etc.) for ecosystem
        -- SAFE: Only if target is in ecosystem OR actor is self OR metadata references self
@@ -430,7 +447,7 @@ async function getManagerActivities(cksCode: string): Promise<HubRoleActivitiesP
     [idArray, scope.cksCode],
   );
 
-  const activities = activitiesResult.rows.map(row => mapActivityRow(row, scope.cksCode));
+  const activities = activitiesResult.rows.map(row => mapActivityRow(row, scope.cksCode, 'manager'));
 
   return {
     role: 'manager',
@@ -1055,8 +1072,11 @@ async function getContractorActivities(cksCode: string): Promise<HubRoleActiviti
           AND metadata ? 'userId' AND UPPER(metadata->>'userId') = $2
         )
         OR
-        -- Catalog service creation events (visible to all users)
+        -- Catalog service creation events (visible to MGR/CON/CUS/CEN)
         (activity_type = 'catalog_service_created')
+        OR
+        -- Product creation events (visible to all roles)
+        (activity_type = 'product_created')
         OR
         -- Show other activity types (orders, services, creations, etc.) for ecosystem
        -- SAFE: Only if target is in ecosystem OR actor is self OR metadata references self
@@ -1081,7 +1101,7 @@ async function getContractorActivities(cksCode: string): Promise<HubRoleActiviti
     [idArray, scope.cksCode],
   );
 
-  const activities = activitiesResult.rows.map(row => mapActivityRow(row, scope.cksCode));
+  const activities = activitiesResult.rows.map(row => mapActivityRow(row, scope.cksCode, 'contractor'));
 
   return {
     role: 'contractor',
@@ -1148,8 +1168,11 @@ async function getCustomerActivities(cksCode: string): Promise<HubRoleActivities
           AND metadata ? 'userId' AND UPPER(metadata->>'userId') = $2
         )
         OR
-        -- Catalog service creation events (visible to all users)
+        -- Catalog service creation events (visible to MGR/CON/CUS/CEN)
         (activity_type = 'catalog_service_created')
+        OR
+        -- Product creation events (visible to all roles)
+        (activity_type = 'product_created')
         OR
         -- Show other activity types (orders, services, creations, etc.) for ecosystem
        -- SAFE: Only if target is in ecosystem OR actor is self OR metadata references self
@@ -1174,7 +1197,7 @@ async function getCustomerActivities(cksCode: string): Promise<HubRoleActivities
     [idArray, scope.cksCode],
   );
 
-  const activities = activitiesResult.rows.map(row => mapActivityRow(row, scope.cksCode));
+  const activities = activitiesResult.rows.map(row => mapActivityRow(row, scope.cksCode, 'customer'));
 
   return {
     role: 'customer',
@@ -1234,8 +1257,8 @@ async function getCenterActivities(cksCode: string): Promise<HubRoleActivitiesPa
           AND metadata ? 'userId' AND UPPER(metadata->>'userId') = $2
         )
         OR
-        -- Catalog service creation events (visible to all users)
-        (activity_type = 'catalog_service_created')
+        -- Product creation events (visible to all roles)
+        (activity_type = 'product_created')
         OR
         -- Show other activity types (orders, services, creations, etc.) for ecosystem
        -- SAFE: Only if target is in ecosystem OR actor is self OR metadata references self
@@ -1260,7 +1283,7 @@ async function getCenterActivities(cksCode: string): Promise<HubRoleActivitiesPa
     [idArray, scope.cksCode],
   );
 
-  const activities = activitiesResult.rows.map(row => mapActivityRow(row, scope.cksCode));
+  const activities = activitiesResult.rows.map(row => mapActivityRow(row, scope.cksCode, 'center'));
 
   return {
     role: 'center',
@@ -1318,8 +1341,8 @@ async function getCrewActivities(cksCode: string): Promise<HubRoleActivitiesPayl
           AND metadata ? 'userId' AND UPPER(metadata->>'userId') = $2
         )
         OR
-        -- Catalog service creation events (visible to all users)
-        (activity_type = 'catalog_service_created')
+        -- Product creation events (crew sees products only; no services)
+        (activity_type = 'product_created')
         OR
         -- Show other activity types (orders, services, creations, etc.) for ecosystem
        -- SAFE: Only if target is in ecosystem OR actor is self OR metadata references self
@@ -1344,7 +1367,7 @@ async function getCrewActivities(cksCode: string): Promise<HubRoleActivitiesPayl
     [idArray, scope.cksCode],
   );
 
-  const activities = activitiesResult.rows.map(row => mapActivityRow(row, scope.cksCode));
+  const activities = activitiesResult.rows.map(row => mapActivityRow(row, scope.cksCode, 'crew'));
 
   return {
     role: 'crew',
@@ -1404,8 +1427,15 @@ async function getWarehouseActivities(cksCode: string): Promise<HubRoleActivitie
           AND metadata ? 'userId' AND UPPER(metadata->>'userId') = $2
         )
         OR
-        -- Catalog service creation events (visible to all users)
-        (activity_type = 'catalog_service_created')
+        -- Product creation events
+        (activity_type = 'product_created')
+        OR
+        -- Inventory adjustments affecting THIS warehouse
+        (
+          activity_type = 'product_inventory_adjusted'
+          AND metadata ? 'warehouseId'
+          AND UPPER(metadata->>'warehouseId') = $2
+        )
         OR
         -- Show other activity types (orders, services, creations, etc.) for ecosystem
        -- SAFE: Only if target is in ecosystem OR actor is self OR metadata references self
@@ -1430,7 +1460,7 @@ async function getWarehouseActivities(cksCode: string): Promise<HubRoleActivitie
     [idArray, scope.cksCode],
   );
 
-  const activities = activitiesResult.rows.map(row => mapActivityRow(row, scope.cksCode));
+  const activities = activitiesResult.rows.map(row => mapActivityRow(row, scope.cksCode, 'warehouse'));
 
   return {
     role: 'warehouse',

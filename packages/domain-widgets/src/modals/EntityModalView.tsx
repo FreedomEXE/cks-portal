@@ -114,6 +114,24 @@ export function EntityModalView({
   const nameValue = nameField?.value;
   const nameString = typeof nameValue === 'string' ? nameValue : undefined;
 
+  // Compute display status with lifecycle priority
+  // Lifecycle state overrides data status for badge display
+  const displayStatus = lifecycle
+    ? lifecycle.state === 'deleted'
+      ? 'deleted'
+      : lifecycle.state === 'archived'
+        ? 'archived'
+        : headerConfig.status
+    : headerConfig.status;
+
+  const displayStatusText = lifecycle
+    ? lifecycle.state === 'deleted'
+      ? 'DELETED'
+      : lifecycle.state === 'archived'
+        ? 'ARCHIVED'
+        : headerConfig.statusText || headerConfig.status?.toUpperCase()
+    : headerConfig.statusText || headerConfig.status?.toUpperCase();
+
   const headerContent = headerConfig ? (
     <EntityHeaderCard
       id={headerConfig.id}
@@ -121,8 +139,8 @@ export function EntityModalView({
       name={nameString}
       accentColor={accentColor}
       status={
-        headerConfig.status
-          ? { value: headerConfig.status, text: headerConfig.status.toUpperCase() }
+        displayStatus
+          ? { value: displayStatus, text: displayStatusText || displayStatus.toUpperCase() }
           : undefined
       }
     />

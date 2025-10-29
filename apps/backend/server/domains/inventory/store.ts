@@ -1,6 +1,7 @@
 import { query } from '../../db/connection';
 import { normalizeIdentity } from '../identity';
 import type { HubInventoryPayload, InventoryItem } from './types';
+import { recordActivity } from '../activity/writer';
 
 async function getWarehouseInventory(cksCode: string): Promise<HubInventoryPayload | null> {
   const warehouseResult = await query<{ status: string | null }>(
@@ -84,10 +85,12 @@ export interface UpdateInventoryInput {
   itemId: string;
   quantityChange: number; // Positive to add, negative to reduce
   reason?: string;
+  actorId: string;
+  actorRole: string;
 }
 
 export async function updateInventoryQuantity(input: UpdateInventoryInput): Promise<void> {
-  const { warehouseId, itemId, quantityChange, reason } = input;
+  const { warehouseId, itemId, quantityChange, reason, actorId, actorRole } = input;
 
   // Validate warehouse exists
   const warehouseCheck = await query(
@@ -131,4 +134,25 @@ export async function updateInventoryQuantity(input: UpdateInventoryInput): Prom
   //    VALUES ($1, $2, $3, $4, NOW())`,
   //   [warehouseId, itemId, quantityChange, reason || 'Manual adjustment']
   // );
+
+  // Record activity for product inventory adjustment (admin/warehouse visibility)
+  try {
+    await recordActivity({
+      activityType: 'product_inventory_adjusted',
+      description: `Adjusted ${itemId.toUpperCase()} inventory`,
+      actorId,
+      actorRole,
+      targetId: itemId.toUpperCase(),
+      targetType: 'product',
+      metadata: {
+        warehouseId: warehouseId.toUpperCase(),
+        quantityChange,
+        newQuantity: newQty,
+        reason: reason || null,
+      },
+    });
+  } catch (e) {
+    // Non-blocking
+    console.warn('[inventory] Failed to record product_inventory_adjusted activity', e);
+  }
 }

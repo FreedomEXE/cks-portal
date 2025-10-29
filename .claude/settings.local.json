@@ -24,7 +24,19 @@
       "Bash(git rm:*)",
       "Bash(taskkill:*)",
       "Bash(ConvertFrom-Json)",
-      "Bash(ConvertTo-Json -Depth 10)"
+      "Bash(ConvertTo-Json -Depth 10)",
+      "Bash(Get-ChildItem -Path \"apps/backend\" -Recurse -Filter \"*seed*.ts\" -File)",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(Start-Sleep -Seconds 8)",
+      "Bash(cat:*)",
+      "Bash(Start-Sleep -Seconds 10)",
+      "mcp__postgres__query",
+      "Bash(Get-ChildItem -Path \"apps/backend/server/domains\" -Recurse -Filter \"*scope*\")",
+      "Bash(Select-Object FullName)",
+      "Bash(DATABASE_SSL=false node scripts/check-product-archive-activities.js)",
+      "Bash(DATABASE_SSL=false node scripts/add-archive-columns-to-catalog-tables.js)",
+      "Bash(DATABASE_SSL=false node scripts/backfill-catalog-archive-metadata.js)",
+      "Bash(npx tsc:*)"
     ],
     "deny": [],
     "ask": []

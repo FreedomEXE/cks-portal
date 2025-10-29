@@ -20,7 +20,7 @@ import type { EntityFetchResult } from './activityRouter';
 interface AdminActivityRoute {
   directoryTab: string;
   nestedSubTab?: string;
-  modalType: 'order' | 'service' | 'user' | 'report';
+  modalType: 'order' | 'service' | 'user' | 'report' | 'product';
 }
 
 const ADMIN_ACTIVITY_ROUTES: Record<string, AdminActivityRoute> = {
@@ -68,6 +68,11 @@ const ADMIN_ACTIVITY_ROUTES: Record<string, AdminActivityRoute> = {
     nestedSubTab: 'feedback',
     modalType: 'report',
   },
+  // NEW: Products route mapping (entityType => route)
+  product: {
+    directoryTab: 'products',
+    modalType: 'product',
+  },
 };
 
 export interface AdminActivityRouterConfig {
@@ -92,6 +97,9 @@ export interface AdminActivityRouterConfig {
   setSelectedEntity: (entity: any) => void;
   setShowActionModal: (show: boolean) => void;
   setSelectedReportForDetails: (report: any) => void;
+
+  // NEW: Universal modal opener from ModalProvider
+  openEntityModal: (entityType: string, entityId: string, options?: any) => void;
 
   // Error handling
   onError: (message: string) => void;
@@ -242,6 +250,16 @@ export function createAdminActivityClickHandler(config: AdminActivityRouterConfi
             deletedBy,
           });
           config.setShowActionModal(true);
+        } else if (route.modalType === 'product') {
+          // Use universal modal for products
+          const options = state === 'deleted' ? { isDeleted: true, deletedAt, deletedBy } : undefined;
+          // targetId is guaranteed earlier, but fall back to entity.id
+          const id = (entity && (entity.productId || entity.id)) || targetId;
+          if (!id) {
+            config.onError('Cannot identify product from activity');
+            return;
+          }
+          config.openEntityModal('product', id, options);
         }
       }, 150);
     } catch (error) {

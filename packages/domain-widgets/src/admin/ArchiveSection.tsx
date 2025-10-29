@@ -29,6 +29,7 @@ export interface ArchiveSectionProps {
   archiveAPI?: ArchiveAPI;
   onViewOrderDetails?: (orderId: string, orderType: 'product' | 'service') => void;
   onViewServiceDetails?: (serviceId: string) => void;
+  onViewProductDetails?: (productId: string) => void;
   onViewReportDetails?: (reportId: string, reportType: 'report' | 'feedback') => void;
   onViewUserDetails?: (userId: string, userType: 'manager' | 'contractor' | 'customer' | 'center' | 'crew' | 'warehouse') => void;
 }
@@ -95,6 +96,7 @@ export default function ArchiveSection({
   archiveAPI,
   onViewOrderDetails,
   onViewServiceDetails,
+  onViewProductDetails,
   onViewReportDetails,
   onViewUserDetails,
 }: ArchiveSectionProps) {
@@ -459,6 +461,12 @@ export default function ArchiveSection({
             // For services: open service modal directly if provided
             if ((effectiveTab === 'catalog-services' || effectiveTab === 'active-services') && onViewServiceDetails) {
               onViewServiceDetails(row.id);
+              return;
+            }
+
+            // For products: open product modal directly if provided
+            if (effectiveTab === 'product' && onViewProductDetails) {
+              onViewProductDetails(row.id);
               return;
             }
 

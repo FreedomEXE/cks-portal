@@ -104,6 +104,9 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
         managed_by: string | null;
         created_at: Date;
         updated_at: Date;
+        archived_at?: Date | null;
+        archived_by?: string | null;
+        deletion_scheduled?: Date | null;
       }>(
         `SELECT
           service_id,
@@ -123,7 +126,10 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
           crew_required,
           managed_by,
           created_at,
-          updated_at
+          updated_at,
+          archived_at,
+          archived_by,
+          deletion_scheduled
          FROM catalog_services
          WHERE UPPER(service_id) = $1
          LIMIT 1`,
@@ -161,6 +167,12 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
         createdAt: row.created_at?.toISOString(),
         updatedAt: row.updated_at?.toISOString()
       };
+
+      // Determine lifecycle state and metadata (root-level for ModalProvider)
+      const svcState: 'active' | 'archived' = row.is_active ? 'active' : 'archived';
+      const archivedAt = row.archived_at ? row.archived_at.toISOString() : undefined;
+      const archivedBy = row.archived_by || undefined;
+      const deletionScheduled = row.deletion_scheduled ? row.deletion_scheduled.toISOString() : undefined;
 
       // If admin, include certifications AND full directory lists
       const isAdmin = (user.role || '').toLowerCase() === 'admin';
@@ -219,11 +231,112 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
       }
 
       console.log('[CATALOG_DETAILS] Sending response with data keys:', Object.keys(data));
-      return reply.send({ data });
+      return reply.send({
+        data,
+        state: svcState,
+        archivedAt,
+        archivedBy,
+        scheduledDeletion: deletionScheduled,
+      });
     } catch (error) {
       console.error('[CATALOG_DETAILS] ERROR:', error);
       request.log.error({ err: error, serviceId }, 'Failed to fetch catalog service details');
       reply.code(500).send({ error: 'Failed to fetch service details' });
+    }
+  });
+
+  // Get catalog product details by ID (on-demand fetching for modals)
+  server.get('/api/catalog/products/:productId/details', async (request, reply) => {
+    const user = await requireActiveRole(request, reply, {});
+    if (!user) return;
+
+    const paramsSchema = z.object({ productId: z.string().min(1) });
+    const p = paramsSchema.safeParse(request.params);
+    if (!p.success) {
+      reply.code(400).send({ error: 'Invalid product ID' });
+      return;
+    }
+
+    const { productId } = p.data;
+    const normalizedId = productId.toUpperCase();
+
+    try {
+      // Fetch product from catalog_products
+      const result = await query<{
+        product_id: string;
+        name: string;
+        description: string | null;
+        category: string | null;
+        unit_of_measure: string | null;
+        is_active: boolean;
+        metadata: any;
+        archived_at?: Date | null;
+        archived_by?: string | null;
+        deleted_at?: Date | null;
+        deleted_by?: string | null;
+      }>(
+        `SELECT product_id, name, description, category, unit_of_measure, is_active, metadata, archived_at, archived_by
+         FROM catalog_products
+         WHERE UPPER(product_id) = $1`,
+        [normalizedId]
+      );
+
+      if (result.rowCount === 0) {
+        reply.code(404).send({ error: 'Product not found' });
+        return;
+      }
+
+      const product = result.rows[0];
+
+      // Fetch inventory data for this product across warehouses
+      const inventoryResult = await query<{
+        warehouse_id: string;
+        warehouse_name: string | null;
+        quantity_on_hand: number;
+        min_stock_level: number | null;
+      }>(
+        `SELECT
+           i.warehouse_id,
+           w.name as warehouse_name,
+           i.quantity_on_hand,
+           i.min_stock_level
+         FROM inventory_items i
+         LEFT JOIN warehouses w ON UPPER(w.warehouse_id) = UPPER(i.warehouse_id)
+         WHERE UPPER(i.item_id) = $1`,
+        [normalizedId]
+      );
+
+      const inventoryData = inventoryResult.rows.map(row => ({
+        warehouseId: row.warehouse_id,
+        warehouseName: row.warehouse_name || row.warehouse_id,
+        quantityOnHand: row.quantity_on_hand,
+        minStockLevel: row.min_stock_level,
+        location: null, // location not in schema
+      }));
+
+      // Determine lifecycle state using is_active (archive sets is_active = FALSE)
+      const state: 'active' | 'archived' = product.is_active ? 'active' : 'archived';
+      const archivedAt = product.archived_at ? new Date(product.archived_at).toISOString() : undefined;
+      const archivedBy = product.archived_by || undefined;
+
+      reply.send({
+        data: {
+          productId: product.product_id,
+          name: product.name,
+          description: product.description,
+          category: product.category,
+          unitOfMeasure: product.unit_of_measure,
+          status: state, // Keep in data for backward compat
+          metadata: product.metadata,
+          inventoryData,
+        },
+        state, // Lifecycle state at root level for ModalProvider
+        archivedAt,
+        archivedBy,
+      });
+    } catch (error) {
+      console.error('[CATALOG] Product details fetch error:', error);
+      reply.code(500).send({ error: 'Failed to fetch product details' });
     }
   });
 

@@ -18,12 +18,19 @@ export interface ProductQuickActionsProps {
   inventoryData?: WarehouseInventory[];
   onSave?: (changes: InventoryChange[]) => Promise<void>;
   onDelete?: () => void;
+  adminActions?: Array<{
+    label: string;
+    onClick: () => void | Promise<void>;
+    variant?: 'primary' | 'secondary' | 'danger';
+    disabled?: boolean;
+  }>;
 }
 
 const ProductQuickActions: React.FC<ProductQuickActionsProps> = ({
   inventoryData = [],
   onSave,
   onDelete,
+  adminActions = [],
 }) => {
   // Track pending quantity adjustments per warehouse
   const [pendingAdjustments, setPendingAdjustments] = useState<Map<string, number>>(new Map());
@@ -243,11 +250,23 @@ const ProductQuickActions: React.FC<ProductQuickActionsProps> = ({
       </div>
 
       {/* Actions */}
-      {(onSave || onDelete) && (
+      {(onSave || onDelete || (adminActions && adminActions.length > 0)) && (
         <div className={styles.actionsSection}>
           <h4 className={styles.sectionTitle}>ACTIONS</h4>
           <div className={styles.actions}>
             <div className={styles.leftActions}>
+              {adminActions.map((a, i) => {
+                const cls = a.variant === 'danger'
+                  ? `${styles.actionButton} ${styles.actionDelete}`
+                  : a.variant === 'primary'
+                    ? `${styles.actionButton} ${styles.actionSave}`
+                    : `${styles.actionButton} ${styles.actionEdit}`;
+                return (
+                  <button key={`admin-action-${i}`} className={cls} onClick={() => a.onClick()} disabled={a.disabled}>
+                    {a.label}
+                  </button>
+                );
+              })}
               {onDelete && (
                 <button
                   className={`${styles.actionButton} ${styles.actionDelete}`}

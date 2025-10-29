@@ -62,6 +62,11 @@ export function canSeeTab(tabId: TabId, context: TabVisibilityContext): boolean 
         return role === 'admin';
       }
 
+      // Products: admin-only history timeline
+      if (entityType === 'product') {
+        return role === 'admin';
+      }
+
       // Other non-user entities (orders, services, reports): everyone can see history
       return true;
     }
