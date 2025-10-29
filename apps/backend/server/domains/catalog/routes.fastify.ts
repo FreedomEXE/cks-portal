@@ -272,10 +272,11 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
         metadata: any;
         archived_at?: Date | null;
         archived_by?: string | null;
+        deletion_scheduled?: Date | null;
         deleted_at?: Date | null;
         deleted_by?: string | null;
       }>(
-        `SELECT product_id, name, description, category, unit_of_measure, is_active, metadata, archived_at, archived_by
+        `SELECT product_id, name, description, category, unit_of_measure, is_active, metadata, archived_at, archived_by, deletion_scheduled
          FROM catalog_products
          WHERE UPPER(product_id) = $1`,
         [normalizedId]
@@ -318,6 +319,7 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
       const state: 'active' | 'archived' = product.is_active ? 'active' : 'archived';
       const archivedAt = product.archived_at ? new Date(product.archived_at).toISOString() : undefined;
       const archivedBy = product.archived_by || undefined;
+      const deletionScheduled = product.deletion_scheduled ? new Date(product.deletion_scheduled).toISOString() : undefined;
 
       reply.send({
         data: {
@@ -333,6 +335,7 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
         state, // Lifecycle state at root level for ModalProvider
         archivedAt,
         archivedBy,
+        scheduledDeletion: deletionScheduled,
       });
     } catch (error) {
       console.error('[CATALOG] Product details fetch error:', error);

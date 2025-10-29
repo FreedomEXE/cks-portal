@@ -99,6 +99,7 @@ export function ModalProvider({ children }: ModalProviderProps) {
             deletedBy?: string;
             archivedAt?: string;
             archivedBy?: string;
+            scheduledDeletion?: string;
           }>(endpoint);
 
           console.log(`[ModalProvider] Fetched ${entityType} data:`, response);
@@ -121,6 +122,7 @@ export function ModalProvider({ children }: ModalProviderProps) {
             ),
             archivedAt: response.archivedAt || options?.archivedAt,
             archivedBy: response.archivedBy || options?.archivedBy,
+            scheduledDeletion: response.scheduledDeletion || options?.scheduledDeletion,
             deletedAt: response.deletedAt || options?.deletedAt,
             deletedBy: response.deletedBy || options?.deletedBy,
           } as any;

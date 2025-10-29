@@ -187,6 +187,7 @@ export function ModalGateway({
           archivedAt: opts.archivedAt,
           archivedBy: opts.archivedBy,
           archiveReason: opts.archiveReason,
+          scheduledDeletion: opts.scheduledDeletion,
         };
       } else {
         lifecycle = { state: 'active' };
@@ -205,6 +206,7 @@ export function ModalGateway({
         state: 'archived',
         archivedAt: opts.archivedAt,
         archivedBy: opts.archivedBy,
+        scheduledDeletion: opts.scheduledDeletion,
       };
     }
     // Priority 3: Infer from data.status (for catalog entities)
@@ -213,6 +215,7 @@ export function ModalGateway({
         state: 'archived',
         archivedAt: options.data.archivedAt,
         archivedBy: options.data.archivedBy,
+        scheduledDeletion: options.data.scheduledDeletion,
       };
     } else {
       lifecycle = { state: 'active' };
