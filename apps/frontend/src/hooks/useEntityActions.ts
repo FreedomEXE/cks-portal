@@ -19,7 +19,7 @@ import { useCallback } from 'react';
 import { useSWRConfig } from 'swr';
 import toast from 'react-hot-toast';
 import { parseEntityId } from '../shared/utils/parseEntityId';
-import { applyHubOrderAction, type OrderActionRequest } from '../shared/api/hub';
+import { applyHubOrderAction, type OrderActionRequest, acknowledgeItem, resolveReport, applyServiceAction } from '../shared/api/hub';
 import { archiveAPI } from '../shared/api/archive';
 import { updateCatalogService } from '../shared/api/admin';
 
@@ -504,11 +504,110 @@ async function handleServiceAction(
       }
 
       case 'start':
+        console.log('[useEntityActions] Starting service:', serviceId);
+        await applyServiceAction(serviceId, 'start', options.notes);
+
+        // Invalidate caches
+        mutate((key: any) => {
+          if (typeof key === 'string') {
+            return key.includes('/services') ||
+                   key.includes('/api/hub/activities') ||
+                   key.includes('/hub/activities') ||
+                   key.includes(serviceId);
+          }
+          return false;
+        });
+
+        console.log('[useEntityActions] Service started: success');
+        toast.success('Service started');
+        options.onSuccess?.();
+        return true;
+
       case 'complete':
+        console.log('[useEntityActions] Completing service:', serviceId);
+        await applyServiceAction(serviceId, 'complete', options.notes);
+
+        // Invalidate caches
+        mutate((key: any) => {
+          if (typeof key === 'string') {
+            return key.includes('/services') ||
+                   key.includes('/api/hub/activities') ||
+                   key.includes('/hub/activities') ||
+                   key.includes(serviceId);
+          }
+          return false;
+        });
+
+        console.log('[useEntityActions] Service completed: success');
+        toast.success('Service completed');
+        options.onSuccess?.();
+        return true;
+
+      case 'cancel':
+        console.log('[useEntityActions] Cancelling service:', serviceId);
+        await applyServiceAction(serviceId, 'cancel', options.notes);
+
+        // Invalidate caches
+        mutate((key: any) => {
+          if (typeof key === 'string') {
+            return key.includes('/services') ||
+                   key.includes('/api/hub/activities') ||
+                   key.includes('/hub/activities') ||
+                   key.includes(serviceId);
+          }
+          return false;
+        });
+
+        console.log('[useEntityActions] Service cancelled: success');
+        toast.success('Service cancelled');
+        options.onSuccess?.();
+        return true;
+
+      case 'verify':
+        console.log('[useEntityActions] Verifying service:', serviceId);
+        await applyServiceAction(serviceId, 'verify', options.notes);
+
+        // Invalidate caches
+        mutate((key: any) => {
+          if (typeof key === 'string') {
+            return key.includes('/services') ||
+                   key.includes('/api/hub/activities') ||
+                   key.includes('/hub/activities') ||
+                   key.includes(serviceId);
+          }
+          return false;
+        });
+
+        console.log('[useEntityActions] Service verified: success');
+        toast.success('Service verified');
+        options.onSuccess?.();
+        return true;
+
+      case 'update-notes':
+      case 'update_notes':
+        console.log('[useEntityActions] Updating service notes:', serviceId);
+        await applyServiceAction(serviceId, 'update-notes', options.notes);
+
+        // Invalidate caches
+        mutate((key: any) => {
+          if (typeof key === 'string') {
+            return key.includes('/services') ||
+                   key.includes('/api/hub/activities') ||
+                   key.includes('/hub/activities') ||
+                   key.includes(serviceId);
+          }
+          return false;
+        });
+
+        console.log('[useEntityActions] Service notes updated: success');
+        toast.success('Service notes updated');
+        options.onSuccess?.();
+        return true;
+
       case 'assign_crew':
-        // TODO: Implement when backend endpoints are ready
-        console.warn(`[useEntityActions] ${actionId} action not yet implemented for services`);
-        toast.error(`${actionId} action not yet implemented`);
+        // TODO: Implement crew assignment UI workflow
+        console.warn(`[useEntityActions] assign_crew action requires UI workflow`);
+        toast.error(`assign_crew action requires UI workflow`);
         return false;
 
       default:
@@ -747,11 +846,54 @@ async function handleReportAction(
       }
 
       case 'acknowledge':
+        console.log(`[useEntityActions] Acknowledging ${entityType}:`, reportId);
+        await acknowledgeItem(reportId, entityType as 'report' | 'feedback');
+
+        // Invalidate caches
+        mutate((key: any) => {
+          if (typeof key === 'string') {
+            return key.includes('/reports') ||
+                   key.includes('/feedback') ||
+                   key.includes('/api/hub/activities') ||
+                   key.includes('/hub/activities') ||
+                   key.includes(reportId);
+          }
+          return false;
+        });
+
+        console.log(`[useEntityActions] ${entityLabel} acknowledged: success`);
+        toast.success(`${entityLabel} acknowledged`);
+        options.onSuccess?.();
+        return true;
+
       case 'resolve':
+        console.log(`[useEntityActions] Resolving ${entityType}:`, reportId);
+        await resolveReport(reportId, {
+          notes: options.notes,
+          actionTaken: options.metadata?.actionTaken as string | undefined,
+        });
+
+        // Invalidate caches
+        mutate((key: any) => {
+          if (typeof key === 'string') {
+            return key.includes('/reports') ||
+                   key.includes('/feedback') ||
+                   key.includes('/api/hub/activities') ||
+                   key.includes('/hub/activities') ||
+                   key.includes(reportId);
+          }
+          return false;
+        });
+
+        console.log(`[useEntityActions] ${entityLabel} resolved: success`);
+        toast.success(`${entityLabel} resolved`);
+        options.onSuccess?.();
+        return true;
+
       case 'close':
-        // TODO: Implement when backend endpoints are ready
-        console.warn(`[useEntityActions] ${actionId} action not yet implemented for reports`);
-        toast.error(`${actionId} action not yet implemented`);
+        // TODO: Implement when backend close endpoint is ready
+        console.warn(`[useEntityActions] close action not yet implemented for reports`);
+        toast.error(`close action not yet implemented`);
         return false;
 
       default:

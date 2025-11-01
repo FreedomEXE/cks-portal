@@ -2,6 +2,7 @@ import { query } from '../../db/connection';
 import type { HubRole } from '../profile/types';
 import { normalizeIdentity } from '../identity';
 import { z } from 'zod';
+import { recordActivity } from '../activity/writer';
 
 export async function applyServiceAction(input: {
   serviceId: string;
@@ -107,6 +108,62 @@ export async function applyServiceAction(input: {
         [newServiceStatus, serviceId]
       );
     }
+  }
+
+  // Record activity for the action
+  const actorId = normalizeIdentity(input.actorCode || null) ?? 'SYSTEM';
+  const actorRole = input.actorRole || 'system';
+
+  if (input.action === 'start') {
+    await recordActivity({
+      activityType: 'service_started',
+      description: `Started Service ${serviceId}`,
+      actorId,
+      actorRole,
+      targetId: serviceId,
+      targetType: 'service',
+      metadata: { notes: input.notes },
+    });
+  } else if (input.action === 'complete') {
+    await recordActivity({
+      activityType: 'service_completed',
+      description: `Completed Service ${serviceId}`,
+      actorId,
+      actorRole,
+      targetId: serviceId,
+      targetType: 'service',
+      metadata: { notes: input.notes },
+    });
+  } else if (input.action === 'cancel') {
+    await recordActivity({
+      activityType: 'service_cancelled',
+      description: `Cancelled Service ${serviceId}`,
+      actorId,
+      actorRole,
+      targetId: serviceId,
+      targetType: 'service',
+      metadata: { reason: input.notes },
+    });
+  } else if (input.action === 'verify') {
+    await recordActivity({
+      activityType: 'service_verified',
+      description: `Verified Service ${serviceId}`,
+      actorId,
+      actorRole,
+      targetId: serviceId,
+      targetType: 'service',
+      metadata: { notes: input.notes },
+    });
+  } else if (input.action === 'update-notes') {
+    await recordActivity({
+      activityType: 'service_notes_updated',
+      description: `Updated Notes for Service ${serviceId}`,
+      actorId,
+      actorRole,
+      targetId: serviceId,
+      targetType: 'service',
+      metadata: { notes: input.notes },
+    });
   }
 
   return {
@@ -276,6 +333,21 @@ export async function addServiceCrewRequests(input: {
     );
   }
 
+  // Record activity for crew request
+  const actorId = normalizeIdentity(input.managerCode) ?? 'MANAGER';
+  await recordActivity({
+    activityType: 'service_crew_requested',
+    description: `Requested Crew for Service ${input.serviceId}`,
+    actorId,
+    actorRole: 'manager',
+    targetId: input.serviceId,
+    targetType: 'service',
+    metadata: {
+      crewCodes: input.crewCodes,
+      message: input.message,
+    },
+  });
+
   return { ...service, metadata: updatedMetadata };
 }
 
@@ -342,6 +414,23 @@ export async function respondToServiceCrewRequest(input: {
       [orderId, code]
     );
   }
+
+  // Record activity for crew response
+  const actorId = normalizeIdentity(code) ?? 'CREW';
+  await recordActivity({
+    activityType: 'service_crew_response',
+    description: input.accept
+      ? `Accepted Crew Request for Service ${input.serviceId}`
+      : `Declined Crew Request for Service ${input.serviceId}`,
+    actorId,
+    actorRole: 'crew',
+    targetId: input.serviceId,
+    targetType: 'service',
+    metadata: {
+      accepted: input.accept,
+      crewCode: code,
+    },
+  });
 
   return { ...service, metadata: updatedMetadata };
 }
