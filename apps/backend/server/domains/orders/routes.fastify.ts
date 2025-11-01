@@ -4,7 +4,7 @@ import { requireActiveRole } from '../../core/auth/guards';
 import { requireActiveAdmin } from '../adminUsers/guards';
 import { authenticate } from '../../core/auth/authenticate';
 import { getAdminUserByClerkId } from '../adminUsers/store';
-import { applyOrderAction, createOrder, getHubOrders, getOrderById, archiveOrder as svcArchiveOrder, restoreOrder as svcRestoreOrder, hardDeleteOrder as svcHardDeleteOrder, requestCrewAssignment, respondToCrewRequest, type CreateOrderInput, type OrderActionInput } from './service';
+import { applyOrderAction, createOrder, getHubOrders, getOrderById, requestCrewAssignment, respondToCrewRequest, type CreateOrderInput, type OrderActionInput } from './service';
 import { fetchOrderForViewer } from './store';
 import type { HubRole } from '../profile/types';
 import type { HubOrderItem } from './types';
@@ -409,60 +409,6 @@ export async function registerOrdersRoutes(server: FastifyInstance) {
     } catch (error) {
       request.log.error({ err: error }, 'Failed to update order');
       reply.code(400).send({ error: error instanceof Error ? error.message : 'Failed to update order' });
-    }
-  });
-
-  // POST /api/orders/:orderId/archive - mark order as archived (admin only)
-  server.post('/api/orders/:orderId/archive', async (request, reply) => {
-    const params = actionParamsSchema.safeParse(request.params);
-    if (!params.success) {
-      reply.code(400).send({ error: 'Invalid order identifier' });
-      return;
-    }
-
-    const account = await requireActiveAdmin(request, reply);
-    if (!account) return;
-
-    try {
-      const archivedBy = account.fullName || account.email || 'Admin';
-      const result = await svcArchiveOrder(params.data.orderId, archivedBy);
-      reply.send({ data: result });
-    } catch (error) {
-      reply.code(400).send({ error: error instanceof Error ? error.message : 'Failed to archive order' });
-    }
-  });
-
-  // POST /api/orders/:orderId/restore - clear archive flag (admin only)
-  server.post('/api/orders/:orderId/restore', async (request, reply) => {
-    const params = actionParamsSchema.safeParse(request.params);
-    if (!params.success) {
-      reply.code(400).send({ error: 'Invalid order identifier' });
-      return;
-    }
-    const account = await requireActiveAdmin(request, reply);
-    if (!account) return;
-    try {
-      const result = await svcRestoreOrder(params.data.orderId);
-      reply.send({ data: result });
-    } catch (error) {
-      reply.code(400).send({ error: error instanceof Error ? error.message : 'Failed to restore order' });
-    }
-  });
-
-  // DELETE /api/orders/:orderId - permanently delete order (admin only)
-  server.delete('/api/orders/:orderId', async (request, reply) => {
-    const params = actionParamsSchema.safeParse(request.params);
-    if (!params.success) {
-      reply.code(400).send({ error: 'Invalid order identifier' });
-      return;
-    }
-    const account = await requireActiveAdmin(request, reply);
-    if (!account) return;
-    try {
-      const result = await svcHardDeleteOrder(params.data.orderId);
-      reply.send({ data: result });
-    } catch (error) {
-      reply.code(400).send({ error: error instanceof Error ? error.message : 'Failed to delete order' });
     }
   });
 

@@ -2577,48 +2577,6 @@ export async function updateOrderFields(
   return fetchOrderById(orderId, {});
 }
 
-export async function archiveOrder(orderId: string, archivedBy?: string): Promise<HubOrderItem | null> {
-  // Fetch current order to get metadata
-  const currentOrder = await query<{ metadata: any }>(
-    `SELECT metadata FROM orders WHERE UPPER(order_id) = UPPER($1)`,
-    [orderId]
-  );
-
-  const currentMetadata = currentOrder.rows[0]?.metadata || {};
-  const updatedMetadata = {
-    ...currentMetadata,
-    archivedBy: archivedBy || 'Admin',
-    archivedAt: new Date().toISOString(),
-  };
-
-  await query(
-    `UPDATE orders SET archived_at = NOW(), metadata = $2, updated_at = NOW() WHERE UPPER(order_id) = UPPER($1)`,
-    [orderId, JSON.stringify(updatedMetadata)]
-  );
-  return fetchOrderById(orderId, {});
-}
-
-export async function restoreOrder(orderId: string): Promise<HubOrderItem | null> {
-  await query(
-    `UPDATE orders SET archived_at = NULL, updated_at = NOW() WHERE UPPER(order_id) = UPPER($1)`,
-    [orderId]
-  );
-  return fetchOrderById(orderId, {});
-}
-
-export async function hardDeleteOrder(orderId: string): Promise<{ success: boolean }> {
-  await query('BEGIN');
-  try {
-    await query(`DELETE FROM order_items WHERE order_id = $1`, [orderId]);
-    await query(`DELETE FROM orders WHERE order_id = $1`, [orderId]);
-    await query('COMMIT');
-    return { success: true };
-  } catch (err) {
-    await query('ROLLBACK');
-    throw err;
-  }
-}
-
 // ============================================
 // CREW REQUEST FUNCTIONS
 // ============================================

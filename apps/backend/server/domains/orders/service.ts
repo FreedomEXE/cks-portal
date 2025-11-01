@@ -5,9 +5,6 @@ import {
   createOrder as storeCreateOrder,
   getHubOrders as storeGetHubOrders,
   fetchOrderById as storeFetchOrderById,
-  archiveOrder as storeArchiveOrder,
-  restoreOrder as storeRestoreOrder,
-  hardDeleteOrder as storeHardDeleteOrder,
   requestCrewAssignment as storeRequestCrewAssignment,
   respondToCrewRequest as storeRespondToCrewRequest,
   type CreateOrderInput,
@@ -60,18 +57,6 @@ export async function applyOrderAction(input: OrderActionInput): Promise<HubOrde
 
 export async function getOrderById(orderId: string): Promise<HubOrderItem | null> {
   return storeFetchOrderById(orderId, {});
-}
-
-export async function archiveOrder(orderId: string, archivedBy?: string): Promise<HubOrderItem | null> {
-  return storeArchiveOrder(orderId, archivedBy);
-}
-
-export async function restoreOrder(orderId: string): Promise<HubOrderItem | null> {
-  return storeRestoreOrder(orderId);
-}
-
-export async function hardDeleteOrder(orderId: string): Promise<{ success: boolean }> {
-  return storeHardDeleteOrder(orderId);
 }
 
 export async function requestCrewAssignment(
