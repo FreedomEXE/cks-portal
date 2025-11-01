@@ -83,3 +83,8 @@
   background-color: #fef3c7;
   color: #92400e;
 }
+
+.statusBadge[data-status="open"] {
+  background-color: #d1fae5;
+  color: #065f46;
+}

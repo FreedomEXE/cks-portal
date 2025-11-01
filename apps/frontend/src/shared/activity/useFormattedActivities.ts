@@ -172,6 +172,128 @@ function personalizeMessage(item: HubActivityItem, viewerId?: string | null): st
     return `Welcome to your new account!`;
   }
 
+  // Report/Feedback activities
+  if (activityType === 'report_created' && item.targetId?.toUpperCase() === normalizedViewerId) {
+    return `You filed a report!`;
+  }
+
+  if (activityType === 'report_acknowledged') {
+    const submittedBy = (metadata.submittedBy as string | undefined)?.toUpperCase();
+    if (submittedBy === normalizedViewerId) {
+      return `Your report was acknowledged!`;
+    }
+  }
+
+  if (activityType === 'report_resolved') {
+    const submittedBy = (metadata.submittedBy as string | undefined)?.toUpperCase();
+    if (submittedBy === normalizedViewerId) {
+      return `Your report was resolved!`;
+    }
+  }
+
+  if (activityType === 'feedback_created' && item.targetId?.toUpperCase() === normalizedViewerId) {
+    return `You submitted feedback!`;
+  }
+
+  if (activityType === 'feedback_acknowledged') {
+    const submittedBy = (metadata.submittedBy as string | undefined)?.toUpperCase();
+    if (submittedBy === normalizedViewerId) {
+      return `Your feedback was acknowledged!`;
+    }
+  }
+
+  // Order activities
+  if (activityType === 'order_created') {
+    const customerId = (metadata.customerId as string | undefined)?.toUpperCase();
+    if (customerId === normalizedViewerId) {
+      return `You created an order!`;
+    }
+  }
+
+  if (activityType === 'order_assigned_to_warehouse') {
+    const warehouseId = (metadata.warehouseId as string | undefined)?.toUpperCase();
+    if (warehouseId === normalizedViewerId) {
+      return `You've been assigned an order!`;
+    }
+  }
+
+  if (activityType === 'order_delivered') {
+    const customerId = (metadata.customerId as string | undefined)?.toUpperCase();
+    if (customerId === normalizedViewerId) {
+      return `Your order was delivered!`;
+    }
+  }
+
+  if (activityType === 'order_completed') {
+    const customerId = (metadata.customerId as string | undefined)?.toUpperCase();
+    if (customerId === normalizedViewerId) {
+      return `Your order is complete!`;
+    }
+  }
+
+  if (activityType === 'order_cancelled') {
+    const customerId = (metadata.customerId as string | undefined)?.toUpperCase();
+    if (customerId === normalizedViewerId) {
+      return `Your order was cancelled`;
+    }
+  }
+
+  // Service activities
+  if (activityType === 'service_started') {
+    const managerId = (metadata.managerId as string | undefined)?.toUpperCase();
+    const customerId = (metadata.customerId as string | undefined)?.toUpperCase();
+    if (managerId === normalizedViewerId || customerId === normalizedViewerId) {
+      return `Your service has been started!`;
+    }
+  }
+
+  if (activityType === 'service_completed') {
+    const managerId = (metadata.managerId as string | undefined)?.toUpperCase();
+    const customerId = (metadata.customerId as string | undefined)?.toUpperCase();
+    if (managerId === normalizedViewerId || customerId === normalizedViewerId) {
+      return `Your service is complete!`;
+    }
+  }
+
+  if (activityType === 'service_cancelled') {
+    const managerId = (metadata.managerId as string | undefined)?.toUpperCase();
+    const customerId = (metadata.customerId as string | undefined)?.toUpperCase();
+    if (managerId === normalizedViewerId || customerId === normalizedViewerId) {
+      return `Your service was cancelled`;
+    }
+  }
+
+  if (activityType === 'service_crew_requested') {
+    const crewCodes = (metadata.crewCodes as string[] | undefined) || [];
+    const isRequested = crewCodes.some(code => code.toUpperCase() === normalizedViewerId);
+    if (isRequested) {
+      return `You've been requested for a service!`;
+    }
+  }
+
+  if (activityType === 'service_crew_response') {
+    const managerId = (metadata.managerId as string | undefined)?.toUpperCase();
+    const response = (metadata.response as string | undefined)?.toLowerCase();
+    if (managerId === normalizedViewerId) {
+      return response === 'accepted'
+        ? `Crew member accepted your request!`
+        : `Crew member declined your request`;
+    }
+  }
+
+  // Archive/Restore/Delete activities
+  if (item.actorId?.toUpperCase() === normalizedViewerId) {
+    if (activityType?.endsWith('_archived')) {
+      return `You archived ${item.targetId || 'an item'}`;
+    }
+    if (activityType?.endsWith('_restored')) {
+      return `You restored ${item.targetId || 'an item'}`;
+    }
+    if (activityType?.endsWith('_hard_deleted')) {
+      return `You permanently deleted ${item.targetId || 'an item'}`;
+    }
+  }
+
   // Default: return backend message unchanged
   return item.description;
 }
