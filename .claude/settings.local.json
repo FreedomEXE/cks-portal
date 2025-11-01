@@ -36,7 +36,10 @@
       "Bash(DATABASE_SSL=false node scripts/check-product-archive-activities.js)",
       "Bash(DATABASE_SSL=false node scripts/add-archive-columns-to-catalog-tables.js)",
       "Bash(DATABASE_SSL=false node scripts/backfill-catalog-archive-metadata.js)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(npm run build:*)",
+      "Bash(Start-Sleep -Seconds 15)",
+      "Bash(git log:*)"
     ],
     "deny": [],
     "ask": []
