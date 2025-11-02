@@ -1118,19 +1118,6 @@ export async function hardDeleteEntity(
         [effectiveId]
       );
       snapshot = enrichedResult.rows[0] || null;
-    } else if (operation.entityType === 'service') {
-      const enrichedResult = await txQuery(
-        `SELECT
-          s.*,
-          row_to_json(c.*) as center_info,
-          row_to_json(cu.*) as customer_info
-        FROM ${tableName} s
-        LEFT JOIN centers c ON c.center_id = s.center_id
-        LEFT JOIN customers cu ON cu.customer_id = s.customer_id
-        WHERE ${idColumn} = $1`,
-        [normalizedId]
-      );
-      snapshot = enrichedResult.rows[0] || null;
     } else {
       // For other entity types, simple snapshot
       const snapshotResult = await txQuery(
