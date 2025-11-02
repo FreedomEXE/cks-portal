@@ -1083,49 +1083,13 @@ export async function hardDeleteEntity(
     // 1. Capture entity snapshot BEFORE deleting
     let snapshot: any = null;
 
-    // For orders and services, capture enriched snapshot with related data
-    if (operation.entityType === 'order') {
-      const enrichedResult = await txQuery(
-        `SELECT
-          o.*,
-          json_agg(DISTINCT oi.*) FILTER (WHERE oi.item_id IS NOT NULL) as items,
-          row_to_json(req.*) as requestor_info,
-          row_to_json(dest.*) as destination_info
-        FROM ${tableName} o
-        LEFT JOIN order_items oi ON o.order_id = oi.order_id
-        LEFT JOIN LATERAL (
-          SELECT
-            CASE
-              WHEN o.requested_by_role = 'crew' THEN (SELECT row_to_json(c) FROM crew c WHERE c.crew_id = o.requested_by_code)
-              WHEN o.requested_by_role = 'center' THEN (SELECT row_to_json(ce) FROM centers ce WHERE ce.center_id = o.requested_by_code)
-              WHEN o.requested_by_role = 'customer' THEN (SELECT row_to_json(cu) FROM customers cu WHERE cu.customer_id = o.requested_by_code)
-              WHEN o.requested_by_role = 'contractor' THEN (SELECT row_to_json(co) FROM contractors co WHERE co.contractor_id = o.requested_by_code)
-              WHEN o.requested_by_role = 'manager' THEN (SELECT row_to_json(m) FROM managers m WHERE m.manager_id = o.requested_by_code)
-              WHEN o.requested_by_role = 'warehouse' THEN (SELECT row_to_json(w) FROM warehouses w WHERE w.warehouse_id = o.requested_by_code)
-            END as data
-        ) req ON true
-        LEFT JOIN LATERAL (
-          SELECT
-            CASE
-              WHEN o.destination_role = 'crew' THEN (SELECT row_to_json(c) FROM crew c WHERE c.crew_id = o.destination_code)
-              WHEN o.destination_role = 'center' THEN (SELECT row_to_json(ce) FROM centers ce WHERE ce.center_id = o.destination_code)
-              WHEN o.destination_role = 'customer' THEN (SELECT row_to_json(cu) FROM customers cu WHERE cu.customer_id = o.destination_code)
-              WHEN o.destination_role = 'warehouse' THEN (SELECT row_to_json(w) FROM warehouses w WHERE w.warehouse_id = o.destination_code)
-            END as data
-        ) dest ON true
-          WHERE ${idColumn} = $1
-          GROUP BY o.order_id, req.data, dest.data`,
-        [effectiveId]
-      );
-      snapshot = enrichedResult.rows[0] || null;
-    } else {
-      // For other entity types, simple snapshot
-      const snapshotResult = await txQuery(
-        `SELECT * FROM ${tableName} WHERE ${idColumn} = $1`,
-        [effectiveId]
-      );
-      snapshot = snapshotResult.rows[0] || null;
-    }
+    // Capture simple snapshot for all entity types
+    // (Complex enrichment queries can fail on schema mismatches with old data)
+    const snapshotResult = await txQuery(
+      `SELECT * FROM ${tableName} WHERE ${idColumn} = $1`,
+      [effectiveId]
+    );
+    snapshot = snapshotResult.rows[0] || null;
 
     if (!snapshot) {
       throw new Error(`Entity not found: ${normalizedId}`);
