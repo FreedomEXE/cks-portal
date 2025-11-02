@@ -1267,6 +1267,7 @@ async function getCenterActivities(cksCode: string): Promise<HubRoleActivitiesPa
           activity_type NOT LIKE '%assigned%'
           AND activity_type != 'assignment_made'
           AND activity_type NOT LIKE '%_created'
+          AND activity_type NOT IN ('catalog_service_certified','catalog_service_decertified','catalogService_certified','catalogService_decertified')
         )
        AND (
          (target_id IS NOT NULL AND UPPER(target_id) = ANY($1::text[]))
@@ -1351,6 +1352,7 @@ async function getCrewActivities(cksCode: string): Promise<HubRoleActivitiesPayl
           activity_type NOT LIKE '%assigned%'
           AND activity_type != 'assignment_made'
           AND activity_type NOT LIKE '%_created'
+          AND activity_type NOT IN ('catalog_service_certified','catalog_service_decertified','catalogService_certified','catalogService_decertified')
         )
        AND (
          (target_id IS NOT NULL AND UPPER(target_id) = ANY($1::text[]))
