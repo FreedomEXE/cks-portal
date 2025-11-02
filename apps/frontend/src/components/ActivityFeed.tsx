@@ -147,10 +147,9 @@ export function ActivityFeed({
 
       // Handle service activities
       if (targetType === 'service') {
-        // Phase 3: ID-first modal opening (requires BOTH flags)
-        // Only proceed if backend /services/:serviceId/details endpoint is ready
-        if (isFeatureEnabled('ID_FIRST_MODALS') && isFeatureEnabled('SERVICE_DETAIL_FETCH')) {
-          console.log('[ActivityFeed] Phase 3: Opening service via openById():', targetId);
+        // Phase 2: ID-first modal opening (with feature flag)
+        if (isFeatureEnabled('ID_FIRST_MODALS')) {
+          console.log('[ActivityFeed] Phase 2: Opening service via openById():', targetId);
           modals.openById(targetId);
           return;
         }
