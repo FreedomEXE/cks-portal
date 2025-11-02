@@ -176,19 +176,20 @@ async function handleOrderAction(
           await archiveAPI.hardDelete('order', orderId, reason);
 
           // Invalidate caches
-          mutate((key: any) => {
-            if (typeof key === 'string') {
-              return key.includes('/archive') ||
-                     key.includes('/admin/directory/activities') ||
-                     key.includes('/api/hub/activities') ||
-                     key.includes('/hub/activities') ||
-                     key.includes('/api/archive/list') ||
-                     key.includes('/archive/list') ||
-                     key.includes('/api/archive/relationships') ||
-                     key.includes(orderId);
-            }
-            return false;
-          });
+            mutate((key: any) => {
+              if (typeof key === 'string') {
+                return key.includes('/archive') ||
+                       key.includes('/admin/directory/activities') ||
+                       key.includes('/admin/directory/orders') ||
+                       key.includes('/api/hub/activities') ||
+                       key.includes('/hub/activities') ||
+                       key.includes('/api/archive/list') ||
+                       key.includes('/archive/list') ||
+                       key.includes('/api/archive/relationships') ||
+                       key.includes(orderId);
+              }
+              return false;
+            });
 
           // Dispatch event for non-SWR components (e.g., ArchiveSection)
           window.dispatchEvent(new CustomEvent('cks:archive:updated', {
@@ -303,7 +304,7 @@ async function handleOrderAction(
 /**
  * Handle Product Actions (admin)
  */
-async function handleProductAction(
+  async function handleProductAction(
   productId: string,
   actionId: string,
   options: EntityActionOptions,
@@ -311,29 +312,58 @@ async function handleProductAction(
 ): Promise<boolean> {
   try {
     switch (actionId) {
-      case 'archive': {
-        const reason = options.notes;
-        await archiveAPI.archiveEntity('product', productId, reason || undefined);
-        mutate((key: any) => typeof key === 'string' && (key.includes('/admin/directory/products') || key.includes('/catalog') || key.includes(productId)));
-        toast.success('Product archived successfully');
-        options.onSuccess?.();
-        return true;
-      }
-      case 'restore': {
-        await archiveAPI.restoreEntity('product', productId);
-        mutate((key: any) => typeof key === 'string' && (key.includes('/admin/directory/products') || key.includes('/catalog') || key.includes(productId)));
-        toast.success('Product restored successfully');
-        options.onSuccess?.();
-        return true;
-      }
-      case 'delete': {
-        const reason = options.notes;
-        await archiveAPI.hardDelete('product', productId, reason);
-        mutate((key: any) => typeof key === 'string' && (key.includes('/admin/directory/products') || key.includes('/catalog') || key.includes(productId)));
-        toast.success('Product permanently deleted');
-        options.onSuccess?.();
-        return true;
-      }
+        case 'archive': {
+          const reason = options.notes;
+          await archiveAPI.archiveEntity('product', productId, reason || undefined);
+          mutate((key: any) => typeof key === 'string' && (
+            key.includes('/admin/directory/products') ||
+            key.includes('/catalog') ||
+            key.includes('/api/archive/list') ||
+            key.includes('/archive/list') ||
+            key.includes(productId)
+          ));
+          // Notify archive widgets to refresh
+          window.dispatchEvent(new CustomEvent('cks:archive:updated', {
+            detail: { entityType: 'product', entityId: productId, action: 'archive' }
+          }));
+          toast.success('Product archived successfully');
+          options.onSuccess?.();
+          return true;
+        }
+        case 'restore': {
+          await archiveAPI.restoreEntity('product', productId);
+          mutate((key: any) => typeof key === 'string' && (
+            key.includes('/admin/directory/products') ||
+            key.includes('/catalog') ||
+            key.includes('/api/archive/list') ||
+            key.includes('/archive/list') ||
+            key.includes(productId)
+          ));
+          window.dispatchEvent(new CustomEvent('cks:archive:updated', {
+            detail: { entityType: 'product', entityId: productId, action: 'restore' }
+          }));
+          toast.success('Product restored successfully');
+          options.onSuccess?.();
+          return true;
+        }
+        case 'delete': {
+          const reason = options.notes;
+          await archiveAPI.hardDelete('product', productId, reason);
+          mutate((key: any) => typeof key === 'string' && (
+            key.includes('/admin/directory/products') ||
+            key.includes('/catalog') ||
+            key.includes('/api/archive/list') ||
+            key.includes('/archive/list') ||
+            key.includes('/api/archive/relationships') ||
+            key.includes(productId)
+          ));
+          window.dispatchEvent(new CustomEvent('cks:archive:updated', {
+            detail: { entityType: 'product', entityId: productId, action: 'hard_delete' }
+          }));
+          toast.success('Product permanently deleted');
+          options.onSuccess?.();
+          return true;
+        }
       default:
         console.warn('[useEntityActions] Unknown action for product:', actionId);
         return false;
@@ -368,14 +398,31 @@ async function handleUserAction(
       case 'archive': {
         const reason = options.notes;
         await archiveAPI.archiveEntity(entityType as any, userId, reason || undefined);
-        mutate((key: any) => typeof key === 'string' && (key.includes('/admin/directory') || key.includes(userId)));
+        mutate((key: any) => typeof key === 'string' && (
+          key.includes('/admin/directory') ||
+          key.includes('/api/archive/list') ||
+          key.includes('/archive/list') ||
+          key.includes(userId)
+        ));
+        // Notify archive widgets to refresh
+        window.dispatchEvent(new CustomEvent('cks:archive:updated', {
+          detail: { entityType, entityId: userId, action: 'archive' }
+        }));
         toast.success('User archived successfully');
         options.onSuccess?.();
         return true;
       }
       case 'restore': {
         await archiveAPI.restoreEntity(entityType as any, userId);
-        mutate((key: any) => typeof key === 'string' && (key.includes('/admin/directory') || key.includes(userId)));
+        mutate((key: any) => typeof key === 'string' && (
+          key.includes('/admin/directory') ||
+          key.includes('/api/archive/list') ||
+          key.includes('/archive/list') ||
+          key.includes(userId)
+        ));
+        window.dispatchEvent(new CustomEvent('cks:archive:updated', {
+          detail: { entityType, entityId: userId, action: 'restore' }
+        }));
         toast.success('User restored successfully');
         options.onSuccess?.();
         return true;
@@ -383,7 +430,16 @@ async function handleUserAction(
       case 'delete': {
         const reason = options.notes;
         await archiveAPI.hardDelete(entityType as any, userId, reason);
-        mutate((key: any) => typeof key === 'string' && (key.includes('/admin/directory') || key.includes(userId)));
+        mutate((key: any) => typeof key === 'string' && (
+          key.includes('/admin/directory') ||
+          key.includes('/api/archive/list') ||
+          key.includes('/archive/list') ||
+          key.includes('/api/archive/relationships') ||
+          key.includes(userId)
+        ));
+        window.dispatchEvent(new CustomEvent('cks:archive:updated', {
+          detail: { entityType, entityId: userId, action: 'hard_delete' }
+        }));
         toast.success('User permanently deleted');
         options.onSuccess?.();
         return true;
@@ -479,18 +535,19 @@ async function handleServiceAction(
         await archiveAPI.hardDelete('service', serviceId, reason);
 
         // Invalidate caches
-        mutate((key: any) => {
-          if (typeof key === 'string') {
-            return key.includes('/archive') ||
-                   key.includes('/api/hub/activities') ||
-                   key.includes('/hub/activities') ||
-                   key.includes('/api/archive/list') ||
-                   key.includes('/archive/list') ||
-                   key.includes('/api/archive/relationships') ||
-                   key.includes(serviceId);
-          }
-          return false;
-        });
+          mutate((key: any) => {
+            if (typeof key === 'string') {
+              return key.includes('/archive') ||
+                     key.includes('/admin/directory/services') ||
+                     key.includes('/api/hub/activities') ||
+                     key.includes('/hub/activities') ||
+                     key.includes('/api/archive/list') ||
+                     key.includes('/archive/list') ||
+                     key.includes('/api/archive/relationships') ||
+                     key.includes(serviceId);
+            }
+            return false;
+          });
 
         // Dispatch event for non-SWR components (e.g., ArchiveSection)
         window.dispatchEvent(new CustomEvent('cks:archive:updated', {
@@ -663,6 +720,10 @@ async function handleCatalogServiceAction(
           return false;
         });
 
+        // Notify archive widgets to refresh
+        window.dispatchEvent(new CustomEvent('cks:archive:updated', {
+          detail: { entityType: 'catalogService', entityId: serviceId, action: 'archive' }
+        }));
         console.log('[useEntityActions] Catalog service archive: success');
         toast.success('Catalog service archived successfully');
         options.onSuccess?.();
@@ -692,6 +753,9 @@ async function handleCatalogServiceAction(
           return false;
         });
 
+        window.dispatchEvent(new CustomEvent('cks:archive:updated', {
+          detail: { entityType: 'catalogService', entityId: serviceId, action: 'restore' }
+        }));
         console.log('[useEntityActions] Catalog service restore: success');
         toast.success('Catalog service restored successfully');
         options.onSuccess?.();
@@ -715,6 +779,9 @@ async function handleCatalogServiceAction(
           return false;
         });
 
+        window.dispatchEvent(new CustomEvent('cks:archive:updated', {
+          detail: { entityType: 'catalogService', entityId: serviceId, action: 'hard_delete' }
+        }));
         console.log('[useEntityActions] Catalog service hard delete: success');
         toast.success('Catalog service permanently deleted');
         options.onSuccess?.();

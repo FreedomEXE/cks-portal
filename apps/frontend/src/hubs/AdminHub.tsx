@@ -1128,20 +1128,22 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
               Service Orders
             </Button>
           </div>
-          <DataTable
-            columns={section.columns}
-            data={section.data}
-            emptyMessage={section.emptyMessage}
-            searchPlaceholder={`Search ${ordersSubTab === 'product-orders' ? 'product orders' : 'service orders'}...`}
-            maxItems={25}
-            showSearch
-            onRowClick={(row) => {
-              const id = row.orderId || row.id;
-              if (id) {
-                setSelectedOrderId(id);
-              }
-            }}
-          />
+            <DataTable
+              columns={section.columns}
+              data={section.data}
+              emptyMessage={section.emptyMessage}
+              searchPlaceholder={`Search ${ordersSubTab === 'product-orders' ? 'product orders' : 'service orders'}...`}
+              maxItems={25}
+              showSearch
+              onRowClick={(row) => {
+                const id = row.orderId || row.id;
+                if (id) {
+                  // Use universal modal flow (ModalGateway) for orders
+                  // Ensures modular archive/restore/delete actions with auto-close + row removal
+                  modals.openById(id);
+                }
+              }}
+            />
         </>
       );
     }

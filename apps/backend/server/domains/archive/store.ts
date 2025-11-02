@@ -37,6 +37,27 @@ type QueryFunction = <R extends QueryResultRow = QueryResultRow>(
 ) => Promise<QueryResult<R>>;
 
 /**
+ * Normalize order ID candidates to handle legacy IDs without zero-padded sequence
+ * Example: CRW-006-PO-11 -> CRW-006-PO-011
+ */
+function getOrderIdCandidates(id: string | null | undefined): string[] | null {
+  if (!id) return null;
+  const input = String(id).toUpperCase().trim();
+  const m = input.match(/^(.*-)(PO|SO)-(\d+)$/i);
+  if (!m) {
+    return [input];
+  }
+  const prefix = (m[1] || '').toUpperCase();
+  const type = (m[2] || '').toUpperCase();
+  const digits = m[3] || '';
+  if (digits.length >= 3) {
+    return [input];
+  }
+  const padded = `${prefix}${type}-${digits.padStart(3, '0')}`;
+  return input === padded ? [input] : [input, padded];
+}
+
+/**
  * Redact PII fields from entity snapshots for compliance (GDPR, privacy)
  * Keeps: ID, name, role, relationships, status
  * Redacts: email, phone, address, SSN, emergency contacts, etc.
@@ -477,7 +498,9 @@ export async function archiveEntity(operation: ArchiveOperation): Promise<{ succ
   // Unassign children
   const unassignedChildren = await unassignChildren(operation.entityType, normalizedId);
 
-  // For products, accept either the given ID or a left-padded numeric variant (e.g., PRD-5 -> PRD-00000005)
+  // For specific entities, accept alternate ID encodings
+  // - products: accept either the given ID or a left-padded numeric variant (e.g., PRD-5 -> PRD-00000005)
+  // - orders: accept a 3-digit left-padded sequence variant (e.g., ...-PO-11 -> ...-PO-011)
   let idParamList: string[] | null = null;
   if (operation.entityType === 'product' && normalizedId) {
     const m = normalizedId.match(/^(PRD)-(\d+)$/i);
@@ -486,6 +509,11 @@ export async function archiveEntity(operation: ArchiveOperation): Promise<{ succ
       const digits = m[2];
       const padded = `${prefix}-${digits.padStart(8, '0')}`;
       idParamList = [normalizedId, padded];
+    }
+  } else if (operation.entityType === 'order' && normalizedId) {
+    const candidates = getOrderIdCandidates(normalizedId);
+    if (candidates && candidates.length > 1) {
+      idParamList = candidates;
     }
   }
 
@@ -710,6 +738,36 @@ export async function restoreEntity(operation: RestoreOperation): Promise<{ succ
        WHERE product_id = $1`,
       [normalizedId, actorId]
     );
+  } else if (operation.entityType === 'order') {
+    // Support legacy order IDs without 3-digit padding
+    const candidates = getOrderIdCandidates(normalizedId) || [normalizedId];
+    if (candidates.length > 1) {
+      await query(
+        `UPDATE ${tableName}
+         SET archived_at = NULL,
+             archived_by = NULL,
+             archive_reason = NULL,
+             deletion_scheduled = NULL,
+             restored_at = NOW(),
+             restored_by = $1,
+             updated_at = NOW()
+         WHERE ${idColumn} = $2 OR ${idColumn} = $3`,
+        [actorId, candidates[0], candidates[1]]
+      );
+    } else {
+      await query(
+        `UPDATE ${tableName}
+         SET archived_at = NULL,
+             archived_by = NULL,
+             archive_reason = NULL,
+             deletion_scheduled = NULL,
+             restored_at = NOW(),
+             restored_by = $1,
+             updated_at = NOW()
+         WHERE ${idColumn} = $2`,
+        [actorId, normalizedId]
+      );
+    }
   } else {
     // Restore the entity (it goes to unassigned bucket)
     const restoreResult = await query(
@@ -979,8 +1037,22 @@ export async function hardDeleteEntity(
     idColumn = `${operation.entityType}_id`;
   }
 
-  // Check if entity is archived
-  if (operation.entityType === 'catalogService') {
+  // Resolve effective entity ID and check archived state
+  let effectiveId = normalizedId;
+  if (operation.entityType === 'order') {
+    const candidates = getOrderIdCandidates(normalizedId) || [normalizedId];
+    const check = await query<{ id: string; archived_at: Date | null }>(
+      `SELECT ${idColumn} as id, archived_at FROM ${tableName} WHERE ${idColumn} = ANY($1::text[]) LIMIT 1`,
+      [candidates]
+    );
+    if (!check.rows[0]) {
+      throw new Error(`Entity not found: ${normalizedId}`);
+    }
+    effectiveId = check.rows[0].id;
+    if (!check.rows[0].archived_at) {
+      throw new Error('Entity must be archived before hard deletion');
+    }
+  } else if (operation.entityType === 'catalogService') {
     const checkResult = await query(
       `SELECT is_active FROM ${tableName} WHERE ${idColumn} = $1`,
       [normalizedId]
@@ -1041,9 +1113,9 @@ export async function hardDeleteEntity(
               WHEN o.destination_role = 'warehouse' THEN (SELECT row_to_json(w) FROM warehouses w WHERE w.warehouse_id = o.destination_code)
             END as data
         ) dest ON true
-        WHERE ${idColumn} = $1
-        GROUP BY o.order_id, req.data, dest.data`,
-        [normalizedId]
+          WHERE ${idColumn} = $1
+          GROUP BY o.order_id, req.data, dest.data`,
+        [effectiveId]
       );
       snapshot = enrichedResult.rows[0] || null;
     } else if (operation.entityType === 'service') {
@@ -1063,7 +1135,7 @@ export async function hardDeleteEntity(
       // For other entity types, simple snapshot
       const snapshotResult = await txQuery(
         `SELECT * FROM ${tableName} WHERE ${idColumn} = $1`,
-        [normalizedId]
+        [effectiveId]
       );
       snapshot = snapshotResult.rows[0] || null;
     }
@@ -1079,10 +1151,10 @@ export async function hardDeleteEntity(
     // This ensures snapshot is saved before entity disappears
     await recordActivity(
       `${operation.entityType}_hard_deleted`,
-      `Deleted ${normalizedId}`,
-      normalizedId,
-      operation.entityType,
-      operation.actor,
+        `Deleted ${effectiveId}`,
+        effectiveId,
+        operation.entityType,
+        operation.actor,
       {
         reason: operation.reason,
         snapshot: redactedSnapshot,  // Redacted snapshot for compliance
@@ -1091,25 +1163,53 @@ export async function hardDeleteEntity(
       { txQuery, throwOnError: true }
     );
 
-    // 3. Perform hard delete
-    await txQuery(
-      `DELETE FROM ${tableName} WHERE ${idColumn} = $1`,
-      [normalizedId]
-    );
+    // 3. Delete dependent rows first (to satisfy FK constraints or avoid orphans)
+    if (operation.entityType === 'order') {
+      // Delete order_items (no FK, but prevents orphans)
+      await txQuery(
+        `DELETE FROM order_items WHERE order_id = $1`,
+        [effectiveId]
+      );
+      // Delete order_participants (has FK to orders)
+      await txQuery(
+        `DELETE FROM order_participants WHERE order_id = $1`,
+        [effectiveId]
+      );
+    } else if (operation.entityType === 'catalogService') {
+      // Delete catalog service dependents (all have FKs)
+      await txQuery(
+        `DELETE FROM contractor_service_offerings WHERE service_id = $1`,
+        [normalizedId]
+      );
+      await txQuery(
+        `DELETE FROM order_items WHERE service_id = $1`,
+        [normalizedId]
+      );
+      await txQuery(
+        `DELETE FROM service_certifications WHERE service_id = $1`,
+        [normalizedId]
+      );
+    }
 
-    // 4. Clean up relationships
+    // 4. Perform hard delete of main entity
+      await txQuery(
+        `DELETE FROM ${tableName} WHERE ${idColumn} = $1`,
+        [effectiveId]
+      );
+
+    // 5. Clean up relationships
     await txQuery(
       `DELETE FROM archive_relationships
        WHERE entity_type = $1 AND entity_id = $2`,
-      [operation.entityType, normalizedId]
-    );
-  });
+        [operation.entityType, effectiveId]
+      );
+    });
 
-  return {
-    success: true,
-    message: `${operation.entityType} ${normalizedId} has been permanently deleted`
-  };
-}
+    return {
+      success: true,
+      message: `${operation.entityType} ${effectiveId} has been permanently deleted`
+    };
+  }
 
 async function checkActiveChildren(entityType: string, entityId: string): Promise<number> {
   let count = 0;
