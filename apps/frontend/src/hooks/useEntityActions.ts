@@ -119,6 +119,7 @@ async function handleOrderAction(
               return key.includes('/hub/orders/') ||
                      key.includes('/admin/directory/orders') ||
                      key.includes('/admin/directory/activities') ||
+                     key.includes('/admin/directory/activities') ||
                      key.includes('/api/hub/activities') ||
                      key.includes('/hub/activities') ||
                      key.includes('/api/archive/list') ||
@@ -148,6 +149,7 @@ async function handleOrderAction(
             if (typeof key === 'string') {
               return key.includes('/hub/orders/') ||
                      key.includes('/admin/directory/orders') ||
+                     key.includes('/admin/directory/activities') ||
                      key.includes('/admin/directory/activities') ||
                      key.includes('/api/hub/activities') ||
                      key.includes('/hub/activities') ||
@@ -478,6 +480,7 @@ async function handleServiceAction(
         mutate((key: any) => {
           if (typeof key === 'string') {
             return key.includes('/admin/directory/services') ||
+                   key.includes('/admin/directory/activities') ||
                    key.includes('/api/hub/activities') ||
                    key.includes('/hub/activities') ||
                    key.includes('/api/archive/list') ||
@@ -506,6 +509,7 @@ async function handleServiceAction(
         mutate((key: any) => {
           if (typeof key === 'string') {
             return key.includes('/admin/directory/services') ||
+                   key.includes('/admin/directory/activities') ||
                    key.includes('/api/hub/activities') ||
                    key.includes('/hub/activities') ||
                    key.includes('/api/archive/list') ||
@@ -539,6 +543,8 @@ async function handleServiceAction(
             if (typeof key === 'string') {
               return key.includes('/archive') ||
                      key.includes('/admin/directory/services') ||
+                     key.includes('/admin/directory/activities') ||
+                     key.includes('/admin/directory/activities') ||
                      key.includes('/api/hub/activities') ||
                      key.includes('/hub/activities') ||
                      key.includes('/api/archive/list') ||
@@ -568,6 +574,7 @@ async function handleServiceAction(
         mutate((key: any) => {
           if (typeof key === 'string') {
             return key.includes('/services') ||
+                   key.includes('/admin/directory/activities') ||
                    key.includes('/api/hub/activities') ||
                    key.includes('/hub/activities') ||
                    key.includes(serviceId);
@@ -588,6 +595,7 @@ async function handleServiceAction(
         mutate((key: any) => {
           if (typeof key === 'string') {
             return key.includes('/services') ||
+                   key.includes('/admin/directory/activities') ||
                    key.includes('/api/hub/activities') ||
                    key.includes('/hub/activities') ||
                    key.includes(serviceId);
@@ -608,6 +616,7 @@ async function handleServiceAction(
         mutate((key: any) => {
           if (typeof key === 'string') {
             return key.includes('/services') ||
+                   key.includes('/admin/directory/activities') ||
                    key.includes('/api/hub/activities') ||
                    key.includes('/hub/activities') ||
                    key.includes(serviceId);
@@ -628,6 +637,7 @@ async function handleServiceAction(
         mutate((key: any) => {
           if (typeof key === 'string') {
             return key.includes('/services') ||
+                   key.includes('/admin/directory/activities') ||
                    key.includes('/api/hub/activities') ||
                    key.includes('/hub/activities') ||
                    key.includes(serviceId);
@@ -649,6 +659,7 @@ async function handleServiceAction(
         mutate((key: any) => {
           if (typeof key === 'string') {
             return key.includes('/services') ||
+                   key.includes('/admin/directory/activities') ||
                    key.includes('/api/hub/activities') ||
                    key.includes('/hub/activities') ||
                    key.includes(serviceId);
@@ -830,6 +841,7 @@ async function handleReportAction(
           if (typeof key === 'string') {
             return key.includes('/admin/directory/reports') ||
                    key.includes('/admin/directory/feedback') ||
+                   key.includes('/admin/directory/activities') ||
                    key.includes('/api/hub/activities') ||
                    key.includes('/hub/activities') ||
                    key.includes('/api/archive/list') ||
@@ -859,6 +871,7 @@ async function handleReportAction(
           if (typeof key === 'string') {
             return key.includes('/admin/directory/reports') ||
                    key.includes('/admin/directory/feedback') ||
+                   key.includes('/admin/directory/activities') ||
                    key.includes('/api/hub/activities') ||
                    key.includes('/hub/activities') ||
                    key.includes('/api/archive/list') ||
@@ -891,6 +904,7 @@ async function handleReportAction(
         mutate((key: any) => {
           if (typeof key === 'string') {
             return key.includes('/archive') ||
+                   key.includes('/admin/directory/activities') ||
                    key.includes('/api/hub/activities') ||
                    key.includes('/hub/activities') ||
                    key.includes('/api/archive/list') ||
@@ -921,6 +935,7 @@ async function handleReportAction(
           if (typeof key === 'string') {
             return key.includes('/reports') ||
                    key.includes('/feedback') ||
+                   key.includes('/admin/directory/activities') ||
                    key.includes('/api/hub/activities') ||
                    key.includes('/hub/activities') ||
                    key.includes(reportId);
@@ -945,6 +960,7 @@ async function handleReportAction(
           if (typeof key === 'string') {
             return key.includes('/reports') ||
                    key.includes('/feedback') ||
+                   key.includes('/admin/directory/activities') ||
                    key.includes('/api/hub/activities') ||
                    key.includes('/hub/activities') ||
                    key.includes(reportId);
