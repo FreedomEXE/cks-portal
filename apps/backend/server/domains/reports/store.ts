@@ -11,6 +11,7 @@ export interface ReportItem {
   submittedBy: string;
   submittedDate: string;
   status: 'open' | 'resolved' | 'closed';
+  creatorId: string | null;
   relatedService?: string | null;
   acknowledgments?: Array<{ userId: string; date: string }>;
   tags?: string[];
@@ -24,6 +25,7 @@ export interface ReportItem {
   priority?: 'LOW' | 'MEDIUM' | 'HIGH' | null;
   rating?: number | null;
   serviceManagedBy?: string | null;
+  metadata?: Record<string, unknown>;
   // Archive metadata (for single-entity fetches)
   archivedAt?: string;
   archivedBy?: string;
@@ -39,6 +41,22 @@ export interface HubReportsPayload {
 }
 
 function mapReportRow(row: any, acknowledgments: Array<{ userId: string; date: string }> = []): ReportItem {
+  const creatorCode = normalizeIdentity(row.created_by_id || null);
+
+  // Build metadata with role IDs for frontend ownership checks
+  const metadata: Record<string, unknown> = {};
+  if (creatorCode) {
+    const roleFromCode = creatorCode.startsWith('CTR') ? 'contractorId' :
+                         creatorCode.startsWith('CUS') ? 'customerId' :
+                         creatorCode.startsWith('CEN') ? 'centerId' :
+                         creatorCode.startsWith('CRW') ? 'crewId' :
+                         creatorCode.startsWith('WHR') ? 'warehouseId' :
+                         creatorCode.startsWith('MGR') ? 'managerId' : null;
+    if (roleFromCode) {
+      metadata[roleFromCode] = creatorCode;
+    }
+  }
+
   return {
     id: row.report_id,
     type: 'report',
@@ -48,6 +66,7 @@ function mapReportRow(row: any, acknowledgments: Array<{ userId: string; date: s
     submittedBy: row.customer_id ?? row.center_id ?? row.created_by_id ?? 'Unknown',
     submittedDate: row.created_at ?? new Date().toISOString(),
     status: row.status ?? 'open',
+    creatorId: creatorCode,
     relatedService: row.service_id ?? null,
     tags: Array.isArray(row.tags) ? row.tags : (typeof row.tags === 'string' ? String(row.tags).split(',') : []),
     acknowledgments,
@@ -60,10 +79,27 @@ function mapReportRow(row: any, acknowledgments: Array<{ userId: string; date: s
     reportReason: row.report_reason ?? null,
     priority: row.priority ?? null,
     serviceManagedBy: row.service_managed_by ?? null,
+    metadata,
   };
 }
 
 function mapFeedbackRow(row: any, acknowledgments: Array<{ userId: string; date: string }> = []): ReportItem {
+  const creatorCode = normalizeIdentity(row.created_by_id || null);
+
+  // Build metadata with role IDs for frontend ownership checks
+  const metadata: Record<string, unknown> = {};
+  if (creatorCode) {
+    const roleFromCode = creatorCode.startsWith('CTR') ? 'contractorId' :
+                         creatorCode.startsWith('CUS') ? 'customerId' :
+                         creatorCode.startsWith('CEN') ? 'centerId' :
+                         creatorCode.startsWith('CRW') ? 'crewId' :
+                         creatorCode.startsWith('WHR') ? 'warehouseId' :
+                         creatorCode.startsWith('MGR') ? 'managerId' : null;
+    if (roleFromCode) {
+      metadata[roleFromCode] = creatorCode;
+    }
+  }
+
   return {
     id: row.feedback_id,
     type: 'feedback',
@@ -73,6 +109,7 @@ function mapFeedbackRow(row: any, acknowledgments: Array<{ userId: string; date:
     submittedBy: row.customer_id ?? row.center_id ?? row.created_by_id ?? 'Unknown',
     submittedDate: row.created_at ?? new Date().toISOString(),
     status: (row.status ?? 'open') === 'resolved' ? 'closed' : (row.status ?? 'open'),
+    creatorId: creatorCode,
     relatedService: null,
     tags: [],
     acknowledgments,
@@ -82,6 +119,7 @@ function mapFeedbackRow(row: any, acknowledgments: Array<{ userId: string; date:
     relatedEntityId: row.related_entity_id ?? null,
     reportReason: row.report_reason ?? null,
     rating: typeof row.rating === 'number' ? row.rating : (row.rating ? Number(row.rating) : null),
+    metadata,
   };
 }
 
