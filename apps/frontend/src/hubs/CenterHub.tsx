@@ -28,14 +28,14 @@ import {
   type TreeNode,
 } from '@cks/domain-widgets';
 import { centerOverviewCards } from '@cks/domain-widgets';
-import { Button, DataTable, OrderDetailsModal, ServiceViewModal, PageHeader, PageWrapper, Scrollbar, TabSection, OrderActionModal } from '@cks/ui';
+import { Button, DataTable, OrderDetailsModal, ServiceViewModal, PageHeader, PageWrapper, Scrollbar, TabSection } from '@cks/ui';
 import { useModals } from '../contexts';
 import OrderDetailsGateway from '../components/OrderDetailsGateway';
 import { useAuth } from '@cks/auth';
 import { useSWRConfig } from 'swr';
 import { useFormattedActivities } from '../shared/activity/useFormattedActivities';
 import { ActivityFeed } from '../components/ActivityFeed';
-import ActivityModalGateway from '../components/ActivityModalGateway';
+// ActivityModalGateway (legacy) removed in favor of universal ModalGateway via modals.openById()
 import { useEntityActions } from '../hooks/useEntityActions';
 
 import MyHubSection from '../components/MyHubSection';
@@ -165,8 +165,7 @@ function CenterHubContent({ initialTab = 'dashboard' }: CenterHubProps) {
   const [activeTab, setActiveTab] = useState(initialTab);
   const [servicesTab, setServicesTab] = useState<'active' | 'history'>('active');
   const [servicesSearchQuery, setServicesSearchQuery] = useState('');
-  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
-  const [actionOrder, setActionOrder] = useState<any | null>(null);
+  // Legacy modal state removed; universal ModalGateway handles all entity modals
   const { code: authCode } = useAuth();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
   const { setHubLoading } = useHubLoading();
@@ -452,8 +451,6 @@ function CenterHubContent({ initialTab = 'dashboard' }: CenterHubProps) {
                 viewerId={normalizedCode || undefined}
                 onClearActivity={handleClearActivity}
                 onClearAll={handleClearAll}
-                onOpenActionableOrder={(order) => setActionOrder(order)}
-                onOpenOrderModal={(order) => setSelectedOrderId(order?.orderId || order?.id || null)}
                 onOpenServiceModal={(serviceId) => modals.openById(serviceId)}
                 isLoading={activitiesLoading}
                 error={activitiesError}
@@ -650,8 +647,8 @@ function CenterHubContent({ initialTab = 'dashboard' }: CenterHubProps) {
                 onCreateServiceOrder={() => navigate('/catalog?mode=services')}
                 onCreateProductOrder={() => navigate('/catalog?mode=products')}
                 onOrderAction={async (orderId, action) => {
-                  if (action === 'View Details') {
-                    setSelectedOrderId(orderId);
+                  if (action === 'View Details' || action === 'View') {
+                    modals.openById(orderId);
                     return;
                   }
                   await handleAction(orderId, action);
@@ -744,44 +741,7 @@ function CenterHubContent({ initialTab = 'dashboard' }: CenterHubProps) {
         </div>
       </Scrollbar>
 
-      {/* Actionable order modal (OrderCard with inline buttons) */}
-      {actionOrder && (
-        <OrderActionModal
-          isOpen={!!actionOrder}
-          onClose={() => setActionOrder(null)}
-          order={{
-            orderId: actionOrder.orderId || actionOrder.id,
-            orderType: (actionOrder.orderType || actionOrder.order_type || 'product') as 'service' | 'product',
-            title: actionOrder.title || actionOrder.orderId || actionOrder.id,
-            requestedBy: actionOrder.requestedBy || null,
-            destination: actionOrder.destination || null,
-            requestedDate: actionOrder.requestedDate || actionOrder.orderDate || null,
-            expectedDate: actionOrder.expectedDate || null,
-            serviceStartDate: actionOrder.serviceStartDate || null,
-            deliveryDate: actionOrder.deliveryDate || null,
-            status: actionOrder.status || 'pending',
-            approvalStages: actionOrder.approvalStages || [],
-            availableActions: actionOrder.availableActions || [],
-            transformedId: actionOrder.transformedId || null,
-          }}
-          onAction={async (orderId, action) => {
-            if (action === 'View Details') {
-              setSelectedOrderId(orderId);
-              return;
-            }
-            await handleAction(orderId, action);
-          }}
-        />
-      )}
-
-      <ActivityModalGateway
-        isOpen={!!selectedOrderId}
-        orderId={selectedOrderId}
-        role="admin"
-        onClose={() => setSelectedOrderId(null)}
-        onEdit={() => {}}
-        onArchive={async () => {}}
-      />
+      {/* Legacy order modals removed: all order interactions go through ModalGateway via modals.openById() */}
 
 
     </div>

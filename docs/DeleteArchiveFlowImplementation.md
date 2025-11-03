@@ -194,4 +194,13 @@ archiveAPI.batchArchive(entities, reason?)
 - [ ] Search archived entities
 - [ ] Verify 30-day scheduling
 - [ ] Test confirmation dialogs
-- [ ] Verify activity logging
+- [ ] Verify activity logging# Delete/Archive Flow (Update 2025-11-02)
+
+This update reflects recent changes to centralize and modularize archive/restore/delete across entities, and to tolerate legacy order ID formats.
+
+- Orders now use the centralized archive system exclusively and open via the universal modal (ID-first) from Admin Directory.
+- Legacy order IDs like …-PO-11 map to …-PO-011 during archive/restore/delete.
+- Frontend actions (useEntityActions) invalidate directory + /archive/list caches and dispatch cks:archive:updated to ensure immediate UI refresh; modals auto-close on success via closeOnSuccess in adapters.
+- Known gap: Central hardDelete must cascade delete dependent rows (e.g., order_items, service crew/training/procedures, and legacy product tables) before removing the primary row to avoid FK errors on existing archived data.
+
+Next steps: Implement per-entity cascade cleanup inside hardDeleteEntity to fully resolve FK issues with historical data.

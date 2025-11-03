@@ -45,6 +45,7 @@ export type EntityActionType =
 export interface PermissionContext {
   state: EntityState;
   entityData?: any;
+  viewerId?: string; // ID of the current user viewing (for ownership checks)
   [key: string]: any;
 }
 
@@ -63,7 +64,7 @@ export function can(
   role: UserRole,
   context: PermissionContext
 ): boolean {
-  const { state, entityData } = context;
+  const { state, entityData, viewerId } = context;
 
   // ===== ADMIN PERMISSIONS =====
   if (role === 'admin') {
@@ -72,7 +73,7 @@ export function can(
 
   // ===== USER PERMISSIONS =====
   // Manager, Contractor, Customer, Center, Crew, Warehouse
-  return canUser(entityType, action, role, state, entityData);
+  return canUser(entityType, action, role, state, entityData, viewerId);
 }
 
 /**
@@ -114,7 +115,8 @@ function canUser(
   action: EntityActionType,
   role: UserRole,
   state: EntityState,
-  entityData?: any
+  entityData?: any,
+  viewerId?: string
 ): boolean {
   // Users cannot archive or permanently delete
   if (['archive', 'delete', 'restore'].includes(action)) {
@@ -129,7 +131,7 @@ function canUser(
   // Entity-specific permissions
   switch (entityType) {
     case 'order':
-      return canUserOrder(action, role, entityData);
+      return canUserOrder(action, role, entityData, viewerId);
 
     case 'report':
     case 'feedback':
@@ -150,7 +152,8 @@ function canUser(
 function canUserOrder(
   action: EntityActionType,
   role: UserRole,
-  entityData?: any
+  entityData?: any,
+  viewerId?: string
 ): boolean {
   // All users can view orders
   if (action === 'view') return true;
@@ -171,11 +174,34 @@ function canUserOrder(
       return ['cancel'].includes(action);
 
     case 'warehouse':
-      // Warehouses can accept/reject product orders
-      return ['accept', 'reject'].includes(action);
+      // Warehouse can accept/reject assigned pending_warehouse orders
+      if ((action === 'accept' || action === 'reject') && viewerId) {
+        const status = entityData?.status?.toLowerCase() || '';
+        if (status !== 'pending_warehouse') return false;
+
+        // Assignment check
+        const warehouseAssigned =
+          entityData?.fulfilledById === viewerId ||
+          entityData?.assignedWarehouse === viewerId ||
+          entityData?.metadata?.warehouseId === viewerId;
+
+        return warehouseAssigned;
+      }
+      return false;
 
     case 'crew':
-      // Crew can view but not act on orders
+      // Crew can cancel their own pending orders
+      if (action === 'cancel' && viewerId) {
+        const status = entityData?.status?.toLowerCase() || '';
+        if (!status.includes('pending')) return false;
+
+        // Ownership check
+        const crewOwnsOrder =
+          entityData?.metadata?.crewId === viewerId ||
+          entityData?.creatorId === viewerId;
+
+        return crewOwnsOrder;
+      }
       return action === 'view';
 
     default:

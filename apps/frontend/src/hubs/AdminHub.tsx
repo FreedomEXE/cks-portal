@@ -1370,7 +1370,6 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
                 viewerId={code || undefined}
                 onClearActivity={handleClearActivity}
                 onClearAll={handleClearAll}
-                onOpenOrderModal={(order) => setSelectedOrderId(order?.orderId || order?.id || null)}
                 onOpenServiceModal={(service) => modals.openById(service?.serviceId || service?.id || null)}
                 isLoading={activitiesLoading}
                 error={activitiesError}

@@ -72,6 +72,7 @@ export interface HubOrderItem {
   title: string | null;
   requestedBy: string | null;
   requesterRole: HubRole | null;
+  creatorId: string | null;
   destination: string | null;
   destinationRole: HubRole | null;
   requestedDate: string | null;

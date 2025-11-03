@@ -190,12 +190,59 @@ function buildOrderDetailsSections(context: TabVisibilityContext): import('@cks/
 }
 
 /**
+ * Normalize order status to canonical CSS-friendly keys
+ * Maps specific order statuses to standard EntityHeaderCard CSS classes
+ */
+function normalizeOrderStatus(status: string | null | undefined): string {
+  if (!status) return 'pending';
+  const normalized = status.toLowerCase();
+
+  // Pending statuses → 'pending'
+  if (normalized.includes('pending')) return 'pending';
+
+  // In-transit/delivery statuses → 'in_transit' (blue)
+  if (normalized.includes('transit') || normalized.includes('delivery')) return 'in_transit';
+
+  // Completion statuses → 'completed'
+  if (normalized.includes('delivered') || normalized.includes('completed')) return 'completed';
+
+  // Cancellation/rejection → 'cancelled'
+  if (normalized.includes('cancelled') || normalized.includes('rejected')) return 'cancelled';
+
+  // Archived → 'archived'
+  if (normalized.includes('archived')) return 'archived';
+
+  // Default
+  return 'pending';
+}
+
+/**
+ * Format status for human-readable display
+ */
+function formatOrderStatus(status: string | null | undefined): string {
+  if (!status) return 'PENDING';
+  return status.toUpperCase().replace(/_/g, ' ');
+}
+
+/**
  * Order Adapter
  */
 const orderAdapter: EntityAdapter = {
   getActionDescriptors: (context: EntityActionContext): EntityActionDescriptor[] => {
-    const { role, state, entityData } = context;
+    const { role, state, entityData, viewerId } = context;
     const descriptors: EntityActionDescriptor[] = [];
+
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[OrderAdapter] getActionDescriptors called:', {
+        role,
+        state,
+        viewerId,
+        hasEntityData: !!entityData,
+        status: entityData?.status,
+        availableActions: entityData?.availableActions,
+        metadata: entityData?.metadata,
+      });
+    }
 
     // Admin actions
     if (role === 'admin') {
@@ -240,35 +287,118 @@ const orderAdapter: EntityAdapter = {
         label && label.toLowerCase() !== 'view details'
       );
 
-      for (const label of actionLabels) {
-        const key = label.toLowerCase().replace(/\s+/g, '_');
+      // If backend provided actions, use them
+      if (actionLabels.length > 0) {
+        for (const label of actionLabels) {
+          const key = label.toLowerCase().replace(/\s+/g, '_');
 
-        // Determine variant based on action type
-        const variant: 'primary' | 'secondary' | 'danger' =
-          /accept|approve|create service/i.test(label) ? 'primary' :
-          /reject|decline|cancel/i.test(label) ? 'danger' : 'secondary';
+          // Determine variant based on action type
+          const variant: 'primary' | 'secondary' | 'danger' =
+            /accept|approve|create service/i.test(label) ? 'primary' :
+            /reject|decline|cancel/i.test(label) ? 'danger' : 'secondary';
 
-        // Add confirmation for destructive actions
-        const confirm = /reject|decline|cancel/i.test(label)
-          ? `Are you sure you want to ${label.toLowerCase()} this order?`
-          : undefined;
+          // Add confirmation for destructive actions
+          const confirm = /reject|decline|cancel/i.test(label)
+            ? `Are you sure you want to ${label.toLowerCase()} this order?`
+            : undefined;
 
-        // Add prompt for actions that need a reason
-        const prompt = /reject|decline/i.test(label)
-          ? `Please provide a reason for ${label.toLowerCase()}:`
-          : undefined;
+          // Add prompt for actions that need a reason
+          const prompt = /reject|decline/i.test(label)
+            ? `Please provide a reason for ${label.toLowerCase()}:`
+            : undefined;
 
-        descriptors.push({
-          key,
-          label,
-          variant,
-          confirm,
-          prompt,
-          closeOnSuccess: true,
-        });
+          descriptors.push({
+            key,
+            label,
+            variant,
+            confirm,
+            prompt,
+            closeOnSuccess: true,
+          });
+        }
+      } else {
+        // Fallback: Derive actions from RBAC policies with ownership checks
+        const status = entityData?.status?.toLowerCase() || '';
+
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('[OrderAdapter] RBAC fallback triggered - no backend actions:', {
+            role,
+            status,
+            viewerId,
+          });
+        }
+
+        // Crew can cancel their own pending orders
+        if (role === 'crew' && status.includes('pending')) {
+          const crewOwnsOrder =
+            entityData?.metadata?.crewId === viewerId ||
+            entityData?.creatorId === viewerId;
+
+          if (process.env.NODE_ENV !== 'production') {
+            console.log('[OrderAdapter] Crew cancel check:', {
+              crewOwnsOrder,
+              metadata: entityData?.metadata,
+              creatorId: entityData?.creatorId,
+            });
+          }
+
+          if (crewOwnsOrder) {
+            if (process.env.NODE_ENV !== 'production') {
+              console.log('[OrderAdapter] Adding crew cancel action');
+            }
+            descriptors.push({
+              key: 'cancel',
+              label: 'Cancel',
+              variant: 'danger',
+              confirm: 'Are you sure you want to cancel this order?',
+              prompt: 'Optional: Provide a reason for cancellation',
+              closeOnSuccess: true,
+            });
+          }
+        }
+
+        // Warehouse can accept/reject if assigned and status is pending_warehouse
+        if (role === 'warehouse' && status === 'pending_warehouse') {
+          const warehouseAssigned =
+            entityData?.fulfilledById === viewerId ||
+            entityData?.assignedWarehouse === viewerId ||
+            entityData?.metadata?.warehouseId === viewerId;
+
+          if (process.env.NODE_ENV !== 'production') {
+            console.log('[OrderAdapter] Warehouse accept/reject check:', {
+              warehouseAssigned,
+              fulfilledById: entityData?.fulfilledById,
+              assignedWarehouse: entityData?.assignedWarehouse,
+              metadata: entityData?.metadata,
+            });
+          }
+
+          if (warehouseAssigned) {
+            if (process.env.NODE_ENV !== 'production') {
+              console.log('[OrderAdapter] Adding warehouse accept/reject actions');
+            }
+            descriptors.push({
+              key: 'accept',
+              label: 'Accept',
+              variant: 'primary',
+              closeOnSuccess: true,
+            });
+            descriptors.push({
+              key: 'reject',
+              label: 'Reject',
+              variant: 'danger',
+              confirm: 'Are you sure you want to reject this order?',
+              prompt: 'Please provide a reason for rejection:',
+              closeOnSuccess: true,
+            });
+          }
+        }
       }
     }
 
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[OrderAdapter] Returning descriptors:', descriptors.length, descriptors);
+    }
     return descriptors;
   },
 
@@ -319,7 +449,8 @@ const orderAdapter: EntityAdapter = {
     return {
       id: entityData?.orderId || '',
       type: entityData?.orderType === 'service' ? 'Service Order' : 'Product Order',
-      status: entityData?.status || 'pending',
+      status: normalizeOrderStatus(entityData?.status),
+      statusText: formatOrderStatus(entityData?.status),
       fields,
     };
   },

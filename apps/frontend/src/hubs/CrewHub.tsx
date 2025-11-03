@@ -31,7 +31,6 @@ import { crewOverviewCards } from '@cks/domain-widgets';
 import { Button, DataTable, OrderDetailsModal, ServiceViewModal, PageHeader, PageWrapper, Scrollbar, TabSection } from '@cks/ui';
 import { useModals } from '../contexts';
 import { apiFetch } from '../shared/api/client';
-import ActivityModalGateway from '../components/ActivityModalGateway';
 import { useEntityActions } from '../hooks/useEntityActions';
 import { useAuth } from '@cks/auth';
 import { useCatalogItems } from '../shared/api/catalog';
@@ -169,9 +168,6 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
   const [activeTab, setActiveTab] = useState(initialTab);
   const [servicesTab, setServicesTab] = useState<'my' | 'active' | 'history'>('active');
   const [servicesSearchQuery, setServicesSearchQuery] = useState('');
-  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
-  const [selectedOrderData, setSelectedOrderData] = useState<any | null>(null);
-  const [actionOrder, setActionOrder] = useState<any | null>(null);
 
   const { code: authCode } = useAuth();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
@@ -508,8 +504,6 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
                 viewerId={normalizedCode || undefined}
                 onClearActivity={handleClearActivity}
                 onClearAll={handleClearAll}
-                onOpenActionableOrder={(order) => setActionOrder(order)}
-                onOpenOrderModal={(order) => setSelectedOrderId(order?.orderId || order?.id || null)}
                 onOpenServiceModal={(serviceId) => modals.openById(serviceId)}
                 isLoading={activitiesLoading}
                 error={activitiesError}
@@ -737,11 +731,8 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
                 onCreateProductOrder={() => navigate('/catalog?mode=products')}
                 onOrderAction={async (orderId, action) => {
                   if (action === 'View Details') {
-                    // Find the full order object for instant modal rendering
-                    const allOrders = [...(serviceOrders || []), ...(productOrders || [])];
-                    const orderData = allOrders.find((o: any) => (o.orderId || o.id) === orderId);
-                    setSelectedOrderId(orderId);
-                    setSelectedOrderData(orderData || null);
+                    // Open order modal using ID-first approach (universal modal)
+                    modals.openById(orderId);
                     return;
                   }
                   const label = (action || '').toLowerCase();
@@ -843,36 +834,6 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
           )}
         </div>
       </Scrollbar>
-
-      {/* Action modal showing OrderCard with buttons for actionable orders */}
-      {/* Progressive Disclosure Modal for orders (user role) */}
-      {actionOrder && (
-        <ActivityModalGateway
-          isOpen={!!actionOrder}
-          onClose={() => setActionOrder(null)}
-          orderId={(actionOrder.orderId || actionOrder.id) as string}
-          initialOrderData={actionOrder}
-          role="user"
-          userAvailableActions={(actionOrder.availableActions || []) as string[]}
-          onAction={(orderId, action) => handleAction(orderId, action)}
-        />
-      )}
-
-      {/* View-only legacy path replaced by ActivityModal expansion; keep for non-action cases via ActivityFeed */}
-      {selectedOrderId && (
-        <ActivityModalGateway
-          isOpen={!!selectedOrderId}
-          onClose={() => {
-            setSelectedOrderId(null);
-            setSelectedOrderData(null);
-          }}
-          orderId={selectedOrderId}
-          initialOrderData={selectedOrderData}
-          role="user"
-          userAvailableActions={[]}
-          onAction={(orderId, action) => handleAction(orderId, action)}
-        />
-      )}
 
       </div>
   );

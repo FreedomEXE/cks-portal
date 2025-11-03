@@ -136,6 +136,10 @@ const { data: activities } = useSWR('/api/activities?userId=MGR-001&cleared=fals
 const { data: history } = useSWR('/api/activities/history?userId=MGR-001&days=30');
 ```
 
+### Frontend Filtering Rule (2025-11-03)
+- Non-admin hubs filter other users' USER-creation events only: `manager_created`, `contractor_created`, `customer_created`, `center_created`, `crew_created`, `warehouse_created` are shown only to the created user.
+- Order/report/feedback creations are NOT filtered in the frontend (shared context) and will be shown to eligible viewers per backend visibility rules.
+
 ## Implementation Priority
 
 **Phase 4A (MVP) - Frontend Complete, Backend Pending:**

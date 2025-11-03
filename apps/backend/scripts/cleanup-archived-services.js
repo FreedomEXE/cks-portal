@@ -62,13 +62,9 @@ async function cleanupArchivedServices() {
       console.log(`  ✅ Cleaned up archive relationships`);
     }
 
-    console.log('\n=== COMMIT or ROLLBACK? ===');
-    console.log('Review the output above.');
-    console.log('If everything looks good, change ROLLBACK to COMMIT in the script.');
-    console.log('\n⚠️  ROLLING BACK (change to COMMIT when ready)\n');
+    console.log('\n=== COMMITTING CHANGES ===\n');
 
-    await client.query('ROLLBACK'); // Change to COMMIT when ready
-    // await client.query('COMMIT');
+    await client.query('COMMIT');
 
   } catch (error) {
     console.error('❌ Error:', error.message);

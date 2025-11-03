@@ -400,8 +400,19 @@ async function getManagerActivities(cksCode: string): Promise<HubRoleActivitiesP
        AND activity_type NOT LIKE '%_hard_deleted'
        AND activity_type NOT LIKE '%_restored'
       ) AND (
-        -- Show creation activities ONLY if target is self
-        (activity_type LIKE '%_created' AND UPPER(target_id) = $2)
+        -- Show user creation activities ONLY if target is self
+        (activity_type IN ('manager_created', 'contractor_created', 'customer_created', 'center_created', 'crew_created', 'warehouse_created') AND UPPER(target_id) = $2)
+        OR
+        -- Show order creation activities if crew/center/customer/etc. in metadata
+        (activity_type = 'order_created' AND (
+          (metadata ? 'crewId' AND UPPER(metadata->>'crewId') = $2)
+          OR (metadata ? 'centerId' AND UPPER(metadata->>'centerId') = $2)
+          OR (metadata ? 'customerId' AND UPPER(metadata->>'customerId') = $2)
+          OR (metadata ? 'contractorId' AND UPPER(metadata->>'contractorId') = $2)
+          OR (metadata ? 'managerId' AND UPPER(metadata->>'managerId') = $2)
+          OR (metadata ? 'warehouseId' AND UPPER(metadata->>'warehouseId') = $2)
+          OR (actor_id IS NOT NULL AND UPPER(actor_id) = $2)
+        ))
         OR
         -- Show assignments where YOU are being assigned (target is self)
         (activity_type LIKE '%_assigned%' AND UPPER(target_id) = $2)
@@ -1055,8 +1066,19 @@ async function getContractorActivities(cksCode: string): Promise<HubRoleActiviti
        AND activity_type NOT LIKE '%_hard_deleted'
        AND activity_type NOT LIKE '%_restored'
       ) AND (
-        -- Show creation activities ONLY if target is self
-        (activity_type LIKE '%_created' AND UPPER(target_id) = $2)
+        -- Show user creation activities ONLY if target is self
+        (activity_type IN ('manager_created', 'contractor_created', 'customer_created', 'center_created', 'crew_created', 'warehouse_created') AND UPPER(target_id) = $2)
+        OR
+        -- Show order creation activities if crew/center/customer/etc. in metadata
+        (activity_type = 'order_created' AND (
+          (metadata ? 'crewId' AND UPPER(metadata->>'crewId') = $2)
+          OR (metadata ? 'centerId' AND UPPER(metadata->>'centerId') = $2)
+          OR (metadata ? 'customerId' AND UPPER(metadata->>'customerId') = $2)
+          OR (metadata ? 'contractorId' AND UPPER(metadata->>'contractorId') = $2)
+          OR (metadata ? 'managerId' AND UPPER(metadata->>'managerId') = $2)
+          OR (metadata ? 'warehouseId' AND UPPER(metadata->>'warehouseId') = $2)
+          OR (actor_id IS NOT NULL AND UPPER(actor_id) = $2)
+        ))
         OR
         -- Show assignments where YOU are being assigned (target is self)
         (activity_type LIKE '%_assigned%' AND UPPER(target_id) = $2)
@@ -1151,8 +1173,19 @@ async function getCustomerActivities(cksCode: string): Promise<HubRoleActivities
        AND activity_type NOT LIKE '%_hard_deleted'
        AND activity_type NOT LIKE '%_restored'
       ) AND (
-        -- Show creation activities ONLY if target is self
-        (activity_type LIKE '%_created' AND UPPER(target_id) = $2)
+        -- Show user creation activities ONLY if target is self
+        (activity_type IN ('manager_created', 'contractor_created', 'customer_created', 'center_created', 'crew_created', 'warehouse_created') AND UPPER(target_id) = $2)
+        OR
+        -- Show order creation activities if crew/center/customer/etc. in metadata
+        (activity_type = 'order_created' AND (
+          (metadata ? 'crewId' AND UPPER(metadata->>'crewId') = $2)
+          OR (metadata ? 'centerId' AND UPPER(metadata->>'centerId') = $2)
+          OR (metadata ? 'customerId' AND UPPER(metadata->>'customerId') = $2)
+          OR (metadata ? 'contractorId' AND UPPER(metadata->>'contractorId') = $2)
+          OR (metadata ? 'managerId' AND UPPER(metadata->>'managerId') = $2)
+          OR (metadata ? 'warehouseId' AND UPPER(metadata->>'warehouseId') = $2)
+          OR (actor_id IS NOT NULL AND UPPER(actor_id) = $2)
+        ))
         OR
         -- Show assignments where YOU are being assigned (target is self)
         (activity_type LIKE '%_assigned%' AND UPPER(target_id) = $2)
@@ -1240,8 +1273,19 @@ async function getCenterActivities(cksCode: string): Promise<HubRoleActivitiesPa
        AND activity_type NOT LIKE '%_hard_deleted'
        AND activity_type NOT LIKE '%_restored'
       ) AND (
-        -- Show creation activities ONLY if target is self
-        (activity_type LIKE '%_created' AND UPPER(target_id) = $2)
+        -- Show user creation activities ONLY if target is self
+        (activity_type IN ('manager_created', 'contractor_created', 'customer_created', 'center_created', 'crew_created', 'warehouse_created') AND UPPER(target_id) = $2)
+        OR
+        -- Show order creation activities if crew/center/customer/etc. in metadata
+        (activity_type = 'order_created' AND (
+          (metadata ? 'crewId' AND UPPER(metadata->>'crewId') = $2)
+          OR (metadata ? 'centerId' AND UPPER(metadata->>'centerId') = $2)
+          OR (metadata ? 'customerId' AND UPPER(metadata->>'customerId') = $2)
+          OR (metadata ? 'contractorId' AND UPPER(metadata->>'contractorId') = $2)
+          OR (metadata ? 'managerId' AND UPPER(metadata->>'managerId') = $2)
+          OR (metadata ? 'warehouseId' AND UPPER(metadata->>'warehouseId') = $2)
+          OR (actor_id IS NOT NULL AND UPPER(actor_id) = $2)
+        ))
         OR
         -- Show assignments where YOU are being assigned (target is self)
         (activity_type LIKE '%_assigned%' AND UPPER(target_id) = $2)
@@ -1327,8 +1371,16 @@ async function getCrewActivities(cksCode: string): Promise<HubRoleActivitiesPayl
        AND activity_type NOT LIKE '%_hard_deleted'
        AND activity_type NOT LIKE '%_restored'
       ) AND (
-        -- Show creation activities ONLY if target is self
-        (activity_type LIKE '%_created' AND UPPER(target_id) = $2)
+        -- Show user creation activities ONLY if target is self
+        (activity_type IN ('manager_created', 'contractor_created', 'customer_created', 'center_created', 'crew_created', 'warehouse_created') AND UPPER(target_id) = $2)
+        OR
+        -- Show order creation activities if crew/center/customer/etc. in metadata
+        (activity_type = 'order_created' AND (
+          (metadata ? 'crewId' AND UPPER(metadata->>'crewId') = $2)
+          OR (metadata ? 'centerId' AND UPPER(metadata->>'centerId') = $2)
+          OR (metadata ? 'customerId' AND UPPER(metadata->>'customerId') = $2)
+          OR (actor_id IS NOT NULL AND UPPER(actor_id) = $2)
+        ))
         OR
         -- Show assignments where YOU are being assigned (target is self)
         (activity_type LIKE '%_assigned%' AND UPPER(target_id) = $2)
@@ -1345,9 +1397,8 @@ async function getCrewActivities(cksCode: string): Promise<HubRoleActivitiesPayl
         -- Product creation events (crew sees products only; no services)
         (activity_type = 'product_created')
         OR
-        -- Show other activity types (orders, services, creations, etc.) for ecosystem
+        -- Show other activity types (orders, services, etc.) for ecosystem
        -- SAFE: Only if target is in ecosystem OR actor is self OR metadata references self
-       -- Creation events now visible for ecosystem (scoped by idArray + dismissals)
         (
           activity_type NOT LIKE '%assigned%'
           AND activity_type != 'assignment_made'
@@ -1358,6 +1409,11 @@ async function getCrewActivities(cksCode: string): Promise<HubRoleActivitiesPayl
          (target_id IS NOT NULL AND UPPER(target_id) = ANY($1::text[]))
          OR (actor_id IS NOT NULL AND UPPER(actor_id) = $2)
          OR (metadata ? 'crewId' AND UPPER(metadata->>'crewId') = $2)
+         OR (metadata ? 'centerId' AND UPPER(metadata->>'centerId') = $2)
+         OR (metadata ? 'customerId' AND UPPER(metadata->>'customerId') = $2)
+         OR (metadata ? 'contractorId' AND UPPER(metadata->>'contractorId') = $2)
+         OR (metadata ? 'managerId' AND UPPER(metadata->>'managerId') = $2)
+         OR (metadata ? 'warehouseId' AND UPPER(metadata->>'warehouseId') = $2)
        )
      )
      AND NOT EXISTS (
@@ -1412,8 +1468,19 @@ async function getWarehouseActivities(cksCode: string): Promise<HubRoleActivitie
        AND activity_type NOT LIKE '%_hard_deleted'
        AND activity_type NOT LIKE '%_restored'
       ) AND (
-        -- Show creation activities ONLY if target is self
-        (activity_type LIKE '%_created' AND UPPER(target_id) = $2)
+        -- Show user creation activities ONLY if target is self
+        (activity_type IN ('manager_created', 'contractor_created', 'customer_created', 'center_created', 'crew_created', 'warehouse_created') AND UPPER(target_id) = $2)
+        OR
+        -- Show order creation activities if crew/center/customer/etc. in metadata
+        (activity_type = 'order_created' AND (
+          (metadata ? 'crewId' AND UPPER(metadata->>'crewId') = $2)
+          OR (metadata ? 'centerId' AND UPPER(metadata->>'centerId') = $2)
+          OR (metadata ? 'customerId' AND UPPER(metadata->>'customerId') = $2)
+          OR (metadata ? 'contractorId' AND UPPER(metadata->>'contractorId') = $2)
+          OR (metadata ? 'managerId' AND UPPER(metadata->>'managerId') = $2)
+          OR (metadata ? 'warehouseId' AND UPPER(metadata->>'warehouseId') = $2)
+          OR (actor_id IS NOT NULL AND UPPER(actor_id) = $2)
+        ))
         OR
         -- Show assignments where YOU are being assigned (target is self)
         (activity_type LIKE '%_assigned%' AND UPPER(target_id) = $2)

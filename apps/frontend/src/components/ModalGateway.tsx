@@ -132,7 +132,13 @@ export function ModalGateway({
   // No hooks needed for users!
   const detailsMap: Record<string, { data: any; isLoading: boolean; error: Error | null; lifecycle: Lifecycle }> = {
     order: {
-      data: orderDetails.order,
+      data: {
+        ...orderDetails.order,
+        // Merge extended fields from useOrderDetails hook
+        requestorInfo: orderDetails.requestorInfo,
+        destinationInfo: orderDetails.destinationInfo,
+        availability: orderDetails.availability,
+      },
       isLoading: orderDetails.isLoading,
       error: orderDetails.error || null,
       lifecycle: extractLifecycle(orderDetails.order, orderDetails.archiveMetadata),
@@ -285,6 +291,7 @@ export function ModalGateway({
       entityId,
       entityType,
       entityData: data,
+      viewerId: currentUserId,
     });
     console.log('[ModalGateway] Action descriptors generated:', descriptors);
     return descriptors;
@@ -372,6 +379,16 @@ export function ModalGateway({
     }, actions);
 
     // Filter tabs based on RBAC policy
+    const hasActions = actions.length > 0;
+    console.log('[ModalGateway] Tab filtering context:', {
+      role,
+      entityType,
+      hasActions,
+      actionsCount: actions.length,
+      lifecycleState: lifecycle.state,
+      allTabsCount: allTabs.length,
+    });
+
     const filtered = filterVisibleTabs(allTabs, {
       role,
       lifecycle,
@@ -379,9 +396,10 @@ export function ModalGateway({
       entityData: data,
       entityId,
       viewerId: currentUserId,
-      hasActions: actions.length > 0,
+      hasActions,
     });
 
+    console.log('[ModalGateway] Visible tabs after filtering:', filtered.map(t => t.id));
     return filtered;
   }, [adapter, role, lifecycle, entityType, data, actions, entityId, currentUserId]);
 

@@ -88,3 +88,21 @@
   background-color: #d1fae5;
   color: #065f46;
 }
+
+.statusBadge[data-status="in_transit"] {
+  background-color: #dbeafe;
+  color: #1e3a8a;
+  border-color: rgba(30, 58, 138, 0.2);
+}
+
+.statusBadge[data-status="completed"] {
+  background-color: #dcfce7;
+  color: #166534;
+  border-color: rgba(22, 101, 52, 0.2);
+}
+
+.statusBadge[data-status="cancelled"] {
+  background-color: #fee2e2;
+  color: #991b1b;
+  border-color: rgba(153, 27, 27, 0.2);
+}

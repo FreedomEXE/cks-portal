@@ -193,6 +193,7 @@ export interface EntityActionContext {
   entityId: string;
   entityType: EntityType;
   entityData?: any;
+  viewerId?: string; // ID of the current user viewing (for ownership checks)
 }
 
 /**

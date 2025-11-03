@@ -29,7 +29,7 @@ import {
   type Activity,
 } from '@cks/domain-widgets';
 import { warehouseOverviewCards } from '@cks/domain-widgets';
-import { Button, DataTable, PageHeader, PageWrapper, Scrollbar, TabSection, OrderActionModal, ServiceViewModal } from '@cks/ui';
+import { Button, DataTable, PageHeader, PageWrapper, Scrollbar, TabSection, ServiceViewModal } from '@cks/ui';
 import { useModals } from '../contexts';
 import OrderDetailsGateway from '../components/OrderDetailsGateway';
 import { useAuth } from '@cks/auth';
@@ -53,7 +53,7 @@ import {
 } from '../shared/api/hub';
 import { useFormattedActivities } from '../shared/activity/useFormattedActivities';
 import { ActivityFeed } from '../components/ActivityFeed';
-import ActivityModalGateway from '../components/ActivityModalGateway';
+// Legacy ActivityModalGateway removed — use universal ModalGateway via modals.openById()
 import { useEntityActions } from '../hooks/useEntityActions';
 import { createFeedback as apiCreateFeedback, acknowledgeItem as apiAcknowledgeItem, resolveReport as apiResolveReport, fetchServicesForReports, fetchProceduresForReports, fetchOrdersForReports } from '../shared/api/hub';
 
@@ -171,8 +171,8 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
   const [inventoryTab, setInventoryTab] = useState<'active' | 'archive'>('active');
   const [inventorySearchQuery, setInventorySearchQuery] = useState('');
   const [inventoryFilter, setInventoryFilter] = useState<string>('');
-  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
-  const [actionOrder, setActionOrder] = useState<any | null>(null);
+  // Legacy selectedOrderId state removed; use modals.openById for ID-first modals
+  // Legacy actionOrder modal removed; use Quick Actions inside universal modal
 
   const { code: authCode } = useAuth();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
@@ -626,8 +626,6 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
                 viewerId={normalizedCode || undefined}
                 onClearActivity={handleClearActivity}
                 onClearAll={handleClearAll}
-                onOpenActionableOrder={(order) => setActionOrder(order)}
-                onOpenOrderModal={(order) => setSelectedOrderId(order?.orderId || order?.id || null)}
                 onOpenServiceModal={(serviceId) => modals.openById(serviceId)}
                 isLoading={activitiesLoading}
                 error={activitiesError}
@@ -1142,7 +1140,13 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
                 userCode={normalizedCode ?? undefined}
                 serviceOrders={serviceOrders}
                 productOrders={productOrders}
-                onOrderAction={handleOrderAction}
+                onOrderAction={async (orderId, action) => {
+                  if (action === 'View Details' || action === 'View') {
+                    modals.openById(orderId);
+                    return;
+                  }
+                  await handleOrderAction(orderId, action);
+                }}
                 showServiceOrders={true}
                 showProductOrders={true}
                 primaryColor="#8b5cf6"
@@ -1210,40 +1214,7 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
         </div>
       </Scrollbar>
 
-      {/* Actionable order modal (OrderCard with inline buttons) */}
-      {actionOrder && (
-        <OrderActionModal
-          isOpen={!!actionOrder}
-          onClose={() => setActionOrder(null)}
-          order={{
-            orderId: actionOrder.orderId || actionOrder.id,
-            orderType: (actionOrder.orderType || actionOrder.order_type || 'product') as 'service' | 'product',
-            title: actionOrder.title || actionOrder.orderId || actionOrder.id,
-            requestedBy: actionOrder.requestedBy || null,
-            destination: actionOrder.destination || null,
-            requestedDate: actionOrder.requestedDate || actionOrder.orderDate || null,
-            expectedDate: actionOrder.expectedDate || null,
-            serviceStartDate: actionOrder.serviceStartDate || null,
-            deliveryDate: actionOrder.deliveryDate || null,
-            status: actionOrder.status || 'pending',
-            approvalStages: actionOrder.approvalStages || [],
-            availableActions: actionOrder.availableActions || [],
-            transformedId: actionOrder.transformedId || null,
-          }}
-          onAction={(orderId, action) => {
-            // Delegate to existing hub handler which maps labels to supported actions
-            return handleOrderAction(orderId, action);
-          }}
-        />
-      )}
-
-      <ActivityModalGateway
-        isOpen={!!selectedOrderId}
-        onClose={() => setSelectedOrderId(null)}
-        orderId={selectedOrderId}
-        role="user"
-        userAvailableActions={[]}
-      />
+      {/* Legacy order modals removed; all order modals open via modals.openById() */}
 
     </div>
   );

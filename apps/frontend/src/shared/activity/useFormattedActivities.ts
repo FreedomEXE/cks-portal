@@ -204,8 +204,24 @@ function personalizeMessage(item: HubActivityItem, viewerId?: string | null): st
 
   // Order activities
   if (activityType === 'order_created') {
+    const crewId = (metadata.crewId as string | undefined)?.toUpperCase();
+    const centerId = (metadata.centerId as string | undefined)?.toUpperCase();
     const customerId = (metadata.customerId as string | undefined)?.toUpperCase();
+    const warehouseId = (metadata.warehouseId as string | undefined)?.toUpperCase();
+
+    if (crewId === normalizedViewerId) {
+      return `You created an order!`;
+    }
+    if (centerId === normalizedViewerId) {
+      return `An order was created at your center!`;
+    }
     if (customerId === normalizedViewerId) {
+      return `An order was created for your customer!`;
+    }
+    if (warehouseId === normalizedViewerId) {
+      return `You've been assigned a new order!`;
+    }
+    if (item.actorId?.toUpperCase() === normalizedViewerId) {
       return `You created an order!`;
     }
   }
@@ -349,10 +365,20 @@ export function useFormattedActivities(
 
     // Frontend guardrail (non-admin hubs):
     // Hide other users' creation events while still showing own creation event.
+    // Only filter user entity creations; orders/reports/feedback are shared context.
     const viewer = cksCode?.toUpperCase() ?? '';
+    const userCreatedTypes = new Set([
+      'manager_created',
+      'contractor_created',
+      'customer_created',
+      'center_created',
+      'crew_created',
+      'warehouse_created',
+    ]);
     const filtered = filteredByCategory.filter((a) => {
       const type = (a.activityType || '').toLowerCase();
-      if (type.endsWith('_created')) {
+      // Only filter user-entity creations by targetId; let order/report/feedback creations through
+      if (userCreatedTypes.has(type)) {
         return (a.targetId || '').toUpperCase() === viewer;
       }
       return true;

@@ -1010,6 +1010,11 @@ async function mapOrderRow(
     };
   }
 
+  // Add role IDs to metadata for frontend ownership checks
+  if (row.crew_id && !(enrichedMetadata as any).crewId) {
+    (enrichedMetadata as any).crewId = normalizeCodeValue(row.crew_id);
+  }
+
   // Format requestedBy and destination as "ID - Name"
   const requestorName = (enrichedMetadata as any).contacts?.requestor?.name;
   const requestedByFormatted = creatorCode && requestorName && requestorName !== creatorCode
@@ -1021,12 +1026,13 @@ async function mapOrderRow(
     ? `${destinationFallbackCode} - ${destinationName}`
     : (destinationFallbackCode ?? null);
 
-  return {
+  const result = {
     orderId: row.order_id,
     orderType,
     title: row.title ?? (orderType === 'product' ? 'Product Order' : 'Service Order'),
     requestedBy: requestedByFormatted,
     requesterRole: normalizeRole(row.creator_role),
+    creatorId: creatorCode, // Add creator ID for ownership checks
     destination: destinationFormatted,
     destinationRole: normalizeRole(row.destination_role) ?? (row.center_id ? 'center' : null),
     requestedDate: toIso(row.requested_date ?? row.created_at),
@@ -1067,6 +1073,9 @@ async function mapOrderRow(
     statusLabel: getStatusLabel(status as any),
     metadata: enrichedMetadata
   };
+
+  console.log('[mapOrderRow] RETURN - creatorId:', result.creatorId, 'metadata.crewId:', (result.metadata as any)?.crewId);
+  return result;
 }
 
 async function loadOrderItems(orderIds: readonly string[]): Promise<Map<string, OrderItemRow[]>> {

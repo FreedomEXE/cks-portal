@@ -9,9 +9,9 @@ import { useAuth } from '@cks/auth';
 import { EcosystemTree } from '@cks/domain-widgets';
 import { useFormattedActivities } from '../shared/activity/useFormattedActivities';
 import { ActivityFeed } from '../components/ActivityFeed';
-import ActivityModalGateway from '../components/ActivityModalGateway';
+// Legacy ActivityModalGateway removed — use universal ModalGateway via modals.openById()
 import { useEntityActions } from '../hooks/useEntityActions';
-import { OrderActionModal } from '@cks/ui';
+// Legacy OrderActionModal removed; Quick Actions are rendered inside the universal modal
 import {
   MemosPreview,
   NewsPreview,
@@ -968,8 +968,8 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
       ? 'Loading recent activity...'
       : 'No recent manager activity';
 
-  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
-  const [actionOrder, setActionOrder] = useState<any | null>(null);
+  // Legacy modal state removed; universal ModalGateway handles all modals
+  // Legacy actionOrder modal removed; use Quick Actions inside universal modal
 
   // Centralized entity action handler (replaces handleOrderAction)
   const { handleAction } = useEntityActions();
@@ -1014,8 +1014,6 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
                 viewerId={managerCode || undefined}
                 onClearActivity={handleClearActivity}
                 onClearAll={handleClearAll}
-                onOpenActionableOrder={(order) => setActionOrder(order)}
-                onOpenOrderModal={(order) => setSelectedOrderId(order?.orderId || order?.id || null)}
                 isLoading={activitiesLoading}
                 error={activitiesError}
                 onError={(msg) => toast.error(msg)}
@@ -1141,7 +1139,13 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
                 serviceOrders={managerServiceOrderCards}
                 productOrders={managerProductOrderCards}
                 onCreateProductOrder={() => navigate('/catalog?mode=products')}
-                onOrderAction={handleAction}
+                onOrderAction={async (orderId, action) => {
+                  if (action === 'View Details' || action === 'View') {
+                    modals.openById(orderId);
+                    return;
+                  }
+                  await handleAction(orderId, action);
+                }}
                 showServiceOrders
                 showProductOrders
                 primaryColor={MANAGER_PRIMARY_COLOR}
@@ -1325,39 +1329,9 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
         </div>
       </Scrollbar>
 
-      {/* Actionable order modal (OrderCard with inline buttons) */}
-      {actionOrder && (
-        <OrderActionModal
-          isOpen={!!actionOrder}
-          onClose={() => setActionOrder(null)}
-          order={{
-            orderId: actionOrder.orderId || actionOrder.id,
-            orderType: (actionOrder.orderType || actionOrder.order_type || 'product') as 'service' | 'product',
-            title: actionOrder.title || actionOrder.orderId || actionOrder.id,
-            requestedBy: actionOrder.requestedBy || null,
-            destination: actionOrder.destination || null,
-            requestedDate: actionOrder.requestedDate || actionOrder.orderDate || null,
-            expectedDate: actionOrder.expectedDate || null,
-            serviceStartDate: actionOrder.serviceStartDate || null,
-            deliveryDate: actionOrder.deliveryDate || null,
-            status: actionOrder.status || 'pending',
-            approvalStages: actionOrder.approvalStages || [],
-            availableActions: actionOrder.availableActions || [],
-            transformedId: actionOrder.transformedId || null,
-          }}
-          onAction={handleAction}
-        />
-      )}
+      {/* Legacy order action modal removed; use modals.openById() + Quick Actions tab */}
 
-      {/* Order Details Modal */}
-      <ActivityModalGateway
-        isOpen={!!selectedOrderId}
-        orderId={selectedOrderId}
-        role="admin"
-        onClose={() => setSelectedOrderId(null)}
-        onEdit={() => {}}
-        onArchive={async () => {}}
-      />
+      {/* Legacy order modal removed; all order modals open via modals.openById() */}
 
       {toast && (
         <div style={{
@@ -1379,9 +1353,3 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
       </div>
   );
 }
-
-
-
-
-
-
