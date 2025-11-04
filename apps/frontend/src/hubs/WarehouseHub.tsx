@@ -779,109 +779,12 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
                                 color: palette.color,
                               }}
                             >
-                              {value ?? '—'}
+                              {value ?? '-'}
                             </span>
                           );
                         },
                       },
                       { key: 'scheduledDate', label: 'SCHEDULED DATE' },
-                      {
-                        key: 'actions',
-                        label: 'ACTIONS',
-                        render: (_value: string, row: any) => {
-                          const deliveryStarted = row.order?.metadata?.deliveryStarted === true;
-
-                          return (
-                            <div style={{ display: 'flex', gap: '8px' }}>
-                              {!deliveryStarted ? (
-                                <>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleOrderAction(row.order.orderId, 'Start Delivery');
-                                    }}
-                                    style={{
-                                      padding: '6px 12px',
-                                      borderRadius: '4px',
-                                      fontSize: '12px',
-                                      fontWeight: 500,
-                                      border: 'none',
-                                      cursor: 'pointer',
-                                      backgroundColor: '#3b82f6',
-                                      color: 'white',
-                                    }}
-                                  >
-                                    Start Delivery
-                                  </button>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      const reason = window.prompt('Please provide a reason for cancellation:');
-                                      if (reason && reason.trim()) {
-                                        handleOrderAction(row.order.orderId, 'Cancel', reason.trim());
-                                      }
-                                    }}
-                                    style={{
-                                      padding: '6px 12px',
-                                      borderRadius: '4px',
-                                      fontSize: '12px',
-                                      fontWeight: 500,
-                                      border: 'none',
-                                      cursor: 'pointer',
-                                      backgroundColor: '#ef4444',
-                                      color: 'white',
-                                    }}
-                                  >
-                                    Cancel
-                                  </button>
-                                </>
-                              ) : (
-                                <>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleOrderAction(row.order.orderId, 'Mark Delivered');
-                                    }}
-                                    style={{
-                                      padding: '6px 12px',
-                                      borderRadius: '4px',
-                                      fontSize: '12px',
-                                      fontWeight: 500,
-                                      border: 'none',
-                                      cursor: 'pointer',
-                                      backgroundColor: '#10b981',
-                                      color: 'white',
-                                    }}
-                                  >
-                                    Mark Delivered
-                                  </button>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      const reason = window.prompt('Please provide a reason for cancellation:');
-                                      if (reason && reason.trim()) {
-                                        handleOrderAction(row.order.orderId, 'Cancel', reason.trim());
-                                      }
-                                    }}
-                                    style={{
-                                      padding: '6px 12px',
-                                      borderRadius: '4px',
-                                      fontSize: '12px',
-                                      fontWeight: 500,
-                                      border: 'none',
-                                      cursor: 'pointer',
-                                      backgroundColor: '#ef4444',
-                                      color: 'white',
-                                    }}
-                                  >
-                                    Cancel
-                                  </button>
-                                </>
-                              )}
-                            </div>
-                          );
-                        },
-                      },
                     ]}
                     data={pendingDeliveries.filter((row) => {
                       if (!deliveriesSearchQuery) {
@@ -897,9 +800,10 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
                     showSearch={false}
                     maxItems={10}
                     onRowClick={(row) => {
-                      // Open the unified order details modal via gateway
-                      if (row?.deliveryId) {
-                        setSelectedOrderId(row.deliveryId);
+                      // ID-first universal modal: open by order ID
+                      const orderId = row?.order?.orderId || row?.deliveryId;
+                      if (orderId) {
+                        modals.openById(orderId);
                       }
                     }}
                   />
@@ -949,9 +853,9 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
                     showSearch={false}
                     maxItems={10}
                     onRowClick={(row) => {
-                      // Open the unified order details modal via gateway
-                      if (row?.deliveryId) {
-                        setSelectedOrderId(row.deliveryId);
+                      const orderId = row?.order?.orderId || row?.deliveryId;
+                      if (orderId) {
+                        modals.openById(orderId);
                       }
                     }}
                   />

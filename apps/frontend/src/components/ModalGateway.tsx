@@ -356,6 +356,18 @@ export function ModalGateway({
                 console.log('[ModalGateway] Closing modal');
                 onClose();
               }
+              // Refresh active entity data so tabs and actions update in place
+              try {
+                if (entityType === 'order') {
+                  orderDetails.refresh?.();
+                } else if (entityType === 'service') {
+                  serviceDetails.refresh?.();
+                } else if (entityType === 'report' || entityType === 'feedback') {
+                  reportDetails.refresh?.();
+                }
+              } catch (e) {
+                console.warn('[ModalGateway] refresh after action failed:', e);
+              }
             },
           });
         },

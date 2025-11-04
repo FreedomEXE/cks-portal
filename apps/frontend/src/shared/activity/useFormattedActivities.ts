@@ -89,6 +89,47 @@ function personalizeMessage(item: HubActivityItem, viewerId?: string | null): st
   const normalizedViewerId = viewerId.toUpperCase();
   const metadata = item.metadata || {};
   const activityType = item.activityType;
+  const actorIdUC = item.actorId ? item.actorId.toUpperCase() : undefined;
+  const actorRole = (item.actorRole || '').toLowerCase();
+  const isActor = actorIdUC === normalizedViewerId;
+
+  // Order flow activities
+  if (activityType === 'order_created') {
+    if (isActor) return 'You created an order!';
+    // Hide order ID for non-actors
+    return 'Created Product Order';
+  }
+
+  if (activityType === 'order_assigned' || activityType === 'order_assigned_to_warehouse') {
+    const whId = (metadata.warehouseId as string | undefined)?.toUpperCase();
+    if (whId === normalizedViewerId) return 'You have been assigned a new order';
+    return 'Warehouse assigned to order';
+  }
+
+  if (activityType === 'order_accepted') {
+    if (isActor && actorRole === 'warehouse') return 'You accepted an order';
+    return 'Warehouse accepted the order';
+  }
+
+  if (activityType === 'delivery_started') {
+    if (isActor && actorRole === 'warehouse') return 'You started delivery';
+    return 'Delivery started';
+  }
+
+  if (activityType === 'delivery_completed' || activityType === 'order_delivered' || activityType === 'order_completed') {
+    if (isActor && actorRole === 'warehouse') return 'You completed delivery';
+    return 'Delivery completed';
+  }
+
+  if (activityType === 'delivery_cancelled') {
+    if (isActor && actorRole === 'warehouse') return 'You cancelled the delivery';
+    return 'Delivery cancelled';
+  }
+
+  if (activityType === 'order_cancelled') {
+    if (isActor) return 'You cancelled the order';
+    return 'Order cancelled';
+  }
 
   // Assignment activities: {entity}_assigned_to_{target}
   if (activityType === 'crew_assigned_to_center') {

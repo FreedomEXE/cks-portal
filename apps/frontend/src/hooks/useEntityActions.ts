@@ -255,6 +255,20 @@ async function handleOrderAction(
       // transformedId should be provided in options
       break;
 
+    // Warehouse delivery flow aliases
+    case 'start_delivery':
+    case 'start-delivery':
+      // Backend expects hyphenated action id
+      backendAction = 'start-delivery';
+      break;
+
+    case 'complete_delivery':
+    case 'mark_delivered':
+    case 'deliver':
+      // Normalize to backend 'deliver'
+      backendAction = 'deliver';
+      break;
+
     case 'view_details':
       // Not an action, just ignore
       return true;
@@ -278,10 +292,13 @@ async function handleOrderAction(
     const result = await applyHubOrderAction(orderId, payload);
     console.log(`[useEntityActions] Order action succeeded:`, result);
 
-    // Success - invalidate all related caches
+    // Success - invalidate all related caches (orders + activities)
     mutate((key: any) => {
       if (typeof key === 'string') {
-        return key.includes('/hub/orders/') || key.includes(orderId);
+        return key.includes('/hub/orders/') ||
+               key.includes('/api/hub/activities') ||
+               key.includes('/hub/activities') ||
+               key.includes(orderId);
       }
       return false;
     });

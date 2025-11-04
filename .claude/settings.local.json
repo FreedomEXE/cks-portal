@@ -4,7 +4,10 @@
       "Bash(git commit:*)",
       "Bash(git push:*)",
       "Bash(powershell:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(set PORT=4000)",
+      "Bash(pnpm dev:*)",
+      "Bash(timeout:*)"
     ],
     "deny": [],
     "ask": []

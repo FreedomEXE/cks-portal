@@ -6,6 +6,7 @@ import { authenticate } from '../../core/auth/authenticate';
 import { getAdminUserByClerkId } from '../adminUsers/store';
 import { applyOrderAction, createOrder, getHubOrders, getOrderById, requestCrewAssignment, respondToCrewRequest, type CreateOrderInput, type OrderActionInput } from './service';
 import { fetchOrderForViewer } from './store';
+import { getEntityWithFallback } from '../entities/service';
 import type { HubRole } from '../profile/types';
 import type { HubOrderItem } from './types';
 
@@ -95,6 +96,9 @@ export async function registerOrdersRoutes(server: FastifyInstance) {
       return;
     }
 
+    const query = z.object({ includeDeleted: z.string().optional() }).safeParse(request.query);
+    const includeDeleted = query.success && query.data.includeDeleted === '1';
+
     // Authenticate first (non-enforcing w.r.t role)
     const auth = await authenticate(request);
     if (!auth.ok) {
@@ -113,13 +117,32 @@ export async function registerOrdersRoutes(server: FastifyInstance) {
     }
 
     if (isAdmin) {
-      const order = await getOrderById(params.data.orderId);
-      if (!order) {
-        reply.code(404).send({ error: 'Order not found' });
+      // Admin path: Use getEntityWithFallback if includeDeleted, otherwise getOrderById
+      if (includeDeleted) {
+        try {
+          const result = await getEntityWithFallback('order', params.data.orderId, true);
+          reply.send({
+            data: result.entity,
+            state: result.state,
+            deletedAt: result.deletedAt,
+            deletedBy: result.deletedBy,
+            archivedAt: result.archivedAt,
+            archivedBy: result.archivedBy
+          });
+          return;
+        } catch (error) {
+          reply.code(404).send({ error: 'Order not found' });
+          return;
+        }
+      } else {
+        const order = await getOrderById(params.data.orderId);
+        if (!order) {
+          reply.code(404).send({ error: 'Order not found' });
+          return;
+        }
+        reply.send({ data: order });
         return;
       }
-      reply.send({ data: order });
-      return;
     }
 
     // Hub role path (RBAC-scoped). Use existing guard to validate active role.
@@ -131,6 +154,12 @@ export async function registerOrdersRoutes(server: FastifyInstance) {
     const code = account.cksCode ?? null;
     if (!role || !code) {
       reply.code(403).send({ error: 'Unsupported role for order details' });
+      return;
+    }
+
+    // Non-admin users cannot access deleted entities
+    if (includeDeleted) {
+      reply.code(403).send({ error: 'Access to deleted orders is restricted to administrators' });
       return;
     }
 

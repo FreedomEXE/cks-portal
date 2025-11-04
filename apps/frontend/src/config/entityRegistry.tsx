@@ -381,7 +381,7 @@ const orderAdapter: EntityAdapter = {
               key: 'accept',
               label: 'Accept',
               variant: 'primary',
-              closeOnSuccess: true,
+              closeOnSuccess: false, // keep modal open to continue workflow
             });
             descriptors.push({
               key: 'reject',
@@ -389,7 +389,68 @@ const orderAdapter: EntityAdapter = {
               variant: 'danger',
               confirm: 'Are you sure you want to reject this order?',
               prompt: 'Please provide a reason for rejection:',
-              closeOnSuccess: true,
+              closeOnSuccess: false,
+            });
+          }
+        }
+
+        // Warehouse delivery workflow (modal-centric)
+        if (role === 'warehouse' && status === 'awaiting_delivery') {
+          const warehouseAssigned =
+            entityData?.fulfilledById === viewerId ||
+            entityData?.assignedWarehouse === viewerId ||
+            entityData?.metadata?.warehouseId === viewerId;
+
+          if (warehouseAssigned) {
+            const deliveryStarted = entityData?.metadata?.deliveryStarted === true;
+            if (deliveryStarted) {
+              // Already started → allow marking delivered
+              descriptors.push({
+                key: 'complete_delivery',
+                label: 'Mark Delivered',
+                variant: 'primary',
+                closeOnSuccess: false,
+              });
+            } else {
+              // Not yet started → allow starting
+              descriptors.push({
+                key: 'start_delivery',
+                label: 'Start Delivery',
+                variant: 'primary',
+                closeOnSuccess: false,
+              });
+            }
+            descriptors.push({
+              key: 'cancel',
+              label: 'Cancel',
+              variant: 'danger',
+              confirm: 'Are you sure you want to cancel this order?',
+              prompt: 'Optional: Provide a reason for cancellation',
+              closeOnSuccess: false,
+            });
+          }
+        }
+
+        if (role === 'warehouse' && status === 'in_transit') {
+          const warehouseAssigned =
+            entityData?.fulfilledById === viewerId ||
+            entityData?.assignedWarehouse === viewerId ||
+            entityData?.metadata?.warehouseId === viewerId;
+
+          if (warehouseAssigned) {
+            descriptors.push({
+              key: 'complete_delivery',
+              label: 'Mark Delivered',
+              variant: 'primary',
+              closeOnSuccess: false,
+            });
+            descriptors.push({
+              key: 'cancel',
+              label: 'Cancel',
+              variant: 'danger',
+              confirm: 'Are you sure you want to cancel this delivery?',
+              prompt: 'Optional: Provide a reason for cancellation',
+              closeOnSuccess: false,
             });
           }
         }

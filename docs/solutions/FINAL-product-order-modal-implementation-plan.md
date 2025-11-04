@@ -678,3 +678,24 @@ Before implementation:
 **Complexity:** Low
 **Impact:** High (fixes broken CrewHub, restores missing details, improves UX)
 **Confidence:** High (architecture validated, small focused changes)
+
+---
+
+## Post-Implementation Update (2025-11-04)
+
+- Delivery Workflow (Warehouse) now fully modal-centric:
+  - Awaiting Delivery → Start Delivery; transitions to In Transit without closing.
+  - In Transit → Mark Delivered; transitions to Delivered, actions disappear.
+  - Cancel remains available where appropriate; confirmation prompts enabled.
+- ActivityFeed opens orders via ID-first universally; legacy branches removed.
+- Activities emitted and visible for delivery lifecycle:
+  - "delivery_started", "order_delivered", "order_cancelled" with personalized text; hides order ID for non-actors/non-admins.
+- Inventory updates on deliver:
+  - quantity_on_hand decremented; quantity_reserved reduced (floor at 0); timestamps updated.
+- Removed row action buttons from Warehouse Deliveries; row click opens the same modal.
+- Modal stays open after actions and refreshes content (details, workflow, actions) in-place.
+
+### What’s Next
+- Implement the same modal-first workflow for Service Orders and Active Services (create/accept/start/complete/cancel), with activity events and copy parity.
+- Add skeleton loading to smooth the initial modal open.
+- Re-verify stakeholder visibility for "order_created" in all hubs.

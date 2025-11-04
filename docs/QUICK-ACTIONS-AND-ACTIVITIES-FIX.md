@@ -255,3 +255,16 @@ if (row.submitter_id && !(enrichedMetadata as any).submitterId) {
 - All non-admin users see activities for entities they're involved in
 - Quick Actions tab appears for all users with appropriate permissions
 - Ownership checks work consistently across all entity types
+
+---
+
+## Update - 2025-11-04 (Warehouse Delivery Flow)
+
+- Frontend now maps action IDs for warehouse delivery lifecycle:
+  - `start_delivery` → backend `start-delivery`
+  - `complete_delivery`/`mark_delivered` → backend `deliver`
+- Warehouse actions live in the universal modal and keep the modal open. The actions update in place after success.
+- ActivityFeed opens orders via ID-first universally; legacy modal branches removed.
+- Personalized activity copy added for:
+  - `delivery_started`, `order_delivered`, `order_cancelled`
+- Inventory updates occur on deliver (backend): `quantity_on_hand` decremented and `quantity_reserved` reduced with a floor at 0.

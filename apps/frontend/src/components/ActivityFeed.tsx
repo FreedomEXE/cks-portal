@@ -84,64 +84,9 @@ export function ActivityFeed({
 
       // Handle order activities
       if (targetType === 'order') {
-        // Phase 2: ID-first modal opening (with feature flag)
-        if (isFeatureEnabled('ID_FIRST_MODALS')) {
-          console.log('[ActivityFeed] Phase 2: Opening order via openById():', targetId);
-          modals.openById(targetId);
-          return;
-        }
-
-        // Legacy path (backwards compatibility)
-        try {
-          // Fetch order with state detection
-          const result = await fetchOrderForActivity(targetId);
-          const { entity, state, deletedAt, deletedBy } = result;
-
-          if (state === 'deleted') {
-            // Deleted orders: Go straight to OrderDetailsModal with banner
-            if (!onOpenOrderModal) {
-              console.warn('[ActivityFeed] onOpenOrderModal not provided, ignoring deleted order click');
-              return;
-            }
-
-            const orderData = {
-              ...entity,
-              isDeleted: true,
-              deletedAt,
-              deletedBy,
-            };
-
-            console.log('[ActivityFeed] Opening deleted order modal:', { orderId: targetId });
-            onOpenOrderModal(orderData);
-          } else {
-            // Admin pattern (if provided): delegate to onOpenOrderActions
-            if (onOpenOrderActions) {
-              console.log('[ActivityFeed] Admin order actions:', { orderId: targetId, state });
-              onOpenOrderActions({ entity, state, deletedAt, deletedBy });
-              return;
-            }
-
-            // Non-admin pattern: If order has actions, open OrderActionModal; else open OrderDetailsModal
-            const hasActions = Array.isArray((entity as any)?.availableActions) && (entity as any).availableActions.length > 0;
-
-            if (hasActions && onOpenActionableOrder) {
-              console.log('[ActivityFeed] Opening actionable order modal:', { orderId: targetId });
-              onOpenActionableOrder(entity);
-              return;
-            }
-
-            if (onOpenOrderModal) {
-              console.log('[ActivityFeed] Opening order details (view-only):', { orderId: targetId });
-              onOpenOrderModal(entity);
-            } else {
-              console.warn('[ActivityFeed] onOpenOrderModal not provided, cannot open order');
-            }
-          }
-        } catch (error) {
-          const message = parseActivityError(error);
-          console.error('[ActivityFeed] Failed to fetch order:', error);
-          onError?.(message);
-        }
+        // Always use ID-first universal modal for orders
+        console.log('[ActivityFeed] Opening order via openById():', targetId);
+        modals.openById(targetId);
         return;
       }
 
