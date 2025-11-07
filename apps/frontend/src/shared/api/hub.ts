@@ -827,12 +827,59 @@ export async function applyServiceAction(serviceId: string, action: ServiceActio
   });
   return response.data;
 }
+
+// Request crew for an existing service (manager only)
+export async function requestServiceCrew(serviceId: string, crewCodes: string[], message?: string) {
+  const response = await apiFetch<ApiResponse<any>>(`/services/${encodeURIComponent(serviceId)}/crew-requests`, {
+    method: 'POST',
+    body: JSON.stringify({ crewCodes, ...(message && message.trim().length ? { message } : {}) }),
+  });
+  return response.data;
+}
+
+// Crew respond to a service invite (crew only)
+export async function respondToServiceCrew(serviceId: string, accept: boolean) {
+  const response = await apiFetch<ApiResponse<any>>(`/services/${encodeURIComponent(serviceId)}/crew-response`, {
+    method: 'POST',
+    body: JSON.stringify({ accept }),
+  });
+  return response.data;
+}
+
+// Update service metadata (procedures/training/notes)
+export async function updateServiceMetadataAPI(
+  serviceId: string,
+  payload: { procedures?: any[]; training?: any[]; tasks?: any[]; notes?: string; crew?: string[] }
+) {
+  const response = await apiFetch<ApiResponse<any>>(`/services/${encodeURIComponent(serviceId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload || {}),
+  });
+  return response.data;
+}
 export interface CertifiedServiceItem {
   serviceId: string;
   name: string;
   category: string | null;
   status: string | null;
   updatedAt: string | null;
+}
+
+// Pre-creation (order-level) crew requests/response
+export async function requestOrderCrew(orderId: string, crewCodes: string[], message?: string) {
+  const response = await apiFetch<ApiResponse<any>>(`/orders/${encodeURIComponent(orderId)}/crew-requests`, {
+    method: 'POST',
+    body: JSON.stringify({ crewCodes, ...(message && message.trim().length ? { message } : {}) }),
+  });
+  return response.data;
+}
+
+export async function respondToOrderCrew(orderId: string, accept: boolean) {
+  const response = await apiFetch<ApiResponse<any>>(`/orders/${encodeURIComponent(orderId)}/crew-response`, {
+    method: 'POST',
+    body: JSON.stringify({ accept }),
+  });
+  return response.data;
 }
 
 export function useCertifiedServices(userId: string | null | undefined, role: 'manager' | 'crew' | 'warehouse') {

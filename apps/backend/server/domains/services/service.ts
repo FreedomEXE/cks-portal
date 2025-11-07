@@ -243,16 +243,19 @@ export async function updateServiceMetadata(input: {
   crew?: string[];
   procedures?: any[];
   training?: any[];
+  tasks?: any[];
   notes?: string;
 }) {
   const service = await getServiceById(input.serviceId);
   if (!service) return null;
   const meta = service.metadata || {};
+  const beforeTasks: any[] = Array.isArray((meta as any).tasks) ? (meta as any).tasks : [];
   const beforeCrew: string[] = Array.isArray((meta as any).crew) ? (meta as any).crew : [];
   const afterCrew: string[] = Array.isArray(input.crew) ? input.crew : beforeCrew;
   (meta as any).crew = afterCrew;
   if (input.procedures) (meta as any).procedures = input.procedures;
   if (input.training) (meta as any).training = input.training;
+  if (input.tasks) (meta as any).tasks = input.tasks;
   if (input.notes !== undefined) (meta as any).notes = input.notes;
   // Diff crew participants
   const beforeSet = new Set(beforeCrew.map(c => (c || '').toUpperCase()));
@@ -279,7 +282,69 @@ export async function updateServiceMetadata(input: {
       `DELETE FROM order_participants WHERE order_id = $1 AND participant_id = $2 AND participant_role = 'crew'`,
       [service.orderId, code]
     );
+    try {
+      await recordActivity({
+        activityType: 'crew_unassigned_from_service',
+        description: `Crew ${code} unassigned from Service ${input.serviceId}`,
+        actorId: normalizeIdentity(input.actorCode || '') || 'SYSTEM',
+        actorRole: input.actorRole || 'system',
+        targetId: input.serviceId,
+        targetType: 'service',
+        metadata: {
+          crewId: code,
+          serviceId: input.serviceId,
+          managerId: normalizeIdentity(input.actorCode || '') || undefined,
+        },
+      });
+    } catch {}
   }
+
+  // Record activity when tasks updated
+  try {
+    if (input.tasks) {
+      // Generic update event
+      await recordActivity({
+        activityType: 'service_tasks_updated',
+        description: `Updated tasks for Service ${input.serviceId}`,
+        actorId: normalizeIdentity(input.actorCode || '') || 'SYSTEM',
+        actorRole: input.actorRole || 'system',
+        targetId: input.serviceId,
+        targetType: 'service',
+        metadata: { taskCount: Array.isArray(input.tasks) ? input.tasks.length : 0 },
+      });
+
+      // Detect newly completed tasks (crew checklist)
+      const role = (input.actorRole || '').toLowerCase();
+      const prevMap = new Map<string, any>();
+      for (const t of beforeTasks) {
+        const id = String((t?.id ?? t?.title ?? '') || '').trim();
+        if (id) prevMap.set(id, t);
+      }
+      for (const t of input.tasks) {
+        const id = String((t?.id ?? t?.title ?? '') || '').trim();
+        if (!id) continue;
+        const was = prevMap.get(id);
+        const nowCompletedAt = (t as any)?.completedAt || null;
+        const wasCompletedAt = was ? (was as any)?.completedAt || null : null;
+        if (nowCompletedAt && !wasCompletedAt && role === 'crew') {
+          await recordActivity({
+            activityType: 'service_task_completed',
+            description: `Completed task "${(t as any)?.title || id}" on Service ${input.serviceId}`,
+            actorId: normalizeIdentity(input.actorCode || '') || 'SYSTEM',
+            actorRole: input.actorRole || 'system',
+            targetId: input.serviceId,
+            targetType: 'service',
+            metadata: {
+              taskId: id,
+              title: (t as any)?.title || id,
+              completedAt: nowCompletedAt,
+              completedBy: normalizeIdentity(input.actorCode || '') || null,
+            },
+          });
+        }
+      }
+    }
+  } catch {}
   return { ...service, metadata: meta };
 }
 
@@ -335,6 +400,7 @@ export async function addServiceCrewRequests(input: {
 
   // Record activity for crew request
   const actorId = normalizeIdentity(input.managerCode) ?? 'MANAGER';
+  // 1) Manager-level log (for manager feeds and service history)
   await recordActivity({
     activityType: 'service_crew_requested',
     description: `Requested Crew for Service ${input.serviceId}`,
@@ -347,6 +413,25 @@ export async function addServiceCrewRequests(input: {
       message: input.message,
     },
   });
+  // 2) Per-crew notifications (target = crew)
+  for (const code of input.crewCodes) {
+    const crewId = normalizeIdentity(code || '') || (code || '').toUpperCase();
+    if (!crewId) continue;
+    await recordActivity({
+      activityType: 'service_crew_requested',
+      description: `Requested you to work on Service ${input.serviceId}`,
+      actorId,
+      actorRole: 'manager',
+      targetId: crewId,
+      targetType: 'crew',
+      metadata: {
+        crewId,
+        serviceId: input.serviceId,
+        managerId: actorId,
+        message: input.message ?? undefined,
+      },
+    });
+  }
 
   return { ...service, metadata: updatedMetadata };
 }
@@ -415,6 +500,17 @@ export async function respondToServiceCrewRequest(input: {
     );
   }
 
+  // Look up manager for scoping metadata on activities
+  let managerId: string | null = null;
+  try {
+    const mgr = await query<{ manager_id: string | null }>(
+      `SELECT manager_id FROM orders WHERE order_id = $1 LIMIT 1`,
+      [orderId]
+    );
+    managerId = (mgr.rows[0]?.manager_id || null) as any;
+    managerId = normalizeIdentity(managerId || null);
+  } catch {}
+
   // Record activity for crew response
   const actorId = normalizeIdentity(code) ?? 'CREW';
   await recordActivity({
@@ -429,8 +525,27 @@ export async function respondToServiceCrewRequest(input: {
     metadata: {
       accepted: input.accept,
       crewCode: code,
+      managerId: managerId || undefined,
     },
   });
+
+  // On acceptance, emit an assignment event so others can be notified
+  if (input.accept) {
+    await recordActivity({
+      activityType: 'crew_assigned_to_service',
+      description: `Crew ${code} assigned to Service ${input.serviceId}`,
+      actorId,
+      actorRole: 'crew',
+      targetId: input.serviceId,
+      targetType: 'service',
+      metadata: {
+        crewId: code,
+        serviceId: input.serviceId,
+        managerId: managerId || undefined,
+        // Optionally include center if available in future
+      },
+    });
+  }
 
   return { ...service, metadata: updatedMetadata };
 }

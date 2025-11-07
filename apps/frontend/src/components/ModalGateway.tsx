@@ -388,6 +388,7 @@ export function ModalGateway({
       entityId,
       viewerId: currentUserId,
       hasActions: actions.length > 0,
+      openContext: options?.context,
     }, actions);
 
     // Filter tabs based on RBAC policy
@@ -409,6 +410,7 @@ export function ModalGateway({
       entityId,
       viewerId: currentUserId,
       hasActions,
+      openContext: options?.context,
     });
 
     console.log('[ModalGateway] Visible tabs after filtering:', filtered.map(t => t.id));
@@ -462,6 +464,56 @@ export function ModalGateway({
 
   // ===== NEW PATTERN: Render EntityModalView directly =====
   if (adapter.getHeaderConfig) {
+    // Smooth loading: show lightweight skeleton tabs while data fetch resolves
+    if (isLoading || !data) {
+      const skeletonLine = (w: string) => (
+        <div style={{
+          height: 12,
+          width: w,
+          background: '#e5e7eb',
+          borderRadius: 4,
+          margin: '8px 0'
+        }} />
+      );
+
+      const skeletonSection = (
+        <div style={{ padding: 16 }}>
+          {skeletonLine('60%')}
+          {skeletonLine('90%')}
+          {skeletonLine('75%')}
+          {skeletonLine('85%')}
+          {skeletonLine('50%')}
+        </div>
+      );
+
+      const skeletonTabs = [
+        { id: 'details' as const, label: 'Details', content: skeletonSection },
+        { id: 'history' as const, label: 'History', content: skeletonSection },
+        { id: 'actions' as const, label: 'Quick Actions', content: skeletonSection },
+      ];
+
+      const placeholderHeader = headerConfig || {
+        id: entityId || '',
+        type: entityType === 'order' ? 'Order' : entityType === 'service' ? 'Service' : undefined,
+        status: 'loading',
+        fields: [],
+      };
+
+      return (
+        <EntityModalView
+          key={`skeleton:${entityType}:${entityId}`}
+          isOpen={isOpen}
+          onClose={onClose}
+          entityType={entityType}
+          entityId={entityId}
+          lifecycle={lifecycle}
+          headerConfig={placeholderHeader}
+          tabs={skeletonTabs}
+        />
+      );
+    }
+
+    // Data ready: render normal modal view
     return (
       <EntityModalView
         key={`${entityType}:${entityId}`}
@@ -511,3 +563,4 @@ export function ModalGateway({
 }
 
 export default ModalGateway;
+ 

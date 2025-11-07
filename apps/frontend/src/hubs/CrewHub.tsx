@@ -321,8 +321,43 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
       profile: profile ?? null,
       scope: scopeData ?? null,
       certifiedServices: certifiedServicesData,
+      orders: orders?.serviceOrders ?? [],
+      viewerId: normalizedCode,
     }),
-  [dashboard, profile, scopeData, certifiedServicesData]);
+  [dashboard, profile, scopeData, certifiedServicesData, orders?.serviceOrders, normalizedCode]);
+
+  // Build dashboard cards once (do not call hooks inside render conditionals)
+  const dashboardCards = useMemo(() => {
+    const openFirstServiceWithTasks = () => {
+      const me = (normalizedCode || '').toUpperCase();
+      const sos = orders?.serviceOrders || [];
+      const dayNames = ['sun','mon','tue','wed','thu','fri','sat'];
+      const todayKey = dayNames[new Date().getDay()];
+      for (const o of sos) {
+        const meta: any = o.metadata || {};
+        const status = String(meta.serviceStatus || meta.service_status || '').toLowerCase();
+        if (status !== 'in_progress') continue;
+        const tasks: any[] = Array.isArray(meta.tasks) ? meta.tasks : [];
+        const has = tasks.some((t: any) => {
+          const assigned = Array.isArray(t?.assignedTo) ? t.assignedTo.map((x: any) => String(x).toUpperCase()) : [];
+          if (!assigned.includes(me) || t?.completedAt) return false;
+          const days: string[] = Array.isArray(t?.days) ? t.days.map((d: any) => String(d).toLowerCase()) : [];
+          const freq = String(t?.frequency || '').toLowerCase();
+          return (days.length > 0 && days.includes(todayKey)) || freq === 'daily' || days.length === 0;
+        });
+        if (has && (o.serviceId || meta.serviceId)) {
+          modals.openById((o.serviceId || meta.serviceId)!, { context: { focus: 'crew-tasks' } });
+          return;
+        }
+      }
+      // Fallback: open Services tab
+      setActiveTab('services');
+    };
+
+    return crewOverviewCards.map((c) =>
+      c.id === 'my-tasks' ? { ...c, onClick: openFirstServiceWithTasks } : c
+    );
+  }, [orders?.serviceOrders, normalizedCode, modals]);
 
   const crewScope = scopeData?.role === 'crew' ? scopeData : null;
 
@@ -466,6 +501,7 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
 
   const myServicesColumns = MY_SERVICES_COLUMNS_BASE;
 
+
   // Don't render anything until we have critical data
   if (!profile || !dashboard) {
     console.log('[CrewHub] Waiting for critical data...');
@@ -491,11 +527,7 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
               {dashboardErrorMessage && (
                 <div style={{ marginBottom: 12, color: '#dc2626' }}>{dashboardErrorMessage}</div>
               )}
-              <OverviewSection
-                cards={crewOverviewCards}
-                data={overviewData}
-                loading={dashboardLoading}
-              />
+              <OverviewSection cards={dashboardCards} data={overviewData} loading={dashboardLoading} />
 
               <PageHeader title="Recent Activity" />
               <ActivityFeed
@@ -620,32 +652,7 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
                         },
                       },
                       { key: 'startDate', label: 'START DATE' },
-                      {
-                        key: 'actions',
-                        label: 'ACTIONS',
-                        render: (_: any, row: any) => {
-                          if (row.canRespond) {
-                            return (
-                              <div style={{ display: 'flex', gap: 8 }}>
-                                <Button size="sm" variant="primary" onClick={async () => { try { await row.onAccept?.(); mutate(`/hub/orders/${normalizedCode}`); } catch (e) { alert('Failed to accept.'); } }}>Accept</Button>
-                                <Button size="sm" variant="danger" onClick={async () => { try { await row.onReject?.(); mutate(`/hub/orders/${normalizedCode}`); } catch (e) { alert('Failed to reject.'); } }}>Reject</Button>
-                              </div>
-                            );
-                          }
-                          return (
-                            <Button
-                              size="sm"
-                              roleColor="#ef4444"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                modals.openById(row.serviceId);
-                              }}
-                            >
-                              View Details
-                            </Button>
-                          );
-                        }
-                      }
+                      // Actions column removed – rows open modal on click
                     ]}
                     data={activeServicesData.filter((row) => {
                       if (!servicesSearchQuery) {
@@ -659,7 +666,9 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
                     })}
                     showSearch={false}
                     maxItems={10}
-                    onRowClick={() => undefined}
+                    onRowClick={(row: any) => {
+                      modals.openById(row.serviceId);
+                    }}
                   />
                 )}
 
@@ -767,6 +776,7 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
                       }
 
                       mutate(`/hub/orders/${normalizedCode}`);
+                      mutate(`/hub/activities/${normalizedCode}`);
                     } else {
                       // Regular order actions (cancel, etc.) - use centralized handler
                       const success = await handleAction(orderId, action);

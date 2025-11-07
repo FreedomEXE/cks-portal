@@ -82,6 +82,8 @@ export interface TabVisibilityContext {
   entityId?: string; // The ID of the entity being viewed
   viewerId?: string; // The ID of the current user viewing
   hasActions: boolean;
+  /** Optional open context passed from modal launcher (e.g., focus flags) */
+  openContext?: Record<string, any>;
 }
 
 /**

@@ -342,6 +342,7 @@ function CartPanel({
   onClose,
   onCheckout,
   role,
+  prefillServiceId,
   defaultDestination,
   centers,
   customers,
@@ -356,6 +357,7 @@ function CartPanel({
     serviceId?: string | null
   ) => void;
   role: string | null;
+  prefillServiceId?: string;
   defaultDestination: string | null;
   centers: DestinationOption[];
   customers: { id: string; name: string | null; contractorId?: string | null }[];
@@ -374,6 +376,11 @@ function CartPanel({
   const [selectedCustomer, setSelectedCustomer] = useState<string | null>(customers.length === 1 ? customers[0].id : null);
   const [selectedCenter, setSelectedCenter] = useState<string | null>(defaultDestination ?? null);
   const [selectedService, setSelectedService] = useState<string | null>(null);
+  useEffect(() => {
+    if (prefillServiceId && services.some(s => (s.id || '').toUpperCase() === prefillServiceId)) {
+      setSelectedService(prefillServiceId);
+    }
+  }, [prefillServiceId, services]);
 
   useEffect(() => {
     if (!selectedCenter && centers && centers.length === 1) {
@@ -780,11 +787,21 @@ export default function CKSCatalog() {
     if (mode === 'products' || mode === 'services') return mode;
     return null; // null = full catalog (both tabs visible)
   }, [searchParams]);
+  const selectedServiceIdFromQuery = useMemo(() => {
+    const sid = searchParams.get('serviceId');
+    return sid && sid.trim().length > 0 ? sid.toUpperCase() : null;
+  }, [searchParams]);
 
   const [kind, setKind] = useState<CatalogKind>(catalogMode === 'services' ? 'services' : 'products');
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [showCart, setShowCart] = useState(false);
+  // Auto-open cart when navigated with serviceId (products mode)
+  useEffect(() => {
+    if (selectedServiceIdFromQuery && catalogMode === 'products') {
+      setShowCart(true);
+    }
+  }, [selectedServiceIdFromQuery, catalogMode]);
   const [selectedService, setSelectedService] = useState<CatalogItem | null>(null);
   // Legacy product modal state removed; use universal modal
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -1128,6 +1145,7 @@ export default function CKSCatalog() {
           onClose={() => setShowCart(false)}
           onCheckout={handleCheckout}
           role={authRole}
+          prefillServiceId={selectedServiceIdFromQuery || undefined}
           defaultDestination={(() => {
             const r = (authRole || '').toLowerCase();
             // Crew: single center (if provided via scope)

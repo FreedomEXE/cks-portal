@@ -40,6 +40,7 @@ interface NormalizedOrder {
     timestamp?: string | null;
   }>;
   metadata?: any;
+  availableActions?: string[];
   isDeleted?: boolean;
   deletedAt?: string;
   deletedBy?: string;
@@ -138,6 +139,7 @@ function normalizeOrder(entity: any): NormalizedOrder {
     serviceId: entity.service_id || entity.serviceId || entity.transformedId || null,
     approvalStages: entity.approvalStages || [],
     metadata,
+    availableActions: Array.isArray(entity.availableActions) ? entity.availableActions : [],
     isDeleted: false,
     deletedAt: undefined,
     deletedBy: undefined,

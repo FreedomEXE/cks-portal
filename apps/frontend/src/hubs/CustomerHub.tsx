@@ -548,22 +548,7 @@ function CustomerHubContent({ initialTab = 'dashboard' }: CustomerHubProps) {
                       },
                       { key: 'managedBy', label: 'MANAGED BY' },
                       { key: 'startDate', label: 'START DATE' },
-                      {
-                        key: 'actions',
-                        label: 'ACTIONS',
-                        render: (_: any, row: any) => (
-                          <Button
-                            size="sm"
-                            roleColor="#eab308"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              modals.openById(row.serviceId);
-                            }}
-                          >
-                            View Details
-                          </Button>
-                        ),
-                      },
+                      // Actions column removed – rows open modal on click
                     ]}
                     data={myServicesData.filter((row) => {
                       if (!servicesSearchQuery) {

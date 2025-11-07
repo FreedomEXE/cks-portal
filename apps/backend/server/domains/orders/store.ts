@@ -2483,6 +2483,27 @@ export async function applyOrderAction(input: OrderActionInput): Promise<HubOrde
       );
 
       console.log(`[auto-create-service] Created service ${transformedId} for order ${input.orderId}`);
+      // Record activity for service creation with transformed ID as target
+      try {
+        await recordActivity({
+          activityType: 'service_created',
+          description: `Created Service ${transformedId}`,
+          actorId: actorCodeNormalized || 'SYSTEM',
+          actorRole: input.actorRole,
+          targetId: transformedId,
+          targetType: 'service',
+          metadata: {
+            orderId: input.orderId,
+            serviceName,
+            serviceType,
+            centerId: normalizeCodeValue(row.center_id) ?? undefined,
+            managerId: normalizeCodeValue(row.manager_id) ?? undefined,
+            warehouseId: normalizeCodeValue(row.assigned_warehouse) ?? undefined,
+          },
+        });
+      } catch (e) {
+        console.warn('[auto-create-service] Failed to record service_created activity', e);
+      }
     }
 
     await query("COMMIT");

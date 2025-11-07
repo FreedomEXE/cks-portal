@@ -19,7 +19,7 @@ import { useCallback } from 'react';
 import { useSWRConfig } from 'swr';
 import toast from 'react-hot-toast';
 import { parseEntityId } from '../shared/utils/parseEntityId';
-import { applyHubOrderAction, type OrderActionRequest, acknowledgeItem, resolveReport, applyServiceAction } from '../shared/api/hub';
+import { applyHubOrderAction, type OrderActionRequest, acknowledgeItem, resolveReport, applyServiceAction, requestServiceCrew, respondToServiceCrew, respondToOrderCrew } from '../shared/api/hub';
 import { archiveAPI } from '../shared/api/archive';
 import { updateCatalogService } from '../shared/api/admin';
 
@@ -103,6 +103,48 @@ async function handleOrderAction(
   mutate: any
 ): Promise<boolean> {
   // Archive API (statically imported)
+
+  // Admin convenience actions: manage related active service from order modal
+  if (actionId === 'archive_related_service' || actionId === 'hard_delete_related_service') {
+    const relatedServiceId = (options as any)?.relatedServiceId || (options as any)?.metadata?.relatedServiceId;
+    if (!relatedServiceId) {
+      toast.error('No related service ID found');
+      return false;
+    }
+    try {
+      if (actionId === 'archive_related_service') {
+        await archiveAPI.archiveEntity('service', relatedServiceId, options.notes || undefined);
+        toast.success('Active service archived');
+      } else {
+        await archiveAPI.hardDelete('service', relatedServiceId, options.notes || undefined);
+        toast.success('Active service permanently deleted');
+      }
+      // Invalidate caches for both orders and services + activities
+      mutate((key: any) => {
+        if (typeof key === 'string') {
+          return key.includes('/hub/orders/') ||
+                 key.includes('/admin/directory/orders') ||
+                 key.includes('/admin/directory/services') ||
+                 key.includes('/api/hub/activities') ||
+                 key.includes('/hub/activities') ||
+                 key.includes('/api/archive/list') ||
+                 key.includes('/archive/list') ||
+                 key.includes(orderId) ||
+                 key.includes(relatedServiceId);
+        }
+        return false;
+      });
+      window.dispatchEvent(new CustomEvent('cks:archive:updated', {
+        detail: { entityType: 'service', entityId: relatedServiceId, action: actionId === 'archive_related_service' ? 'archive' : 'hard_delete' }
+      }));
+      options.onSuccess?.();
+      return true;
+    } catch (err) {
+      console.error('[useEntityActions] related service archive/delete failed:', err);
+      toast.error('Failed to update active service');
+      throw err;
+    }
+  }
 
   // Handle archive/restore/delete actions (admin only)
   if (actionId === 'archive' || actionId === 'restore' || actionId === 'delete') {
@@ -251,8 +293,10 @@ async function handleOrderAction(
       break;
 
     case 'create_service':
-      backendAction = 'create_service';
-      // transformedId should be provided in options
+    case 'create-service':
+      // Backend expects hyphenated action id
+      backendAction = 'create-service';
+      // transformedId should be provided in options (or returned by backend)
       break;
 
     // Warehouse delivery flow aliases
@@ -289,6 +333,26 @@ async function handleOrderAction(
   try {
     // Call backend
     console.log(`[useEntityActions] Calling order action: ${actionId} on ${orderId}`, payload);
+
+    // Crew responding to order-level invite uses a dedicated endpoint
+    if ((actionId === 'accept' || actionId === 'reject') && (options as any)?.metadata?.crewResponse === true) {
+      const accepted = actionId === 'accept';
+      const resp = await respondToOrderCrew(orderId, accepted);
+      // Invalidate caches and toast
+      mutate((key: any) => {
+        if (typeof key === 'string') {
+          return key.includes('/hub/orders/') ||
+                 key.includes('/api/hub/activities') ||
+                 key.includes('/hub/activities') ||
+                 key.includes(orderId);
+        }
+        return false;
+      });
+      toast.success(accepted ? 'Invite accepted' : 'Invite declined');
+      options.onSuccess?.();
+      return true;
+    }
+
     const result = await applyHubOrderAction(orderId, payload);
     console.log(`[useEntityActions] Order action succeeded:`, result);
 
@@ -302,6 +366,22 @@ async function handleOrderAction(
       }
       return false;
     });
+
+    // Special handling: after create-service, also refresh service caches
+    try {
+      if (backendAction === 'create-service') {
+        const newServiceId = (result as any)?.transformedId || (result as any)?.serviceId || undefined;
+        mutate((key: any) => {
+          if (typeof key === 'string') {
+            return key.includes('/services') ||
+                   (newServiceId ? key.includes(newServiceId) : false);
+          }
+          return false;
+        });
+      }
+    } catch (e) {
+      console.warn('[useEntityActions] Post-create-service cache refresh failed:', e);
+    }
 
     options.onSuccess?.();
     console.log(`[useEntityActions] Order action "${actionId}" completed successfully`);
@@ -331,6 +411,7 @@ async function handleOrderAction(
 ): Promise<boolean> {
   try {
     switch (actionId) {
+      
         case 'archive': {
           const reason = options.notes;
           await archiveAPI.archiveEntity('product', productId, reason || undefined);
@@ -604,6 +685,45 @@ async function handleServiceAction(
         options.onSuccess?.();
         return true;
 
+      case 'assign_crew':
+        // Minimal UI: prompt for crew codes and optional message
+        try {
+          const codesRaw = (options?.metadata as any)?.crewCodes as string | undefined || window.prompt('Enter one or more crew codes (comma-separated):') || '';
+          const message = options?.notes || window.prompt('Optional message to include with the invite:') || undefined;
+          const crewCodes = codesRaw
+            .split(',')
+            .map((s) => s.trim().toUpperCase())
+            .filter((s) => s.length > 0);
+
+          if (crewCodes.length === 0) {
+            toast.error('No crew codes provided.');
+            return false;
+          }
+
+          console.log('[useEntityActions] Requesting crew:', { serviceId, crewCodes, message });
+          await requestServiceCrew(serviceId, crewCodes, message);
+
+          // Invalidate caches
+          mutate((key: any) => {
+            if (typeof key === 'string') {
+              return key.includes('/services') ||
+                     key.includes('/admin/directory/activities') ||
+                     key.includes('/api/hub/activities') ||
+                     key.includes('/hub/activities') ||
+                     key.includes(serviceId);
+            }
+            return false;
+          });
+
+          toast.success('Crew request sent');
+          options.onSuccess?.();
+          return true;
+        } catch (e) {
+          console.error('[useEntityActions] assign_crew failed:', e);
+          toast.error('Failed to send crew request');
+          throw e;
+        }
+
       case 'complete':
         console.log('[useEntityActions] Completing service:', serviceId);
         await applyServiceAction(serviceId, 'complete', options.notes);
@@ -689,11 +809,7 @@ async function handleServiceAction(
         options.onSuccess?.();
         return true;
 
-      case 'assign_crew':
-        // TODO: Implement crew assignment UI workflow
-        console.warn(`[useEntityActions] assign_crew action requires UI workflow`);
-        toast.error(`assign_crew action requires UI workflow`);
-        return false;
+      // Note: 'assign_crew' implemented above; no duplicate fallback here
 
       default:
         console.warn('[useEntityActions] Unknown action for service:', actionId);

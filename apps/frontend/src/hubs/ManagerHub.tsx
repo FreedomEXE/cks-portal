@@ -188,33 +188,7 @@ const ACTIVE_SERVICES_COLUMNS = [
     },
   },
   { key: 'startDate', label: 'START DATE' },
-  {
-    key: 'actions',
-    label: 'ACTIONS',
-    render: (_: any, row: any) => {
-      const status = (row.status || '').toLowerCase();
-      const isCreated = status === 'created';
-      const isInProgress = status === 'in progress' || status === 'in_progress' || status === 'active';
-
-      return (
-        <div style={{ display: 'flex', gap: 8 }}>
-          {isCreated && (
-            <Button size="sm" variant="primary" onClick={row.onStart}>
-              Start Service
-            </Button>
-          )}
-          {isInProgress && (
-            <Button size="sm" variant="primary" onClick={row.onComplete}>
-              Complete
-            </Button>
-          )}
-          <Button size="sm" onClick={row.onViewDetails}>
-            View Details
-          </Button>
-        </div>
-      );
-    }
-  }
+  // Actions column removed – row click opens modal with Quick Actions
 ];
 
 const SERVICE_HISTORY_COLUMNS = [

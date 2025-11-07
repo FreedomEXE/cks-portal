@@ -735,22 +735,7 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
                       },
                       { key: 'managedBy', label: 'MANAGED BY' },
                       { key: 'startDate', label: 'START DATE' },
-                      {
-                        key: 'actions',
-                        label: 'ACTIONS',
-                        render: (_: any, row: any) => (
-                          <Button
-                            size="sm"
-                            roleColor="#22c55e"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              modals.openById(row.serviceId);
-                            }}
-                          >
-                            View Details
-                          </Button>
-                        ),
-                      },
+                      // Actions column removed – rows open modal on click
                     ]}
                     data={activeServicesData.filter((row) => {
                       if (!servicesSearchQuery) {

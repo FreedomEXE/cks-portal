@@ -162,8 +162,22 @@ function computeTimelineText(event: LifecycleEvent, fallbackEntityId?: string): 
     if (userId && serviceId) return `${userId} for ${serviceId}`;
   }
 
-  // Generic lifecycle/status: prefer the last ID token; else the entity id fallback
-  return extractLastIdToken(stripped) || extractFirstIdToken(stripped) || (fallbackEntityId || '');
+  // Generic lifecycle/status: prefer ID from description, but avoid mixing catalog vs instance IDs
+  const last = extractLastIdToken(stripped);
+  const first = extractFirstIdToken(stripped);
+  let extracted = last || first || null;
+
+  const fb = (fallbackEntityId || '').toUpperCase();
+  if (fb) {
+    // If fallback looks like a scoped service (CEN-XXX-SRV-###) but extracted is unscoped SRV-###, prefer fallback
+    const fallbackIsScopedService = /-[A-Z]{3}-\d{3}-SRV-\d+$/i.test(fb) || /^(?:[A-Z]{3}-\d{3}-)SRV-\d+$/i.test(fb);
+    const extractedIsCatalogService = !!(extracted && /^SRV-\d+$/i.test(extracted));
+    if (fallbackIsScopedService && extractedIsCatalogService) {
+      return fb;
+    }
+  }
+
+  return extracted || fb || '';
 }
 
 /**
@@ -319,7 +333,7 @@ export function HistoryTab({ entityType, entityId, limit, events: providedEvents
             }
 
             // Compute timeline display description
-            const displayDescription = computeTimelineText(event, /*fallback*/ undefined);
+            const displayDescription = computeTimelineText(event, entityId);
 
             return (
               <div key={event.id || index} style={{ position: 'relative', paddingLeft: '36px' }}>

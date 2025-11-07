@@ -74,6 +74,7 @@ function normalizeService(entity: any): NormalizedService {
     metadata: {
       serviceStatus: metadata.serviceStatus || entity.status,
       serviceType: metadata.serviceType || entity.serviceType || 'one-time',
+      serviceManagedBy: metadata.serviceManagedBy || entity.managedBy || entity.serviceManagedBy || null,
       crew: metadata.crew || entity.crew || [],
       crewRequests: metadata.crewRequests || entity.crewRequests || [],
       procedures: metadata.procedures || entity.procedures || [],

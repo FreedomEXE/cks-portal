@@ -112,6 +112,10 @@ const activityTypeCategory: Record<string, string> = {
   order_delivered: 'success',
   order_completed: 'success',
   service_completed: 'success',
+  service_task_completed: 'success',
+  service_crew_requested: 'action',
+  service_crew_response: 'action',
+  crew_assigned_to_service: 'action',
   catalog_service_certified: 'success',
   order_accepted: 'success',
   order_approved: 'success',
@@ -122,6 +126,7 @@ const activityTypeCategory: Record<string, string> = {
   order_rejected: 'warning',
   order_failed: 'warning',
   service_cancelled: 'warning',
+  crew_unassigned_from_service: 'warning',
   catalog_service_decertified: 'warning',
   support_ticket_updated: 'warning',
 
@@ -431,6 +436,9 @@ async function getManagerActivities(cksCode: string): Promise<HubRoleActivitiesP
         -- Catalog service creation events (visible to MGR/CON/CUS/CEN)
         (activity_type = 'catalog_service_created')
         OR
+        -- Active service created by this manager (links to CEN-XXX-SRV-###)
+        (activity_type = 'service_created' AND metadata ? 'managerId' AND UPPER(metadata->>'managerId') = $2)
+        OR
         -- Product creation events (visible to all roles)
         (activity_type = 'product_created')
         OR
@@ -445,9 +453,24 @@ async function getManagerActivities(cksCode: string): Promise<HubRoleActivitiesP
        AND (
          (target_id IS NOT NULL AND UPPER(target_id) = ANY($1::text[]))
          OR (actor_id IS NOT NULL AND UPPER(actor_id) = $2)
-         OR (metadata ? 'managerId' AND UPPER(metadata->>'managerId') = $2)
-         OR (metadata ? 'cksManager' AND UPPER(metadata->>'cksManager') = $2)
-       )
+        OR (metadata ? 'managerId' AND UPPER(metadata->>'managerId') = $2)
+        OR (metadata ? 'cksManager' AND UPPER(metadata->>'cksManager') = $2)
+        OR (
+          -- Manager sees their own crew requests they initiated
+          activity_type = 'service_crew_requested' AND (actor_id IS NOT NULL AND UPPER(actor_id) = $2)
+        )
+        OR (
+          -- Manager sees crew assignment acceptances for services they manage
+          activity_type = 'crew_assigned_to_service' AND metadata ? 'managerId' AND UPPER(metadata->>'managerId') = $2
+        )
+        OR (
+          -- Manager sees unassignments for services they manage
+          activity_type = 'crew_unassigned_from_service' AND (
+            (metadata ? 'managerId' AND UPPER(metadata->>'managerId') = $2) OR
+            (metadata ? 'crewId') -- still visible via ecosystem filter below
+          )
+        )
+      )
      )
      AND NOT EXISTS (
        SELECT 1 FROM activity_dismissals ad
@@ -1382,8 +1405,18 @@ async function getCrewActivities(cksCode: string): Promise<HubRoleActivitiesPayl
           OR (actor_id IS NOT NULL AND UPPER(actor_id) = $2)
         ))
         OR
+        -- Show manager-to-crew service request directed to this crew
+        (activity_type = 'service_crew_requested' AND (
+          UPPER(target_id) = $2 OR (metadata ? 'crewId' AND UPPER(metadata->>'crewId') = $2)
+        ))
+        OR
         -- Show assignments where YOU are being assigned (target is self)
         (activity_type LIKE '%_assigned%' AND UPPER(target_id) = $2)
+        OR
+        -- Explicit: service assignment accepted (metadata.crewId = you)
+        (activity_type = 'crew_assigned_to_service' AND metadata ? 'crewId' AND UPPER(metadata->>'crewId') = $2)
+        OR
+        (activity_type = 'crew_unassigned_from_service' AND metadata ? 'crewId' AND UPPER(metadata->>'crewId') = $2)
         OR
         -- Show assignments where you are assigned to a center (crew is in metadata)
         (activity_type = 'crew_assigned_to_center' AND metadata ? 'crewId' AND UPPER(metadata->>'crewId') = $2)
@@ -1414,7 +1447,7 @@ async function getCrewActivities(cksCode: string): Promise<HubRoleActivitiesPayl
          OR (metadata ? 'contractorId' AND UPPER(metadata->>'contractorId') = $2)
          OR (metadata ? 'managerId' AND UPPER(metadata->>'managerId') = $2)
          OR (metadata ? 'warehouseId' AND UPPER(metadata->>'warehouseId') = $2)
-       )
+      )
      )
      AND NOT EXISTS (
        SELECT 1 FROM activity_dismissals ad

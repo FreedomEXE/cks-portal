@@ -930,45 +930,7 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
                         },
                       },
                       { key: 'startDate', label: 'START DATE' },
-                      {
-                        key: 'actions',
-                        label: 'ACTIONS',
-                        render: (_: any, row: any) => {
-                          const status = (row.status || '').toLowerCase();
-                          const isCreated = status === 'created';
-                          const isInProgress = status === 'in progress' || status === 'in_progress' || status === 'active';
-
-                          return (
-                            <div style={{ display: 'flex', gap: 8 }}>
-                              {isCreated && row.onStart && (
-                                <Button size="sm" variant="primary" roleColor="#8b5cf6" onClick={(e) => { e.stopPropagation(); row.onStart(); }}>
-                                  Start
-                                </Button>
-                              )}
-                              {isInProgress && row.onComplete && (
-                                <Button size="sm" variant="primary" roleColor="#8b5cf6" onClick={(e) => { e.stopPropagation(); row.onComplete(); }}>
-                                  Complete
-                                </Button>
-                              )}
-                              <Button
-                                size="sm"
-                                roleColor="#8b5cf6"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  modals.openById(row.serviceId);
-                                }}
-                              >
-                                View
-                              </Button>
-                              {(isCreated || isInProgress) && row.onCancel && (
-                                <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); row.onCancel(); }}>
-                                  Cancel
-                                </Button>
-                              )}
-                            </div>
-                          );
-                        },
-                      },
+                      // Actions column removed – rows open modal on click
                     ]}
                     data={activeServicesData.filter((row) => {
                       if (!servicesSearchQuery) {

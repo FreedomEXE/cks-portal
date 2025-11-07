@@ -49,6 +49,13 @@ import { filterVisibleSections } from '../policies/sections';
 import { mapProfileDataForRole } from '../shared/utils/profileMapping';
 import { patchServiceAssignments } from '../shared/api/admin';
 import { updateInventory, getProductInventory } from '../shared/api/admin';
+import ServiceAssignmentsTab from '../components/tabs/ServiceAssignmentsTab/ServiceAssignmentsTab';
+import ServiceProceduresTab from '../components/tabs/ServiceProceduresTab/ServiceProceduresTab';
+import ServiceProceduresViewerTab from '../components/tabs/ServiceProceduresTab/ServiceProceduresViewerTab';
+import ServiceTrainingTab from '../components/tabs/ServiceTrainingTab/ServiceTrainingTab';
+import ServiceProductsTab from '../components/tabs/ServiceProductsTab/ServiceProductsTab';
+import ServiceTasksTab from '../components/tabs/ServiceTasksTab/ServiceTasksTab';
+import ServiceCrewTasksTab from '../components/tabs/ServiceCrewTasksTab/ServiceCrewTasksTab';
 
 /**
  * Order Details Sections Builder
@@ -57,6 +64,7 @@ function buildOrderDetailsSections(context: TabVisibilityContext): import('@cks/
   const { entityData } = context;
   const sections: import('@cks/ui').SectionDescriptor[] = [];
   const isProduct = entityData?.orderType === 'product';
+  const isService = entityData?.orderType === 'service';
 
   // Related Service section (if linked to service)
   if (entityData?.serviceId) {
@@ -150,6 +158,44 @@ function buildOrderDetailsSections(context: TabVisibilityContext): import('@cks/
         unitOfMeasure: item.unitOfMeasure || 'EA',
       })),
     });
+  }
+
+  // Service Information (for service orders)
+  if (isService) {
+    const svc: any = (entityData as any)?.serviceDetails || (entityData as any)?.metadata || {};
+    const firstServiceItem = Array.isArray((entityData as any)?.items)
+      ? (entityData as any).items.find((it: any) => (it?.itemType || it?.item_type) === 'service')
+      : null;
+
+    const name = svc.serviceName || firstServiceItem?.name || null;
+    const type = svc.serviceType || (firstServiceItem?.metadata?.serviceType ?? null);
+    const status = svc.serviceStatus || null;
+    const description = (svc.serviceDescription || firstServiceItem?.description || '').toString();
+    const fields: Array<{ label: string; value: string }> = [];
+
+    const serviceId = svc.serviceId || (entityData as any).serviceId || null;
+    if (serviceId) fields.push({ label: 'Service ID', value: String(serviceId) });
+    if (name) fields.push({ label: 'Name', value: String(name) });
+    if (type) fields.push({ label: 'Type', value: String(type) });
+    if (status) fields.push({ label: 'Status', value: String(status) });
+
+    if (fields.length > 0) {
+      sections.push({
+        id: 'service-info',
+        type: 'key-value-grid',
+        title: 'Service Information',
+        columns: 2,
+        fields,
+      });
+    }
+    if (description.trim().length > 0) {
+      sections.push({
+        id: 'service-description',
+        type: 'rich-text',
+        title: 'Service Description',
+        content: description,
+      } as any);
+    }
   }
 
   // Special Instructions section
@@ -257,6 +303,28 @@ const orderAdapter: EntityAdapter = {
             closeOnSuccess: true,
           });
         }
+
+        // Convenience: manage the related active service directly from the order modal (admin only)
+        if (entityData?.orderType === 'service' && entityData?.serviceId) {
+          descriptors.push({
+            key: 'archive_related_service',
+            label: 'Archive Active Service',
+            variant: 'secondary',
+            confirm: `Archive related active service ${entityData.serviceId}? You can restore it later.`,
+            prompt: 'Optional: Provide a reason for archiving this service',
+            closeOnSuccess: false,
+            payload: { relatedServiceId: entityData.serviceId },
+          });
+          descriptors.push({
+            key: 'hard_delete_related_service',
+            label: 'Permanently Delete Active Service',
+            variant: 'danger',
+            confirm: `Are you sure you want to PERMANENTLY delete active service ${entityData.serviceId}? This cannot be undone.`,
+            prompt: 'Provide a deletion reason (optional):',
+            closeOnSuccess: false,
+            payload: { relatedServiceId: entityData.serviceId },
+          });
+        }
       } else if (state === 'archived') {
         if (can('order', 'restore', role, { state, entityData })) {
           descriptors.push({
@@ -307,13 +375,15 @@ const orderAdapter: EntityAdapter = {
             ? `Please provide a reason for ${label.toLowerCase()}:`
             : undefined;
 
+          // Keep modal open for flow actions like "Create Service"
+          const keepOpen = /create service/i.test(label);
           descriptors.push({
             key,
             label,
             variant,
             confirm,
             prompt,
-            closeOnSuccess: true,
+            closeOnSuccess: keepOpen ? false : true,
           });
         }
       } else {
@@ -328,24 +398,10 @@ const orderAdapter: EntityAdapter = {
           });
         }
 
-        // Crew can cancel their own pending orders
-        if (role === 'crew' && status.includes('pending')) {
-          const crewOwnsOrder =
-            entityData?.metadata?.crewId === viewerId ||
-            entityData?.creatorId === viewerId;
-
-          if (process.env.NODE_ENV !== 'production') {
-            console.log('[OrderAdapter] Crew cancel check:', {
-              crewOwnsOrder,
-              metadata: entityData?.metadata,
-              creatorId: entityData?.creatorId,
-            });
-          }
-
-          if (crewOwnsOrder) {
-            if (process.env.NODE_ENV !== 'production') {
-              console.log('[OrderAdapter] Adding crew cancel action');
-            }
+        // Creator can cancel their own order while pending next-actor approval
+        if (status.includes('pending')) {
+          const isCreator = entityData?.creatorId === viewerId;
+          if (isCreator) {
             descriptors.push({
               key: 'cancel',
               label: 'Cancel',
@@ -452,6 +508,84 @@ const orderAdapter: EntityAdapter = {
               prompt: 'Optional: Provide a reason for cancellation',
               closeOnSuccess: false,
             });
+          }
+        }
+
+        // Crew fallback actions for Service Orders (pre-creation invite flow)
+        if (role === 'crew' && status === 'crew_requested') {
+          const viewerIdUC = (viewerId || '').toUpperCase();
+          const crewRequests: Array<{ crewCode?: string; status?: string }> =
+            (entityData?.metadata?.crewRequests as any[]) || [];
+          const hasPendingInvite = !!viewerIdUC && crewRequests.some((req) =>
+            (req?.status || '').toLowerCase() === 'pending' &&
+            (req?.crewCode || '').toUpperCase() === viewerIdUC
+          );
+          if (hasPendingInvite) {
+            descriptors.push({
+              key: 'accept',
+              label: 'Accept Invite',
+              variant: 'primary',
+              payload: { crewResponse: true },
+              closeOnSuccess: false,
+            });
+            descriptors.push({
+              key: 'reject',
+              label: 'Decline Invite',
+              variant: 'danger',
+              confirm: 'Decline this service invite?',
+              payload: { crewResponse: true },
+              closeOnSuccess: false,
+            });
+          }
+        }
+
+        // Manager fallback actions for Service Orders
+        if (role === 'manager' && (entityData?.orderType === 'service')) {
+          // 1) Accept/Reject when pending manager approval
+          if (status === 'pending_manager') {
+            descriptors.push({
+              key: 'accept',
+              label: 'Accept',
+              variant: 'primary',
+              closeOnSuccess: false,
+            });
+            descriptors.push({
+              key: 'reject',
+              label: 'Reject',
+              variant: 'danger',
+              confirm: 'Are you sure you want to reject this service order?',
+              prompt: 'Please provide a reason for rejection:',
+              closeOnSuccess: false,
+            });
+          }
+
+          // 2) Create Service (transform) after acceptance (or when backend allows)
+          const notTransformed = !entityData?.transformedId;
+          const canTransform = status === 'manager_accepted' || status === 'crew_assigned' || status === 'crew_requested';
+          if (notTransformed && canTransform) {
+            descriptors.push({
+              key: 'create_service',
+              label: 'Create Service',
+              variant: 'primary',
+              closeOnSuccess: false,
+            });
+          }
+        }
+
+        // Warehouse-managed service orders: warehouse is the actor for accept/create
+        if (role === 'warehouse' && (entityData?.orderType === 'service')) {
+          const svcManagedBy = String((entityData?.metadata?.serviceManagedBy || '')).toLowerCase();
+          if (svcManagedBy === 'warehouse') {
+            // Accept/Reject when pending warehouse
+            if (status === 'pending_warehouse') {
+              descriptors.push({ key: 'accept', label: 'Accept', variant: 'primary', closeOnSuccess: false });
+              descriptors.push({ key: 'reject', label: 'Reject', variant: 'danger', confirm: 'Reject this service order?', prompt: 'Please provide a reason for rejection:', closeOnSuccess: false });
+            }
+            // Create Service after warehouse acceptance
+            const notTransformed = !entityData?.transformedId;
+            if (notTransformed && (status === 'warehouse_accepted')) {
+              descriptors.push({ key: 'create_service', label: 'Create Service', variant: 'primary', closeOnSuccess: false });
+            }
           }
         }
       }
@@ -924,9 +1058,20 @@ function buildServiceDetailsSections(context: TabVisibilityContext): import('@ck
   // Service Overview section
   const overviewFields: Array<{ label: string; value: string }> = [];
 
-  overviewFields.push({ label: 'Service Name', value: entityData?.serviceName || '-' });
-  overviewFields.push({ label: 'Service Type', value: entityData?.serviceType || '-' });
-  overviewFields.push({ label: 'Status', value: entityData?.status || '-' });
+  // Overview fields read from normalized metadata when present
+  const svcMeta: any = (entityData as any)?.metadata || {};
+  overviewFields.push({
+    label: 'Service Name',
+    value: svcMeta.serviceName || entityData?.title || entityData?.serviceName || '-',
+  });
+  overviewFields.push({
+    label: 'Service Type',
+    value: svcMeta.serviceType || entityData?.serviceType || '-',
+  });
+  overviewFields.push({
+    label: 'Status',
+    value: svcMeta.serviceStatus || (entityData as any)?.status || '-',
+  });
 
   if (entityData?.assignedTo) {
     overviewFields.push({ label: 'Assigned To', value: entityData.assignedTo });
@@ -973,46 +1118,57 @@ const serviceAdapter: EntityAdapter = {
     const { role, state, entityData } = context;
     const descriptors: EntityActionDescriptor[] = [];
 
-    // Admin actions
+    // Admin actions (unconditional on can(); backend enforces authorization)
     if (role === 'admin') {
       if (state === 'active') {
-        if (can('service', 'archive', role, { state, entityData })) {
-          descriptors.push({
-            key: 'archive',
-            label: 'Archive Service',
-            variant: 'secondary',
-            confirm: 'Are you sure you want to archive this service? You can restore it later.',
-            prompt: 'Optional: Provide a reason for archiving this service',
-            closeOnSuccess: true,
-          });
-        }
+        descriptors.push({
+          key: 'archive',
+          label: 'Archive Service',
+          variant: 'secondary',
+          confirm: 'Are you sure you want to archive this service? You can restore it later.',
+          prompt: 'Optional: Provide a reason for archiving this service',
+          closeOnSuccess: true,
+        });
       } else if (state === 'archived') {
-        if (can('service', 'restore', role, { state, entityData })) {
-          descriptors.push({
-            key: 'restore',
-            label: 'Restore Service',
-            variant: 'secondary',
-            closeOnSuccess: true,
-          });
-        }
-        if (can('service', 'delete', role, { state, entityData })) {
-          descriptors.push({
-            key: 'delete',
-            label: 'Permanently Delete Service',
-            variant: 'danger',
-            confirm: 'Are you sure you want to PERMANENTLY delete this service? This cannot be undone.',
-            prompt: 'Provide a deletion reason (optional):',
-            closeOnSuccess: true,
-          });
-        }
+        descriptors.push({
+          key: 'restore',
+          label: 'Restore Service',
+          variant: 'secondary',
+          closeOnSuccess: true,
+        });
+        descriptors.push({
+          key: 'delete',
+          label: 'Permanently Delete Service',
+          variant: 'danger',
+          confirm: 'Are you sure you want to PERMANENTLY delete this service? This cannot be undone.',
+          prompt: 'Provide a deletion reason (optional):',
+          closeOnSuccess: true,
+        });
       }
     }
 
-    // User workflow actions (start, complete, assign crew)
-    if (role !== 'admin' && state === 'active') {
-      const status = entityData?.status;
+    // Manager lifecycle controls for archived services (Restore)
+    if (role === 'manager' && state === 'archived') {
+      descriptors.push({
+        key: 'restore',
+        label: 'Restore Service',
+        variant: 'secondary',
+        closeOnSuccess: true,
+      });
+    }
 
-      if (can('service', 'start', role, { state, entityData }) && status === 'pending') {
+    // User workflow actions (start, complete, cancel)
+    if (role !== 'admin' && state === 'active') {
+      // Derive live service status from normalized service metadata
+      const statusRaw = String((entityData as any)?.metadata?.serviceStatus || (entityData as any)?.status || '')
+        .toLowerCase()
+        .replace(/\s+/g, '_');
+      const managedBy = String((entityData as any)?.metadata?.serviceManagedBy || (entityData as any)?.managedBy || '')
+        .trim()
+        .toLowerCase();
+
+      // Managers control lifecycle when manager-managed
+      if (role === 'manager' && managedBy !== 'warehouse' && can('service', 'start', role, { state, entityData }) && (statusRaw === 'pending' || statusRaw === 'created')) {
         descriptors.push({
           key: 'start',
           label: 'Start Service',
@@ -1020,24 +1176,39 @@ const serviceAdapter: EntityAdapter = {
           closeOnSuccess: false, // Keep modal open to see updated status
         });
       }
-
-      if (can('service', 'complete', role, { state, entityData }) && status === 'in_progress') {
+      // Per UX: Start/Cancel when pending; Complete/Cancel when in progress (manager only, manager-managed)
+      if (role === 'manager' && managedBy !== 'warehouse' && can('service', 'cancel', role, { state, entityData }) && (statusRaw === 'pending' || statusRaw === 'created' || statusRaw === 'in_progress')) {
+        descriptors.push({
+          key: 'cancel',
+          label: 'Cancel Service',
+          variant: 'danger',
+          confirm: 'Cancel this service?',
+          closeOnSuccess: true,
+        });
+      }
+      if (role === 'manager' && managedBy !== 'warehouse' && can('service', 'complete', role, { state, entityData }) && statusRaw === 'in_progress') {
         descriptors.push({
           key: 'complete',
-          label: 'Complete Service',
+          label: 'Mark Complete',
           variant: 'primary',
           closeOnSuccess: true,
         });
       }
 
-      if (can('service', 'assign_crew', role, { state, entityData })) {
-        descriptors.push({
-          key: 'assign_crew',
-          label: 'Assign Crew',
-          variant: 'secondary',
-          closeOnSuccess: false,
-        });
+      // Warehouse-controlled lifecycle for warehouse-managed services
+      if (role === 'warehouse' && managedBy === 'warehouse') {
+        if (can('service', 'start', role, { state, entityData }) && (statusRaw === 'pending' || statusRaw === 'created')) {
+          descriptors.push({ key: 'start', label: 'Start Service', variant: 'primary', closeOnSuccess: false });
+        }
+        if (can('service', 'cancel', role, { state, entityData }) && (statusRaw === 'pending' || statusRaw === 'created' || statusRaw === 'in_progress')) {
+          descriptors.push({ key: 'cancel', label: 'Cancel Service', variant: 'danger', confirm: 'Cancel this service?', closeOnSuccess: true });
+        }
+        if (can('service', 'complete', role, { state, entityData }) && statusRaw === 'in_progress') {
+          descriptors.push({ key: 'complete', label: 'Mark Complete', variant: 'primary', closeOnSuccess: true });
+        }
       }
+
+      // Assignments moved to dedicated tab; Quick Actions focus on lifecycle (manager only)
     }
 
     return descriptors;
@@ -1058,14 +1229,22 @@ const serviceAdapter: EntityAdapter = {
     const fields: HeaderField[] = [];
 
     // Name-first convention for header card subtitle
-    fields.push({ label: 'Name', value: entityData?.serviceName || entityData?.name || '-' });
+    const svcMetaForHeader: any = (entityData as any)?.metadata || {};
+    fields.push({ label: 'Name', value: svcMetaForHeader.serviceName || entityData?.title || entityData?.name || '-' });
 
-    if (entityData?.serviceType) {
-      fields.push({ label: 'Type', value: entityData.serviceType });
+    if (svcMetaForHeader.serviceType || entityData?.serviceType) {
+      fields.push({ label: 'Type', value: svcMetaForHeader.serviceType || entityData?.serviceType });
     }
 
-    if (entityData?.assignedTo) {
-      fields.push({ label: 'Assigned To', value: entityData.assignedTo });
+    // Assigned crew (universal visibility)
+    const assignedCrew = Array.isArray(svcMetaForHeader.crew)
+      ? (svcMetaForHeader.crew as any[])
+          .map((c) => (typeof c === 'string' ? c : (c?.name || c?.code || '')))
+          .filter(Boolean)
+          .join(', ')
+      : null;
+    if (assignedCrew && assignedCrew.length > 0) {
+      fields.push({ label: 'Assigned Crew', value: assignedCrew });
     }
 
     if (entityData?.managedBy) {
@@ -1083,7 +1262,7 @@ const serviceAdapter: EntityAdapter = {
     return {
       id: entityData?.serviceId || '',
       type: 'Service',
-      status: entityData?.status || 'pending',
+      status: (svcMetaForHeader.serviceStatus || (entityData as any)?.status || 'created') as string,
       fields,
     };
   },
@@ -1111,6 +1290,92 @@ const serviceAdapter: EntityAdapter = {
           />
         ),
       },
+      // Assignments tab: managers can assign crew, procedures, training
+      ...(String((entityData?.metadata?.serviceManagedBy || '')).toLowerCase() !== 'warehouse' && context.role === 'manager'
+        ? [
+            {
+              id: 'crew' as const,
+              label: 'Assignments',
+              content: (
+                <ServiceAssignmentsTab
+                  serviceId={entityData?.serviceId}
+                  viewerCode={context.viewerId}
+                  managedBy={entityData?.metadata?.serviceManagedBy}
+                  assigned={(entityData as any)?.metadata?.crew || []}
+                />
+              ),
+            },
+            {
+              id: 'procedures' as const,
+              label: 'Procedures',
+              content: (
+                <ServiceProceduresTab serviceId={entityData?.serviceId} files={(entityData as any)?.metadata?.procedures || []} />
+              ),
+            },
+            {
+              id: 'training' as const,
+              label: 'Training',
+              content: (
+                <ServiceTrainingTab serviceId={entityData?.serviceId} files={(entityData as any)?.metadata?.training || []} />
+              ),
+            },
+          ]
+        : []),
+      // Tasks tab (manager): parse tasks from procedures and assign to crew
+      ...(context.role === 'manager' ? [
+        {
+          id: 'tasks' as const,
+          label: 'Tasks',
+          content: (
+            <ServiceTasksTab
+              serviceId={entityData?.serviceId}
+              procedures={(entityData as any)?.metadata?.procedures || []}
+              existingTasks={(entityData as any)?.metadata?.tasks || []}
+              viewerCode={context.viewerId}
+            />
+          ),
+        },
+      ] : []),
+      // Crew tabs: My Tasks and Procedures (viewer). If opened with focus=crew-tasks, restrict to tasks only.
+      ...(context.role === 'crew'
+        ? (() => {
+            const focusTasksOnly = (context as any)?.openContext?.focus === 'crew-tasks';
+            const tabsForCrew: TabDescriptor[] = [
+              {
+                id: 'my-tasks' as const,
+                label: 'My Tasks',
+                content: (
+                  <ServiceCrewTasksTab
+                    serviceId={entityData?.serviceId}
+                    tasks={(entityData as any)?.metadata?.tasks || []}
+                    viewerCode={context.viewerId}
+                    serviceStatus={(entityData as any)?.metadata?.serviceStatus || (entityData as any)?.status || null}
+                  />
+                ),
+              },
+            ];
+            if (!focusTasksOnly) {
+              tabsForCrew.push({
+                id: 'procedures' as const,
+                label: 'Procedures',
+                content: (
+                  <ServiceProceduresViewerTab files={(entityData as any)?.metadata?.procedures || []} />
+                ),
+              });
+            }
+            return tabsForCrew;
+          })()
+        : []),
+      // Products tab (manager): link to catalog with service preselected
+      ...(context.role === 'manager' ? [
+        {
+          id: 'products' as const,
+          label: 'Products',
+          content: (
+            <ServiceProductsTab serviceId={entityData?.serviceId} />
+          ),
+        },
+      ] : []),
       {
         id: 'history',
         label: 'History',
@@ -1121,9 +1386,10 @@ const serviceAdapter: EntityAdapter = {
           />
         ),
       },
+      // Quick Actions tab is still available universally, but content is lifecycle-only
       {
         id: 'actions',
-        label: 'Actions',
+        label: 'Quick Actions',
         content: (
           <UserQuickActionsContent actions={actions} />
         ),

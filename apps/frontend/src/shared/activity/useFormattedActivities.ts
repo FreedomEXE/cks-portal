@@ -95,9 +95,11 @@ function personalizeMessage(item: HubActivityItem, viewerId?: string | null): st
 
   // Order flow activities
   if (activityType === 'order_created') {
-    if (isActor) return 'You created an order!';
+    const orderType = String((metadata.orderType as string | undefined) || '').toLowerCase();
+    const isService = orderType === 'service';
+    if (isActor) return isService ? 'You created a service order!' : 'You created a product order!';
     // Hide order ID for non-actors
-    return 'Created Product Order';
+    return isService ? 'Created Service Order' : 'Created Product Order';
   }
 
   if (activityType === 'order_assigned' || activityType === 'order_assigned_to_warehouse') {
@@ -320,11 +322,29 @@ function personalizeMessage(item: HubActivityItem, viewerId?: string | null): st
     }
   }
 
+  // Service lifecycle
+  if (activityType === 'service_created') {
+    if (isActor) return 'You created a service';
+    return 'Service created';
+  }
+  if (activityType === 'service_started') {
+    if (isActor) return 'You started the service';
+    return 'Service started';
+  }
+  if (activityType === 'service_completed') {
+    if (isActor) return 'You completed the service';
+    return 'Service completed';
+  }
+
   if (activityType === 'service_crew_requested') {
     const crewCodes = (metadata.crewCodes as string[] | undefined) || [];
-    const isRequested = crewCodes.some(code => code.toUpperCase() === normalizedViewerId);
+    const crewId = (metadata.crewId as string | undefined)?.toUpperCase();
+    const isRequested = (crewId === normalizedViewerId) || crewCodes.some(code => (code || '').toUpperCase() === normalizedViewerId);
     if (isRequested) {
       return `You've been requested for a service!`;
+    }
+    if (isActor && actorRole === 'manager') {
+      return `You requested a crew member for a service`;
     }
   }
 
@@ -336,6 +356,14 @@ function personalizeMessage(item: HubActivityItem, viewerId?: string | null): st
         ? `Crew member accepted your request!`
         : `Crew member declined your request`;
     }
+  }
+
+  if (activityType === 'crew_assigned_to_service') {
+    const assignedCrew = (metadata.crewId as string | undefined)?.toUpperCase();
+    if (assignedCrew === normalizedViewerId) {
+      return 'You have been assigned to a service';
+    }
+    return 'Crew assigned to a service';
   }
 
   // Archive/Restore/Delete activities

@@ -83,10 +83,37 @@ export function buildCrewOverviewData(inputs: {
   profile: Nullable<HubProfileResponse>;
   scope: any;
   certifiedServices: readonly any[];
+  orders?: readonly HubOrderItem[] | null;
+  viewerId?: string | null;
 }) {
-  const { dashboard, certifiedServices } = inputs;
+  const { dashboard, certifiedServices, orders, viewerId } = inputs;
   const myServices = certifiedServices?.length ?? 0;
-  const myTasks = 0;
+
+  // Compute today's tasks: assigned to viewer, for services in progress, and scheduled for today
+  const today = new Date();
+  const dayNames = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+  const todayKey = dayNames[today.getDay()];
+  const me = (viewerId || '').toUpperCase();
+  let myTasks = 0;
+  if (me && Array.isArray(orders)) {
+    for (const o of orders) {
+      const meta: any = o?.metadata || {};
+      const status = String(meta.serviceStatus || meta.service_status || '').toLowerCase();
+      if (status !== 'in_progress') continue; // only active services
+      const tasks: any[] = Array.isArray(meta.tasks) ? meta.tasks : [];
+      for (const t of tasks) {
+        const assigned = Array.isArray(t?.assignedTo) ? t.assignedTo.map((x: any) => String(x).toUpperCase()) : [];
+        if (!assigned.includes(me)) continue;
+        const days: string[] = Array.isArray(t?.days) ? t.days.map((d: any) => String(d).toLowerCase()) : [];
+        const freq = String(t?.frequency || '').toLowerCase();
+        const dueToday = (days.length > 0 && days.includes(todayKey)) || freq === 'daily' || days.length === 0;
+        if (dueToday && !t?.completedAt) {
+          myTasks += 1;
+        }
+      }
+    }
+  }
+
   const timecard = 0;
   const accountStatus = capitalizeLabel((dashboard as any)?.accountStatus ?? inputs.profile?.status, 'Active');
   return { myServices, myTasks, timecard, accountStatus } as const;
@@ -158,4 +185,3 @@ export function buildAdminOverviewData(inputs: {
     daysOnline,
   } as const;
 }
-

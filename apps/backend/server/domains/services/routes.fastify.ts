@@ -95,6 +95,7 @@ export async function registerServicesRoutes(server: FastifyInstance) {
         crew: Array.isArray(body.crew) ? body.crew : undefined,
         procedures: Array.isArray(body.procedures) ? body.procedures : undefined,
         training: Array.isArray(body.training) ? body.training : undefined,
+        tasks: Array.isArray(body.tasks) ? body.tasks : undefined,
         notes: typeof body.notes === 'string' ? body.notes : undefined,
       });
       if (!data) {

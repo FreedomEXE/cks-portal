@@ -76,7 +76,13 @@ export function canSeeTab(tabId: TabId, context: TabVisibilityContext): boolean 
     // 1. There are actions available (hasActions)
     // 2. Entity is NOT deleted (tombstones are read-only)
     case 'actions':
-      return hasActions && lifecycle.state !== 'deleted';
+      // For orders and services, always show the Actions tab to display workflow,
+      // even when there are no actionable buttons (read-only timeline).
+      // Hide only for deleted tombstones.
+      if (lifecycle.state === 'deleted') return false;
+      if (entityType === 'order' || entityType === 'service') return true;
+      // Other entity types: require actions to show the tab
+      return hasActions;
 
     // ===== QUICK ACTIONS TAB =====
     // Admin-only for catalog services and products (unified catalog view)
