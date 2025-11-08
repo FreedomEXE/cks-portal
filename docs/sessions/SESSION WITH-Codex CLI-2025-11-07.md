@@ -121,7 +121,28 @@ Context highlights:
   - Lists open modals by ID; actions (acknowledge/resolve/archive/restore/delete) with toasts; activities wired.
 
 Please pick up with:
-1) Small polish pass (badges for Managed By and due‑today, status chips in reports/feedback lists).
+1) Small polish pass (badges for Managed By and due-today, status chips in reports/feedback lists).
 2) QA flows for activities visibility and messages.
-3) Prepare a short “MVP test plan” checklist for Services (manager/warehouse), Reports, Feedback.
+3) Prepare a short "MVP test plan" checklist for Services (manager/warehouse), Reports, Feedback.
 
+## Update – Polish & Deploy
+
+- Service header badges added:
+  - Managed By pill (Warehouse vs Manager)
+  - Due Today pill for Crew (viewer-assigned tasks due today)
+- Reports/Feedback lists show a status chip on each card with priority/rating pills.
+- Added docs:
+  - Test plan: `docs/test-plans/MVP-smoke-2025-11-07.md`
+  - Deploy guide: `docs/deployments/production-portal.md`
+
+Vercel (apps/frontend) settings to unblock builds:
+- Root Directory: `apps/frontend`
+- Install Command: `corepack enable && pnpm i --frozen-lockfile`
+- Build Command: `pnpm -C ../../auth build && pnpm -C ../../packages/ui build && pnpm -C ../../packages/domain-widgets build && pnpm build`
+- Output: `dist`
+- Env (Production):
+  - `VITE_CLERK_PUBLISHABLE_KEY`
+  - `VITE_API_URL=https://api.portal.ckscontracting.ca/api`
+  - `HUSKY=0` (optional)
+
+Render (backend) confirmed healthy using ESM + tsx start.

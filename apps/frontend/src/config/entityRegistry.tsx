@@ -598,7 +598,7 @@ const orderAdapter: EntityAdapter = {
   },
 
   getHeaderConfig: (context: TabVisibilityContext): HeaderConfig => {
-    const { entityData } = context;
+    const { entityData, role, viewerId } = context as any;
 
     const formatDateTime = (value?: string) => {
       if (!value) return '—';
@@ -912,7 +912,7 @@ const reportAdapter: EntityAdapter = {
   },
 
   getHeaderConfig: (context: TabVisibilityContext): HeaderConfig => {
-    const { entityData } = context;
+    const { entityData, role, viewerId } = context as any;
 
     const fields: HeaderField[] = [];
 
@@ -1215,7 +1215,7 @@ const serviceAdapter: EntityAdapter = {
   },
 
   getHeaderConfig: (context: TabVisibilityContext): HeaderConfig => {
-    const { entityData } = context;
+    const { entityData, role, viewerId } = context as any;
 
     const formatDateTime = (value?: string) => {
       if (!value) return '—';
@@ -1251,6 +1251,91 @@ const serviceAdapter: EntityAdapter = {
       fields.push({ label: 'Managed By', value: entityData.managedBy });
     }
 
+    // Build badges: Managed By + Due Today (crew)
+    const badges: React.ReactNode[] = [];
+
+    // Managed By badge (Warehouse | Manager)
+    try {
+      const managedRaw = String(
+        (svcMetaForHeader?.serviceManagedBy || (entityData as any)?.managedBy || '')
+      )
+        .trim()
+        .toLowerCase();
+      const isWarehouse = managedRaw === 'warehouse' || managedRaw.startsWith('whs-');
+      const label = isWarehouse ? 'Warehouse' : 'Manager';
+      const color = isWarehouse ? '#6b21a8' : '#1e3a8a'; // purple vs blue
+      const bg = isWarehouse ? '#f3e8ff' : '#dbeafe';
+      badges.push(
+        <span
+          key="managed-by"
+          style={{
+            padding: '4px 10px',
+            borderRadius: 999,
+            fontSize: 12,
+            fontWeight: 600,
+            textTransform: 'uppercase',
+            color,
+            backgroundColor: bg,
+            border: `1px solid ${color}33`,
+          }}
+        >
+          {label}
+        </span>
+      );
+    } catch {}
+
+    // Due Today badge for crew (viewer-assigned tasks due today and not completed)
+    try {
+      const viewer = (viewerId || '').toString().toUpperCase();
+      const isCrew = String(role || '').toLowerCase() === 'crew';
+      const statusRaw = String(
+        (svcMetaForHeader?.serviceStatus || (entityData as any)?.status || '')
+      )
+        .toLowerCase()
+        .replace(/\s+/g, '_');
+      const active = statusRaw === 'in_progress';
+      const tasks: any[] = Array.isArray(svcMetaForHeader?.tasks)
+        ? (svcMetaForHeader?.tasks as any[])
+        : [];
+      if (isCrew && viewer && tasks.length > 0) {
+        const dayNames = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+        const todayKey = dayNames[new Date().getDay()];
+        let due = 0;
+        for (const t of tasks) {
+          const assigned = Array.isArray(t?.assignedTo)
+            ? t.assignedTo.map((x: any) => String(x).toUpperCase())
+            : [];
+          if (!assigned.includes(viewer)) continue;
+          const days: string[] = Array.isArray(t?.days)
+            ? t.days.map((d: any) => String(d).toLowerCase())
+            : [];
+          const freq = String(t?.frequency || '').toLowerCase();
+          const dueToday = (days.length > 0 && days.includes(todayKey)) || freq === 'daily' || days.length === 0;
+          const completed = Boolean((t as any)?.completedAt);
+          if (dueToday && !completed) due += 1;
+        }
+        if (due > 0) {
+          badges.push(
+            <span
+              key="due-today"
+              title={active ? undefined : 'Service not started'}
+              style={{
+                padding: '4px 10px',
+                borderRadius: 999,
+                fontSize: 12,
+                fontWeight: 600,
+                color: '#92400e',
+                backgroundColor: '#fef3c7',
+                border: '1px solid #f59e0b55',
+              }}
+            >
+              {`Due Today: ${due}`}
+            </span>
+          );
+        }
+      }
+    } catch {}
+
     if (entityData?.startDate) {
       fields.push({ label: 'Start Date', value: formatDateTime(entityData.startDate) });
     }
@@ -1264,6 +1349,7 @@ const serviceAdapter: EntityAdapter = {
       type: 'Service',
       status: (svcMetaForHeader.serviceStatus || (entityData as any)?.status || 'created') as string,
       fields,
+      badges: badges.length > 0 ? badges : undefined,
     };
   },
 

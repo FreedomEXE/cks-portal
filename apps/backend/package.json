@@ -2,6 +2,7 @@
   "name": "@cks/backend",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "cross-env NODE_ENV=development TS_NODE_TRANSPILE_ONLY=1 tsx -r dotenv/config server/index.ts",
     "build": "tsc",
