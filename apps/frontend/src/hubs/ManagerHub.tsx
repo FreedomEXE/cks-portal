@@ -137,8 +137,7 @@ const HUB_TABS = [
   { id: 'profile', label: 'My Profile', path: '/manager/profile' },
   { id: 'ecosystem', label: 'My Ecosystem', path: '/manager/ecosystem' },
   { id: 'services', label: 'My Services', path: '/manager/services' },
-  { id: 'procedures', label: 'Procedures', path: '/manager/procedures' },
-  { id: 'training', label: 'Training', path: '/manager/training' },
+  // Removed per request: Procedures & Training
   { id: 'orders', label: 'Orders', path: '/manager/orders' },
   { id: 'reports', label: 'Reports', path: '/manager/reports' },
   { id: 'support', label: 'Support', path: '/manager/support' },
