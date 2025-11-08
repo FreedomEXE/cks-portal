@@ -44,6 +44,16 @@ export interface HistoryTabProps {
   getAuthToken?: () => Promise<string | null>;
 }
 
+function resolveApiBase(): string {
+  try {
+    const w = globalThis as any;
+    const base = (w && w.__CKS_API_BASE) || '/api';
+    return String(base).replace(/\/+$/, '');
+  } catch {
+    return '/api';
+  }
+}
+
 /**
  * Format ISO timestamp to human-readable format
  */
@@ -223,7 +233,8 @@ export function HistoryTab({ entityType, entityId, limit, events: providedEvents
       setError(null);
 
       try {
-        const url = `/api/activity/entity/${entityType}/${entityId}${limit ? `?limit=${limit}` : ''}`;
+        const base = resolveApiBase();
+        const url = `${base}/activity/entity/${entityType}/${entityId}${limit ? `?limit=${limit}` : ''}`;
 
         // Build fetch options with auth if available
         const headers: Record<string, string> = {
@@ -241,7 +252,7 @@ export function HistoryTab({ entityType, entityId, limit, events: providedEvents
           }
         }
 
-        const response = await fetch(url, { headers });
+        const response = await fetch(url, { headers, credentials: 'include' });
 
         if (!response.ok) {
           throw new Error(`Failed to fetch history: ${response.statusText}`);

@@ -7,6 +7,7 @@ import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { AuthenticatedApp, UnauthenticatedApp } from './App';
 import { LoadingProvider } from './contexts/LoadingContext';
+import { API_BASE } from './shared/api/client';
 import GlobalLoader from './components/GlobalLoader';
 import { CartProvider } from './contexts/CartContext';
 import './index.css';
@@ -23,6 +24,9 @@ if (!rootElement) {
 }
 
 const root = ReactDOM.createRoot(rootElement);
+
+// Expose API base for shared UI package components (e.g., HistoryTab)
+try { (window as any).__CKS_API_BASE = API_BASE; } catch {}
 
 root.render(
   <React.StrictMode>
