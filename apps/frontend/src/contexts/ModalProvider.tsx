@@ -12,6 +12,7 @@ import ModalGateway from '../components/ModalGateway';
 import type { EntityType, UserRole, OpenEntityModalOptions } from '../types/entities';
 import { parseEntityId, isValidId } from '../shared/utils/parseEntityId';
 import { apiFetch } from '../shared/api/client';
+import * as LoadingService from '../shared/loading';
 
 export interface ModalContextValue {
   /**
@@ -92,7 +93,7 @@ export function ModalProvider({ children }: ModalProviderProps) {
         console.log(`[ModalProvider] Fetching ${entityType} data from: ${endpoint}`);
 
         try {
-          const response = await apiFetch<{
+          const response = await LoadingService.wrapBlocking(apiFetch<{
             data: any;
             state?: 'active' | 'archived' | 'deleted';
             deletedAt?: string;
@@ -100,7 +101,7 @@ export function ModalProvider({ children }: ModalProviderProps) {
             archivedAt?: string;
             archivedBy?: string;
             scheduledDeletion?: string;
-          }>(endpoint);
+          }>(endpoint));
 
           console.log(`[ModalProvider] Fetched ${entityType} data:`, response);
 
@@ -307,9 +308,9 @@ export function ModalProvider({ children }: ModalProviderProps) {
 
         try {
           // Fetch from catalog list
-          const listResp = await apiFetch<{
+          const listResp = await LoadingService.wrapBlocking(apiFetch<{
             data: { items: any[] };
-          }>(`/catalog/items?type=product&q=${encodeURIComponent(id)}`);
+          }>(`/catalog/items?type=product&q=${encodeURIComponent(id)}`));
 
           const match = (listResp?.data?.items || []).find((it: any) => (it?.code || '').toUpperCase() === id.toUpperCase());
 
