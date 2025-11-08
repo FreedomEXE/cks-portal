@@ -501,7 +501,7 @@ export function ModalGateway({
 
       return (
         <EntityModalView
-          key={`skeleton:${entityType}:${entityId}`}
+          key={`${entityType}:${entityId}`}
           isOpen={isOpen}
           onClose={onClose}
           entityType={entityType}
