@@ -20,7 +20,11 @@ export default function GlobalLoader(): JSX.Element | null {
       .join(', ');
     const size = Number((env.VITE_LOADER_SIZE as string | undefined) || '128');
     const force = String(env.VITE_LOADER_FORCE_VECTOR ?? 'false') === 'true';
-    const svg = (env.VITE_LOADER_SVG as string | undefined)?.trim();
+    // Prefer SVG logo animation by default. If no env is provided,
+    // fall back to the bundled public asset `/portal-icon.svg`.
+    // This ensures the custom loader works in production even if env
+    // variables were not configured on the host.
+    const svg = ((env.VITE_LOADER_SVG as string | undefined)?.trim()) || '/portal-icon.svg';
     const color = (env.VITE_LOADER_COLOR as string | undefined)?.trim() || undefined;
     return {
       loaderSrc: src,
@@ -66,18 +70,33 @@ export default function GlobalLoader(): JSX.Element | null {
 
   // Optional SVG logo animation (declare hooks unconditionally to preserve order)
   const [parsedSvg, setParsedSvg] = useState<ParsedSvg | null>(null);
+  const resolvedSvg = useMemo(() => {
+    if (!svgSource) return null as string | null;
+    try {
+      const base = (import.meta as any).env?.BASE_URL || (import.meta as any).env?.VITE_BASE || '/';
+      if (svgSource.startsWith('http://') || svgSource.startsWith('https://') || svgSource.startsWith('data:')) {
+        return svgSource;
+      }
+      if (svgSource.startsWith('/')) {
+        return String(base).replace(/\/$/, '') + '/' + svgSource.replace(/^\/+/, '');
+      }
+      return String(base).replace(/\/$/, '') + '/' + svgSource;
+    } catch {
+      return svgSource;
+    }
+  }, [svgSource]);
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      if (!svgSource) {
+      if (!resolvedSvg) {
         setParsedSvg(null);
         return;
       }
       try {
-        const isInline = svgSource.trim().startsWith('<');
+        const isInline = resolvedSvg.trim().startsWith('<');
         const text = isInline
-          ? svgSource
-          : await fetch(svgSource, { credentials: 'same-origin' }).then((r) => r.text());
+          ? resolvedSvg
+          : await fetch(resolvedSvg, { credentials: 'same-origin' }).then((r) => r.text());
         if (!cancelled) setParsedSvg(parseSvg(text));
       } catch (e) {
         if (!cancelled) setParsedSvg(null);
@@ -85,7 +104,7 @@ export default function GlobalLoader(): JSX.Element | null {
       }
     })();
     return () => { cancelled = true; };
-  }, [svgSource]);
+  }, [resolvedSvg]);
 
   if (!visible) return null;
 
