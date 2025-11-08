@@ -1,5 +1,6 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef } from 'react';
 import ReactDOM from 'react-dom';
+import { AnimatePresence, motion } from 'motion/react';
 import styles from './ModalRoot.module.css';
 import PixelField from './PixelField';
 
@@ -41,59 +42,34 @@ export default function ModalRoot({
   closeOnOverlayClick = true,
   closeOnEscape = true,
 }: ModalRootProps) {
-  const [mounted, setMounted] = useState(false);
-  const [state, setState] = useState<'entering' | 'entered' | 'exiting'>('entering');
   const countedRef = useRef(false);
-  const exitTimeoutRef = useRef<number | null>(null);
 
   // Portal target
   const portalElRef = useRef<HTMLElement | null>(null);
-
   useLayoutEffect(() => {
     if (typeof document === 'undefined') return;
     portalElRef.current = document.body;
   }, []);
 
-  // Mount/unmount logic with presence for exit animation
+  // Manage body class while open
   useEffect(() => {
-    if (!isOpen) {
-      // trigger exit if currently entered
-      if (mounted) {
-        setState('exiting');
-        if (exitTimeoutRef.current) window.clearTimeout(exitTimeoutRef.current);
-        exitTimeoutRef.current = window.setTimeout(() => {
-          setMounted(false);
-          if (countedRef.current) {
-            countedRef.current = false;
-            removeBodyOpenClass();
-          }
-        }, 180); // exit duration
-      }
-      return;
+    if (!isOpen) return;
+    if (!countedRef.current) {
+      countedRef.current = true;
+      addBodyOpenClass();
     }
-
-    // show and enter
-    setMounted(true);
-    // next frame to allow CSS transition
-    const id = window.requestAnimationFrame(() => {
-      setState('entering');
-      // count body class once per open sequence
-      if (!countedRef.current) {
-        countedRef.current = true;
-        addBodyOpenClass();
+    return () => {
+      // If closed before animation completes, ensure body class is adjusted
+      if (countedRef.current) {
+        countedRef.current = false;
+        removeBodyOpenClass();
       }
-      // move to entered after duration
-      if (exitTimeoutRef.current) window.clearTimeout(exitTimeoutRef.current);
-      exitTimeoutRef.current = window.setTimeout(() => {
-        setState('entered');
-      }, 20); // tiny delay so entering state applies then transitions to entered
-    });
-    return () => window.cancelAnimationFrame(id);
-  }, [isOpen, mounted]);
+    };
+  }, [isOpen]);
 
   // Escape key to close
   useEffect(() => {
-    if (!closeOnEscape || !mounted) return;
+    if (!closeOnEscape || !isOpen) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.stopPropagation();
@@ -102,20 +78,9 @@ export default function ModalRoot({
     };
     window.addEventListener('keydown', onKey, { capture: true });
     return () => window.removeEventListener('keydown', onKey, { capture: true } as any);
-  }, [closeOnEscape, mounted, onClose]);
+  }, [closeOnEscape, isOpen, onClose]);
 
-  // Cleanup on unmount (safety net)
-  useEffect(() => {
-    return () => {
-      if (exitTimeoutRef.current) window.clearTimeout(exitTimeoutRef.current);
-      if (countedRef.current) {
-        countedRef.current = false;
-        removeBodyOpenClass();
-      }
-    };
-  }, []);
-
-  if (!mounted || !portalElRef.current) return null;
+  if (!portalElRef.current) return null;
 
   const handleOverlayClick = (e: React.MouseEvent) => {
     if (!closeOnOverlayClick) return;
@@ -123,22 +88,58 @@ export default function ModalRoot({
     onClose();
   };
 
+  const prefersReduced = typeof window !== 'undefined' &&
+    window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+
   const node = (
-    <div className={styles.root} aria-hidden={!isOpen}>
-      <div
-        className={styles.overlay}
-        data-state={state}
-        onClick={handleOverlayClick}
-        aria-hidden
-      />
-      {/* Animated pixel field (above overlay, below content) */}
-      <div className={styles.grid} data-state={state} aria-hidden>
-        <PixelField active={state !== 'exiting'} />
-      </div>
-      <div className={styles.content} data-state={state}>
-        <div className={styles.box}>{children}</div>
-      </div>
-    </div>
+    <AnimatePresence
+      mode="wait"
+      onExitComplete={() => {
+        // Exit finished: remove body-open if we added it
+        if (countedRef.current) {
+          countedRef.current = false;
+          removeBodyOpenClass();
+        }
+      }}
+    >
+      {isOpen && (
+        <div className={styles.root} aria-hidden={!isOpen}>
+          {/* Backdrop */}
+          <motion.div
+            className={styles.overlay}
+            onClick={handleOverlayClick}
+            aria-hidden
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: prefersReduced ? 0 : 0.3 }}
+          />
+
+          {/* Optional animated grid layer */}
+          <motion.div
+            className={styles.grid}
+            aria-hidden
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: prefersReduced ? 0 : 0.3 }}
+          >
+            <PixelField active={isOpen} />
+          </motion.div>
+
+          {/* Modal content container */}
+          <motion.div
+            className={styles.content}
+            initial={prefersReduced ? { opacity: 1, scale: 1, y: 0 } : { opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={prefersReduced ? { opacity: 1, scale: 1, y: 0 } : { opacity: 0, scale: 0.95, y: 20 }}
+            transition={prefersReduced ? { duration: 0 } : { type: 'spring', bounce: 0.3, duration: 0.5 }}
+          >
+            <div className={styles.box}>{children}</div>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
   );
 
   return ReactDOM.createPortal(node, portalElRef.current);

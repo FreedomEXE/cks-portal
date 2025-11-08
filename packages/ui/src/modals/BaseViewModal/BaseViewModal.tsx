@@ -1,4 +1,5 @@
 import React, { ReactNode, useState, useEffect } from 'react';
+import { motion } from 'motion/react';
 import styles from './BaseViewModal.module.css';
 import { ModalRoot } from '../ModalRoot';
 import { ArchivedBanner } from '../../banners/ArchivedBanner';
@@ -112,9 +113,14 @@ export default function BaseViewModal({
           ×
         </button>
 
-        <div className={styles.header}>
+        <motion.div
+          className={styles.header}
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, ease: 'easeOut' }}
+        >
           {card}
-        </div>
+        </motion.div>
 
         {/* UNIVERSAL LIFECYCLE BANNER - renders for ANY entity */}
         {lifecycle && lifecycle.state !== 'active' && (
@@ -143,24 +149,39 @@ export default function BaseViewModal({
 
         {/* Universal Tab Buttons (if tabs provided) */}
         {tabs && tabs.length > 0 && (
-          <TabContainer>
-            {tabs.map((tab) => (
-              <NavigationTab
-                key={tab.id}
-                label={tab.label}
-                isActive={activeTabId === tab.id}
-                onClick={() => setActiveTabId(tab.id)}
-                variant="underline"
-                activeColor={accentColor}
-              />
-            ))}
-          </TabContainer>
+          <motion.div
+            initial="hidden"
+            animate="show"
+            variants={{ show: { transition: { staggerChildren: 0.05, delayChildren: 0.1 } } }}
+          >
+            <TabContainer>
+              {tabs.map((tab) => (
+                <motion.div
+                  key={tab.id}
+                  variants={{ hidden: { opacity: 0, y: -6 }, show: { opacity: 1, y: 0 } }}
+                >
+                  <NavigationTab
+                    label={tab.label}
+                    isActive={activeTabId === tab.id}
+                    onClick={() => setActiveTabId(tab.id)}
+                    variant="underline"
+                    activeColor={accentColor}
+                  />
+                </motion.div>
+              ))}
+            </TabContainer>
+          </motion.div>
         )}
 
-        <div className={styles.tabContent}>
+        <motion.div
+          className={styles.tabContent}
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.25, ease: 'easeOut' }}
+        >
           {/* Render tab content if using universal tabs */}
           {tabs && activeTab ? activeTab.content : children}
-        </div>
+        </motion.div>
       </div>
     </ModalRoot>
   );

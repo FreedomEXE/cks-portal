@@ -10,7 +10,6 @@
   z-index: 1000; /* behind grid and content */
   background: rgba(0, 0, 0, 0.48);
   opacity: 1;
-  transition: opacity var(--cks-modal-duration, 220ms) var(--cks-modal-ease, cubic-bezier(0.2, 0, 0, 1));
 }
 
 @supports ((-webkit-backdrop-filter: blur(4px)) or (backdrop-filter: blur(4px))) {
@@ -21,9 +20,7 @@
   }
 }
 
-.overlay[data-state='entering'] { opacity: 0; }
-.overlay[data-state='entered'] { opacity: 1; }
-.overlay[data-state='exiting'] { opacity: 0; }
+/* state-based opacity handled by Motion */
 
 .grid {
   position: fixed;
@@ -31,12 +28,9 @@
   z-index: 1001; /* above overlay, below content */
   pointer-events: none;
   opacity: 1;
-  transition: opacity var(--cks-modal-duration, 220ms) var(--cks-modal-ease, cubic-bezier(0.2, 0, 0, 1));
 }
 
-.grid[data-state='entering'] { opacity: 0; }
-.grid[data-state='entered'] { opacity: 1; }
-.grid[data-state='exiting'] { opacity: 0; }
+/* state-based opacity handled by Motion */
 
 .gridLayer {
   position: absolute;
@@ -98,13 +92,10 @@
   justify-content: center;
   padding-top: 40px;
   opacity: 1;
-  transition: opacity var(--cks-modal-duration, 220ms) var(--cks-modal-ease, cubic-bezier(0.2, 0, 0, 1));
   pointer-events: none; /* allow inner box to capture events */
 }
 
-.content[data-state='entering'] { opacity: 0; }
-.content[data-state='entered'] { opacity: 1; }
-.content[data-state='exiting'] { opacity: 0; }
+/* state-based opacity handled by Motion */
 
 .box {
   pointer-events: auto; /* actual modal content area */
