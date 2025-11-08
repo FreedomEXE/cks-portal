@@ -948,8 +948,12 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
   const { handleAction } = useEntityActions();
 
   const handleNodeClick = useCallback((userId: string) => {
-    console.log('[manager] view ecosystem node', userId);
-  }, []);
+    try {
+      modals.openById(userId);
+    } catch (e) {
+      console.warn('[manager] Failed to open modal for ecosystem node', userId, e);
+    }
+  }, [modals]);
 
   // Note: Crew request and service creation handlers removed
   // Services are now auto-created on manager accept
@@ -1004,6 +1008,7 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
                 profileData={managerProfileData}
                 accountManager={null}
                 primaryColor={MANAGER_PRIMARY_COLOR}
+                enabledTabs={[ 'profile', 'settings' ]}
                 onUpdatePhoto={() => console.log('[manager] update photo')}
               />
             </PageWrapper>

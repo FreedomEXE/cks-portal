@@ -560,6 +560,7 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
                 profileData={profileCardData}
                 accountManager={accountManagerCard}
                 primaryColor="#ef4444"
+                enabledTabs={[ 'profile', 'accountManager', 'settings' ]}
                 onUpdatePhoto={() => undefined}
                 onContactManager={() => undefined}
                 onScheduleMeeting={() => undefined}
@@ -570,7 +571,7 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
               <EcosystemTree
                 rootUser={ecosystemTree.user}
                 treeData={ecosystemTree}
-                onNodeClick={() => undefined}
+                onNodeClick={(id) => modals.openById(id)}
                 expandedNodes={ecosystemExpandedNodes}
                 currentUserId={ecosystemCurrentUserId}
                 title="Ecosystem"

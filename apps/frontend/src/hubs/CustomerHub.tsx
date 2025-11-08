@@ -471,6 +471,7 @@ function CustomerHubContent({ initialTab = 'dashboard' }: CustomerHubProps) {
                 profileData={profileCardData}
                 accountManager={accountManagerCard}
                 primaryColor="#eab308"
+                enabledTabs={[ 'profile', 'accountManager', 'settings' ]}
                 onUpdatePhoto={() => undefined}
                 onContactManager={() => undefined}
                 onScheduleMeeting={() => undefined}
@@ -481,7 +482,7 @@ function CustomerHubContent({ initialTab = 'dashboard' }: CustomerHubProps) {
               <EcosystemTree
                 rootUser={ecosystemTree.user}
                 treeData={ecosystemTree}
-                onNodeClick={() => undefined}
+                onNodeClick={(id) => modals.openById(id)}
                 expandedNodes={ecosystemRootId ? [ecosystemRootId] : []}
                 currentUserId={ecosystemRootId}
                 title="Ecosystem"

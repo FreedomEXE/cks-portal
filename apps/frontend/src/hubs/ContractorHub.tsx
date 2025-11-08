@@ -622,6 +622,7 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
                 profileData={profileCardData}
                 accountManager={accountManagerCard}
                 primaryColor="#10b981"
+                enabledTabs={[ 'profile', 'accountManager', 'settings' ]}
                 onUpdatePhoto={() => undefined}
                 onContactManager={() => undefined}
                 onScheduleMeeting={() => undefined}
@@ -636,7 +637,7 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
                   name: profile?.name ?? contractorCode ?? 'Contractor',
                 }}
                 treeData={ecosystemData}
-                onNodeClick={() => undefined}
+                onNodeClick={(id) => modals.openById(id)}
                 expandedNodes={contractorCode ? [contractorCode] : []}
                 currentUserId={contractorCode ?? undefined}
                 title="Ecosystem"

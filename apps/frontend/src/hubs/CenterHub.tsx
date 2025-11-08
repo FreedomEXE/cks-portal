@@ -475,6 +475,7 @@ function CenterHubContent({ initialTab = 'dashboard' }: CenterHubProps) {
                 profileData={profileCardData}
                 accountManager={accountManagerCard}
                 primaryColor="#f97316"
+                enabledTabs={[ 'profile', 'accountManager', 'settings' ]}
                 onUpdatePhoto={() => undefined}
                 onContactManager={() => undefined}
                 onScheduleMeeting={() => undefined}
@@ -485,7 +486,7 @@ function CenterHubContent({ initialTab = 'dashboard' }: CenterHubProps) {
               <EcosystemTree
                 rootUser={ecosystemTree.user}
                 treeData={ecosystemTree}
-                onNodeClick={() => undefined}
+                onNodeClick={(id) => modals.openById(id)}
                 expandedNodes={ecosystemRootId ? [ecosystemRootId] : []}
                 currentUserId={ecosystemRootId}
                 title="Ecosystem"

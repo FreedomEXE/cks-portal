@@ -236,7 +236,15 @@ const EcosystemTree: React.FC<EcosystemTreeProps> = ({
             {node.user.role}
           </span>
 
-          <span style={{ fontWeight: 700, color: '#111827' }}>
+          <span
+            style={{ fontWeight: 700, color: '#111827', cursor: onNodeClick ? 'pointer' : 'default', textDecoration: onNodeClick ? 'underline' : 'none' }}
+            title={onNodeClick ? 'Open profile' : undefined}
+            onClick={(e) => {
+              if (!onNodeClick) return;
+              e.stopPropagation();
+              onNodeClick(node.user.id);
+            }}
+          >
             {node.user.id}
           </span>
 
