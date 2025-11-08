@@ -15,6 +15,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useHubLoading } from '../contexts/HubLoadingContext';
+import { useClerk, useUser } from '@clerk/clerk-react';
+import { loadUserPreferences, saveUserPreferences } from '../shared/preferences';
+import { requestPasswordReset } from '../shared/api/account';
 import { dismissActivity, dismissAllActivities } from '../shared/api/directory';
 import { applyServiceAction } from '../shared/api/hub';
 import {
@@ -175,6 +178,7 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
   // Legacy actionOrder modal removed; use Quick Actions inside universal modal
 
   const { code: authCode } = useAuth();
+  const { user } = useUser();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
   const { setHubLoading } = useHubLoading();
 
@@ -300,6 +304,21 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
       console.error('[WarehouseHub] Failed to clear all activities:', error);
     }
   }, [mutateActivities]);
+
+  const handlePasswordReset = useCallback(async () => {
+    if (!user?.id) {
+      toast.error('User not authenticated');
+      return;
+    }
+
+    try {
+      const result = await requestPasswordReset(user.id);
+      toast.success(result.message || 'Password reset email sent successfully');
+    } catch (error) {
+      console.error('[WarehouseHub] Failed to request password reset', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to send password reset email');
+    }
+  }, [user?.id]);
 
   const overviewData = useMemo(() =>
     buildWarehouseOverviewData({
@@ -594,10 +613,12 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
     return null;
   }
 
+  const { openUserProfile } = useClerk();
+
   return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#f8fafc' }}>
         <MyHubSection
-          hubName="Warehouse Hub"
+          hubName={(loadUserPreferences(normalizedCode ?? null).hubTitle?.trim() || 'Warehouse Hub')}
           tabs={tabs}
         activeTab={activeTab}
         onTabClick={setActiveTab}
@@ -649,7 +670,11 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
                 role="warehouse"
                 profileData={profileCardData}
                 primaryColor="#8b5cf6"
-                onUpdatePhoto={() => undefined}
+                onUpdatePhoto={() => openUserProfile?.()}
+                onOpenAccountSecurity={() => openUserProfile?.()}
+                onRequestPasswordReset={handlePasswordReset}
+                userPreferences={loadUserPreferences(normalizedCode ?? null)}
+                onSaveUserPreferences={(prefs) => saveUserPreferences(normalizedCode ?? null, prefs)}
                 onContactManager={() => undefined}
                 onScheduleMeeting={() => undefined}
               />

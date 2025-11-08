@@ -32,7 +32,9 @@ import { Button, DataTable, OrderDetailsModal, ServiceViewModal, PageHeader, Pag
 import { useModals } from '../contexts';
 import OrderDetailsGateway from '../components/OrderDetailsGateway';
 import { useAuth } from '@cks/auth';
+import { useClerk, useUser } from '@clerk/clerk-react';
 import { useSWRConfig } from 'swr';
+import { requestPasswordReset } from '../shared/api/account';
 import { useFormattedActivities } from '../shared/activity/useFormattedActivities';
 import { ActivityFeed } from '../components/ActivityFeed';
 // ActivityModalGateway (legacy) removed in favor of universal ModalGateway via modals.openById()
@@ -51,6 +53,7 @@ import { createReport as apiCreateReport, createFeedback as apiCreateFeedback, a
 
 import { buildEcosystemTree, DEFAULT_ROLE_COLOR_MAP } from '../shared/utils/ecosystem';
 import { useHubLoading } from '../contexts/HubLoadingContext';
+import { loadUserPreferences, saveUserPreferences } from '../shared/preferences';
 import { buildCenterOverviewData } from '../shared/overview/builders';
 import { dismissActivity, dismissAllActivities } from '../shared/api/directory';
 
@@ -154,6 +157,7 @@ function normalizeOrderStatus(value?: string | null): HubOrderItem['status'] {
 // Main wrapper component that sets up ModalProvider
 export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) {
   const { code: authCode } = useAuth();
+  const { openUserProfile } = useClerk();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
 
   return <CenterHubContent initialTab={initialTab} />;
@@ -167,6 +171,7 @@ function CenterHubContent({ initialTab = 'dashboard' }: CenterHubProps) {
   const [servicesSearchQuery, setServicesSearchQuery] = useState('');
   // Legacy modal state removed; universal ModalGateway handles all entity modals
   const { code: authCode } = useAuth();
+  const { user } = useUser();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
   const { setHubLoading } = useHubLoading();
   const { mutate } = useSWRConfig();
@@ -278,6 +283,21 @@ function CenterHubContent({ initialTab = 'dashboard' }: CenterHubProps) {
       console.error('[CenterHub] Failed to clear all activities:', error);
     }
   }, [mutateActivities]);
+
+  const handlePasswordReset = useCallback(async () => {
+    if (!user?.id) {
+      toast.error('User not authenticated');
+      return;
+    }
+
+    try {
+      const result = await requestPasswordReset(user.id);
+      toast.success(result.message || 'Password reset email sent successfully');
+    } catch (error) {
+      console.error('[CenterHub] Failed to request password reset', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to send password reset email');
+    }
+  }, [user?.id]);
 
   const overviewData = useMemo(() =>
     buildCenterOverviewData({
@@ -421,9 +441,9 @@ function CenterHubContent({ initialTab = 'dashboard' }: CenterHubProps) {
 
   return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#f8fafc' }}>
-        <MyHubSection
-          hubName="Center Hub"
-          tabs={tabs}
+            <MyHubSection
+              hubName={(loadUserPreferences(centerCode ?? normalizedCode).hubTitle?.trim() || 'Center Hub')}
+              tabs={tabs}
           activeTab={activeTab}
           onTabClick={setActiveTab}
         userId={normalizedCode ?? 'CENTER'}
@@ -476,7 +496,12 @@ function CenterHubContent({ initialTab = 'dashboard' }: CenterHubProps) {
                 accountManager={accountManagerCard}
                 primaryColor="#f97316"
                 enabledTabs={[ 'profile', 'accountManager', 'settings' ]}
-                onUpdatePhoto={() => undefined}
+                onUpdatePhoto={() => openUserProfile?.()}
+                onOpenAccountSecurity={() => openUserProfile?.()}
+                onRequestPasswordReset={handlePasswordReset}
+                userPreferences={loadUserPreferences(centerCode ?? normalizedCode)}
+                onSaveUserPreferences={(prefs) => saveUserPreferences(centerCode ?? normalizedCode, prefs)}
+                availableTabs={tabs.map(t => ({ id: t.id, label: t.label }))}
                 onContactManager={() => undefined}
                 onScheduleMeeting={() => undefined}
               />

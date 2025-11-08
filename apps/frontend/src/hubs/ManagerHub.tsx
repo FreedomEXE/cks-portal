@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useAuth } from '@cks/auth';
+import { useClerk, useUser } from '@clerk/clerk-react';
 import { EcosystemTree } from '@cks/domain-widgets';
 import { useFormattedActivities } from '../shared/activity/useFormattedActivities';
 import { ActivityFeed } from '../components/ActivityFeed';
@@ -80,6 +81,8 @@ import { useHubLoading } from '../contexts/HubLoadingContext';
 import { dismissActivity, dismissAllActivities } from '../shared/api/directory';
 import { apiFetch } from '../shared/api/client';
 import { applyServiceAction } from '../shared/api/hub';
+import { requestPasswordReset } from '../shared/api/account';
+import { loadUserPreferences, saveUserPreferences } from '../shared/preferences';
 
 interface ManagerHubProps {
   initialTab?: string;
@@ -494,6 +497,8 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
   }, []);
 
   const { code, fullName, firstName } = useAuth();
+  const { openUserProfile } = useClerk();
+  const { user } = useUser();
   const logout = useLogout();
   const { setHubLoading } = useHubLoading();
 
@@ -501,6 +506,7 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
   const modals = useModals();
 
   const managerCode = useMemo(() => normalizeId(code), [code]);
+  const managerPrefs = useMemo(() => loadUserPreferences(managerCode), [managerCode]);
 
   // Fetch hub-scoped data
   const { data: profileData } = useHubProfile(managerCode);
@@ -955,6 +961,21 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
     }
   }, [modals]);
 
+  const handlePasswordReset = useCallback(async () => {
+    if (!user?.id) {
+      toast.error('User not authenticated');
+      return;
+    }
+
+    try {
+      const result = await requestPasswordReset(user.id);
+      toast.success(result.message || 'Password reset email sent successfully');
+    } catch (error) {
+      console.error('[manager] Failed to request password reset', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to send password reset email');
+    }
+  }, [user?.id]);
+
   // Note: Crew request and service creation handlers removed
   // Services are now auto-created on manager accept
   // Crew, procedures, training are managed from Active Services section
@@ -968,7 +989,7 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
   return (
       <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: '#f9fafb' }}>
         <MyHubSection
-          hubName="Manager Hub"
+          hubName={managerPrefs.hubTitle?.trim() || 'Manager Hub'}
           tabs={HUB_TABS}
           activeTab={activeTab}
           onTabClick={setActiveTab}
@@ -1009,7 +1030,12 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
                 accountManager={null}
                 primaryColor={MANAGER_PRIMARY_COLOR}
                 enabledTabs={[ 'profile', 'settings' ]}
-                onUpdatePhoto={() => console.log('[manager] update photo')}
+                onUpdatePhoto={() => openUserProfile?.()}
+                onOpenAccountSecurity={() => openUserProfile?.()}
+                onRequestPasswordReset={handlePasswordReset}
+                userPreferences={managerPrefs}
+                onSaveUserPreferences={(prefs) => saveUserPreferences(managerCode, prefs)}
+                availableTabs={HUB_TABS.map(t => ({ id: t.id, label: t.label }))}
               />
             </PageWrapper>
           ) : activeTab === 'ecosystem' ? (

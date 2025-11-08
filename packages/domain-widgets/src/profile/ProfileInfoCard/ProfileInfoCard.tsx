@@ -45,6 +45,12 @@ export interface ProfileInfoCardProps {
   enabledTabs?: Array<'profile' | 'accountManager' | 'timeline' | 'settings'>;
   /** When true, removes card border and shadow */
   borderless?: boolean;
+  /** Settings integrations */
+  onOpenAccountSecurity?: () => void;
+  onRequestPasswordReset?: () => void;
+  userPreferences?: { hubTitle?: string; defaultLandingTab?: string; theme?: 'light'|'dark' };
+  onSaveUserPreferences?: (prefs: Partial<ProfileInfoCardProps['userPreferences']>) => void;
+  availableTabs?: Array<{ id: string; label: string }>;
 }
 
 export function ProfileInfoCard({
@@ -58,6 +64,11 @@ export function ProfileInfoCard({
   hideTabs = false,
   enabledTabs,
   borderless = false,
+  onOpenAccountSecurity,
+  onRequestPasswordReset,
+  userPreferences,
+  onSaveUserPreferences,
+  availableTabs,
 }: ProfileInfoCardProps) {
   const [activeTab, setActiveTab] = useState('profile');
 
@@ -114,7 +125,15 @@ export function ProfileInfoCard({
         );
       case 'settings':
         return (
-          <SettingsTab primaryColor={primaryColor} />
+          <SettingsTab
+            primaryColor={primaryColor}
+            onOpenAccountSecurity={onOpenAccountSecurity}
+            onRequestPasswordReset={onRequestPasswordReset}
+            onUpdatePhoto={onUpdatePhoto}
+            preferences={userPreferences}
+            onSavePreferences={onSaveUserPreferences}
+            availableTabs={availableTabs}
+          />
         );
       default:
         return null;

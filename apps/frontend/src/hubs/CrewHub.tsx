@@ -33,7 +33,9 @@ import { useModals } from '../contexts';
 import { apiFetch } from '../shared/api/client';
 import { useEntityActions } from '../hooks/useEntityActions';
 import { useAuth } from '@cks/auth';
+import { useClerk, useUser } from '@clerk/clerk-react';
 import { useCatalogItems } from '../shared/api/catalog';
+import { requestPasswordReset } from '../shared/api/account';
 import { useCertifiedServices } from '../hooks/useCertifiedServices';
 import { useServices as useDirectoryServices } from '../shared/api/directory';
 import { useFormattedActivities } from '../shared/activity/useFormattedActivities';
@@ -55,6 +57,7 @@ import { createFeedback as apiCreateFeedback, acknowledgeItem as apiAcknowledgeI
 import { buildEcosystemTree, DEFAULT_ROLE_COLOR_MAP } from '../shared/utils/ecosystem';
 import { buildCrewOverviewData } from '../shared/overview/builders';
 import { useHubLoading } from '../contexts/HubLoadingContext';
+import { loadUserPreferences, saveUserPreferences } from '../shared/preferences';
 
 interface CrewHubProps {
   initialTab?: string;
@@ -157,6 +160,7 @@ function normalizeOrderStatus(value?: string | null): HubOrderItem['status'] {
 // Main wrapper component that sets up ModalProvider
 export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
   const { code: authCode } = useAuth();
+  const { openUserProfile } = useClerk();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
 
   return <CrewHubContent initialTab={initialTab} />;
@@ -170,6 +174,7 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
   const [servicesSearchQuery, setServicesSearchQuery] = useState('');
 
   const { code: authCode } = useAuth();
+  const { user } = useUser();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
   const { mutate } = useSWRConfig();
   const { setHubLoading } = useHubLoading();
@@ -314,6 +319,21 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
       console.error('[CrewHub] Failed to clear all activities:', error);
     }
   }, [mutateActivities]);
+
+  const handlePasswordReset = useCallback(async () => {
+    if (!user?.id) {
+      toast.error('User not authenticated');
+      return;
+    }
+
+    try {
+      const result = await requestPasswordReset(user.id);
+      toast.success(result.message || 'Password reset email sent successfully');
+    } catch (error) {
+      console.error('[CrewHub] Failed to request password reset', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to send password reset email');
+    }
+  }, [user?.id]);
 
   const overviewData = useMemo(() =>
     buildCrewOverviewData({
@@ -510,9 +530,9 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
 
   return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#f8fafc' }}>
-        <MyHubSection
-          hubName="Crew Hub"
-          tabs={tabs}
+            <MyHubSection
+              hubName={(loadUserPreferences(crewCode ?? normalizedCode).hubTitle?.trim() || 'Crew Hub')}
+              tabs={tabs}
           activeTab={activeTab}
           onTabClick={setActiveTab}
         userId={normalizedCode ?? 'CREW'}
@@ -561,7 +581,12 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
                 accountManager={accountManagerCard}
                 primaryColor="#ef4444"
                 enabledTabs={[ 'profile', 'accountManager', 'settings' ]}
-                onUpdatePhoto={() => undefined}
+                onUpdatePhoto={() => openUserProfile?.()}
+                onOpenAccountSecurity={() => openUserProfile?.()}
+                onRequestPasswordReset={handlePasswordReset}
+                userPreferences={loadUserPreferences(crewCode ?? normalizedCode)}
+                onSaveUserPreferences={(prefs) => saveUserPreferences(crewCode ?? normalizedCode, prefs)}
+                availableTabs={tabs.map(t => ({ id: t.id, label: t.label }))}
                 onContactManager={() => undefined}
                 onScheduleMeeting={() => undefined}
               />

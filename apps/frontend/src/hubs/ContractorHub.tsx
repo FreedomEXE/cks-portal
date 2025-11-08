@@ -34,7 +34,9 @@ import OrderDetailsGateway from '../components/OrderDetailsGateway';
 import { useSWRConfig } from 'swr';
 import { createReport as apiCreateReport, createFeedback as apiCreateFeedback, acknowledgeItem as apiAcknowledgeItem, resolveReport as apiResolveReport, fetchServicesForReports, fetchProceduresForReports, fetchOrdersForReports } from '../shared/api/hub';
 import { useAuth } from '@cks/auth';
+import { useClerk, useUser } from '@clerk/clerk-react';
 import { useFormattedActivities } from '../shared/activity/useFormattedActivities';
+import { requestPasswordReset } from '../shared/api/account';
 import { ActivityFeed } from '../components/ActivityFeed';
 // Legacy ActivityModalGateway removed — use universal ModalGateway via modals.openById()
 import { useEntityActions } from '../hooks/useEntityActions';
@@ -52,6 +54,7 @@ import { buildEcosystemTree } from '../shared/utils/ecosystem';
 import { useCatalogItems } from '../shared/api/catalog';
 import { useCertifiedServices } from '../hooks/useCertifiedServices';
 import { useHubLoading } from '../contexts/HubLoadingContext';
+import { loadUserPreferences, saveUserPreferences } from '../shared/preferences';
 import { dismissActivity, dismissAllActivities } from '../shared/api/directory';
 import { buildContractorOverviewData } from '../shared/overview/builders';
 
@@ -209,6 +212,8 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
   const [servicesSearchQuery, setServicesSearchQuery] = useState('');
   // Legacy modal state removed; universal ModalGateway handles all modals
   const { code: authCode } = useAuth();
+  const { openUserProfile } = useClerk();
+  const { user } = useUser();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
   const { setHubLoading } = useHubLoading();
 
@@ -262,6 +267,21 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
       console.error('[ContractorHub] Failed to clear all activities:', error);
     }
   }, [mutateActivities]);
+
+  const handlePasswordReset = useCallback(async () => {
+    if (!user?.id) {
+      toast.error('User not authenticated');
+      return;
+    }
+
+    try {
+      const result = await requestPasswordReset(user.id);
+      toast.success(result.message || 'Password reset email sent successfully');
+    } catch (error) {
+      console.error('[ContractorHub] Failed to request password reset', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to send password reset email');
+    }
+  }, [user?.id]);
 
   const contractorCode = useMemo(() => profile?.cksCode ?? normalizedCode, [profile?.cksCode, normalizedCode]);
   const welcomeName = profile?.mainContact ?? profile?.name ?? undefined;
@@ -568,7 +588,7 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
   return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#f8fafc' }}>
         <MyHubSection
-        hubName="Contractor Hub"
+        hubName={(loadUserPreferences(contractorCode ?? null).hubTitle?.trim() || 'Contractor Hub')}
         tabs={tabs}
         activeTab={activeTab}
         onTabClick={setActiveTab}
@@ -623,7 +643,12 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
                 accountManager={accountManagerCard}
                 primaryColor="#10b981"
                 enabledTabs={[ 'profile', 'accountManager', 'settings' ]}
-                onUpdatePhoto={() => undefined}
+                onUpdatePhoto={() => openUserProfile?.()}
+                onOpenAccountSecurity={() => openUserProfile?.()}
+                onRequestPasswordReset={handlePasswordReset}
+                userPreferences={loadUserPreferences(contractorCode ?? null)}
+                onSaveUserPreferences={(prefs) => saveUserPreferences(contractorCode ?? null, prefs)}
+                availableTabs={tabs.map(t => ({ id: t.id, label: t.label }))}
                 onContactManager={() => undefined}
                 onScheduleMeeting={() => undefined}
               />

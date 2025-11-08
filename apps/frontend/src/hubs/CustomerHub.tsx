@@ -32,7 +32,9 @@ import { Button, DataTable, OrderDetailsModal, ServiceViewModal, PageHeader, Pag
 import { useModals } from '../contexts';
 import OrderDetailsGateway from '../components/OrderDetailsGateway';
 import { useAuth } from '@cks/auth';
+import { useClerk, useUser } from '@clerk/clerk-react';
 import { useSWRConfig } from 'swr';
+import { requestPasswordReset } from '../shared/api/account';
 import { createReport as apiCreateReport, createFeedback as apiCreateFeedback, acknowledgeItem as apiAcknowledgeItem, resolveReport as apiResolveReport, fetchServicesForReports, fetchProceduresForReports, fetchOrdersForReports } from '../shared/api/hub';
 import { useFormattedActivities } from '../shared/activity/useFormattedActivities';
 import { ActivityFeed } from '../components/ActivityFeed';
@@ -53,6 +55,7 @@ import { useCertifiedServices } from '../hooks/useCertifiedServices';
 import { buildEcosystemTree, DEFAULT_ROLE_COLOR_MAP } from '../shared/utils/ecosystem';
 import { buildCustomerOverviewData } from '../shared/overview/builders';
 import { useHubLoading } from '../contexts/HubLoadingContext';
+import { loadUserPreferences, saveUserPreferences } from '../shared/preferences';
 import { dismissActivity, dismissAllActivities } from '../shared/api/directory';
 
 interface CustomerHubProps {
@@ -156,6 +159,7 @@ function normalizeOrderStatus(value?: string | null): HubOrderItem['status'] {
 // Main wrapper component that sets up ModalProvider
 export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubProps) {
   const { code: authCode } = useAuth();
+  const { openUserProfile } = useClerk();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
 
   return <CustomerHubContent initialTab={initialTab} />;
@@ -169,6 +173,7 @@ function CustomerHubContent({ initialTab = 'dashboard' }: CustomerHubProps) {
   const [servicesSearchQuery, setServicesSearchQuery] = useState('');
   // Legacy modal state removed; universal ModalGateway handles all modals
   const { code: authCode } = useAuth();
+  const { user } = useUser();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
   const { setHubLoading } = useHubLoading();
 
@@ -285,6 +290,21 @@ function CustomerHubContent({ initialTab = 'dashboard' }: CustomerHubProps) {
       console.error('[CustomerHub] Failed to clear all activities:', error);
     }
   }, [mutateActivities]);
+
+  const handlePasswordReset = useCallback(async () => {
+    if (!user?.id) {
+      toast.error('User not authenticated');
+      return;
+    }
+
+    try {
+      const result = await requestPasswordReset(user.id);
+      toast.success(result.message || 'Password reset email sent successfully');
+    } catch (error) {
+      console.error('[CustomerHub] Failed to request password reset', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to send password reset email');
+    }
+  }, [user?.id]);
 
   const overviewData = useMemo(() =>
     buildCustomerOverviewData({
@@ -417,9 +437,9 @@ function CustomerHubContent({ initialTab = 'dashboard' }: CustomerHubProps) {
 
   return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#f8fafc' }}>
-        <MyHubSection
-          hubName="Customer Hub"
-          tabs={tabs}
+      <MyHubSection
+        hubName={(loadUserPreferences(customerCode ?? normalizedCode).hubTitle?.trim() || 'Customer Hub')}
+        tabs={tabs}
           activeTab={activeTab}
           onTabClick={setActiveTab}
         userId={normalizedCode ?? 'CUSTOMER'}
@@ -472,7 +492,12 @@ function CustomerHubContent({ initialTab = 'dashboard' }: CustomerHubProps) {
                 accountManager={accountManagerCard}
                 primaryColor="#eab308"
                 enabledTabs={[ 'profile', 'accountManager', 'settings' ]}
-                onUpdatePhoto={() => undefined}
+                onUpdatePhoto={() => openUserProfile?.()}
+                onOpenAccountSecurity={() => openUserProfile?.()}
+                onRequestPasswordReset={handlePasswordReset}
+                userPreferences={loadUserPreferences(customerCode ?? normalizedCode)}
+                onSaveUserPreferences={(prefs) => saveUserPreferences(customerCode ?? normalizedCode, prefs)}
+                availableTabs={tabs.map(t => ({ id: t.id, label: t.label }))}
                 onContactManager={() => undefined}
                 onScheduleMeeting={() => undefined}
               />
