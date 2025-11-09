@@ -5,8 +5,11 @@
 @layer components {
   .card,
   .ui-card {
-    @apply border border-gray-200 rounded-xl bg-white shadow-lg;
-}
+    border: 1px solid var(--border);
+    border-radius: 0.75rem; /* rounded-xl */
+    background: var(--card-bg);
+    box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1);
+  }
 
 /* Modal background transform and motion tokens */
 :root {

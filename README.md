@@ -44,6 +44,22 @@ Related files:
 - `apps/frontend/src/components/LogoLoader.tsx`
 - `apps/frontend/public/portal-icon.svg`
 
+## Theming & Settings
+
+- Theming uses Tailwind `darkMode: 'class'` with a lightweight provider.
+- Theme is stored in `localStorage` (`cks_theme`) and applied to `document.documentElement`.
+- Users can switch Light/Dark/System under My Profile → Settings.
+- Settings now use a two‑pane layout with a left rail for sections.
+
+Key files:
+- `apps/frontend/src/contexts/ThemeContext.tsx` – `ThemeProvider` and `useTheme()`
+- `apps/frontend/src/index.css` – CSS variables for bg/text/card/border with dark overrides
+- `packages/domain-widgets/src/profile/SettingsTab/SettingsTab.tsx` – side‑nav settings UI
+- `packages/domain-widgets/src/profile/ProfileInfoCard/ProfileInfoCard.tsx` – wires SettingsTab
+
+Persisted preferences (MVP):
+- `apps/frontend/src/shared/preferences.ts` stores `hubTitle`, `defaultLandingTab`, and `theme` (`light` | `dark` | `system`) per‑user in `localStorage`.
+
 ## Workspace Layout
 - `apps/frontend` – React 18 + Vite + SWR + Clerk
 - `apps/backend` – Fastify API with Clerk auth and Postgres
@@ -79,4 +95,3 @@ Ensure the environment variables above are present on the host. The loader uses 
 
 ## License
 Proprietary – internal CKS use.
-

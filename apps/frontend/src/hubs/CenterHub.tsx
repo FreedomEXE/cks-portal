@@ -158,6 +158,7 @@ function normalizeOrderStatus(value?: string | null): HubOrderItem['status'] {
 export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) {
   const { code: authCode } = useAuth();
   const { openUserProfile } = useClerk();
+  const { setTheme } = useTheme();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
 
   return <CenterHubContent initialTab={initialTab} />;
@@ -173,7 +174,7 @@ function CenterHubContent({ initialTab = 'dashboard' }: CenterHubProps) {
   const { code: authCode } = useAuth();
   const { user } = useUser();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
-  const { setHubLoading } = useHubLoading();
+  const handleUploadPhoto = useCallback(async (file: File) => { if (!user) { toast.error('User not authenticated'); return; } try { await user.setProfileImage({ file }); toast.success('Profile photo updated'); } catch (e: any) { console.error('photo upload failed', e); toast.error(e?.message || 'Failed to update photo'); } }, [user]);
   const { mutate } = useSWRConfig();
   const { handleAction } = useEntityActions();
 
@@ -496,12 +497,14 @@ function CenterHubContent({ initialTab = 'dashboard' }: CenterHubProps) {
                 accountManager={accountManagerCard}
                 primaryColor="#f97316"
                 enabledTabs={[ 'profile', 'accountManager', 'settings' ]}
-                onUpdatePhoto={() => openUserProfile?.()}
+                onUploadPhoto={handleUploadPhoto}
                 onOpenAccountSecurity={() => openUserProfile?.()}
                 onRequestPasswordReset={handlePasswordReset}
+                passwordResetAvailable={Boolean(user?.passwordEnabled)}
                 userPreferences={loadUserPreferences(centerCode ?? normalizedCode)}
                 onSaveUserPreferences={(prefs) => saveUserPreferences(centerCode ?? normalizedCode, prefs)}
                 availableTabs={tabs.map(t => ({ id: t.id, label: t.label }))}
+                onSetTheme={setTheme}
                 onContactManager={() => undefined}
                 onScheduleMeeting={() => undefined}
               />
@@ -758,5 +761,10 @@ function CenterHubContent({ initialTab = 'dashboard' }: CenterHubProps) {
     </div>
   );
 }
+
+
+
+
+
 
 

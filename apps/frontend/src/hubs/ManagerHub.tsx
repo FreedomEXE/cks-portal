@@ -8,6 +8,7 @@ import toast from 'react-hot-toast';
 import { useAuth } from '@cks/auth';
 import { useClerk, useUser } from '@clerk/clerk-react';
 import { EcosystemTree } from '@cks/domain-widgets';
+import { useTheme } from '../contexts/ThemeContext';
 import { useFormattedActivities } from '../shared/activity/useFormattedActivities';
 import { ActivityFeed } from '../components/ActivityFeed';
 // Legacy ActivityModalGateway removed — use universal ModalGateway via modals.openById()
@@ -498,6 +499,7 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
 
   const { code, fullName, firstName } = useAuth();
   const { openUserProfile } = useClerk();
+  const { setTheme } = useTheme();
   const { user } = useUser();
   const logout = useLogout();
   const { setHubLoading } = useHubLoading();
@@ -976,6 +978,17 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
     }
   }, [user?.id]);
 
+  const handleUploadPhoto = useCallback(async (file: File) => {
+    if (!user) { toast.error('User not authenticated'); return; }
+    try {
+      await user.setProfileImage({ file });
+      toast.success('Profile photo updated');
+    } catch (e: any) {
+      console.error('[manager] photo upload failed', e);
+      toast.error(e?.message || 'Failed to update photo');
+    }
+  }, [user]);
+
   // Note: Crew request and service creation handlers removed
   // Services are now auto-created on manager accept
   // Crew, procedures, training are managed from Active Services section
@@ -1030,12 +1043,14 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
                 accountManager={null}
                 primaryColor={MANAGER_PRIMARY_COLOR}
                 enabledTabs={[ 'profile', 'settings' ]}
-                onUpdatePhoto={() => openUserProfile?.()}
+                onUploadPhoto={handleUploadPhoto}
                 onOpenAccountSecurity={() => openUserProfile?.()}
                 onRequestPasswordReset={handlePasswordReset}
+                passwordResetAvailable={Boolean(user?.passwordEnabled)}
                 userPreferences={managerPrefs}
                 onSaveUserPreferences={(prefs) => saveUserPreferences(managerCode, prefs)}
                 availableTabs={HUB_TABS.map(t => ({ id: t.id, label: t.label }))}
+                onSetTheme={setTheme}
               />
             </PageWrapper>
           ) : activeTab === 'ecosystem' ? (
@@ -1357,3 +1372,6 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
       </div>
   );
 }
+
+
+

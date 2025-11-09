@@ -14,7 +14,18 @@ export async function registerAccountRoutes(server: FastifyInstance) {
    * Triggers a Clerk password reset email for the authenticated user.
    * User must be logged in to request their own password reset (1-click from Settings).
    */
-  server.post('/api/account/request-password-reset', async (request, reply) => {
+  server.post(
+    '/api/account/request-password-reset',
+    {
+      config: {
+        // Per-route rate limit: conservative to prevent abuse
+        rateLimit: {
+          max: 5,
+          timeWindow: '1 minute',
+        },
+      },
+    },
+    async (request, reply) => {
     // AUTH: Require active user (any role)
     const account = await requireActiveRole(request, reply);
     if (!account) {
@@ -55,5 +66,6 @@ export async function registerAccountRoutes(server: FastifyInstance) {
       const message = error instanceof Error ? error.message : 'Failed to send password reset email';
       reply.code(500).send({ error: message });
     }
-  });
+    }
+  );
 }

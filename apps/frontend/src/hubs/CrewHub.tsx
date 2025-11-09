@@ -161,6 +161,7 @@ function normalizeOrderStatus(value?: string | null): HubOrderItem['status'] {
 export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
   const { code: authCode } = useAuth();
   const { openUserProfile } = useClerk();
+  const { setTheme } = useTheme();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
 
   return <CrewHubContent initialTab={initialTab} />;
@@ -174,10 +175,10 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
   const [servicesSearchQuery, setServicesSearchQuery] = useState('');
 
   const { code: authCode } = useAuth();
-  const { user } = useUser();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
   const { mutate } = useSWRConfig();
-  const { setHubLoading } = useHubLoading();
+  const { user } = useUser();
+  const handleUploadPhoto = useCallback(async (file: File) => { if (!user) { toast.error('User not authenticated'); return; } try { await user.setProfileImage({ file }); toast.success('Profile photo updated'); } catch (e: any) { console.error('photo upload failed', e); toast.error(e?.message || 'Failed to update photo'); } }, [user]);
 
   // Centralized entity action handler (replaces handleOrderAction)
   const { handleAction } = useEntityActions();
@@ -581,12 +582,14 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
                 accountManager={accountManagerCard}
                 primaryColor="#ef4444"
                 enabledTabs={[ 'profile', 'accountManager', 'settings' ]}
-                onUpdatePhoto={() => openUserProfile?.()}
+                onUploadPhoto={handleUploadPhoto}
                 onOpenAccountSecurity={() => openUserProfile?.()}
                 onRequestPasswordReset={handlePasswordReset}
+                passwordResetAvailable={Boolean(user?.passwordEnabled)}
                 userPreferences={loadUserPreferences(crewCode ?? normalizedCode)}
                 onSaveUserPreferences={(prefs) => saveUserPreferences(crewCode ?? normalizedCode, prefs)}
                 availableTabs={tabs.map(t => ({ id: t.id, label: t.label }))}
+                onSetTheme={setTheme}
                 onContactManager={() => undefined}
                 onScheduleMeeting={() => undefined}
               />
@@ -874,3 +877,8 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
       </div>
   );
 }
+
+
+
+
+

@@ -29,10 +29,9 @@ export interface ProfileTabProps {
   role: 'manager' | 'contractor' | 'customer' | 'center' | 'crew' | 'warehouse';
   profileData: any;
   primaryColor: string;
-  onUpdatePhoto?: () => void;
 }
 
-export function ProfileTab({ role, profileData, primaryColor, onUpdatePhoto }: ProfileTabProps) {
+export function ProfileTab({ role, profileData, primaryColor }: ProfileTabProps) {
   const getFieldLabel = (field: string): string => {
     const labels: { [key: string]: string } = {
       fullName: 'Full Name',
@@ -122,14 +121,7 @@ export function ProfileTab({ role, profileData, primaryColor, onUpdatePhoto }: P
         }}>
           <span style={{ userSelect: 'none' }}>{getInitials()}</span>
         </div>
-        {onUpdatePhoto && (
-          <Button
-            variant="secondary"
-            onClick={onUpdatePhoto}
-          >
-            Update Photo
-          </Button>
-        )}
+        {/* Photo upload moved to Settings */}
       </div>
 
       {/* Profile Info Grid - Right Side */}

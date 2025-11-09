@@ -213,9 +213,10 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
   // Legacy modal state removed; universal ModalGateway handles all modals
   const { code: authCode } = useAuth();
   const { openUserProfile } = useClerk();
+  const { setTheme } = useTheme();
   const { user } = useUser();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
-  const { setHubLoading } = useHubLoading();
+  const handleUploadPhoto = useCallback(async (file: File) => { if (!user) { toast.error('User not authenticated'); return; } try { await user.setProfileImage({ file }); toast.success('Profile photo updated'); } catch (e: any) { console.error('photo upload failed', e); toast.error(e?.message || 'Failed to update photo'); } }, [user]);
 
   const {
     data: profile,
@@ -643,12 +644,14 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
                 accountManager={accountManagerCard}
                 primaryColor="#10b981"
                 enabledTabs={[ 'profile', 'accountManager', 'settings' ]}
-                onUpdatePhoto={() => openUserProfile?.()}
+                onUploadPhoto={handleUploadPhoto}
                 onOpenAccountSecurity={() => openUserProfile?.()}
                 onRequestPasswordReset={handlePasswordReset}
+                passwordResetAvailable={Boolean(user?.passwordEnabled)}
                 userPreferences={loadUserPreferences(contractorCode ?? null)}
                 onSaveUserPreferences={(prefs) => saveUserPreferences(contractorCode ?? null, prefs)}
                 availableTabs={tabs.map(t => ({ id: t.id, label: t.label }))}
+                onSetTheme={setTheme}
                 onContactManager={() => undefined}
                 onScheduleMeeting={() => undefined}
               />
@@ -916,6 +919,11 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
       </div>
   );
 }
+
+
+
+
+
 
 
 

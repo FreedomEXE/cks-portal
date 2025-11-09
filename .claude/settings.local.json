@@ -7,7 +7,10 @@
       "Bash(git add:*)",
       "Bash(set PORT=4000)",
       "Bash(pnpm dev:*)",
-      "Bash(timeout:*)"
+      "Bash(timeout:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npx tsx:*)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []

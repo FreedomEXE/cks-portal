@@ -160,6 +160,7 @@ function normalizeOrderStatus(value?: string | null): HubOrderItem['status'] {
 export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubProps) {
   const { code: authCode } = useAuth();
   const { openUserProfile } = useClerk();
+  const { setTheme } = useTheme();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
 
   return <CustomerHubContent initialTab={initialTab} />;
@@ -175,7 +176,7 @@ function CustomerHubContent({ initialTab = 'dashboard' }: CustomerHubProps) {
   const { code: authCode } = useAuth();
   const { user } = useUser();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
-  const { setHubLoading } = useHubLoading();
+  const handleUploadPhoto = useCallback(async (file: File) => { if (!user) { toast.error('User not authenticated'); return; } try { await user.setProfileImage({ file }); toast.success('Profile photo updated'); } catch (e: any) { console.error('photo upload failed', e); toast.error(e?.message || 'Failed to update photo'); } }, [user]);
 
   const {
     data: profile,
@@ -492,12 +493,14 @@ function CustomerHubContent({ initialTab = 'dashboard' }: CustomerHubProps) {
                 accountManager={accountManagerCard}
                 primaryColor="#eab308"
                 enabledTabs={[ 'profile', 'accountManager', 'settings' ]}
-                onUpdatePhoto={() => openUserProfile?.()}
+                onUploadPhoto={handleUploadPhoto}
                 onOpenAccountSecurity={() => openUserProfile?.()}
                 onRequestPasswordReset={handlePasswordReset}
+                passwordResetAvailable={Boolean(user?.passwordEnabled)}
                 userPreferences={loadUserPreferences(customerCode ?? normalizedCode)}
                 onSaveUserPreferences={(prefs) => saveUserPreferences(customerCode ?? normalizedCode, prefs)}
                 availableTabs={tabs.map(t => ({ id: t.id, label: t.label }))}
+                onSetTheme={setTheme}
                 onContactManager={() => undefined}
                 onScheduleMeeting={() => undefined}
               />
@@ -749,5 +752,10 @@ function CustomerHubContent({ initialTab = 'dashboard' }: CustomerHubProps) {
     </div>
   );
 }
+
+
+
+
+
 
 

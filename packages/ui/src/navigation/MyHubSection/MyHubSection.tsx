@@ -45,9 +45,9 @@ export default function MyHubSection({
     <>Welcome to {hubName}!</>
   );
   return (
-    <div style={{ padding: '16px 24px 24px 24px', background: '#f9fafb' }}>
+    <div style={{ padding: '16px 24px 24px 24px', background: 'var(--bg)' }}>
       <div style={{
-        background: '#ffffff',
+        background: 'var(--card-bg)',
         borderRadius: 12,
         border: `3px solid ${colors.primary}`,
         padding: '20px 24px',
@@ -64,7 +64,7 @@ export default function MyHubSection({
             margin: 0,
             fontSize: 32,
             fontWeight: 700,
-            color: '#111827'
+            color: 'var(--text)'
           }}>
             {hubName}
           </h1>
@@ -81,14 +81,14 @@ export default function MyHubSection({
         {/* Welcome Message */}
         <div style={{
           fontSize: 14,
-          color: '#4b5563',
+          color: 'var(--text)',
           marginBottom: 16,
           display: 'flex',
           alignItems: 'center',
         }}>
           {welcomeContent}
           {userId && (
-            <span style={{ marginLeft: 8, fontSize: 12, color: '#6b7280' }}>
+            <span style={{ marginLeft: 8, fontSize: 12, color: 'var(--text)' }}>
               ({userId})
             </span>
           )}
@@ -110,8 +110,8 @@ export default function MyHubSection({
                 onClick={() => onTabClick(tab.id)}
                 style={{
                   padding: '8px 16px',
-                  background: isActive ? colors.accent : '#f3f4f6',
-                  color: isActive ? 'white' : '#374151',
+                  background: isActive ? colors.accent : 'var(--card-muted)',
+                  color: isActive ? 'white' : 'var(--text)',
                   border: 'none',
                   borderRadius: 8,
                   fontSize: 14,
@@ -121,12 +121,12 @@ export default function MyHubSection({
                 }}
                 onMouseEnter={(e) => {
                   if (!isActive) {
-                    e.currentTarget.style.background = '#e5e7eb';
+                    e.currentTarget.style.background = 'var(--border)';
                   }
                 }}
                 onMouseLeave={(e) => {
                   if (!isActive) {
-                    e.currentTarget.style.background = '#f3f4f6';
+                    e.currentTarget.style.background = 'var(--card-muted)';
                   }
                 }}
               >

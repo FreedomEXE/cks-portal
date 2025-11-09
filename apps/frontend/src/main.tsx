@@ -11,6 +11,7 @@ import { API_BASE } from './shared/api/client';
 import GlobalLoader from './components/GlobalLoader';
 import { CartProvider } from './contexts/CartContext';
 import './index.css';
+import { ThemeProvider } from './contexts/ThemeContext';
 
 // Read the Clerk publishable key from Vite env. Do not hardcode or fall back to a dummy key.
 const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined;
@@ -43,6 +44,7 @@ root.render(
           },
         }}
       >
+        <ThemeProvider>
         <LoadingProvider>
           <CartProvider>
             <BrowserRouter>
@@ -56,6 +58,7 @@ root.render(
             <GlobalLoader />
           </CartProvider>
         </LoadingProvider>
+        </ThemeProvider>
       </SWRConfig>
     </ClerkProvider>
   </React.StrictMode>

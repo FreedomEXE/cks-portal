@@ -1,7 +1,7 @@
 export type UserPreferences = {
   hubTitle?: string;
   defaultLandingTab?: string;
-  theme?: 'light' | 'dark';
+  theme?: 'light' | 'dark' | 'system';
 };
 
 const KEY_PREFIX = 'cks_prefs_';
@@ -29,4 +29,3 @@ export function saveUserPreferences(userCode: string | null | undefined, prefs: 
     // ignore
   }
 }
-

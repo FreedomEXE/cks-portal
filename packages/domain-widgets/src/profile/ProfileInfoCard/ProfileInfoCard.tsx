@@ -37,6 +37,7 @@ export interface ProfileInfoCardProps {
   accountManager?: AccountManagerInfo | null;
   primaryColor: string;
   onUpdatePhoto?: () => void;
+  onUploadPhoto?: (file: File) => Promise<void> | void;
   onContactManager?: () => void;
   onScheduleMeeting?: () => void;
   /** When true, hides the internal tab navigation */
@@ -48,9 +49,13 @@ export interface ProfileInfoCardProps {
   /** Settings integrations */
   onOpenAccountSecurity?: () => void;
   onRequestPasswordReset?: () => void;
-  userPreferences?: { hubTitle?: string; defaultLandingTab?: string; theme?: 'light'|'dark' };
+  userPreferences?: { hubTitle?: string; defaultLandingTab?: string; theme?: 'light'|'dark'|'system' };
   onSaveUserPreferences?: (prefs: Partial<ProfileInfoCardProps['userPreferences']>) => void;
   availableTabs?: Array<{ id: string; label: string }>;
+  /** Theme control from frontend (wired to ThemeProvider) */
+  onSetTheme?: (t: 'light' | 'dark' | 'system') => void;
+  /** Whether password reset is available (e.g., not SSO-only) */
+  passwordResetAvailable?: boolean;
 }
 
 export function ProfileInfoCard({
@@ -69,6 +74,9 @@ export function ProfileInfoCard({
   userPreferences,
   onSaveUserPreferences,
   availableTabs,
+  onUploadPhoto,
+  onSetTheme,
+  passwordResetAvailable = true,
 }: ProfileInfoCardProps) {
   const [activeTab, setActiveTab] = useState('profile');
 
@@ -103,7 +111,6 @@ export function ProfileInfoCard({
             role={role}
             profileData={profileData}
             primaryColor={primaryColor}
-            onUpdatePhoto={onUpdatePhoto}
           />
         );
       case 'accountManager':
@@ -129,10 +136,12 @@ export function ProfileInfoCard({
             primaryColor={primaryColor}
             onOpenAccountSecurity={onOpenAccountSecurity}
             onRequestPasswordReset={onRequestPasswordReset}
-            onUpdatePhoto={onUpdatePhoto}
+            onUploadPhoto={onUploadPhoto}
             preferences={userPreferences}
             onSavePreferences={onSaveUserPreferences}
             availableTabs={availableTabs}
+            onSetTheme={onSetTheme}
+            passwordResetAvailable={passwordResetAvailable}
           />
         );
       default:
@@ -162,16 +171,7 @@ export function ProfileInfoCard({
       )}
 
       {/* Card Content */}
-      <div
-        className={borderless ? undefined : 'ui-card'}
-        style={{
-          backgroundColor: '#ffffff',
-          borderRadius: '8px',
-          border: borderless ? 'none' : '1px solid #e5e7eb',
-          padding: 24,
-          boxShadow: borderless ? 'none' : '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)'
-        }}
-      >
+      <div className={borderless ? undefined : 'ui-card'} style={{ padding: 24 }}>
         {renderTabContent()}
       </div>
     </div>

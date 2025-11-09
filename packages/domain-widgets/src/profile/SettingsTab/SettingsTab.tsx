@@ -14,21 +14,23 @@ export interface SettingsTabProps {
   primaryColor: string;
   onOpenAccountSecurity?: () => void;
   onRequestPasswordReset?: () => void;
-  onUpdatePhoto?: () => void;
+  onUploadPhoto?: (file: File) => Promise<void> | void;
   preferences?: {
     hubTitle?: string;
     defaultLandingTab?: string;
-    theme?: 'light' | 'dark';
+    theme?: 'light' | 'dark' | 'system';
   };
   onSavePreferences?: (prefs: Partial<SettingsTabProps['preferences']>) => void;
   availableTabs?: Array<{ id: string; label: string }>;
+  onSetTheme?: (t: 'light' | 'dark' | 'system') => void;
+  passwordResetAvailable?: boolean;
 }
 
 export function SettingsTab({
   primaryColor,
   onOpenAccountSecurity,
   onRequestPasswordReset,
-  onUpdatePhoto,
+  onUploadPhoto,
   preferences,
   onSavePreferences,
   availableTabs = [
@@ -40,111 +42,182 @@ export function SettingsTab({
     { id: 'reports', label: 'Reports' },
     { id: 'support', label: 'Support' },
   ],
+  onSetTheme,
+  passwordResetAvailable = true,
 }: SettingsTabProps) {
   const [hubTitle, setHubTitle] = useState(preferences?.hubTitle || '');
   const [defaultTab, setDefaultTab] = useState(preferences?.defaultLandingTab || 'dashboard');
-  const [theme, setTheme] = useState<'light' | 'dark'>(preferences?.theme || 'light');
+  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>(preferences?.theme || 'light');
 
   const previewHubName = useMemo(() => hubTitle.trim() || 'My Hub', [hubTitle]);
 
+  type Section = 'personalization' | 'photo' | 'security' | 'notifications' | 'accessibility';
+  const [active, setActive] = useState<Section>('personalization');
+
+  const NavItem = ({ id, label }: { id: Section; label: string }) => (
+    <button
+      onClick={() => setActive(id)}
+      style={{
+        textAlign: 'left',
+        padding: '10px 12px',
+        borderRadius: 8,
+        background: active === id ? 'var(--card-muted)' : 'transparent',
+        color: 'var(--text)',
+        border: '1px solid var(--border)'
+      }}
+    >
+      {label}
+    </button>
+  );
+
   return (
-    <div style={{ display: 'grid', gap: 16 }}>
-      {/* Personalization */}
-      <section style={{ border: '1px solid #e5e7eb', borderRadius: 8, background: '#fff' }}>
-        <div style={{ padding: 16, borderBottom: '1px solid #e5e7eb', background: '#f9fafb' }}>
-          <h3 style={{ margin: 0, fontSize: 16, color: '#111827' }}>Personalization</h3>
-        </div>
-        <div style={{ padding: 16, display: 'grid', gap: 12 }}>
-          <div>
-            <label style={{ display: 'block', fontSize: 12, color: '#6b7280', marginBottom: 4 }}>Hub Title</label>
-            <input
-              value={hubTitle}
-              onChange={(e) => setHubTitle(e.target.value)}
-              placeholder="e.g., Downtown Hub"
-              style={{ width: '100%', padding: '8px 10px', border: '1px solid #e5e7eb', borderRadius: 6 }}
-            />
-            <div style={{ fontSize: 12, color: '#6b7280', marginTop: 6 }}>Preview: Welcome to {previewHubName}!</div>
-            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: 16 }}>
+      {/* Left rail */}
+      <aside style={{ display: 'grid', gap: 8, alignContent: 'start' }}>
+        <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)', marginBottom: 4 }}>Settings</div>
+        <NavItem id="personalization" label="Personalization" />
+        <NavItem id="photo" label="Profile Photo" />
+        <NavItem id="security" label="Account Security" />
+        <NavItem id="notifications" label="Notifications" />
+        <NavItem id="accessibility" label="Accessibility" />
+      </aside>
+
+      {/* Right content */}
+      <div style={{ display: 'grid', gap: 16 }}>
+        {active === 'personalization' && (
+          <section className="ui-card">
+            <div style={{ padding: 16, borderBottom: '1px solid var(--border)', background: 'var(--card-muted)' }}>
+              <h3 style={{ margin: 0, fontSize: 16, color: 'var(--text)' }}>Personalization</h3>
+            </div>
+            <div style={{ padding: 16, display: 'grid', gap: 12 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, color: '#6b7280', marginBottom: 4 }}>Hub Title</label>
+                <input
+                  value={hubTitle}
+                  onChange={(e) => setHubTitle(e.target.value)}
+                  placeholder="e.g., Downtown Hub"
+                  style={{ width: '100%', padding: '8px 10px', border: '1px solid var(--border)', borderRadius: 6, background: 'var(--card-bg)', color: 'var(--text)' }}
+                />
+                <div style={{ fontSize: 12, color: '#6b7280', marginTop: 6 }}>Preview: Welcome to {previewHubName}!</div>
+                <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                  <button
+                    style={{ padding: '8px 12px', background: primaryColor, color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}
+                    onClick={() => onSavePreferences?.({ hubTitle: hubTitle.trim() || undefined })}
+                  >
+                    Save Title
+                  </button>
+                  <button
+                    style={{ padding: '8px 12px', background: 'var(--card-muted)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer' }}
+                    onClick={() => { setHubTitle(''); onSavePreferences?.({ hubTitle: undefined }); }}
+                  >
+                    Reset
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: 12, color: '#6b7280', marginBottom: 4 }}>Default Landing Tab</label>
+                <select
+                  value={defaultTab}
+                  onChange={(e) => { setDefaultTab(e.target.value); onSavePreferences?.({ defaultLandingTab: e.target.value }); }}
+                  style={{ width: '100%', padding: '8px 10px', border: '1px solid var(--border)', borderRadius: 6, background: 'var(--card-bg)', color: 'var(--text)' }}
+                >
+                  {availableTabs.map(t => (
+                    <option key={t.id} value={t.id}>{t.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: 12, color: '#6b7280', marginBottom: 4 }}>Theme</label>
+                <div style={{ display: 'flex', gap: 12 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <input type="radio" name="theme" checked={theme === 'light'} onChange={() => { setTheme('light'); onSavePreferences?.({ theme: 'light' }); onSetTheme?.('light'); }} /> Light
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <input type="radio" name="theme" checked={theme === 'dark'} onChange={() => { setTheme('dark'); onSavePreferences?.({ theme: 'dark' }); onSetTheme?.('dark'); }} /> Dark
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <input type="radio" name="theme" checked={theme === 'system'} onChange={() => { setTheme('system'); onSavePreferences?.({ theme: 'system' }); onSetTheme?.('system'); }} /> System
+                  </label>
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {active === 'photo' && (
+          <section className="ui-card">
+            <div style={{ padding: 16, borderBottom: '1px solid var(--border)', background: 'var(--card-muted)' }}>
+              <h3 style={{ margin: 0, fontSize: 16, color: 'var(--text)' }}>Profile Photo</h3>
+            </div>
+            <div style={{ padding: 16 }}>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={async (e) => {
+                  const f = e.target.files?.[0];
+                  if (!f) return;
+                  try { await onUploadPhoto?.(f); } catch {}
+                  e.currentTarget.value = '';
+                }}
+              />
+            </div>
+          </section>
+        )}
+
+        {active === 'security' && (
+          <section className="ui-card">
+            <div style={{ padding: 16, borderBottom: '1px solid var(--border)', background: 'var(--card-muted)' }}>
+              <h3 style={{ margin: 0, fontSize: 16, color: 'var(--text)' }}>Account Security</h3>
+            </div>
+            <div style={{ padding: 16, display: 'flex', gap: 8, flexWrap: 'wrap' as const, alignItems: 'center' }}>
               <button
                 style={{ padding: '8px 12px', background: primaryColor, color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}
-                onClick={() => onSavePreferences?.({ hubTitle: hubTitle.trim() || undefined })}
+                onClick={() => onOpenAccountSecurity?.()}
               >
-                Save Title
+                Manage Account (Clerk)
               </button>
-              <button
-                style={{ padding: '8px 12px', background: '#f3f4f6', color: '#111827', border: '1px solid #e5e7eb', borderRadius: 6, cursor: 'pointer' }}
-                onClick={() => { setHubTitle(''); onSavePreferences?.({ hubTitle: undefined }); }}
-              >
-                Reset
-              </button>
+              {passwordResetAvailable ? (
+                <button
+                  style={{ padding: '8px 12px', background: 'var(--card-muted)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer' }}
+                  onClick={() => onRequestPasswordReset?.()}
+                >
+                  Send Password Reset Email
+                </button>
+              ) : (
+                <span style={{ fontSize: 12, color: '#6b7280' }}>
+                  Password is managed by your SSO provider.
+                </span>
+              )}
             </div>
-          </div>
+          </section>
+        )}
 
-          <div>
-            <label style={{ display: 'block', fontSize: 12, color: '#6b7280', marginBottom: 4 }}>Default Landing Tab</label>
-            <select
-              value={defaultTab}
-              onChange={(e) => { setDefaultTab(e.target.value); onSavePreferences?.({ defaultLandingTab: e.target.value }); }}
-              style={{ width: '100%', padding: '8px 10px', border: '1px solid #e5e7eb', borderRadius: 6 }}
-            >
-              {availableTabs.map(t => (
-                <option key={t.id} value={t.id}>{t.label}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label style={{ display: 'block', fontSize: 12, color: '#6b7280', marginBottom: 4 }}>Theme</label>
-            <div style={{ display: 'flex', gap: 12 }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <input type="radio" name="theme" checked={theme === 'light'} onChange={() => { setTheme('light'); onSavePreferences?.({ theme: 'light' }); }} /> Light
-              </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <input type="radio" name="theme" checked={theme === 'dark'} onChange={() => { setTheme('dark'); onSavePreferences?.({ theme: 'dark' }); }} /> Dark
-              </label>
+        {active === 'notifications' && (
+          <section className="ui-card">
+            <div style={{ padding: 16, borderBottom: '1px solid var(--border)', background: 'var(--card-muted)' }}>
+              <h3 style={{ margin: 0, fontSize: 16, color: 'var(--text)' }}>Notifications</h3>
             </div>
-          </div>
-        </div>
-      </section>
+            <div style={{ padding: 16, color: 'var(--text)' }}>
+              <p style={{ margin: 0, fontSize: 14 }}>Coming soon</p>
+            </div>
+          </section>
+        )}
 
-      {/* Profile Photo */}
-      <section style={{ border: '1px solid #e5e7eb', borderRadius: 8, background: '#fff' }}>
-        <div style={{ padding: 16, borderBottom: '1px solid #e5e7eb', background: '#f9fafb' }}>
-          <h3 style={{ margin: 0, fontSize: 16, color: '#111827' }}>Profile Photo</h3>
-        </div>
-        <div style={{ padding: 16 }}>
-          <button
-            style={{ padding: '8px 12px', background: '#f3f4f6', color: '#111827', border: '1px solid #e5e7eb', borderRadius: 6, cursor: 'pointer' }}
-            onClick={() => onUpdatePhoto?.()}
-          >
-            Update Photo
-          </button>
-        </div>
-      </section>
-
-      {/* Account Security */}
-      <section style={{ border: '1px solid #e5e7eb', borderRadius: 8, background: '#fff' }}>
-        <div style={{ padding: 16, borderBottom: '1px solid #e5e7eb', background: '#f9fafb' }}>
-          <h3 style={{ margin: 0, fontSize: 16, color: '#111827' }}>Account Security</h3>
-        </div>
-        <div style={{ padding: 16, display: 'flex', gap: 8, flexWrap: 'wrap' as const }}>
-          <button
-            style={{ padding: '8px 12px', background: primaryColor, color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}
-            onClick={() => onOpenAccountSecurity?.()}
-          >
-            Manage Account (Clerk)
-          </button>
-          <button
-            style={{ padding: '8px 12px', background: '#f3f4f6', color: '#111827', border: '1px solid #e5e7eb', borderRadius: 6, cursor: 'pointer' }}
-            onClick={() => onRequestPasswordReset?.()}
-          >
-            Send Password Reset Email
-          </button>
-        </div>
-      </section>
+        {active === 'accessibility' && (
+          <section className="ui-card">
+            <div style={{ padding: 16, borderBottom: '1px solid var(--border)', background: 'var(--card-muted)' }}>
+              <h3 style={{ margin: 0, fontSize: 16, color: 'var(--text)' }}>Accessibility</h3>
+            </div>
+            <div style={{ padding: 16, color: 'var(--text)' }}>
+              <p style={{ margin: 0, fontSize: 14 }}>Coming soon</p>
+            </div>
+          </section>
+        )}
+      </div>
     </div>
   );
 }
 
 export default SettingsTab;
-

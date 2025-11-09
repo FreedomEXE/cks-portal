@@ -180,7 +180,7 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
   const { code: authCode } = useAuth();
   const { user } = useUser();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
-  const { setHubLoading } = useHubLoading();
+  const handleUploadPhoto = useCallback(async (file: File) => { if (!user) { toast.error('User not authenticated'); return; } try { await user.setProfileImage({ file }); toast.success('Profile photo updated'); } catch (e: any) { console.error('photo upload failed', e); toast.error(e?.message || 'Failed to update photo'); } }, [user]);
 
 
 
@@ -614,6 +614,7 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
   }
 
   const { openUserProfile } = useClerk();
+  const { setTheme } = useTheme();
 
   return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#f8fafc' }}>
@@ -670,9 +671,10 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
                 role="warehouse"
                 profileData={profileCardData}
                 primaryColor="#8b5cf6"
-                onUpdatePhoto={() => openUserProfile?.()}
+                onUploadPhoto={handleUploadPhoto}
                 onOpenAccountSecurity={() => openUserProfile?.()}
                 onRequestPasswordReset={handlePasswordReset}
+                passwordResetAvailable={Boolean(user?.passwordEnabled)}
                 userPreferences={loadUserPreferences(normalizedCode ?? null)}
                 onSaveUserPreferences={(prefs) => saveUserPreferences(normalizedCode ?? null, prefs)}
                 onContactManager={() => undefined}
@@ -1110,3 +1112,4 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
     </div>
   );
 }
+
