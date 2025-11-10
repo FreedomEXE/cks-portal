@@ -160,7 +160,7 @@ function normalizeOrderStatus(value?: string | null): HubOrderItem['status'] {
 export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubProps) {
   const { code: authCode } = useAuth();
   const { openUserProfile } = useClerk();
-  const { setTheme } = useTheme();
+  const { setTheme } = useAppTheme();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
 
   return <CustomerHubContent initialTab={initialTab} />;
@@ -752,6 +752,7 @@ function CustomerHubContent({ initialTab = 'dashboard' }: CustomerHubProps) {
     </div>
   );
 }
+
 
 
 

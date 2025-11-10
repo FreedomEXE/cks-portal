@@ -213,7 +213,7 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
   // Legacy modal state removed; universal ModalGateway handles all modals
   const { code: authCode } = useAuth();
   const { openUserProfile } = useClerk();
-  const { setTheme } = useTheme();
+  const { setTheme } = useAppTheme();
   const { user } = useUser();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
   const handleUploadPhoto = useCallback(async (file: File) => { if (!user) { toast.error('User not authenticated'); return; } try { await user.setProfileImage({ file }); toast.success('Profile photo updated'); } catch (e: any) { console.error('photo upload failed', e); toast.error(e?.message || 'Failed to update photo'); } }, [user]);
@@ -919,6 +919,7 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
       </div>
   );
 }
+
 
 
 

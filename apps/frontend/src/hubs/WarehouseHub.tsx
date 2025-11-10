@@ -614,7 +614,7 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
   }
 
   const { openUserProfile } = useClerk();
-  const { setTheme } = useTheme();
+  const { setTheme } = useAppTheme();
 
   return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#f8fafc' }}>
@@ -1112,4 +1112,5 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
     </div>
   );
 }
+
 

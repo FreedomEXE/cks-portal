@@ -8,7 +8,7 @@ import toast from 'react-hot-toast';
 import { useAuth } from '@cks/auth';
 import { useClerk, useUser } from '@clerk/clerk-react';
 import { EcosystemTree } from '@cks/domain-widgets';
-import { useTheme } from '../contexts/ThemeContext';
+import { useTheme as useAppTheme } from '../contexts/ThemeContext';
 import { useFormattedActivities } from '../shared/activity/useFormattedActivities';
 import { ActivityFeed } from '../components/ActivityFeed';
 // Legacy ActivityModalGateway removed — use universal ModalGateway via modals.openById()
@@ -499,7 +499,7 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
 
   const { code, fullName, firstName } = useAuth();
   const { openUserProfile } = useClerk();
-  const { setTheme } = useTheme();
+  const { setTheme } = useAppTheme();
   const { user } = useUser();
   const logout = useLogout();
   const { setHubLoading } = useHubLoading();

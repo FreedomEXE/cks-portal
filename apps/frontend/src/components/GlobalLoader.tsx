@@ -52,21 +52,18 @@ export default function GlobalLoader(): JSX.Element | null {
   }, [loaderSrc]);
 
   useEffect(() => {
-    // Only check once on first mount
+    // Only attempt to preload a raster loader if we might show it
+    if (forceVector || svgSource) {
+      setGifOk(null);
+      return;
+    }
     let cancelled = false;
     const img = new Image();
     img.onload = () => !cancelled && setGifOk(true);
-    img.onerror = () => {
-      if (!cancelled) {
-        setGifOk(false);
-        try { console.warn('[GlobalLoader] Failed to load loader image:', resolvedSrc); } catch {}
-      }
-    };
+    img.onerror = () => { if (!cancelled) { setGifOk(false); } };
     img.src = resolvedSrc;
-    return () => {
-      cancelled = true;
-    };
-  }, [resolvedSrc]);
+    return () => { cancelled = true; };
+  }, [resolvedSrc, forceVector, svgSource]);
 
   // Optional SVG logo animation (declare hooks unconditionally to preserve order)
   const [parsedSvg, setParsedSvg] = useState<ParsedSvg | null>(null);

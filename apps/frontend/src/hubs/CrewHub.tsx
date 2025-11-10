@@ -161,7 +161,7 @@ function normalizeOrderStatus(value?: string | null): HubOrderItem['status'] {
 export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
   const { code: authCode } = useAuth();
   const { openUserProfile } = useClerk();
-  const { setTheme } = useTheme();
+  const { setTheme } = useAppTheme();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
 
   return <CrewHubContent initialTab={initialTab} />;
@@ -877,6 +877,7 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
       </div>
   );
 }
+
 
 
 
