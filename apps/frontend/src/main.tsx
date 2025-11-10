@@ -31,35 +31,35 @@ try { (window as any).__CKS_API_BASE = API_BASE; } catch {}
 
 root.render(
   <React.StrictMode>
-    <ClerkProvider publishableKey={PUBLISHABLE_KEY}>
-      <SWRConfig
-        value={{
-          provider: () => new Map(),
-          onErrorRetry: (err, _key, config, revalidate, opts) => {
-            const status = (err as any)?.status;
-            if (status === 401 || status === 403) return;
-            if ((opts.retryCount ?? 0) >= 2) return;
-            const delay = Math.min(5000, 1000 * Math.pow(2, opts.retryCount ?? 0));
-            setTimeout(() => revalidate({ retryCount: (opts.retryCount ?? 0) + 1 }), delay);
-          },
-        }}
-      >
-        <ThemeProvider>
-        <LoadingProvider>
-          <CartProvider>
-            <BrowserRouter>
-              <SignedIn>
-                <AuthenticatedApp />
-              </SignedIn>
-              <SignedOut>
-                <UnauthenticatedApp />
-              </SignedOut>
-            </BrowserRouter>
-            <GlobalLoader />
-          </CartProvider>
-        </LoadingProvider>
-        </ThemeProvider>
-      </SWRConfig>
-    </ClerkProvider>
+    <ThemeProvider>
+      <ClerkProvider publishableKey={PUBLISHABLE_KEY}>
+        <SWRConfig
+          value={{
+            provider: () => new Map(),
+            onErrorRetry: (err, _key, config, revalidate, opts) => {
+              const status = (err as any)?.status;
+              if (status === 401 || status === 403) return;
+              if ((opts.retryCount ?? 0) >= 2) return;
+              const delay = Math.min(5000, 1000 * Math.pow(2, opts.retryCount ?? 0));
+              setTimeout(() => revalidate({ retryCount: (opts.retryCount ?? 0) + 1 }), delay);
+            },
+          }}
+        >
+          <LoadingProvider>
+            <CartProvider>
+              <BrowserRouter>
+                <SignedIn>
+                  <AuthenticatedApp />
+                </SignedIn>
+                <SignedOut>
+                  <UnauthenticatedApp />
+                </SignedOut>
+              </BrowserRouter>
+              <GlobalLoader />
+            </CartProvider>
+          </LoadingProvider>
+        </SWRConfig>
+      </ClerkProvider>
+    </ThemeProvider>
   </React.StrictMode>
 );
