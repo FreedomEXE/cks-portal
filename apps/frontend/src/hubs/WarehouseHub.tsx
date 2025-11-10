@@ -38,6 +38,7 @@ import OrderDetailsGateway from '../components/OrderDetailsGateway';
 import { useAuth } from '@cks/auth';
 import { useSWRConfig } from 'swr';
 import { getAllowedActions, getActionLabel } from '@cks/policies';
+import { useTheme as useAppTheme } from '../contexts/ThemeContext';
 import { useServices as useDirectoryServices } from '../shared/api/directory';
 import { useCatalogItems } from '../shared/api/catalog';
 import { useCertifiedServices } from '../hooks/useCertifiedServices';

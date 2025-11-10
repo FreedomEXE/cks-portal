@@ -30,6 +30,7 @@ import {
 import { customerOverviewCards } from '@cks/domain-widgets';
 import { Button, DataTable, OrderDetailsModal, ServiceViewModal, PageHeader, PageWrapper, Scrollbar, TabSection } from '@cks/ui';
 import { useModals } from '../contexts';
+import { useTheme as useAppTheme } from '../contexts/ThemeContext';
 import OrderDetailsGateway from '../components/OrderDetailsGateway';
 import { useAuth } from '@cks/auth';
 import { useClerk, useUser } from '@clerk/clerk-react';

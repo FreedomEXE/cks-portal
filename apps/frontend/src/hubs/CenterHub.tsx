@@ -38,6 +38,7 @@ import { requestPasswordReset } from '../shared/api/account';
 import { useFormattedActivities } from '../shared/activity/useFormattedActivities';
 import { ActivityFeed } from '../components/ActivityFeed';
 // ActivityModalGateway (legacy) removed in favor of universal ModalGateway via modals.openById()
+import { useTheme as useAppTheme } from '../contexts/ThemeContext';
 import { useEntityActions } from '../hooks/useEntityActions';
 
 import MyHubSection from '../components/MyHubSection';
