@@ -1,7 +1,5 @@
 .heroOuter {
   background: var(--bg);
-  /* prevent 100vw bleed from causing horizontal scrollbar */
-  overflow-x: hidden;
 }
 
 .heroClamp {
@@ -21,4 +19,3 @@
     padding-right: var(--hero-gutter, 12px);
   }
 }
-

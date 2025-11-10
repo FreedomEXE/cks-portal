@@ -181,7 +181,6 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
   const { user } = useUser();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
   const { setHubLoading } = useHubLoading();
-  const userCode = useMemo(() => resolvedUserCode(profile?.cksCode, normalizedCode), [profile?.cksCode, normalizedCode]);
   const { mutate } = useSWRConfig();
   const { handleAction } = useEntityActions();
   const { setTheme } = useAppTheme();
@@ -207,6 +206,9 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
     mutate: refreshOrders,
   } = useHubOrders(normalizedCode);
   const { data: reportsData, isLoading: reportsLoading, mutate: mutateReports } = useHubReports(normalizedCode);
+
+  // Resolve final display/user code after profile is available
+  const userCode = useMemo(() => resolvedUserCode(profile?.cksCode, normalizedCode), [profile?.cksCode, normalizedCode]);
 
   // Access modal context
   const modals = useModals();
@@ -623,7 +625,7 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
   return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#f8fafc' }}>
         <MyHubSection
-          hubName={(loadUserPreferences(userCode ?? null).hubTitle?.trim() || 'Warehouse Hub')}
+          hubName={(loadUserPreferences(normalizedCode ?? null).hubTitle?.trim() || 'Warehouse Hub')}
           tabs={tabs}
         activeTab={activeTab}
         onTabClick={setActiveTab}
@@ -649,7 +651,7 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
               <ActivityFeed
                 activities={activities}
                 hub="warehouse"
-                viewerId={userCode || undefined}
+                viewerId={(userCode || normalizedCode || undefined) as string | undefined}
                 onClearActivity={handleClearActivity}
                 onClearAll={handleClearAll}
                 onOpenServiceModal={(serviceId) => modals.openById(serviceId)}
@@ -679,8 +681,8 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
                 onOpenAccountSecurity={() => openUserProfile?.()}
                 onRequestPasswordReset={handlePasswordReset}
                 passwordResetAvailable={Boolean(user?.passwordEnabled)}
-                userPreferences={loadUserPreferences(userCode ?? null)}
-                onSaveUserPreferences={(prefs) => saveUserPreferences(userCode ?? null, prefs)}
+                userPreferences={loadUserPreferences(normalizedCode ?? null)}
+                onSaveUserPreferences={(prefs) => saveUserPreferences(normalizedCode ?? null, prefs)}
                 onContactManager={() => undefined}
                 onScheduleMeeting={() => undefined}
               />

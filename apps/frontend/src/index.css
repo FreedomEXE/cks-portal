@@ -46,6 +46,17 @@ body {
   }
 }
 
+/* Reduce base font-size slightly on smaller desktop widths to avoid a “zoomed” feel */
+@media (max-width: 1366px) and (min-width: 1025px) {
+  html { font-size: 15.5px; }
+}
+@media (max-width: 1280px) and (min-width: 901px) {
+  html { font-size: 15px; }
+}
+@media (max-width: 1152px) and (min-width: 801px) {
+  html { font-size: 14.5px; }
+}
+
 /* Fluid base to preserve the same visual scale across monitors.
    Tailwind spacing/typography are rem-based, so adjusting html font-size
    keeps the design look consistent without breaking layout. */
