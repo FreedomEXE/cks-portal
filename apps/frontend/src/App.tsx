@@ -2,7 +2,7 @@ import { Login, RoleGuard, useAuth } from '@cks/auth';
 import { useEffect, useRef, type ComponentType } from 'react';
 import { Navigate, Route, Routes, useSearchParams } from 'react-router-dom';
 import { useLoading } from './contexts/LoadingContext';
-import { HubLoadingProvider, useHubLoading } from './contexts/HubLoadingContext';
+import { useHubLoading } from './contexts/HubLoadingContext';
 import { ModalProvider } from './contexts/ModalProvider';
 
 import AdminHub from './hubs/AdminHub';
@@ -100,17 +100,15 @@ export function AuthenticatedApp(): JSX.Element {
   console.log('[AuthenticatedApp] Rendering authenticated app');
 
   return (
-    <HubLoadingProvider>
-      <ModalProvider>
-        <Routes>
-          <Route path="/" element={<Navigate to="/hub" replace />} />
-          <Route path="/hub" element={<RoleHubRoute />} />
-          <Route path="/catalog" element={<CKSCatalog />} />
-          <Route path="/hub/*" element={<Navigate to="/hub" replace />} />
-          <Route path="*" element={<Navigate to="/hub" replace />} />
-        </Routes>
-      </ModalProvider>
-    </HubLoadingProvider>
+    <ModalProvider>
+      <Routes>
+        <Route path="/" element={<Navigate to="/hub" replace />} />
+        <Route path="/hub" element={<RoleHubRoute />} />
+        <Route path="/catalog" element={<CKSCatalog />} />
+        <Route path="/hub/*" element={<Navigate to="/hub" replace />} />
+        <Route path="*" element={<Navigate to="/hub" replace />} />
+      </Routes>
+    </ModalProvider>
   );
 }
 
