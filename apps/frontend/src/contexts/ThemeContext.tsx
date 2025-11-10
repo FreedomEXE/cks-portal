@@ -45,7 +45,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
 export function useTheme(): ThemeCtx {
   const ctx = useContext(Ctx);
-  if (!ctx) throw new Error('useTheme must be used inside ThemeProvider');
+  if (!ctx) {
+    // Fallback to prevent runtime crashes if a consumer renders before
+    // ThemeProvider is mounted (e.g., during auth boundary transitions).
+    return { theme: 'light', setTheme: () => undefined };
+  }
   return ctx;
 }
-

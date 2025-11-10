@@ -33,13 +33,12 @@ try { (window as any).__CKS_API_BASE = API_BASE; } catch {}
 root.render(
   <React.StrictMode>
     <ThemeProvider>
-      <ClerkProvider
-        publishableKey={PUBLISHABLE_KEY}
-        signInUrl={(import.meta as any).env?.VITE_CLERK_SIGN_IN_URL || '/login'}
-        signUpUrl={(import.meta as any).env?.VITE_CLERK_SIGN_UP_URL || '/login'}
-        afterSignInUrl={(import.meta as any).env?.VITE_CLERK_AFTER_SIGN_IN_URL || '/hub'}
-        afterSignUpUrl={(import.meta as any).env?.VITE_CLERK_AFTER_SIGN_UP_URL || '/hub'}
-      >
+    <ClerkProvider
+      publishableKey={PUBLISHABLE_KEY}
+      // Keep only routing entry points; handle post-auth redirects in app/login logic
+      signInUrl={(import.meta as any).env?.VITE_CLERK_SIGN_IN_URL || '/login'}
+      signUpUrl={(import.meta as any).env?.VITE_CLERK_SIGN_UP_URL || '/login'}
+    >
         <HubLoadingProvider>
           <SWRConfig
             value={{
