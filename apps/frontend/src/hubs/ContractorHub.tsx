@@ -449,10 +449,10 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
 
   const ecosystemData = useMemo<TreeNode>(() => {
     if (scopeData) {
-      return buildEcosystemTree(scopeData, { rootName: profile?.name ?? contractorCode ?? 'Contractor' });
+      return buildEcosystemTree(scopeData, { rootName: profile?.name ?? userCode ?? 'Contractor' });
     }
     return {
-      user: { id: userCode ?? 'CONTRACTOR', role: 'Contractor', name: profile?.name ?? contractorCode ?? 'Contractor' },
+      user: { id: userCode ?? 'CONTRACTOR', role: 'Contractor', name: profile?.name ?? userCode ?? 'Contractor' },
     } as TreeNode;
   }, [scopeData, profile, userCode]);
 
@@ -667,7 +667,7 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
                 rootUser={{
                   id: userCode ?? 'CONTRACTOR',
                   role: 'Contractor',
-                  name: profile?.name ?? contractorCode ?? 'Contractor',
+                  name: profile?.name ?? userCode ?? 'Contractor',
                 }}
                 treeData={ecosystemData}
                 onNodeClick={(id) => modals.openById(id)}

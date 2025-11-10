@@ -45,14 +45,19 @@ export default function MyHubSection({
     <>Welcome to {hubName}!</>
   );
   return (
-    <div style={{ padding: '16px 24px 24px 24px', background: 'var(--bg)' }}>
+    <div style={{ background: 'var(--bg)' }}>
       <div style={{
-        background: 'var(--card-bg)',
-        borderRadius: 12,
-        border: `3px solid ${colors.primary}`,
-        padding: '20px 24px',
-        boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'
+        margin: '0 auto',
+        maxWidth: 'var(--page-max-width, 1440px)',
+        padding: '16px 24px 24px 24px'
       }}>
+        <div style={{
+          background: 'var(--card-bg)',
+          borderRadius: 12,
+          border: `3px solid ${colors.primary}`,
+          padding: '20px 24px',
+          boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'
+        }}>
   {/* Header Row */}
         <div style={{
           display: 'flex',
@@ -134,6 +139,7 @@ export default function MyHubSection({
               </button>
             );
           })}
+        </div>
         </div>
       </div>
     </div>

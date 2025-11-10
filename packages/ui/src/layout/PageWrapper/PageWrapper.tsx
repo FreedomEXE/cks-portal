@@ -32,14 +32,16 @@ const PageWrapper: React.FC<PageWrapperProps> = ({
   return (
     <div className={`${styles.pageWrapper} ${styles[variant]} ${className}`}>
       {toolbar && (
-        <div className={styles.toolbar}>
+        <div className={`${styles.toolbar} ${styles.containerClamp}`}>
           {toolbar}
         </div>
       )}
       {showHeader && (
-        <PageHeader title={title} subtitle={subtitle} srOnly={headerSrOnly} />
+        <div className={styles.containerClamp}>
+          <PageHeader title={title} subtitle={subtitle} srOnly={headerSrOnly} />
+        </div>
       )}
-      <div className={styles.contentContainer}>
+      <div className={`${styles.contentContainer} ${styles.containerClamp}`}>
         {children}
       </div>
     </div>
