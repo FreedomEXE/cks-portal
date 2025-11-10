@@ -1,6 +1,6 @@
 import dotenv from "dotenv";
 import { resolve, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 // __dirname is not available in ESM/tsx runtime – reconstruct from import.meta.url
 const CURRENT_DIR = dirname(fileURLToPath(import.meta.url));
@@ -300,7 +300,15 @@ async function start() {
   }
 }
 
-if (require.main === module) {
-  start();
+// ESM-safe entrypoint check (equivalent of `require.main === module`)
+try {
+  const entryHref = process?.argv?.[1] ? pathToFileURL(process.argv[1]).href : '';
+  const isMain = import.meta.url === entryHref;
+  if (isMain) {
+    await start();
+  }
+} catch {
+  // Fallback: start server when check fails in constrained runtimes
+  await start();
 }
 
