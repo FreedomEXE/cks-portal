@@ -1,7 +1,10 @@
 import dotenv from "dotenv";
-import { resolve } from "node:path";
+import { resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 
-dotenv.config({ path: resolve(__dirname, "../.env") });
+// __dirname is not available in ESM/tsx runtime – reconstruct from import.meta.url
+const CURRENT_DIR = dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: resolve(CURRENT_DIR, "../.env") });
 console.log('DATABASE_URL loaded?', !!process.env.DATABASE_URL ? 'yes' : 'no');
 
 import cookie from "@fastify/cookie";
