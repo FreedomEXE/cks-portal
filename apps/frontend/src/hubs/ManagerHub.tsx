@@ -10,7 +10,9 @@ import { useClerk, useUser } from '@clerk/clerk-react';
 import { EcosystemTree } from '@cks/domain-widgets';
 import { useTheme as useAppTheme } from '../contexts/ThemeContext';
 import { useFormattedActivities } from '../shared/activity/useFormattedActivities';
+import { resolvedUserCode } from '../shared/utils/userCode';
 import { ActivityFeed } from '../components/ActivityFeed';
+import { resolvedUserCode, useViewerCodeSafe } from '../shared/utils/userCode';
 // Legacy ActivityModalGateway removed — use universal ModalGateway via modals.openById()
 import { useEntityActions } from '../hooks/useEntityActions';
 // Legacy OrderActionModal removed; Quick Actions are rendered inside the universal modal
@@ -421,8 +423,8 @@ function formatReportsTo(value: string | null | undefined): string | null {
 
 // Main wrapper component that sets up ModalProvider
 export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps) {
-  const { code } = useAuth();
-  const userCode = useMemo(() => normalizeId(code), [code]);
+  const viewerCode = useViewerCodeSafe();
+  const userCode = useMemo(() => resolvedUserCode(null, viewerCode), [viewerCode]);
   const { data: reportsData } = useHubReports(userCode);
   const { data: ordersData } = useHubOrders(userCode);
   const { data: scopeData } = useHubRoleScope(userCode);
@@ -507,7 +509,10 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
   // Access modal context
   const modals = useModals();
 
-  const userCode = useMemo(() => normalizeId(code), [code]);
+  const userCode = useMemo(
+    () => resolvedUserCode(profileData?.cksCode, code),
+    [profileData?.cksCode, code]
+  );
   const managerPrefs = useMemo(() => loadUserPreferences(userCode), [userCode]);
 
   // Fetch hub-scoped data
@@ -1372,6 +1377,7 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
       </div>
   );
 }
+
 
 
 

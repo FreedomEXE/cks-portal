@@ -530,8 +530,8 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
 
   // Don't render anything until we have critical data
   if (!profile || !dashboard) {
-    console.log('[CrewHub] Waiting for critical data...');
-    return null;
+    console.log('[CrewHub.tsx] Waiting for critical data...');
+    return <ProfileSkeleton />;
   }
 
   return (
@@ -559,7 +559,7 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
               <ActivityFeed
                 activities={activities}
                 hub="crew"
-                viewerId={normalizedCode || undefined}
+                viewerId={userCode || undefined}
                 onClearActivity={handleClearActivity}
                 onClearAll={handleClearAll}
                 onOpenServiceModal={(serviceId) => modals.openById(serviceId)}
@@ -882,6 +882,8 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
       </div>
   );
 }
+
+
 
 
 

@@ -440,8 +440,8 @@ function CustomerHubContent({ initialTab = 'dashboard' }: CustomerHubProps) {
 
   // Don't render anything until we have critical data
   if (!profile || !dashboard) {
-    console.log('[CustomerHub] Waiting for critical data...');
-    return null;
+    console.log('[CustomerHub.tsx] Waiting for critical data...');
+    return <ProfileSkeleton />;
   }
 
   return (
@@ -473,7 +473,7 @@ function CustomerHubContent({ initialTab = 'dashboard' }: CustomerHubProps) {
               <ActivityFeed
                 activities={activities}
                 hub="customer"
-                viewerId={normalizedCode || undefined}
+                viewerId={userCode || undefined}
                 onClearActivity={handleClearActivity}
                 onClearAll={handleClearAll}
                 onOpenServiceModal={(serviceId) => modals.openById(serviceId)}
@@ -760,6 +760,8 @@ function CustomerHubContent({ initialTab = 'dashboard' }: CustomerHubProps) {
     </div>
   );
 }
+
+
 
 
 

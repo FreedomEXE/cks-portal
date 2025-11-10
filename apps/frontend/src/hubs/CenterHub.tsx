@@ -442,8 +442,8 @@ function CenterHubContent({ initialTab = 'dashboard' }: CenterHubProps) {
 
   // Don't render anything until we have critical data
   if (!profile || !dashboard) {
-    console.log('[CenterHub] Waiting for critical data...');
-    return null;
+    console.log('[CenterHub.tsx] Waiting for critical data...');
+    return <ProfileSkeleton />;
   }
 
   return (
@@ -475,7 +475,7 @@ function CenterHubContent({ initialTab = 'dashboard' }: CenterHubProps) {
               <ActivityFeed
                 activities={activities}
                 hub="center"
-                viewerId={normalizedCode || undefined}
+                viewerId={userCode || undefined}
                 onClearActivity={handleClearActivity}
                 onClearAll={handleClearAll}
                 onOpenServiceModal={(serviceId) => modals.openById(serviceId)}
@@ -767,6 +767,8 @@ function CenterHubContent({ initialTab = 'dashboard' }: CenterHubProps) {
     </div>
   );
 }
+
+
 
 
 

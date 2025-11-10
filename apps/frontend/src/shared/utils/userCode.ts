@@ -62,3 +62,17 @@ export function useViewerCodeSafe(): string | null {
     return normalizeCode(code);
   }, [code, status]);
 }
+
+/**
+ * Resolve a stable user code from an optional CKS code and a fallback
+ * (typically the auth code). Both inputs are normalized; returns the
+ * first non-empty normalized value, or null if neither is usable.
+ */
+export function resolvedUserCode(
+  cksCode: string | null | undefined,
+  fallback: string | null | undefined
+): string | null {
+  const primary = normalizeCode(cksCode);
+  if (primary) return primary;
+  return normalizeCode(fallback);
+}

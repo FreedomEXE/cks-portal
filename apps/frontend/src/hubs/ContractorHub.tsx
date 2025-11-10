@@ -451,9 +451,9 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
       return buildEcosystemTree(scopeData, { rootName: profile?.name ?? contractorCode ?? 'Contractor' });
     }
     return {
-      user: { id: contractorCode ?? 'CONTRACTOR', role: 'Contractor', name: profile?.name ?? contractorCode ?? 'Contractor' },
+      user: { id: userCode ?? 'CONTRACTOR', role: 'Contractor', name: profile?.name ?? contractorCode ?? 'Contractor' },
     } as TreeNode;
-  }, [scopeData, profile, contractorCode]);
+  }, [scopeData, profile, userCode]);
 
   const { activeServicesData, serviceHistoryData } = useMemo(() => {
     const active: Array<{ serviceId: string; serviceName: string; centerId: string; type: string; status: string; managedBy: string; startDate: string }> = [];
@@ -507,7 +507,7 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
   }, [serviceOrders, serviceById, centerNameMap]);
 
   // Certified services for My Services tab (filtered by certifications)
-  const { data: certifiedServicesData, isLoading: certifiedServicesLoading } = useCertifiedServices(contractorCode, 'contractor', 500);
+  const { data: certifiedServicesData, isLoading: certifiedServicesLoading } = useCertifiedServices(userCode, 'contractor', 500);
 
   // Column definitions for My Services
   const MY_SERVICES_COLUMNS_BASE = [
@@ -552,7 +552,7 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
 
   const profileCardData = useMemo(() => ({
     name: profile?.name ?? EMPTY_VALUE,
-    contractorId: contractorCode ?? EMPTY_VALUE,
+    contractorId: userCode ?? EMPTY_VALUE,
     address: profile?.address ?? EMPTY_VALUE,
     phone: profile?.phone ?? EMPTY_VALUE,
     email: profile?.email ?? EMPTY_VALUE,
@@ -560,7 +560,7 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
     website: getMetadataString(profile?.metadata ?? null, 'website') ?? null,
     mainContact: profile?.mainContact ?? managerReference?.name ?? EMPTY_VALUE,
     startDate: profile?.createdAt ? formatDisplayDate(profile.createdAt) : null,
-  }), [profile, contractorCode, managerReference]);
+  }), [profile, userCode, managerReference]);
 
   const accountManagerCard = useMemo(() => {
     const manager = profile?.manager ?? managerReference;
@@ -586,8 +586,8 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
 
   // Don't render anything until we have critical data
   if (!profile || !dashboard) {
-    console.log('[ContractorHub] Waiting for critical data...');
-    return null;
+    console.log('[ContractorHub.tsx] Waiting for critical data...');
+    return <ProfileSkeleton />;
   }
 
   return (
@@ -597,7 +597,7 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
         tabs={tabs}
         activeTab={activeTab}
         onTabClick={setActiveTab}
-        userId={contractorCode ?? 'CONTRACTOR'}
+        userId={userCode ?? 'CONTRACTOR'}
         welcomeName={welcomeName}
         role="contractor"
       />
@@ -620,7 +620,7 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
               <ActivityFeed
                 activities={formattedActivities}
                 hub="contractor"
-                viewerId={normalizedCode || undefined}
+                viewerId={userCode || undefined}
                 onClearActivity={handleClearActivity}
                 onClearAll={handleClearAll}
                 onOpenServiceModal={(serviceId) => modals.openById(serviceId)}
@@ -664,14 +664,14 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
             <PageWrapper headerSrOnly>
               <EcosystemTree
                 rootUser={{
-                  id: contractorCode ?? 'CONTRACTOR',
+                  id: userCode ?? 'CONTRACTOR',
                   role: 'Contractor',
                   name: profile?.name ?? contractorCode ?? 'Contractor',
                 }}
                 treeData={ecosystemData}
                 onNodeClick={(id) => modals.openById(id)}
-                expandedNodes={contractorCode ? [contractorCode] : []}
-                currentUserId={contractorCode ?? undefined}
+                expandedNodes={userCode ? [userCode] : []}
+                currentUserId={userCode ?? undefined}
                 title="Ecosystem"
                 subtitle="Your business network overview"
                 description="Ecosystem data will populate as relationships become available."
@@ -828,7 +828,7 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
               )}
               <OrdersSection
                 userRole="contractor"
-                userCode={contractorCode}
+                userCode={userCode}
                 serviceOrders={serviceOrders}
                 productOrders={productOrders}
                 onCreateServiceOrder={() => navigate('/catalog?mode=services')}
@@ -849,7 +849,7 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
             <PageWrapper headerSrOnly>
               <ReportsSection
                 role="contractor"
-                userId={contractorCode ?? undefined}
+                userId={userCode ?? undefined}
                 primaryColor="#10b981"
                 reports={reportsData?.reports || []}
                 feedback={reportsData?.feedback || []}
@@ -882,7 +882,7 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
                     // Legacy text-based feedback (fallback)
                     await apiCreateFeedback({ title: payload.title, message: payload.description, category: payload.category });
                   }
-                  await mutate(`/hub/reports/${contractorCode}`);
+                  await mutate(`/hub/reports/`);
                 }}
                 fetchServices={fetchServicesForReports}
                 fetchProcedures={fetchProceduresForReports}
@@ -890,13 +890,13 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
                 onAcknowledge={async (id, type) => {
                   console.log('[ContractorHub] BEFORE acknowledge mutate');
                   await apiAcknowledgeItem(id, type);
-                  await (mutate as any)(`/hub/reports/${contractorCode}`);
+                  await (mutate as any)(`/hub/reports/`);
                   console.log('[ContractorHub] AFTER acknowledge mutate');
                 }}
                 onResolve={async (id, details) => {
                   console.log('[ContractorHub] BEFORE resolve mutate');
                   await apiResolveReport(id, details ?? {});
-                  await (mutate as any)(`/hub/reports/${contractorCode}`);
+                  await (mutate as any)(`/hub/reports/`);
                   console.log('[ContractorHub] AFTER resolve mutate');
                 }}
                 onReportClick={(reportId) => {
@@ -923,6 +923,10 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
       </div>
   );
 }
+
+
+
+
 
 
 

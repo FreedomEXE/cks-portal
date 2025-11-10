@@ -613,8 +613,8 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
 
   // Don't render anything until we have critical data
   if (!profile || !dashboard) {
-    console.log('[WarehouseHub] Waiting for critical data...');
-    return null;
+    console.log('[WarehouseHub.tsx] Waiting for critical data...');
+    return <ProfileSkeleton />;
   }
 
   const { openUserProfile } = useClerk();
@@ -648,7 +648,7 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
               <ActivityFeed
                 activities={activities}
                 hub="warehouse"
-                viewerId={normalizedCode || undefined}
+                viewerId={userCode || undefined}
                 onClearActivity={handleClearActivity}
                 onClearAll={handleClearAll}
                 onOpenServiceModal={(serviceId) => modals.openById(serviceId)}
@@ -1115,6 +1115,8 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
     </div>
   );
 }
+
+
 
 
 
