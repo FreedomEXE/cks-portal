@@ -183,6 +183,7 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
   const userCode = useMemo(() => resolvedUserCode(profile?.cksCode, normalizedCode), [profile?.cksCode, normalizedCode]);
   const { mutate } = useSWRConfig();
   const { handleAction } = useEntityActions();
+  const { setTheme } = useAppTheme();
   const handleUploadPhoto = useCallback(async (file: File) => { if (!user) { toast.error('User not authenticated'); return; } try { await user.setProfileImage({ file }); toast.success('Profile photo updated'); } catch (e: any) { console.error('photo upload failed', e); toast.error(e?.message || 'Failed to update photo'); } }, [user]);
 
 
@@ -617,7 +618,6 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
   }
 
   const { openUserProfile } = useClerk();
-  const { setTheme } = useAppTheme();
 
   return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#f8fafc' }}>
@@ -1115,6 +1115,7 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
     </div>
   );
 }
+
 
 
 

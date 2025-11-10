@@ -172,6 +172,7 @@ function CenterHubContent({ initialTab = 'dashboard' }: CenterHubProps) {
   const [activeTab, setActiveTab] = useState(initialTab);
   const [servicesTab, setServicesTab] = useState<'active' | 'history'>('active');
   const [servicesSearchQuery, setServicesSearchQuery] = useState('');
+  const { setTheme } = useAppTheme();
   // Legacy modal state removed; universal ModalGateway handles all entity modals
   const { code: authCode } = useAuth();
   const { user } = useUser();

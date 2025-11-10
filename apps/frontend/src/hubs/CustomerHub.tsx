@@ -174,6 +174,7 @@ function CustomerHubContent({ initialTab = 'dashboard' }: CustomerHubProps) {
   const [activeTab, setActiveTab] = useState(initialTab);
   const [servicesTab, setServicesTab] = useState<'my' | 'history'>('my');
   const [servicesSearchQuery, setServicesSearchQuery] = useState('');
+  const { setTheme } = useAppTheme();
   // Legacy modal state removed; universal ModalGateway handles all modals
   const { code: authCode } = useAuth();
   const { user } = useUser();
