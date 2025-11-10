@@ -32,7 +32,13 @@ try { (window as any).__CKS_API_BASE = API_BASE; } catch {}
 root.render(
   <React.StrictMode>
     <ThemeProvider>
-      <ClerkProvider publishableKey={PUBLISHABLE_KEY}>
+    <ClerkProvider
+      publishableKey={PUBLISHABLE_KEY}
+      signInUrl="/login"
+      signUpUrl="/login"
+      afterSignInUrl="/hub"
+      afterSignUpUrl="/hub"
+    >
         <SWRConfig
           value={{
             provider: () => new Map(),
