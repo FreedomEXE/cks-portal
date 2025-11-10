@@ -1,0 +1,24 @@
+.heroOuter {
+  background: var(--bg);
+  /* prevent 100vw bleed from causing horizontal scrollbar */
+  overflow-x: hidden;
+}
+
+.heroClamp {
+  margin: 0 auto;
+  max-width: var(--hero-max-width, 1680px);
+  padding: 16px var(--hero-gutter, 16px) 24px var(--hero-gutter, 16px);
+}
+
+/* On viewports <= 1440px, make the hero full-bleed to feel wider than the clamped content */
+@media (max-width: 1440px) {
+  .heroClamp {
+    max-width: none;
+    width: 100vw;
+    margin-left: calc(50% - 50vw);
+    margin-right: calc(50% - 50vw);
+    padding-left: var(--hero-gutter, 12px);
+    padding-right: var(--hero-gutter, 12px);
+  }
+}
+

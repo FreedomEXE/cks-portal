@@ -508,19 +508,22 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
   // Access modal context
   const modals = useModals();
 
-  const userCode = useMemo(
-    () => resolvedUserCode(profileData?.cksCode, code),
-    [profileData?.cksCode, code]
-  );
-  const managerPrefs = useMemo(() => loadUserPreferences(userCode), [userCode]);
+  // Stable fetch key from auth; avoids TDZ on profileData
+  const authCode = useMemo(() => resolvedUserCode(null, code), [code]);
+  const managerPrefs = useMemo(() => loadUserPreferences(authCode), [authCode]);
 
   // Fetch hub-scoped data
-  const { data: profileData } = useHubProfile(userCode);
-  const { data: dashboardData } = useHubDashboard(userCode);
-  const { data: scopeData } = useHubRoleScope(userCode);
-  const { activities: formattedActivities, isLoading: activitiesLoading, error: activitiesError, mutate: mutateActivities } = useFormattedActivities(userCode, { limit: 20 });
+  const { data: profileData } = useHubProfile(authCode);
+  const { data: dashboardData } = useHubDashboard(authCode);
+  const { data: scopeData } = useHubRoleScope(authCode);
+  const { activities: formattedActivities, isLoading: activitiesLoading, error: activitiesError, mutate: mutateActivities } = useFormattedActivities(authCode, { limit: 20 });
 
-  const { data: ordersData } = useHubOrders(userCode);
+  const { data: ordersData } = useHubOrders(authCode);
+  // Resolved display/identity code once profile is known
+  const userCode = useMemo(
+    () => resolvedUserCode(profileData?.cksCode, authCode),
+    [profileData?.cksCode, authCode]
+  );
   const { mutate } = useSWRConfig();
 
   // Handle activity dismissal
@@ -746,7 +749,7 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
           const onStart = async () => {
             try {
               await applyServiceAction(rawServiceId, 'start');
-              mutate(`/hub/orders/${userCode}`, undefined, { revalidate: true });
+              mutate(`/hub/orders/${authCode}`, undefined, { revalidate: true });
               setToast('Service started');
               setTimeout(() => setToast(null), 1800);
             } catch (err) {
@@ -758,7 +761,7 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
           const onComplete = async () => {
             try {
               await applyServiceAction(rawServiceId, 'complete');
-              mutate(`/hub/orders/${userCode}`, undefined, { revalidate: true });
+              mutate(`/hub/orders/${authCode}`, undefined, { revalidate: true });
               setToast('Service completed');
               setTimeout(() => setToast(null), 1800);
             } catch (err) {
@@ -770,7 +773,7 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
           const onVerify = async () => {
             try {
               await applyServiceAction(rawServiceId, 'verify');
-              mutate(`/hub/orders/${userCode}`, undefined, { revalidate: true });
+              mutate(`/hub/orders/${authCode}`, undefined, { revalidate: true });
             } catch (err) {
               console.error('[manager] failed to verify service', err);
               alert(err instanceof Error ? err.message : 'Failed to verify service');
@@ -1052,7 +1055,7 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
                 onRequestPasswordReset={handlePasswordReset}
                 passwordResetAvailable={Boolean(user?.passwordEnabled)}
                 userPreferences={managerPrefs}
-                onSaveUserPreferences={(prefs) => saveUserPreferences(userCode, prefs)}
+                onSaveUserPreferences={(prefs) => saveUserPreferences(authCode, prefs)}
                 availableTabs={HUB_TABS.map(t => ({ id: t.id, label: t.label }))}
                 onSetTheme={setTheme}
               />

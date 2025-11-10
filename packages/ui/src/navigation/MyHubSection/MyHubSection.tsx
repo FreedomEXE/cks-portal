@@ -1,4 +1,5 @@
 import Button from '../../buttons/Button';
+import styles from './MyHubSection.module.css';
 
 export interface Tab {
   id: string;
@@ -45,12 +46,8 @@ export default function MyHubSection({
     <>Welcome to {hubName}!</>
   );
   return (
-    <div style={{ background: 'var(--bg)' }}>
-      <div style={{
-        margin: '0 auto',
-        maxWidth: 'var(--hero-max-width, 1680px)',
-        padding: '16px var(--hero-gutter, 16px) 24px var(--hero-gutter, 16px)'
-      }}>
+    <div className={styles.heroOuter}>
+      <div className={styles.heroClamp}>
         <div style={{
           background: 'var(--card-bg)',
           borderRadius: 12,
@@ -67,7 +64,7 @@ export default function MyHubSection({
         }}>
           <h1 style={{
             margin: 0,
-            fontSize: 32,
+            fontSize: 'clamp(28px, 3.2vw, 40px)',
             fontWeight: 700,
             color: 'var(--text)'
           }}>
