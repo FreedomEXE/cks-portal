@@ -58,7 +58,8 @@ import {
 } from '../shared/api/hub';
 import { useFormattedActivities } from '../shared/activity/useFormattedActivities';
 import { ActivityFeed } from '../components/ActivityFeed';
-// Legacy ActivityModalGateway removed — use universal ModalGateway via modals.openById()
+import ProfileSkeleton from '../components/ProfileSkeleton';
+// Legacy ActivityModalGateway removed - use universal ModalGateway via modals.openById()
 import { useEntityActions } from '../hooks/useEntityActions';
 import { createFeedback as apiCreateFeedback, acknowledgeItem as apiAcknowledgeItem, resolveReport as apiResolveReport, fetchServicesForReports, fetchProceduresForReports, fetchOrdersForReports } from '../shared/api/hub';
 

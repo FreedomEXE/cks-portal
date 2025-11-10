@@ -39,7 +39,8 @@ import { useClerk, useUser } from '@clerk/clerk-react';
 import { useFormattedActivities } from '../shared/activity/useFormattedActivities';
 import { requestPasswordReset } from '../shared/api/account';
 import { ActivityFeed } from '../components/ActivityFeed';
-// Legacy ActivityModalGateway removed — use universal ModalGateway via modals.openById()
+import ProfileSkeleton from '../components/ProfileSkeleton';
+// Legacy ActivityModalGateway removed - use universal ModalGateway via modals.openById()
 import { useEntityActions } from '../hooks/useEntityActions';
 import { resolvedUserCode } from '../shared/utils/userCode';
 

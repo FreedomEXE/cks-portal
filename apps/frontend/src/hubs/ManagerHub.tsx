@@ -10,9 +10,8 @@ import { useClerk, useUser } from '@clerk/clerk-react';
 import { EcosystemTree } from '@cks/domain-widgets';
 import { useTheme as useAppTheme } from '../contexts/ThemeContext';
 import { useFormattedActivities } from '../shared/activity/useFormattedActivities';
-import { resolvedUserCode } from '../shared/utils/userCode';
-import { ActivityFeed } from '../components/ActivityFeed';
 import { resolvedUserCode, useViewerCodeSafe } from '../shared/utils/userCode';
+import { ActivityFeed } from '../components/ActivityFeed';
 // Legacy ActivityModalGateway removed — use universal ModalGateway via modals.openById()
 import { useEntityActions } from '../hooks/useEntityActions';
 // Legacy OrderActionModal removed; Quick Actions are rendered inside the universal modal

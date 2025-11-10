@@ -41,6 +41,7 @@ import { useCertifiedServices } from '../hooks/useCertifiedServices';
 import { useServices as useDirectoryServices } from '../shared/api/directory';
 import { useFormattedActivities } from '../shared/activity/useFormattedActivities';
 import { ActivityFeed } from '../components/ActivityFeed';
+import ProfileSkeleton from '../components/ProfileSkeleton';
 import { dismissActivity, dismissAllActivities } from '../shared/api/directory';
 
 import MyHubSection from '../components/MyHubSection';
