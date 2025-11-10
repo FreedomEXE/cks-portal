@@ -34,10 +34,10 @@ root.render(
     <ThemeProvider>
     <ClerkProvider
       publishableKey={PUBLISHABLE_KEY}
-      signInUrl="/login"
-      signUpUrl="/login"
-      afterSignInUrl="/hub"
-      afterSignUpUrl="/hub"
+      signInUrl={(import.meta as any).env?.VITE_CLERK_SIGN_IN_URL || '/login'}
+      signUpUrl={(import.meta as any).env?.VITE_CLERK_SIGN_UP_URL || '/login'}
+      afterSignInUrl={(import.meta as any).env?.VITE_CLERK_AFTER_SIGN_IN_URL || '/hub'}
+      afterSignUpUrl={(import.meta as any).env?.VITE_CLERK_AFTER_SIGN_UP_URL || '/hub'}
     >
         <SWRConfig
           value={{

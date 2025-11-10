@@ -117,6 +117,8 @@ export function AuthenticatedApp(): JSX.Element {
 export function UnauthenticatedApp(): JSX.Element {
   return (
     <Routes>
+      <Route path="/sign-in" element={<Login />} />
+      <Route path="/sign-up" element={<Login />} />
       <Route path="/login" element={<Login />} />
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
