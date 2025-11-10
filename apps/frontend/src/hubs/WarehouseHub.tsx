@@ -164,9 +164,7 @@ export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubP
 // Inner component that has access to modal context
 function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
   const navigate = useNavigate();
-  const { mutate } = useSWRConfig();
-  const { handleAction } = useEntityActions();
-
+  // local UI state (tabs/search)
   const [activeTab, setActiveTab] = useState(initialTab);
   const [servicesTab, setServicesTab] = useState<'my' | 'active' | 'history'>('active');
   const [servicesSearchQuery, setServicesSearchQuery] = useState('');
@@ -175,12 +173,14 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
   const [inventoryTab, setInventoryTab] = useState<'active' | 'archive'>('active');
   const [inventorySearchQuery, setInventorySearchQuery] = useState('');
   const [inventoryFilter, setInventoryFilter] = useState<string>('');
-  // Legacy selectedOrderId state removed; use modals.openById for ID-first modals
-  // Legacy actionOrder modal removed; use Quick Actions inside universal modal
 
+  // identity + helpers
   const { code: authCode } = useAuth();
   const { user } = useUser();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
+  const { setHubLoading } = useHubLoading();
+  const { mutate } = useSWRConfig();
+  const { handleAction } = useEntityActions();
   const handleUploadPhoto = useCallback(async (file: File) => { if (!user) { toast.error('User not authenticated'); return; } try { await user.setProfileImage({ file }); toast.success('Profile photo updated'); } catch (e: any) { console.error('photo upload failed', e); toast.error(e?.message || 'Failed to update photo'); } }, [user]);
 
 
@@ -1113,5 +1113,6 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
     </div>
   );
 }
+
 
 

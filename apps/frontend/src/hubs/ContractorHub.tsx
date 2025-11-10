@@ -216,6 +216,7 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
   const { openUserProfile } = useClerk();
   const { setTheme } = useAppTheme();
   const { user } = useUser();
+  const { setHubLoading } = useHubLoading();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
   const handleUploadPhoto = useCallback(async (file: File) => { if (!user) { toast.error('User not authenticated'); return; } try { await user.setProfileImage({ file }); toast.success('Profile photo updated'); } catch (e: any) { console.error('photo upload failed', e); toast.error(e?.message || 'Failed to update photo'); } }, [user]);
 

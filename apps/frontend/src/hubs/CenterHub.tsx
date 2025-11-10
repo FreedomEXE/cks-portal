@@ -175,6 +175,7 @@ function CenterHubContent({ initialTab = 'dashboard' }: CenterHubProps) {
   const { code: authCode } = useAuth();
   const { user } = useUser();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
+  const { setHubLoading } = useHubLoading();
   const handleUploadPhoto = useCallback(async (file: File) => { if (!user) { toast.error('User not authenticated'); return; } try { await user.setProfileImage({ file }); toast.success('Profile photo updated'); } catch (e: any) { console.error('photo upload failed', e); toast.error(e?.message || 'Failed to update photo'); } }, [user]);
   const { mutate } = useSWRConfig();
   const { handleAction } = useEntityActions();
