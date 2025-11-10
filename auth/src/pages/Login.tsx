@@ -99,10 +99,12 @@ export default function Login() {
         if (safe) sessionStorage.setItem('code', safe);
       } catch {}
 
+      const env: any = (import.meta as any).env ?? {};
+      const redirectPath = env.VITE_CLERK_SIGN_IN_URL || '/login';
       await signIn!.authenticateWithRedirect({
         strategy: 'oauth_google',
-        redirectUrl: '/login',
-        redirectUrlComplete: '/login',
+        redirectUrl: redirectPath,
+        redirectUrlComplete: redirectPath,
       });
     } catch (err: any) {
       const msg = err?.errors?.[0]?.message || err?.message || 'Google sign-in failed.';
