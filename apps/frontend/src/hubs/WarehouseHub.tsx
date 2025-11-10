@@ -43,6 +43,7 @@ import { useServices as useDirectoryServices } from '../shared/api/directory';
 import { useCatalogItems } from '../shared/api/catalog';
 import { useCertifiedServices } from '../hooks/useCertifiedServices';
 import { buildWarehouseOverviewData } from '../shared/overview/builders';
+import { resolvedUserCode } from '../shared/utils/userCode';
 
 import MyHubSection from '../components/MyHubSection';
 import {
@@ -179,6 +180,7 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
   const { user } = useUser();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
   const { setHubLoading } = useHubLoading();
+  const userCode = useMemo(() => resolvedUserCode(profile?.cksCode, normalizedCode), [profile?.cksCode, normalizedCode]);
   const { mutate } = useSWRConfig();
   const { handleAction } = useEntityActions();
   const handleUploadPhoto = useCallback(async (file: File) => { if (!user) { toast.error('User not authenticated'); return; } try { await user.setProfileImage({ file }); toast.success('Profile photo updated'); } catch (e: any) { console.error('photo upload failed', e); toast.error(e?.message || 'Failed to update photo'); } }, [user]);
@@ -620,7 +622,7 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
   return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#f8fafc' }}>
         <MyHubSection
-          hubName={(loadUserPreferences(normalizedCode ?? null).hubTitle?.trim() || 'Warehouse Hub')}
+          hubName={(loadUserPreferences(userCode ?? null).hubTitle?.trim() || 'Warehouse Hub')}
           tabs={tabs}
         activeTab={activeTab}
         onTabClick={setActiveTab}
@@ -676,8 +678,8 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
                 onOpenAccountSecurity={() => openUserProfile?.()}
                 onRequestPasswordReset={handlePasswordReset}
                 passwordResetAvailable={Boolean(user?.passwordEnabled)}
-                userPreferences={loadUserPreferences(normalizedCode ?? null)}
-                onSaveUserPreferences={(prefs) => saveUserPreferences(normalizedCode ?? null, prefs)}
+                userPreferences={loadUserPreferences(userCode ?? null)}
+                onSaveUserPreferences={(prefs) => saveUserPreferences(userCode ?? null, prefs)}
                 onContactManager={() => undefined}
                 onScheduleMeeting={() => undefined}
               />
@@ -1113,6 +1115,7 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
     </div>
   );
 }
+
 
 
 

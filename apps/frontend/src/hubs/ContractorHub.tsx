@@ -41,6 +41,7 @@ import { requestPasswordReset } from '../shared/api/account';
 import { ActivityFeed } from '../components/ActivityFeed';
 // Legacy ActivityModalGateway removed — use universal ModalGateway via modals.openById()
 import { useEntityActions } from '../hooks/useEntityActions';
+import { resolvedUserCode } from '../shared/utils/userCode';
 
 import MyHubSection from '../components/MyHubSection';
 import {
@@ -286,7 +287,8 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
     }
   }, [user?.id]);
 
-  const contractorCode = useMemo(() => profile?.cksCode ?? normalizedCode, [profile?.cksCode, normalizedCode]);
+  
+  const userCode = useMemo(() => resolvedUserCode(profile?.cksCode, normalizedCode), [profile?.cksCode, normalizedCode]);
   const welcomeName = profile?.mainContact ?? profile?.name ?? undefined;
 
   // Signal when critical data is loaded (but only if not highlighting an order)
@@ -591,7 +593,7 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
   return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#f8fafc' }}>
         <MyHubSection
-        hubName={(loadUserPreferences(contractorCode ?? null).hubTitle?.trim() || 'Contractor Hub')}
+        hubName={(loadUserPreferences(userCode ?? null).hubTitle?.trim() || 'Contractor Hub')}
         tabs={tabs}
         activeTab={activeTab}
         onTabClick={setActiveTab}
@@ -650,8 +652,8 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
                 onOpenAccountSecurity={() => openUserProfile?.()}
                 onRequestPasswordReset={handlePasswordReset}
                 passwordResetAvailable={Boolean(user?.passwordEnabled)}
-                userPreferences={loadUserPreferences(contractorCode ?? null)}
-                onSaveUserPreferences={(prefs) => saveUserPreferences(contractorCode ?? null, prefs)}
+                userPreferences={loadUserPreferences(userCode ?? null)}
+                onSaveUserPreferences={(prefs) => saveUserPreferences(userCode ?? null, prefs)}
                 availableTabs={tabs.map(t => ({ id: t.id, label: t.label }))}
                 onSetTheme={setTheme}
                 onContactManager={() => undefined}
@@ -921,6 +923,8 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
       </div>
   );
 }
+
+
 
 
 

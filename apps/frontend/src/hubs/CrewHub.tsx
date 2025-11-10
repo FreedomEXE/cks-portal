@@ -57,6 +57,7 @@ import { createFeedback as apiCreateFeedback, acknowledgeItem as apiAcknowledgeI
 
 import { buildEcosystemTree, DEFAULT_ROLE_COLOR_MAP } from '../shared/utils/ecosystem';
 import { buildCrewOverviewData } from '../shared/overview/builders';
+import { resolvedUserCode } from '../shared/utils/userCode';
 import { useHubLoading } from '../contexts/HubLoadingContext';
 import { loadUserPreferences, saveUserPreferences } from '../shared/preferences';
 
@@ -204,6 +205,7 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
     error: ordersError,
   } = useHubOrders(normalizedCode);
   const { data: reportsData, isLoading: reportsLoading } = useHubReports(normalizedCode);
+  const userCode = useMemo(() => resolvedUserCode(profile?.cksCode, normalizedCode), [profile?.cksCode, normalizedCode]);
 
   const {
     data: scopeData,
@@ -534,7 +536,7 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
   return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#f8fafc' }}>
             <MyHubSection
-              hubName={(loadUserPreferences(crewCode ?? normalizedCode).hubTitle?.trim() || 'Crew Hub')}
+              hubName={(loadUserPreferences(userCode ?? normalizedCode).hubTitle?.trim() || 'Crew Hub')}
               tabs={tabs}
           activeTab={activeTab}
           onTabClick={setActiveTab}
@@ -588,8 +590,8 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
                 onOpenAccountSecurity={() => openUserProfile?.()}
                 onRequestPasswordReset={handlePasswordReset}
                 passwordResetAvailable={Boolean(user?.passwordEnabled)}
-                userPreferences={loadUserPreferences(crewCode ?? normalizedCode)}
-                onSaveUserPreferences={(prefs) => saveUserPreferences(crewCode ?? normalizedCode, prefs)}
+                userPreferences={loadUserPreferences(userCode ?? normalizedCode)}
+                onSaveUserPreferences={(prefs) => saveUserPreferences(userCode ?? normalizedCode, prefs)}
                 availableTabs={tabs.map(t => ({ id: t.id, label: t.label }))}
                 onSetTheme={setTheme}
                 onContactManager={() => undefined}
@@ -879,6 +881,9 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
       </div>
   );
 }
+
+
+
 
 
 

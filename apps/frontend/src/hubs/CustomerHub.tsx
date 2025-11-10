@@ -41,6 +41,7 @@ import { useFormattedActivities } from '../shared/activity/useFormattedActivitie
 import { ActivityFeed } from '../components/ActivityFeed';
 // Legacy ActivityModalGateway removed — use universal ModalGateway via modals.openById()
 import { useEntityActions } from '../hooks/useEntityActions';
+import { resolvedUserCode } from '../shared/utils/userCode';
 
 import MyHubSection from '../components/MyHubSection';
 import {
@@ -198,7 +199,11 @@ function CustomerHubContent({ initialTab = 'dashboard' }: CustomerHubProps) {
   const {
     data: reportsData,
     isLoading: reportsLoading,
-  mutate: mutateReports } = useHubReports(normalizedCode);
+    mutate: mutateReports,
+  } = useHubReports(normalizedCode);
+
+  const userCode = useMemo(() => resolvedUserCode(profile?.cksCode, normalizedCode), [profile?.cksCode, normalizedCode]);
+  
 
   // Access modal context
   const modals = useModals();
@@ -441,7 +446,7 @@ function CustomerHubContent({ initialTab = 'dashboard' }: CustomerHubProps) {
   return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#f8fafc' }}>
       <MyHubSection
-        hubName={(loadUserPreferences(customerCode ?? normalizedCode).hubTitle?.trim() || 'Customer Hub')}
+        hubName={(loadUserPreferences(userCode ?? normalizedCode).hubTitle?.trim() || 'Customer Hub')}
         tabs={tabs}
           activeTab={activeTab}
           onTabClick={setActiveTab}
@@ -499,8 +504,8 @@ function CustomerHubContent({ initialTab = 'dashboard' }: CustomerHubProps) {
                 onOpenAccountSecurity={() => openUserProfile?.()}
                 onRequestPasswordReset={handlePasswordReset}
                 passwordResetAvailable={Boolean(user?.passwordEnabled)}
-                userPreferences={loadUserPreferences(customerCode ?? normalizedCode)}
-                onSaveUserPreferences={(prefs) => saveUserPreferences(customerCode ?? normalizedCode, prefs)}
+                userPreferences={loadUserPreferences(userCode ?? normalizedCode)}
+                onSaveUserPreferences={(prefs) => saveUserPreferences(userCode ?? normalizedCode, prefs)}
                 availableTabs={tabs.map(t => ({ id: t.id, label: t.label }))}
                 onSetTheme={setTheme}
                 onContactManager={() => undefined}
@@ -754,6 +759,11 @@ function CustomerHubContent({ initialTab = 'dashboard' }: CustomerHubProps) {
     </div>
   );
 }
+
+
+
+
+
 
 
 

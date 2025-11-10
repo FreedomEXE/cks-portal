@@ -36,6 +36,7 @@ import { useClerk, useUser } from '@clerk/clerk-react';
 import { useSWRConfig } from 'swr';
 import { requestPasswordReset } from '../shared/api/account';
 import { useFormattedActivities } from '../shared/activity/useFormattedActivities';
+import { resolvedUserCode } from '../shared/utils/userCode';
 import { ActivityFeed } from '../components/ActivityFeed';
 // ActivityModalGateway (legacy) removed in favor of universal ModalGateway via modals.openById()
 import { useTheme as useAppTheme } from '../contexts/ThemeContext';
@@ -196,6 +197,8 @@ function CenterHubContent({ initialTab = 'dashboard' }: CenterHubProps) {
     error: ordersError,
   } = useHubOrders(normalizedCode);
   const { data: reportsData, isLoading: reportsLoading, mutate: mutateReports } = useHubReports(normalizedCode);
+  // Resolved user code for preferences and identity
+  const centerCode = useMemo(() => profile?.cksCode ?? normalizedCode, [profile?.cksCode, normalizedCode]);
 
   // Access modal context
   const modals = useModals();
@@ -445,7 +448,7 @@ function CenterHubContent({ initialTab = 'dashboard' }: CenterHubProps) {
   return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#f8fafc' }}>
             <MyHubSection
-              hubName={(loadUserPreferences(centerCode ?? normalizedCode).hubTitle?.trim() || 'Center Hub')}
+              hubName={(loadUserPreferences(userCode ?? normalizedCode).hubTitle?.trim() || 'Center Hub')}
               tabs={tabs}
           activeTab={activeTab}
           onTabClick={setActiveTab}
@@ -503,8 +506,8 @@ function CenterHubContent({ initialTab = 'dashboard' }: CenterHubProps) {
                 onOpenAccountSecurity={() => openUserProfile?.()}
                 onRequestPasswordReset={handlePasswordReset}
                 passwordResetAvailable={Boolean(user?.passwordEnabled)}
-                userPreferences={loadUserPreferences(centerCode ?? normalizedCode)}
-                onSaveUserPreferences={(prefs) => saveUserPreferences(centerCode ?? normalizedCode, prefs)}
+                userPreferences={loadUserPreferences(userCode ?? normalizedCode)}
+                onSaveUserPreferences={(prefs) => saveUserPreferences(userCode ?? normalizedCode, prefs)}
                 availableTabs={tabs.map(t => ({ id: t.id, label: t.label }))}
                 onSetTheme={setTheme}
                 onContactManager={() => undefined}
@@ -763,6 +766,8 @@ function CenterHubContent({ initialTab = 'dashboard' }: CenterHubProps) {
     </div>
   );
 }
+
+
 
 
 
