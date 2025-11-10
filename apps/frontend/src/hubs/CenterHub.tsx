@@ -199,7 +199,7 @@ function CenterHubContent({ initialTab = 'dashboard' }: CenterHubProps) {
   } = useHubOrders(normalizedCode);
   const { data: reportsData, isLoading: reportsLoading, mutate: mutateReports } = useHubReports(normalizedCode);
   // Resolved user code for preferences and identity
-  const centerCode = useMemo(() => profile?.cksCode ?? normalizedCode, [profile?.cksCode, normalizedCode]);
+  const userCode = useMemo(() => profile?.cksCode ?? normalizedCode, [profile?.cksCode, normalizedCode]);
 
   // Access modal context
   const modals = useModals();

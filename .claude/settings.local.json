@@ -11,7 +11,8 @@
       "Bash(npx tsc:*)",
       "Bash(npx tsx:*)",
       "Bash(cat:*)",
-      "Bash(pnpm -F ./apps/frontend build)"
+      "Bash(pnpm -F ./apps/frontend build)",
+      "Bash(npx vitest run:*)"
     ],
     "deny": [],
     "ask": []

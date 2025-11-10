@@ -422,10 +422,10 @@ function formatReportsTo(value: string | null | undefined): string | null {
 // Main wrapper component that sets up ModalProvider
 export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps) {
   const { code } = useAuth();
-  const managerCode = useMemo(() => normalizeId(code), [code]);
-  const { data: reportsData } = useHubReports(managerCode);
-  const { data: ordersData } = useHubOrders(managerCode);
-  const { data: scopeData } = useHubRoleScope(managerCode);
+  const userCode = useMemo(() => normalizeId(code), [code]);
+  const { data: reportsData } = useHubReports(userCode);
+  const { data: ordersData } = useHubOrders(userCode);
+  const { data: scopeData } = useHubRoleScope(userCode);
   const { mutate } = useSWRConfig();
 
   // Get available crew from scope
@@ -442,13 +442,13 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(updates),
     });
-    mutate(`/hub/orders/${managerCode}`, undefined, { revalidate: true });
-  }, [managerCode, mutate]);
+    mutate(`/hub/orders/${userCode}`, undefined, { revalidate: true });
+  }, [userCode, mutate]);
 
   const handleServiceAction = useCallback(async (serviceId: string, action: 'start' | 'complete' | 'cancel') => {
     await applyServiceAction(serviceId, action);
-    mutate(`/hub/orders/${managerCode}`, undefined, { revalidate: true });
-  }, [managerCode, mutate]);
+    mutate(`/hub/orders/${userCode}`, undefined, { revalidate: true });
+  }, [userCode, mutate]);
 
   const handleSendCrewRequest = useCallback(async (serviceId: string, crewCodes: string[]) => {
     await apiFetch(`/services/${encodeURIComponent(serviceId)}/crew-requests`, {
@@ -456,8 +456,8 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ crewCodes }),
     });
-    mutate(`/hub/orders/${managerCode}`, undefined, { revalidate: true });
-  }, [managerCode, mutate]);
+    mutate(`/hub/orders/${userCode}`, undefined, { revalidate: true });
+  }, [userCode, mutate]);
 
   return <ManagerHubContent initialTab={initialTab} />;
 }
@@ -507,16 +507,16 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
   // Access modal context
   const modals = useModals();
 
-  const managerCode = useMemo(() => normalizeId(code), [code]);
-  const managerPrefs = useMemo(() => loadUserPreferences(managerCode), [managerCode]);
+  const userCode = useMemo(() => normalizeId(code), [code]);
+  const managerPrefs = useMemo(() => loadUserPreferences(userCode), [userCode]);
 
   // Fetch hub-scoped data
-  const { data: profileData } = useHubProfile(managerCode);
-  const { data: dashboardData } = useHubDashboard(managerCode);
-  const { data: scopeData } = useHubRoleScope(managerCode);
-  const { activities: formattedActivities, isLoading: activitiesLoading, error: activitiesError, mutate: mutateActivities } = useFormattedActivities(managerCode, { limit: 20 });
+  const { data: profileData } = useHubProfile(userCode);
+  const { data: dashboardData } = useHubDashboard(userCode);
+  const { data: scopeData } = useHubRoleScope(userCode);
+  const { activities: formattedActivities, isLoading: activitiesLoading, error: activitiesError, mutate: mutateActivities } = useFormattedActivities(userCode, { limit: 20 });
 
-  const { data: ordersData } = useHubOrders(managerCode);
+  const { data: ordersData } = useHubOrders(userCode);
   const { mutate } = useSWRConfig();
 
   // Handle activity dismissal
@@ -615,10 +615,10 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
 
   const managerRecord = profileData;
   const managerDisplayName = profileData?.name ?? fullName ?? firstName ?? 'Manager';
-  const managerRootId = profileData?.cksCode ?? managerCode ?? 'MANAGER';
+  const managerRootId = profileData?.cksCode ?? userCode ?? 'MANAGER';
 
   // Fetch reports data
-  const { data: reportsData, isLoading: reportsLoading, mutate: mutateReports } = useHubReports(managerCode);
+  const { data: reportsData, isLoading: reportsLoading, mutate: mutateReports } = useHubReports(userCode);
 
   // IMPORTANT: Pass through structured fields from backend (reportCategory, relatedEntityId, reportReason, priority)
   // WarehouseHub already passes raw items; align ManagerHub to preserve all fields
@@ -701,7 +701,7 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
   // Find selected order from hub data for transform-first approach
 
   // Certified services for My Services tab (filtered by certifications)
-  const { data: certifiedServicesData, isLoading: certifiedServicesLoading } = useCertifiedServices(managerCode, 'manager', 500);
+  const { data: certifiedServicesData, isLoading: certifiedServicesLoading } = useCertifiedServices(userCode, 'manager', 500);
 
   const myServicesData = useMemo(() => {
     return certifiedServicesData.map((service) => ({
@@ -742,7 +742,7 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
           const onStart = async () => {
             try {
               await applyServiceAction(rawServiceId, 'start');
-              mutate(`/hub/orders/${managerCode}`, undefined, { revalidate: true });
+              mutate(`/hub/orders/${userCode}`, undefined, { revalidate: true });
               setToast('Service started');
               setTimeout(() => setToast(null), 1800);
             } catch (err) {
@@ -754,7 +754,7 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
           const onComplete = async () => {
             try {
               await applyServiceAction(rawServiceId, 'complete');
-              mutate(`/hub/orders/${managerCode}`, undefined, { revalidate: true });
+              mutate(`/hub/orders/${userCode}`, undefined, { revalidate: true });
               setToast('Service completed');
               setTimeout(() => setToast(null), 1800);
             } catch (err) {
@@ -766,7 +766,7 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
           const onVerify = async () => {
             try {
               await applyServiceAction(rawServiceId, 'verify');
-              mutate(`/hub/orders/${managerCode}`, undefined, { revalidate: true });
+              mutate(`/hub/orders/${userCode}`, undefined, { revalidate: true });
             } catch (err) {
               console.error('[manager] failed to verify service', err);
               alert(err instanceof Error ? err.message : 'Failed to verify service');
@@ -794,7 +794,7 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
             onViewDetails,
           };
         }),
-    [managerServiceOrders, serviceById, managerCode, mutate],
+    [managerServiceOrders, serviceById, userCode, mutate],
   );
   const serviceHistoryData = useMemo(
     () =>
@@ -842,7 +842,7 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
   const managerProfileData = useMemo(
     () => ({
       fullName: managerDisplayName,
-      managerId: profileData?.cksCode ?? managerCode ?? 'N/A',
+      managerId: profileData?.cksCode ?? userCode ?? 'N/A',
       address: profileData?.address ?? null,
       phone: profileData?.phone ?? null,
       email: profileData?.email ?? null,
@@ -851,7 +851,7 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
       reportsTo: formatReportsTo(profileData?.metadata?.reportsTo as string ?? null),
       startDate: profileData?.createdAt ? formatDate(profileData.createdAt) : null,
     }),
-    [managerCode, managerDisplayName, profileData],
+    [userCode, managerDisplayName, profileData],
   );
 
   const managerServiceOrderCards = useMemo<HubOrder[]>(
@@ -1007,7 +1007,7 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
           activeTab={activeTab}
           onTabClick={setActiveTab}
         onLogout={logout}
-        userId={managerCode ?? undefined}
+        userId={userCode ?? undefined}
         role="manager"
       />
 
@@ -1022,7 +1022,7 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
               <ActivityFeed
                 activities={formattedActivities}
                 hub="manager"
-                viewerId={managerCode || undefined}
+                viewerId={userCode || undefined}
                 onClearActivity={handleClearActivity}
                 onClearAll={handleClearAll}
                 isLoading={activitiesLoading}
@@ -1048,7 +1048,7 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
                 onRequestPasswordReset={handlePasswordReset}
                 passwordResetAvailable={Boolean(user?.passwordEnabled)}
                 userPreferences={managerPrefs}
-                onSaveUserPreferences={(prefs) => saveUserPreferences(managerCode, prefs)}
+                onSaveUserPreferences={(prefs) => saveUserPreferences(userCode, prefs)}
                 availableTabs={HUB_TABS.map(t => ({ id: t.id, label: t.label }))}
                 onSetTheme={setTheme}
               />
@@ -1154,7 +1154,7 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
               )}
               <OrdersSection
                 userRole="manager"
-                userCode={managerCode}
+                userCode={userCode}
                 serviceOrders={managerServiceOrderCards}
                 productOrders={managerProductOrderCards}
                 onCreateProductOrder={() => navigate('/catalog?mode=products')}
@@ -1287,7 +1287,7 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
                 console.log('[ManagerHub] AFTER acknowledge mutateReports');
               }}
               onResolve={async (id, details) => {
-                console.log('[ManagerHub] onResolve called with:', { id, details, managerCode });
+                console.log('[ManagerHub] onResolve called with:', { id, details, userCode });
 
                 // Optimistic update: immediately update the local cache with all resolved fields
                 await (mutateReports as any)(
@@ -1305,7 +1305,7 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
                       report.id === id ? {
                         ...report,
                         status: 'resolved' as const,
-                        resolvedBy: managerCode,
+                        resolvedBy: userCode,
                         resolvedAt: now,
                         resolution_notes: details?.notes || null
                       } : report
