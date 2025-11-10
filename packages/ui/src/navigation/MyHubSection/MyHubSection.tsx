@@ -48,8 +48,8 @@ export default function MyHubSection({
     <div style={{ background: 'var(--bg)' }}>
       <div style={{
         margin: '0 auto',
-        maxWidth: 'var(--page-max-width, 1440px)',
-        padding: '16px 24px 24px 24px'
+        maxWidth: 'var(--hero-max-width, 1680px)',
+        padding: '16px var(--hero-gutter, 16px) 24px var(--hero-gutter, 16px)'
       }}>
         <div style={{
           background: 'var(--card-bg)',
