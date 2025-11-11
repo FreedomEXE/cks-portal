@@ -76,20 +76,14 @@ export function canSeeTab(tabId: TabId, context: TabVisibilityContext): boolean 
     // 1. There are actions available (hasActions)
     // 2. Entity is NOT deleted (tombstones are read-only)
     case 'actions':
-      // For orders and services, always show the Actions tab to display workflow,
-      // even when there are no actionable buttons (read-only timeline).
-      // Hide only for deleted tombstones.
-      if (lifecycle.state === 'deleted') return false;
-      if (entityType === 'order' || entityType === 'service') return true;
-      // Other entity types: require actions to show the tab
-      return hasActions;
+      // Quick Actions are now rendered in the header via ActionBar; hide tab universally
+      return false;
 
     // ===== QUICK ACTIONS TAB =====
     // Admin-only for catalog services and products (unified catalog view)
     case 'quick-actions': {
-      const canSee = role === 'admin' && (entityType === 'catalogService' || entityType === 'product');
-      console.log('[TabPolicy] quick-actions visibility check:', { role, entityType, canSee });
-      return canSee;
+      // Quick Actions are rendered in header; hide tab universally
+      return false;
     }
 
     // ===== CREW TAB =====
@@ -185,20 +179,20 @@ export function getDefaultTabOrder(entityType: EntityType): TabId[] {
   switch (entityType) {
     // Orders: Actions first (workflow-driven)
     case 'order':
-      return ['actions', 'details', 'history', 'participants'];
+      return ['details', 'history', 'participants'];
 
     // Services: Overview first, then specialized tabs
     case 'service':
-      return ['overview', 'history', 'crew', 'products', 'procedures', 'training', 'notes', 'actions'];
+      return ['overview', 'history', 'crew', 'products', 'procedures', 'training', 'notes'];
 
     // Reports: Details first
     case 'report':
     case 'feedback':
-      return ['details', 'history', 'actions'];
+      return ['details', 'history'];
 
     // Default: Details → History → Actions
     default:
-      return ['details', 'history', 'actions'];
+      return ['details', 'history'];
   }
 }
 

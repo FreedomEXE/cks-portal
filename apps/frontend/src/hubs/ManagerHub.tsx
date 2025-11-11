@@ -12,6 +12,7 @@ import { useTheme as useAppTheme } from '../contexts/ThemeContext';
 import { useFormattedActivities } from '../shared/activity/useFormattedActivities';
 import { resolvedUserCode, useViewerCodeSafe } from '../shared/utils/userCode';
 import { ActivityFeed } from '../components/ActivityFeed';
+import ProfileSkeleton from '../components/ProfileSkeleton';
 // Legacy ActivityModalGateway removed — use universal ModalGateway via modals.openById()
 import { useEntityActions } from '../hooks/useEntityActions';
 // Legacy OrderActionModal removed; Quick Actions are rendered inside the universal modal
@@ -546,6 +547,11 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
       setHubLoading(false);
     }
   }, [profileData, dashboardData, setHubLoading]);
+
+  // Until critical data is present, render a consistent skeleton to avoid blank screens
+  if (!profileData || !dashboardData) {
+    return <ProfileSkeleton />;
+  }
 
   // Extract role-scoped entities from scope data
   const managerScope = scopeData?.role === 'manager' ? scopeData : null;

@@ -685,8 +685,7 @@ const orderAdapter: EntityAdapter = {
         ),
       },
       {
-        id: 'actions',
-        label: 'Quick Actions',
+        /* Quick Actions tab removed: actions are rendered in header via ActionBar */ id: 'actions_removed', label: 'Removed',
         content: (
           <OrderActionsContent
             actions={actions}
@@ -1009,8 +1008,7 @@ const reportAdapter: EntityAdapter = {
         ),
       },
       {
-        id: 'actions',
-        label: 'Quick Actions',
+        /* Quick Actions tab removed: actions are rendered in header via ActionBar */ id: 'actions_removed', label: 'Removed',
         content: (
           <ReportQuickActions
             type={entityData?.type}
@@ -1474,8 +1472,7 @@ const serviceAdapter: EntityAdapter = {
       },
       // Quick Actions tab is still available universally, but content is lifecycle-only
       {
-        id: 'actions',
-        label: 'Quick Actions',
+        /* Quick Actions tab removed: actions are rendered in header via ActionBar */ id: 'actions_removed', label: 'Removed',
         content: (
           <UserQuickActionsContent actions={actions} />
         ),
@@ -1760,8 +1757,7 @@ const userAdapter: EntityAdapter = {
         ),
       },
       {
-        id: 'actions',
-        label: 'Quick Actions',
+        /* Quick Actions tab removed: actions are rendered in header via ActionBar */ id: 'actions_removed', label: 'Removed',
         content: (
           <UserQuickActionsContent actions={actions} />
         ),
@@ -2305,3 +2301,4 @@ export const entityRegistry: EntityRegistry = {
   product: productAdapter,
   warehouse: userAdapter,
 };
+

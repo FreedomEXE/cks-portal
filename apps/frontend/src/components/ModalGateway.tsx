@@ -525,6 +525,13 @@ export function ModalGateway({
         headerConfig={headerConfig || { id: '', status: 'pending', fields: [] }}
         tabs={visibleTabs}
         headerActions={actions as any}
+        headerWorkflowStages={
+          entityType === 'order'
+            ? ((data as any)?.approvalStages as any)
+            : entityType === 'service'
+              ? (((data as any)?.approvalStages || (data as any)?.metadata?.approvalStages) as any)
+              : undefined
+        }
       />
     );
   }

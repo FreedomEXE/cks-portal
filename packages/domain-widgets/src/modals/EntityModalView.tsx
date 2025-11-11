@@ -26,8 +26,8 @@
  */
 
 import React, { ReactNode, useState, useEffect } from 'react';
-import { BaseViewModal, EntityHeader, EntityHeaderCard, type HeaderConfig, ActionBar } from '@cks/ui';
-import type { ActionDescriptor } from '@cks/ui';
+import { BaseViewModal, EntityHeader, EntityHeaderCard, type HeaderConfig, ActionBar, ApprovalWorkflow } from '@cks/ui';
+import type { ActionDescriptor, ApprovalStage } from '@cks/ui';
 import { getEntityAccentColor } from '../shared/colors';
 
 // Lifecycle interface (matches frontend types)
@@ -73,6 +73,8 @@ export interface EntityModalViewProps {
   tabs: TabDescriptor[];
   /** Header actions rendered as an ActionBar under the summary */
   headerActions?: ActionDescriptor[];
+  /** Optional approval workflow stages rendered beneath actions */
+  headerWorkflowStages?: ApprovalStage[];
 
   /** @deprecated Legacy support for ReactNode header */
   header?: ReactNode;
@@ -108,6 +110,7 @@ export function EntityModalView({
   header, // Legacy support
   tabs,
   headerActions,
+  headerWorkflowStages,
 }: EntityModalViewProps) {
   // Get accent color for this entity type
   const accentColor = getEntityAccentColor(entityType);
@@ -151,6 +154,11 @@ export function EntityModalView({
       {headerActions && headerActions.length ? (
         <div style={{ marginTop: 12 }}>
           <ActionBar actions={headerActions} />
+        </div>
+      ) : null}
+      {headerWorkflowStages && headerWorkflowStages.length ? (
+        <div style={{ marginTop: 12 }}>
+          <ApprovalWorkflow stages={headerWorkflowStages} variant="compact" />
         </div>
       ) : null}
     </EntityHeaderCard>
