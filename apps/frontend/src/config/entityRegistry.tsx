@@ -879,7 +879,7 @@ const reportAdapter: EntityAdapter = {
     if (role !== 'admin' && state === 'active') {
       const status = entityData?.status;
 
-      if (can(reportType, 'acknowledge', role, { state, entityData }) && status === 'open') {
+      if (can(reportType, 'acknowledge', role, { state, entityData, viewerId }) && status === 'open') {
         descriptors.push({
           key: 'acknowledge',
           label: 'Acknowledge',
@@ -888,7 +888,7 @@ const reportAdapter: EntityAdapter = {
         });
       }
 
-      if (can(reportType, 'resolve', role, { state, entityData }) && status === 'open') {
+      if (can(reportType, 'resolve', role, { state, entityData, viewerId }) && status === 'open') {
         descriptors.push({
           key: 'resolve',
           label: 'Resolve',
@@ -897,7 +897,7 @@ const reportAdapter: EntityAdapter = {
         });
       }
 
-      if (can(reportType, 'close', role, { state, entityData }) && status === 'resolved') {
+      if (can(reportType, 'close', role, { state, entityData, viewerId }) && status === 'resolved') {
         descriptors.push({
           key: 'close',
           label: 'Close',

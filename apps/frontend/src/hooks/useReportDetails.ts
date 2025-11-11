@@ -29,6 +29,7 @@ export interface ReportResolution {
 export interface NormalizedReport {
   id: string;
   type: 'report' | 'feedback';
+  creatorId?: string | null;
   reportReason?: string;
   status: 'open' | 'resolved' | 'closed';
   priority?: 'HIGH' | 'MEDIUM' | 'LOW' | null;
@@ -80,6 +81,7 @@ function normalizeReport(entity: any, type: 'report' | 'feedback'): NormalizedRe
     return {
       id: entity.id,
       type: 'report',
+      creatorId: entity.creatorId ?? null,
       reportReason: entity.reportReason || entity.title,
       status: entity.status as 'open' | 'resolved' | 'closed',
       priority: entity.priority as 'HIGH' | 'MEDIUM' | 'LOW' | null,
@@ -113,6 +115,7 @@ function normalizeReport(entity: any, type: 'report' | 'feedback'): NormalizedRe
   return {
     id: entity.id,
     type: 'feedback',
+    creatorId: entity.creatorId ?? null,
     reportReason: entity.reportReason || entity.title,
     status: (entity.status as 'open' | 'resolved' | 'closed') || 'open',
     priority: null,

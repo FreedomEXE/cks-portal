@@ -135,7 +135,7 @@ function canUser(
 
     case 'report':
     case 'feedback':
-      return canUserReport(action, role, entityData);
+      return canUserReport(action, role, entityData, viewerId);
 
     case 'service':
       return canUserService(action, role, entityData);
@@ -215,27 +215,45 @@ function canUserOrder(
 function canUserReport(
   action: EntityActionType,
   role: UserRole,
-  entityData?: any
+  entityData?: any,
+  viewerId?: string
 ): boolean {
   // All users can view reports
   if (action === 'view') return true;
 
   // Check entity status
   const status = entityData?.status;
+  const kind = (entityData?.type || 'report') as 'report' | 'feedback';
+  const creatorId: string | null = (entityData?.creatorId || entityData?.createdById || null) as string | null;
+  const isCreator = !!(creatorId && viewerId && creatorId.toUpperCase() === viewerId.toUpperCase());
+  const alreadyAcknowledged = Array.isArray(entityData?.acknowledgments)
+    ? entityData.acknowledgments.some((ack: any) => (ack.userId || '').toUpperCase() === (viewerId || '').toUpperCase())
+    : false;
 
   switch (role) {
     case 'manager':
-    case 'center':
-    case 'contractor':
-      // These roles can acknowledge and resolve reports
-      if (action === 'acknowledge' && status === 'open') return true;
+      // Managers can acknowledge (not own) and resolve reports
+      if (action === 'acknowledge' && status === 'open') return !isCreator && !alreadyAcknowledged;
       if (action === 'resolve' && status === 'open') return true;
       if (action === 'close' && status === 'resolved') return true;
       return false;
 
+    case 'warehouse':
+      // Warehouse can acknowledge (not own) and resolve reports
+      if (action === 'acknowledge' && status === 'open') return !isCreator && !alreadyAcknowledged;
+      if (action === 'resolve' && status === 'open') return true;
+      if (action === 'close' && status === 'resolved') return true;
+      return false;
+
+    case 'center':
+    case 'contractor':
+      // Can acknowledge reports (not own), cannot resolve
+      if (action === 'acknowledge' && status === 'open') return !isCreator && !alreadyAcknowledged && kind === 'report';
+      return false;
+
     case 'customer':
       // Customers can only acknowledge feedback
-      if (action === 'acknowledge' && status === 'open') return true;
+      if (action === 'acknowledge' && status === 'open') return !isCreator && !alreadyAcknowledged && kind === 'feedback';
       return false;
 
     default:
