@@ -548,10 +548,8 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
     }
   }, [profileData, dashboardData, setHubLoading]);
 
-  // Until critical data is present, render a consistent skeleton to avoid blank screens
-  if (!profileData || !dashboardData) {
-    return <ProfileSkeleton />;
-  }
+  // Readiness flag for rendering skeleton vs content, but never short-circuit hooks
+  const isReady = !!profileData && !!dashboardData;
 
   // Extract role-scoped entities from scope data
   const managerScope = scopeData?.role === 'manager' ? scopeData : null;
