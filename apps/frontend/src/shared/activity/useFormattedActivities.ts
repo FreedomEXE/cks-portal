@@ -216,33 +216,48 @@ function personalizeMessage(item: HubActivityItem, viewerId?: string | null): st
   }
 
   // Report/Feedback activities
-  if (activityType === 'report_created' && item.targetId?.toUpperCase() === normalizedViewerId) {
-    return `You filed a report!`;
+  if (activityType === 'report_created') {
+    // Actor is the report creator
+    if (isActor) return `You Filed a Report`;
+    return `Filed a Report`;
   }
 
   if (activityType === 'report_acknowledged') {
-    const submittedBy = (metadata.submittedBy as string | undefined)?.toUpperCase();
-    if (submittedBy === normalizedViewerId) {
-      return `Your report was acknowledged!`;
+    // Actor is the acknowledger
+    if (isActor) return `You acknowledged this report`;
+    // Personalize for original creator if backend included it
+    const createdBy = (metadata.reportCreatedById as string | undefined)?.toUpperCase();
+    if (createdBy && createdBy === normalizedViewerId) {
+      return `Your report was acknowledged`;
     }
+    return `Report acknowledged`;
   }
 
   if (activityType === 'report_resolved') {
-    const submittedBy = (metadata.submittedBy as string | undefined)?.toUpperCase();
-    if (submittedBy === normalizedViewerId) {
-      return `Your report was resolved!`;
+    // Actor is the resolver (managers perform this)
+    if (isActor) return `You Marked a Report as Resolved`;
+    // Personalize for original creator if backend included it
+    const createdBy = (metadata.reportCreatedById as string | undefined)?.toUpperCase();
+    if (createdBy && createdBy === normalizedViewerId) {
+      return `Your report was resolved`;
     }
+    return `Marked Report as Resolved`;
   }
 
-  if (activityType === 'feedback_created' && item.targetId?.toUpperCase() === normalizedViewerId) {
-    return `You submitted feedback!`;
+  if (activityType === 'feedback_created') {
+    // Actor is the feedback submitter
+    if (isActor) return `You Submitted a Feedback`;
+    return `Submitted a Feedback`;
   }
 
   if (activityType === 'feedback_acknowledged') {
-    const submittedBy = (metadata.submittedBy as string | undefined)?.toUpperCase();
-    if (submittedBy === normalizedViewerId) {
-      return `Your feedback was acknowledged!`;
+    // Actor is the acknowledger
+    if (isActor) return `You acknowledged this feedback`;
+    const createdBy = (metadata.feedbackCreatedById as string | undefined)?.toUpperCase();
+    if (createdBy && createdBy === normalizedViewerId) {
+      return `Your feedback was acknowledged`;
     }
+    return `Feedback acknowledged`;
   }
 
   // Order activities

@@ -218,7 +218,9 @@ export async function reportsRoutes(fastify: FastifyInstance) {
         account.role,
         params.data.id,
         'report',
-        JSON.stringify({}),
+        JSON.stringify({
+          reportCreatedById: reportCheck.rows[0]?.created_by_id ?? null,
+        }),
       ]
     );
 
@@ -249,7 +251,7 @@ export async function reportsRoutes(fastify: FastifyInstance) {
     }
 
     // Check category-based resolution permissions (defense-in-depth)
-    const reportCheck = await query('SELECT report_category, related_entity_id FROM reports WHERE report_id = $1', [params.data.id]);
+    const reportCheck = await query('SELECT report_category, related_entity_id, created_by_id FROM reports WHERE report_id = $1', [params.data.id]);
     const reportCategory = reportCheck.rows[0]?.report_category as string | null;
     const relatedEntityId = reportCheck.rows[0]?.related_entity_id as string | null;
 
@@ -308,6 +310,7 @@ export async function reportsRoutes(fastify: FastifyInstance) {
         JSON.stringify({
           resolution_notes: resolutionNotes,
           action_taken: actionTaken,
+          reportCreatedById: reportCheck.rows[0]?.created_by_id ?? null,
         }),
       ]
     );
@@ -346,7 +349,9 @@ export async function reportsRoutes(fastify: FastifyInstance) {
         account.role,
         params.data.id,
         'feedback',
-        JSON.stringify({}),
+        JSON.stringify({
+          feedbackCreatedById: feedbackCheck.rows[0]?.created_by_id ?? null,
+        }),
       ]
     );
 
