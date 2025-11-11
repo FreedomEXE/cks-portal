@@ -10,5 +10,6 @@ export * from './profile';
 export * from './reports';
 export * from './support';
 export * from './shared/utils/buildOrderActions';
+export * from './actions/buildActions';
 export * from './shared/colors';
 export { default as EcosystemTree } from './EcosystemTree';

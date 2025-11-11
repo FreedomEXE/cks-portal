@@ -1,5 +1,6 @@
 import React from 'react';
 import styles from './ProductOrderModal.module.css';
+import ActionBar, { type ActionDescriptor } from '../components/ActionBar/ActionBar';
 import { ModalRoot } from '../ModalRoot';
 import { DeletedBanner } from '../../banners/DeletedBanner';
 import { ArchivedBanner } from '../../banners/ArchivedBanner';
@@ -61,6 +62,7 @@ export interface ProductOrderModalProps {
   rejectedBy?: string | null;
   rejectedAt?: string | null;
   archiveMetadata?: ArchiveMetadata | null;
+  actions?: ActionDescriptor[];
 }
 
 const ProductOrderModal: React.FC<ProductOrderModalProps> = ({
@@ -77,6 +79,7 @@ const ProductOrderModal: React.FC<ProductOrderModalProps> = ({
   rejectedBy,
   rejectedAt,
   archiveMetadata,
+  actions,
 }) => {
   if (!isOpen || !order) return null;
 
@@ -129,6 +132,11 @@ const ProductOrderModal: React.FC<ProductOrderModalProps> = ({
             ✕
           </button>
         </div>
+        {actions && actions.length ? (
+          <div style={{ padding: '0 16px' }}>
+            <ActionBar actions={actions} />
+          </div>
+        ) : null}
 
         {/* Deleted Banner */}
         {order.isDeleted && (

@@ -26,7 +26,8 @@
  */
 
 import React, { ReactNode, useState, useEffect } from 'react';
-import { BaseViewModal, EntityHeader, EntityHeaderCard, type HeaderConfig } from '@cks/ui';
+import { BaseViewModal, EntityHeader, EntityHeaderCard, type HeaderConfig, ActionBar } from '@cks/ui';
+import type { ActionDescriptor } from '@cks/ui';
 import { getEntityAccentColor } from '../shared/colors';
 
 // Lifecycle interface (matches frontend types)
@@ -70,6 +71,8 @@ export interface EntityModalViewProps {
 
   /** Tab descriptors (RBAC-filtered) */
   tabs: TabDescriptor[];
+  /** Header actions rendered as an ActionBar under the summary */
+  headerActions?: ActionDescriptor[];
 
   /** @deprecated Legacy support for ReactNode header */
   header?: ReactNode;
@@ -104,6 +107,7 @@ export function EntityModalView({
   headerConfig,
   header, // Legacy support
   tabs,
+  headerActions,
 }: EntityModalViewProps) {
   // Get accent color for this entity type
   const accentColor = getEntityAccentColor(entityType);
@@ -143,7 +147,13 @@ export function EntityModalView({
           ? { value: displayStatus, text: displayStatusText || displayStatus.toUpperCase() }
           : undefined
       }
-    />
+    >
+      {headerActions && headerActions.length ? (
+        <div style={{ marginTop: 12 }}>
+          <ActionBar actions={headerActions} />
+        </div>
+      ) : null}
+    </EntityHeaderCard>
   ) : header;
 
   return (

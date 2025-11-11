@@ -524,6 +524,7 @@ export function ModalGateway({
         lifecycle={lifecycle}
         headerConfig={headerConfig || { id: '', status: 'pending', fields: [] }}
         tabs={visibleTabs}
+        headerActions={actions as any}
       />
     );
   }

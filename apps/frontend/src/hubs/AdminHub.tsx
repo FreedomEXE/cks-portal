@@ -28,8 +28,6 @@ import {
   DataTable,
   EditOrderModal,
   NavigationTab,
-  OrderDetailsModal,
-  ServiceViewModal,
   PageHeader,
   PageWrapper,
   Scrollbar,
@@ -298,7 +296,7 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
   }, [selectedOrderId, orders]);
 
   // Use centralized order details hook (with directory context for enrichment)
-  // OrderDetails are now handled via OrderDetailsGateway
+  // Order details modals now open via ModalGateway (openById) with header actions
 
   // Fetch inventory when product catalog modal opens
   // Product inventory fetching handled by modal adapter (universal modal)

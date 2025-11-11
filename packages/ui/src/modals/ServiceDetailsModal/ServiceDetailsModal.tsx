@@ -4,6 +4,7 @@ import { ModalRoot } from '../ModalRoot';
 import { ArchivedBanner } from '../../banners/ArchivedBanner';
 import { DeletedBanner } from '../../banners/DeletedBanner';
 import HistoryTab from '../../tabs/HistoryTab';
+import ActionBar, { type ActionDescriptor } from '../components/ActionBar/ActionBar';
 
 // Lifecycle interface (matches frontend types)
 interface Lifecycle {
@@ -73,6 +74,15 @@ export default function ServiceDetailsModal({
   const [notesInput, setNotesInput] = useState('');
   const [showCrewPicker, setShowCrewPicker] = useState(false);
   const [sendingRequest, setSendingRequest] = useState(false);
+  const actionBarEnabled = (() => {
+    try {
+      const w = (typeof window !== 'undefined') ? (window as any) : {};
+      if (w.__CKS_MODAL_ACTION_BAR != null) return String(w.__CKS_MODAL_ACTION_BAR) !== 'false';
+      const env = (import.meta as any)?.env ?? {};
+      const v = env.VITE_MODAL_ACTION_BAR;
+      return v == null ? true : String(v) !== 'false';
+    } catch { return true; }
+  })();
 
   useEffect(() => {
     if (!isOpen || !service) return;
@@ -169,30 +179,45 @@ export default function ServiceDetailsModal({
             {getStatusBadge()}
           </div>
 
-          {/* Action Buttons */}
-          <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-            {serviceStatus === 'created' && onStartService && (
-              <Button variant="primary" onClick={() => { onStartService(); onClose(); }}>
-                Start Service
-              </Button>
-            )}
-            {serviceStatus === 'in_progress' && onCompleteService && (
-              <Button variant="primary" onClick={() => { onCompleteService(); onClose(); }}>
-                Complete Service
-              </Button>
-            )}
-            {(serviceStatus === 'created' || serviceStatus === 'in_progress') && onCancelService && (
-              <Button variant="danger" onClick={() => {
-                const reason = window.prompt('Please provide a reason for cancellation:');
-                if (reason) {
-                  onCancelService();
-                  onClose();
-                }
-              }}>
-                Cancel Service
-              </Button>
-            )}
-          </div>
+          {/* Action Bar (replaces Quick Actions tab; stays visible across tabs) */}
+          {actionBarEnabled ? (
+            <ActionBar
+              actions={(actions && actions.length ? actions : (
+                [
+                  (serviceStatus === 'created' && onStartService) ? { label: 'Start Service', onClick: () => { onStartService(); onClose(); }, variant: 'primary' as const } : null,
+                  (serviceStatus === 'in_progress' && onCompleteService) ? { label: 'Complete Service', onClick: () => { onCompleteService(); onClose(); }, variant: 'primary' as const } : null,
+                  ((serviceStatus === 'created' || serviceStatus === 'in_progress') && onCancelService) ? { label: 'Cancel Service', onClick: () => {
+                    const reason = window.prompt('Please provide a reason for cancellation:');
+                    if (reason) { onCancelService(); onClose(); }
+                  }, variant: 'danger' as const } : null,
+                ].filter(Boolean) as ActionDescriptor[]
+              ))}
+            />
+          ) : (
+            <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+              {serviceStatus === 'created' && onStartService && (
+                <Button variant="primary" onClick={() => { onStartService(); onClose(); }}>
+                  Start Service
+                </Button>
+              )}
+              {serviceStatus === 'in_progress' && onCompleteService && (
+                <Button variant="primary" onClick={() => { onCompleteService(); onClose(); }}>
+                  Complete Service
+                </Button>
+              )}
+              {(serviceStatus === 'created' || serviceStatus === 'in_progress') && onCancelService && (
+                <Button variant="danger" onClick={() => {
+                  const reason = window.prompt('Please provide a reason for cancellation:');
+                  if (reason) {
+                    onCancelService();
+                    onClose();
+                  }
+                }}>
+                  Cancel Service
+                </Button>
+              )}
+            </div>
+          )}
         </div>
 
         {/* UNIVERSAL LIFECYCLE BANNER - renders for ANY entity */}

@@ -27,19 +27,9 @@ import {
   type ReportFeedback,
 } from '@cks/domain-widgets';
 import { managerOverviewCards } from '@cks/domain-widgets';
-import {
-  Button,
-  DataTable,
-  OrderDetailsModal,
-  ServiceDetailsModal,
-  ServiceViewModal,
-  PageHeader,
-  PageWrapper,
-  Scrollbar,
-  TabSection,
-} from '@cks/ui';
+import { Button, DataTable, PageHeader, PageWrapper, Scrollbar, TabSection } from '@cks/ui';
 import { useModals } from '../contexts';
-import OrderDetailsGateway from '../components/OrderDetailsGateway';
+// Order details handled by ModalGateway openById; legacy gateway removed
 import MyHubSection from '../components/MyHubSection';
 import { useCatalogItems } from '../shared/api/catalog';
 import { useCertifiedServices } from '../hooks/useCertifiedServices';

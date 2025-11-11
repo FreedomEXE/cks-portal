@@ -28,9 +28,8 @@ import {
   type TreeNode,
 } from '@cks/domain-widgets';
 import { centerOverviewCards } from '@cks/domain-widgets';
-import { Button, DataTable, OrderDetailsModal, ServiceViewModal, PageHeader, PageWrapper, Scrollbar, TabSection } from '@cks/ui';
+import { Button, DataTable, PageHeader, PageWrapper, Scrollbar, TabSection } from '@cks/ui';
 import { useModals } from '../contexts';
-import OrderDetailsGateway from '../components/OrderDetailsGateway';
 import { useAuth } from '@cks/auth';
 import { useClerk, useUser } from '@clerk/clerk-react';
 import { useSWRConfig } from 'swr';

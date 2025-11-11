@@ -83,6 +83,8 @@ export { default as AssignServiceModal } from './modals/AssignServiceModal/Assig
 
 export * from './modals/ServiceViewModal/ServiceViewModal';
 export { default as ServiceViewModal } from './modals/ServiceViewModal/ServiceViewModal';
+export { default as ActionBar } from './modals/components/ActionBar/ActionBar';
+export type { ActionDescriptor } from './modals/components/ActionBar/ActionBar';
 
 export * from './modals/WarehouseServiceModal';
 export { default as WarehouseServiceModal } from './modals/WarehouseServiceModal';

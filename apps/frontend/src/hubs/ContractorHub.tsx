@@ -28,10 +28,9 @@ import {
   type TreeNode,
 } from '@cks/domain-widgets';
 import { contractorOverviewCards } from '@cks/domain-widgets';
-import { Button, DataTable, OrderDetailsModal, ServiceViewModal, PageHeader, PageWrapper, Scrollbar, TabSection } from '@cks/ui';
+import { Button, DataTable, PageHeader, PageWrapper, Scrollbar, TabSection } from '@cks/ui';
 import { useModals } from '../contexts';
 import { useTheme as useAppTheme } from '../contexts/ThemeContext';
-import OrderDetailsGateway from '../components/OrderDetailsGateway';
 import { useSWRConfig } from 'swr';
 import { createReport as apiCreateReport, createFeedback as apiCreateFeedback, acknowledgeItem as apiAcknowledgeItem, resolveReport as apiResolveReport, fetchServicesForReports, fetchProceduresForReports, fetchOrdersForReports } from '../shared/api/hub';
 import { useAuth } from '@cks/auth';

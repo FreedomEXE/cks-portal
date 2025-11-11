@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import BaseViewModal from '../BaseViewModal';
 import ProductCard from '../../cards/ProductCard';
 import ProductQuickActions, { type WarehouseInventory, type InventoryChange } from './components/ProductQuickActions';
+import ActionBar from '../components/ActionBar/ActionBar';
 import ProductDetails from './components/ProductDetails';
 
 export interface CatalogProduct {
@@ -39,15 +40,10 @@ const CatalogProductModal: React.FC<CatalogProductModalProps> = ({
   const isAdminView = Boolean(onSave || onDelete);
 
   // Tab state
-  const [activeTab, setActiveTab] = useState(isAdminView ? 'quick-actions' : 'details');
+  const [activeTab, setActiveTab] = useState('details');
 
   // Build tabs based on role
-  const tabs = isAdminView
-    ? [
-        { id: 'quick-actions', label: 'Quick Actions' },
-        { id: 'details', label: 'Details' },
-      ]
-    : [{ id: 'details', label: 'Details' }];
+  const tabs = [{ id: 'details', label: 'Details' }];
 
   // Early return AFTER all hooks
   if (!isOpen || !product) return null;
@@ -69,12 +65,16 @@ const CatalogProductModal: React.FC<CatalogProductModalProps> = ({
 
   return (
     <BaseViewModal isOpen={isOpen} onClose={onClose} card={card}>
-      {activeTab === 'quick-actions' && isAdminView && (
-        <ProductQuickActions
-          inventoryData={inventoryData}
-          onSave={onSave}
-          onDelete={onDelete}
-        />
+      {/* Embedded header actions */}
+      {(onDelete || onSave) && (
+        <div style={{ padding: '0 16px' }}>
+          <ActionBar
+            actions={[
+              onSave ? { label: 'Save Changes', onClick: () => onSave?.([]), variant: 'primary' } : null,
+              onDelete ? { label: 'Delete', onClick: onDelete, variant: 'danger' } : null,
+            ].filter(Boolean) as any}
+          />
+        </div>
       )}
 
       {activeTab === 'details' && (
@@ -89,6 +89,15 @@ const CatalogProductModal: React.FC<CatalogProductModalProps> = ({
           leadTimeDays={product.leadTimeDays}
           metadata={product.metadata}
         />
+      )}
+      {isAdminView && (
+        <div style={{ marginTop: 16 }}>
+          <ProductQuickActions
+            inventoryData={inventoryData}
+            onSave={onSave}
+            onDelete={onDelete}
+          />
+        </div>
       )}
     </BaseViewModal>
   );

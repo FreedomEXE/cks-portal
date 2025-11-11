@@ -1,5 +1,6 @@
 import React from 'react';
 import styles from './ServiceOrderModal.module.css';
+import ActionBar, { type ActionDescriptor } from '../components/ActionBar/ActionBar';
 import { ModalRoot } from '../ModalRoot';
 import { DeletedBanner } from '../../banners/DeletedBanner';
 import { ArchivedBanner } from '../../banners/ArchivedBanner';
@@ -53,6 +54,7 @@ export interface ServiceOrderModalProps {
   rejectedBy?: string | null;
   rejectedAt?: string | null;
   archiveMetadata?: ArchiveMetadata | null;
+  actions?: ActionDescriptor[];
 }
 
 const ServiceOrderModal: React.FC<ServiceOrderModalProps> = ({
@@ -69,6 +71,7 @@ const ServiceOrderModal: React.FC<ServiceOrderModalProps> = ({
   rejectedBy,
   rejectedAt,
   archiveMetadata,
+  actions,
 }) => {
   if (!isOpen || !order) return null;
 
@@ -121,6 +124,11 @@ const ServiceOrderModal: React.FC<ServiceOrderModalProps> = ({
             ✕
           </button>
         </div>
+        {actions && actions.length ? (
+          <div style={{ padding: '0 16px' }}>
+            <ActionBar actions={actions} />
+          </div>
+        ) : null}
 
         {/* Deleted Banner */}
         {order.isDeleted && (

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import BaseViewModal from '../BaseViewModal';
 import UserCard, { type UserAction } from '../../cards/UserCard';
 import UserQuickActions from './UserQuickActions';
+import ActionBar, { type ActionDescriptor } from '../components/ActionBar/ActionBar';
 
 export interface User {
   id: string;
@@ -28,12 +29,11 @@ const UserModal: React.FC<UserModalProps> = ({
   profileData,
   onUpdatePhoto,
 }) => {
-  const [activeTab, setActiveTab] = useState('quick-actions');
+  const [activeTab, setActiveTab] = useState('profile');
 
   if (!isOpen || !user) return null;
 
-  const tabs = [
-    { id: 'quick-actions', label: 'Quick Actions' },
+  const tabs: Array<{ id: string; label: string }> = [
     { id: 'profile', label: 'Profile' },
   ];
 
@@ -52,7 +52,14 @@ const UserModal: React.FC<UserModalProps> = ({
 
   return (
     <BaseViewModal isOpen={isOpen} onClose={onClose} card={card}>
-      {activeTab === 'quick-actions' && <UserQuickActions actions={actions} />}
+      {/* Embedded actions bar visible on all tabs */}
+      {actions && actions.length ? (
+        <div style={{ padding: '0 16px' }}>
+          <ActionBar
+            actions={actions.map(a => ({ label: a.label, onClick: a.onClick, variant: a.variant as ActionDescriptor['variant'], disabled: a.disabled }))}
+          />
+        </div>
+      ) : null}
       {activeTab === 'profile' && (
         profileData ? (
           <div style={{ padding: '0' }}>

@@ -1,6 +1,7 @@
 import React from 'react';
 import Button from '../../buttons/Button/Button';
 import styles from './WarehouseServiceModal.module.css';
+import ActionBar, { type ActionDescriptor } from '../components/ActionBar/ActionBar';
 import { ModalRoot } from '../ModalRoot';
 
 export interface WarehouseServiceData {
@@ -28,6 +29,7 @@ export interface WarehouseServiceModalProps {
   onStartService?: () => void;
   onCompleteService?: () => void;
   onCancelService?: () => void;
+  actions?: ActionDescriptor[];
 }
 
 const WarehouseServiceModal: React.FC<WarehouseServiceModalProps> = ({
@@ -37,6 +39,7 @@ const WarehouseServiceModal: React.FC<WarehouseServiceModalProps> = ({
   onStartService,
   onCompleteService,
   onCancelService,
+  actions,
 }) => {
   if (!service) return null;
 
@@ -78,6 +81,11 @@ const WarehouseServiceModal: React.FC<WarehouseServiceModalProps> = ({
             ✕
           </button>
         </div>
+        {actions && actions.length ? (
+          <div style={{ padding: '0 16px' }}>
+            <ActionBar actions={actions} />
+          </div>
+        ) : null}
 
         <div className={styles.content}>
           {/* Basic Information */}

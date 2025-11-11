@@ -32,9 +32,8 @@ import {
   type Activity,
 } from '@cks/domain-widgets';
 import { warehouseOverviewCards } from '@cks/domain-widgets';
-import { Button, DataTable, PageHeader, PageWrapper, Scrollbar, TabSection, ServiceViewModal } from '@cks/ui';
+import { Button, DataTable, PageHeader, PageWrapper, Scrollbar, TabSection } from '@cks/ui';
 import { useModals } from '../contexts';
-import OrderDetailsGateway from '../components/OrderDetailsGateway';
 import { useAuth } from '@cks/auth';
 import { useSWRConfig } from 'swr';
 import { getAllowedActions, getActionLabel } from '@cks/policies';

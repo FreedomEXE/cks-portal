@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import BaseViewModal from '../BaseViewModal';
 import ServiceCard from '../../cards/ServiceCard';
 import ServiceQuickActions, { type CertifiedUser, type CertificationChanges } from './components/ServiceQuickActions';
+import ActionBar from '../components/ActionBar/ActionBar';
 import ServiceDetails from './components/ServiceDetails';
 
 export type RoleKey = 'manager' | 'contractor' | 'crew' | 'warehouse';
@@ -55,15 +56,10 @@ const CatalogServiceModal: React.FC<CatalogServiceModalProps> = ({
   const isAdminView = Boolean(onSave || onEdit || onDelete);
 
   // Tab state
-  const [activeTab, setActiveTab] = useState(isAdminView ? 'quick-actions' : 'details');
+  const [activeTab, setActiveTab] = useState('details');
 
   // Build tabs based on role
-  const tabs = isAdminView
-    ? [
-        { id: 'quick-actions', label: 'Quick Actions' },
-        { id: 'details', label: 'Details' },
-      ]
-    : [{ id: 'details', label: 'Details' }];
+  const tabs = [{ id: 'details', label: 'Details' }];
 
   // Transform user lists into CertifiedUser[] arrays for Quick Actions
   const buildCertifiedUsers = (
@@ -121,18 +117,16 @@ const CatalogServiceModal: React.FC<CatalogServiceModalProps> = ({
 
   return (
     <BaseViewModal isOpen={isOpen} onClose={onClose} card={card}>
-      {activeTab === 'quick-actions' && isAdminView && (
-        <ServiceQuickActions
-          managers={managersData}
-          contractors={contractorsData}
-          crew={crewData}
-          warehouses={warehousesData}
-          managedBy={managedBy}
-          category={category}
-          onSave={onSave}
-          onEdit={onEdit}
-          onDelete={onDelete}
-        />
+      {/* Embedded header actions */}
+      {(onEdit || onDelete) && (
+        <div style={{ padding: '0 16px' }}>
+          <ActionBar
+            actions={[
+              onEdit ? { label: 'Edit', onClick: onEdit, variant: 'secondary' } : null,
+              onDelete ? { label: 'Delete', onClick: onDelete, variant: 'danger' } : null,
+            ].filter(Boolean) as any}
+          />
+        </div>
       )}
 
       {activeTab === 'details' && (
@@ -144,6 +138,22 @@ const CatalogServiceModal: React.FC<CatalogServiceModalProps> = ({
           managedBy={managedBy}
           description={service.description || undefined}
         />
+      )}
+      {/* Optional admin-only quick-edit section remains in content */}
+      {isAdminView && (
+        <div style={{ marginTop: 16 }}>
+          <ServiceQuickActions
+            managers={managersData}
+            contractors={contractorsData}
+            crew={crewData}
+            warehouses={warehousesData}
+            managedBy={managedBy}
+            category={category}
+            onSave={onSave}
+            onEdit={onEdit}
+            onDelete={onDelete}
+          />
+        </div>
       )}
     </BaseViewModal>
   );

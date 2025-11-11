@@ -1,5 +1,6 @@
 import React from 'react';
 import Button from '../../buttons/Button/Button';
+import ActionBar, { type ActionDescriptor } from '../components/ActionBar/ActionBar';
 import styles from './ServiceViewModal.module.css';
 import { ModalRoot } from '../ModalRoot';
 
@@ -35,6 +36,7 @@ export interface ServiceViewModalProps {
   onCompleteService?: () => void;
   onCancelService?: () => void;
   onAddNotes?: () => void;
+  actions?: ActionDescriptor[];
 }
 
 const ServiceViewModal: React.FC<ServiceViewModalProps> = ({
@@ -47,6 +49,7 @@ const ServiceViewModal: React.FC<ServiceViewModalProps> = ({
   onCompleteService,
   onCancelService,
   onAddNotes,
+  actions,
 }) => {
   if (!service) return null;
 
@@ -87,6 +90,11 @@ const ServiceViewModal: React.FC<ServiceViewModalProps> = ({
             ✕
           </button>
         </div>
+        {actions && actions.length ? (
+          <div style={{ padding: '0 16px' }}>
+            <ActionBar actions={actions} />
+          </div>
+        ) : null}
 
         <div className={styles.content}>
           {/* Basic Information */}

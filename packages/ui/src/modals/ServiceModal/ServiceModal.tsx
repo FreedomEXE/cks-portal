@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import styles from './ServiceModal.module.css';
 import { ModalRoot } from '../ModalRoot';
+import ActionBar, { type ActionDescriptor } from '../components/ActionBar/ActionBar';
 
 // Base service info (SRV-001)
 export interface ServiceInfo {
@@ -67,6 +68,7 @@ export interface ServiceModalProps {
   historyData?: ServiceHistoryData | null;
   userCertification?: UserCertification | null;
   context: 'catalog' | 'myServices' | 'active' | 'history';
+  actions?: ActionDescriptor[];
 }
 
 type TabId = 'info' | 'active' | 'history';
@@ -79,6 +81,7 @@ const ServiceModal: React.FC<ServiceModalProps> = ({
   historyData,
   userCertification,
   context,
+  actions,
 }) => {
   // Determine tab configuration based on context
   const tabConfig = useMemo(() => {
@@ -474,6 +477,12 @@ const ServiceModal: React.FC<ServiceModalProps> = ({
             {formatStatus(service.status)}
           </span>
         </div>
+
+        {actions && actions.length ? (
+          <div style={{ padding: '0 16px' }}>
+            <ActionBar actions={actions} />
+          </div>
+        ) : null}
 
         {/* Tabs (if applicable) */}
         {tabConfig.showTabs && tabConfig.tabs && (

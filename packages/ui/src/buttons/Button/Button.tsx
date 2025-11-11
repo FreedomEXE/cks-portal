@@ -34,6 +34,7 @@ export interface ButtonProps {
   children: React.ReactNode;
   type?: 'button' | 'submit' | 'reset';
   roleColor?: string; // Optional role-based color for primary variant
+  title?: string; // Optional tooltip/title attribute
 }
 
 export default function Button({
@@ -45,7 +46,8 @@ export default function Button({
   children,
   type = 'button',
   roleColor,
-}: ButtonProps) {
+  title,
+}: ButtonProps){
   // Base styles
   const baseStyles: React.CSSProperties = {
     border: 'none',
@@ -180,6 +182,7 @@ export default function Button({
       disabled={disabled}
       style={combinedStyles}
       className={className}
+      title={title}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       onMouseDown={handleMouseDown}
@@ -213,3 +216,5 @@ function shadeColor(color: string, percent: number): string {
   }
   return color;
 }
+
+

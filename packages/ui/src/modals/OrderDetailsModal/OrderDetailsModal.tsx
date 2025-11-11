@@ -1,5 +1,6 @@
 import React from 'react';
 import styles from './OrderDetailsModal.module.css';
+import ActionBar, { type ActionDescriptor } from '../components/ActionBar/ActionBar';
 import { ModalRoot } from '../ModalRoot';
 import { DeletedBanner } from '../../banners/DeletedBanner';
 
@@ -52,6 +53,7 @@ interface OrderDetailsModalProps {
   cancelledBy?: string | null;
   cancelledAt?: string | null;
   rejectionReason?: string | null;
+  actions?: ActionDescriptor[];
 }
 
 const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
@@ -66,6 +68,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
   cancelledBy,
   cancelledAt,
   rejectionReason,
+  actions,
 }) => {
   if (!order) return null;
 
@@ -103,6 +106,11 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
             ✕
           </button>
         </div>
+        {actions && actions.length ? (
+          <div style={{ padding: '0 16px' }}>
+            <ActionBar actions={actions} />
+          </div>
+        ) : null}
 
         {/* Deleted Banner */}
         {order.isDeleted && (

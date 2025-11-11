@@ -533,3 +533,31 @@ packages/
 
 **Last Updated:** October 10, 2025
 **Maintained By:** Development Team
+
+---
+
+## Layout & Page Structure (Hero + Clamp)
+
+Recent UI standardization introduces a two-tier layout:
+
+- MyHubSection (hero):
+  - Wider than the main content on large screens.
+  - On ≤1440px, uses a centered‑bleed technique (100vw with negative margins) so it remains visually wider than the clamped content.
+  - Headline scales with ont-size: clamp(28px, 3.2vw, 40px) for consistent density.
+
+- Main content:
+  - Clamped to --page-max-width (default 1440px) with side gutters.
+
+Key variables (apps/frontend/src/index.css):
+- --page-max-width: 1440px
+- --hero-max-width: calc(var(--page-max-width) + 240px)
+- --page-gutter: 24px
+- --hero-gutter: 16px (12px on small screens)
+
+Key components:
+- packages/ui/src/navigation/MyHubSection/MyHubSection.module.css — hero container & bleed.
+- packages/ui/src/navigation/MyHubSection/MyHubSection.tsx — hero headline clamp.
+- packages/ui/src/layout/PageWrapper/PageWrapper.* — content clamp & gutters.
+
+Rationale:
+- Keeps the “wide header, boxed content” look consistent on large and smaller monitors without globally scaling the entire app.
