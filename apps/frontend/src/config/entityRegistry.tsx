@@ -835,7 +835,7 @@ function buildReportDetailsSections(context: TabVisibilityContext): import('@cks
  */
 const reportAdapter: EntityAdapter = {
   getActionDescriptors: (context: EntityActionContext): EntityActionDescriptor[] => {
-    const { role, state, entityData } = context;
+    const { role, state, entityData, viewerId } = context;
     const descriptors: EntityActionDescriptor[] = [];
 
     const reportType = entityData?.type || 'report';
