@@ -51,6 +51,7 @@ export interface UseServiceDetailsReturn {
   service: NormalizedService | null;
   isLoading: boolean;
   error: Error | null;
+  refresh: () => Promise<any>;
 }
 
 export interface UseServiceDetailsParams {
@@ -119,7 +120,7 @@ export function useServiceDetails(params: UseServiceDetailsParams): UseServiceDe
   const swrKey = shouldFetch ? `/services/${serviceId}/details` : null;
 
   // Fetch on-demand from backend (apiFetch handles tombstone fallback on 404)
-  const { data, error, isLoading } = useSWR<ApiResponse<any>>(
+  const { data, error, isLoading, mutate } = useSWR<ApiResponse<any>>(
     swrKey,
     (url) => apiFetch<ApiResponse<any>>(url),
     {
@@ -135,5 +136,6 @@ export function useServiceDetails(params: UseServiceDetailsParams): UseServiceDe
     service,
     isLoading,
     error: error || null,
+    refresh: () => mutate?.(),
   };
 }
