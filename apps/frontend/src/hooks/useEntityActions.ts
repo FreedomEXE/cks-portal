@@ -534,6 +534,7 @@ async function handleServiceAction(
         mutate((key: any) => {
           if (typeof key === 'string') {
             return key.includes('/admin/directory/services') ||
+                   key.includes('/admin/directory/orders') ||
                    key.includes('/admin/directory/activities') ||
                    key.includes('/api/hub/activities') ||
                    key.includes('/hub/activities') ||
@@ -563,6 +564,7 @@ async function handleServiceAction(
         mutate((key: any) => {
           if (typeof key === 'string') {
             return key.includes('/admin/directory/services') ||
+                   key.includes('/admin/directory/orders') ||
                    key.includes('/admin/directory/activities') ||
                    key.includes('/api/hub/activities') ||
                    key.includes('/hub/activities') ||
@@ -593,21 +595,21 @@ async function handleServiceAction(
         await archiveAPI.hardDelete('service', serviceId, reason);
 
         // Invalidate caches
-          mutate((key: any) => {
-            if (typeof key === 'string') {
-              return key.includes('/archive') ||
-                     key.includes('/admin/directory/services') ||
-                     key.includes('/admin/directory/activities') ||
-                     key.includes('/admin/directory/activities') ||
-                     key.includes('/api/hub/activities') ||
-                     key.includes('/hub/activities') ||
-                     key.includes('/api/archive/list') ||
-                     key.includes('/archive/list') ||
-                     key.includes('/api/archive/relationships') ||
-                     key.includes(serviceId);
-            }
-            return false;
-          });
+        mutate((key: any) => {
+          if (typeof key === 'string') {
+            return key.includes('/archive') ||
+                   key.includes('/admin/directory/services') ||
+                   key.includes('/admin/directory/orders') ||
+                   key.includes('/admin/directory/activities') ||
+                   key.includes('/api/hub/activities') ||
+                   key.includes('/hub/activities') ||
+                   key.includes('/api/archive/list') ||
+                   key.includes('/archive/list') ||
+                   key.includes('/api/archive/relationships') ||
+                   key.includes(serviceId);
+          }
+          return false;
+        });
 
         // Dispatch event for non-SWR components (e.g., ArchiveSection)
         window.dispatchEvent(new CustomEvent('cks:archive:updated', {

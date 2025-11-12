@@ -884,7 +884,14 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
       ],
       data: serviceOrderRows.filter(order => {
         // Filter for transformed service orders (active services)
-        return order.serviceId && order.serviceId.match(/^[a-z]{3}-\d+-srv-\d+$/i);
+        // CRITICAL: Also check that the service still exists in active services list
+        // (archived services are excluded from /admin/directory/services)
+        const hasServiceId = order.serviceId && order.serviceId.match(/^[a-z]{3}-\d+-srv-\d+$/i);
+        if (!hasServiceId) return false;
+
+        // Check if service is still active (not archived)
+        const serviceStillActive = services.some(s => s.id === order.serviceId);
+        return serviceStillActive;
       }).map(order => ({
         ...order,
         id: order.serviceId || order.id,
