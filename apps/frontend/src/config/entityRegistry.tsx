@@ -304,27 +304,6 @@ const orderAdapter: EntityAdapter = {
           });
         }
 
-        // Convenience: manage the related active service directly from the order modal (admin only)
-        if (entityData?.orderType === 'service' && entityData?.serviceId) {
-          descriptors.push({
-            key: 'archive_related_service',
-            label: 'Archive Active Service',
-            variant: 'secondary',
-            confirm: `Archive related active service ${entityData.serviceId}? You can restore it later.`,
-            prompt: 'Optional: Provide a reason for archiving this service',
-            closeOnSuccess: false,
-            payload: { relatedServiceId: entityData.serviceId },
-          });
-          descriptors.push({
-            key: 'hard_delete_related_service',
-            label: 'Permanently Delete Active Service',
-            variant: 'danger',
-            confirm: `Are you sure you want to PERMANENTLY delete active service ${entityData.serviceId}? This cannot be undone.`,
-            prompt: 'Provide a deletion reason (optional):',
-            closeOnSuccess: false,
-            payload: { relatedServiceId: entityData.serviceId },
-          });
-        }
       } else if (state === 'archived') {
         if (can('order', 'restore', role, { state, entityData })) {
           descriptors.push({

@@ -102,50 +102,6 @@ async function handleOrderAction(
   options: EntityActionOptions,
   mutate: any
 ): Promise<boolean> {
-  // Archive API (statically imported)
-
-  // Admin convenience actions: manage related active service from order modal
-  if (actionId === 'archive_related_service' || actionId === 'hard_delete_related_service') {
-    const relatedServiceId = (options as any)?.relatedServiceId || (options as any)?.metadata?.relatedServiceId;
-    if (!relatedServiceId) {
-      toast.error('No related service ID found');
-      return false;
-    }
-    try {
-      if (actionId === 'archive_related_service') {
-        await archiveAPI.archiveEntity('service', relatedServiceId, options.notes || undefined);
-        toast.success('Active service archived');
-      } else {
-        await archiveAPI.hardDelete('service', relatedServiceId, options.notes || undefined);
-        toast.success('Active service permanently deleted');
-      }
-      // Invalidate caches for both orders and services + activities
-      mutate((key: any) => {
-        if (typeof key === 'string') {
-          return key.includes('/hub/orders/') ||
-                 key.includes('/admin/directory/orders') ||
-                 key.includes('/admin/directory/services') ||
-                 key.includes('/api/hub/activities') ||
-                 key.includes('/hub/activities') ||
-                 key.includes('/api/archive/list') ||
-                 key.includes('/archive/list') ||
-                 key.includes(orderId) ||
-                 key.includes(relatedServiceId);
-        }
-        return false;
-      });
-      window.dispatchEvent(new CustomEvent('cks:archive:updated', {
-        detail: { entityType: 'service', entityId: relatedServiceId, action: actionId === 'archive_related_service' ? 'archive' : 'hard_delete' }
-      }));
-      options.onSuccess?.();
-      return true;
-    } catch (err) {
-      console.error('[useEntityActions] related service archive/delete failed:', err);
-      toast.error('Failed to update active service');
-      throw err;
-    }
-  }
-
   // Handle archive/restore/delete actions (admin only)
   if (actionId === 'archive' || actionId === 'restore' || actionId === 'delete') {
     try {

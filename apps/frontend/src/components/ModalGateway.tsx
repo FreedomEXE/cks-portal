@@ -350,24 +350,34 @@ export function ModalGateway({
           await handleAction(entityId!, desc.key, {
             notes: userInput,
             ...desc.payload,
-            onSuccess: () => {
-              console.log('[ModalGateway] Action succeeded, closeOnSuccess:', desc.closeOnSuccess);
-              // Close modal if closeOnSuccess is true (default behavior)
-              if (desc.closeOnSuccess !== false) {
-                console.log('[ModalGateway] Closing modal');
-                onClose();
-              }
+            onSuccess: async () => {
+              console.log('[ModalGateway] Action succeeded, key:', desc.key, 'closeOnSuccess:', desc.closeOnSuccess);
+
               // Refresh active entity data so tabs and actions update in place
               try {
                 if (entityType === 'order') {
-                  orderDetails.refresh?.();
+                  await orderDetails.refresh?.();
                 } else if (entityType === 'service') {
-                  serviceDetails.refresh?.();
+                  await serviceDetails.refresh?.();
                 } else if (entityType === 'report' || entityType === 'feedback') {
-                  reportDetails.refresh?.();
+                  await reportDetails.refresh?.();
                 }
+                console.log('[ModalGateway] Entity data refreshed after action');
               } catch (e) {
                 console.warn('[ModalGateway] refresh after action failed:', e);
+              }
+
+              // For lifecycle actions (archive/restore/delete), close modal after brief delay
+              // so directory views have time to update
+              const isLifecycleAction = ['archive', 'restore', 'delete'].includes(desc.key);
+              if (isLifecycleAction && desc.closeOnSuccess !== false) {
+                console.log('[ModalGateway] Closing modal after lifecycle action');
+                // Small delay to let SWR propagate to directory/archive views
+                setTimeout(() => onClose(), 150);
+              } else if (desc.closeOnSuccess !== false) {
+                // Immediate close for non-lifecycle actions
+                console.log('[ModalGateway] Closing modal immediately');
+                onClose();
               }
             },
           });
