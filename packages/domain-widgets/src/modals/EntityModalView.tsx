@@ -75,6 +75,8 @@ export interface EntityModalViewProps {
   headerActions?: ActionDescriptor[];
   /** Optional approval workflow stages rendered beneath actions */
   headerWorkflowStages?: ApprovalStage[];
+  /** Optional extra content rendered after actions/workflow */
+  headerExtras?: React.ReactNode;
 
   /** @deprecated Legacy support for ReactNode header */
   header?: ReactNode;
@@ -111,6 +113,7 @@ export function EntityModalView({
   tabs,
   headerActions,
   headerWorkflowStages,
+  headerExtras,
 }: EntityModalViewProps) {
   // Get accent color for this entity type
   const accentColor = getEntityAccentColor(entityType);
@@ -159,6 +162,11 @@ export function EntityModalView({
       {headerWorkflowStages && headerWorkflowStages.length ? (
         <div style={{ marginTop: 12 }}>
           <ApprovalWorkflow stages={headerWorkflowStages} variant="compact" />
+        </div>
+      ) : null}
+      {headerExtras ? (
+        <div style={{ marginTop: 12 }}>
+          {headerExtras}
         </div>
       ) : null}
     </EntityHeaderCard>

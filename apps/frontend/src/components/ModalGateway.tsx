@@ -30,6 +30,7 @@ import { useServiceDetails } from '../hooks/useServiceDetails';
 import { useEntityActions } from '../hooks/useEntityActions';
 import { filterVisibleTabs } from '../policies/tabs';
 import { EntityModalView } from '@cks/domain-widgets';
+import ReportHeaderExtras from './ReportHeaderExtras';
 
 /**
  * Extract lifecycle metadata from entity data and archive metadata
@@ -435,6 +436,29 @@ export function ModalGateway({
     return null;
   }, [adapter, role, lifecycle, entityType, data, actions, entityId]);
 
+  const headerExtras = useMemo(() => {
+    if (
+      !adapter ||
+      !data ||
+      !entityType ||
+      !entityId ||
+      (entityType !== 'report' && entityType !== 'feedback')
+    ) {
+      return null;
+    }
+
+    return (
+      <ReportHeaderExtras
+        acknowledgments={data.acknowledgments}
+        resolvedBy={data.resolvedBy}
+        resolvedAt={data.resolvedAt}
+        resolution={data.resolution}
+        resolution_notes={data.resolution_notes}
+        currentUserId={currentUserId}
+      />
+    );
+  }, [adapter, data, entityType, entityId, currentUserId]);
+
   // LEGACY: Map data to component props (for backward compatibility with old modals)
   const componentProps = useMemo(() => {
     if (!adapter || !adapter.mapToProps) return {};
@@ -508,6 +532,7 @@ export function ModalGateway({
           entityId={entityId}
           lifecycle={lifecycle}
           headerConfig={placeholderHeader}
+          headerExtras={headerExtras}
           tabs={skeletonTabs}
         />
       );
@@ -524,6 +549,7 @@ export function ModalGateway({
         lifecycle={lifecycle}
         headerConfig={headerConfig || { id: '', status: 'pending', fields: [] }}
         tabs={visibleTabs}
+        headerExtras={headerExtras}
         headerActions={actions as any}
         headerWorkflowStages={
           entityType === 'order'
