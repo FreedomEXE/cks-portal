@@ -212,6 +212,35 @@ function canUserOrder(
 /**
  * User permissions for reports/feedback
  */
+function normalizeIdentifier(value?: string | null): string {
+  if (!value) return '';
+  return String(value).trim().toUpperCase();
+}
+
+function getRequiredAcknowledgers(entityData?: any): string[] {
+  const rawList = entityData?.requiredAcknowledgers ?? entityData?.metadata?.requiredAcknowledgers ?? [];
+  if (!Array.isArray(rawList)) return [];
+  return rawList
+    .map(normalizeIdentifier)
+    .filter((id) => id.length > 0);
+}
+
+function hasAcknowledgmentCompleteFlag(entityData?: any): boolean {
+  return Boolean(entityData?.acknowledgment_complete || entityData?.metadata?.acknowledgment_complete);
+}
+
+function hasAllRequiredAcknowledgments(entityData?: any): boolean {
+  const required = getRequiredAcknowledgers(entityData);
+  if (required.length === 0) {
+    return hasAcknowledgmentCompleteFlag(entityData);
+  }
+  const acknowledged = Array.isArray(entityData?.acknowledgments)
+    ? entityData.acknowledgments.map((ack: any) => normalizeIdentifier(ack?.userId))
+    : [];
+  const uniqueAcks = new Set(acknowledged);
+  return required.every((id) => uniqueAcks.has(id));
+}
+
 function canUserReport(
   action: EntityActionType,
   role: UserRole,
@@ -232,9 +261,9 @@ function canUserReport(
 
   switch (role) {
     case 'manager':
-      // Managers can acknowledge (not own) and resolve reports
+      // Managers can acknowledge (not own) and resolve reports once required acknowledgers finished
       if (action === 'acknowledge' && status === 'open') return !isCreator && !alreadyAcknowledged;
-      if (action === 'resolve' && status === 'open') return true;
+      if (action === 'resolve' && status === 'open') return hasAllRequiredAcknowledgments(entityData);
       if (action === 'close' && status === 'resolved') return true;
       return false;
 
@@ -247,6 +276,7 @@ function canUserReport(
 
     case 'center':
     case 'contractor':
+    case 'crew':
       // Can acknowledge reports (not own), cannot resolve
       if (action === 'acknowledge' && status === 'open') return !isCreator && !alreadyAcknowledged && kind === 'report';
       return false;
