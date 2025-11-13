@@ -504,8 +504,16 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
   const managerPrefs = useMemo(() => loadUserPreferences(authCode), [authCode]);
 
   // Fetch hub-scoped data
-  const { data: profileData } = useHubProfile(authCode);
-  const { data: dashboardData } = useHubDashboard(authCode);
+  const {
+    data: profileData,
+    isLoading: profileLoading,
+    error: profileError,
+  } = useHubProfile(authCode);
+  const {
+    data: dashboardData,
+    isLoading: dashboardLoading,
+    error: dashboardError,
+  } = useHubDashboard(authCode);
   const { data: scopeData } = useHubRoleScope(authCode);
   const { activities: formattedActivities, isLoading: activitiesLoading, error: activitiesError, mutate: mutateActivities } = useFormattedActivities(authCode, { limit: 20 });
 
@@ -541,12 +549,24 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
 
   // Signal when critical data is loaded (but only if NOT showing new order)
   useEffect(() => {
-    const hasCriticalData = !!profileData && !!dashboardData;
-    if (hasCriticalData) {
-      console.log('[ManagerHub] Critical data loaded, signaling ready');
+    const hubReady =
+      !profileLoading &&
+      !dashboardLoading &&
+      (!!profileData || !!profileError) &&
+      (!!dashboardData || !!dashboardError);
+    if (hubReady) {
+      console.log('[ManagerHub] Critical data loaded (or errored), signaling ready');
       setHubLoading(false);
     }
-  }, [profileData, dashboardData, setHubLoading]);
+  }, [
+    profileData,
+    dashboardData,
+    profileLoading,
+    dashboardLoading,
+    profileError,
+    dashboardError,
+    setHubLoading,
+  ]);
 
   // Readiness flag for rendering skeleton vs content, but never short-circuit hooks
   const isReady = !!profileData && !!dashboardData;

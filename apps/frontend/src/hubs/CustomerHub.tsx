@@ -219,12 +219,16 @@ function CustomerHubContent({ initialTab = 'dashboard' }: CustomerHubProps) {
 
   // Signal when critical data is loaded (but only if not highlighting an order)
   useEffect(() => {
-    const hasCriticalData = !!profile && !!dashboard;
-    if (hasCriticalData) {
-      console.log('[CustomerHub] Critical data loaded, signaling ready (no highlight)');
+    const hubReady =
+      !profileLoading &&
+      !dashboardLoading &&
+      (!!profile || !!profileError) &&
+      (!!dashboard || !!dashboardError);
+    if (hubReady) {
+      console.log('[CustomerHub] Critical data loaded (or errored), signaling ready');
       setHubLoading(false);
     }
-  }, [profile, dashboard, setHubLoading]);
+  }, [profile, dashboard, profileLoading, dashboardLoading, profileError, dashboardError, setHubLoading]);
 
   useEffect(() => {
     const style = document.createElement('style');

@@ -217,12 +217,16 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
 
   // Signal when critical data is loaded
   useEffect(() => {
-    const hasCriticalData = !!profile && !!dashboard;
-    if (hasCriticalData) {
-      console.log('[CrewHub] Critical data loaded, signaling ready');
+    const hubReady =
+      !profileLoading &&
+      !dashboardLoading &&
+      (!!profile || !!profileError) &&
+      (!!dashboard || !!dashboardError);
+    if (hubReady) {
+      console.log('[CrewHub] Critical data loaded (or errored), signaling ready');
       setHubLoading(false);
     }
-  }, [profile, dashboard, setHubLoading]);
+  }, [profile, dashboard, profileLoading, dashboardLoading, profileError, dashboardError, setHubLoading]);
 
   useEffect(() => {
     const style = document.createElement('style');
