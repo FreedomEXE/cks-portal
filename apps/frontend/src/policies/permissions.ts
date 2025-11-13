@@ -268,9 +268,9 @@ function canUserReport(
       return false;
 
     case 'warehouse':
-      // Warehouse can acknowledge (not own) and resolve reports
+      // Warehouse can acknowledge (not own) and resolve once acknowledgments complete
       if (action === 'acknowledge' && status === 'open') return !isCreator && !alreadyAcknowledged;
-      if (action === 'resolve' && status === 'open') return true;
+      if (action === 'resolve' && status === 'open') return hasAllRequiredAcknowledgments(entityData);
       if (action === 'close' && status === 'resolved') return true;
       return false;
 
