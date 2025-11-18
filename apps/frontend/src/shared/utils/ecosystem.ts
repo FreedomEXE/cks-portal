@@ -446,10 +446,10 @@ function buildCenterChildren(scope: CenterRoleScopeResponse): TreeNode[] {
 }
 
 function buildCrewChildren(scope: CrewRoleScopeResponse): TreeNode[] {
-  const { center, crew } = scope.relationships as CrewScopeRelationships;
-
-  const centerNode = referenceToTreeNode(center, 'CENTER');
-  const crewNodes = sortNodes((crew as CrewScopeCrewMember[]).map((member) => toTreeNode(member, 'CREW')));
+  const relationships = scope.relationships as CrewScopeRelationships;
+  const centerNode = referenceToTreeNode(relationships.center, 'CENTER');
+  const crewMembers = Array.isArray(relationships.crew) ? relationships.crew : [];
+  const crewNodes = sortNodes((crewMembers as CrewScopeCrewMember[]).map((member) => toTreeNode(member, 'CREW')));
 
   const children: TreeNode[] = [];
   if (centerNode) {
