@@ -9,6 +9,7 @@ import type {
   ContractorScopeCrewMember,
   ContractorScopeCustomer,
   CrewRoleScopeResponse,
+  CrewScopeCrewMember,
   CrewScopeRelationships,
   CustomerRoleScopeResponse,
   CustomerScopeCenter,
@@ -445,26 +446,16 @@ function buildCenterChildren(scope: CenterRoleScopeResponse): TreeNode[] {
 }
 
 function buildCrewChildren(scope: CrewRoleScopeResponse): TreeNode[] {
-  const { manager, contractor, customer, center } = scope.relationships as CrewScopeRelationships;
+  const { center, crew } = scope.relationships as CrewScopeRelationships;
 
-  const managerNode = referenceToTreeNode(manager, 'MANAGER');
-  const contractorNode = referenceToTreeNode(contractor, 'CONTRACTOR');
-  const customerNode = referenceToTreeNode(customer, 'CUSTOMER');
   const centerNode = referenceToTreeNode(center, 'CENTER');
+  const crewNodes = sortNodes((crew as CrewScopeCrewMember[]).map((member) => toTreeNode(member, 'CREW')));
 
   const children: TreeNode[] = [];
   if (centerNode) {
     children.push(centerNode);
   }
-  if (managerNode) {
-    children.push(managerNode);
-  }
-  if (contractorNode) {
-    children.push(contractorNode);
-  }
-  if (customerNode) {
-    children.push(customerNode);
-  }
+  children.push(...crewNodes);
   return children;
 }
 
