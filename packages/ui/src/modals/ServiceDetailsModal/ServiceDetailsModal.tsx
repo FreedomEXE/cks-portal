@@ -74,6 +74,10 @@ export default function ServiceDetailsModal({
   const [notesInput, setNotesInput] = useState('');
   const [showCrewPicker, setShowCrewPicker] = useState(false);
   const [sendingRequest, setSendingRequest] = useState(false);
+  const normalizeCrewCode = (code?: string | null) => {
+    if (!code) return '';
+    return code.trim().toUpperCase();
+  };
   const actionBarEnabled = (() => {
     try {
       const w = (typeof window !== 'undefined') ? (window as any) : {};
@@ -93,8 +97,14 @@ export default function ServiceDetailsModal({
 
     // Extract crew requests from metadata
     const crewRequests: Array<{crewCode: string; status: string}> = Array.isArray(meta.crewRequests) ? meta.crewRequests : [];
-    const acceptedCrew = crewRequests.filter(r => r.status === 'accepted').map(r => r.crewCode);
-    const pendingCrew = crewRequests.filter(r => r.status === 'pending').map(r => r.crewCode);
+    const acceptedCrew = crewRequests
+      .filter(r => r.status === 'accepted')
+      .map(r => normalizeCrewCode(r.crewCode))
+      .filter(Boolean);
+    const pendingCrew = crewRequests
+      .filter(r => r.status === 'pending')
+      .map(r => normalizeCrewCode(r.crewCode))
+      .filter(Boolean);
 
     setCrewSelected(acceptedCrew);
     setPendingCrewRequests(pendingCrew);
@@ -115,7 +125,8 @@ export default function ServiceDetailsModal({
   };
 
   const handleRemoveCrew = (code: string) => {
-    setCrewSelected(prev => prev.filter(c => c !== code));
+    const normalized = normalizeCrewCode(code);
+    setCrewSelected(prev => prev.filter(c => c !== normalized));
   };
 
   const getStatusBadge = () => {
@@ -433,16 +444,28 @@ export default function ServiceDetailsModal({
                       <div style={{ color: '#6b7280' }}>No crew available in your ecosystem.</div>
                     ) : (
                       availableCrew
-                        .filter(c => !crewSelected.includes(c.code) && !pendingCrewRequests.includes(c.code))
+                          .filter((c) => {
+                            const normalized = normalizeCrewCode(c.code);
+                            return (
+                              !crewSelected.includes(normalized) &&
+                              !pendingCrewRequests.includes(normalized)
+                            );
+                          })
                         .map((c) => (
                           <label key={c.code} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 8, cursor: 'pointer', borderBottom: '1px solid #f3f4f6' }}>
                             <input
                               type="checkbox"
-                              checked={crewSelected.includes(c.code)}
-                              onChange={(e) => {
-                                const checked = e.currentTarget.checked;
-                                setCrewSelected((prev) => checked ? [...prev, c.code] : prev.filter(x => x !== c.code));
-                              }}
+                             checked={crewSelected.includes(normalizeCrewCode(c.code))}
+                             onChange={(e) => {
+                               const checked = e.currentTarget.checked;
+                               const normalized = normalizeCrewCode(c.code);
+                               setCrewSelected((prev) => {
+                                 if (checked) {
+                                   return prev.includes(normalized) ? prev : [...prev, normalized];
+                                 }
+                                 return prev.filter(x => x !== normalized);
+                               });
+                             }}
                             />
                             <span style={{ fontSize: 14 }}>{c.name} ({c.code})</span>
                           </label>
