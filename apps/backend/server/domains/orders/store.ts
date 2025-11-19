@@ -505,6 +505,11 @@ function buildApprovalStages(
   const stages: OrderApprovalStage[] = [];
   const creatorRole = normalizeRole(row.creator_role) ?? 'center';
   const creatorUserId = normalizeCodeValue(row.creator_id);
+  const metadata = (row.metadata || {}) as Record<string, unknown>;
+  const crewRequestsRaw = metadata.crewRequests;
+  const crewRequests = Array.isArray(crewRequestsRaw)
+    ? (crewRequestsRaw as Array<{ crewCode?: string; status?: string; requestedAt?: string | null; respondedAt?: string | null }>)
+    : [];
 
   // Always add creator stage as "requested" (green)
   stages.push({
@@ -583,6 +588,50 @@ function buildApprovalStages(
         status: stageStatus,
         userId: roleToUserId(role),
         timestamp: null,
+      });
+    }
+
+    const shouldShowCrewStage =
+      crewRequests.length > 0 ||
+      status === 'crew_requested' ||
+      status === 'crew_assigned';
+
+    if (shouldShowCrewStage) {
+      const crewAccepted = crewRequests.find(r => (r.status || '').toLowerCase() === 'accepted');
+      const crewPending = crewRequests.find(r => (r.status || '').toLowerCase() === 'pending');
+      const crewRejected = crewRequests.find(r => (r.status || '').toLowerCase() === 'rejected');
+      let crewStageStatus: OrderApprovalStage['status'] = 'pending';
+      let crewLabel = 'Crew Requested';
+
+      if (status === 'crew_assigned' || crewAccepted) {
+        crewStageStatus = 'accepted';
+        crewLabel = 'Crew Accepted';
+      } else if (!crewPending && crewRejected) {
+        crewStageStatus = 'rejected';
+        crewLabel = 'Crew Rejected';
+      } else {
+        crewStageStatus = 'pending';
+        crewLabel = 'Crew Requested';
+      }
+
+      const crewUserId = crewAccepted?.crewCode
+        ? normalizeCodeValue(crewAccepted.crewCode)
+        : normalizeCodeValue(row.crew_id);
+      const crewTimestamp =
+        crewAccepted?.respondedAt
+          ? toIso(crewAccepted.respondedAt)
+          : crewRejected?.respondedAt
+            ? toIso(crewRejected.respondedAt)
+            : crewPending?.requestedAt
+              ? toIso(crewPending.requestedAt)
+              : null;
+
+      stages.push({
+        role: 'crew',
+        status: crewStageStatus,
+        userId: crewUserId,
+        timestamp: crewTimestamp,
+        label: crewLabel,
       });
     }
 

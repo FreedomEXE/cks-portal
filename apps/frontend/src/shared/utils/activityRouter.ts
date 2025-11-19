@@ -85,8 +85,22 @@ export function createActivityClickHandler(config: ActivityRouterConfig) {
       [key: string]: any;
     };
   }) => {
-    const targetId = activity.metadata?.targetId;
-    const targetType = activity.metadata?.targetType;
+    const metadata = activity.metadata ?? {};
+    const targetIdOriginal = metadata.targetId;
+    const targetTypeOriginal = metadata.targetType;
+    const activityType = metadata.activityType;
+
+    let targetId = targetIdOriginal;
+    let targetType = targetTypeOriginal;
+
+    if (
+      activityType === 'service_crew_requested' &&
+      metadata.serviceId &&
+      (!targetTypeOriginal || targetTypeOriginal === 'crew')
+    ) {
+      targetId = metadata.serviceId;
+      targetType = 'service';
+    }
 
     if (!targetId || !targetType) {
       config.onError('Cannot open: missing target information');

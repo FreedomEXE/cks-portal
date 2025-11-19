@@ -93,12 +93,15 @@ Complete structured reporting system with:
 - ✅ Predefined reason selection per category
 - ✅ Priority levels (LOW / MEDIUM / HIGH)
 - ✅ Star ratings (1-5) for feedback
+- ✅ Acknowledge workflow (header surfaces crew acknowledgments + counters)
+- ✅ Resolve workflow (managers/warehouses wait for every required acknowledgment before resolving)
 - ✅ Acknowledge workflow
 - ✅ Resolve workflow (with action taken notes)
 - ✅ Role-based creation permissions:
   - Contractors, Customers, Centers → Can create Reports
   - Managers → Can create Feedback only
 - ✅ Role-based viewing (admins see all, others see own + managed)
+- ✅ Crew ecosystem tab now only renders the crew’s center and fellow crew members (services filtered out)
 
 #### Backend
 - ✅ Database migrations for acknowledgment tracking

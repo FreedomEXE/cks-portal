@@ -317,6 +317,46 @@ export default function ServiceDetailsModal({
                 </div>
               )}
 
+              {(pendingCrewRequests.length > 0 || crewSelected.length > 0) && (
+                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
+                  {pendingCrewRequests.length > 0 && (
+                    <div
+                      style={{
+                        flex: '1 1 240px',
+                        padding: 12,
+                        borderRadius: 8,
+                        backgroundColor: '#fef3c7',
+                        border: '1px solid #f59e0b',
+                      }}
+                    >
+                      <div style={{ fontWeight: 600, color: '#92400e' }}>Crew Requested</div>
+                      <div style={{ fontSize: 13, color: '#92400e' }}>
+                        Request submitted{pendingCrewRequests.length > 1 ? ' to multiple crew members' : ''}; waiting for
+                        {pendingCrewRequests.length === 1 ? ' the crew member' : ' responses'}.
+                      </div>
+                    </div>
+                  )}
+                  {crewSelected.length > 0 && (
+                    <div
+                      style={{
+                        flex: '1 1 240px',
+                        padding: 12,
+                        borderRadius: 8,
+                        backgroundColor: '#ecfdf5',
+                        border: '1px solid #10b981',
+                      }}
+                    >
+                      <div style={{ fontWeight: 600, color: '#065f46' }}>Crew Accepted</div>
+                      <div style={{ fontSize: 13, color: '#065f46' }}>
+                        {crewSelected.length === 1
+                          ? 'One crew member is assigned to this service.'
+                          : `${crewSelected.length} crew members are assigned to this service.`}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Pending Requests Section */}
               {pendingCrewRequests.length > 0 && (
                 <div style={{ marginBottom: 24 }}>
@@ -379,7 +419,7 @@ export default function ServiceDetailsModal({
               )}
 
               {/* Add Crew Section */}
-              {editable && !!onSendCrewRequest && !showCrewPicker && (
+              {editable && !!onSendCrewRequest && !showCrewPicker && pendingCrewRequests.length === 0 && (
                 <div style={{ marginBottom: 16 }}>
                   <Button size="sm" onClick={() => setShowCrewPicker(true)}>Request Crew</Button>
                 </div>
