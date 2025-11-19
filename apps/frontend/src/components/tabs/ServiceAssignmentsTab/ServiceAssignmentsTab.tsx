@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useSWRConfig } from 'swr';
 import toast from 'react-hot-toast';
 import { useHubRoleScope, type ManagerRoleScopeResponse } from '../../../shared/api/hub';
@@ -9,9 +9,16 @@ export interface ServiceAssignmentsTabProps {
   viewerCode?: string | null;
   managedBy?: string | null; // 'manager' | 'warehouse'
   assigned?: Array<{ code: string; name?: string } | string> | null;
+  crewRequests?: Array<{ crewCode?: string; status?: string }> | null;
 }
 
-export default function ServiceAssignmentsTab({ serviceId, viewerCode, managedBy, assigned = [] }: ServiceAssignmentsTabProps) {
+export default function ServiceAssignmentsTab({
+  serviceId,
+  viewerCode,
+  managedBy,
+  assigned = [],
+  crewRequests,
+}: ServiceAssignmentsTabProps) {
   const { mutate } = useSWRConfig();
   const scope = useHubRoleScope(viewerCode || undefined);
   const [query, setQuery] = useState('');
@@ -35,6 +42,18 @@ export default function ServiceAssignmentsTab({ serviceId, viewerCode, managedBy
     const list = (data && data.role === 'manager') ? (data.relationships?.crew || []) : [];
     return list.map((c) => ({ code: c.id, name: c.name || c.id }));
   }, [scope.data]);
+
+  const buildPendingCodes = (requests?: ServiceAssignmentsTabProps['crewRequests']) => {
+    if (!Array.isArray(requests)) return [];
+    return requests
+      .filter((req) => (req?.status || '').toLowerCase() === 'pending')
+      .map((req) => normalizeCode(req?.crewCode))
+      .filter((code) => !!code);
+  };
+
+  useEffect(() => {
+    setPendingRequests(buildPendingCodes(crewRequests));
+  }, [crewRequests]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();

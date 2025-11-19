@@ -2280,4 +2280,3 @@ export const entityRegistry: EntityRegistry = {
   product: productAdapter,
   warehouse: userAdapter,
 };
-
