@@ -16,6 +16,7 @@ export default function ServiceAssignmentsTab({ serviceId, viewerCode, managedBy
   const scope = useHubRoleScope(viewerCode || undefined);
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<string[]>([]);
+  const [pendingRequests, setPendingRequests] = useState<string[]>([]);
   const [message, setMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [removing, setRemoving] = useState<string | null>(null);
@@ -41,6 +42,8 @@ export default function ServiceAssignmentsTab({ serviceId, viewerCode, managedBy
     return crewList.filter((c) => (c.code?.toLowerCase().includes(q) || (c.name || '').toLowerCase().includes(q)));
   }, [crewList, query]);
 
+  const normalizeCode = (code?: string | null) => (code || '').trim().toUpperCase();
+
   const toggle = (code: string) => {
     setSelected((prev) => prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code]);
   };
@@ -63,6 +66,12 @@ export default function ServiceAssignmentsTab({ serviceId, viewerCode, managedBy
       if (viewerCode) {
         await mutate(`/hub/activities/${viewerCode}`);
       }
+      setPendingRequests((prev) => {
+        const normalized = selected.map(normalizeCode).filter(Boolean);
+        return [...prev, ...normalized];
+      });
+      setSelected([]);
+      setMessage('');
       toast.success('Crew request sent');
     } catch (e) {
       console.error('[ServiceAssignmentsTab] request failed', e);
@@ -77,6 +86,9 @@ export default function ServiceAssignmentsTab({ serviceId, viewerCode, managedBy
     return arr.map((a: any) => (typeof a === 'string' ? { code: a, name: a } : { code: a.code, name: a.name || a.code }))
       .filter((x) => !!x.code);
   }, [assigned]);
+
+  const assignedCodes = useMemo(() => new Set(currentAssigned.map((a) => normalizeCode(a.code))), [currentAssigned]);
+  const pendingSet = useMemo(() => new Set(pendingRequests.map((code) => normalizeCode(code))), [pendingRequests]);
 
   const unassign = async (code: string) => {
     try {
@@ -133,22 +145,56 @@ export default function ServiceAssignmentsTab({ serviceId, viewerCode, managedBy
       />
 
       <div style={{ marginTop: 12, maxHeight: 220, overflowY: 'auto', border: '1px solid #e5e7eb', borderRadius: 6 }}>
-        {filtered.length === 0 ? (
+        {filtered.length === 0 && (
           <div style={{ padding: 12, color: '#6b7280' }}>No crew found</div>
-        ) : (
-          filtered.map((c) => (
-            <label key={c.code} style={{ display: 'flex', alignItems: 'center', padding: '8px 10px', borderBottom: '1px solid #f3f4f6', cursor: 'pointer' }}>
-              <input
-                type="checkbox"
-                checked={selected.includes(c.code)}
-                onChange={() => toggle(c.code)}
-                style={{ marginRight: 8 }}
-              />
-              <span style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', marginRight: 8 }}>{c.code}</span>
-              <span style={{ color: '#374151' }}>{c.name}</span>
-            </label>
-          ))
         )}
+        {filtered.map((c) => {
+          const normalized = normalizeCode(c.code);
+          if (assignedCodes.has(normalized)) {
+            return null;
+          }
+          const isPending = pendingSet.has(normalized);
+          return (
+            <div
+              key={c.code}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                padding: '8px 10px',
+                borderBottom: '1px solid #f3f4f6',
+                backgroundColor: isPending ? '#f8fafc' : '#fff',
+              }}
+            >
+              {!isPending && (
+                <input
+                  type="checkbox"
+                  checked={selected.includes(c.code)}
+                  onChange={() => toggle(c.code)}
+                  style={{ marginRight: 8 }}
+                />
+              )}
+              <span style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', marginRight: 8 }}>{c.code}</span>
+              <span style={{ color: '#374151', flex: 1 }}>{c.name}</span>
+              {isPending && (
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '2px 8px',
+                    borderRadius: 999,
+                    fontSize: 11,
+                    border: '1px solid #fcd34d',
+                    color: '#b45309',
+                    backgroundColor: '#fff7ed',
+                  }}
+                >
+                  Request Sent
+                </span>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {selected.length > 0 && (

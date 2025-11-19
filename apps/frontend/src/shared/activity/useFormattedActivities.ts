@@ -447,6 +447,19 @@ export function useFormattedActivities(
       ? items.filter((a) => normalizedCategories.includes((a.category || '').toLowerCase()))
       : items;
 
+    const viewerRole = data?.role?.toLowerCase() ?? '';
+    const filteredByRole =
+      viewerRole === 'manager'
+        ? filteredByCategory.filter(
+            (a) =>
+              !(
+                (a.targetType || '').toLowerCase() === 'crew' &&
+                (a.activityType || (a.metadata && (a.metadata.activityType as string)) || '').toLowerCase() ===
+                  'service_crew_requested'
+              )
+          )
+        : filteredByCategory;
+
     // Frontend guardrail (non-admin hubs):
     // Hide other users' creation events while still showing own creation event.
     // Only filter user entity creations; orders/reports/feedback are shared context.
@@ -459,7 +472,7 @@ export function useFormattedActivities(
       'crew_created',
       'warehouse_created',
     ]);
-    const filtered = filteredByCategory.filter((a) => {
+    const filtered = filteredByRole.filter((a) => {
       const type = (a.activityType || '').toLowerCase();
       // Only filter user-entity creations by targetId; let order/report/feedback creations through
       if (userCreatedTypes.has(type)) {
@@ -471,7 +484,7 @@ export function useFormattedActivities(
     const mapped = filtered.map((item) => mapHubItemToActivity(item, cksCode));
     mapped.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
     return mapped.slice(0, limit);
-  }, [data?.activities, limit, normalizedCategories, cksCode]);
+  }, [data?.activities, data?.role, limit, normalizedCategories, cksCode]);
 
   return { activities, isLoading, error, mutate, raw: data?.activities ?? [] };
 }
