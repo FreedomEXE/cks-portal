@@ -19,7 +19,7 @@ import { useCallback } from 'react';
 import { useSWRConfig } from 'swr';
 import toast from 'react-hot-toast';
 import { parseEntityId } from '../shared/utils/parseEntityId';
-import { applyHubOrderAction, type OrderActionRequest, acknowledgeItem, resolveReport, applyServiceAction, requestServiceCrew, respondToServiceCrew, respondToOrderCrew } from '../shared/api/hub';
+import { applyHubOrderAction, type OrderActionRequest, acknowledgeItem, resolveReport, applyServiceAction, requestServiceCrew, respondToServiceCrew, respondToOrderCrew, respondToCrewInvite } from '../shared/api/hub';
 import { archiveAPI } from '../shared/api/archive';
 import { updateCatalogService } from '../shared/api/admin';
 
@@ -291,9 +291,12 @@ async function handleOrderAction(
     console.log(`[useEntityActions] Calling order action: ${actionId} on ${orderId}`, payload);
 
     // Crew responding to order-level invite uses a dedicated endpoint
-    if ((actionId === 'accept' || actionId === 'reject') && (options as any)?.metadata?.crewResponse === true) {
+    if ((actionId === 'accept' || actionId === 'reject') && (options as any)?.crewResponse === true) {
       const accepted = actionId === 'accept';
-      const resp = await respondToOrderCrew(orderId, accepted);
+      const metadata = options.metadata as Record<string, any> | undefined;
+      const serviceId = metadata?.serviceId || metadata?.transformedId || metadata?.service?.serviceId || metadata?.service_id;
+      await respondToCrewInvite(orderId, serviceId, accepted);
+
       // Invalidate caches and toast
       mutate((key: any) => {
         if (typeof key === 'string') {

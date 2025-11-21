@@ -882,6 +882,13 @@ export async function respondToOrderCrew(orderId: string, accept: boolean) {
   return response.data;
 }
 
+export async function respondToCrewInvite(orderId: string, serviceId: string | null | undefined, accept: boolean) {
+  if (serviceId) {
+    return respondToServiceCrew(serviceId, accept);
+  }
+  return respondToOrderCrew(orderId, accept);
+}
+
 export function useCertifiedServices(userId: string | null | undefined, role: 'manager' | 'crew' | 'warehouse') {
   const key = userId ? `/certified-services?userId=${encodeURIComponent(userId)}&role=${role}` : null;
   return useHubSWR<CertifiedServiceItem[]>(key);

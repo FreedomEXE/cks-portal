@@ -31,7 +31,7 @@ import { crewOverviewCards } from '@cks/domain-widgets';
 import { Button, DataTable, PageHeader, PageWrapper, Scrollbar, TabSection } from '@cks/ui';
 import { useModals } from '../contexts';
 import { useTheme as useAppTheme } from '../contexts/ThemeContext';
-import { apiFetch } from '../shared/api/client';
+import { respondToCrewInvite } from '../shared/api/hub';
 import { useEntityActions } from '../hooks/useEntityActions';
 import { useAuth } from '@cks/auth';
 import { useClerk, useUser } from '@clerk/clerk-react';
@@ -793,26 +793,11 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
                   try {
                     // For crew assignment responses (accept/reject crew invites)
                     if (act === 'accept' || act === 'reject') {
-
-                      // Find the order to get serviceId/transformedId
                       const targetOrder = orders?.orders?.find((o: any) => (o.orderId || o.id) === orderId);
                       const serviceId = (targetOrder as any)?.serviceId || (targetOrder as any)?.transformedId;
 
-                      if (serviceId) {
-                        // Post-creation crew request: use service endpoint
-                        await apiFetch(`/services/${encodeURIComponent(serviceId)}/crew-response`, {
-                          method: 'POST',
-                          body: JSON.stringify({ accept: act === 'accept' }),
-                        });
-                        console.log('[crew] responded to service crew invite', { serviceId, accept: act === 'accept' });
-                      } else {
-                        // Pre-creation crew request (during order approval): use order endpoint
-                        await apiFetch(`/orders/${orderId}/crew-response`, {
-                          method: 'POST',
-                          body: JSON.stringify({ accept: act === 'accept' }),
-                        });
-                        console.log('[crew] responded to order crew invite', { orderId, accept: act === 'accept' });
-                      }
+                      await respondToCrewInvite(orderId, serviceId, act === 'accept');
+                      console.log('[crew] responded to crew invite', { orderId, serviceId, accept: act === 'accept' });
 
                       mutate(`/hub/orders/${normalizedCode}`);
                       mutate(`/hub/activities/${normalizedCode}`);

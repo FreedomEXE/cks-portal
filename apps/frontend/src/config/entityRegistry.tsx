@@ -510,30 +510,27 @@ const orderAdapter: EntityAdapter = {
 
         // Crew fallback actions for Service Orders (pre-creation invite flow)
         if (role === 'crew' && (status === 'crew_requested' || hasPendingServiceInvite)) {
-          const viewerIdUC = (viewerId || '').toUpperCase();
-          const crewRequests: Array<{ crewCode?: string; status?: string }> =
-            (entityData?.metadata?.crewRequests as any[]) || [];
-          const hasPendingInvite = !!viewerIdUC && crewRequests.some((req) =>
-            (req?.status || '').toLowerCase() === 'pending' &&
-            (req?.crewCode || '').toUpperCase() === viewerIdUC
-          );
-          if (hasPendingInvite) {
-            descriptors.push({
-              key: 'accept',
-              label: 'Accept Invite',
-              variant: 'primary',
-              payload: { crewResponse: true },
-              closeOnSuccess: false,
-            });
-            descriptors.push({
-              key: 'reject',
-              label: 'Decline Invite',
-              variant: 'danger',
-              confirm: 'Decline this service invite?',
-              payload: { crewResponse: true },
-              closeOnSuccess: false,
-            });
+          const serviceId = (entityData?.serviceId || entityData?.transformedId) || undefined;
+          const crewPayload: Record<string, unknown> = { crewResponse: true };
+          if (serviceId) {
+            crewPayload.serviceId = serviceId;
           }
+          descriptors.push({
+            key: 'accept',
+            label: 'Accept',
+            variant: 'primary',
+            payload: crewPayload,
+            closeOnSuccess: false,
+          });
+          descriptors.push({
+            key: 'reject',
+            label: 'Reject',
+            variant: 'danger',
+            confirm: 'Decline this service invite?',
+            prompt: 'Optional: Provide a reason for rejection',
+            payload: crewPayload,
+            closeOnSuccess: false,
+          });
         }
 
         // Manager fallback actions for Service Orders
