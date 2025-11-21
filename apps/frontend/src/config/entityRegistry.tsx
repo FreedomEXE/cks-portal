@@ -273,6 +273,23 @@ function formatOrderStatus(status: string | null | undefined): string {
 /**
  * Order Adapter
  */
+function hasPendingCrewInviteFromOrder(entityData: any, viewerId?: string | null): boolean {
+  const viewerIdUC = (viewerId || '').toUpperCase();
+  if (!viewerIdUC) return false;
+
+  const metadata = entityData?.metadata || {};
+  const requests = Array.isArray(metadata.crewRequests) ? metadata.crewRequests : [];
+  const serviceRequests = Array.isArray(metadata?.service?.crewRequests) ? metadata.service.crewRequests : [];
+  const allRequests = [...requests, ...serviceRequests];
+
+  return allRequests.some((req) => {
+    const status = (req?.status || '').toLowerCase();
+    if (status !== 'pending') return false;
+    const crewCode = (req?.crewCode || req?.crewId || '')?.toUpperCase();
+    return crewCode === viewerIdUC;
+  });
+}
+
 const orderAdapter: EntityAdapter = {
   getActionDescriptors: (context: EntityActionContext): EntityActionDescriptor[] => {
     const { role, state, entityData, viewerId } = context;
@@ -368,6 +385,7 @@ const orderAdapter: EntityAdapter = {
       } else {
         // Fallback: Derive actions from RBAC policies with ownership checks
         const status = entityData?.status?.toLowerCase() || '';
+        const hasPendingServiceInvite = hasPendingCrewInviteFromOrder(entityData, viewerId);
 
         if (process.env.NODE_ENV !== 'production') {
           console.log('[OrderAdapter] RBAC fallback triggered - no backend actions:', {
@@ -491,7 +509,7 @@ const orderAdapter: EntityAdapter = {
         }
 
         // Crew fallback actions for Service Orders (pre-creation invite flow)
-        if (role === 'crew' && status === 'crew_requested') {
+        if (role === 'crew' && (status === 'crew_requested' || hasPendingServiceInvite)) {
           const viewerIdUC = (viewerId || '').toUpperCase();
           const crewRequests: Array<{ crewCode?: string; status?: string }> =
             (entityData?.metadata?.crewRequests as any[]) || [];
@@ -1186,34 +1204,6 @@ const serviceAdapter: EntityAdapter = {
       }
 
       // Assignments moved to dedicated tab; Quick Actions focus on lifecycle (manager only)
-    }
-
-    // Crew accept/reject for service invitations
-    if (role === 'crew' && state === 'active') {
-      const viewerIdUC = (viewerId || '').toUpperCase();
-      const crewRequests: Array<{ crewCode?: string; status?: string }> =
-        (entityData?.metadata?.crewRequests as any[]) || [];
-      const hasPendingInvite = !!viewerIdUC && crewRequests.some((req) =>
-        (req?.status || '').toLowerCase() === 'pending' &&
-        (req?.crewCode || '').toUpperCase() === viewerIdUC
-      );
-      if (hasPendingInvite) {
-        descriptors.push({
-          key: 'accept',
-          label: 'Accept Invite',
-          variant: 'primary',
-          payload: { crewResponse: true },
-          closeOnSuccess: false,
-        });
-        descriptors.push({
-          key: 'reject',
-          label: 'Decline Invite',
-          variant: 'danger',
-          confirm: 'Decline this service invite?',
-          payload: { crewResponse: true },
-          closeOnSuccess: true,
-        });
-      }
     }
 
     return descriptors;

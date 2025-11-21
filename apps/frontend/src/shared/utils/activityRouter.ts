@@ -93,13 +93,19 @@ export function createActivityClickHandler(config: ActivityRouterConfig) {
     let targetId = targetIdOriginal;
     let targetType = targetTypeOriginal;
 
-    if (
-      activityType === 'service_crew_requested' &&
-      metadata.serviceId &&
-      (!targetTypeOriginal || targetTypeOriginal === 'crew')
-    ) {
-      targetId = metadata.serviceId;
-      targetType = 'service';
+    if (activityType === 'service_crew_requested') {
+      const orderId = metadata.orderId || metadata.serviceOrderId || metadata.service_id || metadata.order_id;
+      const serviceId = metadata.serviceId || metadata.service_id;
+      if (orderId) {
+        targetId = orderId;
+        targetType = 'order';
+      } else if (
+        serviceId &&
+        (!targetTypeOriginal || targetTypeOriginal === 'crew')
+      ) {
+        targetId = serviceId;
+        targetType = 'service';
+      }
     }
 
     if (!targetId || !targetType) {

@@ -409,7 +409,9 @@ export async function addServiceCrewRequests(input: {
     targetId: input.serviceId,
     targetType: 'service',
     metadata: {
+      orderId,
       crewCodes: input.crewCodes,
+      serviceId: input.serviceId,
       message: input.message,
     },
   });
@@ -417,20 +419,21 @@ export async function addServiceCrewRequests(input: {
   for (const code of input.crewCodes) {
     const crewId = normalizeIdentity(code || '') || (code || '').toUpperCase();
     if (!crewId) continue;
-    await recordActivity({
-      activityType: 'service_crew_requested',
-      description: `Requested you to work on Service ${input.serviceId}`,
-      actorId,
-      actorRole: 'manager',
-      targetId: crewId,
-      targetType: 'crew',
-      metadata: {
-        crewId,
-        serviceId: input.serviceId,
-        managerId: actorId,
-        message: input.message ?? undefined,
-      },
-    });
+      await recordActivity({
+        activityType: 'service_crew_requested',
+        description: `Requested you to work on Service ${input.serviceId}`,
+        actorId,
+        actorRole: 'manager',
+        targetId: crewId,
+        targetType: 'crew',
+        metadata: {
+          orderId,
+          crewId,
+          serviceId: input.serviceId,
+          managerId: actorId,
+          message: input.message ?? undefined,
+        },
+      });
   }
 
   return { ...service, metadata: updatedMetadata };
