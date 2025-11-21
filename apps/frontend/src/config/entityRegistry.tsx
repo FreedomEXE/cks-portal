@@ -1092,7 +1092,7 @@ function buildServiceDetailsSections(context: TabVisibilityContext): import('@ck
  */
 const serviceAdapter: EntityAdapter = {
   getActionDescriptors: (context: EntityActionContext): EntityActionDescriptor[] => {
-    const { role, state, entityData } = context;
+    const { role, state, entityData, viewerId } = context;
     const descriptors: EntityActionDescriptor[] = [];
 
     // Admin actions (unconditional on can(); backend enforces authorization)
@@ -1186,6 +1186,34 @@ const serviceAdapter: EntityAdapter = {
       }
 
       // Assignments moved to dedicated tab; Quick Actions focus on lifecycle (manager only)
+    }
+
+    // Crew accept/reject for service invitations
+    if (role === 'crew' && state === 'active') {
+      const viewerIdUC = (viewerId || '').toUpperCase();
+      const crewRequests: Array<{ crewCode?: string; status?: string }> =
+        (entityData?.metadata?.crewRequests as any[]) || [];
+      const hasPendingInvite = !!viewerIdUC && crewRequests.some((req) =>
+        (req?.status || '').toLowerCase() === 'pending' &&
+        (req?.crewCode || '').toUpperCase() === viewerIdUC
+      );
+      if (hasPendingInvite) {
+        descriptors.push({
+          key: 'accept',
+          label: 'Accept Invite',
+          variant: 'primary',
+          payload: { crewResponse: true },
+          closeOnSuccess: false,
+        });
+        descriptors.push({
+          key: 'reject',
+          label: 'Decline Invite',
+          variant: 'danger',
+          confirm: 'Decline this service invite?',
+          payload: { crewResponse: true },
+          closeOnSuccess: true,
+        });
+      }
     }
 
     return descriptors;

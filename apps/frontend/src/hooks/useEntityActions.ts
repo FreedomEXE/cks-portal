@@ -769,6 +769,32 @@ async function handleServiceAction(
 
       // Note: 'assign_crew' implemented above; no duplicate fallback here
 
+      case 'accept':
+      case 'reject':
+        // Check if this is a crew response to service invite
+        if ((options as any)?.metadata?.crewResponse === true) {
+          const accepted = actionId === 'accept';
+          console.log(`[useEntityActions] Crew ${accepted ? 'accepting' : 'declining'} service invite:`, serviceId);
+          await respondToServiceCrew(serviceId, accepted);
+
+          // Invalidate caches
+          mutate((key: any) => {
+            if (typeof key === 'string') {
+              return key.includes('/services') ||
+                     key.includes('/api/hub/activities') ||
+                     key.includes('/hub/activities') ||
+                     key.includes(serviceId);
+            }
+            return false;
+          });
+
+          console.log('[useEntityActions] Service crew response: success');
+          toast.success(accepted ? 'Service invite accepted!' : 'Service invite declined');
+          options.onSuccess?.();
+          return true;
+        }
+        break;
+
       default:
         console.warn('[useEntityActions] Unknown action for service:', actionId);
         return false;
