@@ -1365,6 +1365,7 @@ const serviceAdapter: EntityAdapter = {
                   viewerCode={context.viewerId}
                   managedBy={entityData?.metadata?.serviceManagedBy}
                   assigned={(entityData as any)?.metadata?.crew || []}
+                  crewRequests={(entityData as any)?.metadata?.crewRequests || []}
                 />
               ),
             },
