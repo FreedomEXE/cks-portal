@@ -290,6 +290,20 @@ function hasPendingCrewInviteFromOrder(entityData: any, viewerId?: string | null
   });
 }
 
+function getServiceIdFromOrder(entityData: any): string | undefined {
+  if (!entityData) return undefined;
+  const metadata = entityData.metadata || {};
+  return (
+    entityData.serviceId ||
+    entityData.transformedId ||
+    metadata.serviceId ||
+    metadata.service?.serviceId ||
+    metadata.service?.transformedId ||
+    metadata.transformedId ||
+    undefined
+  );
+}
+
 const orderAdapter: EntityAdapter = {
   getActionDescriptors: (context: EntityActionContext): EntityActionDescriptor[] => {
     const { role, state, entityData, viewerId } = context;
@@ -510,16 +524,16 @@ const orderAdapter: EntityAdapter = {
 
         // Crew fallback actions for Service Orders (pre-creation invite flow)
         if (role === 'crew' && (status === 'crew_requested' || hasPendingServiceInvite)) {
-          const serviceId = (entityData?.serviceId || entityData?.transformedId) || undefined;
-          const crewPayload: Record<string, unknown> = { crewResponse: true };
+          const serviceId = getServiceIdFromOrder(entityData);
+          const crewMetadata: Record<string, unknown> = { crewResponse: true };
           if (serviceId) {
-            crewPayload.serviceId = serviceId;
+            crewMetadata.serviceId = serviceId;
           }
           descriptors.push({
             key: 'accept',
             label: 'Accept',
             variant: 'primary',
-            payload: crewPayload,
+            payload: { metadata: crewMetadata },
             closeOnSuccess: false,
           });
           descriptors.push({
@@ -528,7 +542,7 @@ const orderAdapter: EntityAdapter = {
             variant: 'danger',
             confirm: 'Decline this service invite?',
             prompt: 'Optional: Provide a reason for rejection',
-            payload: crewPayload,
+            payload: { metadata: crewMetadata },
             closeOnSuccess: false,
           });
         }

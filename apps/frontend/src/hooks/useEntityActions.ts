@@ -291,10 +291,11 @@ async function handleOrderAction(
     console.log(`[useEntityActions] Calling order action: ${actionId} on ${orderId}`, payload);
 
     // Crew responding to order-level invite uses a dedicated endpoint
-    if ((actionId === 'accept' || actionId === 'reject') && (options as any)?.crewResponse === true) {
+    const crewMetadata = (options as any)?.metadata as Record<string, any> | undefined;
+    const isCrewResponse = (options as any)?.crewResponse === true || crewMetadata?.crewResponse === true;
+    if ((actionId === 'accept' || actionId === 'reject') && isCrewResponse) {
       const accepted = actionId === 'accept';
-      const metadata = options.metadata as Record<string, any> | undefined;
-      const serviceId = metadata?.serviceId || metadata?.transformedId || metadata?.service?.serviceId || metadata?.service_id;
+      const serviceId = crewMetadata?.serviceId || crewMetadata?.transformedId || crewMetadata?.service?.serviceId || crewMetadata?.service_id;
       await respondToCrewInvite(orderId, serviceId, accepted);
 
       // Invalidate caches and toast
