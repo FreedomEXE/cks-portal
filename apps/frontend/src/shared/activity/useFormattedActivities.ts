@@ -365,7 +365,10 @@ function personalizeMessage(item: HubActivityItem, viewerId?: string | null): st
 
   if (activityType === 'service_crew_response') {
     const managerId = (metadata.managerId as string | undefined)?.toUpperCase();
-    const response = (metadata.response as string | undefined)?.toLowerCase();
+    let response = (metadata.response as string | undefined)?.toLowerCase();
+    if (!response && metadata.accepted !== undefined) {
+      response = metadata.accepted ? 'accepted' : 'declined';
+    }
     if (managerId === normalizedViewerId) {
       return response === 'accepted'
         ? `Crew member accepted your request!`
@@ -408,23 +411,33 @@ function mapHubItemToActivity(item: HubActivityItem, viewerId?: string | null): 
   // Personalize message based on viewer
   const personalizedMessage = personalizeMessage(item, viewerId);
 
+  const metadata: Record<string, any> = {
+    role, // Used for color coding in ActivityItem
+    title: roleLabel, // Header displayed above the activity
+    targetId: item.targetId || undefined,
+    targetType: item.targetType || undefined,
+    actorId: item.actorId || undefined,
+    category: item.category || undefined,
+    // spread backend-provided metadata FIRST
+    ...(item.metadata ?? undefined),
+    // Then override with activityType from top-level field (prevent overwrite)
+    activityType: item.activityType, // Add activityType to metadata for click handler
+  };
+
+  if (
+    item.activityType === 'service_crew_requested' &&
+    item.metadata?.serviceId
+  ) {
+    metadata.targetId = item.metadata.serviceId;
+    metadata.targetType = 'service';
+  }
+
   return {
     id: item.id,
     message: personalizedMessage, // Use personalized message instead of raw description
     timestamp: validDate,
     type: toActivityType(item.category),
-    metadata: {
-      role, // Used for color coding in ActivityItem
-      title: roleLabel, // Header displayed above the activity
-      targetId: item.targetId || undefined,
-      targetType: item.targetType || undefined,
-      actorId: item.actorId || undefined,
-      category: item.category || undefined,
-      // spread backend-provided metadata FIRST
-      ...(item.metadata ?? undefined),
-      // Then override with activityType from top-level field (prevent overwrite)
-      activityType: item.activityType, // Add activityType to metadata for click handler
-    },
+    metadata,
   };
 }
 
@@ -440,6 +453,8 @@ export function useFormattedActivities(
     () => (categories ?? []).map((c) => c.toLowerCase()),
     [categories]
   );
+
+  const viewerIdUC = cksCode?.toUpperCase() ?? '';
 
   const activities: Activity[] = useMemo(() => {
     const items = data?.activities ?? [];
@@ -481,7 +496,33 @@ export function useFormattedActivities(
       return true;
     });
 
-    const mapped = filtered.map((item) => mapHubItemToActivity(item, cksCode));
+    const filteredByTarget = filtered.filter((activity) => {
+      const type = (activity.activityType || '').toLowerCase();
+      if (type === 'service_crew_requested') {
+        const crewId = (
+          ((activity.metadata?.crewId as string | undefined) ||
+            (activity.metadata?.crewCode as string | undefined) ||
+            (activity.metadata?.targetId as string | undefined) ||
+            '')
+            .toUpperCase()
+        );
+        if (!crewId) return false;
+        if (crewId !== viewerIdUC) return false;
+      }
+      if (type === 'service_crew_response') {
+        const managerId = (
+          ((activity.metadata?.managerId as string | undefined) ||
+            (activity.metadata?.actorId as string | undefined) ||
+            '')
+            .toUpperCase()
+        );
+        if (!managerId) return false;
+        if (managerId !== viewerIdUC) return false;
+      }
+      return true;
+    });
+
+    const mapped = filteredByTarget.map((item) => mapHubItemToActivity(item, cksCode));
     mapped.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
     return mapped.slice(0, limit);
   }, [data?.activities, data?.role, limit, normalizedCategories, cksCode]);
