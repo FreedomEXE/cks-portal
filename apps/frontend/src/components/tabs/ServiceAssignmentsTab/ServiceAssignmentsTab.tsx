@@ -76,14 +76,19 @@ export default function ServiceAssignmentsTab({
       setSubmitting(true);
       await requestServiceCrew(serviceId, selected, message || undefined);
       // Refresh related caches: services, activities, serviceId-specific keys
-      mutate((key: any) => typeof key === 'string' && (
-        key.includes('/services') ||
-        key.includes('/api/hub/activities') ||
-        key.includes('/hub/activities') ||
-        key.includes(serviceId)
-      ));
+      await mutate(`/services/${serviceId}/details`, undefined, { revalidate: true });
+      await mutate(
+        (key: any) => typeof key === 'string' && (
+          key.includes('/services') ||
+          key.includes('/api/hub/activities') ||
+          key.includes('/hub/activities') ||
+          key.includes(serviceId)
+        ),
+        undefined,
+        { revalidate: true }
+      );
       if (viewerCode) {
-        await mutate(`/hub/activities/${viewerCode}`);
+        await mutate(`/hub/activities/${viewerCode}`, undefined, { revalidate: true });
       }
       setPendingRequests((prev) => {
         const normalized = selected.map(normalizeCode).filter(Boolean);
