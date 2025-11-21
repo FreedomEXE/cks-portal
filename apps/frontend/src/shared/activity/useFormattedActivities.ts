@@ -424,12 +424,16 @@ function mapHubItemToActivity(item: HubActivityItem, viewerId?: string | null): 
     activityType: item.activityType, // Add activityType to metadata for click handler
   };
 
-  if (
-    item.activityType === 'service_crew_requested' &&
-    item.metadata?.serviceId
-  ) {
-    metadata.targetId = item.metadata.serviceId;
-    metadata.targetType = 'service';
+  if (item.activityType === 'service_crew_requested') {
+    const orderId = item.metadata?.orderId;
+    const serviceId = item.metadata?.serviceId;
+    if (orderId) {
+      metadata.targetId = orderId;
+      metadata.targetType = 'order';
+    } else if (serviceId) {
+      metadata.targetId = serviceId;
+      metadata.targetType = 'service';
+    }
   }
 
   return {
