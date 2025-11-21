@@ -526,6 +526,7 @@ export async function respondToServiceCrewRequest(input: {
       accepted: input.accept,
       crewCode: code,
       managerId: managerId || undefined,
+      response: input.accept ? 'accepted' : 'declined',
     },
   });
 
