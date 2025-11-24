@@ -1,6 +1,8 @@
-**ISSUE:**  
-When a service is created and manager sends the request to crew, the modal still shows the “send request” button where it should say “request submitted” or “waiting for crew”  
+**ISSUE:**
+When a service is created and manager sends the request to crew, the modal still shows the "send request" button where it should say "request submitted" or "waiting for crew"
 ![][image1]
+
+**STATUS:** RESOLVED
 
 **RESOLUTION:**  
 Added a “Crew Requested / Crew Accepted” status strip ahead of the existing crew tab sections so managers immediately see when a request is waiting (and when crew have already signed up), and now the “Request Crew” button hides while pending invitations exist so the modal reads as “waiting for crew” rather than continually offering to resend (packages/ui/src/modals/ServiceDetailsModal/ServiceDetailsModal.tsx (line 320),  (line 421)).  

@@ -1,6 +1,8 @@
-**ISSUE:**  
-Recent activity notification “Accepted Crew Request for Service CEN-010-SRV-001” should not be showing for “Crew”  
+**ISSUE:**
+Recent activity notification "Accepted Crew Request for Service CEN-010-SRV-001" should not be showing for "Crew"
 ![][image1]
+
+**STATUS:** RESOLVED
 
 **RESOLUTION:**  
 

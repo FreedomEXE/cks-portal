@@ -1,7 +1,9 @@
-**ISSUE:**   
-Other users see canonical activity when they should see a personalized activity for when a crew is requested for a service. What should happen is other users should NOT see requests for crew or any denials from crew. They may be allowed to see once a crew is assigned, that's fine though. and it should be a personalized message that says something like “Has been assigned to work on a service at your center” for example. 
+**ISSUE:**
+Other users see canonical activity when they should see a personalized activity for when a crew is requested for a service. What should happen is other users should NOT see requests for crew or any denials from crew. They may be allowed to see once a crew is assigned, that's fine though. and it should be a personalized message that says something like "Has been assigned to work on a service at your center" for example.
 
 ![][image1]
+
+**STATUS:** RESOLVED
 
 **RESOLUTION:** 
 
