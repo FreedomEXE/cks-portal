@@ -361,9 +361,24 @@ const orderAdapter: EntityAdapter = {
     // These come from backend via entityData.availableActions
     if (role !== 'admin' && state === 'active') {
       const availableActions = entityData?.availableActions || [];
-      const actionLabels = availableActions.filter((label: string) =>
+      const status = entityData?.status?.toLowerCase() || '';
+
+      let actionLabels = availableActions.filter((label: string) =>
         label && label.toLowerCase() !== 'view details'
       );
+
+      // Warehouse delivery buttons must be mutually exclusive
+      if (role === 'warehouse') {
+        const deliveryStarted = entityData?.metadata?.deliveryStarted === true || status === 'in_transit';
+        actionLabels = actionLabels.filter((label: string) => {
+          const lower = label.toLowerCase();
+          if (deliveryStarted) return lower !== 'start delivery';
+          return lower !== 'mark delivered';
+        });
+      }
+
+      // De-dupe after filtering
+      actionLabels = Array.from(new Set(actionLabels));
 
       // If backend provided actions, use them
       if (actionLabels.length > 0) {

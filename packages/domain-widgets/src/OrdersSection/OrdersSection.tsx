@@ -153,6 +153,10 @@ const OrdersSection: React.FC<OrdersSectionProps> = ({
     ['cancelled', 'rejected', 'delivered', 'completed', 'archived', 'service-created'].includes(o.status)  // Only truly completed/terminated orders
   ).length;
 
+  // Non-admin users see "Order History" instead of "Archive"
+  const archiveTabLabel = userRole === 'admin' ? 'Archive' : 'Order History';
+  const archiveSearchPlaceholder = userRole === 'admin' ? 'Search archived orders...' : 'Search order history...';
+
   // Get tab description based on user role and active tab
   const getTabDescription = () => {
     if (activeOrderTab === 'all') {
@@ -450,7 +454,7 @@ const OrdersSection: React.FC<OrdersSectionProps> = ({
   if (showProductOrders) {
     orderTabs.push({ id: 'product', label: 'Product Orders', count: productOrdersCount });
   }
-  orderTabs.push({ id: 'archive', label: 'Archive', count: archiveCount });
+  orderTabs.push({ id: 'archive', label: archiveTabLabel, count: archiveCount });
 
   // Build action buttons based on user role and available callbacks
   const getActionButtons = () => {
@@ -502,7 +506,7 @@ const OrdersSection: React.FC<OrdersSectionProps> = ({
           activeOrderTab === 'all'
             ? 'Search all orders...'
             : activeOrderTab === 'archive'
-            ? 'Search archived orders...'
+            ? archiveSearchPlaceholder
             : `Search ${activeOrderTab} orders...`
         }
         onSearch={setSearchQuery}
