@@ -583,7 +583,7 @@ const ReportsSection: React.FC<ReportsSectionProps> = ({
     { id: 'reports', label: 'Reports', count: reports.filter(r => r.status !== 'closed').length },
     { id: 'feedback', label: 'Feedback', count: feedback.filter(r => r.status !== 'closed').length },
     ...(canCreate ? [{ id: 'create', label: 'Create' }] : []),
-    { id: 'archive', label: 'Archive', count: allReports.filter(r => r.status === 'closed').length }
+    { id: 'archive', label: 'History', count: allReports.filter(r => r.status === 'closed').length }
   ];
 
   return (
@@ -597,7 +597,7 @@ const ReportsSection: React.FC<ReportsSectionProps> = ({
           activeTab === 'create' ? 'Submit new reports or feedback to your ecosystem' :
           activeTab === 'reports' ? 'Issues and problems reported by your ecosystem' :
           activeTab === 'feedback' ? 'Suggestions and compliments from your ecosystem' :
-          'Resolved and closed reports archive'
+          'Resolved and closed reports history'
         }
         searchPlaceholder={
           activeTab !== 'create' ? 'Search reports and feedback...' : undefined

@@ -217,46 +217,72 @@ function personalizeMessage(item: HubActivityItem, viewerId?: string | null): st
 
   // Report/Feedback activities
   if (activityType === 'report_created') {
-    // Actor is the report creator
-    if (isActor) return `You Filed a Report`;
-    return `Filed a Report`;
+    return isActor ? `You created a report` : `Created a report`;
   }
 
   if (activityType === 'report_acknowledged') {
     // Actor is the acknowledger
+    const category = (metadata.reportCategory as string | undefined)?.toLowerCase();
+    const related = metadata.relatedEntityId as string | undefined;
+    const categoryLabel =
+      category === 'order' ? 'Order' :
+      category === 'service' ? 'Service' :
+      category === 'procedure' ? 'Procedure' :
+      null;
+    if (isActor && categoryLabel && related) return `You acknowledged the report for ${categoryLabel} ${related}`;
     if (isActor) return `You acknowledged this report`;
     // Personalize for original creator if backend included it
     const createdBy = (metadata.reportCreatedById as string | undefined)?.toUpperCase();
     if (createdBy && createdBy === normalizedViewerId) {
+      if (categoryLabel && related) return `Your report for ${categoryLabel} ${related} was acknowledged`;
       return `Your report was acknowledged`;
     }
+    if (categoryLabel && related) return `Report for ${categoryLabel} ${related} acknowledged`;
     return `Report acknowledged`;
   }
 
   if (activityType === 'report_resolved') {
     // Actor is the resolver (managers perform this)
+    const category = (metadata.reportCategory as string | undefined)?.toLowerCase();
+    const related = metadata.relatedEntityId as string | undefined;
+    const categoryLabel =
+      category === 'order' ? 'Order' :
+      category === 'service' ? 'Service' :
+      category === 'procedure' ? 'Procedure' :
+      null;
+    if (isActor && categoryLabel && related) return `You resolved the report for ${categoryLabel} ${related}`;
     if (isActor) return `You Marked a Report as Resolved`;
     // Personalize for original creator if backend included it
     const createdBy = (metadata.reportCreatedById as string | undefined)?.toUpperCase();
     if (createdBy && createdBy === normalizedViewerId) {
+      if (categoryLabel && related) return `Your report for ${categoryLabel} ${related} was resolved`;
       return `Your report was resolved`;
     }
+    if (categoryLabel && related) return `Resolved report for ${categoryLabel} ${related}`;
     return `Marked Report as Resolved`;
   }
 
   if (activityType === 'feedback_created') {
-    // Actor is the feedback submitter
-    if (isActor) return `You Submitted a Feedback`;
-    return `Submitted a Feedback`;
+    return isActor ? `You submitted feedback` : `Submitted feedback`;
   }
 
   if (activityType === 'feedback_acknowledged') {
     // Actor is the acknowledger
+    const category = (metadata.reportCategory as string | undefined)?.toLowerCase();
+    const related = metadata.relatedEntityId as string | undefined;
+    const categoryLabel =
+      category === 'order' ? 'Order' :
+      category === 'service' ? 'Service' :
+      category === 'procedure' ? 'Procedure' :
+      null;
+    if (isActor && categoryLabel && related) return `You acknowledged the feedback for ${categoryLabel} ${related}`;
     if (isActor) return `You acknowledged this feedback`;
     const createdBy = (metadata.feedbackCreatedById as string | undefined)?.toUpperCase();
     if (createdBy && createdBy === normalizedViewerId) {
+      if (categoryLabel && related) return `Your feedback for ${categoryLabel} ${related} was acknowledged`;
       return `Your feedback was acknowledged`;
     }
+    if (categoryLabel && related) return `Feedback for ${categoryLabel} ${related} acknowledged`;
     return `Feedback acknowledged`;
   }
 

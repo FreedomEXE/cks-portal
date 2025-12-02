@@ -153,9 +153,9 @@ const OrdersSection: React.FC<OrdersSectionProps> = ({
     ['cancelled', 'rejected', 'delivered', 'completed', 'archived', 'service-created'].includes(o.status)  // Only truly completed/terminated orders
   ).length;
 
-  // Non-admin users see "Order History" instead of "Archive"
-  const archiveTabLabel = userRole === 'admin' ? 'Archive' : 'Order History';
-  const archiveSearchPlaceholder = userRole === 'admin' ? 'Search archived orders...' : 'Search order history...';
+  // Non-admin users see "History" instead of "Archive"
+  const archiveTabLabel = userRole === 'admin' ? 'Archive' : 'History';
+  const archiveSearchPlaceholder = userRole === 'admin' ? 'Search archived orders...' : 'Search history...';
 
   // Get tab description based on user role and active tab
   const getTabDescription = () => {

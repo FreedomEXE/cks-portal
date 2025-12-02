@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { requireActiveRole } from '../../core/auth/guards';
 import { getHubReports, getReportById } from './store';
-import { createReport, createFeedback, updateReportStatus, updateFeedbackStatus, acknowledgeReport, acknowledgeFeedback, getServicesForReports, getOrdersForReports, getProceduresForReports } from './repository';
+import { createReport, createFeedback, updateReportStatus, updateFeedbackStatus, acknowledgeReport, acknowledgeFeedback, getServicesForReports, getOrdersForReports, getProceduresForReports, getReportAcknowledgmentStatus } from './repository';
 import type { HubRole } from '../profile/types';
 import { query } from '../../db/connection';
 
@@ -100,17 +100,28 @@ export async function reportsRoutes(fastify: FastifyInstance) {
     });
 
     // Create activity record
+    const categoryLabel = payload.reportCategory
+      ? `${payload.reportCategory.charAt(0).toUpperCase()}${payload.reportCategory.slice(1)}`
+      : null;
+    const relatedLabel = payload.relatedEntityId && categoryLabel
+      ? `${categoryLabel} ${payload.relatedEntityId}`
+      : null;
+    const createdDescription = relatedLabel
+      ? `Created a report for ${relatedLabel}`
+      : `Created a report`;
+
     await query(
       `INSERT INTO system_activity (description, activity_type, actor_id, actor_role, target_id, target_type, metadata)
        VALUES ($1, $2, $3, $4, $5, $6, $7)`,
       [
-        `Filed Report ${created.id}`,
+        createdDescription,
         'report_created',
         account.cksCode ?? '',
         account.role,
         created.id,
         'report',
         JSON.stringify({
+          createdById: account.cksCode ?? null,
           reportCategory: payload.reportCategory,
           relatedEntityId: payload.relatedEntityId,
           reportReason: payload.reportReason,
@@ -148,6 +159,16 @@ export async function reportsRoutes(fastify: FastifyInstance) {
     }
 
     const payload = body.data;
+    const categoryLabel = payload.reportCategory
+      ? `${payload.reportCategory.charAt(0).toUpperCase()}${payload.reportCategory.slice(1)}`
+      : null;
+    const relatedLabel = payload.relatedEntityId && categoryLabel
+      ? `${categoryLabel} ${payload.relatedEntityId}`
+      : null;
+    const createdDescription = relatedLabel
+      ? `Submitted feedback for ${relatedLabel}`
+      : `Submitted feedback`;
+
     const created = await createFeedback({
       title: payload.title,
       message: payload.message,
@@ -167,13 +188,14 @@ export async function reportsRoutes(fastify: FastifyInstance) {
       `INSERT INTO system_activity (description, activity_type, actor_id, actor_role, target_id, target_type, metadata)
        VALUES ($1, $2, $3, $4, $5, $6, $7)`,
       [
-        `Submitted Feedback ${created.id}`,
+        createdDescription,
         'feedback_created',
         account.cksCode ?? '',
         account.role,
         created.id,
         'feedback',
         JSON.stringify({
+          createdById: account.cksCode ?? null,
           kind: payload.kind,
           reportCategory: payload.reportCategory,
           relatedEntityId: payload.relatedEntityId,
@@ -198,7 +220,7 @@ export async function reportsRoutes(fastify: FastifyInstance) {
     }
 
     // Check if user is the creator - creators don't need to acknowledge their own reports
-    const reportCheck = await query('SELECT created_by_id FROM reports WHERE report_id = $1', [params.data.id]);
+    const reportCheck = await query('SELECT created_by_id, report_category, related_entity_id FROM reports WHERE report_id = $1', [params.data.id]);
     if (reportCheck.rows[0]?.created_by_id?.toUpperCase() === account.cksCode?.toUpperCase()) {
       reply.code(400).send({ error: 'Creators cannot acknowledge their own reports' });
       return;
@@ -220,6 +242,8 @@ export async function reportsRoutes(fastify: FastifyInstance) {
         'report',
         JSON.stringify({
           reportCreatedById: reportCheck.rows[0]?.created_by_id ?? null,
+          reportCategory: reportCheck.rows[0]?.report_category ?? null,
+          relatedEntityId: reportCheck.rows[0]?.related_entity_id ?? null,
         }),
       ]
     );
@@ -231,8 +255,10 @@ export async function reportsRoutes(fastify: FastifyInstance) {
     const account = await requireActiveRole(request, reply);
     if (!account) return;
 
+    const role = account.role.toLowerCase();
+
     // Only managers and warehouses can resolve reports
-    if (account.role.toLowerCase() !== 'manager' && account.role.toLowerCase() !== 'warehouse') {
+    if (role !== 'manager' && role !== 'warehouse') {
       reply.code(403).send({ error: 'Only managers and warehouses can resolve reports' });
       return;
     }
@@ -251,9 +277,10 @@ export async function reportsRoutes(fastify: FastifyInstance) {
     }
 
     // Check category-based resolution permissions (defense-in-depth)
-    const reportCheck = await query('SELECT report_category, related_entity_id, created_by_id FROM reports WHERE report_id = $1', [params.data.id]);
+    const reportCheck = await query('SELECT report_category, related_entity_id FROM reports WHERE report_id = $1', [params.data.id]);
     const reportCategory = reportCheck.rows[0]?.report_category as string | null;
     const relatedEntityId = reportCheck.rows[0]?.related_entity_id as string | null;
+    const createdById = reportCheck.rows[0]?.created_by_id as string | null;
 
     if (reportCategory === 'order') {
       if (account.role.toLowerCase() !== 'warehouse') {
@@ -286,6 +313,16 @@ export async function reportsRoutes(fastify: FastifyInstance) {
       }
     }
 
+    // Enforce "everyone acknowledged" before resolution
+    const { total, acknowledged } = await getReportAcknowledgmentStatus(params.data.id);
+    if (total > 0 && acknowledged < total) {
+      reply.code(400).send({
+        error: 'All stakeholders must acknowledge before this report can be resolved',
+        detail: { acknowledged, total }
+      });
+      return;
+    }
+
     const bodySchema = z.object({
       resolution_notes: z.string().trim().max(2000).optional(),
       action_taken: z.string().trim().max(2000).optional()
@@ -311,6 +348,8 @@ export async function reportsRoutes(fastify: FastifyInstance) {
           resolution_notes: resolutionNotes,
           action_taken: actionTaken,
           reportCreatedById: reportCheck.rows[0]?.created_by_id ?? null,
+          reportCategory: reportCategory,
+          relatedEntityId: relatedEntityId,
         }),
       ]
     );
