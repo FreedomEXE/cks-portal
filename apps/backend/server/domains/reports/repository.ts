@@ -659,6 +659,110 @@ export async function getReportAcknowledgmentStatus(reportId: string): Promise<{
  * Add an acknowledgment for feedback by a specific user.
  * Uses ON CONFLICT to prevent duplicate acknowledgments.
  */
+export async function getFeedbackAcknowledgmentStatus(feedbackId: string): Promise<{ total: number; acknowledged: number }> {
+  const feedbackResult = await query<{
+    cks_manager: string | null;
+    created_by_id: string | null;
+    report_category: string | null;
+    related_entity_id: string | null;
+  }>('SELECT cks_manager, created_by_id, report_category, related_entity_id FROM feedback WHERE feedback_id = $1', [feedbackId]);
+
+  const cksManager = feedbackResult.rows[0]?.cks_manager;
+  const createdById = feedbackResult.rows[0]?.created_by_id;
+  const reportCategory = feedbackResult.rows[0]?.report_category;
+  const relatedEntityId = feedbackResult.rows[0]?.related_entity_id;
+
+  let totalUsers = 0;
+  let acknowledged = 0;
+
+  if (reportCategory && relatedEntityId && ['order', 'service'].includes(reportCategory)) {
+    const orderQuery = reportCategory === 'order'
+      ? 'SELECT customer_id, contractor_id, crew_id, assigned_warehouse, manager_id FROM orders WHERE UPPER(order_id) = UPPER($1)'
+      : 'SELECT customer_id, contractor_id, crew_id, assigned_warehouse, manager_id FROM orders WHERE UPPER(transformed_id) = UPPER($1)';
+
+    const orderResult = await query<{
+      customer_id: string | null;
+      contractor_id: string | null;
+      crew_id: string | null;
+      assigned_warehouse: string | null;
+      manager_id: string | null;
+    }>(orderQuery, [relatedEntityId]);
+
+    let serviceManagedBy: string | null = null;
+    if (reportCategory === 'service') {
+      const serviceResult = await query<{ managed_by: string | null }>(
+        'SELECT managed_by FROM services WHERE UPPER(service_id) = UPPER($1)',
+        [relatedEntityId]
+      );
+      serviceManagedBy = serviceResult.rows[0]?.managed_by ?? null;
+    }
+
+    if (orderResult.rows[0]) {
+      const order = orderResult.rows[0];
+      const stakeholders = new Set<string>();
+      const creator = (createdById ?? '').toUpperCase();
+
+      if (order.manager_id && order.manager_id.toUpperCase() !== creator) {
+        stakeholders.add(order.manager_id.toUpperCase());
+      }
+      if (order.customer_id && order.customer_id.toUpperCase() !== creator) {
+        stakeholders.add(order.customer_id.toUpperCase());
+      }
+      if (order.contractor_id && order.contractor_id.toUpperCase() !== creator) {
+        stakeholders.add(order.contractor_id.toUpperCase());
+      }
+      if (order.crew_id && order.crew_id.toUpperCase() !== creator) {
+        stakeholders.add(order.crew_id.toUpperCase());
+      }
+      if (order.assigned_warehouse && order.assigned_warehouse.toUpperCase() !== creator) {
+        const svcManaged = (serviceManagedBy ?? '').toString();
+        const svcIsWarehouse = svcManaged.toLowerCase() === 'warehouse' || svcManaged.toUpperCase().startsWith('WHS-');
+        if (reportCategory === 'order' || (reportCategory === 'service' && svcIsWarehouse)) {
+          stakeholders.add(order.assigned_warehouse.toUpperCase());
+        }
+      }
+
+      totalUsers = stakeholders.size;
+      if (stakeholders.size > 0) {
+        const stakeholderList = Array.from(stakeholders);
+        const placeholders = stakeholderList.map((_, i) => `$${i + 2}`).join(',');
+        const ackCountResult = await query<{ count: number }>(
+          `SELECT COUNT(*) as count FROM feedback_acknowledgments
+           WHERE feedback_id = $1 AND UPPER(acknowledged_by_id) IN (${placeholders})`,
+          [feedbackId, ...stakeholderList]
+        );
+        acknowledged = parseInt(String(ackCountResult.rows[0]?.count ?? 0));
+      }
+      return { total: totalUsers, acknowledged };
+    }
+  }
+
+  if (cksManager) {
+    const totalUsersResult = await query<{ total: number }>(`
+      SELECT (
+        (SELECT COUNT(*) FROM centers WHERE UPPER(cks_manager) = UPPER($1) AND UPPER(center_id) != UPPER($2)) +
+        (SELECT COUNT(*) FROM customers WHERE UPPER(cks_manager) = UPPER($1) AND UPPER(customer_id) != UPPER($2)) +
+        (SELECT COUNT(*) FROM contractors WHERE UPPER(cks_manager) = UPPER($1) AND UPPER(contractor_id) != UPPER($2)) +
+        (SELECT COUNT(*) FROM crew WHERE assigned_center IN (SELECT center_id FROM centers WHERE UPPER(cks_manager) = UPPER($1)) AND UPPER(crew_id) != UPPER($2)) +
+        CASE WHEN UPPER($1) != UPPER($2) THEN 1 ELSE 0 END
+      ) as total
+    `, [cksManager, createdById ?? '']);
+    totalUsers = totalUsersResult.rows[0]?.total ?? 0;
+
+    const ackCountResult = await query<{ count: number }>(
+      'SELECT COUNT(*) as count FROM feedback_acknowledgments WHERE feedback_id = $1',
+      [feedbackId]
+    );
+    acknowledged = parseInt(String(ackCountResult.rows[0]?.count ?? 0));
+  }
+
+  return { total: totalUsers, acknowledged };
+}
+
+/**
+ * Add an acknowledgment for feedback by a specific user.
+ * Uses ON CONFLICT to prevent duplicate acknowledgments.
+ */
 export async function acknowledgeFeedback(feedbackId: string, acknowledgedById: string, acknowledgedByRole: string) {
   const normalized = normalizeIdentity(acknowledgedById);
   if (!normalized) {
@@ -675,78 +779,14 @@ export async function acknowledgeFeedback(feedbackId: string, acknowledgedById: 
 
   // After acknowledgment, check if all users in the ecosystem have acknowledged
   // If so, auto-mark as closed and auto-archive
-  const feedbackResult = await query<{ cks_manager: string | null; created_by_id: string | null; report_category: string | null; related_entity_id: string | null }>(
-    'SELECT cks_manager, created_by_id, report_category, related_entity_id FROM feedback WHERE feedback_id = $1',
-    [feedbackId]
-  );
+  const { total, acknowledged } = await getFeedbackAcknowledgmentStatus(feedbackId);
 
-  const cksManager = feedbackResult.rows[0]?.cks_manager;
-  const createdById = feedbackResult.rows[0]?.created_by_id;
-  const reportCategory = feedbackResult.rows[0]?.report_category;
-  const relatedEntityId = feedbackResult.rows[0]?.related_entity_id;
-
-  if (cksManager) {
-    let totalUsers = 0;
-
-    // Check if this is a warehouse-managed feedback
-    const isWarehouseFeedback = reportCategory && relatedEntityId && ['order', 'service'].includes(reportCategory);
-    let warehouseId: string | null = null;
-
-    if (isWarehouseFeedback) {
-      // Find the warehouse managing this entity
-      if (reportCategory === 'order') {
-        const orderResult = await query<{ assigned_warehouse: string | null }>(
-          'SELECT assigned_warehouse FROM orders WHERE UPPER(order_id) = UPPER($1)',
-          [relatedEntityId]
-        );
-        warehouseId = orderResult.rows[0]?.assigned_warehouse ?? null;
-      } else if (reportCategory === 'service') {
-        // Service -> find parent order -> get warehouse
-        const serviceOrderResult = await query<{ assigned_warehouse: string | null }>(
-          'SELECT assigned_warehouse FROM orders WHERE UPPER(transformed_id) = UPPER($1)',
-          [relatedEntityId]
-        );
-        warehouseId = serviceOrderResult.rows[0]?.assigned_warehouse ?? null;
-      }
-    }
-
-    if (warehouseId) {
-      // Warehouse-managed feedback: only count Manager + Warehouse (2 people)
-      totalUsers = 2;
-    } else {
-      // Ecosystem feedback: count all users in ecosystem EXCLUDING the creator
-      const totalUsersResult = await query<{ total: number }>(`
-        SELECT (
-          (SELECT COUNT(*) FROM centers WHERE UPPER(cks_manager) = UPPER($1) AND UPPER(center_id) != UPPER($2)) +
-          (SELECT COUNT(*) FROM customers WHERE UPPER(cks_manager) = UPPER($1) AND UPPER(customer_id) != UPPER($2)) +
-          (SELECT COUNT(*) FROM contractors WHERE UPPER(cks_manager) = UPPER($1) AND UPPER(contractor_id) != UPPER($2)) +
-          (SELECT COUNT(*) FROM crew WHERE assigned_center IN (SELECT center_id FROM centers WHERE UPPER(cks_manager) = UPPER($1)) AND UPPER(crew_id) != UPPER($2)) +
-          CASE WHEN UPPER($1) != UPPER($2) THEN 1 ELSE 0 END
-        ) as total
-      `, [cksManager, createdById ?? '']);
-      totalUsers = totalUsersResult.rows[0]?.total ?? 0;
-    }
-
-    // Count acknowledgments for this feedback
-    const ackCountResult = await query<{ count: number }>(
-      'SELECT COUNT(*) as count FROM feedback_acknowledgments WHERE feedback_id = $1',
-      [feedbackId]
+  // Only mark as closed when every stakeholder (excluding creator) has acknowledged
+  if (total > 0 && acknowledged >= total) {
+    await query(
+      'UPDATE feedback SET status = $2 WHERE feedback_id = $1',
+      [feedbackId, 'closed']
     );
-
-    const ackCount = parseInt(String(ackCountResult.rows[0]?.count ?? 0));
-
-    // Edge case: If no users need to acknowledge (single-user ecosystem), don't auto-archive
-    if (totalUsers === 0) {
-      return result.rows[0] ?? null;
-    }
-
-    // If everyone (except creator) has acknowledged, mark as closed (but don't archive)
-    if (ackCount >= totalUsers) {
-      await query(
-        'UPDATE feedback SET status = $2 WHERE feedback_id = $1',
-        [feedbackId, 'closed']
-      );
-    }
   }
 
   return result.rows[0] ?? null;
