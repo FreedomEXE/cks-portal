@@ -172,7 +172,7 @@ export function RecentActivity({
               }}
               title="Customize your view"
             >
-              <span style={{ fontSize: '16px', display: 'inline-block', transition: 'transform 0.5s ease', transform: isFilterHover ? 'rotate(180deg)' : 'none' }}>⚙</span>
+              <span style={{ fontSize: '18px', display: 'inline-block', transition: 'transform 0.5s ease', transform: isFilterHover ? 'rotate(180deg)' : 'none' }}>⚙</span>
               <span style={{ fontSize: '13px', display: (isFilterHover || isFilterOpen) ? 'inline' : 'none' }}>Customize View</span>
             </button>
 

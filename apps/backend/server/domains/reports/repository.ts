@@ -535,6 +535,127 @@ export async function acknowledgeReport(reportId: string, acknowledgedById: stri
 }
 
 /**
+ * Compute how many stakeholders must acknowledge a report and how many have done so.
+ * Used to enforce "all must acknowledge before resolution".
+ */
+export async function getReportAcknowledgmentStatus(reportId: string): Promise<{ total: number; acknowledged: number }> {
+  const reportResult = await query<{
+    cks_manager: string | null;
+    created_by_id: string | null;
+    report_category: string | null;
+    related_entity_id: string | null;
+  }>('SELECT cks_manager, created_by_id, report_category, related_entity_id FROM reports WHERE report_id = $1', [reportId]);
+
+  const cksManager = reportResult.rows[0]?.cks_manager;
+  const createdById = reportResult.rows[0]?.created_by_id;
+  const reportCategory = reportResult.rows[0]?.report_category;
+  const relatedEntityId = reportResult.rows[0]?.related_entity_id;
+
+  // Default totals
+  let totalUsers = 0;
+  let acknowledged = 0;
+
+  if (reportCategory && relatedEntityId && ['order', 'service'].includes(reportCategory)) {
+    // Stakeholder-based counting for order/service reports
+    const orderQuery = reportCategory === 'order'
+      ? 'SELECT customer_id, contractor_id, crew_id, assigned_warehouse, manager_id FROM orders WHERE UPPER(order_id) = UPPER($1)'
+      : 'SELECT customer_id, contractor_id, crew_id, assigned_warehouse, manager_id FROM orders WHERE UPPER(transformed_id) = UPPER($1)';
+
+    const orderResult = await query<{
+      customer_id: string | null;
+      contractor_id: string | null;
+      crew_id: string | null;
+      assigned_warehouse: string | null;
+      manager_id: string | null;
+    }>(orderQuery, [relatedEntityId]);
+
+    // For service reports, check if the service is warehouse-managed
+    let serviceManagedBy: string | null = null;
+    if (reportCategory === 'service') {
+      const serviceResult = await query<{ managed_by: string | null }>(
+        'SELECT managed_by FROM services WHERE UPPER(service_id) = UPPER($1)',
+        [relatedEntityId]
+      );
+      serviceManagedBy = serviceResult.rows[0]?.managed_by ?? null;
+    }
+
+    if (orderResult.rows[0]) {
+      const order = orderResult.rows[0];
+      const stakeholders = new Set<string>();
+
+      const creator = (createdById ?? '').toUpperCase();
+
+      // Add manager
+      if (order.manager_id && order.manager_id.toUpperCase() !== creator) {
+        stakeholders.add(order.manager_id.toUpperCase());
+      }
+
+      // Add customer
+      if (order.customer_id && order.customer_id.toUpperCase() !== creator) {
+        stakeholders.add(order.customer_id.toUpperCase());
+      }
+
+      // Add contractor
+      if (order.contractor_id && order.contractor_id.toUpperCase() !== creator) {
+        stakeholders.add(order.contractor_id.toUpperCase());
+      }
+
+      // Add crew
+      if (order.crew_id && order.crew_id.toUpperCase() !== creator) {
+        stakeholders.add(order.crew_id.toUpperCase());
+      }
+
+      // Add warehouse for:
+      // 1. Order reports (always)
+      // 2. Service reports that are warehouse-managed
+      if (order.assigned_warehouse && order.assigned_warehouse.toUpperCase() !== creator) {
+        const svcManaged = (serviceManagedBy ?? '').toString();
+        const svcIsWarehouse = svcManaged.toLowerCase() === 'warehouse' || svcManaged.toUpperCase().startsWith('WHS-');
+        if (reportCategory === 'order' || (reportCategory === 'service' && svcIsWarehouse)) {
+          stakeholders.add(order.assigned_warehouse.toUpperCase());
+        }
+      }
+
+      totalUsers = stakeholders.size;
+
+      if (stakeholders.size > 0) {
+        const stakeholderList = Array.from(stakeholders);
+        const placeholders = stakeholderList.map((_, i) => `$${i + 2}`).join(',');
+        const ackCountResult = await query<{ count: number }>(
+          `SELECT COUNT(*) as count FROM report_acknowledgments
+           WHERE report_id = $1 AND UPPER(acknowledged_by_id) IN (${placeholders})`,
+          [reportId, ...stakeholderList]
+        );
+        acknowledged = parseInt(String(ackCountResult.rows[0]?.count ?? 0));
+      }
+      return { total: totalUsers, acknowledged };
+    }
+  }
+
+  // Ecosystem-based counting for other report types
+  if (cksManager) {
+    const totalUsersResult = await query<{ total: number }>(`
+      SELECT (
+        (SELECT COUNT(*) FROM centers WHERE UPPER(cks_manager) = UPPER($1) AND UPPER(center_id) != UPPER($2)) +
+        (SELECT COUNT(*) FROM customers WHERE UPPER(cks_manager) = UPPER($1) AND UPPER(customer_id) != UPPER($2)) +
+        (SELECT COUNT(*) FROM contractors WHERE UPPER(cks_manager) = UPPER($1) AND UPPER(contractor_id) != UPPER($2)) +
+        (SELECT COUNT(*) FROM crew WHERE assigned_center IN (SELECT center_id FROM centers WHERE UPPER(cks_manager) = UPPER($1)) AND UPPER(crew_id) != UPPER($2)) +
+        CASE WHEN UPPER($1) != UPPER($2) THEN 1 ELSE 0 END
+      ) as total
+    `, [cksManager, createdById ?? '']);
+    totalUsers = totalUsersResult.rows[0]?.total ?? 0;
+
+    const ackCountResult = await query<{ count: number }>(
+      'SELECT COUNT(*) as count FROM report_acknowledgments WHERE report_id = $1',
+      [reportId]
+    );
+    acknowledged = parseInt(String(ackCountResult.rows[0]?.count ?? 0));
+  }
+
+  return { total: totalUsers, acknowledged };
+}
+
+/**
  * Add an acknowledgment for feedback by a specific user.
  * Uses ON CONFLICT to prevent duplicate acknowledgments.
  */
