@@ -153,6 +153,8 @@ type ActivityRow = {
 
 function mapActivityRow(row: ActivityRow, viewerId?: string, viewerRole?: string): HubActivityItem {
   let description = row.description;
+  const actorIdUC = row.actor_id ? row.actor_id.toUpperCase() : undefined;
+  const viewerIdUC = viewerId ? viewerId.toUpperCase() : undefined;
 
   // Personalize certification activity descriptions for the viewer
   if (viewerId && row.metadata) {
@@ -170,6 +172,18 @@ function mapActivityRow(row: ActivityRow, viewerId?: string, viewerRole?: string
         description = `Uncertified you for ${serviceId}`;
       }
     }
+  }
+
+  // Personalize report/feedback creation and resolution events
+  if (row.activity_type === 'report_created') {
+    description = actorIdUC && actorIdUC === viewerIdUC ? 'You created a report' : 'Created a report';
+  } else if (row.activity_type === 'feedback_created') {
+    description = actorIdUC && actorIdUC === viewerIdUC ? 'You created a feedback' : 'Created a feedback';
+  } else if (row.activity_type === 'report_resolved') {
+    description = actorIdUC && actorIdUC === viewerIdUC ? 'You have marked this report as resolved' : 'Resolved a report';
+  } else if (row.activity_type === 'feedback_acknowledged') {
+    // Keep legacy wording consistent with personalization layer
+    description = actorIdUC && actorIdUC === viewerIdUC ? 'You acknowledged this feedback' : 'Feedback acknowledged';
   }
 
   // Personalize catalog creation and inventory events for non-admin users
@@ -441,6 +455,9 @@ async function getManagerActivities(cksCode: string): Promise<HubRoleActivitiesP
         OR
         -- Product creation events (visible to all roles)
         (activity_type = 'product_created')
+        OR
+        -- Report/Feedback events (show to ecosystem)
+        (activity_type IN ('report_created','report_acknowledged','report_resolved','feedback_created','feedback_acknowledged'))
         OR
         -- Show other activity types (orders, services, creations, etc.) for ecosystem
        -- SAFE: Only if target is in ecosystem OR actor is self OR metadata references self
@@ -1123,6 +1140,9 @@ async function getContractorActivities(cksCode: string): Promise<HubRoleActiviti
         -- Product creation events (visible to all roles)
         (activity_type = 'product_created')
         OR
+        -- Report/Feedback events (show to ecosystem)
+        (activity_type IN ('report_created','report_acknowledged','report_resolved','feedback_created','feedback_acknowledged'))
+        OR
         -- Show other activity types (orders, services, creations, etc.) for ecosystem
        -- SAFE: Only if target is in ecosystem OR actor is self OR metadata references self
        -- Creation events now visible for ecosystem (scoped by idArray + dismissals)
@@ -1230,6 +1250,9 @@ async function getCustomerActivities(cksCode: string): Promise<HubRoleActivities
         -- Product creation events (visible to all roles)
         (activity_type = 'product_created')
         OR
+        -- Report/Feedback events (show to ecosystem)
+        (activity_type IN ('report_created','report_acknowledged','report_resolved','feedback_created','feedback_acknowledged'))
+        OR
         -- Show other activity types (orders, services, creations, etc.) for ecosystem
        -- SAFE: Only if target is in ecosystem OR actor is self OR metadata references self
        -- Creation events now visible for ecosystem (scoped by idArray + dismissals)
@@ -1326,6 +1349,9 @@ async function getCenterActivities(cksCode: string): Promise<HubRoleActivitiesPa
         OR
         -- Product creation events (visible to all roles)
         (activity_type = 'product_created')
+        OR
+        -- Report/Feedback events (show to ecosystem)
+        (activity_type IN ('report_created','report_acknowledged','report_resolved','feedback_created','feedback_acknowledged'))
         OR
         -- Show other activity types (orders, services, creations, etc.) for ecosystem
        -- SAFE: Only if target is in ecosystem OR actor is self OR metadata references self
@@ -1429,6 +1455,9 @@ async function getCrewActivities(cksCode: string): Promise<HubRoleActivitiesPayl
         OR
         -- Product creation events (crew sees products only; no services)
         (activity_type = 'product_created')
+        OR
+        -- Report/Feedback events (show to ecosystem)
+        (activity_type IN ('report_created','report_acknowledged','report_resolved','feedback_created','feedback_acknowledged'))
         OR
         -- Show other activity types (orders, services, etc.) for ecosystem
        -- SAFE: Only if target is in ecosystem OR actor is self OR metadata references self
@@ -1538,6 +1567,9 @@ async function getWarehouseActivities(cksCode: string): Promise<HubRoleActivitie
           AND metadata ? 'warehouseId'
           AND UPPER(metadata->>'warehouseId') = $2
         )
+        OR
+        -- Report/Feedback events (show to ecosystem)
+        (activity_type IN ('report_created','report_acknowledged','report_resolved','feedback_created','feedback_acknowledged'))
         OR
         -- Show other activity types (orders, services, creations, etc.) for ecosystem
        -- SAFE: Only if target is in ecosystem OR actor is self OR metadata references self
