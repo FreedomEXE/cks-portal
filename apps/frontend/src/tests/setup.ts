@@ -97,6 +97,9 @@ vi.mock('@clerk/clerk-react', () => ({
     getToken: async () => 'TEST_TOKEN',
     signOut: vi.fn(),
   }),
+  useClerk: () => ({
+    signOut: vi.fn(),
+  }),
   useSignIn: () => ({
     isLoaded: true,
     signIn: {

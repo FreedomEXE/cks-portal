@@ -339,7 +339,15 @@ export async function registerAdminUserRoutes(server: FastifyInstance) {
       return;
     }
 
-    await clerkClient.users.createPasswordReset({ userId: clerkUser.id });
+    await clerkClient.invitations.createInvitation({
+      emailAddress: contact.email,
+      publicMetadata: {
+        cksCode: entityId,
+        role: entityType,
+      },
+      notify: true,
+      ignoreExisting: true,
+    });
 
     reply.send({
       data: {

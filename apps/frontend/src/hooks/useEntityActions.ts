@@ -18,7 +18,7 @@
 import { useCallback } from 'react';
 import { useSWRConfig } from 'swr';
 import toast from 'react-hot-toast';
-import { useAuth as useClerkAuth, useSignIn } from '@clerk/clerk-react';
+import { useAuth as useClerkAuth, useSignIn, useClerk } from '@clerk/clerk-react';
 import { parseEntityId } from '../shared/utils/parseEntityId';
 import { applyHubOrderAction, type OrderActionRequest, acknowledgeItem, resolveReport, applyServiceAction, requestServiceCrew, respondToServiceCrew, respondToOrderCrew, respondToCrewInvite } from '../shared/api/hub';
 import { archiveAPI } from '../shared/api/archive';
@@ -39,8 +39,9 @@ export interface UseEntityActionsReturn {
 
 export function useEntityActions(): UseEntityActionsReturn {
   const { mutate } = useSWRConfig();
-  const { getToken } = useClerkAuth();
+  const { getToken, isSignedIn } = useClerkAuth();
   const { isLoaded: signInLoaded, signIn, setActive } = useSignIn();
+  const { signOut } = useClerk();
 
   const handleAction = useCallback(
     async (entityId: string, action: string, options: EntityActionOptions = {}): Promise<boolean> => {
@@ -71,6 +72,8 @@ export function useEntityActions(): UseEntityActionsReturn {
             signInLoaded,
             signIn,
             setActive,
+            signOut,
+            isSignedIn,
           });
         }
 
@@ -457,6 +460,8 @@ async function handleUserAction(
     signInLoaded: boolean;
     signIn: any;
     setActive: any;
+    signOut: any;
+    isSignedIn: boolean;
   }
 ): Promise<boolean> {
   // Map subtype to archive entity type
@@ -486,10 +491,23 @@ async function handleUserAction(
           return false;
         }
 
-        const result = await impersonation.signIn.create({
+        const runSignIn = async () => impersonation.signIn.create({
           strategy: 'ticket',
           ticket,
         });
+
+        let result: any;
+        try {
+          result = await runSignIn();
+        } catch (error: any) {
+          const message = error instanceof Error ? error.message : String(error);
+          if (message.toLowerCase().includes('already signed in') && impersonation.signOut) {
+            await impersonation.signOut();
+            result = await runSignIn();
+          } else {
+            throw error;
+          }
+        }
 
         if (result?.status === 'complete') {
           await impersonation.setActive({ session: result.createdSessionId });
