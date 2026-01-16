@@ -279,16 +279,15 @@ export async function registerAdminUserRoutes(server: FastifyInstance) {
     }
 
     const signInTokensApi = (clerkClient as any)?.signInTokens;
-    const createToken =
-      signInTokensApi?.createSignInToken ??
-      signInTokensApi?.create;
 
-    if (!createToken) {
+    if (!signInTokensApi?.createSignInToken && !signInTokensApi?.create) {
       reply.code(501).send({ error: "Impersonation is not available" });
       return;
     }
 
-    const tokenResponse = await createToken({ userId: clerkUserId });
+    const tokenResponse = signInTokensApi?.createSignInToken
+      ? await signInTokensApi.createSignInToken({ userId: clerkUserId })
+      : await signInTokensApi.create({ userId: clerkUserId });
     const token = tokenResponse?.token || tokenResponse?.id || tokenResponse?.signInToken;
 
     if (!token) {

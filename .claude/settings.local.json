@@ -17,7 +17,8 @@
       "Bash(pnpm -F @cks/ui build)",
       "Bash(pnpm -F @cks/domain-widgets build)",
       "Bash(pnpm test:*)",
-      "Bash(git log:*)"
+      "Bash(git log:*)",
+      "Bash(pnpm build:*)"
     ],
     "deny": [],
     "ask": []
