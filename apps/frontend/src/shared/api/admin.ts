@@ -66,7 +66,8 @@ export interface ImpersonationRequest {
 }
 
 export interface ImpersonationResponse {
-  token: string;
+  token?: string;
+  sessionId?: string;
 }
 
 export async function createImpersonationToken(

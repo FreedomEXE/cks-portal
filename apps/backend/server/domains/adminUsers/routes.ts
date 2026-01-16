@@ -278,8 +278,17 @@ export async function registerAdminUserRoutes(server: FastifyInstance) {
       }
     }
 
-    const signInTokensApi = (clerkClient as any)?.signInTokens;
+    const sessionsApi = (clerkClient as any)?.sessions;
+    if (sessionsApi?.createSession) {
+      const session = await sessionsApi.createSession({ userId: clerkUserId });
+      const sessionId = session?.id;
+      if (sessionId) {
+        reply.send({ data: { sessionId } });
+        return;
+      }
+    }
 
+    const signInTokensApi = (clerkClient as any)?.signInTokens;
     if (!signInTokensApi?.createSignInToken && !signInTokensApi?.create) {
       reply.code(501).send({ error: "Impersonation is not available" });
       return;

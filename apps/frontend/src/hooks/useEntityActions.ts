@@ -485,7 +485,15 @@ async function handleUserAction(
           { getToken: impersonation.getToken }
         );
 
+        const sessionId = response?.sessionId;
         const ticket = response?.token;
+
+        if (sessionId) {
+          await impersonation.setActive({ session: sessionId });
+          options.onSuccess?.();
+          window.location.assign('/hub');
+          return true;
+        }
         if (!ticket) {
           toast.error('Failed to start impersonation.');
           return false;

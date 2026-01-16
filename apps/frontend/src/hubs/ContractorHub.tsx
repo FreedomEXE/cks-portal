@@ -549,8 +549,10 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
       scope: contractorScope ?? null,
       certifiedServices: certifiedServicesData,
       orders: orders?.orders ?? [],
+      accessStatus,
+      accessTier,
     }),
-  [dashboard, profile, contractorScope, certifiedServicesData, orders]);
+  [dashboard, profile, contractorScope, certifiedServicesData, orders, accessStatus, accessTier]);
 
   const profileCardData = useMemo(() => ({
     name: profile?.name ?? EMPTY_VALUE,

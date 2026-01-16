@@ -356,8 +356,10 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
       certifiedServices: certifiedServicesData,
       orders: orders?.serviceOrders ?? [],
       viewerId: normalizedCode,
+      accessStatus,
+      accessTier,
     }),
-  [dashboard, profile, scopeData, certifiedServicesData, orders?.serviceOrders, normalizedCode]);
+  [dashboard, profile, scopeData, certifiedServicesData, orders?.serviceOrders, normalizedCode, accessStatus, accessTier]);
 
   // Build dashboard cards once (do not call hooks inside render conditionals)
   const dashboardCards = useMemo(() => {

@@ -14,6 +14,10 @@ export function AccessGate() {
     return null;
   }
 
+  const statusLabel = accessStatus === 'active' ? 'Active' : 'Pending';
+  const tierLabel =
+    accessTier === 'standard' ? 'Free' : accessTier === 'premium' ? 'Premium' : accessTier;
+
   return (
     <section className={styles.gate}>
       <div className={styles.content}>
@@ -61,8 +65,8 @@ export function AccessGate() {
 
         <div className={styles.row}>
           <span className={styles.subtitle}>
-            Status: <strong>{accessStatus === 'active' ? 'Active' : 'Locked'}</strong>
-            {accessTier ? ` · ${accessTier}` : ''}
+            Status: <strong>{statusLabel}</strong>
+            {tierLabel ? ` - ${tierLabel}` : ''}
             {accessSource ? ` (${accessSource})` : ''}
           </span>
           {message ? <span className={styles.message}>{message}</span> : null}
@@ -72,3 +76,4 @@ export function AccessGate() {
     </section>
   );
 }
+

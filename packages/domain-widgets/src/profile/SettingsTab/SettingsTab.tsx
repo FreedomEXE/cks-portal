@@ -60,6 +60,9 @@ export function SettingsTab({
   const [accessMessage, setAccessMessage] = useState<string | null>(null);
   const [accessError, setAccessError] = useState<string | null>(null);
   const [isRedeeming, setIsRedeeming] = useState(false);
+  const statusLabel = accessStatus === 'active' ? 'Active' : 'Pending';
+  const tierLabel =
+    accessTier === 'standard' ? 'Free' : accessTier === 'premium' ? 'Premium' : accessTier;
 
   const previewHubName = useMemo(() => hubTitle.trim() || 'My Hub', [hubTitle]);
 
@@ -216,11 +219,11 @@ export function SettingsTab({
               <div style={{ fontSize: 14, color: 'var(--text)' }}>
                 Status:{' '}
                 <strong style={{ color: accessStatus === 'active' ? '#22c55e' : '#f97316' }}>
-                  {accessStatus === 'active' ? 'Active' : 'Locked'}
+                  {statusLabel}
                 </strong>
-                {accessTier ? (
+                {tierLabel ? (
                   <span style={{ marginLeft: 8, color: '#6b7280', fontSize: 12 }}>
-                    Tier: {accessTier}
+                    Tier: {tierLabel}
                     {accessSource ? ` (${accessSource})` : ''}
                   </span>
                 ) : null}

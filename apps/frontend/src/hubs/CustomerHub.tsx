@@ -327,8 +327,10 @@ function CustomerHubContent({ initialTab = 'dashboard' }: CustomerHubProps) {
       profile: profile ?? null,
       scope: scopeData ?? null,
       certifiedServices: certifiedServicesData,
+      accessStatus,
+      accessTier,
     }),
-  [dashboard, profile, scopeData, certifiedServicesData]);
+  [dashboard, profile, scopeData, certifiedServicesData, accessStatus, accessTier]);
 
   const customerScope = scopeData?.role === 'customer' ? scopeData : null;
 

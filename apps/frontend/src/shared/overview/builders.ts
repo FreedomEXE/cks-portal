@@ -12,6 +12,47 @@ import { capitalizeLabel, countPendingOrdersFromOrders, safeLength } from './met
 
 type Nullable<T> = T | null | undefined;
 
+function formatAccessTier(tier: string | null | undefined): string | null {
+  const normalized = (tier ?? '').trim().toLowerCase();
+  if (!normalized) {
+    return null;
+  }
+  if (normalized === 'standard') {
+    return 'Free';
+  }
+  if (normalized === 'premium') {
+    return 'Premium';
+  }
+  return normalized.replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function resolveAccountStatus({
+  accessStatus,
+  accessTier,
+  fallbackStatus,
+}: {
+  accessStatus?: string | null;
+  accessTier?: string | null;
+  fallbackStatus?: string | null;
+}): string {
+  const fallback = capitalizeLabel(fallbackStatus ?? null, 'Active');
+  const normalizedFallback = (fallbackStatus ?? '').trim().toLowerCase();
+  if (normalizedFallback === 'paused') {
+    return 'Paused';
+  }
+  if (normalizedFallback === 'pending' || normalizedFallback === 'unassigned') {
+    return 'Pending';
+  }
+  if (normalizedFallback === 'cancelled' || normalizedFallback === 'canceled') {
+    return 'Cancelled';
+  }
+
+  const normalizedAccess = (accessStatus ?? '').trim().toLowerCase();
+  const baseStatus = normalizedAccess === 'active' ? 'Active' : 'Pending';
+  const tierLabel = formatAccessTier(accessTier);
+  return tierLabel ? `${baseStatus} · ${tierLabel}` : baseStatus;
+}
+
 // Manager
 export function buildManagerOverviewData(inputs: {
   dashboard: Nullable<ManagerDashboardResponse>;
@@ -19,6 +60,8 @@ export function buildManagerOverviewData(inputs: {
   scope: any;
   certifiedServices: readonly any[];
   orders?: readonly HubOrderItem[] | null;
+  accessStatus?: string | null;
+  accessTier?: string | null;
 }) {
   const { dashboard, scope, certifiedServices, orders } = inputs;
   const myServices = certifiedServices?.length ?? 0;
@@ -27,7 +70,11 @@ export function buildManagerOverviewData(inputs: {
   const myCrew = (dashboard as any)?.crewCount ?? scope?.summary?.crewCount ?? safeLength(scope?.relationships?.crew) ?? 0;
   const pendingOrders =
     (dashboard as any)?.pendingOrders ?? countPendingOrdersFromOrders(orders ?? null);
-  const accountStatus = capitalizeLabel((dashboard as any)?.accountStatus ?? inputs.profile?.status, 'Active');
+  const accountStatus = resolveAccountStatus({
+    accessStatus: inputs.accessStatus ?? null,
+    accessTier: inputs.accessTier ?? null,
+    fallbackStatus: (dashboard as any)?.accountStatus ?? inputs.profile?.status ?? null,
+  });
   return { myServices, myCenters, myCrew, pendingOrders, accountStatus } as const;
 }
 
@@ -38,13 +85,19 @@ export function buildContractorOverviewData(inputs: {
   scope: any;
   certifiedServices: readonly any[];
   orders?: readonly HubOrderItem[] | null;
+  accessStatus?: string | null;
+  accessTier?: string | null;
 }) {
   const { dashboard, scope, certifiedServices } = inputs;
   const myServices = certifiedServices?.length ?? 0;
   const myCustomers =
     (dashboard as any)?.customerCount ?? scope?.summary?.customerCount ?? safeLength(scope?.relationships?.customers) ?? 0;
   const pendingOrders = (dashboard as any)?.pendingOrders ?? 0;
-  const accountStatus = capitalizeLabel((dashboard as any)?.accountStatus ?? inputs.profile?.status, 'Active');
+  const accountStatus = resolveAccountStatus({
+    accessStatus: inputs.accessStatus ?? null,
+    accessTier: inputs.accessTier ?? null,
+    fallbackStatus: (dashboard as any)?.accountStatus ?? inputs.profile?.status ?? null,
+  });
   return { myServices, myCustomers, pendingOrders, accountStatus } as const;
 }
 
@@ -54,12 +107,18 @@ export function buildCustomerOverviewData(inputs: {
   profile: Nullable<HubProfileResponse>;
   scope: any;
   certifiedServices: readonly any[];
+  accessStatus?: string | null;
+  accessTier?: string | null;
 }) {
   const { dashboard, scope, certifiedServices } = inputs;
   const myServices = certifiedServices?.length ?? 0;
   const myCenters = (dashboard as any)?.centerCount ?? scope?.summary?.centerCount ?? safeLength(scope?.relationships?.centers) ?? 0;
   const pendingOrders = (dashboard as any)?.pendingRequests ?? 0;
-  const accountStatus = capitalizeLabel((dashboard as any)?.accountStatus ?? inputs.profile?.status, 'Active');
+  const accountStatus = resolveAccountStatus({
+    accessStatus: inputs.accessStatus ?? null,
+    accessTier: inputs.accessTier ?? null,
+    fallbackStatus: (dashboard as any)?.accountStatus ?? inputs.profile?.status ?? null,
+  });
   return { myServices, myCenters, pendingOrders, accountStatus } as const;
 }
 
@@ -68,12 +127,18 @@ export function buildCenterOverviewData(inputs: {
   dashboard: Nullable<CenterDashboardResponse>;
   profile: Nullable<HubProfileResponse>;
   scope: any;
+  accessStatus?: string | null;
+  accessTier?: string | null;
 }) {
   const { dashboard, scope } = inputs;
   const activeServices = (dashboard as any)?.activeServices ?? scope?.summary?.activeServices ?? 0;
   const activeCrew = (dashboard as any)?.crewCount ?? scope?.summary?.crewCount ?? safeLength(scope?.relationships?.crew) ?? 0;
   const pendingOrders = (dashboard as any)?.pendingRequests ?? 0;
-  const accountStatus = capitalizeLabel((dashboard as any)?.accountStatus ?? inputs.profile?.status, 'Active');
+  const accountStatus = resolveAccountStatus({
+    accessStatus: inputs.accessStatus ?? null,
+    accessTier: inputs.accessTier ?? null,
+    fallbackStatus: (dashboard as any)?.accountStatus ?? inputs.profile?.status ?? null,
+  });
   return { activeServices, activeCrew, pendingOrders, accountStatus } as const;
 }
 
@@ -85,6 +150,8 @@ export function buildCrewOverviewData(inputs: {
   certifiedServices: readonly any[];
   orders?: readonly HubOrderItem[] | null;
   viewerId?: string | null;
+  accessStatus?: string | null;
+  accessTier?: string | null;
 }) {
   const { dashboard, certifiedServices, orders, viewerId } = inputs;
   const myServices = certifiedServices?.length ?? 0;
@@ -115,7 +182,11 @@ export function buildCrewOverviewData(inputs: {
   }
 
   const timecard = 0;
-  const accountStatus = capitalizeLabel((dashboard as any)?.accountStatus ?? inputs.profile?.status, 'Active');
+  const accountStatus = resolveAccountStatus({
+    accessStatus: inputs.accessStatus ?? null,
+    accessTier: inputs.accessTier ?? null,
+    fallbackStatus: (dashboard as any)?.accountStatus ?? inputs.profile?.status ?? null,
+  });
   return { myServices, myTasks, timecard, accountStatus } as const;
 }
 
@@ -126,6 +197,8 @@ export function buildWarehouseOverviewData(inputs: {
   scope: any;
   certifiedServices: readonly any[];
   inventory?: { activeItems?: readonly any[] } | null;
+  accessStatus?: string | null;
+  accessTier?: string | null;
 }) {
   const { dashboard, certifiedServices, inventory } = inputs;
   const myServices = certifiedServices?.length ?? 0;
@@ -133,7 +206,11 @@ export function buildWarehouseOverviewData(inputs: {
   const inventoryCount = (dashboard as any)?.inventoryCount ?? inventory?.activeItems?.length ?? 0;
   const lowStockItems = (dashboard as any)?.lowStockItems ?? (inventory?.activeItems?.filter((i: any) => i.isLow)?.length ?? 0);
   const pendingOrders = (dashboard as any)?.pendingOrders ?? 0;
-  const accountStatus = capitalizeLabel((dashboard as any)?.accountStatus ?? inputs.profile?.status, 'Active');
+  const accountStatus = resolveAccountStatus({
+    accessStatus: inputs.accessStatus ?? null,
+    accessTier: inputs.accessTier ?? null,
+    fallbackStatus: (dashboard as any)?.accountStatus ?? inputs.profile?.status ?? null,
+  });
   return { myServices, inventoryCount, lowStockItems, pendingOrders, accountStatus } as const;
 }
 

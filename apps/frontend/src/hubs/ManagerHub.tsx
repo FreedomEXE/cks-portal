@@ -859,8 +859,10 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
       scope: scopeData ?? null,
       certifiedServices: certifiedServicesData,
       orders: ordersData?.orders ?? [],
+      accessStatus,
+      accessTier,
     }),
-  [dashboardData, profileData, scopeData, certifiedServicesData, ordersData]);
+  [dashboardData, profileData, scopeData, certifiedServicesData, ordersData, accessStatus, accessTier]);
 
   const managerProfileData = useMemo(
     () => ({

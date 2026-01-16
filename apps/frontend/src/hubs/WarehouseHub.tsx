@@ -335,8 +335,10 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
       scope: scopeData ?? null,
       certifiedServices: certifiedServicesData,
       inventory: inventory ?? null,
+      accessStatus,
+      accessTier,
     }),
-  [dashboard, profile, scopeData, certifiedServicesData, inventory]);
+  [dashboard, profile, scopeData, certifiedServicesData, inventory, accessStatus, accessTier]);
 
 
   const { pendingDeliveries, completedDeliveries } = useMemo(() => {

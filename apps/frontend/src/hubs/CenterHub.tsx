@@ -313,8 +313,10 @@ function CenterHubContent({ initialTab = 'dashboard' }: CenterHubProps) {
       dashboard: dashboard ?? null,
       profile: profile ?? null,
       scope: scopeData ?? null,
+      accessStatus,
+      accessTier,
     }),
-  [dashboard, profile, scopeData]);
+  [dashboard, profile, scopeData, accessStatus, accessTier]);
 
   const centerScope = scopeData?.role === 'center' ? scopeData : null;
 
