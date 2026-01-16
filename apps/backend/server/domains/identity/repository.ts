@@ -164,6 +164,28 @@ function mapRoleRow(config: RoleTableConfig, row: Record<string, unknown>): HubA
   };
 }
 
+export async function getClerkUserIdByRoleAndCode(
+  role: IdentityEntity,
+  cksCode: string,
+): Promise<string | null> {
+  const normalizedCode = normalizeIdentity(cksCode);
+  if (!normalizedCode) {
+    return null;
+  }
+
+  const config = ROLE_TABLES.find((entry) => entry.role === role);
+  if (!config) {
+    return null;
+  }
+
+  const result = await query<{ clerk_user_id: string | null }>(
+    `SELECT clerk_user_id FROM ${config.tableName} WHERE UPPER(${config.codeColumn}) = $1 LIMIT 1`,
+    [normalizedCode],
+  );
+
+  return toNullableString(result.rows[0]?.clerk_user_id ?? null);
+}
+
 async function findRoleAccountByClerkId(config: RoleTableConfig, clerkUserId: string): Promise<HubAccountRecord | null> {
   const sql = `SELECT ${selectColumns(config)} FROM ${config.tableName} WHERE clerk_user_id = $1 LIMIT 1`;
   const result = await query<Record<string, unknown>>(sql, [clerkUserId]);

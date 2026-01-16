@@ -32,6 +32,10 @@ VITE_LOADER_SVG=/portal-icon.svg     # default if unset
 
 For backend, see `apps/backend/` README (Fastify + Postgres). Migrations live in `database/migrations` and scripts under `apps/backend/scripts`.
 
+Production environment templates:
+- `apps/frontend/.env.production.example`
+- `apps/backend/.env.production.example`
+
 ## Loader Customization
 The global loading overlay prefers an SVG path animation driven by Framer Motion.
 

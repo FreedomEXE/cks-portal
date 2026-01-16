@@ -9,6 +9,8 @@ import {
   updateAdminUser,
 } from "./store";
 import { requireActiveAdmin } from "./guards";
+import { clerkClient } from "../../core/clerk/client";
+import { getClerkUserIdByRoleAndCode } from "../identity";
 import type { AdminUserCreateInput, AdminUserUpdateInput, AdminUserQueryOptions } from "./types";
 
 function coerceQuery(query: FastifyRequest['query']): AdminUserQueryOptions {
@@ -172,5 +174,59 @@ export async function registerAdminUserRoutes(server: FastifyInstance) {
     }
 
     reply.send({ data: removed });
+  });
+
+  server.post("/api/admin/impersonations", async (request, reply) => {
+    const auth = await requireActiveAdmin(request, reply);
+    if (!auth) return;
+
+    const body = request.body as { entityType?: string; entityId?: string };
+    const entityType = String(body?.entityType ?? "").trim().toLowerCase();
+    const entityId = String(body?.entityId ?? "").trim().toUpperCase();
+
+    const allowedEntityTypes = new Set([
+      "manager",
+      "contractor",
+      "customer",
+      "center",
+      "crew",
+      "warehouse",
+    ]);
+
+    if (!allowedEntityTypes.has(entityType)) {
+      reply.code(400).send({ error: "Invalid entity type" });
+      return;
+    }
+
+    if (!entityId) {
+      reply.code(400).send({ error: "Invalid entity id" });
+      return;
+    }
+
+    const clerkUserId = await getClerkUserIdByRoleAndCode(entityType as any, entityId);
+    if (!clerkUserId) {
+      reply.code(404).send({ error: "User is not linked to Clerk" });
+      return;
+    }
+
+    const signInTokensApi = (clerkClient as any)?.signInTokens;
+    const createToken =
+      signInTokensApi?.createSignInToken ??
+      signInTokensApi?.create;
+
+    if (!createToken) {
+      reply.code(501).send({ error: "Impersonation is not available" });
+      return;
+    }
+
+    const tokenResponse = await createToken({ userId: clerkUserId });
+    const token = tokenResponse?.token || tokenResponse?.id || tokenResponse?.signInToken;
+
+    if (!token) {
+      reply.code(500).send({ error: "Failed to create impersonation token" });
+      return;
+    }
+
+    reply.send({ data: { token } });
   });
 }

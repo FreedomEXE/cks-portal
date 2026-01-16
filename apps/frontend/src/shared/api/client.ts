@@ -15,7 +15,8 @@ declare global {
     __cksDevAuth?: (options?: { role?: string | null; code?: string | null }) => void;
   }
 }
-const DEV_AUTH_ENABLED = ((import.meta as any).env?.VITE_CKS_ENABLE_DEV_AUTH ?? 'false') === 'true';
+const DEV_AUTH_ENABLED =
+  ((import.meta as any).env?.VITE_CKS_ENABLE_DEV_AUTH ?? 'false') === 'true' && !import.meta.env.PROD;
 
 export type ApiResponse<T> = {
   data: T;

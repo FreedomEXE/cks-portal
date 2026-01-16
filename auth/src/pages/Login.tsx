@@ -20,6 +20,7 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loginMethod, setLoginMethod] = useState<'username' | 'email'>('username');
   const submittingRef = useRef(false);
 
   async function onSubmit(e: FormEvent) {
@@ -222,12 +223,38 @@ export default function Login() {
                 </div>
                 {error && <div className="alert-error mb-4">{error}</div>}
                 <form onSubmit={onSubmit} className="relative z-10">
+                <div className="mb-3 flex items-center gap-2">
+                  <button
+                    type="button"
+                    className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
+                      loginMethod === 'username'
+                        ? 'bg-white text-neutral-900'
+                        : 'bg-white/10 text-slate-200 hover:bg-white/20'
+                    }`}
+                    onClick={() => setLoginMethod('username')}
+                  >
+                    Username
+                  </button>
+                  <button
+                    type="button"
+                    className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
+                      loginMethod === 'email'
+                        ? 'bg-white text-neutral-900'
+                        : 'bg-white/10 text-slate-200 hover:bg-white/20'
+                    }`}
+                    onClick={() => setLoginMethod('email')}
+                  >
+                    Email
+                  </button>
+                </div>
                 <div className="mb-4 text-left">
-                  <label className="block mb-2 text-sm font-medium text-slate-200">Username</label>
+                  <label className="block mb-2 text-sm font-medium text-slate-200">
+                    {loginMethod === 'email' ? 'Email' : 'Username'}
+                  </label>
                   <input
                     className="w-full rounded-xl border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 shadow-sm transition focus:border-neutral-600 focus:outline-none focus:ring-2 focus:ring-neutral-600/15 placeholder:text-neutral-500"
-                    type="text"
-                    autoComplete="username"
+                    type={loginMethod === 'email' ? 'email' : 'text'}
+                    autoComplete={loginMethod === 'email' ? 'email' : 'username'}
                     value={identifier}
                     onChange={(e) => setIdentifier(e.target.value)}
                     required

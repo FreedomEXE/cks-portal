@@ -18,10 +18,11 @@
 import { useCallback } from 'react';
 import { useSWRConfig } from 'swr';
 import toast from 'react-hot-toast';
+import { useAuth as useClerkAuth, useSignIn } from '@clerk/clerk-react';
 import { parseEntityId } from '../shared/utils/parseEntityId';
 import { applyHubOrderAction, type OrderActionRequest, acknowledgeItem, resolveReport, applyServiceAction, requestServiceCrew, respondToServiceCrew, respondToOrderCrew, respondToCrewInvite } from '../shared/api/hub';
 import { archiveAPI } from '../shared/api/archive';
-import { updateCatalogService } from '../shared/api/admin';
+import { createImpersonationToken, updateCatalogService } from '../shared/api/admin';
 
 export interface EntityActionOptions {
   notes?: string;
@@ -38,6 +39,8 @@ export interface UseEntityActionsReturn {
 
 export function useEntityActions(): UseEntityActionsReturn {
   const { mutate } = useSWRConfig();
+  const { getToken } = useClerkAuth();
+  const { isLoaded: signInLoaded, signIn, setActive } = useSignIn();
 
   const handleAction = useCallback(
     async (entityId: string, action: string, options: EntityActionOptions = {}): Promise<boolean> => {
@@ -63,7 +66,12 @@ export function useEntityActions(): UseEntityActionsReturn {
 
         // User entities: manager | contractor | customer | center | crew | warehouse
         if (type === 'user') {
-          return await handleUserAction(entityId, actionId, subtype, options, mutate);
+          return await handleUserAction(entityId, actionId, subtype, options, mutate, {
+            getToken,
+            signInLoaded,
+            signIn,
+            setActive,
+          });
         }
 
         if (type === 'product') {
@@ -84,7 +92,7 @@ export function useEntityActions(): UseEntityActionsReturn {
         return false;
       }
     },
-    [mutate]
+    [getToken, mutate, setActive, signIn, signInLoaded]
   );
 
   return {
@@ -443,7 +451,13 @@ async function handleUserAction(
   actionId: string,
   subtype: string | undefined,
   options: EntityActionOptions,
-  mutate: any
+  mutate: any,
+  impersonation: {
+    getToken?: () => Promise<string | null>;
+    signInLoaded: boolean;
+    signIn: any;
+    setActive: any;
+  }
 ): Promise<boolean> {
   // Map subtype to archive entity type
   const validUserTypes = new Set(['manager', 'contractor', 'customer', 'center', 'crew', 'warehouse']);
@@ -455,6 +469,38 @@ async function handleUserAction(
 
   try {
     switch (actionId) {
+      case 'impersonate': {
+        if (!impersonation.signInLoaded || !impersonation.signIn || !impersonation.setActive) {
+          toast.error('Impersonation is not ready yet. Please try again.');
+          return false;
+        }
+
+        const response = await createImpersonationToken(
+          { entityType, entityId: userId },
+          { getToken: impersonation.getToken }
+        );
+
+        const ticket = response?.token;
+        if (!ticket) {
+          toast.error('Failed to start impersonation.');
+          return false;
+        }
+
+        const result = await impersonation.signIn.create({
+          strategy: 'ticket',
+          ticket,
+        });
+
+        if (result?.status === 'complete') {
+          await impersonation.setActive({ session: result.createdSessionId });
+          options.onSuccess?.();
+          window.location.assign('/hub');
+          return true;
+        }
+
+        toast.error('Impersonation requires additional verification.');
+        return false;
+      }
       case 'archive': {
         const reason = options.notes;
         await archiveAPI.archiveEntity(entityType as any, userId, reason || undefined);

@@ -13,7 +13,8 @@ export type AuthResult =
   | { ok: false; reason: AuthFailureReason };
 
 const CLERK_SECRET_KEY = process.env.CLERK_SECRET_KEY;
-const DEV_AUTH_ENABLED = String(process.env.CKS_ENABLE_DEV_AUTH ?? 'false') === 'true';
+const IS_PROD = process.env.NODE_ENV === 'production';
+const DEV_AUTH_ENABLED = String(process.env.CKS_ENABLE_DEV_AUTH ?? 'false') === 'true' && !IS_PROD;
 // In dev override mode, do not hard-throw during module load if Clerk is not configured
 if (!CLERK_SECRET_KEY && !DEV_AUTH_ENABLED) {
   // Keep a soft warning to help surface misconfiguration

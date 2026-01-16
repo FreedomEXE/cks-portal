@@ -1,5 +1,5 @@
 import { generatePrefixedId, normalizeIdentity } from './customIdGenerator';
-import { getHubAccountByClerkId, getHubAccountByCode } from './repository';
+import { getClerkUserIdByRoleAndCode, getHubAccountByClerkId, getHubAccountByCode } from './repository';
 import type { IdentityEntity } from './types';
 
 export async function nextIdentityId(entity: IdentityEntity): Promise<string> {
@@ -8,6 +8,7 @@ export async function nextIdentityId(entity: IdentityEntity): Promise<string> {
 
 export {
   normalizeIdentity,
+  getClerkUserIdByRoleAndCode,
   getHubAccountByClerkId,
   getHubAccountByCode,
 };

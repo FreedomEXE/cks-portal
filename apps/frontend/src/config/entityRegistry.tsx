@@ -1658,6 +1658,14 @@ const userAdapter: EntityAdapter = {
           closeOnSuccess: false,
         });
 
+        descriptors.push({
+          key: 'impersonate',
+          label: 'Impersonate',
+          variant: 'secondary',
+          confirm: 'Impersonate this user? This will switch your session.',
+          closeOnSuccess: true,
+        });
+
         // Edit action
         descriptors.push({
           key: 'edit',

@@ -2,6 +2,14 @@ import { query } from './connection';
 
 export async function seedCatalogData() {
   try {
+    const isProd = process.env.NODE_ENV === 'production';
+    const seedEnabled = String(process.env.CKS_ENABLE_CATALOG_SEED ?? '') === 'true' || !isProd;
+
+    if (!seedEnabled) {
+      console.log('Catalog seeding disabled; skipping sample catalog data.');
+      return;
+    }
+
     // Check if catalog_products already has data
     const productCount = await query(`SELECT COUNT(*) as count FROM catalog_products`, []);
 

@@ -19,6 +19,7 @@ export interface RoleGuardOptions {
 
 const HUB_ROLES = ["manager", "contractor", "customer", "center", "crew", "warehouse"] as const;
 const DEV_ROLE_SET = new Set<string>(["admin", ...HUB_ROLES]);
+const DEV_AUTH_ENABLED = process.env.CKS_ENABLE_DEV_AUTH === "true" && process.env.NODE_ENV !== "production";
 
 type GuardAccount = HubAccountRecord & {
   isAdmin: boolean;
@@ -122,7 +123,7 @@ export async function requireActiveRole(
   reply: FastifyReply,
   options: RoleGuardOptions = {},
 ): Promise<RequireActiveRoleResult | null> {
-  if (process.env.CKS_ENABLE_DEV_AUTH === "true") {
+  if (DEV_AUTH_ENABLED) {
     const devRoleHeader = asString(request.headers["x-cks-dev-role"]);
     const devCodeHeader = asString(request.headers["x-cks-dev-code"]);
 

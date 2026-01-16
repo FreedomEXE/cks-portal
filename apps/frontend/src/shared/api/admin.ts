@@ -60,6 +60,28 @@ export async function fetchAdminUsers(init?: ApiFetchInit): Promise<AdminUser[]>
   return response.data;
 }
 
+export interface ImpersonationRequest {
+  entityType: string;
+  entityId: string;
+}
+
+export interface ImpersonationResponse {
+  token: string;
+}
+
+export async function createImpersonationToken(
+  payload: ImpersonationRequest,
+  init?: ApiFetchInit,
+): Promise<ImpersonationResponse> {
+  const response = await apiFetch<ApiResponse<ImpersonationResponse>>('/admin/impersonations', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    headers: { 'Content-Type': 'application/json', ...(init?.headers || {}) },
+    ...init,
+  });
+  return response.data;
+}
+
 export interface UpdateInventoryInput {
   warehouseId: string;
   itemId: string;
