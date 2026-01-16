@@ -59,6 +59,7 @@ import { useHubLoading } from '../contexts/HubLoadingContext';
 import { loadUserPreferences, saveUserPreferences } from '../shared/preferences';
 import { dismissActivity, dismissAllActivities } from '../shared/api/directory';
 import { buildContractorOverviewData } from '../shared/overview/builders';
+import { useAccessCodeRedemption } from '../hooks/useAccessCodeRedemption';
 
 interface ContractorHubProps {
   initialTab?: string;
@@ -213,11 +214,12 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
   const [servicesTab, setServicesTab] = useState<'my' | 'active' | 'history'>('my');
   const [servicesSearchQuery, setServicesSearchQuery] = useState('');
   // Legacy modal state removed; universal ModalGateway handles all modals
-  const { code: authCode } = useAuth();
+  const { code: authCode, accessStatus, accessTier, accessSource } = useAuth();
   const { openUserProfile } = useClerk();
   const { setTheme } = useAppTheme();
   const { user } = useUser();
   const { setHubLoading } = useHubLoading();
+  const accessGate = useAccessCodeRedemption();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
   const handleUploadPhoto = useCallback(async (file: File) => { if (!user) { toast.error('User not authenticated'); return; } try { await user.setProfileImage({ file }); toast.success('Profile photo updated'); } catch (e: any) { console.error('photo upload failed', e); toast.error(e?.message || 'Failed to update photo'); } }, [user]);
 
@@ -656,6 +658,10 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
                 onSaveUserPreferences={(prefs) => saveUserPreferences(userCode ?? null, prefs)}
                 availableTabs={tabs.map(t => ({ id: t.id, label: t.label }))}
                 onSetTheme={setTheme}
+                accessStatus={accessStatus}
+                accessTier={accessTier}
+                accessSource={accessSource}
+                onRedeemAccessCode={accessGate.redeem}
                 onContactManager={() => undefined}
                 onScheduleMeeting={() => undefined}
               />

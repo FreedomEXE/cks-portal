@@ -56,6 +56,10 @@ export interface ProfileInfoCardProps {
   onSetTheme?: (t: 'light' | 'dark' | 'system') => void;
   /** Whether password reset is available (e.g., not SSO-only) */
   passwordResetAvailable?: boolean;
+  accessStatus?: 'active' | 'locked';
+  accessTier?: string | null;
+  accessSource?: 'direct' | 'cascade' | null;
+  onRedeemAccessCode?: (code: string) => Promise<void> | void;
 }
 
 export function ProfileInfoCard({
@@ -77,6 +81,10 @@ export function ProfileInfoCard({
   onUploadPhoto,
   onSetTheme,
   passwordResetAvailable = true,
+  accessStatus,
+  accessTier,
+  accessSource,
+  onRedeemAccessCode,
 }: ProfileInfoCardProps) {
   const [activeTab, setActiveTab] = useState('profile');
 
@@ -142,6 +150,10 @@ export function ProfileInfoCard({
             availableTabs={availableTabs}
             onSetTheme={onSetTheme}
             passwordResetAvailable={passwordResetAvailable}
+            accessStatus={accessStatus}
+            accessTier={accessTier}
+            accessSource={accessSource}
+            onRedeemAccessCode={onRedeemAccessCode}
           />
         );
       default:

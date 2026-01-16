@@ -10,7 +10,7 @@ import {
 } from "./store";
 import { requireActiveAdmin } from "./guards";
 import { clerkClient } from "../../core/clerk/client";
-import { getClerkUserIdByRoleAndCode } from "../identity";
+import { getClerkUserIdByRoleAndCode, getIdentityContactByRoleAndCode, linkClerkUserToAccount } from "../identity";
 import type { AdminUserCreateInput, AdminUserUpdateInput, AdminUserQueryOptions } from "./types";
 
 function coerceQuery(query: FastifyRequest['query']): AdminUserQueryOptions {
@@ -228,5 +228,105 @@ export async function registerAdminUserRoutes(server: FastifyInstance) {
     }
 
     reply.send({ data: { token } });
+  });
+
+  server.post("/api/admin/invitations", async (request, reply) => {
+    const auth = await requireActiveAdmin(request, reply);
+    if (!auth) return;
+
+    const body = request.body as { entityType?: string; entityId?: string };
+    const entityType = String(body?.entityType ?? "").trim().toLowerCase();
+    const entityId = String(body?.entityId ?? "").trim().toUpperCase();
+
+    const allowedEntityTypes = new Set([
+      "manager",
+      "contractor",
+      "customer",
+      "center",
+      "crew",
+      "warehouse",
+    ]);
+
+    if (!allowedEntityTypes.has(entityType)) {
+      reply.code(400).send({ error: "Invalid entity type" });
+      return;
+    }
+
+    if (!entityId) {
+      reply.code(400).send({ error: "Invalid entity id" });
+      return;
+    }
+
+    const contact = await getIdentityContactByRoleAndCode(entityType as any, entityId);
+    if (!contact?.email) {
+      reply.code(404).send({ error: "User email not found" });
+      return;
+    }
+
+    const emailAddress = contact.email;
+    let clerkUserId = contact.clerkUserId;
+    let clerkUser: any = null;
+
+    if (clerkUserId) {
+      try {
+        clerkUser = await clerkClient.users.getUser(clerkUserId);
+      } catch {
+        clerkUserId = null;
+      }
+    }
+
+    if (!clerkUser) {
+      try {
+        clerkUser = await clerkClient.users.createUser({
+          emailAddress: [emailAddress],
+          externalId: entityId,
+          publicMetadata: { role: entityType, cksCode: entityId },
+          username: entityId,
+          skipPasswordRequirement: true,
+        });
+      } catch (error: any) {
+        const errorCode = error?.errors?.[0]?.code || error?.code;
+        if (errorCode === "form_identifier_exists" || errorCode === "email_address_exists") {
+          const existing = await clerkClient.users.getUserList({ emailAddress: [emailAddress] });
+          clerkUser = existing?.[0] ?? null;
+        } else {
+          throw error;
+        }
+      }
+    }
+
+    if (!clerkUser?.id) {
+      reply.code(500).send({ error: "Failed to provision Clerk user" });
+      return;
+    }
+
+    if (clerkUser?.username !== entityId) {
+      try {
+        clerkUser = await clerkClient.users.updateUser(clerkUser.id, {
+          username: entityId,
+          publicMetadata: { role: entityType, cksCode: entityId },
+        });
+      } catch (error: any) {
+        const errorCode = error?.errors?.[0]?.code || error?.code;
+        if (errorCode === "form_identifier_exists" || errorCode === "username_exists") {
+          reply.code(409).send({ error: "CKS ID already exists in Clerk" });
+          return;
+        }
+        throw error;
+      }
+    }
+
+    if (!contact.clerkUserId || contact.clerkUserId !== clerkUser.id) {
+      await linkClerkUserToAccount(entityType as any, entityId, clerkUser.id);
+    }
+
+    await clerkClient.users.createPasswordReset({ userId: clerkUser.id });
+
+    reply.send({
+      data: {
+        userId: clerkUser.id,
+        email: emailAddress,
+      },
+    });
   });
 }

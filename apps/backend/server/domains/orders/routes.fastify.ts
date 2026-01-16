@@ -9,6 +9,7 @@ import { fetchOrderForViewer } from './store';
 import { getEntityWithFallback } from '../entities/service';
 import type { HubRole } from '../profile/types';
 import type { HubOrderItem } from './types';
+import { hasActionAccess } from '../access/service';
 
 const hubRoles = ['manager', 'contractor', 'customer', 'center', 'crew', 'warehouse'] as const;
 
@@ -258,6 +259,14 @@ export async function registerOrdersRoutes(server: FastifyInstance) {
     if (!actorCode) {
       reply.code(400).send({ error: 'No CKS code associated with the current user' });
       return;
+    }
+
+    if (!account.isAdmin) {
+      const allowed = await hasActionAccess(role, actorCode);
+      if (!allowed) {
+        reply.code(403).send({ error: 'Account access is locked', reason: 'access_locked' });
+        return;
+      }
     }
 
     const body = bodyResult.data;

@@ -36,6 +36,7 @@ import { useCatalogItems } from '../shared/api/catalog';
 import { useCertifiedServices } from '../hooks/useCertifiedServices';
 import { useLogout } from '../hooks/useLogout';
 import { buildManagerOverviewData } from '../shared/overview/builders';
+import { useAccessCodeRedemption } from '../hooks/useAccessCodeRedemption';
 
 /**
  * File: ManagerHub.tsx
@@ -489,12 +490,13 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
     };
   }, []);
 
-  const { code, fullName, firstName } = useAuth();
+  const { code, fullName, firstName, accessStatus, accessTier, accessSource } = useAuth();
   const { openUserProfile } = useClerk();
   const { setTheme } = useAppTheme();
   const { user } = useUser();
   const logout = useLogout();
   const { setHubLoading } = useHubLoading();
+  const accessGate = useAccessCodeRedemption();
 
   // Access modal context
   const modals = useModals();
@@ -1072,6 +1074,10 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
                 onSaveUserPreferences={(prefs) => saveUserPreferences(authCode, prefs)}
                 availableTabs={HUB_TABS.map(t => ({ id: t.id, label: t.label }))}
                 onSetTheme={setTheme}
+                accessStatus={accessStatus}
+                accessTier={accessTier}
+                accessSource={accessSource}
+                onRedeemAccessCode={accessGate.redeem}
               />
             </PageWrapper>
           ) : activeTab === 'ecosystem' ? (

@@ -59,6 +59,7 @@ import { buildCustomerOverviewData } from '../shared/overview/builders';
 import { useHubLoading } from '../contexts/HubLoadingContext';
 import { loadUserPreferences, saveUserPreferences } from '../shared/preferences';
 import { dismissActivity, dismissAllActivities } from '../shared/api/directory';
+import { useAccessCodeRedemption } from '../hooks/useAccessCodeRedemption';
 
 interface CustomerHubProps {
   initialTab?: string;
@@ -176,10 +177,11 @@ function CustomerHubContent({ initialTab = 'dashboard' }: CustomerHubProps) {
   const [servicesSearchQuery, setServicesSearchQuery] = useState('');
   const { setTheme } = useAppTheme();
   // Legacy modal state removed; universal ModalGateway handles all modals
-  const { code: authCode } = useAuth();
+  const { code: authCode, accessStatus, accessTier, accessSource } = useAuth();
   const { user } = useUser();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
   const { setHubLoading } = useHubLoading();
+  const accessGate = useAccessCodeRedemption();
   const handleUploadPhoto = useCallback(async (file: File) => { if (!user) { toast.error('User not authenticated'); return; } try { await user.setProfileImage({ file }); toast.success('Profile photo updated'); } catch (e: any) { console.error('photo upload failed', e); toast.error(e?.message || 'Failed to update photo'); } }, [user]);
 
   const {
@@ -513,6 +515,10 @@ function CustomerHubContent({ initialTab = 'dashboard' }: CustomerHubProps) {
                 onSaveUserPreferences={(prefs) => saveUserPreferences(userCode ?? normalizedCode, prefs)}
                 availableTabs={tabs.map(t => ({ id: t.id, label: t.label }))}
                 onSetTheme={setTheme}
+                accessStatus={accessStatus}
+                accessTier={accessTier}
+                accessSource={accessSource}
+                onRedeemAccessCode={accessGate.redeem}
                 onContactManager={() => undefined}
                 onScheduleMeeting={() => undefined}
               />

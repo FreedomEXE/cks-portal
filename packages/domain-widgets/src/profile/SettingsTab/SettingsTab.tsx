@@ -24,6 +24,10 @@ export interface SettingsTabProps {
   availableTabs?: Array<{ id: string; label: string }>;
   onSetTheme?: (t: 'light' | 'dark' | 'system') => void;
   passwordResetAvailable?: boolean;
+  accessStatus?: 'active' | 'locked';
+  accessTier?: string | null;
+  accessSource?: 'direct' | 'cascade' | null;
+  onRedeemAccessCode?: (code: string) => Promise<void> | void;
 }
 
 export function SettingsTab({
@@ -44,14 +48,22 @@ export function SettingsTab({
   ],
   onSetTheme,
   passwordResetAvailable = true,
+  accessStatus = 'locked',
+  accessTier,
+  accessSource,
+  onRedeemAccessCode,
 }: SettingsTabProps) {
   const [hubTitle, setHubTitle] = useState(preferences?.hubTitle || '');
   const [defaultTab, setDefaultTab] = useState(preferences?.defaultLandingTab || 'dashboard');
   const [theme, setTheme] = useState<'light' | 'dark' | 'system'>(preferences?.theme || 'light');
+  const [accessCode, setAccessCode] = useState('');
+  const [accessMessage, setAccessMessage] = useState<string | null>(null);
+  const [accessError, setAccessError] = useState<string | null>(null);
+  const [isRedeeming, setIsRedeeming] = useState(false);
 
   const previewHubName = useMemo(() => hubTitle.trim() || 'My Hub', [hubTitle]);
 
-  type Section = 'personalization' | 'photo' | 'security' | 'notifications' | 'accessibility';
+  type Section = 'personalization' | 'photo' | 'security' | 'access' | 'notifications' | 'accessibility';
   const [active, setActive] = useState<Section>('personalization');
 
   const NavItem = ({ id, label }: { id: Section; label: string }) => (
@@ -78,6 +90,7 @@ export function SettingsTab({
         <NavItem id="personalization" label="Personalization" />
         <NavItem id="photo" label="Profile Photo" />
         <NavItem id="security" label="Account Security" />
+        <NavItem id="access" label="Access Codes" />
         <NavItem id="notifications" label="Notifications" />
         <NavItem id="accessibility" label="Accessibility" />
       </aside>
@@ -190,6 +203,73 @@ export function SettingsTab({
                   Password is managed by your SSO provider.
                 </span>
               )}
+            </div>
+          </section>
+        )}
+
+        {active === 'access' && (
+          <section className="ui-card">
+            <div style={{ padding: 16, borderBottom: '1px solid var(--border)', background: 'var(--card-muted)' }}>
+              <h3 style={{ margin: 0, fontSize: 16, color: 'var(--text)' }}>Access Codes</h3>
+            </div>
+            <div style={{ padding: 16, display: 'grid', gap: 12 }}>
+              <div style={{ fontSize: 14, color: 'var(--text)' }}>
+                Status:{' '}
+                <strong style={{ color: accessStatus === 'active' ? '#22c55e' : '#f97316' }}>
+                  {accessStatus === 'active' ? 'Active' : 'Locked'}
+                </strong>
+                {accessTier ? (
+                  <span style={{ marginLeft: 8, color: '#6b7280', fontSize: 12 }}>
+                    Tier: {accessTier}
+                    {accessSource ? ` (${accessSource})` : ''}
+                  </span>
+                ) : null}
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: 12, color: '#6b7280', marginBottom: 4 }}>
+                  Enter product code
+                </label>
+                <input
+                  value={accessCode}
+                  onChange={(e) => {
+                    setAccessCode(e.target.value);
+                    setAccessMessage(null);
+                    setAccessError(null);
+                  }}
+                  placeholder="CKS-XXXX-XXXX-XXXX"
+                  style={{ width: '100%', padding: '8px 10px', border: '1px solid var(--border)', borderRadius: 6, background: 'var(--card-bg)', color: 'var(--text)' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' as const }}>
+                <button
+                  style={{ padding: '8px 12px', background: primaryColor, color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}
+                  disabled={isRedeeming || !accessCode.trim() || !onRedeemAccessCode}
+                  onClick={async () => {
+                    if (!onRedeemAccessCode || !accessCode.trim()) {
+                      return;
+                    }
+                    setIsRedeeming(true);
+                    setAccessMessage(null);
+                    setAccessError(null);
+                    try {
+                      await onRedeemAccessCode(accessCode.trim());
+                      setAccessMessage('Access code applied. You can now place orders and submit reports.');
+                      setAccessCode('');
+                    } catch (error) {
+                      const message = error instanceof Error ? error.message : 'Failed to redeem access code';
+                      setAccessError(message);
+                    } finally {
+                      setIsRedeeming(false);
+                    }
+                  }}
+                >
+                  {isRedeeming ? 'Applying...' : 'Apply Code'}
+                </button>
+                {accessMessage ? <span style={{ fontSize: 12, color: '#16a34a' }}>{accessMessage}</span> : null}
+                {accessError ? <span style={{ fontSize: 12, color: '#dc2626' }}>{accessError}</span> : null}
+              </div>
             </div>
           </section>
         )}

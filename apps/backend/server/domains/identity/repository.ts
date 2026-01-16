@@ -186,6 +186,72 @@ export async function getClerkUserIdByRoleAndCode(
   return toNullableString(result.rows[0]?.clerk_user_id ?? null);
 }
 
+export async function getIdentityContactByRoleAndCode(
+  role: IdentityEntity,
+  cksCode: string,
+): Promise<{ email: string | null; fullName: string | null; clerkUserId: string | null } | null> {
+  const normalizedCode = normalizeIdentity(cksCode);
+  if (!normalizedCode) {
+    return null;
+  }
+
+  const config = ROLE_TABLES.find((entry) => entry.role === role);
+  if (!config) {
+    return null;
+  }
+
+  const columns = [config.codeColumn, "clerk_user_id", ...(config.fullNameColumns ?? [])];
+  if (config.emailColumn) {
+    columns.push(config.emailColumn);
+  }
+
+  const sql = `SELECT ${Array.from(new Set(columns)).join(", ")} FROM ${config.tableName} WHERE UPPER(${config.codeColumn}) = $1 LIMIT 1`;
+  const result = await query<Record<string, unknown>>(sql, [normalizedCode]);
+  const row = result.rows[0];
+  if (!row) {
+    return null;
+  }
+
+  let fullName: string | null = null;
+  for (const column of config.fullNameColumns) {
+    const candidate = toNullableString(row[column]);
+    if (candidate) {
+      fullName = candidate;
+      break;
+    }
+  }
+
+  return {
+    email: config.emailColumn ? toNullableString(row[config.emailColumn]) : null,
+    fullName,
+    clerkUserId: toNullableString(row["clerk_user_id"]),
+  };
+}
+
+export async function linkClerkUserToAccount(
+  role: IdentityEntity,
+  cksCode: string,
+  clerkUserId: string,
+): Promise<boolean> {
+  const normalizedCode = normalizeIdentity(cksCode);
+  const normalizedUserId = toNullableString(clerkUserId);
+  if (!normalizedCode || !normalizedUserId) {
+    return false;
+  }
+
+  const config = ROLE_TABLES.find((entry) => entry.role === role);
+  if (!config) {
+    return false;
+  }
+
+  const result = await query(
+    `UPDATE ${config.tableName} SET clerk_user_id = $1, updated_at = NOW() WHERE UPPER(${config.codeColumn}) = $2`,
+    [normalizedUserId, normalizedCode],
+  );
+
+  return result.rowCount > 0;
+}
+
 async function findRoleAccountByClerkId(config: RoleTableConfig, clerkUserId: string): Promise<HubAccountRecord | null> {
   const sql = `SELECT ${selectColumns(config)} FROM ${config.tableName} WHERE clerk_user_id = $1 LIMIT 1`;
   const result = await query<Record<string, unknown>>(sql, [clerkUserId]);

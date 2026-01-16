@@ -82,6 +82,29 @@ export async function createImpersonationToken(
   return response.data;
 }
 
+export interface InviteRequest {
+  entityType: string;
+  entityId: string;
+}
+
+export interface InviteResponse {
+  userId: string;
+  email: string;
+}
+
+export async function sendUserInvite(
+  payload: InviteRequest,
+  init?: ApiFetchInit,
+): Promise<InviteResponse> {
+  const response = await apiFetch<ApiResponse<InviteResponse>>('/admin/invitations', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    headers: { 'Content-Type': 'application/json', ...(init?.headers || {}) },
+    ...init,
+  });
+  return response.data;
+}
+
 export interface UpdateInventoryInput {
   warehouseId: string;
   itemId: string;

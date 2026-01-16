@@ -32,6 +32,8 @@ import { reportsRoutes } from "./domains/reports/routes.fastify";
 import { registerInventoryRoutes } from "./domains/inventory/routes.fastify";
 import entityRoutes from "./domains/entities/routes.fastify";
 import { registerAccountRoutes } from "./domains/account/routes.fastify";
+import { registerAccessRoutes } from "./domains/access";
+import { resolveAccessStatus } from "./domains/access/service";
 import { initializeSequences } from "./db/init-sequences";
 
 type BootstrapResponse = {
@@ -42,6 +44,9 @@ type BootstrapResponse = {
   fullName: string | null;
   firstName: string | null;
   ownerFirstName: string | null;
+  accessStatus: "active" | "locked";
+  accessTier: string | null;
+  accessSource: "direct" | "cascade" | null;
 };
 
 const bootstrapSchema = z.object({
@@ -56,6 +61,9 @@ const bootstrapResponseSchema = z.object({
   fullName: z.string().nullable(),
   firstName: z.string().nullable(),
   ownerFirstName: z.string().nullable(),
+  accessStatus: z.enum(["active", "locked"]),
+  accessTier: z.string().nullable(),
+  accessSource: z.enum(["direct", "cascade"]).nullable(),
 });
 
 function extractFirstName(fullName?: string | null): string | null {
@@ -211,6 +219,9 @@ export async function buildServer() {
           fullName: adminUser.fullName ?? null,
           firstName,
           ownerFirstName: firstName,
+          accessStatus: "active",
+          accessTier: "premium",
+          accessSource: "direct",
         };
 
         return reply.send(bootstrapResponseSchema.parse(response));
@@ -244,7 +255,17 @@ export async function buildServer() {
         fullName: hubAccount.fullName ?? null,
         firstName,
         ownerFirstName: firstName,
+        accessStatus: "locked",
+        accessTier: null,
+        accessSource: null,
       };
+
+      if (responseCode) {
+        const access = await resolveAccessStatus(hubAccount.role, responseCode);
+        response.accessStatus = access.status;
+        response.accessTier = access.tier;
+        response.accessSource = access.source;
+      }
 
       return reply.send(bootstrapResponseSchema.parse(response));
     } catch (error) {
@@ -267,6 +288,7 @@ export async function buildServer() {
   await registerCatalogRoutes(server);
   await registerInventoryRoutes(server);
   await registerAccountRoutes(server);
+  await registerAccessRoutes(server);
   await server.register(reportsRoutes, { prefix: '/api' });
   await server.register(entityRoutes, { prefix: '/api' });
 

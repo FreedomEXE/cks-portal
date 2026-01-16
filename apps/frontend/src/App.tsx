@@ -1,9 +1,10 @@
-import { Login, RoleGuard, useAuth } from '@cks/auth';
+import { Forgot, Login, RoleGuard, useAuth } from '@cks/auth';
 import { useEffect, useRef, type ComponentType } from 'react';
 import { Navigate, Route, Routes, useSearchParams } from 'react-router-dom';
 import { useLoading } from './contexts/LoadingContext';
 import { useHubLoading } from './contexts/HubLoadingContext';
 import { ModalProvider } from './contexts/ModalProvider';
+import { AccessGate } from './components/AccessGate';
 
 import AdminHub from './hubs/AdminHub';
 import CenterHub from './hubs/CenterHub';
@@ -35,7 +36,7 @@ function sanitizeTab(value: string | null): string | undefined {
 }
 
 function HubLoader({ initialTab }: { initialTab?: string }): JSX.Element | null {
-  const { status, role, code } = useAuth();
+  const { status, role, code, accessStatus } = useAuth();
   const { start } = useLoading();
   const { isHubLoading } = useHubLoading();
   const loaderEndRef = useRef<(() => void) | null>(null);
@@ -82,7 +83,12 @@ function HubLoader({ initialTab }: { initialTab?: string }): JSX.Element | null 
 
   // Always render hub - keep it laid out (not hidden) so OrdersSection
   // can scroll and measure correctly under the global loader overlay
-  return <Hub initialTab={initialTab} />;
+  return (
+    <>
+      {accessStatus === 'locked' ? <AccessGate /> : null}
+      <Hub initialTab={initialTab} />
+    </>
+  );
 }
 
 function RoleHubRoute(): JSX.Element {
@@ -118,6 +124,7 @@ export function UnauthenticatedApp(): JSX.Element {
       <Route path="/sign-in" element={<Login />} />
       <Route path="/sign-up" element={<Login />} />
       <Route path="/login" element={<Login />} />
+      <Route path="/forgot" element={<Forgot />} />
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   );

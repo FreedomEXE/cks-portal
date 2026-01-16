@@ -61,6 +61,7 @@ import { buildCrewOverviewData } from '../shared/overview/builders';
 import { resolvedUserCode } from '../shared/utils/userCode';
 import { useHubLoading } from '../contexts/HubLoadingContext';
 import { loadUserPreferences, saveUserPreferences } from '../shared/preferences';
+import { useAccessCodeRedemption } from '../hooks/useAccessCodeRedemption';
 
 interface CrewHubProps {
   initialTab?: string;
@@ -178,11 +179,12 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
   const [servicesSearchQuery, setServicesSearchQuery] = useState('');
   const { setTheme } = useAppTheme();
 
-  const { code: authCode } = useAuth();
+  const { code: authCode, accessStatus, accessTier, accessSource } = useAuth();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
   const { mutate } = useSWRConfig();
   const { user } = useUser();
   const { setHubLoading } = useHubLoading();
+  const accessGate = useAccessCodeRedemption();
   const handleUploadPhoto = useCallback(async (file: File) => { if (!user) { toast.error('User not authenticated'); return; } try { await user.setProfileImage({ file }); toast.success('Profile photo updated'); } catch (e: any) { console.error('photo upload failed', e); toast.error(e?.message || 'Failed to update photo'); } }, [user]);
 
   // Centralized entity action handler (replaces handleOrderAction)
@@ -600,6 +602,10 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
                 onSaveUserPreferences={(prefs) => saveUserPreferences(userCode ?? normalizedCode, prefs)}
                 availableTabs={tabs.map(t => ({ id: t.id, label: t.label }))}
                 onSetTheme={setTheme}
+                accessStatus={accessStatus}
+                accessTier={accessTier}
+                accessSource={accessSource}
+                onRedeemAccessCode={accessGate.redeem}
                 onContactManager={() => undefined}
                 onScheduleMeeting={() => undefined}
               />

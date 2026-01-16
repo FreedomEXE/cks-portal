@@ -22,7 +22,7 @@ import { useAuth as useClerkAuth, useSignIn } from '@clerk/clerk-react';
 import { parseEntityId } from '../shared/utils/parseEntityId';
 import { applyHubOrderAction, type OrderActionRequest, acknowledgeItem, resolveReport, applyServiceAction, requestServiceCrew, respondToServiceCrew, respondToOrderCrew, respondToCrewInvite } from '../shared/api/hub';
 import { archiveAPI } from '../shared/api/archive';
-import { createImpersonationToken, updateCatalogService } from '../shared/api/admin';
+import { createImpersonationToken, sendUserInvite, updateCatalogService } from '../shared/api/admin';
 
 export interface EntityActionOptions {
   notes?: string;
@@ -500,6 +500,15 @@ async function handleUserAction(
 
         toast.error('Impersonation requires additional verification.');
         return false;
+      }
+      case 'invite': {
+        await sendUserInvite(
+          { entityType, entityId: userId },
+          { getToken: impersonation.getToken }
+        );
+        toast.success('Invite email sent');
+        options.onSuccess?.();
+        return true;
       }
       case 'archive': {
         const reason = options.notes;

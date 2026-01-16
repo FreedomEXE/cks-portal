@@ -58,6 +58,7 @@ import { useHubLoading } from '../contexts/HubLoadingContext';
 import { loadUserPreferences, saveUserPreferences } from '../shared/preferences';
 import { buildCenterOverviewData } from '../shared/overview/builders';
 import { dismissActivity, dismissAllActivities } from '../shared/api/directory';
+import { useAccessCodeRedemption } from '../hooks/useAccessCodeRedemption';
 
 interface CenterHubProps {
   initialTab?: string;
@@ -174,10 +175,11 @@ function CenterHubContent({ initialTab = 'dashboard' }: CenterHubProps) {
   const [servicesSearchQuery, setServicesSearchQuery] = useState('');
   const { setTheme } = useAppTheme();
   // Legacy modal state removed; universal ModalGateway handles all entity modals
-  const { code: authCode } = useAuth();
+  const { code: authCode, accessStatus, accessTier, accessSource } = useAuth();
   const { user } = useUser();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
   const { setHubLoading } = useHubLoading();
+  const accessGate = useAccessCodeRedemption();
   const handleUploadPhoto = useCallback(async (file: File) => { if (!user) { toast.error('User not authenticated'); return; } try { await user.setProfileImage({ file }); toast.success('Profile photo updated'); } catch (e: any) { console.error('photo upload failed', e); toast.error(e?.message || 'Failed to update photo'); } }, [user]);
   const { mutate } = useSWRConfig();
   const { handleAction } = useEntityActions();
@@ -511,6 +513,10 @@ function CenterHubContent({ initialTab = 'dashboard' }: CenterHubProps) {
                 onSaveUserPreferences={(prefs) => saveUserPreferences(userCode ?? normalizedCode, prefs)}
                 availableTabs={tabs.map(t => ({ id: t.id, label: t.label }))}
                 onSetTheme={setTheme}
+                accessStatus={accessStatus}
+                accessTier={accessTier}
+                accessSource={accessSource}
+                onRedeemAccessCode={accessGate.redeem}
                 onContactManager={() => undefined}
                 onScheduleMeeting={() => undefined}
               />

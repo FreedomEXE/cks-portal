@@ -97,6 +97,13 @@ vi.mock('@clerk/clerk-react', () => ({
     getToken: async () => 'TEST_TOKEN',
     signOut: vi.fn(),
   }),
+  useSignIn: () => ({
+    isLoaded: true,
+    signIn: {
+      create: vi.fn(async () => ({ status: 'complete', createdSessionId: 'test_session' })),
+    },
+    setActive: vi.fn(),
+  }),
   useUser: () => ({
     user: {
       id: 'user_test',

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 type AuthStatus = 'idle' | 'loading' | 'ready' | 'error';
+type AccessStatus = 'active' | 'locked';
 
 type AuthState = {
   status: AuthStatus;
@@ -11,6 +12,9 @@ type AuthState = {
   fullName: string | null;
   firstName: string | null;
   ownerFirstName: string | null;
+  accessStatus: AccessStatus;
+  accessTier: string | null;
+  accessSource: 'direct' | 'cascade' | null;
   error: Error | null;
   refresh: () => Promise<void>;
 };
@@ -23,6 +27,9 @@ type AuthSnapshot = {
   fullName: string | null;
   firstName: string | null;
   ownerFirstName: string | null;
+  accessStatus: AccessStatus;
+  accessTier: string | null;
+  accessSource: 'direct' | 'cascade' | null;
 };
 
 const INITIAL_STATE: InternalAuthState = {
@@ -32,6 +39,9 @@ const INITIAL_STATE: InternalAuthState = {
   fullName: null,
   firstName: null,
   ownerFirstName: null,
+  accessStatus: 'locked',
+  accessTier: null,
+  accessSource: null,
   error: null,
 };
 
@@ -226,6 +236,9 @@ export function useAuth(): AuthState {
             fullName: null,
             firstName: null,
             ownerFirstName: null,
+            accessStatus: 'locked',
+            accessTier: null,
+            accessSource: null,
             error: null,
           });
           return;
@@ -279,6 +292,15 @@ export function useAuth(): AuthState {
           username,
           code: resolvedCode,
         }) ?? resolvedFirstName;
+      const accessStatus =
+        data?.accessStatus === 'active' || data?.accessStatus === 'locked'
+          ? data.accessStatus
+          : 'locked';
+      const accessTier = sanitizePreservingCase(data?.accessTier);
+      const accessSource =
+        data?.accessSource === 'direct' || data?.accessSource === 'cascade'
+          ? data.accessSource
+          : null;
 
       // Only update state if this is the latest request
       if (requestIdRef.current !== id || controller.signal.aborted) {
@@ -291,6 +313,9 @@ export function useAuth(): AuthState {
         fullName,
         firstName: resolvedFirstName,
         ownerFirstName: resolvedOwnerFirstName,
+        accessStatus,
+        accessTier,
+        accessSource,
       };
       lastResolvedRef.current = snapshot;
       bootstrapRetriesRef.current = 0;
@@ -301,6 +326,9 @@ export function useAuth(): AuthState {
         fullName: snapshot.fullName,
         firstName: snapshot.firstName,
         ownerFirstName: snapshot.ownerFirstName,
+        accessStatus: snapshot.accessStatus,
+        accessTier: snapshot.accessTier,
+        accessSource: snapshot.accessSource,
         error: null,
       });
     } catch (err) {
@@ -322,6 +350,9 @@ export function useAuth(): AuthState {
           fullName: cached?.fullName ?? null,
           firstName: cached?.firstName ?? null,
           ownerFirstName: cached?.ownerFirstName ?? null,
+          accessStatus: cached?.accessStatus ?? 'locked',
+          accessTier: cached?.accessTier ?? null,
+          accessSource: cached?.accessSource ?? null,
           error: null,
         });
       } else {
@@ -346,6 +377,9 @@ export function useAuth(): AuthState {
               fullName: cached.fullName,
               firstName: cached.firstName,
               ownerFirstName: cached.ownerFirstName,
+              accessStatus: cached.accessStatus,
+              accessTier: cached.accessTier,
+              accessSource: cached.accessSource,
               error: null,
             });
           } else {
@@ -356,6 +390,9 @@ export function useAuth(): AuthState {
               fullName: null,
               firstName: null,
               ownerFirstName: null,
+              accessStatus: 'locked',
+              accessTier: null,
+              accessSource: null,
               error,
             });
           }

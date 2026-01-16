@@ -5,6 +5,7 @@ import { getHubReports, getReportById } from './store';
 import { createReport, createFeedback, updateReportStatus, updateFeedbackStatus, acknowledgeReport, acknowledgeFeedback, getServicesForReports, getOrdersForReports, getProceduresForReports, getReportAcknowledgmentStatus } from './repository';
 import type { HubRole } from '../profile/types';
 import { query } from '../../db/connection';
+import { hasActionAccess } from '../access/service';
 
 export async function reportsRoutes(fastify: FastifyInstance) {
   // Get single report/feedback by ID (on-demand fetching for modals)
@@ -50,6 +51,14 @@ export async function reportsRoutes(fastify: FastifyInstance) {
     const account = await requireActiveRole(request, reply);
     if (!account) {
       return;
+    }
+
+    if (!account.isAdmin && account.cksCode) {
+      const allowed = await hasActionAccess(account.role, account.cksCode);
+      if (!allowed) {
+        reply.code(403).send({ error: 'Account access is locked', reason: 'access_locked' });
+        return;
+      }
     }
 
     const schema = z.object({
@@ -138,6 +147,14 @@ export async function reportsRoutes(fastify: FastifyInstance) {
     const account = await requireActiveRole(request, reply);
     if (!account) {
       return;
+    }
+
+    if (!account.isAdmin && account.cksCode) {
+      const allowed = await hasActionAccess(account.role, account.cksCode);
+      if (!allowed) {
+        reply.code(403).send({ error: 'Account access is locked', reason: 'access_locked' });
+        return;
+      }
     }
 
     const schema = z.object({

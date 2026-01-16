@@ -1,5 +1,6 @@
 // Auth package exports
 export { default as Callback } from './pages/Callback';
+export { default as Forgot } from './pages/Forgot';
 export { default as Invite } from './pages/Invite';
 export { default as Login } from './pages/Login';
 export { default as Logout } from './pages/Logout';

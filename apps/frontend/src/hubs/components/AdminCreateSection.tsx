@@ -24,8 +24,9 @@ import {
   type ManagerCreatePayload,
   type WarehouseCreatePayload
 } from '../../shared/api/provisioning';
+import { createAccessCode } from '../../shared/api/access';
 
-type TabKey = 'managers' | 'contractors' | 'customers' | 'centers' | 'crew' | 'warehouses';
+type TabKey = 'managers' | 'contractors' | 'customers' | 'centers' | 'crew' | 'warehouses' | 'accessCodes';
 
 type FieldConfig = {
   name: string;
@@ -277,6 +278,57 @@ function buildTabConfigs(): TabConfig<unknown>[] {
     { name: 'address', label: 'Address', required: true, placeholder: 'Street, City, State' },
   ];
 
+  const accessCodeFields: FieldConfig[] = [
+    {
+      name: 'targetRole',
+      label: 'Target Role',
+      required: true,
+      control: 'select',
+      options: [
+        { value: 'manager', label: 'Manager' },
+        { value: 'contractor', label: 'Contractor' },
+        { value: 'customer', label: 'Customer' },
+        { value: 'center', label: 'Center' },
+        { value: 'crew', label: 'Crew' },
+        { value: 'warehouse', label: 'Warehouse' },
+      ],
+      placeholder: 'Select role',
+    },
+    {
+      name: 'tier',
+      label: 'Tier',
+      required: true,
+      control: 'select',
+      options: [
+        { value: 'free', label: 'Free' },
+        { value: 'premium', label: 'Premium' },
+      ],
+      placeholder: 'Select tier',
+    },
+    {
+      name: 'maxRedemptions',
+      label: 'Max Redemptions',
+      required: true,
+      placeholder: '1',
+    },
+    {
+      name: 'scopeCode',
+      label: 'Scope Code',
+      placeholder: 'Optional (e.g., MGR-001)',
+    },
+    {
+      name: 'expiresAt',
+      label: 'Expires At',
+      placeholder: 'Optional (YYYY-MM-DD)',
+    },
+    {
+      name: 'notes',
+      label: 'Notes',
+      multiline: true,
+      placeholder: 'Optional usage notes',
+    },
+  ];
+
   const configs: TabConfig<unknown>[] = [
     {
       key: 'managers',
@@ -399,6 +451,28 @@ function buildTabConfigs(): TabConfig<unknown>[] {
       resetValues: buildFieldValues(warehouseFields),
       successMessage: () => 'Warehouse created',
       mutateKeys: ['/admin/directory/warehouses'],
+    },
+    {
+      key: 'accessCodes',
+      label: 'Access Codes',
+      color: '#2563eb',
+      fields: accessCodeFields,
+      submitLabel: 'Create Access Code',
+      create: async (values, getToken) => {
+        const maxRedemptions = Number(values.maxRedemptions);
+        const payload = {
+          targetRole: values.targetRole.trim(),
+          tier: values.tier.trim() as 'free' | 'premium',
+          maxRedemptions: Number.isNaN(maxRedemptions) ? 1 : maxRedemptions,
+          scopeCode: stringOrUndefined(values.scopeCode),
+          notes: stringOrUndefined(values.notes),
+          expiresAt: stringOrUndefined(values.expiresAt),
+        };
+        return createAccessCode(payload, { getToken });
+      },
+      resetValues: buildFieldValues(accessCodeFields),
+      successMessage: (record: any) => `Access code created: ${record.code ?? ''}`.trim(),
+      mutateKeys: [],
     },
   ];
 

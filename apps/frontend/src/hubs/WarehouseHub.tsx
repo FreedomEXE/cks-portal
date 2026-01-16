@@ -43,6 +43,7 @@ import { useCatalogItems } from '../shared/api/catalog';
 import { useCertifiedServices } from '../hooks/useCertifiedServices';
 import { buildWarehouseOverviewData } from '../shared/overview/builders';
 import { resolvedUserCode } from '../shared/utils/userCode';
+import { useAccessCodeRedemption } from '../hooks/useAccessCodeRedemption';
 
 import MyHubSection from '../components/MyHubSection';
 import {
@@ -176,13 +177,14 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
   const [inventoryFilter, setInventoryFilter] = useState<string>('');
 
   // identity + helpers
-  const { code: authCode } = useAuth();
+  const { code: authCode, accessStatus, accessTier, accessSource } = useAuth();
   const { user } = useUser();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
   const { setHubLoading } = useHubLoading();
   const { mutate } = useSWRConfig();
   const { handleAction } = useEntityActions();
   const { setTheme } = useAppTheme();
+  const accessGate = useAccessCodeRedemption();
   const handleUploadPhoto = useCallback(async (file: File) => { if (!user) { toast.error('User not authenticated'); return; } try { await user.setProfileImage({ file }); toast.success('Profile photo updated'); } catch (e: any) { console.error('photo upload failed', e); toast.error(e?.message || 'Failed to update photo'); } }, [user]);
 
 
@@ -682,6 +684,10 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
                 passwordResetAvailable={Boolean(user?.passwordEnabled)}
                 userPreferences={loadUserPreferences(normalizedCode ?? null)}
                 onSaveUserPreferences={(prefs) => saveUserPreferences(normalizedCode ?? null, prefs)}
+                accessStatus={accessStatus}
+                accessTier={accessTier}
+                accessSource={accessSource}
+                onRedeemAccessCode={accessGate.redeem}
                 onContactManager={() => undefined}
                 onScheduleMeeting={() => undefined}
               />
