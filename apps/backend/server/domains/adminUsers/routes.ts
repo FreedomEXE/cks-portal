@@ -247,6 +247,10 @@ export async function registerAdminUserRoutes(server: FastifyInstance) {
     const body = request.body as { entityType?: string; entityId?: string };
     const entityType = String(body?.entityType ?? "").trim().toLowerCase();
     const entityId = String(body?.entityId ?? "").trim().toUpperCase();
+    request.log.info(
+      { entityType, entityId },
+      "[impersonations] request"
+    );
 
     const allowedEntityTypes = new Set([
       "manager",
@@ -258,11 +262,13 @@ export async function registerAdminUserRoutes(server: FastifyInstance) {
     ]);
 
     if (!allowedEntityTypes.has(entityType)) {
+      request.log.warn({ entityType }, "[impersonations] invalid entity type");
       reply.code(400).send({ error: "Invalid entity type" });
       return;
     }
 
     if (!entityId) {
+      request.log.warn({ entityType }, "[impersonations] missing entity id");
       reply.code(400).send({ error: "Invalid entity id" });
       return;
     }
@@ -270,19 +276,26 @@ export async function registerAdminUserRoutes(server: FastifyInstance) {
     let clerkUserId = await getClerkUserIdByRoleAndCode(entityType as any, entityId);
     if (!clerkUserId) {
       try {
+        request.log.info({ entityType, entityId }, "[impersonations] provisioning Clerk user");
         const clerkUser = await getOrCreateClerkUserForEntity(entityType, entityId);
         clerkUserId = clerkUser?.id ?? null;
       } catch (error) {
+        request.log.warn(
+          { entityType, entityId, error: error instanceof Error ? error.message : error },
+          "[impersonations] provisioning failed"
+        );
         reply.code(404).send({ error: error instanceof Error ? error.message : "User is not linked to Clerk" });
         return;
       }
     }
+    request.log.info({ entityType, entityId, clerkUserId }, "[impersonations] clerk user resolved");
 
     const sessionsApi = (clerkClient as any)?.sessions;
     if (sessionsApi?.createSession) {
       const session = await sessionsApi.createSession({ userId: clerkUserId });
       const sessionId = session?.id;
       if (sessionId) {
+        request.log.info({ entityType, entityId, sessionId }, "[impersonations] session created");
         reply.send({ data: { sessionId } });
         return;
       }
