@@ -27,3 +27,6 @@ export type { RichTextSectionProps } from './RichTextSection';
 
 export { NotesSection } from './NotesSection';
 export type { NotesSectionProps } from './NotesSection';
+
+export { MapSection } from './MapSection';
+export type { MapSectionProps } from './MapSection';

@@ -85,7 +85,7 @@ function HubLoader({ initialTab }: { initialTab?: string }): JSX.Element | null 
   // can scroll and measure correctly under the global loader overlay
   return (
     <>
-      {accessStatus === 'locked' ? <AccessGate /> : null}
+      {accessStatus === 'locked' && role.toLowerCase() !== 'admin' ? <AccessGate /> : null}
       <Hub initialTab={initialTab} />
     </>
   );

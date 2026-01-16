@@ -55,6 +55,70 @@ function handleValidationError(reply: FastifyReply, error: unknown) {
   return false;
 }
 
+async function getOrCreateClerkUserForEntity(entityType: string, entityId: string) {
+  const contact = await getIdentityContactByRoleAndCode(entityType as any, entityId);
+  const emailAddress = contact?.email ?? null;
+  let clerkUserId = contact?.clerkUserId ?? null;
+  let clerkUser: any = null;
+
+  if (clerkUserId) {
+    try {
+      clerkUser = await clerkClient.users.getUser(clerkUserId);
+    } catch {
+      clerkUserId = null;
+    }
+  }
+
+  if (!clerkUser) {
+    if (!emailAddress) {
+      throw new Error("User email not found");
+    }
+
+    try {
+      clerkUser = await clerkClient.users.createUser({
+        emailAddress: [emailAddress],
+        externalId: entityId,
+        publicMetadata: { role: entityType, cksCode: entityId },
+        username: entityId,
+        skipPasswordRequirement: true,
+      });
+    } catch (error: any) {
+      const errorCode = error?.errors?.[0]?.code || error?.code;
+      if (errorCode === "form_identifier_exists" || errorCode === "email_address_exists") {
+        const existing = await clerkClient.users.getUserList({ emailAddress: [emailAddress] });
+        clerkUser = existing?.[0] ?? null;
+      } else {
+        throw error;
+      }
+    }
+  }
+
+  if (!clerkUser?.id) {
+    throw new Error("Failed to provision Clerk user");
+  }
+
+  if (clerkUser?.username !== entityId) {
+    try {
+      clerkUser = await clerkClient.users.updateUser(clerkUser.id, {
+        username: entityId,
+        publicMetadata: { role: entityType, cksCode: entityId },
+      });
+    } catch (error: any) {
+      const errorCode = error?.errors?.[0]?.code || error?.code;
+      if (errorCode === "form_identifier_exists" || errorCode === "username_exists") {
+        throw new Error("CKS ID already exists in Clerk");
+      }
+      throw error;
+    }
+  }
+
+  if (!contact?.clerkUserId || contact.clerkUserId !== clerkUser.id) {
+    await linkClerkUserToAccount(entityType as any, entityId, clerkUser.id);
+  }
+
+  return clerkUser;
+}
+
 export async function registerAdminUserRoutes(server: FastifyInstance) {
   server.get("/api/admin/users", async (request, reply) => {
     const auth = await requireActiveAdmin(request, reply);
@@ -203,10 +267,15 @@ export async function registerAdminUserRoutes(server: FastifyInstance) {
       return;
     }
 
-    const clerkUserId = await getClerkUserIdByRoleAndCode(entityType as any, entityId);
+    let clerkUserId = await getClerkUserIdByRoleAndCode(entityType as any, entityId);
     if (!clerkUserId) {
-      reply.code(404).send({ error: "User is not linked to Clerk" });
-      return;
+      try {
+        const clerkUser = await getOrCreateClerkUserForEntity(entityType, entityId);
+        clerkUserId = clerkUser?.id ?? null;
+      } catch (error) {
+        reply.code(404).send({ error: error instanceof Error ? error.message : "User is not linked to Clerk" });
+        return;
+      }
     }
 
     const signInTokensApi = (clerkClient as any)?.signInTokens;
@@ -263,61 +332,12 @@ export async function registerAdminUserRoutes(server: FastifyInstance) {
       return;
     }
 
-    const emailAddress = contact.email;
-    let clerkUserId = contact.clerkUserId;
-    let clerkUser: any = null;
-
-    if (clerkUserId) {
-      try {
-        clerkUser = await clerkClient.users.getUser(clerkUserId);
-      } catch {
-        clerkUserId = null;
-      }
-    }
-
-    if (!clerkUser) {
-      try {
-        clerkUser = await clerkClient.users.createUser({
-          emailAddress: [emailAddress],
-          externalId: entityId,
-          publicMetadata: { role: entityType, cksCode: entityId },
-          username: entityId,
-          skipPasswordRequirement: true,
-        });
-      } catch (error: any) {
-        const errorCode = error?.errors?.[0]?.code || error?.code;
-        if (errorCode === "form_identifier_exists" || errorCode === "email_address_exists") {
-          const existing = await clerkClient.users.getUserList({ emailAddress: [emailAddress] });
-          clerkUser = existing?.[0] ?? null;
-        } else {
-          throw error;
-        }
-      }
-    }
-
-    if (!clerkUser?.id) {
-      reply.code(500).send({ error: "Failed to provision Clerk user" });
+    let clerkUser: any;
+    try {
+      clerkUser = await getOrCreateClerkUserForEntity(entityType, entityId);
+    } catch (error) {
+      reply.code(404).send({ error: error instanceof Error ? error.message : "Failed to provision Clerk user" });
       return;
-    }
-
-    if (clerkUser?.username !== entityId) {
-      try {
-        clerkUser = await clerkClient.users.updateUser(clerkUser.id, {
-          username: entityId,
-          publicMetadata: { role: entityType, cksCode: entityId },
-        });
-      } catch (error: any) {
-        const errorCode = error?.errors?.[0]?.code || error?.code;
-        if (errorCode === "form_identifier_exists" || errorCode === "username_exists") {
-          reply.code(409).send({ error: "CKS ID already exists in Clerk" });
-          return;
-        }
-        throw error;
-      }
-    }
-
-    if (!contact.clerkUserId || contact.clerkUserId !== clerkUser.id) {
-      await linkClerkUserToAccount(entityType as any, entityId, clerkUser.id);
     }
 
     await clerkClient.users.createPasswordReset({ userId: clerkUser.id });
@@ -325,7 +345,7 @@ export async function registerAdminUserRoutes(server: FastifyInstance) {
     reply.send({
       data: {
         userId: clerkUser.id,
-        email: emailAddress,
+        email: contact.email,
       },
     });
   });

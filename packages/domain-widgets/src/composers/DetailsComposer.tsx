@@ -21,6 +21,7 @@ import {
   AvailabilitySection,
   RichTextSection,
   NotesSection,
+  MapSection,
 } from '@cks/ui';
 
 /**
@@ -34,6 +35,7 @@ const sectionRegistry: Record<string, React.ComponentType<any>> = {
   'availability': AvailabilitySection,
   'rich-text': RichTextSection,
   'notes': NotesSection,
+  'map': MapSection,
 };
 
 export interface DetailsComposerProps {

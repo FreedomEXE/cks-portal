@@ -96,6 +96,17 @@ export interface NotesSectionDescriptor extends BaseSectionDescriptor {
 }
 
 /**
+ * Map section - iframe embed for static tracking
+ */
+export interface MapSectionDescriptor extends BaseSectionDescriptor {
+  type: 'map';
+  mapUrl: string;
+  mapLink?: string;
+  caption?: string;
+  height?: number;
+}
+
+/**
  * Union of all section descriptors
  */
 export type SectionDescriptor =
@@ -105,4 +116,5 @@ export type SectionDescriptor =
   | ContactInfoSectionDescriptor
   | AvailabilitySectionDescriptor
   | RichTextSectionDescriptor
-  | NotesSectionDescriptor;
+  | NotesSectionDescriptor
+  | MapSectionDescriptor;

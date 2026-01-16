@@ -65,6 +65,8 @@ function buildOrderDetailsSections(context: TabVisibilityContext): import('@cks/
   const sections: import('@cks/ui').SectionDescriptor[] = [];
   const isProduct = entityData?.orderType === 'product';
   const isService = entityData?.orderType === 'service';
+  const destinationAddress = entityData?.destinationInfo?.address || null;
+  const deliveryStatus = entityData?.status || null;
 
   // Related Service section (if linked to service)
   if (entityData?.serviceId) {
@@ -120,6 +122,21 @@ function buildOrderDetailsSections(context: TabVisibilityContext): import('@cks/
         phone: entityData.destinationInfo.phone,
         email: entityData.destinationInfo.email,
       },
+    });
+  }
+
+  // Delivery map (static embed)
+  if (destinationAddress) {
+    const encoded = encodeURIComponent(destinationAddress);
+    sections.push({
+      id: 'delivery-map',
+      type: 'map',
+      title: 'Delivery Map',
+      mapUrl: `https://www.google.com/maps?q=${encoded}&output=embed`,
+      mapLink: `https://www.google.com/maps/search/?api=1&query=${encoded}`,
+      caption: deliveryStatus
+        ? `Status: ${formatOrderStatus(deliveryStatus)} (static map)`
+        : 'Static delivery map',
     });
   }
 
