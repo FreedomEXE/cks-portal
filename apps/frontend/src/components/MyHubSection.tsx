@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '@cks/auth';
 import { useUser } from '@clerk/clerk-react';
@@ -19,6 +19,7 @@ export default function MyHubSection({
   const { code, firstName, ownerFirstName, role } = useAuth();
   const { user } = useUser();
   const location = useLocation();
+  const [showReturnToAdmin, setShowReturnToAdmin] = useState(false);
 
   // Handle navigation from catalog with specific tab request
   useEffect(() => {
@@ -27,6 +28,23 @@ export default function MyHubSection({
       onTabClick(tabFromState);
     }
   }, [location.state, onTabClick]);
+
+  useEffect(() => {
+    try {
+      setShowReturnToAdmin(sessionStorage.getItem('cks_impersonation_active') === 'true');
+    } catch {
+      setShowReturnToAdmin(false);
+    }
+  }, []);
+
+  const handleReturnToAdmin = useCallback(async () => {
+    try {
+      sessionStorage.removeItem('cks_impersonation_active');
+      sessionStorage.removeItem('cks_impersonation_ticket');
+      sessionStorage.removeItem('cks_impersonation_return');
+    } catch {}
+    await logout();
+  }, [logout]);
 
   const onLogout = providedOnLogout ?? logout;
   const welcomeName = providedWelcomeName ?? ownerFirstName ?? firstName ?? undefined;
@@ -40,6 +58,11 @@ export default function MyHubSection({
       welcomeName={welcomeName}
       userId={userId}
       onLogout={onLogout}
+      secondaryAction={showReturnToAdmin ? {
+        label: 'Return to Admin',
+        onClick: handleReturnToAdmin,
+        variant: 'secondary',
+      } : undefined}
       onTabClick={onTabClick}
     />
   );

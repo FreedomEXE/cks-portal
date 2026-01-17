@@ -17,6 +17,11 @@ export interface MyHubSectionProps {
   userId?: string;
   role?: string;
   welcomeName?: string;
+  secondaryAction?: {
+    label: string;
+    onClick: () => void;
+    variant?: 'primary' | 'secondary' | 'danger' | 'ghost' | 'link';
+  };
 }
 
 // Role-based color mapping
@@ -39,6 +44,7 @@ export default function MyHubSection({
   userId,
   role = 'manager',
   welcomeName,
+  secondaryAction,
 }: MyHubSectionProps) {
   const colors = roleColors[role?.toLowerCase() || 'manager'] || roleColors.manager;
 
@@ -71,13 +77,23 @@ export default function MyHubSection({
             {hubName}
           </h1>
 
-          <Button
-            variant="primary"
-            onClick={onLogout}
-            roleColor={colors.primary}
-          >
-            Log out
-          </Button>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            {secondaryAction ? (
+              <Button
+                variant={secondaryAction.variant ?? 'secondary'}
+                onClick={secondaryAction.onClick}
+              >
+                {secondaryAction.label}
+              </Button>
+            ) : null}
+            <Button
+              variant="primary"
+              onClick={onLogout}
+              roleColor={colors.primary}
+            >
+              Log out
+            </Button>
+          </div>
         </div>
 
         {/* Welcome Message */}

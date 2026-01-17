@@ -95,7 +95,7 @@ export function useEntityActions(): UseEntityActionsReturn {
         return false;
       }
     },
-    [getToken, mutate, setActive, signIn, signInLoaded]
+    [getToken, mutate, setActive, signIn, signInLoaded, signOut, isSignedIn]
   );
 
   return {
@@ -489,6 +489,8 @@ async function handleUserAction(
         const ticket = response?.token;
 
         if (sessionId) {
+          sessionStorage.setItem('cks_impersonation_active', 'true');
+          sessionStorage.setItem('cks_impersonation_return', window.location.pathname + window.location.search);
           await impersonation.setActive({ session: sessionId });
           options.onSuccess?.();
           window.location.assign('/hub');
@@ -499,33 +501,24 @@ async function handleUserAction(
           return false;
         }
 
-        const runSignIn = async () => impersonation.signIn.create({
-          strategy: 'ticket',
-          ticket,
-        });
+        sessionStorage.setItem('cks_impersonation_ticket', ticket);
+        sessionStorage.setItem('cks_impersonation_active', 'true');
+        sessionStorage.setItem('cks_impersonation_return', window.location.pathname + window.location.search);
 
-        let result: any;
-        try {
-          result = await runSignIn();
-        } catch (error: any) {
-          const message = error instanceof Error ? error.message : String(error);
-          if (message.toLowerCase().includes('already signed in') && impersonation.signOut) {
+        const redirectUrl = `/impersonate?ticket=${encodeURIComponent(ticket)}`;
+        if (impersonation.signOut) {
+          try {
+            await impersonation.signOut({ redirectUrl });
+          } catch (error) {
+            console.warn('[useEntityActions] Sign-out redirect failed, falling back to hard redirect.', error);
             await impersonation.signOut();
-            result = await runSignIn();
-          } else {
-            throw error;
+            window.location.assign(redirectUrl);
           }
-        }
-
-        if (result?.status === 'complete') {
-          await impersonation.setActive({ session: result.createdSessionId });
-          options.onSuccess?.();
-          window.location.assign('/hub');
           return true;
         }
 
-        toast.error('Impersonation requires additional verification.');
-        return false;
+        window.location.assign(redirectUrl);
+        return true;
       }
       case 'invite': {
         await sendUserInvite(

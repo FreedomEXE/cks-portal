@@ -14,6 +14,7 @@ import CustomerHub from './hubs/CustomerHub';
 import ManagerHub from './hubs/ManagerHub';
 import WarehouseHub from './hubs/WarehouseHub';
 import CKSCatalog from './pages/CKSCatalog';
+import Impersonate from './pages/Impersonate';
 
 type HubComponent = ComponentType<{ initialTab?: string }>;
 
@@ -73,7 +74,8 @@ function HubLoader({ initialTab }: { initialTab?: string }): JSX.Element | null 
     return <Navigate to="/login" replace />;
   }
 
-  const Hub = HUB_COMPONENTS[role.toLowerCase()];
+  const normalizedRole = role.toLowerCase();
+  const Hub = HUB_COMPONENTS[normalizedRole];
   console.log('[HubLoader] Looking for hub component:', role.toLowerCase(), '-> found:', !!Hub);
 
   if (!Hub) {
@@ -85,7 +87,7 @@ function HubLoader({ initialTab }: { initialTab?: string }): JSX.Element | null 
   // can scroll and measure correctly under the global loader overlay
   return (
     <>
-      {accessStatus === 'locked' && role.toLowerCase() !== 'admin' ? <AccessGate /> : null}
+      {accessStatus === 'locked' && !['admin', 'administrator'].includes(normalizedRole) ? <AccessGate /> : null}
       <Hub initialTab={initialTab} />
     </>
   );
@@ -111,6 +113,7 @@ export function AuthenticatedApp(): JSX.Element {
         <Route path="/" element={<Navigate to="/hub" replace />} />
         <Route path="/hub" element={<RoleHubRoute />} />
         <Route path="/catalog" element={<CKSCatalog />} />
+        <Route path="/impersonate" element={<Impersonate />} />
         <Route path="/hub/*" element={<Navigate to="/hub" replace />} />
         <Route path="*" element={<Navigate to="/hub" replace />} />
       </Routes>
@@ -125,6 +128,7 @@ export function UnauthenticatedApp(): JSX.Element {
       <Route path="/sign-up" element={<Login />} />
       <Route path="/login" element={<Login />} />
       <Route path="/forgot" element={<Forgot />} />
+      <Route path="/impersonate" element={<Impersonate />} />
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   );
