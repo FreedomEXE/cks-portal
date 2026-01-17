@@ -292,12 +292,24 @@ export async function registerAdminUserRoutes(server: FastifyInstance) {
 
     const sessionsApi = (clerkClient as any)?.sessions;
     if (sessionsApi?.createSession) {
-      const session = await sessionsApi.createSession({ userId: clerkUserId });
-      const sessionId = session?.id;
-      if (sessionId) {
-        request.log.info({ entityType, entityId, sessionId }, "[impersonations] session created");
-        reply.send({ data: { sessionId } });
-        return;
+      try {
+        const session = await sessionsApi.createSession({ userId: clerkUserId });
+        const sessionId = session?.id;
+        if (sessionId) {
+          request.log.info({ entityType, entityId, sessionId }, "[impersonations] session created");
+          reply.send({ data: { sessionId } });
+          return;
+        }
+      } catch (error: any) {
+        const clerkCode = error?.errors?.[0]?.code;
+        if (clerkCode === "request_invalid_for_environment") {
+          request.log.info(
+            { entityType, entityId },
+            "[impersonations] session create not allowed in production, falling back to sign-in token"
+          );
+        } else {
+          throw error;
+        }
       }
     }
 
