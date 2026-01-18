@@ -487,6 +487,12 @@ async function handleUserAction(
 
         const sessionId = response?.sessionId;
         const ticket = response?.token;
+        console.log('[useEntityActions] impersonation response', {
+          entityType,
+          entityId: userId,
+          hasSession: Boolean(sessionId),
+          hasTicket: Boolean(ticket),
+        });
 
         if (sessionId) {
           await impersonation.setActive({ session: sessionId });

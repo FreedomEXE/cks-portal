@@ -32,6 +32,11 @@ export default function Impersonate(): JSX.Element {
     }
 
     const ticket = ticketFromQuery || sessionStorage.getItem(IMPERSONATION_TICKET_KEY);
+    console.log('[Impersonate] init', {
+      hasTicket: Boolean(ticket),
+      ticketFromQuery: Boolean(ticketFromQuery),
+      isSignedIn,
+    });
     if (!ticket) {
       setMessage('No impersonation ticket found.');
       setShowReturn(true);
@@ -61,6 +66,7 @@ export default function Impersonate(): JSX.Element {
         if (result?.status !== 'complete') {
           setMessage('Impersonation requires additional verification.');
           setShowReturn(true);
+          console.warn('[Impersonate] non-complete sign-in result', result);
           return;
         }
         sessionStorage.removeItem(IMPERSONATION_TICKET_KEY);
@@ -72,6 +78,8 @@ export default function Impersonate(): JSX.Element {
       })
       .catch((error: unknown) => {
         const detail = error instanceof Error ? error.message : String(error);
+        const meta = (error as any)?.errors ?? (error as any)?.data ?? undefined;
+        console.error('[Impersonate] sign-in failed', { detail, meta, error });
         if (detail.toLowerCase().includes('token has already been used')) {
           sessionStorage.removeItem(IMPERSONATION_TICKET_KEY);
           sessionStorage.removeItem(IMPERSONATION_ACTIVE_KEY);
