@@ -506,7 +506,10 @@ async function handleUserAction(
           return false;
         }
 
-        const redirectUrl = `/impersonate?ticket=${encodeURIComponent(ticket)}`;
+        sessionStorage.setItem('cks_impersonation_ticket', ticket);
+        sessionStorage.removeItem('cks_impersonation_attempt');
+
+        const redirectUrl = '/impersonate';
         if (impersonation.signOut) {
           try {
             await impersonation.signOut({ redirectUrl });

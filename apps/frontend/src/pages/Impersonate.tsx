@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth, useClerk, useSignIn } from '@clerk/clerk-react';
 
 const IMPERSONATION_TICKET_KEY = 'cks_impersonation_ticket';
@@ -7,7 +7,6 @@ const IMPERSONATION_ACTIVE_KEY = 'cks_impersonation_active';
 const IMPERSONATION_ATTEMPT_KEY = 'cks_impersonation_attempt';
 
 export default function Impersonate(): JSX.Element {
-  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { isLoaded, signIn, setActive } = useSignIn();
   const { signOut } = useClerk();
@@ -22,19 +21,12 @@ export default function Impersonate(): JSX.Element {
     }
 
     try {
-      sessionStorage.removeItem(IMPERSONATION_TICKET_KEY);
       sessionStorage.removeItem(IMPERSONATION_ACTIVE_KEY);
     } catch {}
 
-    const ticketFromQuery = searchParams.get('ticket');
-    if (ticketFromQuery) {
-      sessionStorage.setItem(IMPERSONATION_TICKET_KEY, ticketFromQuery);
-    }
-
-    const ticket = ticketFromQuery || sessionStorage.getItem(IMPERSONATION_TICKET_KEY);
+    const ticket = sessionStorage.getItem(IMPERSONATION_TICKET_KEY);
     console.log('[Impersonate] init', {
       hasTicket: Boolean(ticket),
-      ticketFromQuery: Boolean(ticketFromQuery),
       isSignedIn,
     });
     if (!ticket) {
@@ -52,7 +44,7 @@ export default function Impersonate(): JSX.Element {
     if (isSignedIn) {
       hasRun.current = true;
       setMessage('Signing out to continue impersonation...');
-      signOut({ redirectUrl: `/impersonate?ticket=${encodeURIComponent(ticket)}` });
+      signOut({ redirectUrl: '/impersonate' });
       return;
     }
 
@@ -91,7 +83,7 @@ export default function Impersonate(): JSX.Element {
         setMessage(`Impersonation failed: ${detail}`);
         setShowReturn(true);
       });
-  }, [isLoaded, isSignedIn, navigate, searchParams, setActive, signIn, signOut]);
+  }, [isLoaded, isSignedIn, navigate, setActive, signIn, signOut]);
 
   return (
     <div style={{ padding: 24, maxWidth: 520 }}>
