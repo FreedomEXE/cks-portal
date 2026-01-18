@@ -162,8 +162,19 @@ function formatText(value?: string | null): string {
   return trimmed.length ? trimmed : 'N/A';
 }
 
+function normalizeId(value?: string | null): string | null {
+  if (!value) return null;
+  return value.trim().toUpperCase();
+}
+
+function isTestId(value?: string | null): boolean {
+  if (!value) return false;
+  return value.toUpperCase().includes('-TEST');
+}
+
 const HUB_TABS = [
   { id: 'dashboard', label: 'Dashboard', path: '/dashboard' },
+  { id: 'ecosystems', label: 'Ecosystems', path: '/ecosystems' },
   { id: 'directory', label: 'Directory', path: '/directory' },
   { id: 'create', label: 'Create', path: '/create' },
   { id: 'assign', label: 'Assign', path: '/assign' },
@@ -226,6 +237,7 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
   const [ordersSubTab, setOrdersSubTab] = useState('product-orders');
   const [servicesSubTab, setServicesSubTab] = useState('catalog-services');
   const [reportsSubTab, setReportsSubTab] = useState('reports');
+  const [showTestEcosystems, setShowTestEcosystems] = useState(false);
 
   const [showActionModal, setShowActionModal] = useState(false);
   const [selectedEntity, setSelectedEntity] = useState<Record<string, any> | null>(null);
@@ -750,6 +762,208 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
         _entityType: 'feedback',
       })),
     [reportsData],
+  );
+
+  const ecosystemRows = useMemo(() => {
+    const contractorById = new Map<string, typeof contractors[number]>();
+    contractors.forEach((contractor) => {
+      const key = normalizeId(contractor.id);
+      if (key) contractorById.set(key, contractor);
+    });
+
+    const customerById = new Map<string, typeof customers[number]>();
+    customers.forEach((customer) => {
+      const key = normalizeId(customer.id);
+      if (key) customerById.set(key, customer);
+    });
+
+    const centerById = new Map<string, typeof centers[number]>();
+    centers.forEach((center) => {
+      const key = normalizeId(center.id);
+      if (key) centerById.set(key, center);
+    });
+
+    const warehouseById = new Map<string, typeof warehouses[number]>();
+    warehouses.forEach((warehouse) => {
+      const key = normalizeId(warehouse.id);
+      if (key) warehouseById.set(key, warehouse);
+    });
+
+    const contractorByManager = new Map<string, typeof contractors>();
+    contractors.forEach((contractor) => {
+      const key = normalizeId(contractor.managerId);
+      if (!key) return;
+      const list = contractorByManager.get(key) ?? [];
+      list.push(contractor);
+      contractorByManager.set(key, list);
+    });
+
+    const customerByManager = new Map<string, typeof customers>();
+    customers.forEach((customer) => {
+      const key = normalizeId(customer.managerId);
+      if (!key) return;
+      const list = customerByManager.get(key) ?? [];
+      list.push(customer);
+      customerByManager.set(key, list);
+    });
+
+    const centerByManager = new Map<string, typeof centers>();
+    const getManagerIdForCenter = (center?: typeof centers[number] | null) => {
+      if (!center) return null;
+      return (
+        normalizeId(center.managerId) ??
+        normalizeId(customerById.get(normalizeId(center.customerId) ?? '')?.managerId) ??
+        normalizeId(contractorById.get(normalizeId(center.contractorId) ?? '')?.managerId)
+      );
+    };
+
+    centers.forEach((center) => {
+      const key = getManagerIdForCenter(center);
+      if (!key) return;
+      const list = centerByManager.get(key) ?? [];
+      list.push(center);
+      centerByManager.set(key, list);
+    });
+
+    const warehouseByManager = new Map<string, typeof warehouses>();
+    warehouses.forEach((warehouse) => {
+      const key = normalizeId(warehouse.managerId);
+      if (!key) return;
+      const list = warehouseByManager.get(key) ?? [];
+      list.push(warehouse);
+      warehouseByManager.set(key, list);
+    });
+
+    const crewByManager = new Map<string, typeof crew>();
+    crew.forEach((member) => {
+      const center = centerById.get(normalizeId(member.assignedCenter) ?? '');
+      const key = getManagerIdForCenter(center);
+      if (!key) return;
+      const list = crewByManager.get(key) ?? [];
+      list.push(member);
+      crewByManager.set(key, list);
+    });
+
+    const ordersByManager = new Map<string, Array<unknown>>();
+    const allOrders = [...(orders?.productOrders || []), ...(orders?.serviceOrders || [])];
+    allOrders.forEach((order: any) => {
+      const key =
+        normalizeId(order.managerId) ??
+        getManagerIdForCenter(centerById.get(normalizeId(order.centerId) ?? '') ?? null) ??
+        normalizeId(customerById.get(normalizeId(order.customerId) ?? '')?.managerId) ??
+        normalizeId(warehouseById.get(normalizeId(order.assignedWarehouse) ?? '')?.managerId);
+      if (!key) return;
+      const list = ordersByManager.get(key) ?? [];
+      list.push(order);
+      ordersByManager.set(key, list);
+    });
+
+    const reportsByManager = new Map<string, Array<unknown>>();
+    (reportsData?.reports || []).forEach((report: any) => {
+      const key =
+        getManagerIdForCenter(centerById.get(normalizeId(report.centerId) ?? '') ?? null) ??
+        normalizeId(customerById.get(normalizeId(report.customerId) ?? '')?.managerId);
+      if (!key) return;
+      const list = reportsByManager.get(key) ?? [];
+      list.push(report);
+      reportsByManager.set(key, list);
+    });
+
+    const feedbackByManager = new Map<string, Array<unknown>>();
+    (reportsData?.feedback || []).forEach((entry: any) => {
+      const key =
+        getManagerIdForCenter(centerById.get(normalizeId(entry.centerId) ?? '') ?? null) ??
+        normalizeId(customerById.get(normalizeId(entry.customerId) ?? '')?.managerId);
+      if (!key) return;
+      const list = feedbackByManager.get(key) ?? [];
+      list.push(entry);
+      feedbackByManager.set(key, list);
+    });
+
+    return managers
+      .filter((manager) => (showTestEcosystems ? true : !isTestId(manager.id)))
+      .map((manager) => {
+        const key = normalizeId(manager.id) ?? '';
+        const contractorsForManager = contractorByManager.get(key) ?? [];
+        const customersForManager = customerByManager.get(key) ?? [];
+        const centersForManager = centerByManager.get(key) ?? [];
+        const crewForManager = crewByManager.get(key) ?? [];
+        const warehousesForManager = warehouseByManager.get(key) ?? [];
+        const ordersForManager = ordersByManager.get(key) ?? [];
+        const reportsForManager = reportsByManager.get(key) ?? [];
+        const feedbackForManager = feedbackByManager.get(key) ?? [];
+
+        const ecosystemName =
+          contractorsForManager[0]?.name ||
+          manager.name ||
+          manager.id ||
+          'Ecosystem';
+
+        return {
+          id: manager.id,
+          ecosystem: formatText(ecosystemName ?? null),
+          managerName: formatText(manager.name),
+          managerId: manager.id,
+          contractors: contractorsForManager.length,
+          customers: customersForManager.length,
+          centers: centersForManager.length,
+          crew: crewForManager.length,
+          warehouses: warehousesForManager.length,
+          orders: ordersForManager.length,
+          reports: reportsForManager.length + feedbackForManager.length,
+          status: formatText(manager.status ?? 'active'),
+          isTest: isTestId(manager.id),
+        };
+      });
+  }, [
+    managers,
+    contractors,
+    customers,
+    centers,
+    crew,
+    warehouses,
+    orders,
+    reportsData,
+    showTestEcosystems,
+  ]);
+
+  const ecosystemColumns = useMemo(
+    () => [
+      {
+        key: 'ecosystem',
+        label: 'ECOSYSTEM',
+        render: (_value: any, row: any) => (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span>{row.ecosystem}</span>
+            {row.isTest ? (
+              <span
+                style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  padding: '2px 6px',
+                  borderRadius: 999,
+                  background: '#fee2e2',
+                  color: '#991b1b',
+                }}
+              >
+                TEST
+              </span>
+            ) : null}
+          </div>
+        ),
+      },
+      { key: 'managerName', label: 'MANAGER' },
+      { key: 'managerId', label: 'MANAGER ID' },
+      { key: 'contractors', label: 'CONTRACTORS' },
+      { key: 'customers', label: 'CUSTOMERS' },
+      { key: 'centers', label: 'CENTERS' },
+      { key: 'crew', label: 'CREW' },
+      { key: 'warehouses', label: 'WAREHOUSES' },
+      { key: 'orders', label: 'ORDERS' },
+      { key: 'reports', label: 'REPORTS' },
+      { key: 'status', label: 'STATUS' },
+    ],
+    [],
   );
 
   const renderActions = useCallback(
@@ -1388,6 +1602,35 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
                 <NewsPreview color="#111827" onViewAll={() => console.log('View news')} />
                 <MemosPreview color="#111827" onViewAll={() => console.log('View memos')} />
               </div>
+            </PageWrapper>
+          ) : activeTab === 'ecosystems' ? (
+            <PageWrapper title="Ecosystems" showHeader>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                <PageHeader title="Ecosystems Overview" />
+                <Button
+                  variant={showTestEcosystems ? 'primary' : 'secondary'}
+                  size="small"
+                  onClick={() => setShowTestEcosystems((prev) => !prev)}
+                >
+                  {showTestEcosystems ? 'Hide test ecosystems' : 'Show test ecosystems'}
+                </Button>
+              </div>
+              <div style={{ marginBottom: 12, color: '#64748b', fontSize: 13 }}>
+                Test ecosystems use the `-TEST` suffix on IDs (example: `MGR-001-TEST`).
+              </div>
+              <DataTable
+                columns={ecosystemColumns}
+                data={ecosystemRows}
+                emptyMessage="No ecosystems found."
+                searchPlaceholder="Search ecosystems..."
+                maxItems={25}
+                showSearch
+                onRowClick={(row) => {
+                  if (row.managerId) {
+                    modals.openEntityModal('manager', row.managerId);
+                  }
+                }}
+              />
             </PageWrapper>
           ) : activeTab === 'directory' ? (
             <PageWrapper title="Directory" showHeader>

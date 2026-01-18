@@ -120,6 +120,11 @@ export type CreateFeedbackInput = {
   rating?: number | null;
 };
 
+function isTestId(value: string | null | undefined): boolean {
+  if (!value) return false;
+  return value.toUpperCase().includes('-TEST');
+}
+
 export async function createReport(input: CreateReportInput) {
   // Generate ID with creator prefix (e.g., CEN-001-RPT-001)
   const reportId = await generateReportFeedbackId('report', input.createdById);
@@ -132,6 +137,14 @@ export async function createReport(input: CreateReportInput) {
     input.createdById,
     input.createdByRole
   );
+
+  const isTestReport = [
+    input.createdById,
+    input.centerId,
+    input.customerId,
+    input.relatedEntityId,
+  ].some(isTestId);
+  const reportCategory = input.reportCategory ?? (isTestReport ? 'test' : null);
 
   const sql = `
     INSERT INTO reports (
@@ -155,7 +168,7 @@ export async function createReport(input: CreateReportInput) {
     cksManager,
     now,
     now,
-    input.reportCategory ?? null,
+    reportCategory,
     input.relatedEntityId ?? null,
     input.reportReason ?? null,
     input.priority ?? null,
@@ -176,6 +189,14 @@ export async function createFeedback(input: CreateFeedbackInput) {
     input.createdById,
     input.createdByRole
   );
+
+  const isTestFeedback = [
+    input.createdById,
+    input.centerId,
+    input.customerId,
+    input.relatedEntityId,
+  ].some(isTestId);
+  const reportCategory = input.reportCategory ?? (isTestFeedback ? 'test' : null);
 
   const sql = `
     INSERT INTO feedback (
@@ -198,7 +219,7 @@ export async function createFeedback(input: CreateFeedbackInput) {
     input.createdById,
     cksManager,
     now,
-    input.reportCategory ?? null,
+    reportCategory,
     input.relatedEntityId ?? null,
     input.reportReason ?? null,
     input.rating ?? null,

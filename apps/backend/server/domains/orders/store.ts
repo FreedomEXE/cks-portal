@@ -218,6 +218,11 @@ function normalizeCodeValue(value: string | null | undefined): string | null {
   return trimmed ? trimmed.toUpperCase() : null;
 }
 
+function isTestCode(value: string | null | undefined): boolean {
+  if (!value) return false;
+  return value.toUpperCase().includes('-TEST');
+}
+
 function parseOrderType(raw: string | null | undefined): "product" | "service" {
   if (!raw) {
     return "product";
@@ -1865,6 +1870,21 @@ export async function createOrder(input: CreateOrderInput): Promise<HubOrderItem
   // Add serviceManagedBy to metadata for service orders
   if (orderType === 'service' && serviceManagedBy) {
     metadataExpanded.serviceManagedBy = serviceManagedBy;
+  }
+
+  const isTestOrder = [
+    creatorCode,
+    destinationCode,
+    customerId,
+    centerId,
+    contractorId,
+    managerId,
+    crewId,
+    assignedWarehouse,
+  ].some(isTestCode);
+
+  if (isTestOrder) {
+    metadataExpanded.is_test = true;
   }
 
   const metadataValue = JSON.stringify(metadataExpanded);
