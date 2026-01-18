@@ -48,9 +48,9 @@ export default function MyHubSection({
 }: MyHubSectionProps) {
   const colors = roleColors[role?.toLowerCase() || 'manager'] || roleColors.manager;
 
-  const welcomeContent = (
-    <>Welcome to {hubName}!</>
-  );
+  const welcomeContent = welcomeName
+    ? <>Welcome, {welcomeName}!</>
+    : <>Welcome to {hubName}!</>;
   return (
     <div className={styles.heroOuter}>
       <div className={styles.heroClamp}>

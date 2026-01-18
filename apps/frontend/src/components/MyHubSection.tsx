@@ -52,18 +52,34 @@ export default function MyHubSection({
   const resolvedRole = (providedRole ?? role ?? 'admin').toLowerCase();
 
   return (
-    <BaseMyHubSection
-      {...rest}
-      role={resolvedRole}
-      welcomeName={welcomeName}
-      userId={userId}
-      onLogout={onLogout}
-      secondaryAction={showReturnToAdmin ? {
-        label: 'Return to Admin',
-        onClick: handleReturnToAdmin,
-        variant: 'secondary',
-      } : undefined}
-      onTabClick={onTabClick}
-    />
+    <>
+      {showReturnToAdmin ? (
+        <div style={{
+          background: '#fef3c7',
+          border: '1px solid #f59e0b',
+          color: '#92400e',
+          borderRadius: 10,
+          padding: '10px 14px',
+          marginBottom: 12,
+          fontSize: 13,
+          fontWeight: 600,
+        }}>
+          Impersonation mode: viewing as {welcomeName ?? userId ?? 'user'}.
+        </div>
+      ) : null}
+      <BaseMyHubSection
+        {...rest}
+        role={resolvedRole}
+        welcomeName={welcomeName}
+        userId={userId}
+        onLogout={onLogout}
+        secondaryAction={showReturnToAdmin ? {
+          label: 'Return to Admin',
+          onClick: handleReturnToAdmin,
+          variant: 'secondary',
+        } : undefined}
+        onTabClick={onTabClick}
+      />
+    </>
   );
 }
