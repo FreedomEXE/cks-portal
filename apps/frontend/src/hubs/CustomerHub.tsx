@@ -60,6 +60,7 @@ import { useHubLoading } from '../contexts/HubLoadingContext';
 import { loadUserPreferences, saveUserPreferences } from '../shared/preferences';
 import { dismissActivity, dismissAllActivities } from '../shared/api/directory';
 import { useAccessCodeRedemption } from '../hooks/useAccessCodeRedemption';
+import { buildSupportTickets, mapSupportIssuePayload } from '../shared/support/supportTickets';
 
 interface CustomerHubProps {
   initialTab?: string;
@@ -206,6 +207,7 @@ function CustomerHubContent({ initialTab = 'dashboard' }: CustomerHubProps) {
   } = useHubReports(normalizedCode);
 
   const userCode = useMemo(() => resolvedUserCode(profile?.cksCode, normalizedCode), [profile?.cksCode, normalizedCode]);
+  const supportTickets = useMemo(() => buildSupportTickets(reportsData), [reportsData]);
   
 
   // Access modal context
@@ -320,6 +322,27 @@ function CustomerHubContent({ initialTab = 'dashboard' }: CustomerHubProps) {
       toast.error(error instanceof Error ? error.message : 'Failed to send password reset email');
     }
   }, [user?.id]);
+
+  const handleSupportSubmit = useCallback(async (payload: any) => {
+    const mapped = mapSupportIssuePayload(payload);
+    if (mapped.type === 'report') {
+      await apiCreateReport({
+        title: mapped.title,
+        description: mapped.description,
+        category: mapped.category,
+        priority: mapped.priority,
+        customerId: normalizedCode ?? undefined,
+      });
+    } else {
+      await apiCreateFeedback({
+        title: mapped.title,
+        message: mapped.description,
+        category: mapped.category,
+        customerId: normalizedCode ?? undefined,
+      });
+    }
+    await mutateReports();
+  }, [mutateReports, normalizedCode]);
 
   const overviewData = useMemo(() =>
     buildCustomerOverviewData({
@@ -755,7 +778,12 @@ function CustomerHubContent({ initialTab = 'dashboard' }: CustomerHubProps) {
             </PageWrapper>
           ) : activeTab === 'support' ? (
             <PageWrapper headerSrOnly>
-              <SupportSection role="customer" primaryColor="#eab308" />
+              <SupportSection
+                role="customer"
+                primaryColor="#eab308"
+                tickets={supportTickets}
+                onSubmitTicket={handleSupportSubmit}
+              />
             </PageWrapper>
           ) : (
             <PageWrapper title={activeTab} showHeader headerSrOnly>

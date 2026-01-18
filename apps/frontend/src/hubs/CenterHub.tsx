@@ -59,6 +59,7 @@ import { loadUserPreferences, saveUserPreferences } from '../shared/preferences'
 import { buildCenterOverviewData } from '../shared/overview/builders';
 import { dismissActivity, dismissAllActivities } from '../shared/api/directory';
 import { useAccessCodeRedemption } from '../hooks/useAccessCodeRedemption';
+import { buildSupportTickets, mapSupportIssuePayload } from '../shared/support/supportTickets';
 
 interface CenterHubProps {
   initialTab?: string;
@@ -200,6 +201,7 @@ function CenterHubContent({ initialTab = 'dashboard' }: CenterHubProps) {
     error: ordersError,
   } = useHubOrders(normalizedCode);
   const { data: reportsData, isLoading: reportsLoading, mutate: mutateReports } = useHubReports(normalizedCode);
+  const supportTickets = useMemo(() => buildSupportTickets(reportsData), [reportsData]);
   // Resolved user code for preferences and identity
   const userCode = useMemo(() => profile?.cksCode ?? normalizedCode, [profile?.cksCode, normalizedCode]);
 
@@ -307,6 +309,27 @@ function CenterHubContent({ initialTab = 'dashboard' }: CenterHubProps) {
       toast.error(error instanceof Error ? error.message : 'Failed to send password reset email');
     }
   }, [user?.id]);
+
+  const handleSupportSubmit = useCallback(async (payload: any) => {
+    const mapped = mapSupportIssuePayload(payload);
+    if (mapped.type === 'report') {
+      await apiCreateReport({
+        title: mapped.title,
+        description: mapped.description,
+        category: mapped.category,
+        priority: mapped.priority,
+        centerId: normalizedCode ?? undefined,
+      });
+    } else {
+      await apiCreateFeedback({
+        title: mapped.title,
+        message: mapped.description,
+        category: mapped.category,
+        centerId: normalizedCode ?? undefined,
+      });
+    }
+    await mutateReports();
+  }, [mutateReports, normalizedCode]);
 
   const overviewData = useMemo(() =>
     buildCenterOverviewData({
@@ -758,7 +781,12 @@ function CenterHubContent({ initialTab = 'dashboard' }: CenterHubProps) {
             </PageWrapper>
           ) : activeTab === 'support' ? (
             <PageWrapper headerSrOnly>
-              <SupportSection role="center" primaryColor="#f97316" />
+              <SupportSection
+                role="center"
+                primaryColor="#f97316"
+                tickets={supportTickets}
+                onSubmitTicket={handleSupportSubmit}
+              />
             </PageWrapper>
           ) : (
             <PageWrapper title={activeTab} showHeader headerSrOnly>

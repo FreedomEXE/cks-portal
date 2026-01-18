@@ -1,15 +1,48 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { OverviewSection } from '../overview';
 import { DataTable } from '@cks/ui';
+import type { SupportTicket } from './SupportSection';
 
 interface AdminSupportSectionProps {
   primaryColor?: string;
+  tickets?: SupportTicket[];
+  onTicketClick?: (ticket: SupportTicket) => void;
 }
 
 const AdminSupportSection: React.FC<AdminSupportSectionProps> = ({
-  primaryColor = '#6366f1'
+  primaryColor = '#6366f1',
+  tickets = [],
+  onTicketClick
 }) => {
   const [selectedCategory, setSelectedCategory] = useState('Open Tickets');
+
+  const isToday = (value: string) => {
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      return false;
+    }
+    const now = new Date();
+    return (
+      parsed.getFullYear() === now.getFullYear() &&
+      parsed.getMonth() === now.getMonth() &&
+      parsed.getDate() === now.getDate()
+    );
+  };
+
+  const ticketGroups = useMemo(() => {
+    const open = tickets.filter((t) => t.status === 'Open');
+    const pending = tickets.filter((t) => t.status === 'In Progress');
+    const resolvedToday = tickets.filter((t) => t.status === 'Resolved' && isToday(t.lastUpdated));
+    const escalated = tickets.filter((t) =>
+      (t.priority === 'High' || t.priority === 'Critical') && t.status !== 'Resolved'
+    );
+    return {
+      open,
+      pending,
+      resolvedToday,
+      escalated,
+    };
+  }, [tickets]);
 
   // Admin support overview cards
   const overviewCards = [
@@ -19,29 +52,22 @@ const AdminSupportSection: React.FC<AdminSupportSectionProps> = ({
     { id: 'escalated', title: 'Escalated', dataKey: 'escalated', color: 'red' }
   ];
 
-  // Mock data for overview cards
-  const overviewData = {
-    openTickets: 0,
-    pendingReview: 0,
-    resolvedToday: 0,
-    escalated: 0
-  };
+  const overviewData = useMemo(() => ({
+    openTickets: ticketGroups.open.length,
+    pendingReview: ticketGroups.pending.length,
+    resolvedToday: ticketGroups.resolvedToday.length,
+    escalated: ticketGroups.escalated.length
+  }), [ticketGroups]);
 
-  // Mock tickets data for different categories
-  const ticketsData = {
-    'Open Tickets': [],
-    'Pending Review': [],
-    'Resolved Today': [],
-    'Escalated': []
-  };
+  const ticketsData = useMemo(() => ({
+    'Open Tickets': ticketGroups.open,
+    'Pending Review': ticketGroups.pending,
+    'Resolved Today': ticketGroups.resolvedToday,
+    'Escalated': ticketGroups.escalated
+  }), [ticketGroups]);
 
   const handleCardClick = (cardTitle: string) => {
     setSelectedCategory(cardTitle);
-  };
-
-  const handleCreateTicket = () => {
-    console.log('Creating new ticket...');
-    // This would open a modal or navigate to create ticket form
   };
 
   const handleExportReport = () => {
@@ -113,21 +139,6 @@ const AdminSupportSection: React.FC<AdminSupportSectionProps> = ({
 
           <div style={{ display: 'flex', gap: '12px' }}>
             <button
-              onClick={handleCreateTicket}
-              style={{
-                padding: '8px 16px',
-                fontSize: '14px',
-                fontWeight: 500,
-                backgroundColor: primaryColor,
-                color: 'white',
-                border: 'none',
-                borderRadius: '6px',
-                cursor: 'pointer'
-              }}
-            >
-              Create New Ticket
-            </button>
-            <button
               onClick={handleExportReport}
               style={{
                 padding: '8px 16px',
@@ -184,24 +195,42 @@ const AdminSupportSection: React.FC<AdminSupportSectionProps> = ({
                 </p>
               </div>
             ) : (
-              <DataTable
-                columns={[
-                  { key: 'ticketId', label: 'TICKET ID', clickable: true },
-                  { key: 'subject', label: 'SUBJECT' },
-                  { key: 'submittedBy', label: 'SUBMITTED BY' },
-                  { key: 'priority', label: 'PRIORITY' },
-                  { key: 'status', label: 'STATUS' },
-                  { key: 'assignedTo', label: 'ASSIGNED TO' },
-                  { key: 'dateSubmitted', label: 'DATE SUBMITTED' },
-                  { key: 'lastUpdate', label: 'LAST UPDATE' }
-                ]}
-                data={ticketsData[selectedCategory as keyof typeof ticketsData]}
-                showSearch={true}
-                searchPlaceholder="Search tickets..."
-                maxItems={10}
-                onRowClick={(row) => console.log('View ticket:', row)}
-              />
-            )}
+                <DataTable
+                  columns={[
+                    { key: 'ticketId', label: 'TICKET ID', clickable: true },
+                    { key: 'subject', label: 'SUBJECT' },
+                    { key: 'submittedBy', label: 'SUBMITTED BY' },
+                    { key: 'priority', label: 'PRIORITY' },
+                    { key: 'status', label: 'STATUS' },
+                    { key: 'assignedTo', label: 'ASSIGNED TO' },
+                    { key: 'dateSubmitted', label: 'DATE SUBMITTED' },
+                    { key: 'lastUpdate', label: 'LAST UPDATE' }
+                  ]}
+                  data={ticketsData[selectedCategory as keyof typeof ticketsData].map((ticket) => ({
+                    ticketId: ticket.ticketId,
+                    subject: ticket.subject,
+                    submittedBy: 'N/A',
+                    priority: ticket.priority,
+                    status: ticket.status,
+                    assignedTo: 'Unassigned',
+                    dateSubmitted: ticket.dateCreated,
+                    lastUpdate: ticket.lastUpdated,
+                  }))}
+                  showSearch={true}
+                  searchPlaceholder="Search tickets..."
+                  maxItems={10}
+                  onRowClick={(row) => {
+                    if (onTicketClick) {
+                      const ticket = tickets.find((t) => t.ticketId === row.ticketId);
+                      if (ticket) {
+                        onTicketClick(ticket);
+                        return;
+                      }
+                    }
+                    console.log('View ticket:', row);
+                  }}
+                />
+              )}
           </div>
         </div>
       </div>

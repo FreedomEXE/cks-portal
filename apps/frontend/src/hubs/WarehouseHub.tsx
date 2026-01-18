@@ -44,6 +44,7 @@ import { useCertifiedServices } from '../hooks/useCertifiedServices';
 import { buildWarehouseOverviewData } from '../shared/overview/builders';
 import { resolvedUserCode } from '../shared/utils/userCode';
 import { useAccessCodeRedemption } from '../hooks/useAccessCodeRedemption';
+import { buildSupportTickets, mapSupportIssuePayload } from '../shared/support/supportTickets';
 
 import MyHubSection from '../components/MyHubSection';
 import {
@@ -207,6 +208,7 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
     mutate: refreshOrders,
   } = useHubOrders(normalizedCode);
   const { data: reportsData, isLoading: reportsLoading, mutate: mutateReports } = useHubReports(normalizedCode);
+  const supportTickets = useMemo(() => buildSupportTickets(reportsData), [reportsData]);
 
   // Resolve final display/user code after profile is available
   const userCode = useMemo(() => resolvedUserCode(profile?.cksCode, normalizedCode), [profile?.cksCode, normalizedCode]);
@@ -327,6 +329,25 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
       toast.error(error instanceof Error ? error.message : 'Failed to send password reset email');
     }
   }, [user?.id]);
+
+  const handleSupportSubmit = useCallback(async (payload: any) => {
+    const mapped = mapSupportIssuePayload(payload);
+    if (mapped.type === 'report') {
+      await apiCreateReport({
+        title: mapped.title,
+        description: mapped.description,
+        category: mapped.category,
+        priority: mapped.priority,
+      });
+    } else {
+      await apiCreateFeedback({
+        title: mapped.title,
+        message: mapped.description,
+        category: mapped.category,
+      });
+    }
+    await mutateReports();
+  }, [mutateReports]);
 
   const overviewData = useMemo(() =>
     buildWarehouseOverviewData({
@@ -1109,7 +1130,12 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
             </PageWrapper>
           ) : activeTab === 'support' ? (
             <PageWrapper headerSrOnly>
-              <SupportSection role="warehouse" primaryColor="#8b5cf6" />
+              <SupportSection
+                role="warehouse"
+                primaryColor="#8b5cf6"
+                tickets={supportTickets}
+                onSubmitTicket={handleSupportSubmit}
+              />
             </PageWrapper>
           ) : (
             <PageWrapper title={activeTab} showHeader headerSrOnly>

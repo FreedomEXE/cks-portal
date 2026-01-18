@@ -53,6 +53,7 @@ import { useHubLoading } from '../contexts/HubLoadingContext';
 import { buildOrderActions } from '@cks/domain-widgets';
 import { mapProfileDataForRole, type DirectoryRole, directoryTabToRole } from '../shared/utils/profileMapping';
 import { buildAdminOverviewData } from '../shared/overview/builders';
+import { buildSupportTickets } from '../shared/support/supportTickets';
 
 import { useAdminUsers, updateInventory, fetchAdminOrderById, provisionTestEcosystemUsers } from '../shared/api/admin';
 import {
@@ -263,6 +264,12 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
   // Use hub endpoint for complete report data (same as all other roles)
   const { data: reportsData, isLoading: reportsLoading } = useHubReports(code || 'ADMIN');
   const { data: activityItems, isLoading: activitiesLoading, error: activitiesError } = useActivities();
+  const supportTickets = useMemo(() => buildSupportTickets(reportsData), [reportsData]);
+  const supportItems = useMemo(() => {
+    const reports = reportsData?.reports ?? [];
+    const feedback = reportsData?.feedback ?? [];
+    return [...reports, ...feedback];
+  }, [reportsData]);
 
   const [activityFeed, setActivityFeed] = useState<Activity[]>([]);
 
@@ -499,10 +506,10 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
       centers,
       crew,
       warehouses,
-      reports: reportsData?.reports || [],
+      reports: supportItems,
       goLiveTimestamp: GO_LIVE_TIMESTAMP,
     }),
-  [adminUsers, managers, contractors, customers, centers, crew, warehouses, reportsData]);
+  [adminUsers, managers, contractors, customers, centers, crew, warehouses, supportItems]);
 
   const adminRows = useMemo(
     () =>
@@ -1701,7 +1708,7 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
       />
           ) : activeTab === 'support' ? (
             <PageWrapper title="Support" headerSrOnly>
-              <AdminSupportSection primaryColor="#6366f1" />
+              <AdminSupportSection primaryColor="#6366f1" tickets={supportTickets} />
             </PageWrapper>
           ) : (
             <PageWrapper title={activeTab} showHeader>

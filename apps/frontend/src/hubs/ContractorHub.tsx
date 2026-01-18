@@ -60,6 +60,7 @@ import { loadUserPreferences, saveUserPreferences } from '../shared/preferences'
 import { dismissActivity, dismissAllActivities } from '../shared/api/directory';
 import { buildContractorOverviewData } from '../shared/overview/builders';
 import { useAccessCodeRedemption } from '../hooks/useAccessCodeRedemption';
+import { buildSupportTickets, mapSupportIssuePayload } from '../shared/support/supportTickets';
 
 interface ContractorHubProps {
   initialTab?: string;
@@ -244,7 +245,8 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
   const {
     data: reportsData,
     isLoading: reportsLoading,
-  mutate: mutateReports } = useHubReports(normalizedCode);
+    mutate: mutateReports } = useHubReports(normalizedCode);
+  const supportTickets = useMemo(() => buildSupportTickets(reportsData), [reportsData]);
 
   // Access modal context
   const modals = useModals();
@@ -288,6 +290,25 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
       toast.error(error instanceof Error ? error.message : 'Failed to send password reset email');
     }
   }, [user?.id]);
+
+  const handleSupportSubmit = useCallback(async (payload: any) => {
+    const mapped = mapSupportIssuePayload(payload);
+    if (mapped.type === 'report') {
+      await apiCreateReport({
+        title: mapped.title,
+        description: mapped.description,
+        category: mapped.category,
+        priority: mapped.priority,
+      });
+    } else {
+      await apiCreateFeedback({
+        title: mapped.title,
+        message: mapped.description,
+        category: mapped.category,
+      });
+    }
+    await mutateReports();
+  }, [mutateReports]);
 
   
   const userCode = useMemo(() => resolvedUserCode(profile?.cksCode, normalizedCode), [profile?.cksCode, normalizedCode]);
@@ -914,7 +935,12 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
             </PageWrapper>
           ) : activeTab === 'support' ? (
             <PageWrapper headerSrOnly>
-              <SupportSection role="contractor" primaryColor="#10b981" />
+              <SupportSection
+                role="contractor"
+                primaryColor="#10b981"
+                tickets={supportTickets}
+                onSubmitTicket={handleSupportSubmit}
+              />
             </PageWrapper>
           ) : (
             <PageWrapper title={activeTab} showHeader headerSrOnly>

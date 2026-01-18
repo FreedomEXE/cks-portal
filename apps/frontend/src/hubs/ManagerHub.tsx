@@ -77,6 +77,7 @@ import { apiFetch } from '../shared/api/client';
 import { applyServiceAction } from '../shared/api/hub';
 import { requestPasswordReset } from '../shared/api/account';
 import { loadUserPreferences, saveUserPreferences } from '../shared/preferences';
+import { buildSupportTickets, mapSupportIssuePayload } from '../shared/support/supportTickets';
 
 interface ManagerHubProps {
   initialTab?: string;
@@ -520,6 +521,7 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
   const { activities: formattedActivities, isLoading: activitiesLoading, error: activitiesError, mutate: mutateActivities } = useFormattedActivities(authCode, { limit: 20 });
 
   const { data: ordersData } = useHubOrders(authCode);
+  const supportTickets = useMemo(() => buildSupportTickets(reportsData), [reportsData]);
   // Resolved display/identity code once profile is known
   const userCode = useMemo(
     () => resolvedUserCode(profileData?.cksCode, authCode),
@@ -1014,6 +1016,25 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
     }
   }, [user]);
 
+  const handleSupportSubmit = useCallback(async (payload: any) => {
+    const mapped = mapSupportIssuePayload(payload);
+    if (mapped.type === 'report') {
+      await apiCreateReport({
+        title: mapped.title,
+        description: mapped.description,
+        category: mapped.category,
+        priority: mapped.priority,
+      });
+    } else {
+      await apiCreateFeedback({
+        title: mapped.title,
+        message: mapped.description,
+        category: mapped.category,
+      });
+    }
+    await mutateReports();
+  }, [mutateReports]);
+
   // Note: Crew request and service creation handlers removed
   // Services are now auto-created on manager accept
   // Crew, procedures, training are managed from Active Services section
@@ -1265,7 +1286,12 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
             </PageWrapper>
           ) : activeTab === 'support' ? (
             <PageWrapper title="Support" headerSrOnly>
-              <SupportSection role="manager" primaryColor={MANAGER_PRIMARY_COLOR} />
+              <SupportSection
+                role="manager"
+                primaryColor={MANAGER_PRIMARY_COLOR}
+                tickets={supportTickets}
+                onSubmitTicket={handleSupportSubmit}
+              />
             </PageWrapper>
           ) : activeTab === 'reports' ? (
           <PageWrapper title="Reports" headerSrOnly>

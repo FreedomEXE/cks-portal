@@ -62,6 +62,7 @@ import { resolvedUserCode } from '../shared/utils/userCode';
 import { useHubLoading } from '../contexts/HubLoadingContext';
 import { loadUserPreferences, saveUserPreferences } from '../shared/preferences';
 import { useAccessCodeRedemption } from '../hooks/useAccessCodeRedemption';
+import { buildSupportTickets, mapSupportIssuePayload } from '../shared/support/supportTickets';
 
 interface CrewHubProps {
   initialTab?: string;
@@ -208,7 +209,8 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
     isLoading: ordersLoading,
     error: ordersError,
   } = useHubOrders(normalizedCode);
-  const { data: reportsData, isLoading: reportsLoading } = useHubReports(normalizedCode);
+  const { data: reportsData, isLoading: reportsLoading, mutate: mutateReports } = useHubReports(normalizedCode);
+  const supportTickets = useMemo(() => buildSupportTickets(reportsData), [reportsData]);
   const userCode = useMemo(() => resolvedUserCode(profile?.cksCode, normalizedCode), [profile?.cksCode, normalizedCode]);
 
   const {
@@ -347,6 +349,25 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
       toast.error(error instanceof Error ? error.message : 'Failed to send password reset email');
     }
   }, [user?.id]);
+
+  const handleSupportSubmit = useCallback(async (payload: any) => {
+    const mapped = mapSupportIssuePayload(payload);
+    if (mapped.type === 'report') {
+      await apiCreateReport({
+        title: mapped.title,
+        description: mapped.description,
+        category: mapped.category,
+        priority: mapped.priority,
+      });
+    } else {
+      await apiCreateFeedback({
+        title: mapped.title,
+        message: mapped.description,
+        category: mapped.category,
+      });
+    }
+    await mutateReports();
+  }, [mutateReports]);
 
   const overviewData = useMemo(() =>
     buildCrewOverviewData({
@@ -866,7 +887,12 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
             </PageWrapper>
           ) : activeTab === 'support' ? (
             <PageWrapper headerSrOnly>
-              <SupportSection role="crew" primaryColor="#ef4444" />
+              <SupportSection
+                role="crew"
+                primaryColor="#ef4444"
+                tickets={supportTickets}
+                onSubmitTicket={handleSupportSubmit}
+              />
             </PageWrapper>
           ) : (
             <PageWrapper title={activeTab} showHeader headerSrOnly>

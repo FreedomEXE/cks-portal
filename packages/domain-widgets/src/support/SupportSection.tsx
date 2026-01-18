@@ -6,7 +6,7 @@ interface FAQ {
   answer: string;
 }
 
-interface SupportTicket {
+export interface SupportTicket {
   ticketId: string;
   subject: string;
   issueType: string;
@@ -16,14 +16,28 @@ interface SupportTicket {
   lastUpdated: string;
 }
 
+export interface SupportTicketFormPayload {
+  issueType: string;
+  priority: string;
+  subject: string;
+  description: string;
+  stepsToReproduce: string;
+}
+
 interface SupportSectionProps {
   role?: string;
   primaryColor?: string;
+  tickets?: SupportTicket[];
+  onSubmitTicket?: (payload: SupportTicketFormPayload) => Promise<void> | void;
+  onTicketClick?: (ticket: SupportTicket) => void;
 }
 
 const SupportSection: React.FC<SupportSectionProps> = ({
   role = 'warehouse',
-  primaryColor = '#8b5cf6'
+  primaryColor = '#8b5cf6',
+  tickets,
+  onSubmitTicket,
+  onTicketClick
 }) => {
   const [activeTab, setActiveTab] = useState('knowledge');
   const [searchQuery, setSearchQuery] = useState('');
@@ -33,6 +47,13 @@ const SupportSection: React.FC<SupportSectionProps> = ({
     subject: '',
     description: '',
     stepsToReproduce: ''
+  });
+  const [submitState, setSubmitState] = useState<{
+    status: 'idle' | 'submitting' | 'success' | 'error';
+    message: string | null;
+  }>({
+    status: 'idle',
+    message: null
   });
 
   // FAQ data based on role
@@ -206,19 +227,29 @@ const SupportSection: React.FC<SupportSectionProps> = ({
   const faqs = getFAQs(role);
 
   // TODO: Fetch real tickets from backend API
-  const myTickets: SupportTicket[] = [];
+  const myTickets = tickets ?? [];
 
-  const handleSubmitTicket = () => {
-    console.log('Submitting ticket:', ticketForm);
-    // Reset form
-    setTicketForm({
-      issueType: '',
-      priority: 'Medium',
-      subject: '',
-      description: '',
-      stepsToReproduce: ''
-    });
-    alert('Support ticket submitted successfully!');
+  const handleSubmitTicket = async () => {
+    if (!onSubmitTicket) {
+      setSubmitState({ status: 'error', message: 'Support submission is not configured.' });
+      return;
+    }
+
+    setSubmitState({ status: 'submitting', message: null });
+    try {
+      await onSubmitTicket(ticketForm);
+      setSubmitState({ status: 'success', message: 'Support ticket submitted successfully.' });
+      setTicketForm({
+        issueType: '',
+        priority: 'Medium',
+        subject: '',
+        description: '',
+        stepsToReproduce: ''
+      });
+    } catch (error: any) {
+      const message = error?.message || 'Failed to submit support ticket.';
+      setSubmitState({ status: 'error', message });
+    }
   };
 
   const handleClearForm = () => {
@@ -303,7 +334,13 @@ const SupportSection: React.FC<SupportSectionProps> = ({
         showSearch={false}
         externalSearchQuery={searchQuery}
         maxItems={10}
-        onRowClick={(row) => console.log('View ticket:', row)}
+        onRowClick={(row) => {
+          if (onTicketClick) {
+            onTicketClick(row as SupportTicket);
+            return;
+          }
+          console.log('View ticket:', row);
+        }}
       />
     </div>
   );
@@ -320,6 +357,18 @@ const SupportSection: React.FC<SupportSectionProps> = ({
       </h3>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        {submitState.status !== 'idle' && submitState.message && (
+          <div style={{
+            padding: '10px 12px',
+            borderRadius: '6px',
+            fontSize: '14px',
+            border: `1px solid ${submitState.status === 'error' ? '#fecaca' : '#bbf7d0'}`,
+            backgroundColor: submitState.status === 'error' ? '#fef2f2' : '#f0fdf4',
+            color: submitState.status === 'error' ? '#dc2626' : '#15803d'
+          }}>
+            {submitState.message}
+          </div>
+        )}
         {/* Issue Type and Priority Row */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
           <div>
@@ -500,7 +549,7 @@ const SupportSection: React.FC<SupportSectionProps> = ({
           </button>
           <button
             onClick={handleSubmitTicket}
-            disabled={!ticketForm.issueType || !ticketForm.subject || !ticketForm.description}
+            disabled={submitState.status === 'submitting' || !ticketForm.issueType || !ticketForm.subject || !ticketForm.description}
             style={{
               padding: '10px 20px',
               fontSize: '14px',
@@ -512,7 +561,7 @@ const SupportSection: React.FC<SupportSectionProps> = ({
               cursor: ticketForm.issueType && ticketForm.subject && ticketForm.description ? 'pointer' : 'not-allowed'
             }}
           >
-            Submit Ticket
+            {submitState.status === 'submitting' ? 'Submitting...' : 'Submit Ticket'}
           </button>
         </div>
       </div>
