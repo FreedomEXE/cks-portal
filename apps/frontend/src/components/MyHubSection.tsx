@@ -20,6 +20,10 @@ export default function MyHubSection({
   const { user } = useUser();
   const location = useLocation();
   const [showReturnToAdmin, setShowReturnToAdmin] = useState(false);
+  const onLogout = providedOnLogout ?? logout;
+  const welcomeName = providedWelcomeName ?? ownerFirstName ?? firstName ?? undefined;
+  const userId = code ?? providedUserId ?? user?.username ?? undefined;
+  const resolvedRole = (providedRole ?? role ?? 'admin').toLowerCase();
 
   // Handle navigation from catalog with specific tab request
   useEffect(() => {
@@ -55,14 +59,12 @@ export default function MyHubSection({
     await logout();
   }, [logout]);
 
-  const onLogout = providedOnLogout ?? logout;
-  const welcomeName = providedWelcomeName ?? ownerFirstName ?? firstName ?? undefined;
-  const userId = code ?? providedUserId ?? user?.username ?? undefined;
-  const resolvedRole = (providedRole ?? role ?? 'admin').toLowerCase();
+  const isAdmin = resolvedRole === 'admin' || resolvedRole === 'administrator';
+  const shouldShowImpersonation = showReturnToAdmin && !isAdmin;
 
   return (
     <>
-      {showReturnToAdmin ? (
+      {shouldShowImpersonation ? (
         <div style={{
           background: '#fef3c7',
           border: '1px solid #f59e0b',
@@ -82,7 +84,7 @@ export default function MyHubSection({
         welcomeName={welcomeName}
         userId={userId}
         onLogout={onLogout}
-        secondaryAction={showReturnToAdmin ? {
+        secondaryAction={shouldShowImpersonation ? {
           label: 'Return to Admin',
           onClick: handleReturnToAdmin,
           variant: 'secondary',

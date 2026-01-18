@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 
 const SESSION_KEYS = ['role', 'code'];
 const LOCAL_KEYS = ['userLoggedOut'];
-const IMPERSONATION_KEYS = ['cks_impersonation_active', 'cks_impersonation_ticket', 'cks_impersonation_return'];
+const IMPERSONATION_KEYS = ['cks_impersonation_active', 'cks_impersonation_ticket', 'cks_impersonation_return', 'cks_impersonation_attempt'];
 
 export function useLogout() {
   const { signOut } = useClerk();

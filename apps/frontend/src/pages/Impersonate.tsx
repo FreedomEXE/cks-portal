@@ -4,6 +4,7 @@ import { useAuth, useClerk, useSignIn } from '@clerk/clerk-react';
 
 const IMPERSONATION_TICKET_KEY = 'cks_impersonation_ticket';
 const IMPERSONATION_ACTIVE_KEY = 'cks_impersonation_active';
+const IMPERSONATION_ATTEMPT_KEY = 'cks_impersonation_attempt';
 
 export default function Impersonate(): JSX.Element {
   const [searchParams] = useSearchParams();
@@ -37,6 +38,12 @@ export default function Impersonate(): JSX.Element {
       return;
     }
 
+    if (sessionStorage.getItem(IMPERSONATION_ATTEMPT_KEY) === ticket) {
+      setMessage('Impersonation token already used. Please return to admin and try again.');
+      setShowReturn(true);
+      return;
+    }
+
     if (isSignedIn) {
       hasRun.current = true;
       setMessage('Signing out to continue impersonation...');
@@ -47,6 +54,7 @@ export default function Impersonate(): JSX.Element {
     hasRun.current = true;
     setMessage('Signing in as target user...');
 
+    sessionStorage.setItem(IMPERSONATION_ATTEMPT_KEY, ticket);
     signIn
       .create({ strategy: 'ticket', ticket })
       .then(async (result) => {
@@ -56,6 +64,7 @@ export default function Impersonate(): JSX.Element {
           return;
         }
         sessionStorage.removeItem(IMPERSONATION_TICKET_KEY);
+        sessionStorage.removeItem(IMPERSONATION_ATTEMPT_KEY);
         sessionStorage.setItem(IMPERSONATION_ACTIVE_KEY, 'true');
         setShowReturn(false);
         await setActive({ session: result.createdSessionId });
@@ -66,6 +75,7 @@ export default function Impersonate(): JSX.Element {
         if (detail.toLowerCase().includes('token has already been used')) {
           sessionStorage.removeItem(IMPERSONATION_TICKET_KEY);
           sessionStorage.removeItem(IMPERSONATION_ACTIVE_KEY);
+          sessionStorage.removeItem(IMPERSONATION_ATTEMPT_KEY);
           setMessage('Impersonation token already used. Please return to admin and try again.');
           setShowReturn(true);
           return;
@@ -86,6 +96,7 @@ export default function Impersonate(): JSX.Element {
             try {
               sessionStorage.removeItem(IMPERSONATION_TICKET_KEY);
               sessionStorage.removeItem(IMPERSONATION_ACTIVE_KEY);
+              sessionStorage.removeItem(IMPERSONATION_ATTEMPT_KEY);
             } catch {}
             navigate('/login', { replace: true });
           }}
