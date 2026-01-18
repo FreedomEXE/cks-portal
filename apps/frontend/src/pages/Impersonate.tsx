@@ -11,6 +11,7 @@ export default function Impersonate(): JSX.Element {
   const { signOut } = useClerk();
   const { isSignedIn } = useAuth();
   const [message, setMessage] = useState('Preparing impersonation...');
+  const [showReturn, setShowReturn] = useState(false);
   const hasRun = useRef(false);
 
   useEffect(() => {
@@ -26,6 +27,7 @@ export default function Impersonate(): JSX.Element {
     const ticket = ticketFromQuery || sessionStorage.getItem(IMPERSONATION_TICKET_KEY);
     if (!ticket) {
       setMessage('No impersonation ticket found.');
+      setShowReturn(true);
       return;
     }
 
@@ -44,22 +46,50 @@ export default function Impersonate(): JSX.Element {
       .then(async (result) => {
         if (result?.status !== 'complete') {
           setMessage('Impersonation requires additional verification.');
+          setShowReturn(true);
           return;
         }
         sessionStorage.removeItem(IMPERSONATION_TICKET_KEY);
+        setShowReturn(false);
         await setActive({ session: result.createdSessionId });
         navigate('/hub', { replace: true });
       })
       .catch((error: unknown) => {
         const detail = error instanceof Error ? error.message : String(error);
+        if (detail.toLowerCase().includes('token has already been used')) {
+          sessionStorage.removeItem(IMPERSONATION_TICKET_KEY);
+          setMessage('Impersonation token already used. Please return to admin and try again.');
+          setShowReturn(true);
+          return;
+        }
         setMessage(`Impersonation failed: ${detail}`);
+        setShowReturn(true);
       });
   }, [isLoaded, isSignedIn, navigate, searchParams, setActive, signIn, signOut]);
 
   return (
-    <div style={{ padding: 24 }}>
+    <div style={{ padding: 24, maxWidth: 520 }}>
       <h2 style={{ margin: 0, marginBottom: 8 }}>Impersonation</h2>
       <p style={{ margin: 0, color: '#4b5563' }}>{message}</p>
+      {showReturn ? (
+        <button
+          type="button"
+          onClick={() => navigate('/login', { replace: true })}
+          style={{
+            marginTop: 16,
+            padding: '8px 14px',
+            borderRadius: 8,
+            border: '1px solid #d1d5db',
+            background: '#ffffff',
+            color: '#111827',
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: 'pointer',
+          }}
+        >
+          Return to Admin
+        </button>
+      ) : null}
     </div>
   );
 }
