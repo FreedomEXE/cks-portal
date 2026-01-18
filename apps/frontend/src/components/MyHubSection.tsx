@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '@cks/auth';
 import { useUser } from '@clerk/clerk-react';
@@ -19,7 +19,6 @@ export default function MyHubSection({
   const { code, firstName, ownerFirstName, role } = useAuth();
   const { user } = useUser();
   const location = useLocation();
-  const [showReturnToAdmin, setShowReturnToAdmin] = useState(false);
   const onLogout = providedOnLogout ?? logout;
   const welcomeName = providedWelcomeName ?? ownerFirstName ?? firstName ?? undefined;
   const userId = code ?? providedUserId ?? user?.username ?? undefined;
@@ -36,18 +35,13 @@ export default function MyHubSection({
   useEffect(() => {
     try {
       const isActive = sessionStorage.getItem('cks_impersonation_active') === 'true';
-      const isAdmin = resolvedRole === 'admin' || resolvedRole === 'administrator';
-      if (isAdmin && isActive) {
+      const isAdminRole = resolvedRole === 'admin' || resolvedRole === 'administrator';
+      if (isAdminRole && isActive) {
         sessionStorage.removeItem('cks_impersonation_active');
         sessionStorage.removeItem('cks_impersonation_ticket');
         sessionStorage.removeItem('cks_impersonation_return');
-        setShowReturnToAdmin(false);
-        return;
       }
-      setShowReturnToAdmin(isActive);
-    } catch {
-      setShowReturnToAdmin(false);
-    }
+    } catch {}
   }, [resolvedRole]);
 
   const handleReturnToAdmin = useCallback(async () => {
@@ -60,7 +54,11 @@ export default function MyHubSection({
   }, [logout]);
 
   const isAdmin = resolvedRole === 'admin' || resolvedRole === 'administrator';
-  const shouldShowImpersonation = showReturnToAdmin && !isAdmin;
+  let impersonationActive = false;
+  try {
+    impersonationActive = sessionStorage.getItem('cks_impersonation_active') === 'true';
+  } catch {}
+  const shouldShowImpersonation = impersonationActive && !isAdmin;
 
   return (
     <>
