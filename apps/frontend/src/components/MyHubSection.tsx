@@ -31,11 +31,20 @@ export default function MyHubSection({
 
   useEffect(() => {
     try {
-      setShowReturnToAdmin(sessionStorage.getItem('cks_impersonation_active') === 'true');
+      const isActive = sessionStorage.getItem('cks_impersonation_active') === 'true';
+      const isAdmin = resolvedRole === 'admin' || resolvedRole === 'administrator';
+      if (isAdmin && isActive) {
+        sessionStorage.removeItem('cks_impersonation_active');
+        sessionStorage.removeItem('cks_impersonation_ticket');
+        sessionStorage.removeItem('cks_impersonation_return');
+        setShowReturnToAdmin(false);
+        return;
+      }
+      setShowReturnToAdmin(isActive);
     } catch {
       setShowReturnToAdmin(false);
     }
-  }, []);
+  }, [resolvedRole]);
 
   const handleReturnToAdmin = useCallback(async () => {
     try {

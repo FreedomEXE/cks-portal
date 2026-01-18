@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth, useClerk, useSignIn } from '@clerk/clerk-react';
 
 const IMPERSONATION_TICKET_KEY = 'cks_impersonation_ticket';
+const IMPERSONATION_ACTIVE_KEY = 'cks_impersonation_active';
 
 export default function Impersonate(): JSX.Element {
   const [searchParams] = useSearchParams();
@@ -18,6 +19,11 @@ export default function Impersonate(): JSX.Element {
     if (!isLoaded || hasRun.current) {
       return;
     }
+
+    try {
+      sessionStorage.removeItem(IMPERSONATION_TICKET_KEY);
+      sessionStorage.removeItem(IMPERSONATION_ACTIVE_KEY);
+    } catch {}
 
     const ticketFromQuery = searchParams.get('ticket');
     if (ticketFromQuery) {
@@ -50,6 +56,7 @@ export default function Impersonate(): JSX.Element {
           return;
         }
         sessionStorage.removeItem(IMPERSONATION_TICKET_KEY);
+        sessionStorage.setItem(IMPERSONATION_ACTIVE_KEY, 'true');
         setShowReturn(false);
         await setActive({ session: result.createdSessionId });
         navigate('/hub', { replace: true });
@@ -58,6 +65,7 @@ export default function Impersonate(): JSX.Element {
         const detail = error instanceof Error ? error.message : String(error);
         if (detail.toLowerCase().includes('token has already been used')) {
           sessionStorage.removeItem(IMPERSONATION_TICKET_KEY);
+          sessionStorage.removeItem(IMPERSONATION_ACTIVE_KEY);
           setMessage('Impersonation token already used. Please return to admin and try again.');
           setShowReturn(true);
           return;
@@ -74,7 +82,13 @@ export default function Impersonate(): JSX.Element {
       {showReturn ? (
         <button
           type="button"
-          onClick={() => navigate('/login', { replace: true })}
+          onClick={() => {
+            try {
+              sessionStorage.removeItem(IMPERSONATION_TICKET_KEY);
+              sessionStorage.removeItem(IMPERSONATION_ACTIVE_KEY);
+            } catch {}
+            navigate('/login', { replace: true });
+          }}
           style={{
             marginTop: 16,
             padding: '8px 14px',

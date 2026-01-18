@@ -489,9 +489,8 @@ async function handleUserAction(
         const ticket = response?.token;
 
         if (sessionId) {
-          sessionStorage.setItem('cks_impersonation_active', 'true');
-          sessionStorage.setItem('cks_impersonation_return', window.location.pathname + window.location.search);
           await impersonation.setActive({ session: sessionId });
+          sessionStorage.setItem('cks_impersonation_active', 'true');
           options.onSuccess?.();
           window.location.assign('/hub');
           return true;
@@ -500,10 +499,6 @@ async function handleUserAction(
           toast.error('Failed to start impersonation.');
           return false;
         }
-
-        sessionStorage.setItem('cks_impersonation_ticket', ticket);
-        sessionStorage.setItem('cks_impersonation_active', 'true');
-        sessionStorage.setItem('cks_impersonation_return', window.location.pathname + window.location.search);
 
         const redirectUrl = `/impersonate?ticket=${encodeURIComponent(ticket)}`;
         if (impersonation.signOut) {
