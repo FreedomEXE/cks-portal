@@ -390,4 +390,38 @@ export async function registerAdminUserRoutes(server: FastifyInstance) {
       },
     });
   });
+
+  server.post("/api/admin/test-ecosystem/provision", async (request, reply) => {
+    const auth = await requireActiveAdmin(request, reply);
+    if (!auth) return;
+
+    const testEntities = [
+      { entityType: "manager", entityId: "MGR-001-TEST" },
+      { entityType: "contractor", entityId: "CON-001-TEST" },
+      { entityType: "customer", entityId: "CUS-001-TEST" },
+      { entityType: "center", entityId: "CEN-001-TEST" },
+      { entityType: "crew", entityId: "CRW-001-TEST" },
+      { entityType: "warehouse", entityId: "WHS-001-TEST" },
+    ];
+
+    const results = [];
+    for (const entity of testEntities) {
+      try {
+        const clerkUser = await getOrCreateClerkUserForEntity(entity.entityType, entity.entityId);
+        results.push({
+          ...entity,
+          status: "linked",
+          clerkUserId: clerkUser?.id ?? null,
+        });
+      } catch (error) {
+        results.push({
+          ...entity,
+          status: "error",
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    reply.send({ data: { results } });
+  });
 }

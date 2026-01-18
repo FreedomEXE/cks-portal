@@ -54,7 +54,7 @@ import { buildOrderActions } from '@cks/domain-widgets';
 import { mapProfileDataForRole, type DirectoryRole, directoryTabToRole } from '../shared/utils/profileMapping';
 import { buildAdminOverviewData } from '../shared/overview/builders';
 
-import { useAdminUsers, updateInventory, fetchAdminOrderById } from '../shared/api/admin';
+import { useAdminUsers, updateInventory, fetchAdminOrderById, provisionTestEcosystemUsers } from '../shared/api/admin';
 import {
   useActivities,
   useCenters,
@@ -1607,13 +1607,39 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
             <PageWrapper title="Ecosystems" showHeader>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
                 <PageHeader title="Ecosystems Overview" />
-                <Button
-                  variant={showTestEcosystems ? 'primary' : 'secondary'}
-                  size="small"
-                  onClick={() => setShowTestEcosystems((prev) => !prev)}
-                >
-                  {showTestEcosystems ? 'Hide test ecosystems' : 'Show test ecosystems'}
-                </Button>
+                <div style={{ display: 'flex', gap: 12 }}>
+                  <Button
+                    variant="secondary"
+                    size="small"
+                    onClick={async () => {
+                      try {
+                        const results = await provisionTestEcosystemUsers();
+                        const linked = results.filter((r) => r.status === 'linked').length;
+                        const failed = results.filter((r) => r.status === 'error');
+                        if (failed.length > 0) {
+                          setToast(`Linked ${linked} test users. ${failed.length} failed.`);
+                          console.warn('[admin] test user provisioning failures', failed);
+                        } else {
+                          setToast(`Linked ${linked} test users in Clerk.`);
+                        }
+                        setTimeout(() => setToast(null), 3500);
+                      } catch (error) {
+                        console.error('[admin] test user provisioning failed', error);
+                        setToast('Failed to link test users. Check logs.');
+                        setTimeout(() => setToast(null), 3500);
+                      }
+                    }}
+                  >
+                    Link test users
+                  </Button>
+                  <Button
+                    variant={showTestEcosystems ? 'primary' : 'secondary'}
+                    size="small"
+                    onClick={() => setShowTestEcosystems((prev) => !prev)}
+                  >
+                    {showTestEcosystems ? 'Hide test ecosystems' : 'Show test ecosystems'}
+                  </Button>
+                </div>
               </div>
               <div style={{ marginBottom: 12, color: '#64748b', fontSize: 13 }}>
                 Test ecosystems use the `-TEST` suffix on IDs (example: `MGR-001-TEST`).

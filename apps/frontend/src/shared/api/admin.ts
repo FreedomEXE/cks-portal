@@ -106,6 +106,27 @@ export async function sendUserInvite(
   return response.data;
 }
 
+export interface ProvisionTestUsersResult {
+  entityType: string;
+  entityId: string;
+  status: 'linked' | 'error';
+  clerkUserId?: string | null;
+  error?: string;
+}
+
+export async function provisionTestEcosystemUsers(
+  init?: ApiFetchInit,
+): Promise<ProvisionTestUsersResult[]> {
+  const response = await apiFetch<ApiResponse<{ results: ProvisionTestUsersResult[] }>>(
+    '/admin/test-ecosystem/provision',
+    {
+      method: 'POST',
+      ...init,
+    },
+  );
+  return response.data.results;
+}
+
 export interface UpdateInventoryInput {
   warehouseId: string;
   itemId: string;
