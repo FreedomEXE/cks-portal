@@ -6,6 +6,11 @@ html, body, #root {
   height: 100%;
 }
 
+/* Scale typography across common desktop widths without affecting large screens. */
+html {
+  font-size: clamp(14px, 0.65vw + 7px, 16px);
+}
+
 :root {
   --bg: #f8fafc;
   --text: #0f172a;
@@ -47,22 +52,7 @@ body {
   }
 }
 
-/* Reduce base font-size slightly on smaller desktop widths to avoid a “zoomed” feel */
-@media (max-width: 1366px) and (min-width: 1025px) {
-  html { font-size: 15.5px; }
-}
-@media (max-width: 1280px) and (min-width: 901px) {
-  html { font-size: 15px; }
-}
-@media (max-width: 1152px) and (min-width: 801px) {
-  html { font-size: 14.5px; }
-}
-
-/* Fluid base to preserve the same visual scale across monitors.
-   Tailwind spacing/typography are rem-based, so adjusting html font-size
-   keeps the design look consistent without breaking layout. */
-/* Keep root font-size at 16px for accessibility and consistency */
-/* html { font-size: 16px; } (default) */
+/* Tailwind spacing/typography are rem-based, so scaling html keeps visuals consistent. */
 
 .btn { @apply px-3 py-2 rounded-md; }
 .btn-primary { @apply bg-brand-600 text-white hover:bg-brand-500 focus:ring-2 focus:ring-brand-300 focus:outline-none; }

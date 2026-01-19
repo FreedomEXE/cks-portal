@@ -201,6 +201,7 @@ export default function Login() {
   const isIOS = /iPhone|iPad|iPod/i.test(ua);
   const isAndroid = /Android/i.test(ua);
   const isChrome = /Chrome|CriOS/i.test(ua);
+  const isEdge = /Edg/i.test(ua);
   const isStandalone =
     window.matchMedia('(display-mode: standalone)').matches ||
     (window.navigator as any).standalone === true;
@@ -336,7 +337,11 @@ export default function Login() {
                           </div>
                         ) : isAndroid && isChrome ? (
                           <div>
-                            Android Chrome: open the menu (⋮) and choose “Install app”.
+                            Android Chrome: tap the menu (⋮) and choose “Install app”.
+                          </div>
+                        ) : isChrome || isEdge ? (
+                          <div>
+                            Look for the install icon in the address bar, or use the browser menu to install.
                           </div>
                         ) : (
                           <div>
