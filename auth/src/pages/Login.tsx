@@ -10,6 +10,11 @@ import logoSrc from '../assets/cks-portal-logo.svg';
 
 const CARD_ANIMATION_STYLE_ID = 'cks-login-card-animation';
 
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
+}
+
 export default function Login() {
   const navigate = useNavigate();
   const { isLoaded, signIn, setActive } = useSignIn();
@@ -20,6 +25,8 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [isInstalled, setIsInstalled] = useState(false);
   const submittingRef = useRef(false);
 
   async function onSubmit(e: FormEvent) {
@@ -151,6 +158,52 @@ export default function Login() {
     };
   }, []);
 
+  useEffect(() => {
+    const handleBeforeInstall = (event: Event) => {
+      event.preventDefault();
+      setInstallPrompt(event as BeforeInstallPromptEvent);
+    };
+    const handleInstalled = () => {
+      setIsInstalled(true);
+      setInstallPrompt(null);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+    window.addEventListener('appinstalled', handleInstalled);
+
+    const standaloneMatch = window.matchMedia('(display-mode: standalone)');
+    if (standaloneMatch.matches) {
+      setIsInstalled(true);
+    }
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+      window.removeEventListener('appinstalled', handleInstalled);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (installPrompt) {
+      await installPrompt.prompt();
+      const choice = await installPrompt.userChoice;
+      if (choice.outcome !== 'dismissed') {
+        setInstallPrompt(null);
+        setIsInstalled(true);
+      }
+      return;
+    }
+
+    const ua = navigator.userAgent || '';
+    const isIOS = /iPhone|iPad|iPod/i.test(ua);
+    const isStandalone = (window.navigator as any).standalone === true;
+    if (isIOS && !isStandalone) {
+      alert('To install, tap Share and choose Add to Home Screen.');
+      return;
+    }
+
+    alert('Install is not available in this browser.');
+  };
+
   const cardSurfaceStyle = useMemo(
     () => ({
       backgroundColor: '#4a5568',
@@ -266,6 +319,14 @@ export default function Login() {
                 >
                   Continue with Google
                 </button>
+                {!isInstalled && (
+                  <button
+                    onClick={handleInstallClick}
+                    className="mt-3 inline-flex w-full items-center justify-center rounded-xl border border-white/30 bg-transparent px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
+                  >
+                    Install app
+                  </button>
+                )}
                 <div className="mt-4 text-center text-xs text-slate-400">Secured by Clerk</div>
               </div>
             </div>
