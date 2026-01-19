@@ -33,6 +33,7 @@ import { useModals } from '../contexts';
 // Order details handled by ModalGateway openById; legacy gateway removed
 import MyHubSection from '../components/MyHubSection';
 import { useCatalogItems } from '../shared/api/catalog';
+import { useNewsFeed } from '../shared/api/news';
 import { useCertifiedServices } from '../hooks/useCertifiedServices';
 import { useLogout } from '../hooks/useLogout';
 import { buildManagerOverviewData } from '../shared/overview/builders';
@@ -421,6 +422,17 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
   const { data: ordersData } = useHubOrders(userCode);
   const { data: scopeData } = useHubRoleScope(userCode);
   const { mutate } = useSWRConfig();
+  const { data: newsItems = [] } = useNewsFeed();
+
+  const newsPreviewItems = useMemo(
+    () =>
+      newsItems.slice(0, 3).map((item) => ({
+        id: item.id,
+        title: item.title,
+        date: new Date(item.createdAt),
+      })),
+    [newsItems],
+  );
 
   // Get available crew from scope
   const availableCrew = useMemo(() => {
@@ -1077,7 +1089,7 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
               />
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 24 }}>
-                <NewsPreview color={MANAGER_PRIMARY_COLOR} onViewAll={() => console.log('[manager] view news')} />
+                <NewsPreview color={MANAGER_PRIMARY_COLOR} items={newsPreviewItems} onViewAll={() => navigate('/news')} />
                 <MemosPreview color={MANAGER_PRIMARY_COLOR} onViewAll={() => navigate('/memos')} />
               </div>
             </PageWrapper>

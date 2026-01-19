@@ -37,6 +37,7 @@ import { useAuth } from '@cks/auth';
 import { useClerk, useUser } from '@clerk/clerk-react';
 import { useFormattedActivities } from '../shared/activity/useFormattedActivities';
 import { requestPasswordReset } from '../shared/api/account';
+import { useNewsFeed } from '../shared/api/news';
 import { ActivityFeed } from '../components/ActivityFeed';
 import ProfileSkeleton from '../components/ProfileSkeleton';
 // Legacy ActivityModalGateway removed - use universal ModalGateway via modals.openById()
@@ -240,6 +241,16 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
     error: ordersError,
   } = useHubOrders(normalizedCode);
   const { mutate } = useSWRConfig();
+  const { data: newsItems = [] } = useNewsFeed();
+  const newsPreviewItems = useMemo(
+    () =>
+      newsItems.slice(0, 3).map((item) => ({
+        id: item.id,
+        title: item.title,
+        date: new Date(item.createdAt),
+      })),
+    [newsItems],
+  );
   const { handleAction } = useEntityActions();
   const [notice, setNotice] = useState<string | null>(null);
   const {
@@ -655,7 +666,7 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
               />
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 24 }}>
-                <NewsPreview color="#10b981" onViewAll={() => navigate('/news')} />
+                <NewsPreview color="#10b981" items={newsPreviewItems} onViewAll={() => navigate('/news')} />
                 <MemosPreview color="#10b981" onViewAll={() => navigate('/memos')} />
               </div>
             </PageWrapper>

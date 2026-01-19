@@ -97,8 +97,9 @@ export function parseEntityId(id: string | null | undefined): ParsedEntityId {
       // Make sure it's not an order/report (those have additional segments)
       const segments = normalizedId.split('-');
       // User IDs are exactly 2 segments: PREFIX-NUMBER
+      // Test IDs allow a trailing "-TEST" suffix.
       // Orders are 4+ segments: PREFIX-NUMBER-TYPE-NUMBER
-      if (segments.length === 2) {
+      if (segments.length === 2 || (segments.length === 3 && segments[2] === 'TEST')) {
         return { type: 'user', id, subtype, scope };
       }
     }

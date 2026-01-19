@@ -35,6 +35,7 @@ import { useAuth } from '@cks/auth';
 import { useClerk, useUser } from '@clerk/clerk-react';
 import { useSWRConfig } from 'swr';
 import { requestPasswordReset } from '../shared/api/account';
+import { useNewsFeed } from '../shared/api/news';
 import { createReport as apiCreateReport, createFeedback as apiCreateFeedback, acknowledgeItem as apiAcknowledgeItem, resolveReport as apiResolveReport, fetchServicesForReports, fetchProceduresForReports, fetchOrdersForReports } from '../shared/api/hub';
 import { useFormattedActivities } from '../shared/activity/useFormattedActivities';
 import { ActivityFeed } from '../components/ActivityFeed';
@@ -218,6 +219,16 @@ function CustomerHubContent({ initialTab = 'dashboard' }: CustomerHubProps) {
   } = useHubRoleScope(normalizedCode);
   const { data: certifiedServicesData, isLoading: certifiedServicesLoading } = useCertifiedServices(normalizedCode, 'customer', 500);
   const { mutate } = useSWRConfig();
+  const { data: newsItems = [] } = useNewsFeed();
+  const newsPreviewItems = useMemo(
+    () =>
+      newsItems.slice(0, 3).map((item) => ({
+        id: item.id,
+        title: item.title,
+        date: new Date(item.createdAt),
+      })),
+    [newsItems],
+  );
   const { handleAction } = useEntityActions();
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -514,7 +525,7 @@ function CustomerHubContent({ initialTab = 'dashboard' }: CustomerHubProps) {
               />
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 24 }}>
-                <NewsPreview color="#eab308" onViewAll={() => navigate('/news')} />
+                <NewsPreview color="#eab308" items={newsPreviewItems} onViewAll={() => navigate('/news')} />
                 <MemosPreview color="#eab308" onViewAll={() => navigate('/memos')} />
               </div>
             </PageWrapper>

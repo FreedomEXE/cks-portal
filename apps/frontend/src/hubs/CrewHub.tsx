@@ -37,6 +37,7 @@ import { useAuth } from '@cks/auth';
 import { useClerk, useUser } from '@clerk/clerk-react';
 import { useCatalogItems } from '../shared/api/catalog';
 import { requestPasswordReset } from '../shared/api/account';
+import { useNewsFeed } from '../shared/api/news';
 import { useCertifiedServices } from '../hooks/useCertifiedServices';
 import { useServices as useDirectoryServices } from '../shared/api/directory';
 import { useFormattedActivities } from '../shared/activity/useFormattedActivities';
@@ -183,6 +184,16 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
   const { code: authCode, accessStatus, accessTier, accessSource } = useAuth();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
   const { mutate } = useSWRConfig();
+  const { data: newsItems = [] } = useNewsFeed();
+  const newsPreviewItems = useMemo(
+    () =>
+      newsItems.slice(0, 3).map((item) => ({
+        id: item.id,
+        title: item.title,
+        date: new Date(item.createdAt),
+      })),
+    [newsItems],
+  );
   const { user } = useUser();
   const { setHubLoading } = useHubLoading();
   const accessGate = useAccessCodeRedemption();
@@ -599,7 +610,7 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
               />
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 24 }}>
-                <NewsPreview color="#ef4444" onViewAll={() => navigate('/news')} />
+                <NewsPreview color="#ef4444" items={newsPreviewItems} onViewAll={() => navigate('/news')} />
                 <MemosPreview color="#ef4444" onViewAll={() => navigate('/memos')} />
               </div>
             </PageWrapper>

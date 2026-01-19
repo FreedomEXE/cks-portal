@@ -18,6 +18,7 @@ import { useHubLoading } from '../contexts/HubLoadingContext';
 import { useClerk, useUser } from '@clerk/clerk-react';
 import { loadUserPreferences, saveUserPreferences } from '../shared/preferences';
 import { requestPasswordReset } from '../shared/api/account';
+import { useNewsFeed } from '../shared/api/news';
 import { dismissActivity, dismissAllActivities } from '../shared/api/directory';
 import { applyServiceAction } from '../shared/api/hub';
 import {
@@ -183,6 +184,16 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
   const { setHubLoading } = useHubLoading();
   const { mutate } = useSWRConfig();
+  const { data: newsItems = [] } = useNewsFeed();
+  const newsPreviewItems = useMemo(
+    () =>
+      newsItems.slice(0, 3).map((item) => ({
+        id: item.id,
+        title: item.title,
+        date: new Date(item.createdAt),
+      })),
+    [newsItems],
+  );
   const { handleAction } = useEntityActions();
   const { setTheme } = useAppTheme();
   const accessGate = useAccessCodeRedemption();
@@ -685,7 +696,7 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
               />
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 24 }}>
-                <NewsPreview color="#8b5cf6" onViewAll={() => navigate('/news')} />
+                <NewsPreview color="#8b5cf6" items={newsPreviewItems} onViewAll={() => navigate('/news')} />
                 <MemosPreview color="#8b5cf6" onViewAll={() => navigate('/memos')} />
               </div>
             </PageWrapper>

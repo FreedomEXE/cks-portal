@@ -34,6 +34,7 @@ import { useAuth } from '@cks/auth';
 import { useClerk, useUser } from '@clerk/clerk-react';
 import { useSWRConfig } from 'swr';
 import { requestPasswordReset } from '../shared/api/account';
+import { useNewsFeed } from '../shared/api/news';
 import { useFormattedActivities } from '../shared/activity/useFormattedActivities';
 import { resolvedUserCode } from '../shared/utils/userCode';
 import { ActivityFeed } from '../components/ActivityFeed';
@@ -183,6 +184,16 @@ function CenterHubContent({ initialTab = 'dashboard' }: CenterHubProps) {
   const accessGate = useAccessCodeRedemption();
   const handleUploadPhoto = useCallback(async (file: File) => { if (!user) { toast.error('User not authenticated'); return; } try { await user.setProfileImage({ file }); toast.success('Profile photo updated'); } catch (e: any) { console.error('photo upload failed', e); toast.error(e?.message || 'Failed to update photo'); } }, [user]);
   const { mutate } = useSWRConfig();
+  const { data: newsItems = [] } = useNewsFeed();
+  const newsPreviewItems = useMemo(
+    () =>
+      newsItems.slice(0, 3).map((item) => ({
+        id: item.id,
+        title: item.title,
+        date: new Date(item.createdAt),
+      })),
+    [newsItems],
+  );
   const { handleAction } = useEntityActions();
 
   const {
@@ -512,7 +523,7 @@ function CenterHubContent({ initialTab = 'dashboard' }: CenterHubProps) {
               />
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 24 }}>
-                <NewsPreview color="#f97316" onViewAll={() => navigate('/news')} />
+                <NewsPreview color="#f97316" items={newsPreviewItems} onViewAll={() => navigate('/news')} />
                 <MemosPreview color="#f97316" onViewAll={() => navigate('/memos')} />
               </div>
             </PageWrapper>

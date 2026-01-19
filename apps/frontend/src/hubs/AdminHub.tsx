@@ -13,6 +13,7 @@
 -----------------------------------------------*/
 
 import { useNavigate } from 'react-router-dom';
+import { useNewsFeed } from '../shared/api/news';
 import {
   AdminSupportSection,
   ArchiveSection,
@@ -250,6 +251,17 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
   const [selectedOrderForEdit, setSelectedOrderForEdit] = useState<HubOrderItem | null>(null);
   const logout = useLogout();
   const { mutate } = useSWRConfig();
+  const { data: newsItems = [] } = useNewsFeed();
+
+  const newsPreviewItems = useMemo(
+    () =>
+      newsItems.slice(0, 3).map((item) => ({
+        id: item.id,
+        title: item.title,
+        date: new Date(item.createdAt),
+      })),
+    [newsItems],
+  );
 
   const { data: adminUsers, isLoading: adminUsersLoading, error: adminUsersError } = useAdminUsers();
   const { data: managers, isLoading: managersLoading, error: managersError } = useManagers();
@@ -1608,7 +1620,7 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
               />
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 24 }}>
-                <NewsPreview color="#111827" onViewAll={() => console.log('View news')} />
+                <NewsPreview color="#111827" items={newsPreviewItems} onViewAll={() => navigate('/news')} />
                 <MemosPreview color="#111827" onViewAll={() => navigate('/memos')} />
               </div>
             </PageWrapper>

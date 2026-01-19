@@ -1,0 +1,153 @@
+.news-page {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+}
+
+.news-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.news-title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.news-subtitle {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.news-panel {
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.news-panelHeader {
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 12px;
+}
+
+.news-form {
+  display: grid;
+  gap: 12px;
+}
+
+.news-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.news-form input,
+.news-form textarea,
+.news-form select {
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-family: inherit;
+}
+
+.news-roles {
+  display: grid;
+  gap: 8px;
+}
+
+.news-rolesGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+}
+
+.news-roleItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.news-button {
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.news-button--primary {
+  background: #111827;
+  color: #fff;
+  border-color: #111827;
+}
+
+.news-button--ghost {
+  background: #f9fafb;
+  border-color: #e5e7eb;
+  color: #111827;
+}
+
+.news-list {
+  display: grid;
+  gap: 12px;
+}
+
+.news-item {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 14px 16px;
+  background: #fff;
+}
+
+.news-itemHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.news-item h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.news-meta {
+  margin: 4px 0 0;
+  font-size: 11px;
+  color: #6b7280;
+}
+
+.news-body {
+  margin: 10px 0 0;
+  font-size: 13px;
+  color: #374151;
+  white-space: pre-wrap;
+}
+
+.news-muted {
+  margin: 0;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.news-error {
+  margin: 0;
+  font-size: 12px;
+  color: #dc2626;
+}
