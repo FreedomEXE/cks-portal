@@ -27,6 +27,7 @@ export default function Login() {
   const [error, setError] = useState<string | null>(null);
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isInstalled, setIsInstalled] = useState(false);
+  const [showInstallHelp, setShowInstallHelp] = useState(false);
   const submittingRef = useRef(false);
 
   async function onSubmit(e: FormEvent) {
@@ -193,16 +194,16 @@ export default function Login() {
       return;
     }
 
-    const ua = navigator.userAgent || '';
-    const isIOS = /iPhone|iPad|iPod/i.test(ua);
-    const isStandalone = (window.navigator as any).standalone === true;
-    if (isIOS && !isStandalone) {
-      alert('To install, tap Share and choose Add to Home Screen.');
-      return;
-    }
-
-    alert('Install is not available in this browser.');
+    setShowInstallHelp(true);
   };
+
+  const ua = navigator.userAgent || '';
+  const isIOS = /iPhone|iPad|iPod/i.test(ua);
+  const isAndroid = /Android/i.test(ua);
+  const isChrome = /Chrome|CriOS/i.test(ua);
+  const isStandalone =
+    window.matchMedia('(display-mode: standalone)').matches ||
+    (window.navigator as any).standalone === true;
 
   const cardSurfaceStyle = useMemo(
     () => ({
@@ -320,12 +321,34 @@ export default function Login() {
                   Continue with Google
                 </button>
                 {!isInstalled && (
-                  <button
-                    onClick={handleInstallClick}
-                    className="mt-3 inline-flex w-full items-center justify-center rounded-xl border border-white/30 bg-transparent px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
-                  >
-                    Install app
-                  </button>
+                  <>
+                    <button
+                      onClick={handleInstallClick}
+                      className="mt-3 inline-flex w-full items-center justify-center rounded-xl border border-white/30 bg-transparent px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
+                    >
+                      Install app
+                    </button>
+                    {showInstallHelp && (
+                      <div className="mt-3 rounded-xl border border-white/15 bg-black/20 px-4 py-3 text-xs text-slate-200">
+                        {isIOS ? (
+                          <div>
+                            iPhone/iPad: tap Share, then Add to Home Screen.
+                          </div>
+                        ) : isAndroid && isChrome ? (
+                          <div>
+                            Android Chrome: open the menu (⋮) and choose “Install app”.
+                          </div>
+                        ) : (
+                          <div>
+                            If install isn’t available, use the browser menu and look for “Install app” or “Add to Home screen”.
+                          </div>
+                        )}
+                        <div className="mt-2 text-slate-400">
+                          Install requires HTTPS, a valid manifest, and an active service worker.
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
                 <div className="mt-4 text-center text-xs text-slate-400">Secured by Clerk</div>
               </div>
