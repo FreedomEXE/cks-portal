@@ -91,6 +91,50 @@ function newAnnouncementId() {
 }
 
 export async function registerNewsRoutes(fastify: FastifyInstance) {
+  fastify.get('/api/news/ecosystems', async (request, reply) => {
+    const account = await requireActiveRole(request, reply);
+    if (!account) {
+      return;
+    }
+
+    const role = (account.role ?? '').trim().toLowerCase();
+    const cksCode = normalizeId(account.cksCode ?? '');
+    const admin = isAdminRole(role);
+    const manager = isManagerRole(role);
+
+    if (!admin && !manager) {
+      reply.code(403).send({ error: 'Only admins and managers can access ecosystems.' });
+      return;
+    }
+
+    if (manager) {
+      const result = await query(
+        'SELECT manager_id, name FROM managers WHERE UPPER(manager_id) = UPPER($1)',
+        [cksCode],
+      );
+      reply.send({
+        data: result.rows.map((row) => ({ id: row.manager_id, name: row.name })),
+      });
+      return;
+    }
+
+    const ecosystems = await query(
+      `
+      SELECT manager_id, name
+      FROM managers
+      WHERE status IS NULL OR status <> 'archived'
+      ORDER BY manager_id ASC
+      `,
+    );
+
+    reply.send({
+      data: ecosystems.rows.map((row) => ({
+        id: row.manager_id,
+        name: row.name,
+      })),
+    });
+  });
+
   fastify.get('/api/news', async (request, reply) => {
     const account = await requireActiveRole(request, reply);
     if (!account) {

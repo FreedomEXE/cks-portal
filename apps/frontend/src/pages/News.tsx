@@ -1,8 +1,15 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth as useCksAuth } from '@cks/auth';
 import { useAuth as useClerkAuth } from '@clerk/clerk-react';
-import { createNews, dismissNews, useNewsFeed, type NewsCreatePayload } from '../shared/api/news';
+import {
+  createNews,
+  dismissNews,
+  fetchNewsEcosystems,
+  useNewsFeed,
+  type NewsCreatePayload,
+  type NewsEcosystem,
+} from '../shared/api/news';
 import './News.css';
 
 const ROLE_OPTIONS = ['manager', 'crew', 'contractor', 'customer', 'center', 'warehouse', 'admin'];
@@ -30,6 +37,9 @@ export default function News() {
   const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [ecosystems, setEcosystems] = useState<NewsEcosystem[]>([]);
+  const [ecosystemsLoading, setEcosystemsLoading] = useState(false);
+  const [ecosystemsError, setEcosystemsError] = useState<string | null>(null);
 
   const canCreate = isAdmin || isManager;
   const viewerId = code ?? '';
@@ -43,6 +53,30 @@ export default function News() {
     }
     return 'User ID';
   }, [isManager, scopeType, viewerId]);
+
+  useEffect(() => {
+    if (!canCreate || scopeType !== 'ecosystem') {
+      return;
+    }
+
+    const loadEcosystems = async () => {
+      setEcosystemsLoading(true);
+      setEcosystemsError(null);
+      try {
+        const data = await fetchNewsEcosystems(getToken);
+        setEcosystems(data);
+        if (isAdmin && data.length > 0 && !scopeId) {
+          setScopeId(data[0].id);
+        }
+      } catch (error) {
+        setEcosystemsError('Unable to load ecosystems.');
+      } finally {
+        setEcosystemsLoading(false);
+      }
+    };
+
+    void loadEcosystems();
+  }, [canCreate, getToken, isAdmin, scopeId, scopeType]);
 
   const toggleRole = useCallback((value: string) => {
     setSelectedRoles((prev) =>
@@ -149,13 +183,29 @@ export default function News() {
             {scopeType !== 'global' ? (
               <label>
                 {scopeLabel}
-                <input
-                  value={isManager && scopeType === 'ecosystem' ? viewerId : scopeId}
-                  onChange={(event) => setScopeId(event.target.value)}
-                  disabled={isManager && scopeType === 'ecosystem'}
-                  placeholder={scopeType === 'user' ? 'CKS ID (e.g., CEN-001)' : 'MGR-001'}
-                />
+                {scopeType === 'ecosystem' && isAdmin ? (
+                  <select value={scopeId} onChange={(event) => setScopeId(event.target.value)}>
+                    {ecosystems.map((ecosystem) => (
+                      <option key={ecosystem.id} value={ecosystem.id}>
+                        {ecosystem.name ? `${ecosystem.name} (${ecosystem.id})` : ecosystem.id}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    value={isManager && scopeType === 'ecosystem' ? viewerId : scopeId}
+                    onChange={(event) => setScopeId(event.target.value)}
+                    disabled={isManager && scopeType === 'ecosystem'}
+                    placeholder={scopeType === 'user' ? 'CKS ID (e.g., CEN-001)' : 'MGR-001'}
+                  />
+                )}
               </label>
+            ) : null}
+            {scopeType === 'ecosystem' && isAdmin ? (
+              <>
+                {ecosystemsLoading ? <p className="news-muted">Loading ecosystems...</p> : null}
+                {ecosystemsError ? <p className="news-error">{ecosystemsError}</p> : null}
+              </>
             ) : null}
             <div className="news-roles">
               <p>Show to roles (optional)</p>

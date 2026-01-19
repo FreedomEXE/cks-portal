@@ -28,11 +28,21 @@ export type NewsCreatePayload = {
   expiresAt?: string;
 };
 
+export type NewsEcosystem = {
+  id: string;
+  name: string | null;
+};
+
 export function useNewsFeed() {
   const { getToken } = useClerkAuth();
   return useSWR('/news', (path) =>
     apiFetch<ApiResponse<NewsItem[]>>(path, { getToken }).then((res) => res.data ?? []),
   );
+}
+
+export async function fetchNewsEcosystems(getToken?: () => Promise<string | null>) {
+  const response = await apiFetch<ApiResponse<NewsEcosystem[]>>('/news/ecosystems', { getToken });
+  return response.data ?? [];
 }
 
 export async function createNews(payload: NewsCreatePayload, getToken?: () => Promise<string | null>) {
