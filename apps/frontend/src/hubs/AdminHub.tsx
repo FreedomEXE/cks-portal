@@ -1596,7 +1596,7 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
         onLogout={logout}
       />
 
-      <Scrollbar style={{ flex: 1, padding: '0 24px' }} className="hub-content-scroll">
+      <Scrollbar style={{ flex: 1, padding: '0 var(--hub-gutter, 24px)' }} className="hub-content-scroll">
         <div style={{ maxWidth: 1400, margin: '0 auto' }}>
           {activeTab === 'dashboard' ? (
             <PageWrapper title="Dashboard" showHeader={false}>

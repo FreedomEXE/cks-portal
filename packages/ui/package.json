@@ -30,6 +30,7 @@
     "build-storybook": "storybook build"
   },
   "dependencies": {
+    "@emotion/is-prop-valid": "^1.4.0",
     "clsx": "^2.0.0",
     "fast-glob": "^3.3.3",
     "motion": "^11.18.2",

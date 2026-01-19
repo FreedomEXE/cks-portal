@@ -8,6 +8,55 @@
   padding: 16px var(--hero-gutter, 16px) 24px var(--hero-gutter, 16px);
 }
 
+.card {
+  background: var(--card-bg);
+  border-radius: 12px;
+  border: 3px solid var(--border);
+  padding: 20px 24px;
+  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+}
+
+.headerRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  gap: 12px;
+}
+
+.headerActions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.welcomeRow {
+  font-size: clamp(13px, 1.2vw, 14px);
+  color: var(--text);
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.tabsRow {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
+.tabButton {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
 /* On viewports <= 1440px, make the hero full-bleed to feel wider than the clamped content */
 @media (max-width: 1440px) {
   .heroClamp {
@@ -17,5 +66,28 @@
     margin-right: calc(50% - 50vw);
     padding-left: var(--hero-gutter, 12px);
     padding-right: var(--hero-gutter, 12px);
+  }
+}
+
+@media (max-width: 768px) {
+  .card {
+    padding: 16px;
+    border-width: 2px;
+  }
+
+  .headerRow {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .headerActions {
+    width: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  .tabButton {
+    padding: 6px 12px;
+    font-size: 13px;
   }
 }

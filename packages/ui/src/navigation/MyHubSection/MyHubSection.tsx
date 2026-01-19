@@ -54,20 +54,12 @@ export default function MyHubSection({
   return (
     <div className={styles.heroOuter}>
       <div className={styles.heroClamp}>
-        <div style={{
-          background: 'var(--card-bg)',
-          borderRadius: 12,
-          border: `3px solid ${colors.primary}`,
-          padding: '20px 24px',
-          boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'
-        }}>
+        <div
+          className={styles.card}
+          style={{ borderColor: colors.primary }}
+        >
   {/* Header Row */}
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: 12
-        }}>
+        <div className={styles.headerRow}>
           <h1 style={{
             margin: 0,
             fontSize: 'clamp(28px, 3.2vw, 40px)',
@@ -77,7 +69,7 @@ export default function MyHubSection({
             {hubName}
           </h1>
 
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <div className={styles.headerActions}>
             {secondaryAction ? (
               <Button
                 variant={secondaryAction.variant ?? 'secondary'}
@@ -97,13 +89,7 @@ export default function MyHubSection({
         </div>
 
         {/* Welcome Message */}
-        <div style={{
-          fontSize: 14,
-          color: 'var(--text)',
-          marginBottom: 16,
-          display: 'flex',
-          alignItems: 'center',
-        }}>
+        <div className={styles.welcomeRow}>
           {welcomeContent}
           {userId && (
             <span style={{ marginLeft: 8, fontSize: 12, color: 'var(--text)' }}>
@@ -113,12 +99,7 @@ export default function MyHubSection({
         </div>
 
         {/* Navigation Tabs */}
-        <div style={{
-          display: 'flex',
-          gap: 8,
-          marginTop: 16,
-          flexWrap: 'wrap'
-        }}>
+        <div className={styles.tabsRow}>
           {tabs.map((tab) => {
             const isActive = activeTab === tab.id;
 
@@ -126,16 +107,11 @@ export default function MyHubSection({
               <button
                 key={tab.id}
                 onClick={() => onTabClick(tab.id)}
+                className={styles.tabButton}
                 style={{
-                  padding: '8px 16px',
                   background: isActive ? colors.accent : 'var(--card-muted)',
                   color: isActive ? 'white' : 'var(--text)',
-                  border: 'none',
-                  borderRadius: 8,
-                  fontSize: 14,
                   fontWeight: isActive ? 600 : 500,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s'
                 }}
                 onMouseEnter={(e) => {
                   if (!isActive) {

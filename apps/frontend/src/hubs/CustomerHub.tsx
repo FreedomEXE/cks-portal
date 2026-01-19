@@ -497,7 +497,7 @@ function CustomerHubContent({ initialTab = 'dashboard' }: CustomerHubProps) {
         role="customer"
       />
 
-      <Scrollbar className="hub-content-scroll" style={{ flex: 1, padding: '0 24px' }}>
+      <Scrollbar className="hub-content-scroll" style={{ flex: 1, padding: '0 var(--hub-gutter, 24px)' }}>
         <div style={{ maxWidth: 1400, margin: '0 auto' }}>
           {activeTab === 'dashboard' ? (
             <PageWrapper title="Dashboard" showHeader={false}>

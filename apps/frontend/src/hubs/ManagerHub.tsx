@@ -1069,7 +1069,7 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
         role="manager"
       />
 
-      <Scrollbar style={{ flex: 1, padding: '0 24px' }} className="hub-content-scroll">
+      <Scrollbar style={{ flex: 1, padding: '0 var(--hub-gutter, 24px)' }} className="hub-content-scroll">
         <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
           {activeTab === 'dashboard' ? (
             <PageWrapper title="Dashboard" showHeader={false}>

@@ -17,8 +17,9 @@ html, body, #root {
   /* Hero (MyHubSection) is intentionally wider than content */
   --hero-max-width: calc(var(--page-max-width) + 240px); /* 1680px when page is 1440 */
   /* Gutters */
-  --page-gutter: 24px;
-  --hero-gutter: 16px;
+  --page-gutter: clamp(12px, 2.5vw, 24px);
+  --hub-gutter: var(--page-gutter);
+  --hero-gutter: clamp(12px, 2.5vw, 16px);
 }
 
 .dark {
@@ -41,8 +42,8 @@ body {
 
 @media (max-width: 768px) {
   :root {
-    /* On small screens keep hero visually wider by reducing its gutter */
-    --hero-gutter: 12px;
+    /* Keep hero visually wide while reducing overall padding */
+    --hero-gutter: clamp(10px, 3vw, 12px);
   }
 }
 
