@@ -12,6 +12,7 @@
   Manifested by Freedom_EXE
 -----------------------------------------------*/
 
+import { useNavigate } from 'react-router-dom';
 import {
   AdminSupportSection,
   ArchiveSection,
@@ -231,6 +232,7 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
 function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
   const { code, firstName, fullName } = useAuth();
   const { setHubLoading } = useHubLoading();
+  const navigate = useNavigate();
 
   // Local tab state (no URL changes)
   const [activeTab, setActiveTab] = useState(initialTab);
@@ -1607,7 +1609,7 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 24 }}>
                 <NewsPreview color="#111827" onViewAll={() => console.log('View news')} />
-                <MemosPreview color="#111827" onViewAll={() => console.log('View memos')} />
+                <MemosPreview color="#111827" onViewAll={() => navigate('/memos')} />
               </div>
             </PageWrapper>
           ) : activeTab === 'ecosystems' ? (

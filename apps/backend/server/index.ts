@@ -34,6 +34,7 @@ import entityRoutes from "./domains/entities/routes.fastify";
 import { registerAccountRoutes } from "./domains/account/routes.fastify";
 import { registerAccessRoutes } from "./domains/access";
 import { resolveAccessStatus } from "./domains/access/service";
+import { registerMemosRoutes } from "./domains/memos/routes.fastify";
 import { initializeSequences } from "./db/init-sequences";
 
 type BootstrapResponse = {
@@ -289,6 +290,7 @@ export async function buildServer() {
   await registerInventoryRoutes(server);
   await registerAccountRoutes(server);
   await registerAccessRoutes(server);
+  await registerMemosRoutes(server);
   await server.register(reportsRoutes, { prefix: '/api' });
   await server.register(entityRoutes, { prefix: '/api' });
 

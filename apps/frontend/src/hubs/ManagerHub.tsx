@@ -1078,7 +1078,7 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 24 }}>
                 <NewsPreview color={MANAGER_PRIMARY_COLOR} onViewAll={() => console.log('[manager] view news')} />
-                <MemosPreview color={MANAGER_PRIMARY_COLOR} onViewAll={() => console.log('[manager] view memos')} />
+                <MemosPreview color={MANAGER_PRIMARY_COLOR} onViewAll={() => navigate('/memos')} />
               </div>
             </PageWrapper>
           ) : activeTab === 'profile' ? (

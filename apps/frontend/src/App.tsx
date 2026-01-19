@@ -15,6 +15,7 @@ import ManagerHub from './hubs/ManagerHub';
 import WarehouseHub from './hubs/WarehouseHub';
 import CKSCatalog from './pages/CKSCatalog';
 import Impersonate from './pages/Impersonate';
+import Memos from './pages/Memos';
 
 type HubComponent = ComponentType<{ initialTab?: string }>;
 
@@ -113,6 +114,7 @@ export function AuthenticatedApp(): JSX.Element {
         <Route path="/" element={<Navigate to="/hub" replace />} />
         <Route path="/hub" element={<RoleHubRoute />} />
         <Route path="/catalog" element={<CKSCatalog />} />
+        <Route path="/memos" element={<Memos />} />
         <Route path="/impersonate" element={<Impersonate />} />
         <Route path="/hub/*" element={<Navigate to="/hub" replace />} />
         <Route path="*" element={<Navigate to="/hub" replace />} />

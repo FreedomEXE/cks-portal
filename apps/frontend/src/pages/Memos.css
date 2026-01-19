@@ -1,0 +1,220 @@
+.memos-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+}
+
+.memos-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.memos-title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.memos-subtitle {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.memos-layout {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 16px;
+}
+
+.memos-panel {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.memos-panelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.memos-muted {
+  margin: 0;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.memos-error {
+  margin: 0;
+  font-size: 12px;
+  color: #dc2626;
+}
+
+.memos-button {
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.memos-button--primary {
+  background: #2563eb;
+  color: #fff;
+  border-color: #2563eb;
+}
+
+.memos-button--ghost {
+  background: #f9fafb;
+  border-color: #e5e7eb;
+  color: #111827;
+}
+
+.memos-button--full {
+  width: 100%;
+}
+
+.memos-threads {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.memos-threadItem {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 10px 12px;
+  text-align: left;
+  background: #fff;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.memos-threadItem.is-active {
+  border-color: #2563eb;
+  background: #eff6ff;
+}
+
+.memos-threadTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.memos-threadMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 11px;
+  color: #6b7280;
+}
+
+.memos-new {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.memos-adminFilter {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 0 0;
+}
+
+.memos-label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.memos-label input,
+.memos-label textarea,
+.memos-label select {
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-family: inherit;
+}
+
+.memos-conversation {
+  min-height: 520px;
+}
+
+.memos-messages {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 420px;
+  overflow-y: auto;
+  padding-right: 8px;
+}
+
+.memos-message {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #fff;
+}
+
+.memos-message.is-self {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+
+.memos-messageMeta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #6b7280;
+  margin-bottom: 6px;
+}
+
+.memos-messageBody {
+  font-size: 13px;
+  color: #111827;
+  white-space: pre-wrap;
+}
+
+.memos-composer {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.memos-composer textarea {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 10px;
+  font-size: 12px;
+  font-family: inherit;
+}
+
+@media (max-width: 900px) {
+  .memos-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .memos-threadList {
+    order: 2;
+  }
+}
