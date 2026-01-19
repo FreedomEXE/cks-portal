@@ -429,8 +429,8 @@ const OrdersSection: React.FC<OrdersSectionProps> = ({
                 actions={getOrderActions(order)}
                 onAction={(action) => onOrderAction?.(order.orderId, action)}
                 showWorkflow={userRole === 'manager' || (order.approvalStages?.length ?? 0) > 0}
-                collapsible={true}
-                defaultExpanded={false}
+                collapsible={order.status !== 'delivered' && order.status !== 'cancelled' && order.status !== 'rejected'}
+                defaultExpanded={order.status === 'delivered'}
                 transformedId={activeOrderTab === 'archive' ? order.transformedId : undefined}
               />
             </div>

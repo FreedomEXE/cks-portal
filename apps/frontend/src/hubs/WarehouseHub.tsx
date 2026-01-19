@@ -20,7 +20,7 @@ import { loadUserPreferences, saveUserPreferences } from '../shared/preferences'
 import { requestPasswordReset } from '../shared/api/account';
 import { useNewsFeed } from '../shared/api/news';
 import { dismissActivity, dismissAllActivities } from '../shared/api/directory';
-import { applyServiceAction } from '../shared/api/hub';
+import { applyServiceAction, type OrderActionType } from '../shared/api/hub';
 import {
   MemosPreview,
   NewsPreview,
@@ -177,6 +177,7 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
   const [inventoryTab, setInventoryTab] = useState<'active' | 'archive'>('active');
   const [inventorySearchQuery, setInventorySearchQuery] = useState('');
   const [inventoryFilter, setInventoryFilter] = useState<string>('');
+  const [pendingAction, setPendingAction] = useState<{ orderId: string; action: OrderActionType } | null>(null);
 
   // identity + helpers
   const { code: authCode, accessStatus, accessTier, accessSource } = useAuth();
@@ -623,7 +624,16 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
       setSelectedOrderId(orderId);
       return;
     }
-    await handleAction(orderId, actionLabel);
+    const actionId = actionLabel.toLowerCase().replace(/\s+/g, '-') as OrderActionType;
+    if (pendingAction?.orderId === orderId && pendingAction.action === actionId) {
+      return;
+    }
+    setPendingAction({ orderId, action: actionId });
+    try {
+      await handleAction(orderId, actionLabel);
+    } finally {
+      setPendingAction(null);
+    }
   };
   const profileCardData = useMemo(() => ({
     name: profile?.name ?? '-',
