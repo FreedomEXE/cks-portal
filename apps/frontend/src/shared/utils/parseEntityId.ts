@@ -180,7 +180,7 @@ export function isValidId(id: string | null | undefined): boolean {
   // Pattern 3: Complex entity ID (CON-010-FBK-001, MGR-005-SO-023, etc.)
   const patterns = [
     /^[A-Z]+-\d+(?:-TEST)?$/,                    // Simple or user (with optional -TEST)
-    /^[A-Z]+-\d+-[A-Z]+-\d+(?:-TEST)?$/,        // Complex entity (with optional -TEST suffix)
+    /^[A-Z]+-\d+(?:-TEST)?-[A-Z]+-\d+(?:-TEST)?$/, // Complex entity (allow -TEST after scope or suffix)
     /^[A-Z]+-TEST-\d+$/,                         // Test-first simple (e.g., SRV-TEST-001)
     /^[A-Z]+-\d+-TEST$/,                         // Test suffix without extra segments (e.g., SRV-001-TEST)
   ];
