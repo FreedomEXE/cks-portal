@@ -533,7 +533,6 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
   const { activities: formattedActivities, isLoading: activitiesLoading, error: activitiesError, mutate: mutateActivities } = useFormattedActivities(authCode, { limit: 20 });
 
   const { data: ordersData } = useHubOrders(authCode);
-  const supportTickets = useMemo(() => buildSupportTickets(reportsData), [reportsData]);
   // Resolved display/identity code once profile is known
   const userCode = useMemo(
     () => resolvedUserCode(profileData?.cksCode, authCode),
@@ -656,6 +655,7 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
 
   // Fetch reports data
   const { data: reportsData, isLoading: reportsLoading, mutate: mutateReports } = useHubReports(userCode);
+  const supportTickets = useMemo(() => buildSupportTickets(reportsData), [reportsData]);
 
   // IMPORTANT: Pass through structured fields from backend (reportCategory, relatedEntityId, reportReason, priority)
   // WarehouseHub already passes raw items; align ManagerHub to preserve all fields
