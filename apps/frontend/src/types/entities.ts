@@ -61,6 +61,8 @@ export type TabId =
   | 'history'
   | 'actions'
   | 'quick-actions'
+  | 'actions_removed'
+  | 'management'
   | 'profile'
   | 'participants'
   | 'crew'

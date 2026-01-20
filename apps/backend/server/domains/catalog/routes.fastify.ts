@@ -48,12 +48,14 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
 
     const { type, q, tags, page, pageSize } = parsed.data;
     const normalizedTags = normalizeTags(tags);
+    const isTest = Boolean(auth.cksCode && auth.cksCode.toUpperCase().includes('-TEST'));
     const filters = {
       type: type ?? undefined,
       search: q ?? null,
       tags: normalizedTags.length ? normalizedTags : undefined,
       limit: pageSize,
       offset: (page - 1) * pageSize,
+      isTest,
     };
 
     const result = await getCatalogItems(filters);

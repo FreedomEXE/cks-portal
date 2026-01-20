@@ -152,6 +152,14 @@ function buildWhere(filters: CatalogFilters) {
     }
   }
 
+  if (filters.isTest === true) {
+    params.push('%-TEST%');
+    where.push(`i.item_code ILIKE $${params.length}`);
+  } else if (filters.isTest === false) {
+    params.push('%-TEST%');
+    where.push(`i.item_code NOT ILIKE $${params.length}`);
+  }
+
   const clause = where.length ? `WHERE ${where.join(" AND ")}` : "";
   return { clause, params };
 }
@@ -192,7 +200,7 @@ const CATALOG_UNION = `
     WHERE status = 'active' AND archived_at IS NULL
     GROUP BY item_id
   ) inv ON p.product_id = inv.item_id
-  WHERE p.is_active = TRUE AND inv.total_on_hand IS NOT NULL AND inv.total_on_hand > 0
+  WHERE p.is_active = TRUE
   UNION ALL
   SELECT
     s.service_id AS item_code,

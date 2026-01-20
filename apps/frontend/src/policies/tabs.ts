@@ -86,6 +86,18 @@ export function canSeeTab(tabId: TabId, context: TabVisibilityContext): boolean 
       return false;
     }
 
+    // ===== REMOVED ACTIONS TAB =====
+    case 'actions_removed':
+      // Placeholder tab ids; always hidden
+      return false;
+
+    // ===== MANAGEMENT TAB =====
+    // Admin-only: account status/tier management for user entities
+    case 'management': {
+      const userEntityTypes: EntityType[] = ['manager', 'contractor', 'customer', 'center', 'crew', 'warehouse'];
+      return role === 'admin' && userEntityTypes.includes(entityType);
+    }
+
     // ===== CREW TAB =====
     // Service-specific: visible to admin, manager, contractor
     case 'crew':

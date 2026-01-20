@@ -43,6 +43,7 @@ export interface CatalogFilters {
   tags?: string[];
   limit?: number;
   offset?: number;
+  isTest?: boolean;
 }
 
 export interface CatalogPage {
