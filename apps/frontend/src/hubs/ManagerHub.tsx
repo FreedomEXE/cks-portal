@@ -422,18 +422,6 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
   const { data: ordersData } = useHubOrders(userCode);
   const { data: scopeData } = useHubRoleScope(userCode);
   const { mutate } = useSWRConfig();
-  const { data: newsItems = [] } = useNewsFeed();
-
-  const newsPreviewItems = useMemo(
-    () =>
-      newsItems.slice(0, 3).map((item) => ({
-        id: item.id,
-        title: item.title,
-        date: new Date(item.createdAt),
-      })),
-    [newsItems],
-  );
-
   // Get available crew from scope
   const availableCrew = useMemo(() => {
     if (!scopeData || scopeData.role !== 'manager') return [];
@@ -656,6 +644,16 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
   // Fetch reports data
   const { data: reportsData, isLoading: reportsLoading, mutate: mutateReports } = useHubReports(userCode);
   const supportTickets = useMemo(() => buildSupportTickets(reportsData), [reportsData]);
+  const { data: newsItems = [] } = useNewsFeed();
+  const newsPreviewItems = useMemo(
+    () =>
+      newsItems.slice(0, 3).map((item) => ({
+        id: item.id,
+        title: item.title,
+        date: new Date(item.createdAt),
+      })),
+    [newsItems],
+  );
 
   // IMPORTANT: Pass through structured fields from backend (reportCategory, relatedEntityId, reportReason, priority)
   // WarehouseHub already passes raw items; align ManagerHub to preserve all fields
