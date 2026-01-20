@@ -144,8 +144,8 @@ export async function updateInventoryQuantity(input: UpdateInventoryInput): Prom
 
     await query(
       `INSERT INTO inventory_items
-       (warehouse_id, item_id, item_name, category, quantity_on_hand, min_stock_level, status, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, 'active', NOW())`,
+       (warehouse_id, item_id, item_name, category, item_type, quantity_on_hand, min_stock_level, status, updated_at)
+       VALUES ($1, $2, $3, $4, 'product', $5, $6, 'active', NOW())`,
       [
         normalizedWarehouseId,
         catalogItem.product_id,
