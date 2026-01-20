@@ -23,6 +23,7 @@ export type SectionId =
   | 'availability'
   | 'notes'
   | 'special-instructions'
+  | 'delivery-map'
   | 'cancellation-reason'
   | 'rejection-reason'
   | 'fulfilled-by'
@@ -66,6 +67,7 @@ export function canSeeSection(
   switch (sectionId) {
     case 'requestor-info':
     case 'destination-info':
+    case 'delivery-map':
     case 'notes':
     case 'special-instructions':
     case 'description':
