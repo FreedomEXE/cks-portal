@@ -1493,10 +1493,11 @@ async function insertOrderItems(
 
       // Query inventory for this item across all warehouses
       const inventoryResult = await q<{ warehouse_id: string; quantity_available: number }>(
-        `SELECT warehouse_id, quantity_available
+        `SELECT warehouse_id,
+                COALESCE(quantity_available, quantity_on_hand, 0) AS quantity_available
          FROM inventory_items
          WHERE item_id = $1 AND status = 'active'
-         ORDER BY quantity_available DESC`,
+         ORDER BY COALESCE(quantity_available, quantity_on_hand, 0) DESC`,
         [product.product_id]
       );
 

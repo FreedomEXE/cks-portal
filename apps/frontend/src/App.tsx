@@ -5,6 +5,7 @@ import { useLoading } from './contexts/LoadingContext';
 import { useHubLoading } from './contexts/HubLoadingContext';
 import { ModalProvider } from './contexts/ModalProvider';
 import { AccessGate } from './components/AccessGate';
+import BuildBadge from './components/BuildBadge';
 
 import AdminHub from './hubs/AdminHub';
 import CenterHub from './hubs/CenterHub';
@@ -111,6 +112,7 @@ export function AuthenticatedApp(): JSX.Element {
 
   return (
     <ModalProvider>
+      <BuildBadge />
       <Routes>
         <Route path="/" element={<Navigate to="/hub" replace />} />
         <Route path="/hub" element={<RoleHubRoute />} />
@@ -127,13 +129,16 @@ export function AuthenticatedApp(): JSX.Element {
 
 export function UnauthenticatedApp(): JSX.Element {
   return (
-    <Routes>
-      <Route path="/sign-in" element={<Login />} />
-      <Route path="/sign-up" element={<Login />} />
-      <Route path="/login" element={<Login />} />
-      <Route path="/forgot" element={<Forgot />} />
-      <Route path="/impersonate" element={<Impersonate />} />
-      <Route path="*" element={<Navigate to="/login" replace />} />
-    </Routes>
+    <>
+      <BuildBadge />
+      <Routes>
+        <Route path="/sign-in" element={<Login />} />
+        <Route path="/sign-up" element={<Login />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/forgot" element={<Forgot />} />
+        <Route path="/impersonate" element={<Impersonate />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    </>
   );
 }

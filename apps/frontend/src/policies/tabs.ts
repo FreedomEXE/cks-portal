@@ -82,8 +82,8 @@ export function canSeeTab(tabId: TabId, context: TabVisibilityContext): boolean 
     // ===== QUICK ACTIONS TAB =====
     // Admin-only for catalog services and products (unified catalog view)
     case 'quick-actions': {
-      // Quick Actions are rendered in header; hide tab universally
-      return false;
+      // Allow admin-only quick actions for product inventory management
+      return role === 'admin' && entityType === 'product';
     }
 
     // ===== REMOVED ACTIONS TAB =====
