@@ -101,6 +101,24 @@ export default function BaseViewModal({
     // Otherwise: leave activeTabId unchanged (prevents snap-back glitch)
   }, [tabs, activeTabId]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent).detail || {};
+      const tabId = detail.tabId as string | undefined;
+      if (!tabId || !tabs || tabs.length === 0) {
+        return;
+      }
+      if (tabs.some((tab) => tab.id === tabId)) {
+        setActiveTabId(tabId);
+      }
+    };
+
+    window.addEventListener('cks:modal:switch-tab', handler as EventListener);
+    return () => window.removeEventListener('cks:modal:switch-tab', handler as EventListener);
+  }, [isOpen, tabs]);
+
   if (!isOpen) return null;
 
   // Find active tab content

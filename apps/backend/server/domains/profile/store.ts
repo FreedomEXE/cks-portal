@@ -101,6 +101,280 @@ function toNumber(input: string | number | null | undefined): number | null {
   return Number.isNaN(value) ? null : value;
 }
 
+type UserProfileUpdatePayload = {
+  name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  address?: string | null;
+  mainContact?: string | null;
+  emergencyContact?: string | null;
+  territory?: string | null;
+  reportsTo?: string | null;
+};
+
+type AccountStatus = "active" | "paused" | "ended";
+
+type ProfileActor = {
+  cksCode?: string | null;
+  clerkUserId?: string | null;
+  role?: string | null;
+  fullName?: string | null;
+};
+
+function normalizeInput(value?: string | null): string | null | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (value === null) {
+    return null;
+  }
+  const trimmed = String(value).trim();
+  return trimmed.length === 0 ? null : trimmed;
+}
+
+async function recordProfileUpdate(
+  actor: ProfileActor,
+  targetType: string,
+  targetId: string,
+  updatedFields: string[],
+): Promise<void> {
+  const actorId = normalizeIdentity(actor.cksCode) ?? actor.clerkUserId ?? "ADMIN";
+  const actorRole = (actor.role ?? "admin").toLowerCase();
+  const description = `Updated profile for ${targetId}`;
+
+  try {
+    await query(
+      `INSERT INTO system_activity (
+        activity_type,
+        description,
+        actor_id,
+        actor_role,
+        target_id,
+        target_type,
+        metadata,
+        created_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, NOW())`,
+      [
+        "profile_updated",
+        description,
+        actorId,
+        actorRole,
+        targetId,
+        targetType,
+        JSON.stringify({ updatedFields }),
+      ],
+    );
+  } catch (error) {
+    console.warn("[profile] Failed to record profile update activity", error);
+  }
+}
+
+async function recordStatusUpdate(
+  actor: ProfileActor,
+  targetType: string,
+  targetId: string,
+  status: string,
+): Promise<void> {
+  const actorId = normalizeIdentity(actor.cksCode) ?? actor.clerkUserId ?? "ADMIN";
+  const actorRole = (actor.role ?? "admin").toLowerCase();
+  const description = `Updated account status for ${targetId}`;
+
+  try {
+    await query(
+      `INSERT INTO system_activity (
+        activity_type,
+        description,
+        actor_id,
+        actor_role,
+        target_id,
+        target_type,
+        metadata,
+        created_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, NOW())`,
+      [
+        "account_status_updated",
+        description,
+        actorId,
+        actorRole,
+        targetId,
+        targetType,
+        JSON.stringify({ status }),
+      ],
+    );
+  } catch (error) {
+    console.warn("[profile] Failed to record status update activity", error);
+  }
+}
+
+async function applyProfileUpdate(
+  table: string,
+  idColumn: string,
+  idValue: string,
+  updates: Array<{ column: string; value: string | null | undefined }>,
+): Promise<boolean> {
+  const normalized = normalizeIdentity(idValue);
+  if (!normalized) {
+    return false;
+  }
+
+  const fields = updates.filter((update) => update.value !== undefined);
+  if (fields.length === 0) {
+    return true;
+  }
+
+  const assignments = fields.map((field, index) => `${field.column} = $${index + 1}`);
+  const values = fields.map((field) => field.value);
+  assignments.push(`updated_at = NOW()`);
+
+  const sql = `
+    UPDATE ${table}
+    SET ${assignments.join(", ")}
+    WHERE UPPER(${idColumn}) = $${values.length + 1}
+  `;
+
+  const result = await query(sql, [...values, normalized]);
+  return result.rowCount > 0;
+}
+
+export async function updateUserProfile(
+  entityType: string,
+  entityId: string,
+  payload: UserProfileUpdatePayload,
+  actor: ProfileActor,
+): Promise<{ updated: boolean; updatedFields: string[] }> {
+  const updates: Array<{ column: string; value: string | null | undefined; field: string }> = [];
+
+  switch (entityType) {
+    case "manager":
+      updates.push(
+        { column: "name", value: normalizeInput(payload.name), field: "name" },
+        { column: "email", value: normalizeInput(payload.email), field: "email" },
+        { column: "phone", value: normalizeInput(payload.phone), field: "phone" },
+        { column: "address", value: normalizeInput(payload.address), field: "address" },
+        { column: "territory", value: normalizeInput(payload.territory), field: "territory" },
+        { column: "reports_to", value: normalizeInput(payload.reportsTo), field: "reportsTo" },
+      );
+      break;
+    case "contractor":
+      updates.push(
+        { column: "name", value: normalizeInput(payload.name), field: "name" },
+        { column: "contact_person", value: normalizeInput(payload.mainContact), field: "mainContact" },
+        { column: "email", value: normalizeInput(payload.email), field: "email" },
+        { column: "phone", value: normalizeInput(payload.phone), field: "phone" },
+        { column: "address", value: normalizeInput(payload.address), field: "address" },
+      );
+      break;
+    case "customer":
+      updates.push(
+        { column: "name", value: normalizeInput(payload.name), field: "name" },
+        { column: "main_contact", value: normalizeInput(payload.mainContact), field: "mainContact" },
+        { column: "email", value: normalizeInput(payload.email), field: "email" },
+        { column: "phone", value: normalizeInput(payload.phone), field: "phone" },
+        { column: "address", value: normalizeInput(payload.address), field: "address" },
+      );
+      break;
+    case "center":
+      updates.push(
+        { column: "name", value: normalizeInput(payload.name), field: "name" },
+        { column: "main_contact", value: normalizeInput(payload.mainContact), field: "mainContact" },
+        { column: "email", value: normalizeInput(payload.email), field: "email" },
+        { column: "phone", value: normalizeInput(payload.phone), field: "phone" },
+        { column: "address", value: normalizeInput(payload.address), field: "address" },
+      );
+      break;
+    case "crew":
+      updates.push(
+        { column: "name", value: normalizeInput(payload.name), field: "name" },
+        { column: "emergency_contact", value: normalizeInput(payload.emergencyContact), field: "emergencyContact" },
+        { column: "email", value: normalizeInput(payload.email), field: "email" },
+        { column: "phone", value: normalizeInput(payload.phone), field: "phone" },
+        { column: "address", value: normalizeInput(payload.address), field: "address" },
+      );
+      break;
+    case "warehouse":
+      updates.push(
+        { column: "name", value: normalizeInput(payload.name), field: "name" },
+        { column: "main_contact", value: normalizeInput(payload.mainContact), field: "mainContact" },
+        { column: "email", value: normalizeInput(payload.email), field: "email" },
+        { column: "phone", value: normalizeInput(payload.phone), field: "phone" },
+        { column: "address", value: normalizeInput(payload.address), field: "address" },
+      );
+      break;
+    default:
+      throw new Error(`Unsupported entity type: ${entityType}`);
+  }
+
+  const updatedFields = updates.filter((u) => u.value !== undefined).map((u) => u.field);
+  let updated = false;
+
+  if (entityType === "manager") {
+    updated = await applyProfileUpdate("managers", "manager_id", entityId, updates.map(({ column, value }) => ({ column, value })));
+  } else if (entityType === "contractor") {
+    updated = await applyProfileUpdate("contractors", "contractor_id", entityId, updates.map(({ column, value }) => ({ column, value })));
+  } else if (entityType === "customer") {
+    updated = await applyProfileUpdate("customers", "customer_id", entityId, updates.map(({ column, value }) => ({ column, value })));
+  } else if (entityType === "center") {
+    updated = await applyProfileUpdate("centers", "center_id", entityId, updates.map(({ column, value }) => ({ column, value })));
+  } else if (entityType === "crew") {
+    updated = await applyProfileUpdate("crew", "crew_id", entityId, updates.map(({ column, value }) => ({ column, value })));
+  } else if (entityType === "warehouse") {
+    updated = await applyProfileUpdate("warehouses", "warehouse_id", entityId, updates.map(({ column, value }) => ({ column, value })));
+  }
+
+  if (updated && updatedFields.length > 0) {
+    await recordProfileUpdate(actor, entityType, entityId, updatedFields);
+  }
+
+  return { updated, updatedFields };
+}
+
+export async function updateUserAccountStatus(
+  entityType: string,
+  entityId: string,
+  status: AccountStatus,
+  actor: ProfileActor,
+): Promise<boolean> {
+  const normalizedStatus = normalizeInput(status) as AccountStatus | null;
+  if (!normalizedStatus) {
+    return false;
+  }
+
+  let updated = false;
+  if (entityType === "manager") {
+    updated = await applyProfileUpdate("managers", "manager_id", entityId, [
+      { column: "status", value: normalizedStatus },
+    ]);
+  } else if (entityType === "contractor") {
+    updated = await applyProfileUpdate("contractors", "contractor_id", entityId, [
+      { column: "status", value: normalizedStatus },
+    ]);
+  } else if (entityType === "customer") {
+    updated = await applyProfileUpdate("customers", "customer_id", entityId, [
+      { column: "status", value: normalizedStatus },
+    ]);
+  } else if (entityType === "center") {
+    updated = await applyProfileUpdate("centers", "center_id", entityId, [
+      { column: "status", value: normalizedStatus },
+    ]);
+  } else if (entityType === "crew") {
+    updated = await applyProfileUpdate("crew", "crew_id", entityId, [
+      { column: "status", value: normalizedStatus },
+    ]);
+  } else if (entityType === "warehouse") {
+    updated = await applyProfileUpdate("warehouses", "warehouse_id", entityId, [
+      { column: "status", value: normalizedStatus },
+    ]);
+  } else {
+    throw new Error(`Unsupported entity type: ${entityType}`);
+  }
+
+  if (updated) {
+    await recordStatusUpdate(actor, entityType, entityId, normalizedStatus);
+  }
+
+  return updated;
+}
+
 function mapContact(options: {
   id: string | null;
   name: string | null;

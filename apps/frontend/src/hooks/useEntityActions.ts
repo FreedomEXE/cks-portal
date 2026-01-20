@@ -474,6 +474,28 @@ async function handleUserAction(
 
   try {
     switch (actionId) {
+      case 'edit': {
+        window.dispatchEvent(new CustomEvent('cks:modal:switch-tab', {
+          detail: { tabId: 'profile', entityId: userId }
+        }));
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('cks:modal:profile-edit', {
+            detail: { enabled: true, entityId: userId }
+          }));
+        }, 0);
+        options.onSuccess?.();
+        return true;
+      }
+      case 'manage': {
+        window.dispatchEvent(new CustomEvent('cks:modal:switch-tab', {
+          detail: { tabId: 'management', entityId: userId }
+        }));
+        window.dispatchEvent(new CustomEvent('cks:modal:profile-edit', {
+          detail: { enabled: false, entityId: userId }
+        }));
+        options.onSuccess?.();
+        return true;
+      }
       case 'impersonate': {
         if (!impersonation.signInLoaded || !impersonation.signIn || !impersonation.setActive) {
           toast.error('Impersonation is not ready yet. Please try again.');

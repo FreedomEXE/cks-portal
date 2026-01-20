@@ -56,6 +56,8 @@ import ServiceTrainingTab from '../components/tabs/ServiceTrainingTab/ServiceTra
 import ServiceProductsTab from '../components/tabs/ServiceProductsTab/ServiceProductsTab';
 import ServiceTasksTab from '../components/tabs/ServiceTasksTab/ServiceTasksTab';
 import ServiceCrewTasksTab from '../components/tabs/ServiceCrewTasksTab/ServiceCrewTasksTab';
+import EditableUserProfileTab from '../components/tabs/UserProfileTab/EditableUserProfileTab';
+import UserManagementTab from '../components/tabs/UserManagementTab/UserManagementTab';
 
 /**
  * Order Details Sections Builder
@@ -1691,14 +1693,13 @@ const userAdapter: EntityAdapter = {
           closeOnSuccess: false,
         });
 
-        // Pause action
-        descriptors.push({
-          key: 'pause',
-          label: 'Pause',
-          variant: 'secondary',
-          confirm: 'Are you sure you want to pause this account?',
-          closeOnSuccess: false,
-        });
+          // Manage action
+          descriptors.push({
+            key: 'manage',
+            label: 'Manage',
+            variant: 'secondary',
+            closeOnSuccess: false,
+          });
 
         // Archive action
         if (can(context.entityType, 'archive', role, { state, entityData })) {
@@ -1775,7 +1776,7 @@ const userAdapter: EntityAdapter = {
   getDetailsSections: buildUserDetailsSections,
 
   getTabDescriptors: (context: TabVisibilityContext, actions: EntityAction[]): TabDescriptor[] => {
-    const { entityData, entityType } = context;
+    const { entityData, entityType, role } = context;
 
     // Get profile data for Profile tab
     const profileData = mapProfileDataForRole(entityType as any, entityData);
@@ -1788,21 +1789,30 @@ const userAdapter: EntityAdapter = {
                    profileData.centerId || profileData.crewId || profileData.warehouseId ||
                    entityData?.id || '';
 
-    // Build tab descriptors (final order): Profile, Quick Actions, History
+    // Build tab descriptors (final order): Profile, Management (admin), History
     const tabs: TabDescriptor[] = [
       {
         id: 'profile',
         label: 'Profile',
         content: (
-          <ProfileInfoCard
-            role={entityType as any}
-            profileData={profileData}
-            accountManager={null}
-            primaryColor={accentColor}
-            hideTabs
-            borderless
-            enabledTabs={['profile']}
-          />
+          role === 'admin' ? (
+            <EditableUserProfileTab
+              entityType={entityType as any}
+              entityId={userId}
+              entityData={entityData}
+              profileData={profileData}
+            />
+          ) : (
+            <ProfileInfoCard
+              role={entityType as any}
+              profileData={profileData}
+              accountManager={null}
+              primaryColor={accentColor}
+              hideTabs
+              borderless
+              enabledTabs={['profile']}
+            />
+          )
         ),
       },
       {
@@ -1811,6 +1821,17 @@ const userAdapter: EntityAdapter = {
           <UserQuickActionsContent actions={actions} />
         ),
       },
+      ...(role === 'admin' ? [{
+        id: 'management',
+        label: 'Management',
+        content: (
+          <UserManagementTab
+            entityType={entityType as any}
+            entityId={userId}
+            entityData={entityData}
+          />
+        ),
+      }] : []),
       {
         id: 'history',
         label: 'History',

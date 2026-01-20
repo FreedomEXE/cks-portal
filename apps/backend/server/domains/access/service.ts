@@ -3,10 +3,12 @@ import { normalizeIdentity } from '../identity';
 import {
   getAccessCode,
   getActiveAccessGrant,
+  getLatestAccessGrant,
   getCascadeGrantForCode,
   incrementAccessCodeRedemptions,
   insertAccessCode,
   insertAccessGrant,
+  updateAccessGrant,
 } from './repository';
 import type { AccessCodeRecord, AccessGrantRecord, AccessTier } from './types';
 
@@ -361,6 +363,60 @@ export async function resolveAccessStatus(role: string, cksCode: string): Promis
 export async function hasActionAccess(role: string, cksCode: string): Promise<boolean> {
   const status = await resolveAccessStatus(role, cksCode);
   return status.status === 'active';
+}
+
+export async function getAccountAccessGrant(
+  role: string,
+  cksCode: string,
+): Promise<AccessGrantRecord | null> {
+  const normalizedRole = normalizeRole(role);
+  if (!normalizedRole) {
+    return null;
+  }
+  return getLatestAccessGrant(cksCode, normalizedRole);
+}
+
+export async function setAccountAccessGrant(params: {
+  role: string;
+  cksCode: string;
+  tier: AccessTier;
+  status: 'active' | 'revoked';
+  grantedByRole: string | null;
+  grantedByCode: string | null;
+}): Promise<AccessGrantRecord> {
+  const normalizedRole = normalizeRole(params.role);
+  if (!normalizedRole) {
+    throw new Error('Invalid role for access grant');
+  }
+
+  const existing = await getLatestAccessGrant(params.cksCode, normalizedRole);
+  if (existing) {
+    const updated = await updateAccessGrant(existing.grantId, {
+      tier: params.tier,
+      status: params.status,
+    });
+    if (!updated) {
+      throw new Error('Failed to update access grant');
+    }
+    return updated;
+  }
+
+  const created = await insertAccessGrant({
+    cksCode: params.cksCode,
+    role: normalizedRole,
+    tier: params.tier,
+    status: params.status,
+    sourceCode: 'ADMIN',
+    cascade: false,
+    grantedByRole: params.grantedByRole,
+    grantedByCode: params.grantedByCode,
+  });
+
+  if (!created) {
+    throw new Error('Failed to create access grant');
+  }
+
+  return created;
 }
 
 async function resolveCascadeGrant(role: string, cksCode: string): Promise<AccessGrantRecord | null> {

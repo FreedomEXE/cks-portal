@@ -185,6 +185,22 @@ export async function getActiveAccessGrant(
   return row ? mapAccessGrant(row) : null;
 }
 
+export async function getLatestAccessGrant(
+  cksCode: string,
+  role: string,
+): Promise<AccessGrantRecord | null> {
+  const normalizedCode = normalizeIdentity(cksCode) ?? cksCode;
+  const result = await query<Record<string, unknown>>(
+    `SELECT * FROM access_grants
+     WHERE UPPER(cks_code) = $1 AND role = $2
+     ORDER BY granted_at DESC
+     LIMIT 1`,
+    [normalizedCode, role],
+  );
+  const row = result.rows[0];
+  return row ? mapAccessGrant(row) : null;
+}
+
 export async function getCascadeGrantForCode(
   cksCode: string,
 ): Promise<AccessGrantRecord | null> {
@@ -196,6 +212,46 @@ export async function getCascadeGrantForCode(
      LIMIT 1`,
     [normalizedCode],
   );
+  const row = result.rows[0];
+  return row ? mapAccessGrant(row) : null;
+}
+
+export async function updateAccessGrant(
+  grantId: number,
+  payload: {
+    tier?: AccessTier;
+    status?: string;
+  },
+): Promise<AccessGrantRecord | null> {
+  const updates: string[] = [];
+  const values: Array<string | number | null> = [];
+  let index = 1;
+
+  if (payload.tier !== undefined) {
+    updates.push(`tier = $${index}`);
+    values.push(payload.tier);
+    index += 1;
+  }
+
+  if (payload.status !== undefined) {
+    updates.push(`status = $${index}`);
+    values.push(payload.status);
+    index += 1;
+    updates.push(`revoked_at = CASE WHEN $${index - 1} = 'revoked' THEN NOW() ELSE NULL END`);
+  }
+
+  if (updates.length === 0) {
+    return null;
+  }
+
+  const result = await query<Record<string, unknown>>(
+    `UPDATE access_grants
+     SET ${updates.join(', ')}
+     WHERE grant_id = $${index}
+     RETURNING *`,
+    [...values, grantId],
+  );
+
   const row = result.rows[0];
   return row ? mapAccessGrant(row) : null;
 }

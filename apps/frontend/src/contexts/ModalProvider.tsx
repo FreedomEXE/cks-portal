@@ -380,6 +380,16 @@ export function ModalProvider({ children }: ModalProviderProps) {
     return () => window.removeEventListener('cks:modal:close', handler as EventListener);
   }, [closeModal]);
 
+  useEffect(() => {
+    const handler = () => {
+      if (currentModal?.entityType && currentModal?.entityId) {
+        openEntityModal(currentModal.entityType, currentModal.entityId, currentModal.options);
+      }
+    };
+    window.addEventListener('cks:modal:refresh', handler as EventListener);
+    return () => window.removeEventListener('cks:modal:refresh', handler as EventListener);
+  }, [currentModal, openEntityModal]);
+
   return (
     <ModalContext.Provider value={value}>
       {children}

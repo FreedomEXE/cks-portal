@@ -195,6 +195,74 @@ export async function patchServiceAssignments(serviceId: string, payload: { role
   });
 }
 
+export type UserProfileUpdatePayload = {
+  name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  address?: string | null;
+  mainContact?: string | null;
+  emergencyContact?: string | null;
+  territory?: string | null;
+  reportsTo?: string | null;
+};
+
+export async function updateUserProfile(
+  entityType: 'manager' | 'contractor' | 'customer' | 'center' | 'crew' | 'warehouse',
+  entityId: string,
+  payload: UserProfileUpdatePayload,
+  init?: ApiFetchInit,
+) {
+  return apiFetch<{ data: any; state?: string }>(
+    `/admin/profile/${encodeURIComponent(entityType)}/${encodeURIComponent(entityId)}`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+      headers: { 'Content-Type': 'application/json', ...(init?.headers || {}) },
+      ...init,
+    },
+  );
+}
+
+export type AccountStatus = 'active' | 'paused' | 'ended';
+export type AccessTier = 'standard' | 'premium';
+export type AccessGrantStatus = 'active' | 'revoked';
+
+export interface AccountManagementSnapshot {
+  accountStatus: AccountStatus | string | null;
+  accessTier: AccessTier | null;
+  accessStatus: AccessGrantStatus | null;
+}
+
+export async function fetchAccountManagement(
+  entityType: 'manager' | 'contractor' | 'customer' | 'center' | 'crew' | 'warehouse',
+  entityId: string,
+  init?: ApiFetchInit,
+): Promise<AccountManagementSnapshot> {
+  const response = await apiFetch<{ data: AccountManagementSnapshot }>(
+    `/admin/account-management/${encodeURIComponent(entityType)}/${encodeURIComponent(entityId)}`,
+    init,
+  );
+  return response.data;
+}
+
+export async function updateAccountManagement(
+  entityType: 'manager' | 'contractor' | 'customer' | 'center' | 'crew' | 'warehouse',
+  entityId: string,
+  payload: { accountStatus?: AccountStatus; accessTier?: AccessTier },
+  init?: ApiFetchInit,
+): Promise<AccountManagementSnapshot> {
+  const response = await apiFetch<{ data: AccountManagementSnapshot }>(
+    `/admin/account-management/${encodeURIComponent(entityType)}/${encodeURIComponent(entityId)}`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+      headers: { 'Content-Type': 'application/json', ...(init?.headers || {}) },
+      ...init,
+    },
+  );
+  return response.data;
+}
+
 export async function getServiceCertifications(serviceId: string, init?: ApiFetchInit) {
   return apiFetch<{ success: boolean; data: { managers: string[]; contractors: string[]; crew: string[]; warehouses: string[] } }>(`/admin/catalog/services/${encodeURIComponent(serviceId)}/certifications`, {
     method: 'GET',
