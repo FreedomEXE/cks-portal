@@ -43,6 +43,7 @@ import {
 } from '@cks/ui';
 // Deep import for product quick actions (not exported at package root)
 import ProductManagementTab from '../components/tabs/ProductManagementTab';
+import ServiceManagementTab from '../components/tabs/ServiceManagementTab';
 import type { ActivityModalProps } from '@cks/ui';
 import { DetailsComposer, ProfileInfoCard, getEntityAccentColor } from '@cks/domain-widgets';
 import { filterVisibleSections } from '../policies/sections';
@@ -2049,6 +2050,22 @@ const catalogServiceAdapter: EntityAdapter = {
         />
       ),
     });
+
+    if (role === 'admin') {
+      tabs.push({
+        id: 'management',
+        label: 'Management',
+        content: (
+          <ServiceManagementTab
+            serviceId={entityData?.serviceId}
+            name={entityData?.name}
+            description={entityData?.description}
+            category={entityData?.category}
+            imageUrl={entityData?.imageUrl}
+          />
+        ),
+      });
+    }
 
     // Note: No separate Actions tab for catalog services; admin actions render inside Quick Actions
 

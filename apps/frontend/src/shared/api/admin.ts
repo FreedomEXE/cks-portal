@@ -167,6 +167,7 @@ export async function updateCatalogService(
     name?: string;
     category?: string;
     description?: string;
+    imageUrl?: string;
     tags?: string[];
     isActive?: boolean;
     metadata?: Record<string, unknown>;

@@ -117,13 +117,6 @@ async function handleOrderAction(
   if (actionId === 'archive' || actionId === 'restore' || actionId === 'delete') {
     try {
       switch (actionId) {
-        case 'edit': {
-          window.dispatchEvent(new CustomEvent('cks:modal:switch-tab', {
-            detail: { tabId: 'management', entityId: productId },
-          }));
-          options.onSuccess?.();
-          return true;
-        }
         case 'archive': {
           const reason = options.notes;
           console.log('[useEntityActions] Archiving order:', orderId);
@@ -929,10 +922,11 @@ async function handleCatalogServiceAction(
   try {
     switch (actionId) {
       case 'edit': {
-        // TODO: Implement edit form/modal for catalog services
-        console.warn('[useEntityActions] Edit action not yet implemented for catalog services');
-        toast.error('Edit functionality coming soon');
-        return false;
+        window.dispatchEvent(new CustomEvent('cks:modal:switch-tab', {
+          detail: { tabId: 'management', entityId: serviceId },
+        }));
+        options.onSuccess?.();
+        return true;
       }
 
       case 'archive': {

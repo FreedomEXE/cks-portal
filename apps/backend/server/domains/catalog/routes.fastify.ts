@@ -359,6 +359,7 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
       name: z.string().trim().min(1).optional(),
       category: z.string().trim().min(1).optional(),
       description: z.string().trim().optional(),
+      imageUrl: z.string().trim().optional(),
       tags: z.array(z.string().trim()).optional(),
       isActive: z.boolean().optional(),
       metadata: z.record(z.string(), z.any()).optional(),
@@ -372,7 +373,7 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
     }
 
     const { serviceId } = p.data;
-    const { name, category, description, tags, isActive, metadata } = b.data;
+    const { name, category, description, imageUrl, tags, isActive, metadata } = b.data;
 
     console.log('[CATALOG] PATCH service:', serviceId);
     console.log('[CATALOG] Received metadata:', JSON.stringify(metadata, null, 2));
@@ -383,6 +384,7 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
     if (name !== undefined) { params.push(name); sets.push(`name = $${params.length}`); }
     if (category !== undefined) { params.push(category); sets.push(`category = $${params.length}`); }
     if (description !== undefined) { params.push(description); sets.push(`description = $${params.length}`); }
+    if (imageUrl !== undefined) { params.push(imageUrl); sets.push(`image_url = $${params.length}`); }
     if (Array.isArray(tags)) { params.push(tags); sets.push(`tags = $${params.length}`); }
     if (isActive !== undefined) { params.push(isActive); sets.push(`is_active = $${params.length}`); }
     if (metadata !== undefined) {

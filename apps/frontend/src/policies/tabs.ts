@@ -82,8 +82,8 @@ export function canSeeTab(tabId: TabId, context: TabVisibilityContext): boolean 
     // ===== QUICK ACTIONS TAB =====
     // Admin-only for catalog services and products (unified catalog view)
     case 'quick-actions': {
-      // Allow admin-only quick actions for product inventory management
-      return role === 'admin' && entityType === 'product';
+      // Allow admin-only quick actions for product inventory + catalog service certifications
+      return role === 'admin' && (entityType === 'product' || entityType === 'catalogService');
     }
 
     // ===== REMOVED ACTIONS TAB =====
@@ -94,7 +94,7 @@ export function canSeeTab(tabId: TabId, context: TabVisibilityContext): boolean 
     // ===== MANAGEMENT TAB =====
     // Admin-only: account status/tier management for user entities
     case 'management': {
-      const manageableEntityTypes: EntityType[] = ['manager', 'contractor', 'customer', 'center', 'crew', 'warehouse', 'product'];
+      const manageableEntityTypes: EntityType[] = ['manager', 'contractor', 'customer', 'center', 'crew', 'warehouse', 'product', 'catalogService'];
       return role === 'admin' && manageableEntityTypes.includes(entityType);
     }
 
