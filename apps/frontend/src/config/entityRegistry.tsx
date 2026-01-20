@@ -42,7 +42,7 @@ import {
   ServiceQuickActions,
 } from '@cks/ui';
 // Deep import for product quick actions (not exported at package root)
-import { ProductQuickActions } from '@cks/ui';
+import ProductManagementTab from '../components/tabs/ProductManagementTab';
 import type { ActivityModalProps } from '@cks/ui';
 import { DetailsComposer, ProfileInfoCard, getEntityAccentColor } from '@cks/domain-widgets';
 import { filterVisibleSections } from '../policies/sections';
@@ -2310,45 +2310,24 @@ const productAdapter: EntityAdapter = {
       },
     ];
 
-    // Admin-only: Inventory management quick actions
-    if (role === 'admin') {
-      tabs.unshift({
-        id: 'quick-actions',
-        label: 'Quick Actions',
-        content: (
-          <ProductQuickActions
-            inventoryData={entityData?.inventoryData || []}
-            onSave={async (changes) => {
-              const productId = entityData?.productId;
-              if (!productId) return;
-              for (const change of changes) {
-                await updateInventory({
-                  warehouseId: change.warehouseId,
-                  itemId: productId,
-                  quantityChange: change.quantityChange,
-                  reason: 'Admin adjustment via product quick actions',
-                });
-              }
-              try {
-                const result = await getProductInventory(productId);
-                if (result?.success && Array.isArray(result.data)) {
-                  (entityData as any).inventoryData = result.data;
-                }
-              } catch (e) {
-                console.warn('[ProductAdapter] Failed to refresh inventory', e);
-              }
-              toast.success('Inventory saved');
-            }}
-            adminActions={actions.map(a => ({
-              label: a.label,
-              onClick: a.onClick,
-              variant: a.variant as any,
-              disabled: a.disabled,
-            }))}
-          />
-        ),
-      });
-    }
+      if (role === 'admin') {
+        tabs.push({
+          id: 'management',
+          label: 'Management',
+          content: (
+            <ProductManagementTab
+              productId={entityData?.productId}
+              name={entityData?.name}
+              description={entityData?.description}
+              imageUrl={entityData?.imageUrl}
+              inventoryData={entityData?.inventoryData || []}
+              onInventoryRefresh={(data) => {
+                (entityData as any).inventoryData = data;
+              }}
+            />
+          ),
+        });
+      }
 
     return tabs;
   },

@@ -117,6 +117,13 @@ async function handleOrderAction(
   if (actionId === 'archive' || actionId === 'restore' || actionId === 'delete') {
     try {
       switch (actionId) {
+        case 'edit': {
+          window.dispatchEvent(new CustomEvent('cks:modal:switch-tab', {
+            detail: { tabId: 'management', entityId: productId },
+          }));
+          options.onSuccess?.();
+          return true;
+        }
         case 'archive': {
           const reason = options.notes;
           console.log('[useEntityActions] Archiving order:', orderId);

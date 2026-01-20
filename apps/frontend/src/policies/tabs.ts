@@ -94,8 +94,8 @@ export function canSeeTab(tabId: TabId, context: TabVisibilityContext): boolean 
     // ===== MANAGEMENT TAB =====
     // Admin-only: account status/tier management for user entities
     case 'management': {
-      const userEntityTypes: EntityType[] = ['manager', 'contractor', 'customer', 'center', 'crew', 'warehouse'];
-      return role === 'admin' && userEntityTypes.includes(entityType);
+      const manageableEntityTypes: EntityType[] = ['manager', 'contractor', 'customer', 'center', 'crew', 'warehouse', 'product'];
+      return role === 'admin' && manageableEntityTypes.includes(entityType);
     }
 
     // ===== CREW TAB =====

@@ -268,6 +268,7 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
         product_id: string;
         name: string;
         description: string | null;
+        image_url: string | null;
         category: string | null;
         unit_of_measure: string | null;
         is_active: boolean;
@@ -278,7 +279,7 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
         deleted_at?: Date | null;
         deleted_by?: string | null;
       }>(
-        `SELECT product_id, name, description, category, unit_of_measure, is_active, metadata, archived_at, archived_by, deletion_scheduled
+        `SELECT product_id, name, description, image_url, category, unit_of_measure, is_active, metadata, archived_at, archived_by, deletion_scheduled
          FROM catalog_products
          WHERE UPPER(product_id) = $1`,
         [normalizedId]
@@ -328,6 +329,7 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
           productId: product.product_id,
           name: product.name,
           description: product.description,
+          imageUrl: product.image_url,
           category: product.category,
           unitOfMeasure: product.unit_of_measure,
           status: state, // Keep in data for backward compat
@@ -575,6 +577,51 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
         error: 'Failed to fetch product inventory',
         details: error instanceof Error ? error.message : String(error)
       });
+    }
+  });
+
+  server.patch('/api/admin/catalog/products/:productId', async (request, reply) => {
+    const admin = await requireActiveAdmin(request, reply);
+    if (!admin) return;
+
+    const paramsSchema = z.object({ productId: z.string().min(1) });
+    const bodySchema = z.object({
+      name: z.string().trim().min(1).optional(),
+      description: z.string().trim().optional(),
+      imageUrl: z.string().trim().optional(),
+    });
+
+    const p = paramsSchema.safeParse(request.params);
+    const b = bodySchema.safeParse(request.body);
+    if (!p.success || !b.success) {
+      reply.code(400).send({ error: 'Invalid request' });
+      return;
+    }
+
+    const { productId } = p.data;
+    const { name, description, imageUrl } = b.data;
+
+    const sets: string[] = [];
+    const params: any[] = [];
+    if (name !== undefined) { params.push(name); sets.push(`name = $${params.length}`); }
+    if (description !== undefined) { params.push(description); sets.push(`description = $${params.length}`); }
+    if (imageUrl !== undefined) { params.push(imageUrl); sets.push(`image_url = $${params.length}`); }
+
+    if (sets.length === 0) {
+      reply.send({ success: true });
+      return;
+    }
+
+    params.push(productId);
+    try {
+      const sql = `UPDATE catalog_products
+         SET ${sets.join(', ')}, updated_at = NOW()
+         WHERE product_id = $${params.length}`;
+      await query(sql, params);
+      reply.send({ success: true });
+    } catch (error) {
+      request.log.error({ err: error, productId }, 'update catalog product failed');
+      reply.code(500).send({ error: 'Failed to update catalog product' });
     }
   });
 }

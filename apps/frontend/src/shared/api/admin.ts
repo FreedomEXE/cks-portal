@@ -181,6 +181,23 @@ export async function updateCatalogService(
   });
 }
 
+export async function updateCatalogProduct(
+  productId: string,
+  payload: {
+    name?: string;
+    description?: string;
+    imageUrl?: string;
+  },
+  init?: ApiFetchInit,
+) {
+  return apiFetch<{ success: boolean }>(`/admin/catalog/products/${encodeURIComponent(productId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+    headers: { 'Content-Type': 'application/json', ...(init?.headers || {}) },
+    ...init,
+  });
+}
+
 export async function fetchServiceCertifications(serviceId: string, init?: ApiFetchInit): Promise<{ managers: string[]; crew: string[]; warehouses: string[] }>{
   const res = await apiFetch<{ success: boolean; data: { managers: string[]; crew: string[]; warehouses: string[] } }>(`/admin/catalog/services/${encodeURIComponent(serviceId)}/certifications`, init);
   return res.data;
