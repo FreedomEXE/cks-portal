@@ -138,6 +138,27 @@ function computeTimelineText(event: LifecycleEvent, fallbackEntityId?: string): 
   const metadata = (event.metadata || {}) as Record<string, any>;
   const stripped = stripLeadingVerb(event.description || '');
 
+  if (type === 'product_inventory_adjusted') {
+    const productId =
+      (metadata.productId as string | undefined) ||
+      (metadata.itemId as string | undefined) ||
+      extractFirstIdToken(stripped) ||
+      extractLastIdToken(stripped) ||
+      fallbackEntityId ||
+      '';
+    const delta = Number(metadata.quantityChange);
+    const newQty = Number(metadata.newQuantity);
+    const deltaLabel = Number.isFinite(delta) ? `${delta > 0 ? '+' : ''}${delta}` : '';
+    const newLabel = Number.isFinite(newQty) ? `-> ${newQty}` : '';
+    const qtyLabel = [deltaLabel, newLabel].filter(Boolean).join(' ');
+    const warehouseId = (metadata.warehouseId as string | undefined)?.toUpperCase();
+    const suffixParts = [];
+    if (qtyLabel) suffixParts.push(qtyLabel);
+    if (warehouseId) suffixParts.push(`@ ${warehouseId}`);
+    const suffix = suffixParts.length ? `: ${suffixParts.join(' ')}` : '';
+    return `${productId || fallbackEntityId || 'Inventory'}${suffix}`;
+  }
+
   // Assignment shapes
   if (type === 'crew_assigned_to_center') {
     const a = (metadata.crewId as string) || extractFirstIdToken(stripped);

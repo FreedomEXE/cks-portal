@@ -165,6 +165,13 @@ function formatText(value?: string | null): string {
   return trimmed.length ? trimmed : 'N/A';
 }
 
+function formatCount(value?: number | null): string {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) {
+    return '0';
+  }
+  return String(value);
+}
+
 function normalizeId(value?: string | null): string | null {
   if (!value) return null;
   return value.trim().toUpperCase();
@@ -722,6 +729,7 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
         originalCategory: product.category, // Store original for modal
         status: formatText(product.status),
         originalStatus: product.status, // Store original for modal
+        inventoryOnHand: formatCount(product.inventoryOnHand ?? null),
         updatedAt: formatDate(product.updatedAt),
         source: (product as any).source ?? 'products',
       })),
@@ -1165,16 +1173,17 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
       data: serviceOrderRows,
       emptyMessage: 'No service orders recorded.',
     },
-    products: {
-      columns: [
-        { key: 'id', label: 'PRODUCT ID', clickable: true },
-        { key: 'name', label: 'NAME' },
-        { key: 'category', label: 'CATEGORY' },
-        { key: 'status', label: 'STATUS', render: renderStatusBadge },
-        { key: 'updatedAt', label: 'UPDATED' },
-      ],
-      data: productRows,
-      emptyMessage: 'No products available.',
+      products: {
+        columns: [
+          { key: 'id', label: 'PRODUCT ID', clickable: true },
+          { key: 'name', label: 'NAME' },
+          { key: 'category', label: 'CATEGORY' },
+          { key: 'inventoryOnHand', label: 'ON HAND' },
+          { key: 'status', label: 'STATUS', render: renderStatusBadge },
+          { key: 'updatedAt', label: 'UPDATED' },
+        ],
+        data: productRows,
+        emptyMessage: 'No products available.',
       onRowClick: (row: any) => {
         // Open universal product modal for products
         const productId = row.id || row.productId || row.code;

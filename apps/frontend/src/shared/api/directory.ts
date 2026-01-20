@@ -153,6 +153,7 @@ export interface Product {
   price: string | null;
   unit: string | null;
   status: string | null;
+  inventoryOnHand?: number | null;
   createdAt: string | null;
   updatedAt: string | null;
   rawId?: string | null;

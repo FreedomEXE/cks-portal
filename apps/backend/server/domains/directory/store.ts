@@ -654,9 +654,7 @@ async function listOrders(limit = DEFAULT_LIMIT): Promise<OrderDirectoryEntry[]>
 }
 
 async function listProducts(limit = DEFAULT_LIMIT): Promise<ProductDirectoryEntry[]> {
-  // Primary: live inventory from inventory_items (joined to catalog for details)
-  try {
-    const inv = await query<{
+    const catalog = await query<{
       product_id: string;
       product_name: string;
       category: string | null;
@@ -664,86 +662,110 @@ async function listProducts(limit = DEFAULT_LIMIT): Promise<ProductDirectoryEntr
       price: number | string | null;
       unit: string | null;
       status: string | null;
+      inventory_on_hand: number | string | null;
       created_at: Date | null;
       updated_at: Date | null;
     }>(
       `SELECT
-         ii.item_id AS product_id,
-         ii.item_name AS product_name,
-         cp.category,
-         cp.description,
-         cp.base_price AS price,
-         cp.unit_of_measure AS unit,
-         'active' AS status,
-         ii.created_at,
-         COALESCE(ii.updated_at, ii.created_at) AS updated_at
-       FROM inventory_items ii
-       LEFT JOIN catalog_products cp ON cp.product_id = ii.item_id
-       WHERE ii.archived_at IS NULL
-       ORDER BY ii.item_id
-       LIMIT $1`,
+        p.product_id,
+        COALESCE(MAX(ii.item_name), p.name) AS product_name,
+        COALESCE(MAX(ii.category), p.category) AS category,
+        p.description,
+        p.base_price AS price,
+        p.unit_of_measure AS unit,
+        CASE WHEN p.is_active THEN 'active' ELSE 'inactive' END AS status,
+        COALESCE(SUM(ii.quantity_on_hand), 0) AS inventory_on_hand,
+        p.created_at,
+        p.updated_at
+      FROM catalog_products p
+      LEFT JOIN inventory_items ii
+        ON ii.item_id = p.product_id
+        AND ii.archived_at IS NULL
+      GROUP BY
+        p.product_id,
+        p.name,
+        p.category,
+        p.description,
+        p.base_price,
+        p.unit_of_measure,
+        p.is_active,
+        p.created_at,
+        p.updated_at
+      ORDER BY p.product_id
+      LIMIT $1`,
       [limit]
     );
-    if (inv.rows && inv.rows.length > 0) {
-      return inv.rows.map((row) => ({
-        id: formatPrefixedId(row.product_id, 'PRD'),
-        rawId: toNullableString(row.product_id),
-        name: row.product_name,
-        category: toNullableString(row.category),
-        description: toNullableString(row.description),
-        price: toNullableNumber(row.price),
-        unit: toNullableString(row.unit),
-        status: toNullableString(row.status),
-        createdAt: toIso(row.created_at),
-        updatedAt: toIso(row.updated_at),
-        source: 'products' as const,
-      }));
-    }
-  } catch (error) {
-    // Fall through to catalog fallback
-  }
 
-  // Fallback: catalog products (view only)
-  const catalog = await query<{
-    product_id: string;
-    product_name: string;
-    category: string | null;
-    description: string | null;
-    price: number | string | null;
-    unit: string | null;
-    status: string | null;
-    created_at: Date | null;
-    updated_at: Date | null;
-  }>(
-    `SELECT
-       p.product_id,
-       p.name AS product_name,
-       p.category,
-       p.description,
-       p.base_price AS price,
-       p.unit_of_measure AS unit,
-       CASE WHEN p.is_active THEN 'active' ELSE 'inactive' END AS status,
-       p.created_at,
-       p.updated_at
-     FROM catalog_products p
-     WHERE p.is_active = TRUE
-     ORDER BY p.product_id
-     LIMIT $1`,
-    [limit]
-  );
-  return catalog.rows.map((row) => ({
+  const baseRows = catalog.rows.map((row) => ({
     id: formatPrefixedId(row.product_id, 'PRD'),
     rawId: toNullableString(row.product_id),
     name: row.product_name,
     category: toNullableString(row.category),
-    description: toNullableString(row.description),
-    price: toNullableNumber(row.price),
-    unit: toNullableString(row.unit),
-    status: toNullableString(row.status),
-    createdAt: toIso(row.created_at),
-    updatedAt: toIso(row.updated_at),
-    source: 'catalog' as const,
-  }));
+      description: toNullableString(row.description),
+      price: toNullableNumber(row.price),
+      unit: toNullableString(row.unit),
+      status: toNullableString(row.status),
+      inventoryOnHand: Number(row.inventory_on_hand ?? 0),
+      createdAt: toIso(row.created_at),
+      updatedAt: toIso(row.updated_at),
+      source: 'catalog' as const,
+    }));
+
+  const remaining = Math.max(0, limit - baseRows.length);
+  if (remaining === 0) {
+    return baseRows;
+  }
+
+    const inventoryOnly = await query<{
+      product_id: string;
+      product_name: string;
+      category: string | null;
+      description: string | null;
+      price: number | string | null;
+      unit: string | null;
+      status: string | null;
+      inventory_on_hand: number | string | null;
+      created_at: Date | null;
+      updated_at: Date | null;
+    }>(
+      `SELECT
+        ii.item_id AS product_id,
+        MAX(ii.item_name) AS product_name,
+        MAX(ii.category) AS category,
+        NULL::text AS description,
+        NULL::numeric AS price,
+        NULL::text AS unit,
+        COALESCE(MAX(ii.status), 'active') AS status,
+        COALESCE(SUM(ii.quantity_on_hand), 0) AS inventory_on_hand,
+        MIN(ii.created_at) AS created_at,
+        COALESCE(MAX(ii.updated_at), MAX(ii.created_at)) AS updated_at
+      FROM inventory_items ii
+      LEFT JOIN catalog_products p ON p.product_id = ii.item_id
+      WHERE p.product_id IS NULL
+        AND ii.archived_at IS NULL
+      GROUP BY ii.item_id
+      ORDER BY ii.item_id
+      LIMIT $1`,
+      [remaining]
+    );
+
+  return [
+    ...baseRows,
+    ...inventoryOnly.rows.map((row) => ({
+      id: formatPrefixedId(row.product_id, 'PRD'),
+      rawId: toNullableString(row.product_id),
+      name: row.product_name,
+      category: toNullableString(row.category),
+        description: toNullableString(row.description),
+        price: toNullableNumber(row.price),
+        unit: toNullableString(row.unit),
+        status: toNullableString(row.status),
+        inventoryOnHand: Number(row.inventory_on_hand ?? 0),
+        createdAt: toIso(row.created_at),
+        updatedAt: toIso(row.updated_at),
+        source: 'products' as const,
+      })),
+    ];
 }
 
 async function listTraining(limit = DEFAULT_LIMIT): Promise<TrainingDirectoryEntry[]> {

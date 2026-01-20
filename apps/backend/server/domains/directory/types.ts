@@ -191,6 +191,7 @@ export interface ProductDirectoryEntry {
   price: number | null;
   unit: string | null;
   status: string | null;
+  inventoryOnHand: number;
   createdAt: string | null;
   updatedAt: string | null;
   rawId?: string | null;

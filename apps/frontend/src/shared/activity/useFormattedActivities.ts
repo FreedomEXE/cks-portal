@@ -377,6 +377,22 @@ function personalizeMessage(item: HubActivityItem, viewerId?: string | null): st
     return 'Service completed';
   }
 
+  if (activityType === 'product_inventory_adjusted') {
+    const productId = (item.targetId || (metadata.productId as string | undefined) || '').toUpperCase();
+    const warehouseId = (metadata.warehouseId as string | undefined)?.toUpperCase();
+    const delta = Number(metadata.quantityChange);
+    const newQty = Number(metadata.newQuantity);
+    const deltaLabel = Number.isFinite(delta) ? `${delta > 0 ? '+' : ''}${delta}` : null;
+    const newLabel = Number.isFinite(newQty) ? `new ${newQty}` : null;
+    const detail = [deltaLabel, newLabel].filter(Boolean).join(', ');
+    const location = warehouseId ? ` @ ${warehouseId}` : '';
+
+    if (isActor) {
+      return `You adjusted inventory${productId ? ` for ${productId}` : ''}${detail ? ` (${detail})` : ''}${location}`;
+    }
+    return `Inventory adjusted${productId ? ` for ${productId}` : ''}${detail ? ` (${detail})` : ''}${location}`;
+  }
+
   if (activityType === 'service_crew_requested') {
     const crewCodes = (metadata.crewCodes as string[] | undefined) || [];
     const crewId = (metadata.crewId as string | undefined)?.toUpperCase();
