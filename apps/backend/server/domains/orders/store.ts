@@ -223,6 +223,25 @@ function isTestCode(value: string | null | undefined): boolean {
   return value.toUpperCase().includes('-TEST');
 }
 
+function buildTestOrderVisibilityClause(cksCode: string): string {
+  const isTestViewer = isTestCode(cksCode);
+  const testClause = `
+    (
+      COALESCE((metadata->>'is_test')::boolean, false) = true
+      OR UPPER(order_id) LIKE '%-TEST%'
+      OR UPPER(creator_id) LIKE '%-TEST%'
+      OR UPPER(customer_id) LIKE '%-TEST%'
+      OR UPPER(center_id) LIKE '%-TEST%'
+      OR UPPER(contractor_id) LIKE '%-TEST%'
+      OR UPPER(manager_id) LIKE '%-TEST%'
+      OR UPPER(crew_id) LIKE '%-TEST%'
+      OR UPPER(assigned_warehouse) LIKE '%-TEST%'
+      OR UPPER(destination) LIKE '%-TEST%'
+    )
+  `;
+  return isTestViewer ? `AND ${testClause}` : `AND NOT ${testClause}`;
+}
+
 function parseOrderType(raw: string | null | undefined): "product" | "service" {
   if (!raw) {
     return "product";
@@ -1244,6 +1263,7 @@ async function fetchOrders(whereClause: string, params: readonly unknown[], cont
 function buildRoleFilter(role: HubRole, cksCode: string): { clause: string; params: unknown[] } {
   // Direct visibility only: users see orders where they are directly referenced in the order
   // No ecosystem-wide joins - only show orders this specific entity is involved in
+  const testVisibility = buildTestOrderVisibilityClause(cksCode);
   switch (role) {
     case "customer": {
       // Customer sees orders they created, where they're referenced, or from their centers
@@ -1252,7 +1272,7 @@ function buildRoleFilter(role: HubRole, cksCode: string): { clause: string; para
         OR customer_id = $1
         OR center_id IN (SELECT center_id FROM centers WHERE customer_id = $1)
       `;
-      return { clause, params: [cksCode] };
+      return { clause: `${clause} ${testVisibility}`, params: [cksCode] };
     }
     case "center": {
       // Center sees orders they created, are referenced in, or from their parent customer
@@ -1262,7 +1282,7 @@ function buildRoleFilter(role: HubRole, cksCode: string): { clause: string; para
         OR destination = $1
         OR customer_id IN (SELECT customer_id FROM centers WHERE center_id = $1)
       `;
-      return { clause, params: [cksCode] };
+      return { clause: `${clause} ${testVisibility}`, params: [cksCode] };
     }
     case "manager": {
       // Manager sees ALL orders in their ecosystem (they manage multiple entities)
@@ -1273,7 +1293,7 @@ function buildRoleFilter(role: HubRole, cksCode: string): { clause: string; para
         center_id IN (SELECT center_id FROM centers WHERE cks_manager = $1) OR
         crew_id IN (SELECT crew_id FROM crew WHERE cks_manager = $1)
       `;
-      return { clause, params: [cksCode] };
+      return { clause: `${clause} ${testVisibility}`, params: [cksCode] };
     }
     case "contractor": {
       // Contractor sees orders they created, are referenced in, or from their ecosystem
@@ -1284,7 +1304,7 @@ function buildRoleFilter(role: HubRole, cksCode: string): { clause: string; para
         OR customer_id IN (SELECT customer_id FROM customers WHERE contractor_id = $1)
         OR center_id IN (SELECT center_id FROM centers WHERE customer_id IN (SELECT customer_id FROM customers WHERE contractor_id = $1))
       `;
-      return { clause, params: [cksCode] };
+      return { clause: `${clause} ${testVisibility}`, params: [cksCode] };
     }
     case "crew": {
       // Product vs Service visibility differs for crew:
@@ -1319,13 +1339,13 @@ function buildRoleFilter(role: HubRole, cksCode: string): { clause: string; para
           )
         )
       `;
-      return { clause, params: [cksCode] };
+      return { clause: `${clause} ${testVisibility}`, params: [cksCode] };
     }
     case "warehouse":
       // Warehouse only sees orders assigned to them or destined for them
-      return { clause: "assigned_warehouse = $1 OR destination = $1", params: [cksCode] };
+      return { clause: `(assigned_warehouse = $1 OR destination = $1) ${testVisibility}`, params: [cksCode] };
     default:
-      return { clause: "creator_id = $1", params: [cksCode] };
+      return { clause: `creator_id = $1 ${testVisibility}`, params: [cksCode] };
   }
 }
 
@@ -1419,12 +1439,16 @@ async function fetchServices(codes: readonly string[]): Promise<Map<string, Cata
   return map;
 }
 
-async function findDefaultWarehouse(): Promise<string | null> {
+async function findDefaultWarehouse(isTest: boolean): Promise<string | null> {
   // Prefer warehouses with actual user data over dummy warehouses
+  const testFilter = isTest
+    ? "AND UPPER(warehouse_id) LIKE '%-TEST%'"
+    : "AND UPPER(warehouse_id) NOT LIKE '%-TEST%'";
   const result = await query<{ warehouse_id: string }>(
     `SELECT warehouse_id
      FROM warehouses
      WHERE status = 'active'
+     ${testFilter}
      ORDER BY
        CASE WHEN clerk_user_id IS NOT NULL THEN 0 ELSE 1 END,
        created_at ASC
@@ -1627,6 +1651,7 @@ export async function createOrder(input: CreateOrderInput): Promise<HubOrderItem
 
   let destinationCode = normalizeCodeValue(input.destination?.code ?? null);
   let destinationRole = input.destination?.role ?? null;
+  const isTestContext = isTestCode(creatorCode) || isTestCode(destinationCode);
 
   let assignedWarehouse: string | null = null;
   let nextActorRole: HubRole | null = null;
@@ -1643,9 +1668,18 @@ export async function createOrder(input: CreateOrderInput): Promise<HubOrderItem
     }
 
     if (destinationRole === "warehouse" && destinationCode) {
+      if (isTestContext && !isTestCode(destinationCode)) {
+        throw new Error("Test orders must be assigned to a test warehouse.");
+      }
+      if (!isTestContext && isTestCode(destinationCode)) {
+        throw new Error("Live orders cannot be assigned to a test warehouse.");
+      }
       assignedWarehouse = destinationCode;
     } else {
-      const defaultWarehouse = await findDefaultWarehouse();
+      const defaultWarehouse = await findDefaultWarehouse(isTestContext);
+      if (isTestContext && !defaultWarehouse) {
+        throw new Error("No test warehouse available for test orders.");
+      }
       assignedWarehouse = normalizeCodeValue(defaultWarehouse);
     }
     nextActorRole = "warehouse";
@@ -1833,7 +1867,10 @@ export async function createOrder(input: CreateOrderInput): Promise<HubOrderItem
   // For warehouse-managed service orders, assign default warehouse (same as product orders)
   // TODO: Post-MVP - Add warehouse_id column to centers table for flexible warehouse assignment
   if (orderType === 'service' && serviceManagedBy === 'warehouse' && !assignedWarehouse) {
-    const defaultWarehouse = await findDefaultWarehouse();
+    const defaultWarehouse = await findDefaultWarehouse(isTestContext);
+    if (isTestContext && !defaultWarehouse) {
+      throw new Error("No test warehouse available for test orders.");
+    }
     assignedWarehouse = normalizeCodeValue(defaultWarehouse);
   }
 
@@ -2004,6 +2041,7 @@ export async function createOrder(input: CreateOrderInput): Promise<HubOrderItem
       managerId: managerId ?? undefined,
       crewId: crewId ?? undefined,
       warehouseId: assignedWarehouse ?? undefined,
+      is_test: isTestOrder || undefined,
     },
   });
 

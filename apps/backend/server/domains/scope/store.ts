@@ -139,6 +139,41 @@ const activityTypeCategory: Record<string, string> = {
   product_inventory_adjusted: 'info',
 };
 
+function isTestCode(value: string | null | undefined): boolean {
+  if (!value) return false;
+  return value.toUpperCase().includes('-TEST');
+}
+
+function buildTestActivityFilter(viewerCode: string): string {
+  const isTestViewer = isTestCode(viewerCode);
+  const testClause = `
+    (
+      COALESCE((metadata->>'is_test')::boolean, false) = true
+      OR UPPER(actor_id) LIKE '%-TEST%'
+      OR UPPER(target_id) LIKE '%-TEST%'
+    )
+  `;
+  return isTestViewer ? `AND ${testClause}` : `AND NOT ${testClause}`;
+}
+
+function buildTestOrderFilter(viewerCode: string): string {
+  const isTestViewer = isTestCode(viewerCode);
+  const testClause = `
+    (
+      COALESCE((metadata->>'is_test')::boolean, false) = true
+      OR UPPER(order_id) LIKE '%-TEST%'
+      OR UPPER(creator_id) LIKE '%-TEST%'
+      OR UPPER(customer_id) LIKE '%-TEST%'
+      OR UPPER(center_id) LIKE '%-TEST%'
+      OR UPPER(contractor_id) LIKE '%-TEST%'
+      OR UPPER(manager_id) LIKE '%-TEST%'
+      OR UPPER(crew_id) LIKE '%-TEST%'
+      OR UPPER(assigned_warehouse) LIKE '%-TEST%'
+      OR UPPER(destination) LIKE '%-TEST%'
+    )
+  `;
+  return isTestViewer ? `AND ${testClause}` : `AND NOT ${testClause}`;
+}
 type ActivityRow = {
   activity_id: number;
   description: string;
@@ -301,6 +336,7 @@ async function getManagerRoleScope(cksCode: string): Promise<ManagerRoleScopePay
          FROM customers
          WHERE UPPER(cks_manager) = $1
        )
+       ${buildTestOrderFilter(normalizedCode)}
        AND LOWER(status) IN ('pending', 'requested', 'in-progress')`,
       [normalizedCode],
     ),
@@ -409,6 +445,7 @@ async function getManagerActivities(cksCode: string): Promise<HubRoleActivitiesP
     idArray.push(scope.cksCode);
   }
 
+  const testFilter = buildTestActivityFilter(scope.cksCode);
   const activitiesResult = await query<ActivityRow>(
     `SELECT activity_id, description, activity_type, actor_id, actor_role, target_id, target_type, metadata, created_at
      FROM system_activity
@@ -489,6 +526,7 @@ async function getManagerActivities(cksCode: string): Promise<HubRoleActivitiesP
         )
       )
      )
+     ${testFilter}
      AND NOT EXISTS (
        SELECT 1 FROM activity_dismissals ad
        WHERE ad.activity_id = system_activity.activity_id AND ad.user_id = $2
@@ -965,6 +1003,8 @@ async function getWarehouseRoleScope(cksCode: string): Promise<WarehouseRoleScop
     return null;
   }
 
+  const testOrderFilter = buildTestOrderFilter(normalizedCode);
+
   const warehouseResult = await query<{
     manager_id: string | null;
     status: string | null
@@ -980,20 +1020,21 @@ async function getWarehouseRoleScope(cksCode: string): Promise<WarehouseRoleScop
   const warehouseRow = warehouseResult.rows[0];
 
   const [orderRows, inventoryRows, pendingOrders, scheduledDeliveries, lowStock] = await Promise.all([
-    query<{
-      order_id: string;
-      name: string | null;
-      status: string | null;
-      destination: string | null;
-    }>(
-      `SELECT order_id, description AS name, status, destination_center AS destination
-       FROM orders
-       WHERE UPPER(warehouse_id) = $1
-       AND LOWER(status) IN ('pending', 'processing', 'shipped')
-       ORDER BY created_at DESC
-       LIMIT 100`,
-      [normalizedCode],
-    ),
+      query<{
+        order_id: string;
+        name: string | null;
+        status: string | null;
+        destination: string | null;
+      }>(
+        `SELECT order_id, description AS name, status, destination_center AS destination
+         FROM orders
+         WHERE UPPER(warehouse_id) = $1
+         ${testOrderFilter}
+         AND LOWER(status) IN ('pending', 'processing', 'shipped')
+         ORDER BY created_at DESC
+         LIMIT 100`,
+        [normalizedCode],
+      ),
     query<{
       product_id: string;
       name: string | null;
@@ -1012,6 +1053,7 @@ async function getWarehouseRoleScope(cksCode: string): Promise<WarehouseRoleScop
       `SELECT COUNT(*)::text AS count
        FROM orders
        WHERE UPPER(warehouse_id) = $1
+       ${testOrderFilter}
        AND LOWER(status) = 'pending'`,
       [normalizedCode],
     ),
@@ -1019,6 +1061,7 @@ async function getWarehouseRoleScope(cksCode: string): Promise<WarehouseRoleScop
       `SELECT COUNT(*)::text AS count
        FROM orders
        WHERE UPPER(warehouse_id) = $1
+       ${testOrderFilter}
        AND LOWER(status) = 'scheduled'`,
       [normalizedCode],
     ),
@@ -1096,6 +1139,7 @@ async function getContractorActivities(cksCode: string): Promise<HubRoleActiviti
     idArray.push(scope.cksCode);
   }
 
+  const testFilter = buildTestActivityFilter(scope.cksCode);
   const activitiesResult = await query<ActivityRow>(
     `SELECT activity_id, description, activity_type, actor_id, actor_role, target_id, target_type, metadata, created_at
      FROM system_activity
@@ -1157,6 +1201,7 @@ async function getContractorActivities(cksCode: string): Promise<HubRoleActiviti
          OR (metadata ? 'contractorId' AND UPPER(metadata->>'contractorId') = $2)
        )
      )
+     ${testFilter}
      AND NOT EXISTS (
        SELECT 1 FROM activity_dismissals ad
        WHERE ad.activity_id = system_activity.activity_id AND ad.user_id = $2
@@ -1206,6 +1251,7 @@ async function getCustomerActivities(cksCode: string): Promise<HubRoleActivities
     idArray.push(scope.cksCode);
   }
 
+  const testFilter = buildTestActivityFilter(scope.cksCode);
   const activitiesResult = await query<ActivityRow>(
     `SELECT activity_id, description, activity_type, actor_id, actor_role, target_id, target_type, metadata, created_at
      FROM system_activity
@@ -1267,6 +1313,7 @@ async function getCustomerActivities(cksCode: string): Promise<HubRoleActivities
          OR (metadata ? 'customerId' AND UPPER(metadata->>'customerId') = $2)
        )
      )
+     ${testFilter}
      AND NOT EXISTS (
        SELECT 1 FROM activity_dismissals ad
        WHERE ad.activity_id = system_activity.activity_id AND ad.user_id = $2
@@ -1309,6 +1356,7 @@ async function getCenterActivities(cksCode: string): Promise<HubRoleActivitiesPa
     idArray.push(scope.cksCode);
   }
 
+  const testFilter = buildTestActivityFilter(scope.cksCode);
   const activitiesResult = await query<ActivityRow>(
     `SELECT activity_id, description, activity_type, actor_id, actor_role, target_id, target_type, metadata, created_at
      FROM system_activity
@@ -1368,6 +1416,7 @@ async function getCenterActivities(cksCode: string): Promise<HubRoleActivitiesPa
          OR (metadata ? 'centerId' AND UPPER(metadata->>'centerId') = $2)
        )
      )
+     ${testFilter}
      AND NOT EXISTS (
        SELECT 1 FROM activity_dismissals ad
        WHERE ad.activity_id = system_activity.activity_id AND ad.user_id = $2
@@ -1410,6 +1459,7 @@ async function getCrewActivities(cksCode: string): Promise<HubRoleActivitiesPayl
     idArray.push(scope.cksCode);
   }
 
+  const testFilter = buildTestActivityFilter(scope.cksCode);
   const activitiesResult = await query<ActivityRow>(
     `SELECT activity_id, description, activity_type, actor_id, actor_role, target_id, target_type, metadata, created_at
      FROM system_activity
@@ -1478,6 +1528,7 @@ async function getCrewActivities(cksCode: string): Promise<HubRoleActivitiesPayl
          OR (metadata ? 'warehouseId' AND UPPER(metadata->>'warehouseId') = $2)
       )
      )
+     ${testFilter}
      AND NOT EXISTS (
        SELECT 1 FROM activity_dismissals ad
        WHERE ad.activity_id = system_activity.activity_id AND ad.user_id = $2
@@ -1520,6 +1571,7 @@ async function getWarehouseActivities(cksCode: string): Promise<HubRoleActivitie
     idArray.push(scope.cksCode);
   }
 
+  const testFilter = buildTestActivityFilter(scope.cksCode);
   const activitiesResult = await query<ActivityRow>(
     `SELECT activity_id, description, activity_type, actor_id, actor_role, target_id, target_type, metadata, created_at
      FROM system_activity
@@ -1585,6 +1637,7 @@ async function getWarehouseActivities(cksCode: string): Promise<HubRoleActivitie
          OR (metadata ? 'warehouseId' AND UPPER(metadata->>'warehouseId') = $2)
        )
      )
+     ${testFilter}
      AND NOT EXISTS (
        SELECT 1 FROM activity_dismissals ad
        WHERE ad.activity_id = system_activity.activity_id AND ad.user_id = $2

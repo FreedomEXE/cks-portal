@@ -765,12 +765,12 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
                 primaryColor="#8b5cf6"
               >
 
-              {inventoryTab === 'active' && (
-                <DataTable
-                  columns={[
-                    { key: 'productId', label: 'PRODUCT ID', clickable: true },
-                    { key: 'name', label: 'NAME' },
-                    { key: 'type', label: 'TYPE' },
+                {inventoryTab === 'active' && (
+                  <DataTable
+                    columns={[
+                      { key: 'productId', label: 'PRODUCT ID', clickable: true },
+                      { key: 'name', label: 'NAME' },
+                      { key: 'type', label: 'TYPE' },
                     { key: 'onHand', label: 'ON HAND' },
                     { key: 'min', label: 'MIN' },
                     { key: 'location', label: 'LOCATION' },
@@ -790,29 +790,39 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
                         </span>
                       )
                     }
-                  ]}
-                  data={filteredActiveInventoryData}
-                  showSearch={false}
-                  maxItems={10}
-                  modalType="product-inventory"
-                />
-              )}
+                    ]}
+                    data={filteredActiveInventoryData}
+                    showSearch={false}
+                    maxItems={10}
+                    onRowClick={(row) => {
+                      const productId = row.productId || row.id;
+                      if (productId) {
+                        modals.openEntityModal('product', productId);
+                      }
+                    }}
+                  />
+                )}
 
-              {inventoryTab === 'archive' && (
-                <DataTable
-                  columns={[
-                    { key: 'productId', label: 'PRODUCT ID', clickable: true },
-                    { key: 'name', label: 'NAME' },
+                {inventoryTab === 'archive' && (
+                  <DataTable
+                    columns={[
+                      { key: 'productId', label: 'PRODUCT ID', clickable: true },
+                      { key: 'name', label: 'NAME' },
                     { key: 'type', label: 'TYPE' },
                     { key: 'archivedDate', label: 'ARCHIVED DATE' },
                     { key: 'reason', label: 'REASON' }
-                  ]}
-                  data={filteredArchivedInventoryData}
-                  showSearch={false}
-                  maxItems={10}
-                  modalType="product-inventory"
-                />
-              )}
+                    ]}
+                    data={filteredArchivedInventoryData}
+                    showSearch={false}
+                    maxItems={10}
+                    onRowClick={(row) => {
+                      const productId = row.productId || row.id;
+                      if (productId) {
+                        modals.openEntityModal('product', productId, { state: 'archived' });
+                      }
+                    }}
+                  />
+                )}
               </TabSection>
             </PageWrapper>
           ) : activeTab === 'deliveries' ? (
