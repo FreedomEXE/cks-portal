@@ -227,16 +227,16 @@ function buildTestOrderVisibilityClause(cksCode: string): string {
   const isTestViewer = isTestCode(cksCode);
   const testClause = `
     (
-      COALESCE((metadata->>'is_test')::boolean, false) = true
-      OR UPPER(order_id) LIKE '%-TEST%'
-      OR UPPER(creator_id) LIKE '%-TEST%'
-      OR UPPER(customer_id) LIKE '%-TEST%'
-      OR UPPER(center_id) LIKE '%-TEST%'
-      OR UPPER(contractor_id) LIKE '%-TEST%'
-      OR UPPER(manager_id) LIKE '%-TEST%'
-      OR UPPER(crew_id) LIKE '%-TEST%'
-      OR UPPER(assigned_warehouse) LIKE '%-TEST%'
-      OR UPPER(destination) LIKE '%-TEST%'
+      COALESCE((o.metadata->>'is_test')::boolean, false) = true
+      OR UPPER(o.order_id) LIKE '%-TEST%'
+      OR UPPER(o.creator_id) LIKE '%-TEST%'
+      OR UPPER(o.customer_id) LIKE '%-TEST%'
+      OR UPPER(o.center_id) LIKE '%-TEST%'
+      OR UPPER(o.contractor_id) LIKE '%-TEST%'
+      OR UPPER(o.manager_id) LIKE '%-TEST%'
+      OR UPPER(o.crew_id) LIKE '%-TEST%'
+      OR UPPER(o.assigned_warehouse) LIKE '%-TEST%'
+      OR UPPER(o.destination) LIKE '%-TEST%'
     )
   `;
   return isTestViewer ? `AND ${testClause}` : `AND NOT ${testClause}`;
