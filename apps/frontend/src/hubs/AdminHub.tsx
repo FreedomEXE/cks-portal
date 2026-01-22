@@ -17,6 +17,7 @@ import { useNewsFeed } from '../shared/api/news';
 import {
   AdminSupportSection,
   ArchiveSection,
+  EcosystemTree,
   MemosPreview,
   NewsPreview,
   OverviewSection,
@@ -56,6 +57,7 @@ import { buildOrderActions } from '@cks/domain-widgets';
 import { mapProfileDataForRole, type DirectoryRole, directoryTabToRole } from '../shared/utils/profileMapping';
 import { buildAdminOverviewData } from '../shared/overview/builders';
 import { buildSupportTickets } from '../shared/support/supportTickets';
+import { buildEcosystemTree } from '../shared/utils/ecosystem';
 
 import { useAdminUsers, updateInventory, fetchAdminOrderById, provisionTestEcosystemUsers } from '../shared/api/admin';
 import {
@@ -121,6 +123,17 @@ const STATUS_PALETTES: Record<string, StatusPalette> = {
   unassigned: { bg: '#e0f2fe', fg: '#0369a1' },
   unknown: { bg: '#e2e8f0', fg: '#475569' },
 };
+
+const TEST_ECOSYSTEM_LOGINS = [
+  { role: 'Manager', id: 'MGR-001-TEST' },
+  { role: 'Contractor', id: 'CON-001-TEST' },
+  { role: 'Customer', id: 'CUS-001-TEST' },
+  { role: 'Center', id: 'CEN-001-TEST' },
+  { role: 'Crew', id: 'CRW-001-TEST' },
+  { role: 'Warehouse', id: 'WHS-001-TEST' },
+];
+
+const DEFAULT_TEST_PASSWORD = 'ckstest123';
 
 function renderStatusBadge(value: string | null | undefined) {
   if (!value) return null;
@@ -249,6 +262,7 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
   const [servicesSubTab, setServicesSubTab] = useState('catalog-services');
   const [reportsSubTab, setReportsSubTab] = useState('reports');
   const [showTestEcosystems, setShowTestEcosystems] = useState(false);
+  const [selectedEcosystemId, setSelectedEcosystemId] = useState<string | null>(null);
 
   const [showActionModal, setShowActionModal] = useState(false);
   const [selectedEntity, setSelectedEntity] = useState<Record<string, any> | null>(null);
@@ -269,6 +283,22 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
       })),
     [newsItems],
   );
+
+  const testPassword = useMemo(() => {
+    const raw = (import.meta as any).env?.VITE_TEST_PASSWORD as string | undefined;
+    return raw?.trim() || DEFAULT_TEST_PASSWORD;
+  }, []);
+
+  const testCredentialsCopy = useMemo(() => {
+    const lines = [
+      'CKS Portal Test Ecosystem Logins',
+      '',
+      ...TEST_ECOSYSTEM_LOGINS.map((entry) => `${entry.role}: ${entry.id}`),
+      '',
+      `Password: ${testPassword}`,
+    ];
+    return lines.join('\n');
+  }, [testPassword]);
 
   const { data: adminUsers, isLoading: adminUsersLoading, error: adminUsersError } = useAdminUsers();
   const { data: managers, isLoading: managersLoading, error: managersError } = useManagers();
@@ -364,6 +394,21 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
       document.head.removeChild(style);
     };
   }, []);
+
+  const handleCopyTestCredentials = useCallback(async () => {
+    try {
+      if (!navigator?.clipboard?.writeText) {
+        throw new Error('Clipboard access unavailable');
+      }
+      await navigator.clipboard.writeText(testCredentialsCopy);
+      setToast('Copied test credentials to clipboard.');
+      setTimeout(() => setToast(null), 2500);
+    } catch (error) {
+      console.error('[admin] Failed to copy test credentials', error);
+      setToast('Failed to copy test credentials.');
+      setTimeout(() => setToast(null), 2500);
+    }
+  }, [testCredentialsCopy]);
 
 
 
@@ -793,7 +838,7 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
     [reportsData],
   );
 
-  const ecosystemRows = useMemo(() => {
+  const ecosystemLookup = useMemo(() => {
     const contractorById = new Map<string, typeof contractors[number]>();
     contractors.forEach((contractor) => {
       const key = normalizeId(contractor.id);
@@ -818,6 +863,27 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
       if (key) warehouseById.set(key, warehouse);
     });
 
+    const getManagerIdForCenter = (center?: typeof centers[number] | null) => {
+      if (!center) return null;
+      return (
+        normalizeId(center.managerId) ??
+        normalizeId(customerById.get(normalizeId(center.customerId) ?? '')?.managerId) ??
+        normalizeId(contractorById.get(normalizeId(center.contractorId) ?? '')?.managerId)
+      );
+    };
+
+    return {
+      contractorById,
+      customerById,
+      centerById,
+      warehouseById,
+      getManagerIdForCenter,
+    };
+  }, [contractors, customers, centers, warehouses]);
+
+  const ecosystemRows = useMemo(() => {
+    const { contractorById, customerById, centerById, warehouseById, getManagerIdForCenter } = ecosystemLookup;
+
     const contractorByManager = new Map<string, typeof contractors>();
     contractors.forEach((contractor) => {
       const key = normalizeId(contractor.managerId);
@@ -837,14 +903,6 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
     });
 
     const centerByManager = new Map<string, typeof centers>();
-    const getManagerIdForCenter = (center?: typeof centers[number] | null) => {
-      if (!center) return null;
-      return (
-        normalizeId(center.managerId) ??
-        normalizeId(customerById.get(normalizeId(center.customerId) ?? '')?.managerId) ??
-        normalizeId(contractorById.get(normalizeId(center.contractorId) ?? '')?.managerId)
-      );
-    };
 
     centers.forEach((center) => {
       const key = getManagerIdForCenter(center);
@@ -954,6 +1012,7 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
     orders,
     reportsData,
     showTestEcosystems,
+    ecosystemLookup,
   ]);
 
   const ecosystemColumns = useMemo(
@@ -991,9 +1050,141 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
       { key: 'orders', label: 'ORDERS' },
       { key: 'reports', label: 'REPORTS' },
       { key: 'status', label: 'STATUS' },
+      {
+        key: 'view',
+        label: '',
+        render: (_value: any, row: any) => (
+          <Button
+            variant="secondary"
+            size="small"
+            onClick={(event) => {
+              event.stopPropagation();
+              if (row.managerId) {
+                modals.openEntityModal('manager', row.managerId);
+              }
+            }}
+          >
+            View
+          </Button>
+        ),
+      },
     ],
-    [],
+    [modals],
   );
+
+  useEffect(() => {
+    if (ecosystemRows.length === 0) {
+      if (selectedEcosystemId) {
+        setSelectedEcosystemId(null);
+      }
+      return;
+    }
+    const normalizedSelected = normalizeId(selectedEcosystemId ?? '') ?? '';
+    const exists = ecosystemRows.some((row) => normalizeId(row.managerId) === normalizedSelected);
+    if (!normalizedSelected || !exists) {
+      setSelectedEcosystemId(ecosystemRows[0].managerId);
+    }
+  }, [ecosystemRows, selectedEcosystemId]);
+
+  const selectedManager = useMemo(() => {
+    const target = normalizeId(selectedEcosystemId ?? '');
+    if (!target) return null;
+    return managers.find((manager) => normalizeId(manager.id) === target) ?? null;
+  }, [managers, selectedEcosystemId]);
+
+  const selectedEcosystemTree = useMemo(() => {
+    if (!selectedManager) {
+      return null;
+    }
+
+    const { centerById, getManagerIdForCenter } = ecosystemLookup;
+    const managerKey = normalizeId(selectedManager.id);
+    if (!managerKey) {
+      return null;
+    }
+
+    const contractorsForManager = contractors.filter((contractor) => normalizeId(contractor.managerId) === managerKey);
+    const customersForManager = customers.filter((customer) => normalizeId(customer.managerId) === managerKey);
+    const centersForManager = centers.filter((center) => getManagerIdForCenter(center) === managerKey);
+    const crewForManager = crew.filter((member) => {
+      const center = centerById.get(normalizeId(member.assignedCenter) ?? '');
+      return getManagerIdForCenter(center ?? null) === managerKey;
+    });
+
+    const inferredCustomerContractor = new Map<string, string>();
+    centersForManager.forEach((center) => {
+      const customerId = normalizeId(center.customerId);
+      const contractorId = normalizeId(center.contractorId);
+      if (!customerId || !contractorId) {
+        return;
+      }
+      if (!inferredCustomerContractor.has(customerId)) {
+        inferredCustomerContractor.set(customerId, contractorId);
+      }
+    });
+
+    const scope = {
+      role: 'manager' as const,
+      cksCode: selectedManager.id,
+      summary: {
+        contractorCount: contractorsForManager.length,
+        customerCount: customersForManager.length,
+        centerCount: centersForManager.length,
+        crewCount: crewForManager.length,
+        pendingOrders: 0,
+        accountStatus: selectedManager.status ?? null,
+      },
+      relationships: {
+        contractors: contractorsForManager.map((contractor) => ({
+          id: contractor.id,
+          role: 'contractor' as const,
+          name: contractor.name,
+          status: contractor.status,
+          email: contractor.email,
+          phone: contractor.phone,
+          address: contractor.address,
+          contactPerson: contractor.mainContact,
+        })),
+        customers: customersForManager.map((customer) => ({
+          id: customer.id,
+          role: 'customer' as const,
+          name: customer.name,
+          status: customer.status,
+          email: customer.email,
+          phone: customer.phone,
+          address: customer.address,
+          contractorId: inferredCustomerContractor.get(normalizeId(customer.id) ?? '') ?? null,
+          mainContact: customer.mainContact,
+        })),
+        centers: centersForManager.map((center) => ({
+          id: center.id,
+          role: 'center' as const,
+          name: center.name,
+          status: center.status,
+          email: center.email,
+          phone: center.phone,
+          address: center.address,
+          contractorId: center.contractorId,
+          customerId: center.customerId,
+          mainContact: center.mainContact,
+        })),
+        crew: crewForManager.map((member) => ({
+          id: member.id,
+          role: 'crew' as const,
+          name: member.name,
+          status: member.status,
+          email: member.email,
+          phone: member.phone,
+          address: member.address,
+          assignedCenter: member.assignedCenter,
+        })),
+      },
+    };
+
+    return buildEcosystemTree(scope, {
+      rootName: selectedManager.name ?? selectedManager.id,
+    });
+  }, [selectedManager, contractors, customers, centers, crew, ecosystemLookup]);
 
   const renderActions = useCallback(
     (_value: any, row: Record<string, any>) => (
@@ -1663,6 +1854,13 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
                     Link test users
                   </Button>
                   <Button
+                    variant="secondary"
+                    size="small"
+                    onClick={handleCopyTestCredentials}
+                  >
+                    Copy test credentials
+                  </Button>
+                  <Button
                     variant={showTestEcosystems ? 'primary' : 'secondary'}
                     size="small"
                     onClick={() => setShowTestEcosystems((prev) => !prev)}
@@ -1671,22 +1869,73 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
                   </Button>
                 </div>
               </div>
-              <div style={{ marginBottom: 12, color: '#64748b', fontSize: 13 }}>
-                Test ecosystems use the `-TEST` suffix on IDs (example: `MGR-001-TEST`).
+              <div style={{ marginBottom: 16, color: '#64748b', fontSize: 13 }}>
+                Test ecosystems use the `-TEST` suffix on IDs (example: `MGR-001-TEST`). Sign in with the CKS ID and the shared test password.
               </div>
-              <DataTable
-                columns={ecosystemColumns}
-                data={ecosystemRows}
-                emptyMessage="No ecosystems found."
-                searchPlaceholder="Search ecosystems..."
-                maxItems={25}
-                showSearch
-                onRowClick={(row) => {
-                  if (row.managerId) {
-                    modals.openEntityModal('manager', row.managerId);
-                  }
-                }}
-              />
+              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.15fr) minmax(0, 0.85fr)', gap: 20, alignItems: 'start' }}>
+                <div>
+                  <DataTable
+                    columns={ecosystemColumns}
+                    data={ecosystemRows}
+                    emptyMessage="No ecosystems found."
+                    searchPlaceholder="Search ecosystems..."
+                    maxItems={25}
+                    showSearch
+                    onRowClick={(row) => {
+                      if (row.managerId) {
+                        setSelectedEcosystemId(row.managerId);
+                      }
+                    }}
+                  />
+                </div>
+                <div style={{ borderRadius: 16, border: '1px solid #e2e8f0', background: '#f8fafc', padding: 16 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                    <div>
+                      <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.6, color: '#64748b' }}>
+                        Ecosystem Preview
+                      </div>
+                      <div style={{ fontSize: 18, fontWeight: 700, color: '#0f172a' }}>
+                        {selectedManager?.name || selectedManager?.id || 'Select an ecosystem'}
+                      </div>
+                    </div>
+                    {selectedManager?.id ? (
+                      <Button
+                        variant="secondary"
+                        size="small"
+                        onClick={() => modals.openEntityModal('manager', selectedManager.id)}
+                      >
+                        Open manager
+                      </Button>
+                    ) : null}
+                  </div>
+                  {selectedEcosystemTree ? (
+                    <EcosystemTree
+                      rootUser={{
+                        id: selectedManager?.id || 'MANAGER',
+                        role: 'Manager',
+                        name: selectedManager?.name || selectedManager?.id || 'Manager',
+                      }}
+                      treeData={selectedEcosystemTree}
+                      expandedNodes={[selectedManager?.id || '']}
+                      currentUserId={selectedManager?.id || undefined}
+                      title="Ecosystem"
+                      subtitle="Manager ecosystem preview"
+                      description="Select an ecosystem to explore the hierarchy."
+                      roleColorMap={{
+                        manager: '#e0f2fe',
+                        contractor: '#dcfce7',
+                        customer: '#fef9c3',
+                        center: '#ffedd5',
+                        crew: '#fee2e2',
+                      }}
+                    />
+                  ) : (
+                    <div style={{ padding: 16, borderRadius: 12, background: '#fff', border: '1px dashed #cbd5f5', color: '#64748b', fontSize: 13 }}>
+                      Select an ecosystem row to preview the hierarchy.
+                    </div>
+                  )}
+                </div>
+              </div>
             </PageWrapper>
           ) : activeTab === 'directory' ? (
             <PageWrapper title="Directory" showHeader>

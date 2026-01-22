@@ -55,11 +55,57 @@ function handleValidationError(reply: FastifyReply, error: unknown) {
   return false;
 }
 
+const TEST_PASSWORD = (process.env.TEST_PASSWORD || process.env.CKS_TEST_PASSWORD || '').trim() || null;
+
+function isTestEntity(entityId: string, emailAddress?: string | null) {
+  const normalized = entityId.toUpperCase();
+  if (normalized.includes('-TEST')) {
+    return true;
+  }
+  if (normalized.endsWith('-900')) {
+    return true;
+  }
+  if (emailAddress && emailAddress.toLowerCase().includes('clerk_test')) {
+    return true;
+  }
+  return false;
+}
+
+async function ensureTestUserPassword(
+  clerkUser: any,
+  entityId: string,
+  emailAddress?: string | null,
+): Promise<any> {
+  if (!TEST_PASSWORD) {
+    return clerkUser;
+  }
+  if (!isTestEntity(entityId, emailAddress)) {
+    return clerkUser;
+  }
+  if (!clerkUser?.id) {
+    return clerkUser;
+  }
+
+  try {
+    return await clerkClient.users.updateUser(clerkUser.id, {
+      password: TEST_PASSWORD,
+      skipPasswordChecks: true,
+    });
+  } catch (error) {
+    console.warn('[admin] Failed to set test password', {
+      entityId,
+      error: error instanceof Error ? error.message : error,
+    });
+    return clerkUser;
+  }
+}
+
 async function getOrCreateClerkUserForEntity(entityType: string, entityId: string) {
   const contact = await getIdentityContactByRoleAndCode(entityType as any, entityId);
   const emailAddress = contact?.email ?? null;
   let clerkUserId = contact?.clerkUserId ?? null;
   let clerkUser: any = null;
+  const shouldSetTestPassword = Boolean(TEST_PASSWORD && isTestEntity(entityId, emailAddress));
 
   if (clerkUserId) {
     try {
@@ -80,7 +126,13 @@ async function getOrCreateClerkUserForEntity(entityType: string, entityId: strin
         externalId: entityId,
         publicMetadata: { role: entityType, cksCode: entityId },
         username: entityId,
-        skipPasswordRequirement: true,
+        skipPasswordRequirement: !shouldSetTestPassword,
+        ...(shouldSetTestPassword
+          ? {
+            password: TEST_PASSWORD!,
+            skipPasswordChecks: true,
+          }
+          : {}),
       });
     } catch (error: any) {
       const errorCode = error?.errors?.[0]?.code || error?.code;
@@ -115,6 +167,8 @@ async function getOrCreateClerkUserForEntity(entityType: string, entityId: strin
   if (!contact?.clerkUserId || contact.clerkUserId !== clerkUser.id) {
     await linkClerkUserToAccount(entityType as any, entityId, clerkUser.id);
   }
+
+  clerkUser = await ensureTestUserPassword(clerkUser, entityId, emailAddress);
 
   return clerkUser;
 }
