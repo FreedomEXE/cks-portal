@@ -127,6 +127,25 @@ export async function provisionTestEcosystemUsers(
   return response.data.results;
 }
 
+export interface UpdateTestUserPasswordInput {
+  entityType: 'manager' | 'contractor' | 'customer' | 'center' | 'crew' | 'warehouse';
+  entityId: string;
+  password: string;
+}
+
+export async function updateTestUserPassword(
+  input: UpdateTestUserPasswordInput,
+  init?: ApiFetchInit,
+) {
+  const response = await apiFetch<ApiResponse<{ clerkUserId: string }>>('/admin/test-users/password', {
+    method: 'POST',
+    body: JSON.stringify(input),
+    headers: { 'Content-Type': 'application/json', ...(init?.headers || {}) },
+    ...init,
+  });
+  return response.data;
+}
+
 export interface UpdateInventoryInput {
   warehouseId: string;
   itemId: string;

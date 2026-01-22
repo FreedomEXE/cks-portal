@@ -45,6 +45,8 @@ interface EcosystemTreeProps {
   };
   treeData: TreeNode;
   onNodeClick?: (userId: string) => void;
+  onNodeView?: (node: TreeNode) => void;
+  onNodeEdit?: (node: TreeNode) => void;
   expandedNodes?: string[];
   roleColorMap?: Record<string, string>;
   title?: string;
@@ -57,6 +59,8 @@ const EcosystemTree: React.FC<EcosystemTreeProps> = ({
   rootUser,
   treeData,
   onNodeClick,
+  onNodeView,
+  onNodeEdit,
   expandedNodes = [],
   roleColorMap = {},
   title = 'Ecosystem',
@@ -251,6 +255,53 @@ const EcosystemTree: React.FC<EcosystemTreeProps> = ({
           <span style={{ color: '#6b7280', marginRight: 'auto' }}>
             — {node.user.name}
           </span>
+
+          {(onNodeView || onNodeEdit) && (
+            <div style={{ display: 'flex', gap: 6 }}>
+              {onNodeView && (
+                <button
+                  type="button"
+                  style={{
+                    border: '1px solid #e2e8f0',
+                    background: '#fff',
+                    color: '#0f172a',
+                    borderRadius: 6,
+                    padding: '4px 8px',
+                    fontSize: 11,
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onNodeView(node);
+                  }}
+                >
+                  View
+                </button>
+              )}
+              {onNodeEdit && (
+                <button
+                  type="button"
+                  style={{
+                    border: '1px solid #e2e8f0',
+                    background: '#f8fafc',
+                    color: '#0f172a',
+                    borderRadius: 6,
+                    padding: '4px 8px',
+                    fontSize: 11,
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onNodeEdit(node);
+                  }}
+                >
+                  Edit
+                </button>
+              )}
+            </div>
+          )}
 
           <div style={{ display: 'flex', gap: 6 }}>
             {badges}

@@ -478,4 +478,68 @@ export async function registerAdminUserRoutes(server: FastifyInstance) {
 
     reply.send({ data: { results } });
   });
+
+  server.post("/api/admin/test-users/password", async (request, reply) => {
+    const auth = await requireActiveAdmin(request, reply);
+    if (!auth) return;
+
+    const body = request.body as { entityType?: string; entityId?: string; password?: string };
+    const entityType = String(body?.entityType ?? "").trim().toLowerCase();
+    const entityId = String(body?.entityId ?? "").trim().toUpperCase();
+    const password = String(body?.password ?? "").trim();
+
+    const allowedEntityTypes = new Set([
+      "manager",
+      "contractor",
+      "customer",
+      "center",
+      "crew",
+      "warehouse",
+    ]);
+
+    if (!allowedEntityTypes.has(entityType)) {
+      reply.code(400).send({ error: "Invalid entity type" });
+      return;
+    }
+
+    if (!entityId) {
+      reply.code(400).send({ error: "Invalid entity id" });
+      return;
+    }
+
+    if (!password || password.length < 8) {
+      reply.code(400).send({ error: "Password must be at least 8 characters" });
+      return;
+    }
+
+    const contact = await getIdentityContactByRoleAndCode(entityType as any, entityId);
+    if (!isTestEntity(entityId, contact?.email ?? null)) {
+      reply.code(403).send({ error: "Password updates are limited to test users" });
+      return;
+    }
+
+    let clerkUserId = await getClerkUserIdByRoleAndCode(entityType as any, entityId);
+    if (!clerkUserId) {
+      try {
+        const clerkUser = await getOrCreateClerkUserForEntity(entityType, entityId);
+        clerkUserId = clerkUser?.id ?? null;
+      } catch (error) {
+        reply.code(404).send({ error: error instanceof Error ? error.message : "User is not linked to Clerk" });
+        return;
+      }
+    }
+
+    try {
+      await clerkClient.users.updateUser(clerkUserId, {
+        password,
+        skipPasswordChecks: true,
+        signOutOfOtherSessions: true,
+      });
+    } catch (error) {
+      reply.code(500).send({ error: error instanceof Error ? error.message : "Failed to update password" });
+      return;
+    }
+
+    reply.send({ data: { clerkUserId } });
+  });
 }

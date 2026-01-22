@@ -1015,63 +1015,6 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
     ecosystemLookup,
   ]);
 
-  const ecosystemColumns = useMemo(
-    () => [
-      {
-        key: 'ecosystem',
-        label: 'ECOSYSTEM',
-        render: (_value: any, row: any) => (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span>{row.ecosystem}</span>
-            {row.isTest ? (
-              <span
-                style={{
-                  fontSize: 11,
-                  fontWeight: 600,
-                  padding: '2px 6px',
-                  borderRadius: 999,
-                  background: '#fee2e2',
-                  color: '#991b1b',
-                }}
-              >
-                TEST
-              </span>
-            ) : null}
-          </div>
-        ),
-      },
-      { key: 'managerName', label: 'MANAGER' },
-      { key: 'managerId', label: 'MANAGER ID' },
-      { key: 'contractors', label: 'CONTRACTORS' },
-      { key: 'customers', label: 'CUSTOMERS' },
-      { key: 'centers', label: 'CENTERS' },
-      { key: 'crew', label: 'CREW' },
-      { key: 'warehouses', label: 'WAREHOUSES' },
-      { key: 'orders', label: 'ORDERS' },
-      { key: 'reports', label: 'REPORTS' },
-      { key: 'status', label: 'STATUS' },
-      {
-        key: 'view',
-        label: '',
-        render: (_value: any, row: any) => (
-          <Button
-            variant="secondary"
-            size="small"
-            onClick={(event) => {
-              event.stopPropagation();
-              if (row.managerId) {
-                modals.openEntityModal('manager', row.managerId);
-              }
-            }}
-          >
-            View
-          </Button>
-        ),
-      },
-    ],
-    [modals],
-  );
-
   useEffect(() => {
     if (ecosystemRows.length === 0) {
       if (selectedEcosystemId) {
@@ -1186,17 +1129,48 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
     });
   }, [selectedManager, contractors, customers, centers, crew, ecosystemLookup]);
 
-  const renderActions = useCallback(
-    (_value: any, row: Record<string, any>) => (
-      <Button
-        variant="primary"
-        size="small"
-        onClick={() => handleView(row)}
-      >
-        View
-      </Button>
-    ),
-    [handleView],
+  const handleEcosystemView = useCallback(
+    (node: { user: { id: string }; type?: string }) => {
+      const roleKey = ((node.type ?? '') || (node.user as any)?.role || '').toLowerCase();
+      const roleMap: Record<string, 'manager' | 'contractor' | 'customer' | 'center' | 'crew' | 'warehouse'> = {
+        manager: 'manager',
+        contractor: 'contractor',
+        customer: 'customer',
+        center: 'center',
+        'service center': 'center',
+        crew: 'crew',
+        'crew member': 'crew',
+        warehouse: 'warehouse',
+      };
+      const entityType = roleMap[roleKey];
+      if (!entityType || !node.user.id) {
+        return;
+      }
+      modals.openEntityModal(entityType, node.user.id);
+    },
+    [modals],
+  );
+
+  const handleEcosystemEdit = useCallback(
+    (node: { user: { id: string }; type?: string }) => {
+      const roleKey = ((node.type ?? '') || (node.user as any)?.role || '').toLowerCase();
+      const roleMap: Record<string, 'manager' | 'contractor' | 'customer' | 'center' | 'crew' | 'warehouse'> = {
+        manager: 'manager',
+        contractor: 'contractor',
+        customer: 'customer',
+        center: 'center',
+        'service center': 'center',
+        crew: 'crew',
+        'crew member': 'crew',
+        warehouse: 'warehouse',
+      };
+      const entityType = roleMap[roleKey];
+      if (!entityType || !node.user.id) {
+        return;
+      }
+      modals.openEntityModal(entityType, node.user.id, { context: { intent: 'edit' } });
+    },
+    [modals],
   );
 
   const directoryConfig = useMemo(() => ({
@@ -1872,69 +1846,74 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
               <div style={{ marginBottom: 16, color: '#64748b', fontSize: 13 }}>
                 Test ecosystems use the `-TEST` suffix on IDs (example: `MGR-001-TEST`). Sign in with the CKS ID and the shared test password.
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.15fr) minmax(0, 0.85fr)', gap: 20, alignItems: 'start' }}>
-                <div>
-                  <DataTable
-                    columns={ecosystemColumns}
-                    data={ecosystemRows}
-                    emptyMessage="No ecosystems found."
-                    searchPlaceholder="Search ecosystems..."
-                    maxItems={25}
-                    showSearch
-                    onRowClick={(row) => {
-                      if (row.managerId) {
-                        setSelectedEcosystemId(row.managerId);
-                      }
-                    }}
-                  />
-                </div>
-                <div style={{ borderRadius: 16, border: '1px solid #e2e8f0', background: '#f8fafc', padding: 16 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                    <div>
-                      <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.6, color: '#64748b' }}>
-                        Ecosystem Preview
-                      </div>
-                      <div style={{ fontSize: 18, fontWeight: 700, color: '#0f172a' }}>
-                        {selectedManager?.name || selectedManager?.id || 'Select an ecosystem'}
-                      </div>
+              <div style={{ borderRadius: 16, border: '1px solid #e2e8f0', background: '#f8fafc', padding: 16 }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                  <div>
+                    <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.6, color: '#64748b' }}>
+                      Ecosystem Preview
                     </div>
-                    {selectedManager?.id ? (
-                      <Button
-                        variant="secondary"
-                        size="small"
-                        onClick={() => modals.openEntityModal('manager', selectedManager.id)}
-                      >
-                        Open manager
-                      </Button>
-                    ) : null}
+                    <div style={{ fontSize: 18, fontWeight: 700, color: '#0f172a' }}>
+                      {selectedManager?.name || selectedManager?.id || 'Select an ecosystem'}
+                    </div>
                   </div>
-                  {selectedEcosystemTree ? (
-                    <EcosystemTree
-                      rootUser={{
-                        id: selectedManager?.id || 'MANAGER',
-                        role: 'Manager',
-                        name: selectedManager?.name || selectedManager?.id || 'Manager',
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 240 }}>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.4 }}>
+                      Ecosystem
+                    </span>
+                    <select
+                      value={selectedEcosystemId ?? ''}
+                      onChange={(event) => setSelectedEcosystemId(event.target.value)}
+                      style={{
+                        borderRadius: 10,
+                        border: '1px solid #cbd5f5',
+                        padding: '10px 12px',
+                        fontSize: 14,
+                        background: '#fff',
+                        color: '#0f172a',
                       }}
-                      treeData={selectedEcosystemTree}
-                      expandedNodes={[selectedManager?.id || '']}
-                      currentUserId={selectedManager?.id || undefined}
-                      title="Ecosystem"
-                      subtitle="Manager ecosystem preview"
-                      description="Select an ecosystem to explore the hierarchy."
-                      roleColorMap={{
-                        manager: '#e0f2fe',
-                        contractor: '#dcfce7',
-                        customer: '#fef9c3',
-                        center: '#ffedd5',
-                        crew: '#fee2e2',
-                      }}
-                    />
-                  ) : (
-                    <div style={{ padding: 16, borderRadius: 12, background: '#fff', border: '1px dashed #cbd5f5', color: '#64748b', fontSize: 13 }}>
-                      Select an ecosystem row to preview the hierarchy.
-                    </div>
-                  )}
+                    >
+                      {ecosystemRows.length === 0 ? (
+                        <option value="" disabled>
+                          No ecosystems available
+                        </option>
+                      ) : (
+                        ecosystemRows.map((row) => (
+                          <option key={row.managerId} value={row.managerId}>
+                            {row.ecosystem} ({row.managerId})
+                          </option>
+                        ))
+                      )}
+                    </select>
+                  </label>
                 </div>
+                {selectedEcosystemTree ? (
+                  <EcosystemTree
+                    rootUser={{
+                      id: selectedManager?.id || 'MANAGER',
+                      role: 'Manager',
+                      name: selectedManager?.name || selectedManager?.id || 'Manager',
+                    }}
+                    treeData={selectedEcosystemTree}
+                    expandedNodes={[selectedManager?.id || '']}
+                    currentUserId={selectedManager?.id || undefined}
+                    title="Ecosystem"
+                    subtitle="Manager ecosystem preview"
+                    description="Click any row to expand. Use View/Edit to manage test accounts."
+                    roleColorMap={{
+                      manager: '#e0f2fe',
+                      contractor: '#dcfce7',
+                      customer: '#fef9c3',
+                      center: '#ffedd5',
+                      crew: '#fee2e2',
+                    }}
+                    onNodeView={handleEcosystemView}
+                    onNodeEdit={handleEcosystemEdit}
+                  />
+                ) : (
+                  <div style={{ padding: 16, borderRadius: 12, background: '#fff', border: '1px dashed #cbd5f5', color: '#64748b', fontSize: 13 }}>
+                    No ecosystems available yet.
+                  </div>
+                )}
               </div>
             </PageWrapper>
           ) : activeTab === 'directory' ? (
