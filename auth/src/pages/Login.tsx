@@ -2,13 +2,14 @@
  * OG Login page - copied from frontend/src/pages/Login.tsx
  * Kept intact to preserve visuals and flow.
  */
-import { SignedIn, useAuth as useClerkAuth, useSignIn } from '@clerk/clerk-react';
+import { ClerkLoaded, SignedIn, useAuth as useClerkAuth, useSignIn } from '@clerk/clerk-react';
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth as useBootstrapAuth } from '../hooks/useAuth';
 import logoSrc from '../assets/cks-portal-logo.svg';
 
 const CARD_ANIMATION_STYLE_ID = 'cks-login-card-animation';
+const LOGIN_DRAFT_STORAGE_KEY = 'cks_login_draft';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -27,8 +28,10 @@ export default function Login() {
   const [error, setError] = useState<string | null>(null);
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isInstalled, setIsInstalled] = useState(false);
-  const [showInstallHelp, setShowInstallHelp] = useState(false);
+  const [showInstallModal, setShowInstallModal] = useState(false);
+  const [installOutcome, setInstallOutcome] = useState<'idle' | 'accepted' | 'dismissed' | 'error'>('idle');
   const submittingRef = useRef(false);
+  const hydrationRef = useRef(false);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -52,6 +55,7 @@ export default function Login() {
 
       if (result.status === 'complete') {
         await setActive!({ session: result.createdSessionId });
+        try { sessionStorage.removeItem(LOGIN_DRAFT_STORAGE_KEY); } catch {}
         navigate('/hub', { replace: true });
         return;
       }
@@ -64,6 +68,7 @@ export default function Login() {
 
         if (attempt.status === 'complete') {
           await setActive!({ session: attempt.createdSessionId });
+          try { sessionStorage.removeItem(LOGIN_DRAFT_STORAGE_KEY); } catch {}
           navigate('/hub', { replace: true });
           return;
         }
@@ -160,6 +165,31 @@ export default function Login() {
   }, []);
 
   useEffect(() => {
+    if (hydrationRef.current) return;
+    hydrationRef.current = true;
+    try {
+      const raw = sessionStorage.getItem(LOGIN_DRAFT_STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as { identifier?: string; password?: string };
+      if (typeof parsed.identifier === 'string') {
+        setIdentifier(parsed.identifier);
+      }
+      if (typeof parsed.password === 'string') {
+        setPassword(parsed.password);
+      }
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(
+        LOGIN_DRAFT_STORAGE_KEY,
+        JSON.stringify({ identifier, password }),
+      );
+    } catch {}
+  }, [identifier, password]);
+
+  useEffect(() => {
     const handleBeforeInstall = (event: Event) => {
       event.preventDefault();
       setInstallPrompt(event as BeforeInstallPromptEvent);
@@ -183,28 +213,45 @@ export default function Login() {
     };
   }, []);
 
-  const handleInstallClick = async () => {
-    if (installPrompt) {
+  useEffect(() => {
+    if (isInstalled) {
+      setShowInstallModal(false);
+    }
+  }, [isInstalled]);
+
+  const handleInstallClick = () => {
+    setInstallOutcome('idle');
+    setShowInstallModal(true);
+  };
+
+  const handlePromptInstall = async () => {
+    if (!installPrompt) {
+      setInstallOutcome('error');
+      return;
+    }
+    try {
       await installPrompt.prompt();
       const choice = await installPrompt.userChoice;
+      setInstallOutcome(choice.outcome === 'dismissed' ? 'dismissed' : 'accepted');
       if (choice.outcome !== 'dismissed') {
         setInstallPrompt(null);
         setIsInstalled(true);
+        setShowInstallModal(false);
       }
-      return;
+    } catch {
+      setInstallOutcome('error');
     }
-
-    setShowInstallHelp(true);
   };
 
   const ua = navigator.userAgent || '';
   const isIOS = /iPhone|iPad|iPod/i.test(ua);
   const isAndroid = /Android/i.test(ua);
-  const isChrome = /Chrome|CriOS/i.test(ua);
-  const isEdge = /Edg/i.test(ua);
   const isStandalone =
     window.matchMedia('(display-mode: standalone)').matches ||
     (window.navigator as any).standalone === true;
+  const canPromptInstall = Boolean(installPrompt);
+  const isSecureContext = window.location.protocol === 'https:' || window.location.hostname === 'localhost';
+  const hasServiceWorker = 'serviceWorker' in navigator;
 
   const cardSurfaceStyle = useMemo(
     () => ({
@@ -232,6 +279,96 @@ export default function Login() {
       <SignedIn>
         <Navigate to="/hub" replace />
       </SignedIn>
+
+      {showInstallModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-6 py-8">
+          <div className="w-full max-w-lg rounded-2xl border border-slate-700/60 bg-[#0f172a] p-6 text-slate-100 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="text-xs uppercase tracking-[0.2em] text-slate-400">Install CKS Portal</div>
+                <div className="mt-2 text-lg font-semibold text-white">Add the app to your device</div>
+              </div>
+              <button
+                type="button"
+                className="rounded-full border border-slate-600/50 px-3 py-1 text-xs text-slate-200 hover:bg-slate-800/60"
+                onClick={() => setShowInstallModal(false)}
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="mt-4 rounded-xl border border-slate-700/60 bg-slate-900/60 p-4 text-sm text-slate-200">
+              {canPromptInstall ? (
+                <div>
+                  <div className="font-semibold text-white">Ready to install</div>
+                  <div className="mt-1 text-slate-300">
+                    Your browser supports one-tap install. Click below to continue.
+                  </div>
+                </div>
+              ) : isIOS ? (
+                <div>
+                  <div className="font-semibold text-white">iPhone / iPad</div>
+                  <div className="mt-1 text-slate-300">
+                    Tap Share, then “Add to Home Screen”.
+                  </div>
+                </div>
+              ) : isAndroid ? (
+                <div>
+                  <div className="font-semibold text-white">Android</div>
+                  <div className="mt-1 text-slate-300">
+                    Open the browser menu (⋮) and choose “Install app” or “Add to Home screen”.
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <div className="font-semibold text-white">Desktop</div>
+                  <div className="mt-1 text-slate-300">
+                    Look for the install icon in the address bar or use the browser menu.
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-4 grid gap-3">
+              {canPromptInstall ? (
+                <button
+                  type="button"
+                  className="inline-flex w-full items-center justify-center rounded-xl bg-white px-4 py-3 text-base font-semibold text-slate-900"
+                  onClick={handlePromptInstall}
+                >
+                  Install now
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="inline-flex w-full items-center justify-center rounded-xl border border-slate-500/60 px-4 py-3 text-sm font-semibold text-white"
+                  onClick={() => setInstallOutcome('error')}
+                >
+                  Show install checklist
+                </button>
+              )}
+            </div>
+
+            {(installOutcome === 'error' || !canPromptInstall) && (
+              <div className="mt-4 text-xs text-slate-400">
+                <div className="font-semibold text-slate-200">Install checklist</div>
+                <ul className="mt-2 list-disc space-y-1 pl-4">
+                  <li>Use HTTPS (or localhost). Current: {isSecureContext ? 'OK' : 'Not secure'}</li>
+                  <li>Ensure the app manifest and icons are reachable.</li>
+                  <li>Service worker must be registered. Current: {hasServiceWorker ? 'Supported' : 'Not supported'}</li>
+                  <li>iOS installs require Safari’s Share menu.</li>
+                </ul>
+              </div>
+            )}
+
+            {installOutcome === 'dismissed' && (
+              <div className="mt-3 text-xs text-amber-300">
+                Install dismissed. You can try again anytime.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="relative min-h-screen w-full overflow-hidden">
         {/* Diagonal split background */}
@@ -276,7 +413,8 @@ export default function Login() {
                   />
                 </div>
                 {error && <div className="alert-error mb-4">{error}</div>}
-                <form onSubmit={onSubmit} className="relative z-10">
+                <ClerkLoaded>
+                  <form onSubmit={onSubmit} className="relative z-10">
                 <div className="mb-4 text-left">
                   <label className="block mb-2 text-sm font-medium text-slate-200">CKS ID</label>
                   <input
@@ -312,6 +450,7 @@ export default function Login() {
                   </a>
                 </div>
               </form>
+                </ClerkLoaded>
 
               <div className="mt-6 border-t border-slate-500/30 pt-6">
                 <button
@@ -329,30 +468,6 @@ export default function Login() {
                     >
                       Install app
                     </button>
-                    {showInstallHelp && (
-                      <div className="mt-3 rounded-xl border border-white/15 bg-black/20 px-4 py-3 text-xs text-slate-200">
-                        {isIOS ? (
-                          <div>
-                            iPhone/iPad: tap Share, then Add to Home Screen.
-                          </div>
-                        ) : isAndroid && isChrome ? (
-                          <div>
-                            Android Chrome: tap the menu (⋮) and choose “Install app”.
-                          </div>
-                        ) : isChrome || isEdge ? (
-                          <div>
-                            Look for the install icon in the address bar, or use the browser menu to install.
-                          </div>
-                        ) : (
-                          <div>
-                            If install isn’t available, use the browser menu and look for “Install app” or “Add to Home screen”.
-                          </div>
-                        )}
-                        <div className="mt-2 text-slate-400">
-                          Install requires HTTPS, a valid manifest, and an active service worker.
-                        </div>
-                      </div>
-                    )}
                   </>
                 )}
                 <div className="mt-4 text-center text-xs text-slate-400">Secured by Clerk</div>
