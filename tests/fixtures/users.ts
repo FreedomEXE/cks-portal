@@ -68,7 +68,7 @@ export const testUsers: Record<Role, TestUser> = {
  * Get test password from environment variable
  */
 function getTestPassword(): string {
-  const password = process.env.TEST_PASSWORD || 'ckstest123';
+  const password = process.env.TEST_PASSWORD || 'test123!';
   return password;
 }
 

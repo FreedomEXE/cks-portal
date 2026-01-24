@@ -133,7 +133,7 @@ const TEST_ECOSYSTEM_LOGINS = [
   { role: 'Warehouse', id: 'WHS-001-TEST' },
 ];
 
-const DEFAULT_TEST_PASSWORD = 'ckstest123';
+const DEFAULT_TEST_PASSWORD = 'test123!';
 
 function renderStatusBadge(value: string | null | undefined) {
   if (!value) return null;
