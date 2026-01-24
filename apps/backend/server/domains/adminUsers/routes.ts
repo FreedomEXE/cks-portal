@@ -55,7 +55,7 @@ function handleValidationError(reply: FastifyReply, error: unknown) {
   return false;
 }
 
-const TEST_PASSWORD = (process.env.TEST_PASSWORD || process.env.CKS_TEST_PASSWORD || 'test123!').trim() || null;
+const TEST_PASSWORD = (process.env.TEST_PASSWORD || process.env.CKS_TEST_PASSWORD || 'CksTest!2026-Alpha').trim() || null;
 
 function isTestEntity(entityId: string, emailAddress?: string | null) {
   const normalized = entityId.toUpperCase();

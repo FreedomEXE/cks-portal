@@ -11,7 +11,7 @@ This directory contains end-to-end tests for the CKS Portal using Playwright.
 
 2. **Configure test credentials** (already done):
    - Credentials are stored in `.env.test` (not committed to git)
-   - All test users share password: `test123!`
+   - All test users share password: `CksTest!2026-Alpha`
 
 3. **Start the development server**:
    ```bash
@@ -75,7 +75,7 @@ tests/
 | Warehouse | warehousetest+clerk_test@example.com | WHS-004 | Manuel |
 | Admin | admin@ckscontracting.ca | FREEDOM_EXE | Freedom |
 
-All passwords: `test123!`
+All passwords: `CksTest!2026-Alpha`
 
 ## Writing New Tests
 
