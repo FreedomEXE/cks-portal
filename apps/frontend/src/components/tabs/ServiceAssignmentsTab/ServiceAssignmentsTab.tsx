@@ -10,6 +10,7 @@ export interface ServiceAssignmentsTabProps {
   managedBy?: string | null; // 'manager' | 'warehouse'
   assigned?: Array<{ code: string; name?: string } | string> | null;
   crewRequests?: Array<{ crewCode?: string; status?: string }> | null;
+  readOnly?: boolean;
 }
 
 export default function ServiceAssignmentsTab({
@@ -18,6 +19,7 @@ export default function ServiceAssignmentsTab({
   managedBy,
   assigned = [],
   crewRequests,
+  readOnly = false,
 }: ServiceAssignmentsTabProps) {
   const { mutate } = useSWRConfig();
   const scope = useHubRoleScope(viewerCode || undefined);
@@ -28,14 +30,8 @@ export default function ServiceAssignmentsTab({
   const [submitting, setSubmitting] = useState(false);
   const [removing, setRemoving] = useState<string | null>(null);
 
-  // Hide entirely for warehouse-managed services
-  if ((managedBy || '').toLowerCase() === 'warehouse') {
-    return (
-      <div style={{ padding: 16, color: '#6b7280' }}>
-        Assignments are managed by Warehouse for this service.
-      </div>
-    );
-  }
+  const managedByWarehouse = (managedBy || '').toLowerCase() === 'warehouse';
+  const canManage = !readOnly;
 
   const crewList = useMemo(() => {
     const data = scope.data as ManagerRoleScopeResponse | null;
@@ -135,11 +131,18 @@ export default function ServiceAssignmentsTab({
 
   return (
     <div style={{ padding: 16 }}>
-      <h3 style={{ margin: '0 0 12px 0', fontSize: 16, fontWeight: 600 }}>Crew Assignments</h3>
-      <p style={{ margin: '0 0 12px 0', color: '#6b7280' }}>Search and select crew to invite to this service.</p>
+      <h3 style={{ margin: '0 0 12px 0', fontSize: 16, fontWeight: 600 }}>Assigned Crew</h3>
+      {managedByWarehouse && !canManage && (
+        <div style={{ marginBottom: 12, color: '#6b7280' }}>
+          Assigned crew is managed by Warehouse for this service.
+        </div>
+      )}
+      {!readOnly && (
+        <p style={{ margin: '0 0 12px 0', color: '#6b7280' }}>Search and select crew to invite to this service.</p>
+      )}
 
       {/* Current assignments */}
-      {currentAssigned.length > 0 && (
+      {currentAssigned.length > 0 ? (
         <div style={{ marginBottom: 12 }}>
           <div style={{ fontWeight: 600, marginBottom: 6 }}>Currently Assigned</div>
           <ul>
@@ -147,81 +150,89 @@ export default function ServiceAssignmentsTab({
               <li key={a.code} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                 <span style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>{a.code}</span>
                 <span>{a.name}</span>
-                <button
-                  onClick={() => unassign(a.code)}
-                  disabled={!!removing}
-                  style={{ marginLeft: 'auto', padding: '4px 8px', borderRadius: 4, border: '1px solid #e5e7eb', color: '#b91c1c' }}
-                >
-                  {removing === a.code ? 'Removing…' : 'Unassign'}
-                </button>
+                {canManage && (
+                  <button
+                    onClick={() => unassign(a.code)}
+                    disabled={!!removing}
+                    style={{ marginLeft: 'auto', padding: '4px 8px', borderRadius: 4, border: '1px solid #e5e7eb', color: '#b91c1c' }}
+                  >
+                    {removing === a.code ? 'Removing…' : 'Unassign'}
+                  </button>
+                )}
               </li>
             ))}
           </ul>
         </div>
+      ) : (
+        <div style={{ marginBottom: 12, color: '#6b7280' }}>No crew assigned yet.</div>
       )}
 
-      <input
-        type="text"
-        placeholder="Search crew by code or name"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        style={{ width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: 6 }}
-      />
+      {canManage && (
+        <>
+          <input
+            type="text"
+            placeholder="Search crew by code or name"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            style={{ width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: 6 }}
+          />
 
-      <div style={{ marginTop: 12, maxHeight: 220, overflowY: 'auto', border: '1px solid #e5e7eb', borderRadius: 6 }}>
-        {filtered.length === 0 && (
-          <div style={{ padding: 12, color: '#6b7280' }}>No crew found</div>
-        )}
-        {filtered.map((c) => {
-          const normalized = normalizeCode(c.code);
-          if (assignedCodes.has(normalized)) {
-            return null;
-          }
-          const isPending = pendingSet.has(normalized);
-          return (
-            <div
-              key={c.code}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                padding: '8px 10px',
-                borderBottom: '1px solid #f3f4f6',
-                backgroundColor: isPending ? '#f8fafc' : '#fff',
-              }}
-            >
-              {!isPending && (
-                <input
-                  type="checkbox"
-                  checked={selected.includes(c.code)}
-                  onChange={() => toggle(c.code)}
-                  style={{ marginRight: 8 }}
-                />
-              )}
-              <span style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', marginRight: 8 }}>{c.code}</span>
-              <span style={{ color: '#374151', flex: 1 }}>{c.name}</span>
-              {isPending && (
-                <span
+          <div style={{ marginTop: 12, maxHeight: 220, overflowY: 'auto', border: '1px solid #e5e7eb', borderRadius: 6 }}>
+            {filtered.length === 0 && (
+              <div style={{ padding: 12, color: '#6b7280' }}>No crew found</div>
+            )}
+            {filtered.map((c) => {
+              const normalized = normalizeCode(c.code);
+              if (assignedCodes.has(normalized)) {
+                return null;
+              }
+              const isPending = pendingSet.has(normalized);
+              return (
+                <div
+                  key={c.code}
                   style={{
-                    display: 'inline-flex',
+                    display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'center',
-                    padding: '2px 8px',
-                    borderRadius: 999,
-                    fontSize: 11,
-                    border: '1px solid #fcd34d',
-                    color: '#b45309',
-                    backgroundColor: '#fff7ed',
+                    padding: '8px 10px',
+                    borderBottom: '1px solid #f3f4f6',
+                    backgroundColor: isPending ? '#f8fafc' : '#fff',
                   }}
                 >
-                  Request Sent
-                </span>
-              )}
-            </div>
-          );
-        })}
-      </div>
+                  {!isPending && (
+                    <input
+                      type="checkbox"
+                      checked={selected.includes(c.code)}
+                      onChange={() => toggle(c.code)}
+                      style={{ marginRight: 8 }}
+                    />
+                  )}
+                  <span style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', marginRight: 8 }}>{c.code}</span>
+                  <span style={{ color: '#374151', flex: 1 }}>{c.name}</span>
+                  {isPending && (
+                    <span
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '2px 8px',
+                        borderRadius: 999,
+                        fontSize: 11,
+                        border: '1px solid #fcd34d',
+                        color: '#b45309',
+                        backgroundColor: '#fff7ed',
+                      }}
+                    >
+                      Request Sent
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
 
-      {selected.length > 0 && (
+      {canManage && selected.length > 0 && (
         <div style={{ marginTop: 10, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
           {selected.map((code) => (
             <span key={code} style={{ background: '#eef2ff', color: '#4f46e5', padding: '4px 8px', borderRadius: 999, fontSize: 12 }}>
@@ -231,20 +242,24 @@ export default function ServiceAssignmentsTab({
         </div>
       )}
 
-      <label style={{ display: 'block', fontSize: 12, color: '#374151', marginTop: 14, marginBottom: 6 }}>Optional message</label>
-      <textarea
-        value={message}
-        onChange={(e) => setMessage(e.target.value)}
-        placeholder="Add a note to include with the invite"
-        rows={3}
-        style={{ width: '100%', padding: 10, border: '1px solid #d1d5db', borderRadius: 6 }}
-      />
+      {canManage && (
+        <>
+          <label style={{ display: 'block', fontSize: 12, color: '#374151', marginTop: 14, marginBottom: 6 }}>Optional message</label>
+          <textarea
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            placeholder="Add a note to include with the invite"
+            rows={3}
+            style={{ width: '100%', padding: 10, border: '1px solid #d1d5db', borderRadius: 6 }}
+          />
 
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
-        <button onClick={submit} disabled={submitting} style={{ padding: '8px 12px', borderRadius: 6, background: '#4f46e5', color: '#fff', border: '1px solid #4338ca' }}>
-          {submitting ? 'Sending…' : 'Send Request'}
-        </button>
-      </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
+            <button onClick={submit} disabled={submitting} style={{ padding: '8px 12px', borderRadius: 6, background: '#4f46e5', color: '#fff', border: '1px solid #4338ca' }}>
+              {submitting ? 'Sending…' : 'Send Request'}
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }

@@ -63,6 +63,7 @@ import { resolvedUserCode } from '../shared/utils/userCode';
 import { useHubLoading } from '../contexts/HubLoadingContext';
 import { loadUserPreferences, saveUserPreferences } from '../shared/preferences';
 import { useAccessCodeRedemption } from '../hooks/useAccessCodeRedemption';
+import OverviewDetailPanel, { type OverviewDetailItem } from '../components/overview/OverviewDetailPanel';
 import { buildSupportTickets, mapSupportIssuePayload } from '../shared/support/supportTickets';
 
 interface CrewHubProps {
@@ -179,6 +180,7 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
   const [activeTab, setActiveTab] = useState(initialTab);
   const [servicesTab, setServicesTab] = useState<'my' | 'active' | 'history'>('active');
   const [servicesSearchQuery, setServicesSearchQuery] = useState('');
+  const [overviewFocus, setOverviewFocus] = useState<string | null>(null);
   const { setTheme } = useAppTheme();
 
   const { code: authCode, accessStatus, accessTier, accessSource } = useAuth();
@@ -380,38 +382,93 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
     await mutateReports();
   }, [mutateReports]);
 
-  // Build dashboard cards once (do not call hooks inside render conditionals)
-  const dashboardCards = useMemo(() => {
-    const openFirstServiceWithTasks = () => {
-      const me = (normalizedCode || '').toUpperCase();
-      const sos = orders?.serviceOrders || [];
-      const dayNames = ['sun','mon','tue','wed','thu','fri','sat'];
-      const todayKey = dayNames[new Date().getDay()];
-      for (const o of sos) {
-        const meta: any = o.metadata || {};
-        const status = String(meta.serviceStatus || meta.service_status || '').toLowerCase();
-        if (status !== 'in_progress') continue;
-        const tasks: any[] = Array.isArray(meta.tasks) ? meta.tasks : [];
-        const has = tasks.some((t: any) => {
-          const assigned = Array.isArray(t?.assignedTo) ? t.assignedTo.map((x: any) => String(x).toUpperCase()) : [];
-          if (!assigned.includes(me) || t?.completedAt) return false;
-          const days: string[] = Array.isArray(t?.days) ? t.days.map((d: any) => String(d).toLowerCase()) : [];
-          const freq = String(t?.frequency || '').toLowerCase();
-          return (days.length > 0 && days.includes(todayKey)) || freq === 'daily' || days.length === 0;
-        });
-        if (has && (o.serviceId || meta.serviceId)) {
-          modals.openById((o.serviceId || meta.serviceId)!, { context: { focus: 'crew-tasks' } });
-          return;
-        }
-      }
-      // Fallback: open Services tab
-      setActiveTab('services');
-    };
+  const assignedTaskItems = useMemo(() => {
+    const me = (normalizedCode || '').toUpperCase();
+    const sos = orders?.serviceOrders || [];
+    const dayNames = ['sun','mon','tue','wed','thu','fri','sat'];
+    const todayKey = dayNames[new Date().getDay()];
+    const items: Array<{ primary: string; secondary?: string; meta?: string }> = [];
 
-    return crewOverviewCards.map((c) =>
-      c.id === 'my-tasks' ? { ...c, onClick: openFirstServiceWithTasks } : c
-    );
-  }, [orders?.serviceOrders, normalizedCode, modals]);
+    for (const o of sos) {
+      const meta: any = o.metadata || {};
+      const status = String(meta.serviceStatus || meta.service_status || '').toLowerCase();
+      if (status !== 'in_progress') continue;
+      const tasks: any[] = Array.isArray(meta.tasks) ? meta.tasks : [];
+      const assignedTasks = tasks.filter((t: any) => {
+        const assigned = Array.isArray(t?.assignedTo) ? t.assignedTo.map((x: any) => String(x).toUpperCase()) : [];
+        if (!assigned.includes(me) || t?.completedAt) return false;
+        const days: string[] = Array.isArray(t?.days) ? t.days.map((d: any) => String(d).toLowerCase()) : [];
+        const freq = String(t?.frequency || '').toLowerCase();
+        return (days.length > 0 && days.includes(todayKey)) || freq === 'daily' || days.length === 0;
+      });
+      if (assignedTasks.length > 0) {
+        items.push({
+          primary: o.title || o.serviceId || o.orderId || 'Service',
+          secondary: o.serviceId || o.orderId || undefined,
+          meta: `${assignedTasks.length} task${assignedTasks.length === 1 ? '' : 's'}`,
+        });
+      }
+    }
+    return items;
+  }, [orders?.serviceOrders, normalizedCode]);
+
+  const dashboardCards = useMemo(() => {
+    return crewOverviewCards.map((c) => ({
+      ...c,
+      onClick: () => setOverviewFocus((prev) => (prev === c.id ? null : c.id)),
+    }));
+  }, []);
+
+  const overviewDetail = useMemo(() => {
+    if (!overviewFocus) return null;
+    const cap = 5;
+    const toItems = (rows: Array<{ primary: string; secondary?: string; meta?: string }>) =>
+      rows.slice(0, cap).map((row) => ({ primary: row.primary, secondary: row.secondary, meta: row.meta }));
+
+    switch (overviewFocus) {
+      case 'active-services':
+        return {
+          title: 'Active Services',
+          subtitle: 'Services you are working on',
+          items: toItems(activeServicesData.map((svc) => ({
+            primary: svc.serviceName ?? svc.serviceId,
+            secondary: svc.serviceId,
+            meta: svc.status,
+          }))),
+          emptyMessage: 'No active services yet.',
+        };
+      case 'my-tasks':
+        return {
+          title: 'My Tasks',
+          subtitle: 'Tasks assigned for today',
+          items: toItems(assignedTaskItems),
+          emptyMessage: 'No tasks assigned right now.',
+        };
+      case 'timecard':
+        return {
+          title: 'Timecard',
+          subtitle: 'Quick snapshot',
+          items: [
+            { primary: 'Completed Today', secondary: String(dashboard?.completedToday ?? 0) },
+            { primary: 'Active Services', secondary: String(dashboard?.activeServices ?? 0) },
+          ],
+          emptyMessage: 'No timecard data available.',
+        };
+      case 'account-status':
+        return {
+          title: 'Account Status',
+          subtitle: 'Access and tier overview',
+          items: [
+            { primary: 'Access Status', secondary: accessStatus || dashboard?.accountStatus || '—' },
+            { primary: 'Access Tier', secondary: accessTier || '—' },
+            { primary: 'Access Source', secondary: accessSource || '—' },
+          ],
+          emptyMessage: 'No account status available.',
+        };
+      default:
+        return null;
+    }
+  }, [overviewFocus, activeServicesData, assignedTaskItems, dashboard?.completedToday, dashboard?.activeServices, dashboard?.accountStatus, accessStatus, accessTier, accessSource]);
 
   const crewScope = scopeData?.role === 'crew' ? scopeData : null;
 
@@ -600,6 +657,15 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
                 <div style={{ marginBottom: 12, color: '#dc2626' }}>{dashboardErrorMessage}</div>
               )}
               <OverviewSection cards={dashboardCards} data={overviewData} loading={dashboardLoading} />
+              {overviewDetail && (
+                <OverviewDetailPanel
+                  title={overviewDetail.title}
+                  subtitle={overviewDetail.subtitle}
+                  items={overviewDetail.items as OverviewDetailItem[]}
+                  emptyMessage={overviewDetail.emptyMessage}
+                  onClose={() => setOverviewFocus(null)}
+                />
+              )}
 
               <PageHeader title="Recent Activity" />
               <ActivityFeed

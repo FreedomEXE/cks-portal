@@ -58,6 +58,7 @@ import { mapProfileDataForRole, type DirectoryRole, directoryTabToRole } from '.
 import { buildAdminOverviewData } from '../shared/overview/builders';
 import { buildSupportTickets } from '../shared/support/supportTickets';
 import { buildEcosystemTree } from '../shared/utils/ecosystem';
+import OverviewDetailPanel, { type OverviewDetailItem } from '../components/overview/OverviewDetailPanel';
 
 import { useAdminUsers, updateInventory, fetchAdminOrderById, provisionTestEcosystemUsers } from '../shared/api/admin';
 import {
@@ -257,6 +258,7 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
 
   // Local tab state (no URL changes)
   const [activeTab, setActiveTab] = useState(initialTab);
+  const [overviewFocus, setOverviewFocus] = useState<string | null>(null);
   const [directoryTab, setDirectoryTab] = useState('admins');
   const [ordersSubTab, setOrdersSubTab] = useState('product-orders');
   const [servicesSubTab, setServicesSubTab] = useState('catalog-services');
@@ -576,6 +578,74 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
       goLiveTimestamp: GO_LIVE_TIMESTAMP,
     }),
   [adminUsers, managers, contractors, customers, centers, crew, warehouses, supportItems]);
+
+  const overviewCards = useMemo(() => {
+    return adminOverviewCards.map((card) => {
+      return {
+        ...card,
+        onClick: () => setOverviewFocus((prev) => (prev === card.id ? null : card.id)),
+      };
+    });
+  }, []);
+
+  const overviewDetail = useMemo(() => {
+    if (!overviewFocus) return null;
+    const cap = 6;
+    const toItems = (rows: Array<{ primary: string; secondary?: string; meta?: string }>) =>
+      rows.slice(0, cap).map((row) => ({ primary: row.primary, secondary: row.secondary, meta: row.meta }));
+
+    switch (overviewFocus) {
+      case 'users':
+        return {
+          title: 'User Breakdown',
+          subtitle: 'Current totals by role',
+          items: [
+            { primary: 'Managers', secondary: String(managers.length) },
+            { primary: 'Contractors', secondary: String(contractors.length) },
+            { primary: 'Customers', secondary: String(customers.length) },
+            { primary: 'Centers', secondary: String(centers.length) },
+            { primary: 'Crew', secondary: String(crew.length) },
+            { primary: 'Warehouses', secondary: String(warehouses.length) },
+          ],
+          emptyMessage: 'No users found.',
+        };
+      case 'tickets':
+      case 'priority': {
+        const isPriority = overviewFocus === 'priority';
+        const filtered = supportItems.filter((item: any) => {
+          const status = String(item?.status || '').toLowerCase();
+          const priority = String(item?.priority || '').toLowerCase();
+          if (status === 'closed') return false;
+          if (isPriority) {
+            return priority === 'high' || priority === 'urgent';
+          }
+          return true;
+        });
+        return {
+          title: isPriority ? 'High Priority' : 'Open Support Tickets',
+          subtitle: 'Latest items needing attention',
+          items: toItems(filtered.map((item: any) => ({
+            primary: item.title || item.id || 'Ticket',
+            secondary: item.category || item.type || undefined,
+            meta: item.priority || item.status || undefined,
+          }))),
+          emptyMessage: isPriority ? 'No high priority tickets.' : 'No open tickets.',
+        };
+      }
+      case 'days':
+        return {
+          title: 'Days Online',
+          subtitle: 'System uptime snapshot',
+          items: [
+            { primary: 'Go-live Date', secondary: GO_LIVE_DATE_INPUT || 'Not set' },
+            { primary: 'Days Online', secondary: String(overviewData?.daysOnline ?? 0) },
+          ],
+          emptyMessage: 'No uptime data available.',
+        };
+      default:
+        return null;
+    }
+  }, [overviewFocus, managers.length, contractors.length, customers.length, centers.length, crew.length, warehouses.length, supportItems, overviewData?.daysOnline]);
 
   const adminRows = useMemo(
     () =>
@@ -1775,7 +1845,16 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
           {activeTab === 'dashboard' ? (
             <PageWrapper title="Dashboard" showHeader={false}>
               <PageHeader title="Overview" />
-              <OverviewSection cards={adminOverviewCards} data={overviewData} />
+              <OverviewSection cards={overviewCards} data={overviewData} />
+              {overviewDetail && (
+                <OverviewDetailPanel
+                  title={overviewDetail.title}
+                  subtitle={overviewDetail.subtitle}
+                  items={overviewDetail.items as OverviewDetailItem[]}
+                  emptyMessage={overviewDetail.emptyMessage}
+                  onClose={() => setOverviewFocus(null)}
+                />
+              )}
 
               <PageHeader title="Recent Activity" />
               <ActivityFeed

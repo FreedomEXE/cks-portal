@@ -1420,22 +1420,37 @@ const serviceAdapter: EntityAdapter = {
           />
         ),
       },
-      // Assignments tab: managers can assign crew, procedures, training
-      ...(String((entityData?.metadata?.serviceManagedBy || '')).toLowerCase() !== 'warehouse' && context.role === 'manager'
+      // Assigned Crew tab: everyone can view, managers/warehouse can edit when they manage
+      ...(context.role !== 'admin'
+        ? (() => {
+            const managedBy = String((entityData?.metadata?.serviceManagedBy || '')).toLowerCase();
+            const canManageAssignments =
+              (context.role === 'manager' && managedBy !== 'warehouse') ||
+              (context.role === 'warehouse' && managedBy === 'warehouse');
+            const focusTasksOnly = (context as any)?.openContext?.focus === 'crew-tasks';
+            if (context.role === 'crew' && focusTasksOnly) {
+              return [];
+            }
+            return [
+              {
+                id: 'crew' as const,
+                label: 'Assigned Crew',
+                content: (
+                  <ServiceAssignmentsTab
+                    serviceId={entityData?.serviceId}
+                    viewerCode={context.viewerId}
+                    managedBy={entityData?.metadata?.serviceManagedBy}
+                    assigned={(entityData as any)?.metadata?.crew || []}
+                    crewRequests={(entityData as any)?.metadata?.crewRequests || []}
+                    readOnly={!canManageAssignments}
+                  />
+                ),
+              },
+            ];
+          })()
+        : []),
+      ...(context.role === 'manager'
         ? [
-            {
-              id: 'crew' as const,
-              label: 'Assignments',
-              content: (
-                <ServiceAssignmentsTab
-                  serviceId={entityData?.serviceId}
-                  viewerCode={context.viewerId}
-                  managedBy={entityData?.metadata?.serviceManagedBy}
-                  assigned={(entityData as any)?.metadata?.crew || []}
-                  crewRequests={(entityData as any)?.metadata?.crewRequests || []}
-                />
-              ),
-            },
             {
               id: 'procedures' as const,
               label: 'Procedures',

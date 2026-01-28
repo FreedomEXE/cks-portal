@@ -54,6 +54,7 @@ export default function OverviewCard({
   loading = false
 }: OverviewCardProps) {
   const displayColor = colorMap[color] || color;
+  const isClickable = typeof onClick === 'function';
 
   if (loading) {
     return (
@@ -98,25 +99,29 @@ export default function OverviewCard({
       style={{
         padding: 16,
         textAlign: 'center',
-        cursor: 'pointer',
+        cursor: isClickable ? 'pointer' : 'default',
         transition: 'all 0.2s',
         userSelect: 'none',
         WebkitUserSelect: 'none'
       }}
       onMouseEnter={(e) => {
+        if (!isClickable) return;
         e.currentTarget.style.transform = 'translateY(-2px)';
         e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06)';
         e.currentTarget.style.background = '#fafafa';
       }}
       onMouseLeave={(e) => {
+        if (!isClickable) return;
         e.currentTarget.style.transform = 'translateY(0)';
         e.currentTarget.style.boxShadow = '';
         e.currentTarget.style.background = '';
       }}
       onMouseDown={(e) => {
+        if (!isClickable) return;
         e.currentTarget.style.transform = 'translateY(0) scale(0.98)';
       }}
       onMouseUp={(e) => {
+        if (!isClickable) return;
         e.currentTarget.style.transform = 'translateY(-2px) scale(1)';
       }}
     >

@@ -45,6 +45,7 @@ import { useCertifiedServices } from '../hooks/useCertifiedServices';
 import { buildWarehouseOverviewData } from '../shared/overview/builders';
 import { resolvedUserCode } from '../shared/utils/userCode';
 import { useAccessCodeRedemption } from '../hooks/useAccessCodeRedemption';
+import OverviewDetailPanel, { type OverviewDetailItem } from '../components/overview/OverviewDetailPanel';
 import { buildSupportTickets, mapSupportIssuePayload } from '../shared/support/supportTickets';
 
 import MyHubSection from '../components/MyHubSection';
@@ -177,6 +178,7 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
   const [inventoryTab, setInventoryTab] = useState<'active' | 'archive'>('active');
   const [inventorySearchQuery, setInventorySearchQuery] = useState('');
   const [inventoryFilter, setInventoryFilter] = useState<string>('');
+  const [overviewFocus, setOverviewFocus] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<{ orderId: string; action: OrderActionType } | null>(null);
 
   // identity + helpers
@@ -433,7 +435,11 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
     let filtered = activeInventoryData;
 
     if (inventoryFilter && inventoryFilter !== 'All Types') {
-      filtered = filtered.filter(item => item.type === inventoryFilter);
+      if (inventoryFilter === 'Low Stock') {
+        filtered = filtered.filter(item => item.isLow);
+      } else {
+        filtered = filtered.filter(item => item.type === inventoryFilter);
+      }
     }
 
     if (inventorySearchQuery) {
@@ -451,7 +457,11 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
     let filtered = archivedInventoryData;
 
     if (inventoryFilter && inventoryFilter !== 'All Types') {
-      filtered = filtered.filter(item => item.type === inventoryFilter);
+      if (inventoryFilter === 'Low Stock') {
+        filtered = filtered.filter(item => item.isLow);
+      } else {
+        filtered = filtered.filter(item => item.type === inventoryFilter);
+      }
     }
 
     if (inventorySearchQuery) {
@@ -587,6 +597,98 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
     }),
   [dashboard, profile, scopeData, certifiedServicesData, activeServicesData.length, inventory, accessStatus, accessTier]);
 
+  const overviewCards = useMemo(() => {
+    return warehouseOverviewCards.map((card) => {
+      switch (card.id) {
+        case 'active-services':
+        case 'inventory':
+        case 'low-stock':
+        case 'pending-orders':
+        case 'account-status':
+          return {
+            ...card,
+            onClick: () => setOverviewFocus((prev) => (prev === card.id ? null : card.id)),
+          };
+        default:
+          return {
+            ...card,
+            onClick: () => setOverviewFocus((prev) => (prev === card.id ? null : card.id)),
+          };
+      }
+    });
+  }, []);
+
+  const overviewDetail = useMemo(() => {
+    if (!overviewFocus) return null;
+    const cap = 5;
+    const toItems = (rows: Array<{ primary: string; secondary?: string; meta?: string }>) =>
+      rows.slice(0, cap).map((row) => ({ primary: row.primary, secondary: row.secondary, meta: row.meta }));
+
+    switch (overviewFocus) {
+      case 'active-services':
+        return {
+          title: 'Active Services',
+          subtitle: 'Services currently managed',
+          items: toItems(activeServicesData.map((svc) => ({
+            primary: svc.serviceName ?? svc.serviceId,
+            secondary: svc.serviceId,
+            meta: svc.status,
+          }))),
+          emptyMessage: 'No active services yet.',
+        };
+      case 'inventory':
+        return {
+          title: 'Inventory',
+          subtitle: 'Recent inventory items',
+          items: toItems(activeInventoryData.map((item) => ({
+            primary: item.name || item.productId,
+            secondary: item.productId,
+            meta: `On hand: ${item.onHand}`,
+          }))),
+          emptyMessage: 'No inventory items found.',
+        };
+      case 'low-stock': {
+        const lowStock = activeInventoryData.filter((item) => item.isLow);
+        return {
+          title: 'Low Stock',
+          subtitle: 'Items below minimum stock',
+          items: toItems(lowStock.map((item) => ({
+            primary: item.name || item.productId,
+            secondary: item.productId,
+            meta: `On hand: ${item.onHand}`,
+          }))),
+          emptyMessage: 'No low-stock items right now.',
+        };
+      }
+      case 'pending-orders': {
+        const pending = (orders?.orders || []).filter((order) => String(order.status || '').toLowerCase().includes('pending'));
+        return {
+          title: 'Pending Orders',
+          subtitle: 'Orders awaiting action',
+          items: toItems(pending.map((order) => ({
+            primary: order.orderId || order.id || 'Order',
+            secondary: order.title || undefined,
+            meta: formatStatusLabel(order.status || 'pending'),
+          }))),
+          emptyMessage: 'No pending orders.',
+        };
+      }
+      case 'account-status':
+        return {
+          title: 'Account Status',
+          subtitle: 'Access and tier overview',
+          items: [
+            { primary: 'Access Status', secondary: accessStatus || dashboard?.accountStatus || '—' },
+            { primary: 'Access Tier', secondary: accessTier || '—' },
+            { primary: 'Access Source', secondary: accessSource || '—' },
+          ],
+          emptyMessage: 'No account status available.',
+        };
+      default:
+        return null;
+    }
+  }, [overviewFocus, activeServicesData, activeInventoryData, orders?.orders, accessStatus, accessTier, accessSource, dashboard?.accountStatus]);
+
   // Column definitions for My Services
   const MY_SERVICES_COLUMNS_BASE = [
     { key: 'serviceId', label: 'SERVICE ID', clickable: true },
@@ -687,10 +789,19 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
                 <div style={{ marginBottom: 12, color: '#dc2626' }}>{dashboardErrorMessage}</div>
               )}
               <OverviewSection
-                cards={warehouseOverviewCards}
+                cards={overviewCards}
                 data={overviewData}
                 loading={dashboardLoading}
               />
+              {overviewDetail && (
+                <OverviewDetailPanel
+                  title={overviewDetail.title}
+                  subtitle={overviewDetail.subtitle}
+                  items={overviewDetail.items as OverviewDetailItem[]}
+                  emptyMessage={overviewDetail.emptyMessage}
+                  onClose={() => setOverviewFocus(null)}
+                />
+              )}
 
               <PageHeader title="Recent Activity" />
               <ActivityFeed
@@ -758,7 +869,7 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
                 }
                 onSearch={setInventorySearchQuery}
                 filterOptions={{
-                  options: ['Equipment', 'Products', 'Materials'],
+                  options: ['Low Stock', 'Equipment', 'Products', 'Materials'],
                   placeholder: 'All Types',
                   onFilter: setInventoryFilter
                 }}
@@ -1036,6 +1147,9 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
                     })}
                     showSearch={false}
                     maxItems={10}
+                    onRowClick={(row: any) => {
+                      modals.openById(row.serviceId);
+                    }}
                   />
                 )}
 
@@ -1081,6 +1195,9 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
                     })}
                     showSearch={false}
                     maxItems={10}
+                    onRowClick={(row: any) => {
+                      modals.openById(row.serviceId);
+                    }}
                   />
                 )}
               </TabSection>

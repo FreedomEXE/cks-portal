@@ -38,6 +38,7 @@ import { useCertifiedServices } from '../hooks/useCertifiedServices';
 import { useLogout } from '../hooks/useLogout';
 import { buildManagerOverviewData } from '../shared/overview/builders';
 import { useAccessCodeRedemption } from '../hooks/useAccessCodeRedemption';
+import OverviewDetailPanel, { type OverviewDetailItem } from '../components/overview/OverviewDetailPanel';
 
 /**
  * File: ManagerHub.tsx
@@ -464,6 +465,7 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
   const [servicesTab, setServicesTab] = useState<'my' | 'active' | 'history'>('my');
   const [servicesSearchQuery, setServicesSearchQuery] = useState('');
   const [toast, setToast] = useState<string | null>(null);
+  const [overviewFocus, setOverviewFocus] = useState<string | null>(null);
 
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -877,6 +879,99 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
     }),
   [dashboardData, profileData, scopeData, certifiedServicesData, activeServicesData.length, ordersData, accessStatus, accessTier]);
 
+  const overviewCards = useMemo(() => {
+    return managerOverviewCards.map((card) => {
+      switch (card.id) {
+        case 'active-services':
+        case 'my-centers':
+        case 'my-crew':
+        case 'pending-orders':
+        case 'account-status':
+          return {
+            ...card,
+            onClick: () => setOverviewFocus((prev) => (prev === card.id ? null : card.id)),
+          };
+        default:
+          return {
+            ...card,
+            onClick: () => setOverviewFocus((prev) => (prev === card.id ? null : card.id)),
+          };
+      }
+    });
+  }, []);
+
+  const overviewDetail = useMemo(() => {
+    if (!overviewFocus) return null;
+    const cap = 5;
+    const toItems = (rows: Array<{ primary: string; secondary?: string; meta?: string }>) =>
+      rows.slice(0, cap).map((row) => ({ primary: row.primary, secondary: row.secondary, meta: row.meta }));
+
+    switch (overviewFocus) {
+      case 'active-services':
+        return {
+          title: 'Active Services',
+          subtitle: 'Currently in progress or created',
+          items: toItems(activeServicesData.map((svc) => ({
+            primary: svc.serviceName ?? svc.serviceId,
+            secondary: svc.serviceId,
+            meta: svc.status,
+          }))),
+          emptyMessage: 'No active services yet.',
+        };
+      case 'my-centers':
+        return {
+          title: 'My Centers',
+          subtitle: 'Centers under your ecosystem',
+          items: toItems(centerEntries.map((center) => ({
+            primary: center.name || center.id,
+            secondary: center.id,
+            meta: center.mainContact || undefined,
+          }))),
+          emptyMessage: 'No centers found.',
+        };
+      case 'my-crew':
+        return {
+          title: 'My Crew',
+          subtitle: 'Crew members under your scope',
+          items: toItems(crewEntries.map((crew) => ({
+            primary: crew.name || crew.id,
+            secondary: crew.id,
+            meta: crew.assignedCenter || undefined,
+          }))),
+          emptyMessage: 'No crew members found.',
+        };
+      case 'pending-orders': {
+        const pending = orderEntries.filter((order) => {
+          const status = String(order.status || '').toLowerCase();
+          return status.includes('pending');
+        });
+        return {
+          title: 'Pending Orders',
+          subtitle: 'Orders awaiting action',
+          items: toItems(pending.map((order) => ({
+            primary: order.orderId || order.id || 'Order',
+            secondary: order.title || undefined,
+            meta: formatStatusLabel(order.status || 'pending'),
+          }))),
+          emptyMessage: 'No pending orders.',
+        };
+      }
+      case 'account-status':
+        return {
+          title: 'Account Status',
+          subtitle: 'Access and tier overview',
+          items: [
+            { primary: 'Access Status', secondary: accessStatus || dashboardData?.accountStatus || '—' },
+            { primary: 'Access Tier', secondary: accessTier || '—' },
+            { primary: 'Access Source', secondary: accessSource || '—' },
+          ],
+          emptyMessage: 'No account status available.',
+        };
+      default:
+        return null;
+    }
+  }, [overviewFocus, activeServicesData, centerEntries, crewEntries, orderEntries, accessStatus, accessTier, accessSource, dashboardData?.accountStatus]);
+
   const managerProfileData = useMemo(
     () => ({
       fullName: managerDisplayName,
@@ -1073,7 +1168,16 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
           {activeTab === 'dashboard' ? (
             <PageWrapper title="Dashboard" showHeader={false}>
               <PageHeader title="Overview" />
-              <OverviewSection cards={managerOverviewCards} data={overviewData} />
+              <OverviewSection cards={overviewCards} data={overviewData} />
+              {overviewDetail && (
+                <OverviewDetailPanel
+                  title={overviewDetail.title}
+                  subtitle={overviewDetail.subtitle}
+                  items={overviewDetail.items as OverviewDetailItem[]}
+                  emptyMessage={overviewDetail.emptyMessage}
+                  onClose={() => setOverviewFocus(null)}
+                />
+              )}
 
               <PageHeader title="Recent Activity" />
               <ActivityFeed
