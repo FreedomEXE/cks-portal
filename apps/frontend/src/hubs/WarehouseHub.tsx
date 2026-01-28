@@ -45,7 +45,7 @@ import { useCertifiedServices } from '../hooks/useCertifiedServices';
 import { buildWarehouseOverviewData } from '../shared/overview/builders';
 import { resolvedUserCode } from '../shared/utils/userCode';
 import { useAccessCodeRedemption } from '../hooks/useAccessCodeRedemption';
-import OverviewDetailPanel, { type OverviewDetailItem } from '../components/overview/OverviewDetailPanel';
+import OverviewSummaryModal, { type OverviewSummaryItem } from '../components/overview/OverviewSummaryModal';
 import { buildSupportTickets, mapSupportIssuePayload } from '../shared/support/supportTickets';
 
 import MyHubSection from '../components/MyHubSection';
@@ -178,7 +178,14 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
   const [inventoryTab, setInventoryTab] = useState<'active' | 'archive'>('active');
   const [inventorySearchQuery, setInventorySearchQuery] = useState('');
   const [inventoryFilter, setInventoryFilter] = useState<string>('');
-  const [overviewFocus, setOverviewFocus] = useState<string | null>(null);
+  const [overviewModal, setOverviewModal] = useState<{
+    id: string;
+    title: string;
+    subtitle?: string;
+    items: OverviewSummaryItem[];
+    emptyMessage?: string;
+    accentColor?: string;
+  } | null>(null);
   const [pendingAction, setPendingAction] = useState<{ orderId: string; action: OrderActionType } | null>(null);
 
   // identity + helpers
@@ -598,96 +605,92 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
   [dashboard, profile, scopeData, certifiedServicesData, activeServicesData.length, inventory, accessStatus, accessTier]);
 
   const overviewCards = useMemo(() => {
-    return warehouseOverviewCards.map((card) => {
-      switch (card.id) {
-        case 'active-services':
-        case 'inventory':
-        case 'low-stock':
-        case 'pending-orders':
-        case 'account-status':
-          return {
-            ...card,
-            onClick: () => setOverviewFocus((prev) => (prev === card.id ? null : card.id)),
-          };
-        default:
-          return {
-            ...card,
-            onClick: () => setOverviewFocus((prev) => (prev === card.id ? null : card.id)),
-          };
-      }
-    });
-  }, []);
+    return warehouseOverviewCards.map((card) => ({
+      ...card,
+      onClick: () => {
+        const cap = 5;
+        const toItems = (rows: OverviewSummaryItem[]) => rows.slice(0, cap);
+        let payload: Omit<typeof overviewModal, 'id'> | null = null;
 
-  const overviewDetail = useMemo(() => {
-    if (!overviewFocus) return null;
-    const cap = 5;
-    const toItems = (rows: Array<{ primary: string; secondary?: string; meta?: string }>) =>
-      rows.slice(0, cap).map((row) => ({ primary: row.primary, secondary: row.secondary, meta: row.meta }));
+        switch (card.id) {
+          case 'active-services':
+            payload = {
+              title: 'Active Services',
+              subtitle: 'Services currently managed',
+              items: toItems(activeServicesData.map((svc) => ({
+                primary: svc.serviceName ?? svc.serviceId,
+                secondary: svc.serviceId,
+                meta: svc.status,
+              }))),
+              emptyMessage: 'No active services yet.',
+              accentColor: card.color,
+            };
+            break;
+          case 'inventory':
+            payload = {
+              title: 'Inventory',
+              subtitle: 'Recent inventory items',
+              items: toItems(activeInventoryData.map((item) => ({
+                primary: item.name || item.productId,
+                secondary: item.productId,
+                meta: `On hand: ${item.onHand}`,
+              }))),
+              emptyMessage: 'No inventory items found.',
+              accentColor: card.color,
+            };
+            break;
+          case 'low-stock': {
+            const lowStock = activeInventoryData.filter((item) => item.isLow);
+            payload = {
+              title: 'Low Stock',
+              subtitle: 'Items below minimum stock',
+              items: toItems(lowStock.map((item) => ({
+                primary: item.name || item.productId,
+                secondary: item.productId,
+                meta: `On hand: ${item.onHand}`,
+              }))),
+              emptyMessage: 'No low-stock items right now.',
+              accentColor: card.color,
+            };
+            break;
+          }
+          case 'pending-orders': {
+            const pending = (orders?.orders || []).filter((order) => String(order.status || '').toLowerCase().includes('pending'));
+            payload = {
+              title: 'Pending Orders',
+              subtitle: 'Orders awaiting action',
+              items: toItems(pending.map((order) => ({
+                primary: order.orderId || order.id || 'Order',
+                secondary: order.title || undefined,
+                meta: formatStatusLabel(order.status || 'pending'),
+              }))),
+              emptyMessage: 'No pending orders.',
+              accentColor: card.color,
+            };
+            break;
+          }
+          case 'account-status':
+            payload = {
+              title: 'Account Status',
+              subtitle: 'Access and tier overview',
+              items: [
+                { primary: 'Access Status', secondary: accessStatus || dashboard?.accountStatus || '—' },
+                { primary: 'Access Tier', secondary: accessTier || '—' },
+                { primary: 'Access Source', secondary: accessSource || '—' },
+              ],
+              emptyMessage: 'No account status available.',
+              accentColor: card.color,
+            };
+            break;
+          default:
+            break;
+        }
 
-    switch (overviewFocus) {
-      case 'active-services':
-        return {
-          title: 'Active Services',
-          subtitle: 'Services currently managed',
-          items: toItems(activeServicesData.map((svc) => ({
-            primary: svc.serviceName ?? svc.serviceId,
-            secondary: svc.serviceId,
-            meta: svc.status,
-          }))),
-          emptyMessage: 'No active services yet.',
-        };
-      case 'inventory':
-        return {
-          title: 'Inventory',
-          subtitle: 'Recent inventory items',
-          items: toItems(activeInventoryData.map((item) => ({
-            primary: item.name || item.productId,
-            secondary: item.productId,
-            meta: `On hand: ${item.onHand}`,
-          }))),
-          emptyMessage: 'No inventory items found.',
-        };
-      case 'low-stock': {
-        const lowStock = activeInventoryData.filter((item) => item.isLow);
-        return {
-          title: 'Low Stock',
-          subtitle: 'Items below minimum stock',
-          items: toItems(lowStock.map((item) => ({
-            primary: item.name || item.productId,
-            secondary: item.productId,
-            meta: `On hand: ${item.onHand}`,
-          }))),
-          emptyMessage: 'No low-stock items right now.',
-        };
-      }
-      case 'pending-orders': {
-        const pending = (orders?.orders || []).filter((order) => String(order.status || '').toLowerCase().includes('pending'));
-        return {
-          title: 'Pending Orders',
-          subtitle: 'Orders awaiting action',
-          items: toItems(pending.map((order) => ({
-            primary: order.orderId || order.id || 'Order',
-            secondary: order.title || undefined,
-            meta: formatStatusLabel(order.status || 'pending'),
-          }))),
-          emptyMessage: 'No pending orders.',
-        };
-      }
-      case 'account-status':
-        return {
-          title: 'Account Status',
-          subtitle: 'Access and tier overview',
-          items: [
-            { primary: 'Access Status', secondary: accessStatus || dashboard?.accountStatus || '—' },
-            { primary: 'Access Tier', secondary: accessTier || '—' },
-            { primary: 'Access Source', secondary: accessSource || '—' },
-          ],
-          emptyMessage: 'No account status available.',
-        };
-      default:
-        return null;
-    }
-  }, [overviewFocus, activeServicesData, activeInventoryData, orders?.orders, accessStatus, accessTier, accessSource, dashboard?.accountStatus]);
+        if (!payload) return;
+        setOverviewModal((prev) => (prev?.id === card.id ? null : { id: card.id, ...payload }));
+      },
+    }));
+  }, [activeServicesData, activeInventoryData, orders?.orders, accessStatus, accessTier, accessSource, dashboard?.accountStatus]);
 
   // Column definitions for My Services
   const MY_SERVICES_COLUMNS_BASE = [
@@ -793,13 +796,15 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
                 data={overviewData}
                 loading={dashboardLoading}
               />
-              {overviewDetail && (
-                <OverviewDetailPanel
-                  title={overviewDetail.title}
-                  subtitle={overviewDetail.subtitle}
-                  items={overviewDetail.items as OverviewDetailItem[]}
-                  emptyMessage={overviewDetail.emptyMessage}
-                  onClose={() => setOverviewFocus(null)}
+              {overviewModal && (
+                <OverviewSummaryModal
+                  isOpen={!!overviewModal}
+                  onClose={() => setOverviewModal(null)}
+                  title={overviewModal.title}
+                  subtitle={overviewModal.subtitle}
+                  items={overviewModal.items}
+                  emptyMessage={overviewModal.emptyMessage}
+                  accentColor={overviewModal.accentColor}
                 />
               )}
 

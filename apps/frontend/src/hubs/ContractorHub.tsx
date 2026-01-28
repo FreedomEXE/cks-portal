@@ -61,7 +61,7 @@ import { loadUserPreferences, saveUserPreferences } from '../shared/preferences'
 import { dismissActivity, dismissAllActivities } from '../shared/api/directory';
 import { buildContractorOverviewData } from '../shared/overview/builders';
 import { useAccessCodeRedemption } from '../hooks/useAccessCodeRedemption';
-import OverviewDetailPanel, { type OverviewDetailItem } from '../components/overview/OverviewDetailPanel';
+import OverviewSummaryModal, { type OverviewSummaryItem } from '../components/overview/OverviewSummaryModal';
 import { buildSupportTickets, mapSupportIssuePayload } from '../shared/support/supportTickets';
 
 interface ContractorHubProps {
@@ -216,7 +216,14 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
   const [activeTab, setActiveTab] = useState(initialTab);
   const [servicesTab, setServicesTab] = useState<'my' | 'active' | 'history'>('my');
   const [servicesSearchQuery, setServicesSearchQuery] = useState('');
-  const [overviewFocus, setOverviewFocus] = useState<string | null>(null);
+  const [overviewModal, setOverviewModal] = useState<{
+    id: string;
+    title: string;
+    subtitle?: string;
+    items: OverviewSummaryItem[];
+    emptyMessage?: string;
+    accentColor?: string;
+  } | null>(null);
   // Legacy modal state removed; universal ModalGateway handles all modals
   const { code: authCode, accessStatus, accessTier, accessSource } = useAuth();
   const { openUserProfile } = useClerk();
@@ -590,82 +597,77 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
   [dashboard, profile, contractorScope, certifiedServicesData, activeServicesData.length, orders, accessStatus, accessTier]);
 
   const overviewCards = useMemo(() => {
-    return contractorOverviewCards.map((card) => {
-      switch (card.id) {
-        case 'active-services':
-        case 'my-customers':
-        case 'pending-orders':
-        case 'account-status':
-          return {
-            ...card,
-            onClick: () => setOverviewFocus((prev) => (prev === card.id ? null : card.id)),
-          };
-        default:
-          return {
-            ...card,
-            onClick: () => setOverviewFocus((prev) => (prev === card.id ? null : card.id)),
-          };
-      }
-    });
-  }, []);
+    return contractorOverviewCards.map((card) => ({
+      ...card,
+      onClick: () => {
+        const cap = 5;
+        const toItems = (rows: OverviewSummaryItem[]) => rows.slice(0, cap);
+        let payload: Omit<typeof overviewModal, 'id'> | null = null;
 
-  const overviewDetail = useMemo(() => {
-    if (!overviewFocus) return null;
-    const cap = 5;
-    const toItems = (rows: Array<{ primary: string; secondary?: string; meta?: string }>) =>
-      rows.slice(0, cap).map((row) => ({ primary: row.primary, secondary: row.secondary, meta: row.meta }));
+        switch (card.id) {
+          case 'active-services':
+            payload = {
+              title: 'Active Services',
+              subtitle: 'Services currently underway',
+              items: toItems(activeServicesData.map((svc) => ({
+                primary: svc.serviceName ?? svc.serviceId,
+                secondary: svc.serviceId,
+                meta: svc.status,
+              }))),
+              emptyMessage: 'No active services yet.',
+              accentColor: card.color,
+            };
+            break;
+          case 'my-customers':
+            payload = {
+              title: 'My Customers',
+              subtitle: 'Customers in your ecosystem',
+              items: toItems((contractorScope?.relationships?.customers || []).map((customer) => ({
+                primary: customer.name || customer.id,
+                secondary: customer.id,
+                meta: customer.mainContact || undefined,
+              }))),
+              emptyMessage: 'No customers found.',
+              accentColor: card.color,
+            };
+            break;
+          case 'pending-orders': {
+            const pending = (orders?.orders || []).filter((order) => String(order.status || '').toLowerCase().includes('pending'));
+            payload = {
+              title: 'Pending Orders',
+              subtitle: 'Orders awaiting action',
+              items: toItems(pending.map((order) => ({
+                primary: order.orderId || order.id || 'Order',
+                secondary: order.title || undefined,
+                meta: formatStatusLabel(order.status || 'pending'),
+              }))),
+              emptyMessage: 'No pending orders.',
+              accentColor: card.color,
+            };
+            break;
+          }
+          case 'account-status':
+            payload = {
+              title: 'Account Status',
+              subtitle: 'Access and tier overview',
+              items: [
+                { primary: 'Access Status', secondary: accessStatus || dashboard?.accountStatus || '—' },
+                { primary: 'Access Tier', secondary: accessTier || '—' },
+                { primary: 'Access Source', secondary: accessSource || '—' },
+              ],
+              emptyMessage: 'No account status available.',
+              accentColor: card.color,
+            };
+            break;
+          default:
+            break;
+        }
 
-    switch (overviewFocus) {
-      case 'active-services':
-        return {
-          title: 'Active Services',
-          subtitle: 'Services currently underway',
-          items: toItems(activeServicesData.map((svc) => ({
-            primary: svc.serviceName ?? svc.serviceId,
-            secondary: svc.serviceId,
-            meta: svc.status,
-          }))),
-          emptyMessage: 'No active services yet.',
-        };
-      case 'my-customers':
-        return {
-          title: 'My Customers',
-          subtitle: 'Customers in your ecosystem',
-          items: toItems((contractorScope?.relationships?.customers || []).map((customer) => ({
-            primary: customer.name || customer.id,
-            secondary: customer.id,
-            meta: customer.mainContact || undefined,
-          }))),
-          emptyMessage: 'No customers found.',
-        };
-      case 'pending-orders': {
-        const pending = (orders?.orders || []).filter((order) => String(order.status || '').toLowerCase().includes('pending'));
-        return {
-          title: 'Pending Orders',
-          subtitle: 'Orders awaiting action',
-          items: toItems(pending.map((order) => ({
-            primary: order.orderId || order.id || 'Order',
-            secondary: order.title || undefined,
-            meta: formatStatusLabel(order.status || 'pending'),
-          }))),
-          emptyMessage: 'No pending orders.',
-        };
-      }
-      case 'account-status':
-        return {
-          title: 'Account Status',
-          subtitle: 'Access and tier overview',
-          items: [
-            { primary: 'Access Status', secondary: accessStatus || dashboard?.accountStatus || '—' },
-            { primary: 'Access Tier', secondary: accessTier || '—' },
-            { primary: 'Access Source', secondary: accessSource || '—' },
-          ],
-          emptyMessage: 'No account status available.',
-        };
-      default:
-        return null;
-    }
-  }, [overviewFocus, activeServicesData, contractorScope?.relationships?.customers, orders?.orders, accessStatus, accessTier, accessSource, dashboard?.accountStatus]);
+        if (!payload) return;
+        setOverviewModal((prev) => (prev?.id === card.id ? null : { id: card.id, ...payload }));
+      },
+    }));
+  }, [activeServicesData, contractorScope?.relationships?.customers, orders?.orders, accessStatus, accessTier, accessSource, dashboard?.accountStatus]);
 
   const profileCardData = useMemo(() => ({
     name: profile?.name ?? EMPTY_VALUE,
@@ -732,13 +734,15 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
                 data={overviewData}
                 loading={dashboardLoading}
               />
-              {overviewDetail && (
-                <OverviewDetailPanel
-                  title={overviewDetail.title}
-                  subtitle={overviewDetail.subtitle}
-                  items={overviewDetail.items as OverviewDetailItem[]}
-                  emptyMessage={overviewDetail.emptyMessage}
-                  onClose={() => setOverviewFocus(null)}
+              {overviewModal && (
+                <OverviewSummaryModal
+                  isOpen={!!overviewModal}
+                  onClose={() => setOverviewModal(null)}
+                  title={overviewModal.title}
+                  subtitle={overviewModal.subtitle}
+                  items={overviewModal.items}
+                  emptyMessage={overviewModal.emptyMessage}
+                  accentColor={overviewModal.accentColor}
                 />
               )}
 

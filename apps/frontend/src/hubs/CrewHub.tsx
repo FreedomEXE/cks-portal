@@ -63,7 +63,7 @@ import { resolvedUserCode } from '../shared/utils/userCode';
 import { useHubLoading } from '../contexts/HubLoadingContext';
 import { loadUserPreferences, saveUserPreferences } from '../shared/preferences';
 import { useAccessCodeRedemption } from '../hooks/useAccessCodeRedemption';
-import OverviewDetailPanel, { type OverviewDetailItem } from '../components/overview/OverviewDetailPanel';
+import OverviewSummaryModal, { type OverviewSummaryItem } from '../components/overview/OverviewSummaryModal';
 import { buildSupportTickets, mapSupportIssuePayload } from '../shared/support/supportTickets';
 
 interface CrewHubProps {
@@ -180,7 +180,14 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
   const [activeTab, setActiveTab] = useState(initialTab);
   const [servicesTab, setServicesTab] = useState<'my' | 'active' | 'history'>('active');
   const [servicesSearchQuery, setServicesSearchQuery] = useState('');
-  const [overviewFocus, setOverviewFocus] = useState<string | null>(null);
+  const [overviewModal, setOverviewModal] = useState<{
+    id: string;
+    title: string;
+    subtitle?: string;
+    items: OverviewSummaryItem[];
+    emptyMessage?: string;
+    accentColor?: string;
+  } | null>(null);
   const { setTheme } = useAppTheme();
 
   const { code: authCode, accessStatus, accessTier, accessSource } = useAuth();
@@ -382,7 +389,7 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
     await mutateReports();
   }, [mutateReports]);
 
-  const assignedTaskItems = useMemo(() => {
+  const assignedTaskItems = useMemo<OverviewSummaryItem[]>(() => {
     const me = (normalizedCode || '').toUpperCase();
     const sos = orders?.serviceOrders || [];
     const dayNames = ['sun','mon','tue','wed','thu','fri','sat'];
@@ -413,62 +420,70 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
   }, [orders?.serviceOrders, normalizedCode]);
 
   const dashboardCards = useMemo(() => {
-    return crewOverviewCards.map((c) => ({
-      ...c,
-      onClick: () => setOverviewFocus((prev) => (prev === c.id ? null : c.id)),
+    return crewOverviewCards.map((card) => ({
+      ...card,
+      onClick: () => {
+        const cap = 5;
+        const toItems = (rows: OverviewSummaryItem[]) => rows.slice(0, cap);
+        let payload: Omit<typeof overviewModal, 'id'> | null = null;
+
+        switch (card.id) {
+          case 'active-services':
+            payload = {
+              title: 'Active Services',
+              subtitle: 'Services you are working on',
+              items: toItems(activeServicesData.map((svc) => ({
+                primary: svc.serviceName ?? svc.serviceId,
+                secondary: svc.serviceId,
+                meta: svc.status,
+              }))),
+              emptyMessage: 'No active services yet.',
+              accentColor: card.color,
+            };
+            break;
+          case 'my-tasks':
+            payload = {
+              title: 'My Tasks',
+              subtitle: 'Tasks assigned for today',
+              items: toItems(assignedTaskItems),
+              emptyMessage: 'No tasks assigned right now.',
+              accentColor: card.color,
+            };
+            break;
+          case 'timecard':
+            payload = {
+              title: 'Timecard',
+              subtitle: 'Quick snapshot',
+              items: [
+                { primary: 'Completed Today', secondary: String(dashboard?.completedToday ?? 0) },
+                { primary: 'Active Services', secondary: String(dashboard?.activeServices ?? 0) },
+              ],
+              emptyMessage: 'No timecard data available.',
+              accentColor: card.color,
+            };
+            break;
+          case 'account-status':
+            payload = {
+              title: 'Account Status',
+              subtitle: 'Access and tier overview',
+              items: [
+                { primary: 'Access Status', secondary: accessStatus || dashboard?.accountStatus || '—' },
+                { primary: 'Access Tier', secondary: accessTier || '—' },
+                { primary: 'Access Source', secondary: accessSource || '—' },
+              ],
+              emptyMessage: 'No account status available.',
+              accentColor: card.color,
+            };
+            break;
+          default:
+            break;
+        }
+
+        if (!payload) return;
+        setOverviewModal((prev) => (prev?.id === card.id ? null : { id: card.id, ...payload }));
+      },
     }));
-  }, []);
-
-  const overviewDetail = useMemo(() => {
-    if (!overviewFocus) return null;
-    const cap = 5;
-    const toItems = (rows: Array<{ primary: string; secondary?: string; meta?: string }>) =>
-      rows.slice(0, cap).map((row) => ({ primary: row.primary, secondary: row.secondary, meta: row.meta }));
-
-    switch (overviewFocus) {
-      case 'active-services':
-        return {
-          title: 'Active Services',
-          subtitle: 'Services you are working on',
-          items: toItems(activeServicesData.map((svc) => ({
-            primary: svc.serviceName ?? svc.serviceId,
-            secondary: svc.serviceId,
-            meta: svc.status,
-          }))),
-          emptyMessage: 'No active services yet.',
-        };
-      case 'my-tasks':
-        return {
-          title: 'My Tasks',
-          subtitle: 'Tasks assigned for today',
-          items: toItems(assignedTaskItems),
-          emptyMessage: 'No tasks assigned right now.',
-        };
-      case 'timecard':
-        return {
-          title: 'Timecard',
-          subtitle: 'Quick snapshot',
-          items: [
-            { primary: 'Completed Today', secondary: String(dashboard?.completedToday ?? 0) },
-            { primary: 'Active Services', secondary: String(dashboard?.activeServices ?? 0) },
-          ],
-          emptyMessage: 'No timecard data available.',
-        };
-      case 'account-status':
-        return {
-          title: 'Account Status',
-          subtitle: 'Access and tier overview',
-          items: [
-            { primary: 'Access Status', secondary: accessStatus || dashboard?.accountStatus || '—' },
-            { primary: 'Access Tier', secondary: accessTier || '—' },
-            { primary: 'Access Source', secondary: accessSource || '—' },
-          ],
-          emptyMessage: 'No account status available.',
-        };
-      default:
-        return null;
-    }
-  }, [overviewFocus, activeServicesData, assignedTaskItems, dashboard?.completedToday, dashboard?.activeServices, dashboard?.accountStatus, accessStatus, accessTier, accessSource]);
+  }, [activeServicesData, assignedTaskItems, dashboard?.completedToday, dashboard?.activeServices, dashboard?.accountStatus, accessStatus, accessTier, accessSource]);
 
   const crewScope = scopeData?.role === 'crew' ? scopeData : null;
 
@@ -657,13 +672,15 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
                 <div style={{ marginBottom: 12, color: '#dc2626' }}>{dashboardErrorMessage}</div>
               )}
               <OverviewSection cards={dashboardCards} data={overviewData} loading={dashboardLoading} />
-              {overviewDetail && (
-                <OverviewDetailPanel
-                  title={overviewDetail.title}
-                  subtitle={overviewDetail.subtitle}
-                  items={overviewDetail.items as OverviewDetailItem[]}
-                  emptyMessage={overviewDetail.emptyMessage}
-                  onClose={() => setOverviewFocus(null)}
+              {overviewModal && (
+                <OverviewSummaryModal
+                  isOpen={!!overviewModal}
+                  onClose={() => setOverviewModal(null)}
+                  title={overviewModal.title}
+                  subtitle={overviewModal.subtitle}
+                  items={overviewModal.items}
+                  emptyMessage={overviewModal.emptyMessage}
+                  accentColor={overviewModal.accentColor}
                 />
               )}
 

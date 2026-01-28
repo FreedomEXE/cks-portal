@@ -61,7 +61,7 @@ import { useHubLoading } from '../contexts/HubLoadingContext';
 import { loadUserPreferences, saveUserPreferences } from '../shared/preferences';
 import { dismissActivity, dismissAllActivities } from '../shared/api/directory';
 import { useAccessCodeRedemption } from '../hooks/useAccessCodeRedemption';
-import OverviewDetailPanel, { type OverviewDetailItem } from '../components/overview/OverviewDetailPanel';
+import OverviewSummaryModal, { type OverviewSummaryItem } from '../components/overview/OverviewSummaryModal';
 import { buildSupportTickets, mapSupportIssuePayload } from '../shared/support/supportTickets';
 
 interface CustomerHubProps {
@@ -178,7 +178,14 @@ function CustomerHubContent({ initialTab = 'dashboard' }: CustomerHubProps) {
   const [activeTab, setActiveTab] = useState(initialTab);
   const [servicesTab, setServicesTab] = useState<'my' | 'history'>('my');
   const [servicesSearchQuery, setServicesSearchQuery] = useState('');
-  const [overviewFocus, setOverviewFocus] = useState<string | null>(null);
+  const [overviewModal, setOverviewModal] = useState<{
+    id: string;
+    title: string;
+    subtitle?: string;
+    items: OverviewSummaryItem[];
+    emptyMessage?: string;
+    accentColor?: string;
+  } | null>(null);
   const { setTheme } = useAppTheme();
   // Legacy modal state removed; universal ModalGateway handles all modals
   const { code: authCode, accessStatus, accessTier, accessSource } = useAuth();
@@ -443,82 +450,77 @@ function CustomerHubContent({ initialTab = 'dashboard' }: CustomerHubProps) {
   [dashboard, profile, scopeData, certifiedServicesData, myServicesData.length, accessStatus, accessTier]);
 
   const overviewCards = useMemo(() => {
-    return customerOverviewCards.map((card) => {
-      switch (card.id) {
-        case 'active-services':
-        case 'my-centers':
-        case 'pending-orders':
-        case 'account-status':
-          return {
-            ...card,
-            onClick: () => setOverviewFocus((prev) => (prev === card.id ? null : card.id)),
-          };
-        default:
-          return {
-            ...card,
-            onClick: () => setOverviewFocus((prev) => (prev === card.id ? null : card.id)),
-          };
-      }
-    });
-  }, []);
+    return customerOverviewCards.map((card) => ({
+      ...card,
+      onClick: () => {
+        const cap = 5;
+        const toItems = (rows: OverviewSummaryItem[]) => rows.slice(0, cap);
+        let payload: Omit<typeof overviewModal, 'id'> | null = null;
 
-  const overviewDetail = useMemo(() => {
-    if (!overviewFocus) return null;
-    const cap = 5;
-    const toItems = (rows: Array<{ primary: string; secondary?: string; meta?: string }>) =>
-      rows.slice(0, cap).map((row) => ({ primary: row.primary, secondary: row.secondary, meta: row.meta }));
+        switch (card.id) {
+          case 'active-services':
+            payload = {
+              title: 'Active Services',
+              subtitle: 'Services currently active',
+              items: toItems(myServicesData.map((svc) => ({
+                primary: svc.serviceName ?? svc.serviceId,
+                secondary: svc.serviceId,
+                meta: svc.status,
+              }))),
+              emptyMessage: 'No active services yet.',
+              accentColor: card.color,
+            };
+            break;
+          case 'my-centers':
+            payload = {
+              title: 'My Centers',
+              subtitle: 'Centers tied to your account',
+              items: toItems((scopeData?.relationships?.centers || []).map((center) => ({
+                primary: center.name || center.id,
+                secondary: center.id,
+                meta: center.mainContact || undefined,
+              }))),
+              emptyMessage: 'No centers found.',
+              accentColor: card.color,
+            };
+            break;
+          case 'pending-orders': {
+            const pending = (orders?.orders || []).filter((order) => String(order.status || '').toLowerCase().includes('pending'));
+            payload = {
+              title: 'Pending Orders',
+              subtitle: 'Orders awaiting action',
+              items: toItems(pending.map((order) => ({
+                primary: order.orderId || order.id || 'Order',
+                secondary: order.title || undefined,
+                meta: formatStatusLabel(order.status || 'pending'),
+              }))),
+              emptyMessage: 'No pending orders.',
+              accentColor: card.color,
+            };
+            break;
+          }
+          case 'account-status':
+            payload = {
+              title: 'Account Status',
+              subtitle: 'Access and tier overview',
+              items: [
+                { primary: 'Access Status', secondary: accessStatus || dashboard?.accountStatus || '—' },
+                { primary: 'Access Tier', secondary: accessTier || '—' },
+                { primary: 'Access Source', secondary: accessSource || '—' },
+              ],
+              emptyMessage: 'No account status available.',
+              accentColor: card.color,
+            };
+            break;
+          default:
+            break;
+        }
 
-    switch (overviewFocus) {
-      case 'active-services':
-        return {
-          title: 'Active Services',
-          subtitle: 'Services currently active',
-          items: toItems(myServicesData.map((svc) => ({
-            primary: svc.serviceName ?? svc.serviceId,
-            secondary: svc.serviceId,
-            meta: svc.status,
-          }))),
-          emptyMessage: 'No active services yet.',
-        };
-      case 'my-centers':
-        return {
-          title: 'My Centers',
-          subtitle: 'Centers tied to your account',
-          items: toItems((scopeData?.relationships?.centers || []).map((center) => ({
-            primary: center.name || center.id,
-            secondary: center.id,
-            meta: center.mainContact || undefined,
-          }))),
-          emptyMessage: 'No centers found.',
-        };
-      case 'pending-orders': {
-        const pending = (orders?.orders || []).filter((order) => String(order.status || '').toLowerCase().includes('pending'));
-        return {
-          title: 'Pending Orders',
-          subtitle: 'Orders awaiting action',
-          items: toItems(pending.map((order) => ({
-            primary: order.orderId || order.id || 'Order',
-            secondary: order.title || undefined,
-            meta: formatStatusLabel(order.status || 'pending'),
-          }))),
-          emptyMessage: 'No pending orders.',
-        };
-      }
-      case 'account-status':
-        return {
-          title: 'Account Status',
-          subtitle: 'Access and tier overview',
-          items: [
-            { primary: 'Access Status', secondary: accessStatus || dashboard?.accountStatus || '—' },
-            { primary: 'Access Tier', secondary: accessTier || '—' },
-            { primary: 'Access Source', secondary: accessSource || '—' },
-          ],
-          emptyMessage: 'No account status available.',
-        };
-      default:
-        return null;
-    }
-  }, [overviewFocus, myServicesData, scopeData?.relationships?.centers, orders?.orders, accessStatus, accessTier, accessSource, dashboard?.accountStatus]);
+        if (!payload) return;
+        setOverviewModal((prev) => (prev?.id === card.id ? null : { id: card.id, ...payload }));
+      },
+    }));
+  }, [myServicesData, scopeData?.relationships?.centers, orders?.orders, accessStatus, accessTier, accessSource, dashboard?.accountStatus]);
 
   const tabs = useMemo(() => [
     { id: 'dashboard', label: 'Dashboard', path: '/customer/dashboard' },
@@ -595,13 +597,15 @@ function CustomerHubContent({ initialTab = 'dashboard' }: CustomerHubProps) {
                 data={overviewData}
                 loading={dashboardLoading}
               />
-              {overviewDetail && (
-                <OverviewDetailPanel
-                  title={overviewDetail.title}
-                  subtitle={overviewDetail.subtitle}
-                  items={overviewDetail.items as OverviewDetailItem[]}
-                  emptyMessage={overviewDetail.emptyMessage}
-                  onClose={() => setOverviewFocus(null)}
+              {overviewModal && (
+                <OverviewSummaryModal
+                  isOpen={!!overviewModal}
+                  onClose={() => setOverviewModal(null)}
+                  title={overviewModal.title}
+                  subtitle={overviewModal.subtitle}
+                  items={overviewModal.items}
+                  emptyMessage={overviewModal.emptyMessage}
+                  accentColor={overviewModal.accentColor}
                 />
               )}
 
