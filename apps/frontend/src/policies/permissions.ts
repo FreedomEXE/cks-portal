@@ -302,8 +302,8 @@ function canUserService(
   // All users can view services
   if (action === 'view') return true;
 
-  // Check service status
-  const status = String(entityData?.status ?? '')
+  // Check service status (prefer normalized metadata if present)
+  const status = String(entityData?.metadata?.serviceStatus ?? entityData?.status ?? '')
     .toLowerCase()
     .replace(/[\s-]+/g, '_');
 
