@@ -22,6 +22,34 @@ interface ReportsSectionProps {
   onReportClick?: (reportId: string, reportType: 'report' | 'feedback') => void;
 }
 
+type FeedbackRatingKey = 'qualityExcellence' | 'crewProfessionalism' | 'completionTime' | 'communication';
+
+const AREA_OPTIONS = [
+  'Front Desk',
+  'Washrooms',
+  'Windows',
+  'Floors',
+  'Lobby',
+  'Offices',
+  'Break Room',
+  'Exterior',
+  'Other',
+];
+
+const FEEDBACK_RATING_FIELDS: Array<{ key: FeedbackRatingKey; label: string }> = [
+  { key: 'qualityExcellence', label: 'Quality Excellence' },
+  { key: 'crewProfessionalism', label: 'Crew Professionalism' },
+  { key: 'completionTime', label: 'Completion Time' },
+  { key: 'communication', label: 'Communication' },
+];
+
+const DEFAULT_FEEDBACK_RATINGS: Record<FeedbackRatingKey, 0 | 1 | 2 | 3 | 4 | 5> = {
+  qualityExcellence: 0,
+  crewProfessionalism: 0,
+  completionTime: 0,
+  communication: 0,
+};
+
 const ReportsSection: React.FC<ReportsSectionProps> = ({
   role,
   userId,
@@ -51,8 +79,10 @@ const ReportsSection: React.FC<ReportsSectionProps> = ({
     reportCategory: '' as ReportCategory | '',  // service | order | procedure
     relatedEntityId: '',                         // ID of selected entity
     reportReason: '',                            // Selected reason
+    reportArea: '',                              // Selected area (e.g., washrooms)
+    details: '',                                 // Extra details (max 100 chars)
     priority: '' as '' | 'LOW' | 'MEDIUM' | 'HIGH',
-    rating: 0 as 0 | 1 | 2 | 3 | 4 | 5,
+    feedbackRatings: { ...DEFAULT_FEEDBACK_RATINGS },
   });
 
   // State for entity lists (populated by API calls)
@@ -145,13 +175,22 @@ const ReportsSection: React.FC<ReportsSectionProps> = ({
       alert('Please make all selections before submitting');
       return;
     }
+    if (!reportForm.reportArea) {
+      alert('Please select an area before submitting');
+      return;
+    }
 
     if (reportForm.type === 'report' && !reportForm.priority) {
       alert('Please select a priority for the report');
       return;
     }
-    if (reportForm.type === 'feedback' && (!reportForm.rating || reportForm.rating < 1)) {
-      alert('Please select a rating (1-5) for the feedback');
+    const ratingValues = FEEDBACK_RATING_FIELDS.map((field) => reportForm.feedbackRatings[field.key] || 0);
+    const hasAllRatings = ratingValues.every((value) => value > 0);
+    const ratingAverage = hasAllRatings
+      ? Math.ceil(ratingValues.reduce((sum: number, value) => sum + value, 0) / FEEDBACK_RATING_FIELDS.length)
+      : 0;
+    if (reportForm.type === 'feedback' && !hasAllRatings) {
+      alert('Please rate all feedback categories (1-5)');
       return;
     }
 
@@ -164,8 +203,11 @@ const ReportsSection: React.FC<ReportsSectionProps> = ({
             reportCategory: reportForm.reportCategory,
             relatedEntityId: reportForm.relatedEntityId,
             reportReason: reportForm.reportReason,
+            reportArea: reportForm.reportArea,
+            details: reportForm.details,
+            ratingBreakdown: reportForm.feedbackRatings,
             priority: reportForm.type === 'report' ? reportForm.priority : undefined,
-            rating: reportForm.type === 'feedback' ? reportForm.rating : undefined,
+            rating: reportForm.type === 'feedback' ? ratingAverage : undefined,
           }),
         );
       } else {
@@ -183,8 +225,10 @@ const ReportsSection: React.FC<ReportsSectionProps> = ({
       reportCategory: '',
       relatedEntityId: '',
       reportReason: '',
+      reportArea: '',
+      details: '',
       priority: '',
-      rating: 0,
+      feedbackRatings: { ...DEFAULT_FEEDBACK_RATINGS },
     });
 
     alert('Submitted successfully!');
@@ -231,6 +275,8 @@ const ReportsSection: React.FC<ReportsSectionProps> = ({
     const availableReasons = getAvailableReasons();
     const hasCategory = Boolean(reportForm.reportCategory);
     const hasEntity = Boolean(reportForm.relatedEntityId);
+    const hasReason = Boolean(reportForm.reportReason);
+    const hasArea = Boolean(reportForm.reportArea);
     const selectedCategoryLabel = hasCategory
       ? CATEGORY_LABELS[reportForm.reportCategory as ReportCategory]
       : '';
@@ -275,8 +321,10 @@ const ReportsSection: React.FC<ReportsSectionProps> = ({
                     reportCategory: '',
                     relatedEntityId: '',
                     reportReason: '',
+                    reportArea: '',
+                    details: '',
                     priority: '',
-                    rating: 0,
+                    feedbackRatings: { ...DEFAULT_FEEDBACK_RATINGS },
                   })}
                   style={{
                     width: '100%',
@@ -325,8 +373,10 @@ const ReportsSection: React.FC<ReportsSectionProps> = ({
                   reportCategory: e.target.value as ReportCategory | '',
                   relatedEntityId: '',
                   reportReason: '',
+                  reportArea: '',
+                  details: '',
                   priority: '',
-                  rating: 0,
+                  feedbackRatings: { ...DEFAULT_FEEDBACK_RATINGS },
                 })}
                 style={{
                   width: '100%',
@@ -364,7 +414,9 @@ const ReportsSection: React.FC<ReportsSectionProps> = ({
                   onChange={(e) => setReportForm({
                     ...reportForm,
                     relatedEntityId: e.target.value,
-                    reportReason: ''
+                    reportReason: '',
+                    reportArea: '',
+                    details: '',
                   })}
                   disabled={entitiesLoading}
                   style={{
@@ -404,7 +456,9 @@ const ReportsSection: React.FC<ReportsSectionProps> = ({
                   value={reportForm.reportReason}
                   onChange={(e) => setReportForm({
                     ...reportForm,
-                    reportReason: e.target.value
+                    reportReason: e.target.value,
+                    reportArea: '',
+                    details: '',
                   })}
                   style={{
                     width: '100%',
@@ -427,8 +481,86 @@ const ReportsSection: React.FC<ReportsSectionProps> = ({
             </div>
           ) : null}
 
-          {/* Row 5: Priority (reports) or Rating (feedback) */}
-          {hasCategory && hasEntity ? (
+          {/* Row 5: Area Selection */}
+          {hasCategory && hasEntity && hasReason ? (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: '14px',
+                  fontWeight: 500,
+                  color: '#374151',
+                  marginBottom: '6px'
+                }}>
+                  Area *
+                </label>
+                <select
+                  value={reportForm.reportArea}
+                  onChange={(e) => setReportForm({
+                    ...reportForm,
+                    reportArea: e.target.value
+                  })}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    backgroundColor: '#ffffff'
+                  }}
+                >
+                  <option value="">Select area</option>
+                  {AREA_OPTIONS.map((area) => (
+                    <option key={area} value={area}>{area}</option>
+                  ))}
+                </select>
+              </div>
+              <div></div>
+            </div>
+          ) : null}
+
+          {/* Row 6: Extra Details */}
+          {hasCategory && hasEntity && hasReason && hasArea ? (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: '14px',
+                  fontWeight: 500,
+                  color: '#374151',
+                  marginBottom: '6px'
+                }}>
+                  Extra Details (optional, 100 chars max)
+                </label>
+                <textarea
+                  value={reportForm.details}
+                  maxLength={100}
+                  onChange={(e) => setReportForm({
+                    ...reportForm,
+                    details: e.target.value
+                  })}
+                  placeholder="Add any additional context..."
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    backgroundColor: '#ffffff',
+                    minHeight: '80px',
+                    resize: 'vertical'
+                  }}
+                />
+                <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+                  {reportForm.details.length}/100
+                </div>
+              </div>
+              <div></div>
+            </div>
+          ) : null}
+
+          {/* Row 7: Priority (reports) or Ratings (feedback) */}
+          {hasCategory && hasEntity && hasReason && hasArea ? (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
               {reportForm.type === 'report' ? (
                 <div>
@@ -468,27 +600,44 @@ const ReportsSection: React.FC<ReportsSectionProps> = ({
                     color: '#374151',
                     marginBottom: '6px'
                   }}>
-                    Rating *
+                    Ratings *
                   </label>
-                  <select
-                    value={String(reportForm.rating)}
-                    onChange={(e) => setReportForm({ ...reportForm, rating: Number(e.target.value) as 0 | 1 | 2 | 3 | 4 | 5 })}
-                    style={{
-                      width: '100%',
-                      padding: '10px 12px',
-                      border: '1px solid #e5e7eb',
-                      borderRadius: '6px',
-                      fontSize: '14px',
-                      backgroundColor: '#ffffff'
-                    }}
-                  >
-                    <option value="0">Select rating</option>
-                    <option value="1">★ 1</option>
-                    <option value="2">★★ 2</option>
-                    <option value="3">★★★ 3</option>
-                    <option value="4">★★★★ 4</option>
-                    <option value="5">★★★★★ 5</option>
-                  </select>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {FEEDBACK_RATING_FIELDS.map((field) => (
+                      <div key={field.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                        <span style={{ fontSize: '13px', color: '#111827' }}>{field.label}</span>
+                        <div style={{ display: 'flex', gap: '4px' }}>
+                          {[1, 2, 3, 4, 5].map((value) => {
+                            const active = reportForm.feedbackRatings[field.key] >= value;
+                            return (
+                              <button
+                                key={value}
+                                type="button"
+                                onClick={() => setReportForm({
+                                  ...reportForm,
+                                  feedbackRatings: {
+                                    ...reportForm.feedbackRatings,
+                                    [field.key]: value as 1 | 2 | 3 | 4 | 5
+                                  }
+                                })}
+                                style={{
+                                  border: 'none',
+                                  background: 'transparent',
+                                  cursor: 'pointer',
+                                  padding: 0,
+                                  fontSize: '18px',
+                                  color: active ? '#f59e0b' : '#d1d5db'
+                                }}
+                                aria-label={`${field.label} ${value} star${value === 1 ? '' : 's'}`}
+                              >
+                                ★
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
               <div></div>
@@ -499,16 +648,40 @@ const ReportsSection: React.FC<ReportsSectionProps> = ({
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
             <button
               onClick={handleSubmitReport}
-              disabled={!reportForm.reportCategory || !reportForm.relatedEntityId || !reportForm.reportReason || (reportForm.type === 'report' ? !reportForm.priority : reportForm.rating === 0)}
+              disabled={
+                !reportForm.reportCategory ||
+                !reportForm.relatedEntityId ||
+                !reportForm.reportReason ||
+                !reportForm.reportArea ||
+                (reportForm.type === 'report'
+                  ? !reportForm.priority
+                  : FEEDBACK_RATING_FIELDS.some((field) => (reportForm.feedbackRatings[field.key] || 0) === 0))
+              }
               style={{
                 padding: '12px 24px',
                 fontSize: '14px',
                 fontWeight: 500,
-                backgroundColor: (reportForm.reportCategory && reportForm.relatedEntityId && reportForm.reportReason && (reportForm.type === 'report' ? !!reportForm.priority : reportForm.rating > 0)) ? primaryColor : '#e5e7eb',
+                backgroundColor: (
+                  reportForm.reportCategory &&
+                  reportForm.relatedEntityId &&
+                  reportForm.reportReason &&
+                  reportForm.reportArea &&
+                  (reportForm.type === 'report'
+                    ? !!reportForm.priority
+                    : FEEDBACK_RATING_FIELDS.every((field) => (reportForm.feedbackRatings[field.key] || 0) > 0))
+                ) ? primaryColor : '#e5e7eb',
                 color: 'white',
                 border: 'none',
                 borderRadius: '6px',
-                cursor: (reportForm.reportCategory && reportForm.relatedEntityId && reportForm.reportReason && (reportForm.type === 'report' ? !!reportForm.priority : reportForm.rating > 0)) ? 'pointer' : 'not-allowed'
+                cursor: (
+                  reportForm.reportCategory &&
+                  reportForm.relatedEntityId &&
+                  reportForm.reportReason &&
+                  reportForm.reportArea &&
+                  (reportForm.type === 'report'
+                    ? !!reportForm.priority
+                    : FEEDBACK_RATING_FIELDS.every((field) => (reportForm.feedbackRatings[field.key] || 0) > 0))
+                ) ? 'pointer' : 'not-allowed'
               }}
             >
               Submit {reportForm.type === 'report' ? 'Report' : 'Feedback'}

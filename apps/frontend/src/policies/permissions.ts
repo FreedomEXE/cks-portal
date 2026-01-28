@@ -303,14 +303,22 @@ function canUserService(
   if (action === 'view') return true;
 
   // Check service status
-  const status = entityData?.status;
+  const status = String(entityData?.status ?? '')
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_');
 
   switch (role) {
     case 'manager':
       // Managers can start, complete, assign crew
-      if (action === 'start' && status === 'pending') return true;
+      if (action === 'start' && (status === 'pending' || status === 'created' || status === 'service_created')) return true;
       if (action === 'complete' && status === 'in_progress') return true;
       if (action === 'assign_crew') return true;
+      return false;
+
+    case 'warehouse':
+      // Warehouse can start/complete warehouse-managed services
+      if (action === 'start' && (status === 'pending' || status === 'created' || status === 'service_created')) return true;
+      if (action === 'complete' && status === 'in_progress') return true;
       return false;
 
     case 'crew':

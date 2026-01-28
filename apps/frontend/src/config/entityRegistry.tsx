@@ -128,18 +128,20 @@ function buildOrderDetailsSections(context: TabVisibilityContext): import('@cks/
     });
   }
 
-  // Delivery map (static embed)
+  // Location map (static embed)
   if (destinationAddress) {
     const encoded = encodeURIComponent(destinationAddress);
     sections.push({
-      id: 'delivery-map',
+      id: isService ? 'service-location-map' : 'delivery-map',
       type: 'map',
-      title: 'Delivery Map',
+      title: isService ? 'Service Location' : 'Delivery Map',
       mapUrl: `https://www.google.com/maps?q=${encoded}&output=embed`,
       mapLink: `https://www.google.com/maps/search/?api=1&query=${encoded}`,
-      caption: deliveryStatus
-        ? `Status: ${formatOrderStatus(deliveryStatus)} (static map)`
-        : 'Static delivery map',
+      caption: isService
+        ? 'Service location (static map)'
+        : (deliveryStatus
+          ? `Status: ${formatOrderStatus(deliveryStatus)} (static map)`
+          : 'Static delivery map'),
     });
   }
 
@@ -1203,13 +1205,14 @@ const serviceAdapter: EntityAdapter = {
       // Derive live service status from normalized service metadata
       const statusRaw = String((entityData as any)?.metadata?.serviceStatus || (entityData as any)?.status || '')
         .toLowerCase()
-        .replace(/\s+/g, '_');
+        .replace(/[\s-]+/g, '_');
+      const normalizedStatus = statusRaw === 'service_created' ? 'created' : statusRaw;
       const managedBy = String((entityData as any)?.metadata?.serviceManagedBy || (entityData as any)?.managedBy || '')
         .trim()
         .toLowerCase();
 
       // Managers control lifecycle when manager-managed
-      if (role === 'manager' && managedBy !== 'warehouse' && can('service', 'start', role, { state, entityData }) && (statusRaw === 'pending' || statusRaw === 'created')) {
+      if (role === 'manager' && managedBy !== 'warehouse' && can('service', 'start', role, { state, entityData }) && (normalizedStatus === 'pending' || normalizedStatus === 'created')) {
         descriptors.push({
           key: 'start',
           label: 'Start Service',
@@ -1218,7 +1221,7 @@ const serviceAdapter: EntityAdapter = {
         });
       }
       // Per UX: Start/Cancel when pending; Complete/Cancel when in progress (manager only, manager-managed)
-      if (role === 'manager' && managedBy !== 'warehouse' && can('service', 'cancel', role, { state, entityData }) && (statusRaw === 'pending' || statusRaw === 'created' || statusRaw === 'in_progress')) {
+      if (role === 'manager' && managedBy !== 'warehouse' && can('service', 'cancel', role, { state, entityData }) && (normalizedStatus === 'pending' || normalizedStatus === 'created' || normalizedStatus === 'in_progress')) {
         descriptors.push({
           key: 'cancel',
           label: 'Cancel Service',
@@ -1227,7 +1230,7 @@ const serviceAdapter: EntityAdapter = {
           closeOnSuccess: true,
         });
       }
-      if (role === 'manager' && managedBy !== 'warehouse' && can('service', 'complete', role, { state, entityData }) && statusRaw === 'in_progress') {
+      if (role === 'manager' && managedBy !== 'warehouse' && can('service', 'complete', role, { state, entityData }) && normalizedStatus === 'in_progress') {
         descriptors.push({
           key: 'complete',
           label: 'Mark Complete',
@@ -1238,13 +1241,13 @@ const serviceAdapter: EntityAdapter = {
 
       // Warehouse-controlled lifecycle for warehouse-managed services
       if (role === 'warehouse' && managedBy === 'warehouse') {
-        if (can('service', 'start', role, { state, entityData }) && (statusRaw === 'pending' || statusRaw === 'created')) {
+        if (can('service', 'start', role, { state, entityData }) && (normalizedStatus === 'pending' || normalizedStatus === 'created')) {
           descriptors.push({ key: 'start', label: 'Start Service', variant: 'primary', closeOnSuccess: false });
         }
-        if (can('service', 'cancel', role, { state, entityData }) && (statusRaw === 'pending' || statusRaw === 'created' || statusRaw === 'in_progress')) {
+        if (can('service', 'cancel', role, { state, entityData }) && (normalizedStatus === 'pending' || normalizedStatus === 'created' || normalizedStatus === 'in_progress')) {
           descriptors.push({ key: 'cancel', label: 'Cancel Service', variant: 'danger', confirm: 'Cancel this service?', closeOnSuccess: true });
         }
-        if (can('service', 'complete', role, { state, entityData }) && statusRaw === 'in_progress') {
+        if (can('service', 'complete', role, { state, entityData }) && normalizedStatus === 'in_progress') {
           descriptors.push({ key: 'complete', label: 'Mark Complete', variant: 'primary', closeOnSuccess: true });
         }
       }
