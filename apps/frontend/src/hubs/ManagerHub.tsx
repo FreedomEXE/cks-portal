@@ -870,11 +870,12 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
       profile: profileData ?? null,
       scope: scopeData ?? null,
       certifiedServices: certifiedServicesData,
+      activeServicesCount: activeServicesData.length,
       orders: ordersData?.orders ?? [],
       accessStatus,
       accessTier,
     }),
-  [dashboardData, profileData, scopeData, certifiedServicesData, ordersData, accessStatus, accessTier]);
+  [dashboardData, profileData, scopeData, certifiedServicesData, activeServicesData.length, ordersData, accessStatus, accessTier]);
 
   const managerProfileData = useMemo(
     () => ({
@@ -1320,17 +1321,21 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
                       reportCategory: payload.reportCategory,
                       relatedEntityId: payload.relatedEntityId,
                       reportReason: payload.reportReason,
+                      reportArea: payload.reportArea,
+                      details: payload.details,
                       priority: payload.priority,
                     });
                   } else {
                     await apiCreateFeedback({
                       title: 'Feedback',
-                      message: payload.reportReason,
                       category: 'Recognition',
                       reportCategory: payload.reportCategory,
                       relatedEntityId: payload.relatedEntityId,
                       reportReason: payload.reportReason,
                       rating: payload.rating,
+                      reportArea: payload.reportArea,
+                      details: payload.details,
+                      ratingBreakdown: payload.ratingBreakdown,
                     });
                   }
                 } else if (payload.type === 'report') {

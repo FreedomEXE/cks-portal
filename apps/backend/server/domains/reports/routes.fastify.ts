@@ -73,6 +73,8 @@ export async function reportsRoutes(fastify: FastifyInstance) {
       reportCategory: z.enum(['service', 'order', 'procedure']).optional(),
       relatedEntityId: z.string().trim().min(1).max(64).optional(),
       reportReason: z.string().trim().min(1).max(100).optional(),
+      reportArea: z.string().trim().min(1).max(100).optional(),
+      details: z.string().trim().min(1).max(100).optional(),
       priority: z.enum(['LOW','MEDIUM','HIGH']).optional(),
     });
     const body = schema.safeParse(request.body);
@@ -91,6 +93,12 @@ export async function reportsRoutes(fastify: FastifyInstance) {
       // Structured report: auto-generate simple title, detailed description
       title = payload.reportReason;
       description = `Structured report for ${payload.reportCategory}: ${payload.relatedEntityId}. Reason: ${payload.reportReason}`;
+      if (payload.reportArea) {
+        description += ` Area: ${payload.reportArea}.`;
+      }
+      if (payload.details) {
+        description += ` Details: ${payload.details}`;
+      }
     }
 
     const created = await createReport({

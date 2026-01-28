@@ -630,6 +630,8 @@ export async function createReport(payload: {
   reportCategory?: 'service' | 'order' | 'procedure';
   relatedEntityId?: string;
   reportReason?: string;
+  reportArea?: string;
+  details?: string;
   // Priority
   priority?: 'LOW' | 'MEDIUM' | 'HIGH';
 }) {
@@ -643,14 +645,52 @@ export async function createReport(payload: {
     ...(payload.reportCategory && payload.relatedEntityId && payload.reportReason
       ? { reportCategory: payload.reportCategory, relatedEntityId: payload.relatedEntityId, reportReason: payload.reportReason }
       : {}),
+    ...(payload.reportArea ? { reportArea: payload.reportArea } : {}),
+    ...(payload.details ? { details: payload.details } : {}),
     ...(payload.priority ? { priority: payload.priority } : {}),
   };
   await apiFetch<ApiResponse<{ id: string }>>('/reports', { method: 'POST', body: JSON.stringify(body) });
 }
 
+function buildFeedbackMessage(payload: {
+  message?: string;
+  reportReason?: string;
+  reportArea?: string;
+  details?: string;
+  ratingBreakdown?: Record<string, number>;
+}): string {
+  const directMessage = (payload.message || '').trim();
+  if (directMessage) return directMessage;
+
+  const parts: string[] = [];
+  if (payload.reportArea) {
+    parts.push(`Area: ${payload.reportArea}`);
+  }
+  if (payload.details) {
+    parts.push(`Details: ${payload.details}`);
+  }
+  if (payload.ratingBreakdown) {
+    const entries = Object.entries(payload.ratingBreakdown)
+      .filter(([, value]) => typeof value === 'number' && value > 0)
+      .map(([key, value]) => {
+        const label = key
+          .replace(/([A-Z])/g, ' $1')
+          .replace(/^./, (c) => c.toUpperCase());
+        return `${label} ${value}/5`;
+      });
+    if (entries.length > 0) {
+      parts.push(`Ratings: ${entries.join(', ')}`);
+    }
+  }
+  if (parts.length === 0 && payload.reportReason) {
+    parts.push(payload.reportReason);
+  }
+  return parts.join('\n') || 'No details provided';
+}
+
 export async function createFeedback(payload: {
   title: string;
-  message: string;
+  message?: string;
   category: string;
   centerId?: string | null;
   customerId?: string | null;
@@ -658,12 +698,16 @@ export async function createFeedback(payload: {
   reportCategory?: 'service' | 'order' | 'procedure';
   relatedEntityId?: string;
   reportReason?: string;
+  reportArea?: string;
+  details?: string;
   // Rating
   rating?: number;
+  ratingBreakdown?: Record<string, number>;
 }) {
+  const message = buildFeedbackMessage(payload);
   const body: any = {
     title: payload.title,
-    message: payload.message,
+    message,
     kind: normalizeFeedbackKind(payload.category),
     ...(payload.centerId ? { centerId: payload.centerId } : {}),
     ...(payload.customerId ? { customerId: payload.customerId } : {}),

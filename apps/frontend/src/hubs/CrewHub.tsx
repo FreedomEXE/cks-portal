@@ -380,19 +380,6 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
     await mutateReports();
   }, [mutateReports]);
 
-  const overviewData = useMemo(() =>
-    buildCrewOverviewData({
-      dashboard: dashboard ?? null,
-      profile: profile ?? null,
-      scope: scopeData ?? null,
-      certifiedServices: certifiedServicesData,
-      orders: orders?.serviceOrders ?? [],
-      viewerId: normalizedCode,
-      accessStatus,
-      accessTier,
-    }),
-  [dashboard, profile, scopeData, certifiedServicesData, orders?.serviceOrders, normalizedCode, accessStatus, accessTier]);
-
   // Build dashboard cards once (do not call hooks inside render conditionals)
   const dashboardCards = useMemo(() => {
     const openFirstServiceWithTasks = () => {
@@ -473,9 +460,13 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
       const meta: any = (order as any).metadata || {};
       const svcStatus = normalizeStatusValue(meta?.serviceStatus as string | null);
       const actualStartDate = meta.actualStartDate || meta.serviceStartDate;
+      const serviceId = (order as any).serviceId ?? (order as any).transformedId ?? (order as any).transformed_id ?? null;
+      if (!serviceId) {
+        return;
+      }
       const base: any = {
-        serviceId: order.serviceId ?? order.orderId,
-        serviceName: order.title ?? order.serviceId ?? order.orderId,
+        serviceId,
+        serviceName: order.title ?? serviceId,
         type: order.orderType === 'service' ? 'Service' : 'Product',
         status: svcStatus ? formatStatusLabel(svcStatus) : formatStatusLabel(order.status),
         startDate: svcStatus === 'created' ? 'Pending' : (actualStartDate ? formatDisplayDate(actualStartDate) : formatDisplayDate(order.requestedDate)),
@@ -502,6 +493,20 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
 
     return { activeServicesData: active, serviceHistoryData: history };
   }, [serviceOrders]);
+
+  const overviewData = useMemo(() =>
+    buildCrewOverviewData({
+      dashboard: dashboard ?? null,
+      profile: profile ?? null,
+      scope: scopeData ?? null,
+      certifiedServices: certifiedServicesData,
+      activeServicesCount: activeServicesData.length,
+      orders: orders?.serviceOrders ?? [],
+      viewerId: normalizedCode,
+      accessStatus,
+      accessTier,
+    }),
+  [dashboard, profile, scopeData, certifiedServicesData, activeServicesData.length, orders?.serviceOrders, normalizedCode, accessStatus, accessTier]);
 
   const tabs = useMemo(() => [
     { id: 'dashboard', label: 'Dashboard', path: '/crew/dashboard' },
@@ -869,19 +874,23 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
                 feedback={reportsData?.feedback || []}
                 isLoading={reportsLoading}
               onSubmit={async (payload) => {
-                  await apiCreateFeedback({
-                    title: payload.title || 'Feedback',
-                    message: payload.description || (payload.reportReason ?? ''),
-                    category: payload.category || 'Recognition',
-                    ...(payload.reportCategory && payload.relatedEntityId && payload.reportReason ? {
-                      reportCategory: payload.reportCategory,
-                      relatedEntityId: payload.relatedEntityId,
-                      reportReason: payload.reportReason,
-                      rating: payload.rating,
-                    } : {}),
-                  });
-                  await mutate(`/hub/reports/${normalizedCode}`);
-                }}
+                await apiCreateFeedback({
+                  title: payload.title || 'Feedback',
+                  category: payload.category || 'Recognition',
+                  ...(payload.reportCategory && payload.relatedEntityId && payload.reportReason ? {
+                    reportCategory: payload.reportCategory,
+                    relatedEntityId: payload.relatedEntityId,
+                    reportReason: payload.reportReason,
+                    rating: payload.rating,
+                    reportArea: payload.reportArea,
+                    details: payload.details,
+                    ratingBreakdown: payload.ratingBreakdown,
+                  } : {
+                    message: payload.description
+                  }),
+                });
+                await mutate(`/hub/reports/${normalizedCode}`);
+              }}
                 fetchServices={fetchServicesForReports}
                 fetchProcedures={fetchProceduresForReports}
                 fetchOrders={fetchOrdersForReports}

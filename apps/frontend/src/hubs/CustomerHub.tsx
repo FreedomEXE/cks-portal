@@ -355,17 +355,6 @@ function CustomerHubContent({ initialTab = 'dashboard' }: CustomerHubProps) {
     await mutateReports();
   }, [mutateReports, normalizedCode]);
 
-  const overviewData = useMemo(() =>
-    buildCustomerOverviewData({
-      dashboard: dashboard ?? null,
-      profile: profile ?? null,
-      scope: scopeData ?? null,
-      certifiedServices: certifiedServicesData,
-      accessStatus,
-      accessTier,
-    }),
-  [dashboard, profile, scopeData, certifiedServicesData, accessStatus, accessTier]);
-
   const customerScope = scopeData?.role === 'customer' ? scopeData : null;
 
   const ecosystemTree = useMemo<TreeNode>(() => {
@@ -405,9 +394,13 @@ function CustomerHubContent({ initialTab = 'dashboard' }: CustomerHubProps) {
       const managedBy = metadata.managerId ? `${metadata.managerId}${metadata.managerName ? ' - ' + metadata.managerName : ''}` : '—';
       const actualStartDate = metadata.actualStartDate || metadata.serviceStartDate;
 
+      const serviceId = (order as any).serviceId ?? (order as any).transformedId ?? (order as any).transformed_id ?? null;
+      if (!serviceId) {
+        return;
+      }
       const base = {
-        serviceId: order.serviceId ?? order.orderId,
-        serviceName: order.title ?? order.serviceId ?? order.orderId,
+        serviceId,
+        serviceName: order.title ?? serviceId,
         centerId: order.centerId ?? order.destination ?? '—',
         type: serviceType,
         status: serviceStatus,
@@ -434,6 +427,18 @@ function CustomerHubContent({ initialTab = 'dashboard' }: CustomerHubProps) {
 
     return { myServicesData: my, serviceHistoryData: history };
   }, [serviceOrders]);
+
+  const overviewData = useMemo(() =>
+    buildCustomerOverviewData({
+      dashboard: dashboard ?? null,
+      profile: profile ?? null,
+      scope: scopeData ?? null,
+      certifiedServices: certifiedServicesData,
+      activeServicesCount: myServicesData.length,
+      accessStatus,
+      accessTier,
+    }),
+  [dashboard, profile, scopeData, certifiedServicesData, myServicesData.length, accessStatus, accessTier]);
 
   const tabs = useMemo(() => [
     { id: 'dashboard', label: 'Dashboard', path: '/customer/dashboard' },
@@ -645,6 +650,9 @@ function CustomerHubContent({ initialTab = 'dashboard' }: CustomerHubProps) {
                     })}
                     showSearch={false}
                     maxItems={10}
+                    onRowClick={(row: any) => {
+                      modals.openById(row.serviceId);
+                    }}
                   />
                 )}
 
@@ -692,6 +700,9 @@ function CustomerHubContent({ initialTab = 'dashboard' }: CustomerHubProps) {
                     showSearch={false}
                     maxItems={10}
                     modalType="service-history"
+                    onRowClick={(row: any) => {
+                      modals.openById(row.serviceId);
+                    }}
                   />
                 )}
               </TabSection>
@@ -743,18 +754,22 @@ function CustomerHubContent({ initialTab = 'dashboard' }: CustomerHubProps) {
                         reportCategory: payload.reportCategory,
                         relatedEntityId: payload.relatedEntityId,
                         reportReason: payload.reportReason,
+                        reportArea: payload.reportArea,
+                        details: payload.details,
                         priority: payload.priority,
                         customerId: normalizedCode ?? undefined,
                       });
                     } else {
                       await apiCreateFeedback({
                         title: 'Feedback',
-                        message: payload.reportReason,
                         category: 'Recognition',
                         reportCategory: payload.reportCategory,
                         relatedEntityId: payload.relatedEntityId,
                         reportReason: payload.reportReason,
                         rating: payload.rating,
+                        reportArea: payload.reportArea,
+                        details: payload.details,
+                        ratingBreakdown: payload.ratingBreakdown,
                         customerId: normalizedCode ?? undefined,
                       });
                     }

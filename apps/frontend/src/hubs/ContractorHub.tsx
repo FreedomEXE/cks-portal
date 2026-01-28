@@ -580,11 +580,12 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
       profile: profile ?? null,
       scope: contractorScope ?? null,
       certifiedServices: certifiedServicesData,
+      activeServicesCount: activeServicesData.length,
       orders: orders?.orders ?? [],
       accessStatus,
       accessTier,
     }),
-  [dashboard, profile, contractorScope, certifiedServicesData, orders, accessStatus, accessTier]);
+  [dashboard, profile, contractorScope, certifiedServicesData, activeServicesData.length, orders, accessStatus, accessTier]);
 
   const profileCardData = useMemo(() => ({
     name: profile?.name ?? EMPTY_VALUE,
@@ -902,17 +903,21 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
                         reportCategory: payload.reportCategory,
                         relatedEntityId: payload.relatedEntityId,
                         reportReason: payload.reportReason,
+                        reportArea: payload.reportArea,
+                        details: payload.details,
                         priority: payload.priority,
                       });
                     } else {
                       await apiCreateFeedback({
                         title: 'Feedback',
-                        message: payload.reportReason,
                         category: 'Recognition',
                         reportCategory: payload.reportCategory,
                         relatedEntityId: payload.relatedEntityId,
                         reportReason: payload.reportReason,
                         rating: payload.rating,
+                        reportArea: payload.reportArea,
+                        details: payload.details,
+                        ratingBreakdown: payload.ratingBreakdown,
                       });
                     }
                   } else if (payload.type === 'report') {

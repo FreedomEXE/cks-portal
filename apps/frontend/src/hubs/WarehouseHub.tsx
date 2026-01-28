@@ -361,19 +361,6 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
     await mutateReports();
   }, [mutateReports]);
 
-  const overviewData = useMemo(() =>
-    buildWarehouseOverviewData({
-      dashboard: dashboard ?? null,
-      profile: profile ?? null,
-      scope: scopeData ?? null,
-      certifiedServices: certifiedServicesData,
-      inventory: inventory ?? null,
-      accessStatus,
-      accessTier,
-    }),
-  [dashboard, profile, scopeData, certifiedServicesData, inventory, accessStatus, accessTier]);
-
-
   const { pendingDeliveries, completedDeliveries } = useMemo(() => {
     const pending: Array<{
       deliveryId: string;
@@ -586,6 +573,19 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
 
     return { activeServicesData: active, serviceHistoryData: history };
   }, [serviceOrders, refreshOrders]);
+
+  const overviewData = useMemo(() =>
+    buildWarehouseOverviewData({
+      dashboard: dashboard ?? null,
+      profile: profile ?? null,
+      scope: scopeData ?? null,
+      certifiedServices: certifiedServicesData,
+      activeServicesCount: activeServicesData.length,
+      inventory: inventory ?? null,
+      accessStatus,
+      accessTier,
+    }),
+  [dashboard, profile, scopeData, certifiedServicesData, activeServicesData.length, inventory, accessStatus, accessTier]);
 
   // Column definitions for My Services
   const MY_SERVICES_COLUMNS_BASE = [
@@ -1123,14 +1123,18 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
                   if (payload.type === 'feedback') {
                     await apiCreateFeedback({
                       title: payload.title || 'Feedback',
-                      message: payload.description || (payload.reportReason ?? ''),
                       category: payload.category || 'Recognition',
                       ...(payload.reportCategory && payload.relatedEntityId && payload.reportReason ? {
                         reportCategory: payload.reportCategory,
                         relatedEntityId: payload.relatedEntityId,
                         reportReason: payload.reportReason,
                         rating: payload.rating,
-                      } : {}),
+                        reportArea: payload.reportArea,
+                        details: payload.details,
+                        ratingBreakdown: payload.ratingBreakdown,
+                      } : {
+                        message: payload.description
+                      }),
                     });
                   } else {
                     alert('Warehouse can only submit feedback at this time.');

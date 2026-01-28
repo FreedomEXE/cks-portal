@@ -59,12 +59,17 @@ export function buildManagerOverviewData(inputs: {
   profile: Nullable<HubProfileResponse>;
   scope: any;
   certifiedServices: readonly any[];
+  activeServicesCount?: number;
   orders?: readonly HubOrderItem[] | null;
   accessStatus?: string | null;
   accessTier?: string | null;
 }) {
-  const { dashboard, scope, certifiedServices, orders } = inputs;
-  const myServices = certifiedServices?.length ?? 0;
+  const { dashboard, scope, orders } = inputs;
+  const activeServices =
+    inputs.activeServicesCount ??
+    (dashboard as any)?.activeServices ??
+    scope?.summary?.activeServices ??
+    0;
   const myCenters =
     (dashboard as any)?.centerCount ?? scope?.summary?.centerCount ?? safeLength(scope?.relationships?.centers) ?? 0;
   const myCrew = (dashboard as any)?.crewCount ?? scope?.summary?.crewCount ?? safeLength(scope?.relationships?.crew) ?? 0;
@@ -75,7 +80,7 @@ export function buildManagerOverviewData(inputs: {
     accessTier: inputs.accessTier ?? null,
     fallbackStatus: (dashboard as any)?.accountStatus ?? inputs.profile?.status ?? null,
   });
-  return { myServices, myCenters, myCrew, pendingOrders, accountStatus } as const;
+  return { activeServices, myCenters, myCrew, pendingOrders, accountStatus } as const;
 }
 
 // Contractor
@@ -84,12 +89,17 @@ export function buildContractorOverviewData(inputs: {
   profile: Nullable<HubProfileResponse>;
   scope: any;
   certifiedServices: readonly any[];
+  activeServicesCount?: number;
   orders?: readonly HubOrderItem[] | null;
   accessStatus?: string | null;
   accessTier?: string | null;
 }) {
-  const { dashboard, scope, certifiedServices } = inputs;
-  const myServices = certifiedServices?.length ?? 0;
+  const { dashboard, scope } = inputs;
+  const activeServices =
+    inputs.activeServicesCount ??
+    (dashboard as any)?.activeServices ??
+    scope?.summary?.activeServices ??
+    0;
   const myCustomers =
     (dashboard as any)?.customerCount ?? scope?.summary?.customerCount ?? safeLength(scope?.relationships?.customers) ?? 0;
   const pendingOrders = (dashboard as any)?.pendingOrders ?? 0;
@@ -98,7 +108,7 @@ export function buildContractorOverviewData(inputs: {
     accessTier: inputs.accessTier ?? null,
     fallbackStatus: (dashboard as any)?.accountStatus ?? inputs.profile?.status ?? null,
   });
-  return { myServices, myCustomers, pendingOrders, accountStatus } as const;
+  return { activeServices, myCustomers, pendingOrders, accountStatus } as const;
 }
 
 // Customer
@@ -107,11 +117,16 @@ export function buildCustomerOverviewData(inputs: {
   profile: Nullable<HubProfileResponse>;
   scope: any;
   certifiedServices: readonly any[];
+  activeServicesCount?: number;
   accessStatus?: string | null;
   accessTier?: string | null;
 }) {
-  const { dashboard, scope, certifiedServices } = inputs;
-  const myServices = certifiedServices?.length ?? 0;
+  const { dashboard, scope } = inputs;
+  const activeServices =
+    inputs.activeServicesCount ??
+    (dashboard as any)?.activeServices ??
+    scope?.summary?.activeServices ??
+    0;
   const myCenters = (dashboard as any)?.centerCount ?? scope?.summary?.centerCount ?? safeLength(scope?.relationships?.centers) ?? 0;
   const pendingOrders = (dashboard as any)?.pendingRequests ?? 0;
   const accountStatus = resolveAccountStatus({
@@ -119,7 +134,7 @@ export function buildCustomerOverviewData(inputs: {
     accessTier: inputs.accessTier ?? null,
     fallbackStatus: (dashboard as any)?.accountStatus ?? inputs.profile?.status ?? null,
   });
-  return { myServices, myCenters, pendingOrders, accountStatus } as const;
+  return { activeServices, myCenters, pendingOrders, accountStatus } as const;
 }
 
 // Center
@@ -127,11 +142,16 @@ export function buildCenterOverviewData(inputs: {
   dashboard: Nullable<CenterDashboardResponse>;
   profile: Nullable<HubProfileResponse>;
   scope: any;
+  activeServicesCount?: number;
   accessStatus?: string | null;
   accessTier?: string | null;
 }) {
   const { dashboard, scope } = inputs;
-  const activeServices = (dashboard as any)?.activeServices ?? scope?.summary?.activeServices ?? 0;
+  const activeServices =
+    inputs.activeServicesCount ??
+    (dashboard as any)?.activeServices ??
+    scope?.summary?.activeServices ??
+    0;
   const activeCrew = (dashboard as any)?.crewCount ?? scope?.summary?.crewCount ?? safeLength(scope?.relationships?.crew) ?? 0;
   const pendingOrders = (dashboard as any)?.pendingRequests ?? 0;
   const accountStatus = resolveAccountStatus({
@@ -148,13 +168,17 @@ export function buildCrewOverviewData(inputs: {
   profile: Nullable<HubProfileResponse>;
   scope: any;
   certifiedServices: readonly any[];
+  activeServicesCount?: number;
   orders?: readonly HubOrderItem[] | null;
   viewerId?: string | null;
   accessStatus?: string | null;
   accessTier?: string | null;
 }) {
-  const { dashboard, certifiedServices, orders, viewerId } = inputs;
-  const myServices = certifiedServices?.length ?? 0;
+  const { dashboard, orders, viewerId } = inputs;
+  const activeServices =
+    inputs.activeServicesCount ??
+    (dashboard as any)?.activeServices ??
+    0;
 
   // Compute today's tasks: assigned to viewer, for services in progress, and scheduled for today
   const today = new Date();
@@ -187,7 +211,7 @@ export function buildCrewOverviewData(inputs: {
     accessTier: inputs.accessTier ?? null,
     fallbackStatus: (dashboard as any)?.accountStatus ?? inputs.profile?.status ?? null,
   });
-  return { myServices, myTasks, timecard, accountStatus } as const;
+  return { activeServices, myTasks, timecard, accountStatus } as const;
 }
 
 // Warehouse
@@ -196,12 +220,16 @@ export function buildWarehouseOverviewData(inputs: {
   profile: Nullable<HubProfileResponse>;
   scope: any;
   certifiedServices: readonly any[];
+  activeServicesCount?: number;
   inventory?: { activeItems?: readonly any[] } | null;
   accessStatus?: string | null;
   accessTier?: string | null;
 }) {
-  const { dashboard, certifiedServices, inventory } = inputs;
-  const myServices = certifiedServices?.length ?? 0;
+  const { dashboard, inventory } = inputs;
+  const activeServices =
+    inputs.activeServicesCount ??
+    (dashboard as any)?.activeServices ??
+    0;
   // Fallback to counting active inventory items if dashboard doesn't provide count
   const inventoryCount = (dashboard as any)?.inventoryCount ?? inventory?.activeItems?.length ?? 0;
   const lowStockItems = (dashboard as any)?.lowStockItems ?? (inventory?.activeItems?.filter((i: any) => i.isLow)?.length ?? 0);
@@ -211,7 +239,7 @@ export function buildWarehouseOverviewData(inputs: {
     accessTier: inputs.accessTier ?? null,
     fallbackStatus: (dashboard as any)?.accountStatus ?? inputs.profile?.status ?? null,
   });
-  return { myServices, inventoryCount, lowStockItems, pendingOrders, accountStatus } as const;
+  return { activeServices, inventoryCount, lowStockItems, pendingOrders, accountStatus } as const;
 }
 
 // Admin
