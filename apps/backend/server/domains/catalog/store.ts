@@ -87,6 +87,7 @@ function mapCatalogRow(row: CatalogItemRow): CatalogItem {
     code: row.item_code,
     name: row.name,
     type: row.item_type,
+    category: row.category ?? null,
     description: row.description ?? null,
     tags,
     imageUrl: row.image_url ?? null,
@@ -132,13 +133,21 @@ function buildWhere(filters: CatalogFilters) {
     where.push(`i.item_type = $${params.length}`);
   }
 
+  if (filters.category) {
+    const normalizedCategory = filters.category.trim();
+    if (normalizedCategory.length > 0) {
+      params.push(normalizedCategory);
+      where.push(`i.category = $${params.length}`);
+    }
+  }
+
   if (filters.search) {
     const trimmed = filters.search.trim();
     if (trimmed.length > 0) {
       const searchValue = `%${trimmed.replace(/%+/g, '%')}%`;
       params.push(searchValue);
       const placeholder = `$${params.length}`;
-      where.push(`(i.name ILIKE ${placeholder} OR i.description ILIKE ${placeholder} OR EXISTS (
+      where.push(`(i.name ILIKE ${placeholder} OR i.description ILIKE ${placeholder} OR i.item_code ILIKE ${placeholder} OR EXISTS (
         SELECT 1 FROM UNNEST(i.tags) AS tag WHERE tag ILIKE ${placeholder}
       ))`);
     }
@@ -278,7 +287,9 @@ export async function fetchCatalogItems(filters: CatalogFilters): Promise<Catalo
        i.stock_on_hand
      FROM catalog_union AS i
      ${clause}
-     ORDER BY i.name ASC
+     ORDER BY
+       CASE WHEN i.item_type = 'service' AND i.item_code = 'SRV-001' THEN 0 ELSE 1 END,
+       i.name ASC
      LIMIT $${limitPosition}
      OFFSET $${offsetPosition}`,
     queryParams,

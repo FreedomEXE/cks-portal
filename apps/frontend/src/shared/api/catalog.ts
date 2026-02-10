@@ -27,6 +27,7 @@ export interface CatalogItem {
   code: string;
   name: string;
   type: CatalogType;
+  category: string | null;
   description: string | null;
   tags: string[];
   imageUrl: string | null;
@@ -52,6 +53,7 @@ export interface CatalogListResult {
 
 export interface FetchCatalogParams {
   type?: CatalogType;
+  category?: string;
   q?: string;
   tags?: string[];
   page?: number;
@@ -62,6 +64,9 @@ export async function fetchCatalogItems(params: FetchCatalogParams = {}): Promis
   const searchParams = new URLSearchParams();
   if (params.type) {
     searchParams.set("type", params.type);
+  }
+  if (params.category) {
+    searchParams.set("category", params.category);
   }
   if (params.q) {
     searchParams.set("q", params.q);
@@ -86,6 +91,7 @@ export function useCatalogItems(params: FetchCatalogParams) {
   const key = [
     "catalog",
     params.type ?? "all",
+    params.category ?? "",
     params.q ?? "",
     (params.tags ?? []).join("|"),
     params.page ?? 1,

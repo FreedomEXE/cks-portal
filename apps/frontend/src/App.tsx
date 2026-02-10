@@ -6,6 +6,7 @@ import { useHubLoading } from './contexts/HubLoadingContext';
 import { ModalProvider } from './contexts/ModalProvider';
 import { AccessGate } from './components/AccessGate';
 import BuildBadge from './components/BuildBadge';
+import ErrorBoundary from './components/ErrorBoundary';
 
 import AdminHub from './hubs/AdminHub';
 import CenterHub from './hubs/CenterHub';
@@ -111,34 +112,38 @@ export function AuthenticatedApp(): JSX.Element {
   console.log('[AuthenticatedApp] Rendering authenticated app');
 
   return (
-    <ModalProvider>
-      <BuildBadge />
-      <Routes>
-        <Route path="/" element={<Navigate to="/hub" replace />} />
-        <Route path="/hub" element={<RoleHubRoute />} />
-        <Route path="/catalog" element={<CKSCatalog />} />
-        <Route path="/memos" element={<Memos />} />
-        <Route path="/news" element={<News />} />
-        <Route path="/impersonate" element={<Impersonate />} />
-        <Route path="/hub/*" element={<Navigate to="/hub" replace />} />
-        <Route path="*" element={<Navigate to="/hub" replace />} />
-      </Routes>
-    </ModalProvider>
+    <ErrorBoundary>
+      <ModalProvider>
+        <BuildBadge />
+        <Routes>
+          <Route path="/" element={<Navigate to="/hub" replace />} />
+          <Route path="/hub" element={<RoleHubRoute />} />
+          <Route path="/catalog" element={<CKSCatalog />} />
+          <Route path="/memos" element={<Memos />} />
+          <Route path="/news" element={<News />} />
+          <Route path="/impersonate" element={<Impersonate />} />
+          <Route path="/hub/*" element={<Navigate to="/hub" replace />} />
+          <Route path="*" element={<Navigate to="/hub" replace />} />
+        </Routes>
+      </ModalProvider>
+    </ErrorBoundary>
   );
 }
 
 export function UnauthenticatedApp(): JSX.Element {
   return (
-    <>
-      <BuildBadge />
-      <Routes>
-        <Route path="/sign-in" element={<Login />} />
-        <Route path="/sign-up" element={<Login />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/forgot" element={<Forgot />} />
-        <Route path="/impersonate" element={<Impersonate />} />
-        <Route path="*" element={<Navigate to="/login" replace />} />
-      </Routes>
-    </>
+    <ErrorBoundary>
+      <>
+        <BuildBadge />
+        <Routes>
+          <Route path="/sign-in" element={<Login />} />
+          <Route path="/sign-up" element={<Login />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/forgot" element={<Forgot />} />
+          <Route path="/impersonate" element={<Impersonate />} />
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        </Routes>
+      </>
+    </ErrorBoundary>
   );
 }

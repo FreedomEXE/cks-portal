@@ -419,6 +419,54 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
     return items;
   }, [orders?.serviceOrders, normalizedCode]);
 
+  const { activeServicesData, serviceHistoryData } = useMemo(() => {
+    const active: Array<{ serviceId: string; serviceName: string; type: string; status: string; startDate: string; canRespond?: boolean; onAccept?: () => Promise<void>; onReject?: () => Promise<void> }>
+      = [];
+    const history: Array<{ serviceId: string; serviceName: string; type: string; status: string; startDate: string; endDate: string }>
+      = [];
+
+    serviceOrders.forEach((order) => {
+      if (!(order as any).serviceId && !(order as any).transformedId) {
+        return;
+      }
+      const normalizedStatus = normalizeStatusValue(order.status);
+      const meta: any = (order as any).metadata || {};
+      const svcStatus = normalizeStatusValue(meta?.serviceStatus as string | null);
+      const actualStartDate = meta.actualStartDate || meta.serviceStartDate;
+      const serviceId = (order as any).serviceId ?? (order as any).transformedId ?? (order as any).transformed_id ?? null;
+      if (!serviceId) {
+        return;
+      }
+      const base: any = {
+        serviceId,
+        serviceName: order.title ?? serviceId,
+        type: order.orderType === 'service' ? 'Service' : 'Product',
+        status: svcStatus ? formatStatusLabel(svcStatus) : formatStatusLabel(order.status),
+        startDate: svcStatus === 'created' ? 'Pending' : (actualStartDate ? formatDisplayDate(actualStartDate) : formatDisplayDate(order.requestedDate)),
+        endDate: formatDisplayDate(order.expectedDate),
+      };
+
+      const m = (order as any).metadata || {};
+      const crewReqs: any[] = Array.isArray(m.crewRequests) ? m.crewRequests : [];
+      const pendingForMe = !!normalizedCode && crewReqs.some(r => (r.crewCode || '').toUpperCase() === normalizedCode && r.status === 'pending');
+
+      // If there's a pending crew request for this crew, it should appear in Service Orders tab, not here
+      if (pendingForMe) {
+        return; // Skip this service in Active Services
+      }
+
+      // Completed/cancelled services go to history for crew too
+      if (svcStatus === 'completed' || svcStatus === 'cancelled' || normalizedStatus === 'cancelled' || normalizedStatus === 'rejected') {
+        history.push(base);
+      } else {
+        // Include active service statuses: pending approval stages, in-progress work, AND created services that are active
+        active.push(base);
+      }
+    });
+
+    return { activeServicesData: active, serviceHistoryData: history };
+  }, [serviceOrders, normalizedCode]);
+
   const dashboardCards = useMemo(() => {
     return crewOverviewCards.map((card) => ({
       ...card,
@@ -517,54 +565,6 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
     }
     return nodes;
   }, [ecosystemRootId, normalizedCode]);
-
-  const { activeServicesData, serviceHistoryData } = useMemo(() => {
-    const active: Array<{ serviceId: string; serviceName: string; type: string; status: string; startDate: string; canRespond?: boolean; onAccept?: () => Promise<void>; onReject?: () => Promise<void> }>
-      = [];
-    const history: Array<{ serviceId: string; serviceName: string; type: string; status: string; startDate: string; endDate: string }>
-      = [];
-
-    serviceOrders.forEach((order) => {
-      if (!(order as any).serviceId && !(order as any).transformedId) {
-        return;
-      }
-      const normalizedStatus = normalizeStatusValue(order.status);
-      const meta: any = (order as any).metadata || {};
-      const svcStatus = normalizeStatusValue(meta?.serviceStatus as string | null);
-      const actualStartDate = meta.actualStartDate || meta.serviceStartDate;
-      const serviceId = (order as any).serviceId ?? (order as any).transformedId ?? (order as any).transformed_id ?? null;
-      if (!serviceId) {
-        return;
-      }
-      const base: any = {
-        serviceId,
-        serviceName: order.title ?? serviceId,
-        type: order.orderType === 'service' ? 'Service' : 'Product',
-        status: svcStatus ? formatStatusLabel(svcStatus) : formatStatusLabel(order.status),
-        startDate: svcStatus === 'created' ? 'Pending' : (actualStartDate ? formatDisplayDate(actualStartDate) : formatDisplayDate(order.requestedDate)),
-        endDate: formatDisplayDate(order.expectedDate),
-      };
-
-      const m = (order as any).metadata || {};
-      const crewReqs: any[] = Array.isArray(m.crewRequests) ? m.crewRequests : [];
-      const pendingForMe = !!normalizedCode && crewReqs.some(r => (r.crewCode || '').toUpperCase() === normalizedCode && r.status === 'pending');
-
-      // If there's a pending crew request for this crew, it should appear in Service Orders tab, not here
-      if (pendingForMe) {
-        return; // Skip this service in Active Services
-      }
-
-      // Completed/cancelled services go to history for crew too
-      if (svcStatus === 'completed' || svcStatus === 'cancelled' || normalizedStatus === 'cancelled' || normalizedStatus === 'rejected') {
-        history.push(base);
-      } else {
-        // Include active service statuses: pending approval stages, in-progress work, AND created services that are active
-        active.push(base);
-      }
-    });
-
-    return { activeServicesData: active, serviceHistoryData: history };
-  }, [serviceOrders]);
 
   const overviewData = useMemo(() =>
     buildCrewOverviewData({

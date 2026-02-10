@@ -499,29 +499,32 @@ const ReportCard: React.FC<ReportCardProps> = ({
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: '#374151', marginBottom: '4px' }}>
-                    Action Taken ({actionTaken.length}/100)
+                    Action Taken *
                   </label>
-                  <input
-                    type="text"
+                  <select
                     value={actionTaken}
-                    onChange={(e) => {
-                      if (e.target.value.length <= 100) {
-                        setActionTaken(e.target.value);
-                      }
-                    }}
-                    placeholder="Brief description (max 100 chars)"
+                    onChange={(e) => setActionTaken(e.target.value)}
                     style={{
                       width: '100%',
                       padding: '8px 12px',
                       border: '1px solid #d1d5db',
                       borderRadius: '4px',
-                      fontSize: '14px'
+                      fontSize: '14px',
+                      backgroundColor: '#ffffff'
                     }}
-                  />
+                  >
+                    <option value="">Select action taken...</option>
+                    <option value="Passed the info to the crew">Passed the info to the crew</option>
+                    <option value="Supervisor is coming to the center and solve it along with the crew">Supervisor is coming to the center and solve it along with the crew</option>
+                    <option value="Re-training the Crew with tasks agreed">Re-training the Crew with tasks agreed</option>
+                    <option value="Warning the Crew regarding">Warning the Crew regarding</option>
+                    <option value="Replaced the Crew">Replaced the Crew</option>
+                    <option value="Other">Other</option>
+                  </select>
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: '#374151', marginBottom: '4px' }}>
-                    Resolution Notes ({resolutionNotes.length}/300)
+                    Additional Notes ({resolutionNotes.length}/300)
                   </label>
                   <textarea
                     value={resolutionNotes}

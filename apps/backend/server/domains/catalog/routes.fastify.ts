@@ -8,6 +8,7 @@ import { recordActivity } from '../activity/writer';
 
 const querySchema = z.object({
   type: z.enum(['product', 'service']).optional(),
+  category: z.string().trim().min(1).optional(),
   q: z.string().trim().min(1).optional(),
   tags: z.union([z.string(), z.array(z.string())]).optional(),
   page: z.coerce.number().int().min(1).default(1),
@@ -46,11 +47,12 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
       return;
     }
 
-    const { type, q, tags, page, pageSize } = parsed.data;
+    const { type, category, q, tags, page, pageSize } = parsed.data;
     const normalizedTags = normalizeTags(tags);
     const isTest = Boolean(auth.cksCode && auth.cksCode.toUpperCase().includes('-TEST'));
     const filters = {
       type: type ?? undefined,
+      category: category ?? undefined,
       search: q ?? null,
       tags: normalizedTags.length ? normalizedTags : undefined,
       limit: pageSize,

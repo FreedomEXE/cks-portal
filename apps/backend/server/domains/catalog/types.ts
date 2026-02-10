@@ -24,6 +24,7 @@ export interface CatalogItem {
   code: string;
   name: string;
   type: CatalogItemType;
+  category: string | null;
   description: string | null;
   tags: string[];
   imageUrl: string | null;
@@ -39,6 +40,7 @@ export interface CatalogItem {
 
 export interface CatalogFilters {
   type?: CatalogItemType;
+  category?: string;
   search?: string | null;
   tags?: string[];
   limit?: number;

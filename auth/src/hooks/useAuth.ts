@@ -55,6 +55,28 @@ const RAW_API_BASE = import.meta.env.VITE_API_URL || DEV_PROXY_BASE;
 const API_BASE = RAW_API_BASE.replace(/\/+$/, '');
 const MAX_BOOTSTRAP_RETRIES = Number(import.meta.env.VITE_BOOTSTRAP_MAX_RETRIES ?? 8);
 const BOOTSTRAP_RETRY_BASE_MS = Number(import.meta.env.VITE_BOOTSTRAP_RETRY_BASE_MS ?? 250);
+const SESSION_KEYS = ['role', 'code', 'cks_login_draft', 'cks_impersonation_active', 'cks_impersonation_ticket', 'cks_impersonation_return', 'cks_impersonation_attempt'];
+const LOCAL_PRESERVE_KEYS = new Set(['userLoggedOut']);
+
+function clearAuthStorage(): void {
+  try {
+    SESSION_KEYS.forEach((key) => window.sessionStorage.removeItem(key));
+
+    Object.keys(window.sessionStorage).forEach((key) => {
+      if (/clerk|auth|token|session/i.test(key)) {
+        window.sessionStorage.removeItem(key);
+      }
+    });
+
+    Object.keys(window.localStorage).forEach((key) => {
+      if (/clerk|auth|token|session/i.test(key) && !LOCAL_PRESERVE_KEYS.has(key)) {
+        window.localStorage.removeItem(key);
+      }
+    });
+  } catch {
+    // Ignore storage errors.
+  }
+}
 
 function sanitize(value: unknown): string | null {
   if (typeof value !== 'string') {
@@ -225,22 +247,10 @@ export function useAuth(): AuthState {
 
       if (!response.ok) {
         if (response.status === 401) {
-          console.log('[useAuth] 401 Unauthorized - clearing auth state');
+          console.log('[useAuth] 401 Unauthorized - invalid session');
+          clearAuthStorage();
           lastResolvedRef.current = null;
-          // Trigger re-authentication or show user notification
-          // Consider calling Clerk's signOut() or redirecting to login
-          setState({
-            status: 'ready',
-            role: null,
-            code: null,
-            fullName: null,
-            firstName: null,
-            ownerFirstName: null,
-            accessStatus: 'locked',
-            accessTier: null,
-            accessSource: null,
-            error: null,
-          });
+          setState({ ...SIGNED_OUT_STATE });
           return;
         }
         if (
@@ -270,7 +280,11 @@ export function useAuth(): AuthState {
       const rawRole = sanitize(data?.role) ?? sanitize(data?.kind);
       const rawCode = sanitizePreservingCase(data?.code) ?? sanitizePreservingCase(data?.internal_code);
       if (!rawRole) {
-        throw new Error('Bootstrap response missing role');
+        console.error('[useAuth] Bootstrap missing role - clearing session');
+        clearAuthStorage();
+        lastResolvedRef.current = null;
+        setState({ ...SIGNED_OUT_STATE });
+        return;
       }
 
       const resolvedCode = fallbackCode(rawCode, email, username);
@@ -368,7 +382,6 @@ export function useAuth(): AuthState {
             error: null,
           }));
         } else {
-          const error = err instanceof Error ? err : new Error('Failed to bootstrap user role');
           if (cached) {
             setState({
               status: 'ready',
@@ -383,18 +396,9 @@ export function useAuth(): AuthState {
               error: null,
             });
           } else {
-            setState({
-              status: 'error',
-              role: null,
-              code: null,
-              fullName: null,
-              firstName: null,
-              ownerFirstName: null,
-              accessStatus: 'locked',
-              accessTier: null,
-              accessSource: null,
-              error,
-            });
+            console.error('[useAuth] Max retries exceeded with no cache');
+            clearAuthStorage();
+            setState({ ...SIGNED_OUT_STATE });
           }
         }
       }

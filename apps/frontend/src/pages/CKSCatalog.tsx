@@ -765,7 +765,7 @@ function CartPanel({
   );
 }
 
-const PAGE_SIZE = 24;
+const PAGE_SIZE = 20;
 
 export default function CKSCatalog() {
   const navigate = useNavigate();
@@ -795,6 +795,8 @@ export default function CKSCatalog() {
   const [kind, setKind] = useState<CatalogKind>(catalogMode === 'services' ? 'services' : 'products');
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
   const [showCart, setShowCart] = useState(false);
   // Auto-open cart when navigated with serviceId (products mode)
   useEffect(() => {
@@ -811,6 +813,10 @@ export default function CKSCatalog() {
     const handle = setTimeout(() => setDebouncedQuery(query), 250);
     return () => clearTimeout(handle);
   }, [query]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [kind, debouncedQuery, selectedCategory]);
 
   // Fetch active services for managers/contractors when cart is opened
   useEffect(() => {
@@ -858,15 +864,28 @@ export default function CKSCatalog() {
   const params = useMemo(
     () => ({
       type: kind === "products" ? "product" : "service",
+      category: selectedCategory || undefined,
       q: debouncedQuery || undefined,
-      page: 1,
+      page: currentPage,
       pageSize: PAGE_SIZE,
     }),
-    [kind, debouncedQuery],
+    [kind, selectedCategory, debouncedQuery, currentPage],
   );
 
   const { data, isLoading, error } = useCatalogItems(params);
   const items = data?.items ?? [];
+  const categories = useMemo(() => {
+    const unique = new Set(items.map((item) => item.category).filter((value): value is string => Boolean(value)));
+    return Array.from(unique).sort((a, b) => a.localeCompare(b));
+  }, [items]);
+  const pageData = data?.page ?? null;
+  const total = pageData?.total ?? 0;
+  const limit = pageData?.limit ?? PAGE_SIZE;
+  const offset = pageData?.offset ?? 0;
+  const hasMore = pageData?.hasMore ?? false;
+  const totalPages = Math.max(1, Math.ceil(total / limit));
+  const showingFrom = total === 0 ? 0 : offset + 1;
+  const showingTo = total === 0 ? 0 : Math.min(offset + items.length, total);
 
   // Manage loader based on catalog loading state
   useEffect(() => {
@@ -1100,13 +1119,25 @@ export default function CKSCatalog() {
             </div>
           </div>
           <div className="mt-4">
-            <div className="relative max-w-xl">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={`Search ${kind}...`}
-                className="w-full rounded-lg border border-gray-300 bg-white text-gray-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-300 focus:border-brand-500 placeholder:text-gray-400"
+                className="w-full sm:max-w-xl rounded-lg border border-gray-300 bg-white text-gray-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-300 focus:border-brand-500 placeholder:text-gray-400"
               />
+              <select
+                value={selectedCategory || ''}
+                onChange={(e) => setSelectedCategory(e.target.value || null)}
+                className="w-full sm:w-64 rounded-lg border border-gray-300 bg-white text-gray-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-300 focus:border-brand-500"
+              >
+                <option value="">All Categories</option>
+                {categories.map((category) => (
+                  <option key={category} value={category}>
+                    {category}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
         </div>
@@ -1120,22 +1151,50 @@ export default function CKSCatalog() {
         ) : items.length === 0 ? (
           <div className="text-center text-gray-500 py-16">No {kind} found.</div>
         ) : (
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {items.map((item) => (
-              <Card
-                key={item.code}
-                item={item}
-                onView={() => {
-                  if (item.type === 'service') {
-                    modals.openById(item.code);
-                  } else {
-                    modals.openEntityModal('product', item.code);
-                  }
-                }}
-                onAdd={() => item.type === "product" ? handleAddProduct(item) : handleAddService(item)}
-                isInCart={cart.isInCart(item.code)}
-              />
-            ))}
+          <div className="space-y-6">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="text-sm text-gray-600">
+                Showing <span className="font-semibold">{showingFrom}-{showingTo}</span> of{" "}
+                <span className="font-semibold">{total}</span> items
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                  disabled={currentPage <= 1 || isLoading}
+                  className="px-3 py-1.5 text-sm rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Prev
+                </button>
+                <span className="text-sm text-gray-600 min-w-[110px] text-center">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  onClick={() => setCurrentPage((prev) => prev + 1)}
+                  disabled={!hasMore || isLoading}
+                  className="px-3 py-1.5 text-sm rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {items.map((item) => (
+                <Card
+                  key={item.code}
+                  item={item}
+                  onView={() => {
+                    if (item.type === 'service') {
+                      modals.openById(item.code);
+                    } else {
+                      modals.openEntityModal('product', item.code);
+                    }
+                  }}
+                  onAdd={() => item.type === "product" ? handleAddProduct(item) : handleAddService(item)}
+                  isInCart={cart.isInCart(item.code)}
+                />
+              ))}
+            </div>
           </div>
         )}
       </div>
