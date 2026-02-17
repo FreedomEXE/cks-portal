@@ -14,15 +14,30 @@ import {
 } from '../shared/watermark';
 
 const WATERMARK_IMAGE_CSS_VAR = '--cks-account-watermark-image';
+const WATERMARK_DEBUG_LOGS_ENABLED = import.meta.env.DEV;
+
+function logWatermarkDebug(message: string, value?: string): void {
+  if (!WATERMARK_DEBUG_LOGS_ENABLED) {
+    return;
+  }
+  if (typeof value === 'string') {
+    console.log(`[Watermark] ${message}`, value);
+    return;
+  }
+  console.log(`[Watermark] ${message}`);
+}
 
 function setWatermarkImage(url: string | undefined): void {
   const root = document.documentElement;
   if (!url || !url.trim()) {
+    logWatermarkDebug('Clearing watermark (no URL)');
     root.style.setProperty(WATERMARK_IMAGE_CSS_VAR, 'none');
     return;
   }
   const safeUrl = url.replace(/"/g, '\\"');
-  root.style.setProperty(WATERMARK_IMAGE_CSS_VAR, `url("${safeUrl}")`);
+  const cssValue = `url("${safeUrl}")`;
+  logWatermarkDebug('Setting watermark:', cssValue);
+  root.style.setProperty(WATERMARK_IMAGE_CSS_VAR, cssValue);
 }
 
 export function useAccountWatermark(

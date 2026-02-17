@@ -747,6 +747,7 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
                 onRedeemAccessCode={accessGate.redeem}
                 onContactManager={() => undefined}
                 onScheduleMeeting={() => undefined}
+                photoUrl={user?.imageUrl}
               />
             </PageWrapper>
           ) : activeTab === 'ecosystem' ? (

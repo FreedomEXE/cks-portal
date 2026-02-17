@@ -809,6 +809,7 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
                 onRedeemAccessCode={accessGate.redeem}
                 onContactManager={() => undefined}
                 onScheduleMeeting={() => undefined}
+                photoUrl={user?.imageUrl}
               />
             </PageWrapper>
           ) : activeTab === 'ecosystem' ? (

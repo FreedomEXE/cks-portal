@@ -1225,6 +1225,7 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
                 accessTier={accessTier}
                 accessSource={accessSource}
                 onRedeemAccessCode={accessGate.redeem}
+                photoUrl={user?.imageUrl}
               />
             </PageWrapper>
           ) : activeTab === 'ecosystem' ? (

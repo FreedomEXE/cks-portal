@@ -67,6 +67,8 @@ export interface ProfileInfoCardProps {
   onRedeemAccessCode?: (code: string) => Promise<void> | void;
   canEditWatermark?: boolean;
   effectiveWatermarkUrl?: string;
+  /** Profile photo URL from Clerk user.imageUrl */
+  photoUrl?: string | null;
 }
 
 export function ProfileInfoCard({
@@ -94,6 +96,7 @@ export function ProfileInfoCard({
   onRedeemAccessCode,
   canEditWatermark = false,
   effectiveWatermarkUrl,
+  photoUrl,
 }: ProfileInfoCardProps) {
   const [activeTab, setActiveTab] = useState('profile');
 
@@ -128,6 +131,7 @@ export function ProfileInfoCard({
             role={role}
             profileData={profileData}
             primaryColor={primaryColor}
+            photoUrl={photoUrl}
           />
         );
       case 'accountManager':

@@ -675,6 +675,7 @@ function CustomerHubContent({ initialTab = 'dashboard' }: CustomerHubProps) {
                 onRedeemAccessCode={accessGate.redeem}
                 onContactManager={() => undefined}
                 onScheduleMeeting={() => undefined}
+                photoUrl={user?.imageUrl}
               />
             </PageWrapper>
           ) : activeTab === 'ecosystem' ? (

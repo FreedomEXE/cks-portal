@@ -29,9 +29,12 @@ export interface ProfileTabProps {
   role: 'manager' | 'contractor' | 'customer' | 'center' | 'crew' | 'warehouse';
   profileData: any;
   primaryColor: string;
+  photoUrl?: string | null;
 }
 
-export function ProfileTab({ role, profileData, primaryColor }: ProfileTabProps) {
+export function ProfileTab({ role, profileData, primaryColor, photoUrl }: ProfileTabProps) {
+  const normalizedPhotoUrl = typeof photoUrl === 'string' ? photoUrl.trim() : '';
+
   const getFieldLabel = (field: string): string => {
     const labels: { [key: string]: string } = {
       fullName: 'Full Name',
@@ -108,7 +111,8 @@ export function ProfileTab({ role, profileData, primaryColor }: ProfileTabProps)
           width: '160px',
           height: '160px',
           borderRadius: '50%',
-          background: 'linear-gradient(135deg, #f3f4f6, #e5e7eb)',
+          background: normalizedPhotoUrl ? '#f3f4f6' : 'linear-gradient(135deg, #f3f4f6, #e5e7eb)',
+          overflow: 'hidden',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -119,9 +123,22 @@ export function ProfileTab({ role, profileData, primaryColor }: ProfileTabProps)
           border: '3px solid #ffffff',
           boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
         }}>
-          <span style={{ userSelect: 'none' }}>{getInitials()}</span>
+          {normalizedPhotoUrl ? (
+            <img
+              src={normalizedPhotoUrl}
+              alt="Profile"
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                display: 'block',
+              }}
+            />
+          ) : (
+            <span style={{ userSelect: 'none' }}>{getInitials()}</span>
+          )}
         </div>
-        {/* Photo upload moved to Settings */}
+        {/* Photo upload available in Settings > Profile Photo */}
       </div>
 
       {/* Profile Info Grid - Right Side */}

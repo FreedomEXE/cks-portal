@@ -673,6 +673,7 @@ function CenterHubContent({ initialTab = 'dashboard' }: CenterHubProps) {
                 onRedeemAccessCode={accessGate.redeem}
                 onContactManager={() => undefined}
                 onScheduleMeeting={() => undefined}
+                photoUrl={user?.imageUrl}
               />
             </PageWrapper>
           ) : activeTab === 'ecosystem' ? (

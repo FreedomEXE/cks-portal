@@ -867,6 +867,7 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
                 onRedeemAccessCode={accessGate.redeem}
                 onContactManager={() => undefined}
                 onScheduleMeeting={() => undefined}
+                photoUrl={user?.imageUrl}
               />
             </PageWrapper>
           ) : activeTab === 'inventory' ? (
