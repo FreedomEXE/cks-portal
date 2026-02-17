@@ -1759,3 +1759,48 @@ useEffect(() => {
 **Priority:** Low (Post-MVP Month 2-3, after critical flows are stable)
 
 **Effort:** 1-2 days
+
+## 27. Durable Storage for Profile Photos and Watermark Images
+
+### Current State (as of February 17, 2026)
+- Profile photo updates are handled via Clerk and mirrored into app preferences.
+- Watermark logo preference is currently stored client-side in localStorage (`logoWatermarkUrl`).
+- Uploaded watermark files may be encoded as data URLs, which can hit browser storage limits and are device/browser specific.
+
+### Problem
+- localStorage is not durable or shared across devices.
+- Data URLs are large and inefficient for long-term storage.
+- Users switching browsers/devices can lose watermark configuration.
+- No centralized governance (size/type limits, lifecycle cleanup, auditability).
+
+### Recommendation
+Move profile/watermark image persistence to backend-managed storage and database metadata.
+
+### Implementation Options
+
+**Option A (Fastest acceptable): DB-persisted URL references**
+- Add `profile_image_url` and `watermark_image_url` to role profile tables (or a shared profile settings table).
+- Expose API endpoints to read/update these URLs.
+- Continue using Clerk-hosted image URL as source for profile photo when available.
+- Use DB values as single source of truth for cross-device consistency.
+- Estimated effort: 1-2 days.
+
+**Option B (Preferred durable architecture): Managed object storage + DB metadata**
+- Add object storage bucket (S3/R2/GCS) for uploads.
+- Backend upload endpoint with validation (mime, size, dimensions), virus scan hook (optional), and signed URL flow.
+- Store only canonical file keys/URLs in DB.
+- Add image lifecycle policies (replacement cleanup, orphan cleanup job).
+- Keep Clerk image update path, but persist canonical CKS watermark asset independently.
+- Estimated effort: 3-5 days.
+
+### Why This Is Not a “Quick Patch”
+- Requires schema/API changes plus security validation around uploads.
+- Needs storage governance and cleanup to avoid orphaned/oversized assets.
+- Should be implemented once as a cross-role platform capability, not per-hub quick fixes.
+
+### Proposed Schedule
+- Design + migration plan by **March 6, 2026**
+- Implementation window (Option B preferred) starting **March 9, 2026**
+
+### Priority
+- **Medium-High** (Post-MVP Month 1-2)
