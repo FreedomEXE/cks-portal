@@ -23,6 +23,7 @@ export interface SettingsTabProps {
     defaultLandingTab?: string;
     theme?: 'light' | 'dark' | 'system';
     logoWatermarkUrl?: string;
+    syncProfilePhotoToWatermark?: boolean;
   };
   onSavePreferences?: (prefs: Partial<SettingsTabProps['preferences']>) => Promise<void> | void;
   availableTabs?: Array<{ id: string; label: string }>;
@@ -65,6 +66,9 @@ export function SettingsTab({
   const [defaultTab, setDefaultTab] = useState(preferences?.defaultLandingTab || 'dashboard');
   const [theme, setTheme] = useState<'light' | 'dark' | 'system'>(preferences?.theme || 'light');
   const [logoWatermarkUrl, setLogoWatermarkUrl] = useState(preferences?.logoWatermarkUrl || '');
+  const [syncPhotoToWatermark, setSyncPhotoToWatermark] = useState(
+    preferences?.syncProfilePhotoToWatermark !== false,
+  );
   const [accessCode, setAccessCode] = useState('');
   const [accessMessage, setAccessMessage] = useState<string | null>(null);
   const [accessError, setAccessError] = useState<string | null>(null);
@@ -92,11 +96,13 @@ export function SettingsTab({
     setDefaultTab(preferences?.defaultLandingTab || 'dashboard');
     setTheme(preferences?.theme || 'light');
     setLogoWatermarkUrl(preferences?.logoWatermarkUrl || '');
+    setSyncPhotoToWatermark(preferences?.syncProfilePhotoToWatermark !== false);
   }, [
     preferences?.hubTitle,
     preferences?.defaultLandingTab,
     preferences?.theme,
     preferences?.logoWatermarkUrl,
+    preferences?.syncProfilePhotoToWatermark,
   ]);
   const displayedWatermarkUrl = (effectiveWatermarkUrl || logoWatermarkUrl || '').trim();
 
@@ -316,9 +322,32 @@ export function SettingsTab({
             <div style={{ padding: 16 }}>
               <p style={{ margin: '0 0 10px 0', fontSize: 12, color: '#6b7280' }}>
                 {canEditWatermark
-                  ? 'Updating your profile photo also updates your contractor watermark logo.'
+                  ? syncPhotoToWatermark
+                    ? 'Updating your profile photo also updates your contractor watermark logo.'
+                    : 'Profile photo and watermark are independent. Your watermark will not change when you upload a photo.'
                   : 'Updating your profile photo does not change ecosystem watermark branding.'}
               </p>
+              {canEditWatermark ? (
+                <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginBottom: 10, fontSize: 12, color: '#475569' }}>
+                  <input
+                    type="checkbox"
+                    checked={syncPhotoToWatermark}
+                    onChange={async (event) => {
+                      const next = event.target.checked;
+                      setSyncPhotoToWatermark(next);
+                      try {
+                        await onSavePreferences?.({ syncProfilePhotoToWatermark: next });
+                        toast.success(next ? 'Profile photo will sync to watermark.' : 'Profile photo sync to watermark disabled.');
+                      } catch (error) {
+                        const message = error instanceof Error ? error.message : 'Failed to update sync setting';
+                        toast.error(message);
+                        setSyncPhotoToWatermark(!next);
+                      }
+                    }}
+                  />
+                  Sync profile photo to watermark automatically
+                </label>
+              ) : null}
               <input
                 type="file"
                 accept="image/*"
@@ -330,7 +359,7 @@ export function SettingsTab({
               <div style={{ display: 'flex', gap: 8, marginTop: 10, alignItems: 'center', flexWrap: 'wrap' as const }}>
                 <button
                   style={{ padding: '8px 12px', background: primaryColor, color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}
-                  disabled={!selectedPhotoFile || isSavingPhoto}
+                  disabled={isSavingPhoto}
                   onClick={async () => {
                     if (!selectedPhotoFile) {
                       toast.error('No photo selected');

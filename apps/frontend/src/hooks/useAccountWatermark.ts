@@ -40,9 +40,18 @@ function setWatermarkImage(url: string | undefined): void {
   root.style.setProperty(WATERMARK_IMAGE_CSS_VAR, cssValue);
 }
 
-function resolveWatermarkUrl(logoWatermarkUrl: string | null | undefined): string {
+function resolveWatermarkUrl(
+  logoWatermarkUrl: string | null | undefined,
+  options?: { fallbackToCks?: boolean },
+): string | undefined {
   const trimmed = typeof logoWatermarkUrl === 'string' ? logoWatermarkUrl.trim() : '';
-  return trimmed || CKS_DEFAULT_WATERMARK_URL;
+  if (trimmed) {
+    return trimmed;
+  }
+  if (options?.fallbackToCks) {
+    return CKS_DEFAULT_WATERMARK_URL;
+  }
+  return undefined;
 }
 
 export function useAccountWatermark(
@@ -75,8 +84,8 @@ export function useAccountWatermark(
     }
 
     if (!hasWatermarkPolicy) {
-      // Non-policy roles/routes still receive the global CKS watermark.
-      setWatermarkImage(CKS_DEFAULT_WATERMARK_URL);
+      // Roles outside the ecosystem watermark policy do not render a fallback watermark.
+      setWatermarkImage(undefined);
       return;
     }
 
@@ -87,7 +96,7 @@ export function useAccountWatermark(
 
     const ownerCode = watermarkOwnerCode;
     if (!ownerCode) {
-      setWatermarkImage(CKS_DEFAULT_WATERMARK_URL);
+      setWatermarkImage(undefined);
       return;
     }
 

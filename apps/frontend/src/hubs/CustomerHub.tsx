@@ -65,7 +65,6 @@ import OverviewSummaryModal, { type OverviewSummaryItem } from '../components/ov
 import { buildSupportTickets, mapSupportIssuePayload } from '../shared/support/supportTickets';
 import { uploadProfilePhotoAndSyncLogo } from '../shared/profilePhoto';
 import {
-  CKS_DEFAULT_WATERMARK_URL,
   canRoleEditWatermark,
   sanitizeWatermarkPreferenceWrite,
 } from '../shared/watermark';
@@ -242,7 +241,7 @@ function CustomerHubContent({ initialTab = 'dashboard' }: CustomerHubProps) {
   );
   const customerEffectiveWatermarkUrl = useMemo(() => {
     const contractorPrefs = loadUserPreferences(contractorWatermarkCode);
-    return contractorPrefs.logoWatermarkUrl?.trim() || CKS_DEFAULT_WATERMARK_URL;
+    return contractorPrefs.logoWatermarkUrl?.trim() || '';
   }, [contractorWatermarkCode]);
   const { data: certifiedServicesData, isLoading: certifiedServicesLoading } = useCertifiedServices(normalizedCode, 'customer', 500);
   const { mutate } = useSWRConfig();

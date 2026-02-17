@@ -30,6 +30,7 @@ export function parseEntityId(id: string | null | undefined): ParsedEntityId {
 
   const normalizedId = id.trim().toUpperCase();
   const scope = extractScope(id);
+  const segments = normalizedId.split('-');
 
   // Order IDs: contain -PO- (product order) or -SO- (service order)
   if (normalizedId.includes('-PO-')) {
@@ -94,12 +95,21 @@ export function parseEntityId(id: string | null | undefined): ParsedEntityId {
 
   for (const [prefix, subtype] of Object.entries(userPrefixMap)) {
     if (normalizedId.startsWith(prefix)) {
-      // Make sure it's not an order/report (those have additional segments)
-      const segments = normalizedId.split('-');
-      // User IDs are exactly 2 segments: PREFIX-NUMBER
-      // Test IDs allow a trailing "-TEST" suffix.
-      // Orders are 4+ segments: PREFIX-NUMBER-TYPE-NUMBER
-      if (segments.length === 2 || (segments.length === 3 && segments[2] === 'TEST')) {
+      const hasNestedEntityToken = segments.some((segment, index) => {
+        if (index < 2) {
+          return false;
+        }
+        return segment === 'PO' ||
+          segment === 'SO' ||
+          segment === 'RPT' ||
+          segment === 'FBK' ||
+          segment === 'SRV' ||
+          segment === 'PRO' ||
+          segment === 'TRN' ||
+          segment === 'PRD';
+      });
+
+      if (!hasNestedEntityToken) {
         return { type: 'user', id, subtype, scope };
       }
     }
@@ -174,6 +184,35 @@ export function isValidId(id: string | null | undefined): boolean {
   if (!id) return false;
 
   const normalizedId = id.trim().toUpperCase();
+  const segments = normalizedId.split('-');
+  const hasUserPrefix =
+    normalizedId.startsWith('MGR-') ||
+    normalizedId.startsWith('CON-') ||
+    normalizedId.startsWith('CUS-') ||
+    normalizedId.startsWith('CEN-') ||
+    normalizedId.startsWith('CRW-') ||
+    normalizedId.startsWith('WAR-') ||
+    normalizedId.startsWith('WHS-');
+
+  if (hasUserPrefix) {
+    const hasNestedEntityToken = segments.some((segment, index) => {
+      if (index < 2) {
+        return false;
+      }
+      return segment === 'PO' ||
+        segment === 'SO' ||
+        segment === 'RPT' ||
+        segment === 'FBK' ||
+        segment === 'SRV' ||
+        segment === 'PRO' ||
+        segment === 'TRN' ||
+        segment === 'PRD';
+    });
+
+    if (!hasNestedEntityToken) {
+      return true;
+    }
+  }
 
   // Pattern 1: Simple entity ID (SRV-001, PRO-055, etc.)
   // Pattern 2: User ID (CON-010, MGR-005, etc.)

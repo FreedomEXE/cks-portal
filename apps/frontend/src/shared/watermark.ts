@@ -63,13 +63,17 @@ export function resolveWatermarkOwnerCode(
   return null;
 }
 
-export function sanitizeWatermarkPreferenceWrite<T extends { logoWatermarkUrl?: string }>(
+export function sanitizeWatermarkPreferenceWrite<T extends { logoWatermarkUrl?: string; syncProfilePhotoToWatermark?: boolean }>(
   role: string | null | undefined,
   prefs: Partial<T>,
 ): Partial<T> {
   if (canRoleEditWatermark(role)) {
     return prefs;
   }
-  const { logoWatermarkUrl: _ignored, ...rest } = prefs;
+  const {
+    logoWatermarkUrl: _ignoredLogo,
+    syncProfilePhotoToWatermark: _ignoredSync,
+    ...rest
+  } = prefs;
   return rest as Partial<T>;
 }

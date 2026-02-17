@@ -155,6 +155,22 @@ const EcosystemTree: React.FC<EcosystemTreeProps> = ({
     // Calculate counts based on role
     const role = roleKey;
     const badges = [];
+    const openNodeProfile = (event: React.MouseEvent) => {
+      if (!onNodeClick) {
+        return;
+      }
+      event.stopPropagation();
+      onNodeClick(node.user.id);
+    };
+    const handleRowClick = () => {
+      if (onNodeClick) {
+        onNodeClick(node.user.id);
+        return;
+      }
+      if (hasChildren) {
+        toggle(node.user.id);
+      }
+    };
 
     if (role === 'manager') {
       // Manager shows: contractors, customers, centers, crew
@@ -199,14 +215,14 @@ const EcosystemTree: React.FC<EcosystemTreeProps> = ({
             gap: 8,
             padding: 12,
             borderRadius: 8,
-            cursor: hasChildren ? 'pointer' : 'default',
+            cursor: onNodeClick ? 'pointer' : hasChildren ? 'pointer' : 'default',
             background: isCurrentUser ? highlightStyle.bg : '#fff',
             border: isCurrentUser ? `2px solid ${highlightStyle.border}` : '1px solid #e5e7eb',
             paddingLeft: 12 + level * 20,
             transition: 'all 0.2s ease',
             position: 'relative'
           }}
-          onClick={() => hasChildren && toggle(node.user.id)}
+          onClick={handleRowClick}
           onMouseEnter={(e) => {
             if (!isCurrentUser) {
               e.currentTarget.style.background = '#f9fafb';
@@ -222,7 +238,15 @@ const EcosystemTree: React.FC<EcosystemTreeProps> = ({
             width: 16,
             textAlign: 'center',
             color: '#6b7280',
-            fontSize: 12
+            fontSize: 12,
+            cursor: hasChildren ? 'pointer' : 'default'
+          }}
+          onClick={(e) => {
+            if (!hasChildren) {
+              return;
+            }
+            e.stopPropagation();
+            toggle(node.user.id);
           }}>
             {hasChildren ? (isOpen ? '▼' : '▶') : ''}
           </span>
@@ -243,16 +267,16 @@ const EcosystemTree: React.FC<EcosystemTreeProps> = ({
           <span
             style={{ fontWeight: 700, color: '#111827', cursor: onNodeClick ? 'pointer' : 'default', textDecoration: onNodeClick ? 'underline' : 'none' }}
             title={onNodeClick ? 'Open profile' : undefined}
-            onClick={(e) => {
-              if (!onNodeClick) return;
-              e.stopPropagation();
-              onNodeClick(node.user.id);
-            }}
+            onClick={openNodeProfile}
           >
             {node.user.id}
           </span>
 
-          <span style={{ color: '#6b7280', marginRight: 'auto' }}>
+          <span
+            style={{ color: '#6b7280', marginRight: 'auto', cursor: onNodeClick ? 'pointer' : 'default' }}
+            title={onNodeClick ? 'Open profile' : undefined}
+            onClick={openNodeProfile}
+          >
             — {node.user.name}
           </span>
 

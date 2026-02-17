@@ -54,6 +54,7 @@ export interface ProfileInfoCardProps {
     defaultLandingTab?: string;
     theme?: 'light'|'dark'|'system';
     logoWatermarkUrl?: string;
+    syncProfilePhotoToWatermark?: boolean;
   };
   onSaveUserPreferences?: (prefs: Partial<ProfileInfoCardProps['userPreferences']>) => void;
   availableTabs?: Array<{ id: string; label: string }>;

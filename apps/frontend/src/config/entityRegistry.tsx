@@ -48,6 +48,7 @@ import type { ActivityModalProps } from '@cks/ui';
 import { DetailsComposer, ProfileInfoCard, getEntityAccentColor } from '@cks/domain-widgets';
 import { filterVisibleSections } from '../policies/sections';
 import { mapProfileDataForRole } from '../shared/utils/profileMapping';
+import { loadUserPreferencesWithFallback } from '../shared/preferences';
 import { patchServiceAssignments } from '../shared/api/admin';
 import { updateInventory, getProductInventory } from '../shared/api/admin';
 import ServiceAssignmentsTab from '../components/tabs/ServiceAssignmentsTab/ServiceAssignmentsTab';
@@ -1677,6 +1678,32 @@ function UserQuickActionsContent({ actions }: { actions: EntityAction[] }) {
   return <UserQuickActions actions={actions} />;
 }
 
+function extractUserProfilePhotoUrl(entityType: string, entityData: any, userId: string): string | undefined {
+  const directUrlCandidates = [
+    entityData?.photoUrl,
+    entityData?.imageUrl,
+    entityData?.avatarUrl,
+    entityData?.profileImageUrl,
+  ];
+
+  for (const candidate of directUrlCandidates) {
+    if (typeof candidate === 'string' && candidate.trim().length > 0) {
+      return candidate.trim();
+    }
+  }
+
+  // Contractors commonly use their branding asset as profile identity in ecosystem views.
+  if (entityType === 'contractor' && userId) {
+    const prefs = loadUserPreferencesWithFallback(userId);
+    const fallbackLogo = prefs.logoWatermarkUrl?.trim();
+    if (fallbackLogo) {
+      return fallbackLogo;
+    }
+  }
+
+  return undefined;
+}
+
 /**
  * User Adapter (for manager, contractor, customer, center, crew, warehouse)
  */
@@ -1778,6 +1805,7 @@ const userAdapter: EntityAdapter = {
     const userId = profileData.managerId || profileData.contractorId || profileData.customerId ||
                    profileData.centerId || profileData.crewId || profileData.warehouseId ||
                    entityData?.id || '';
+    const photoUrl = extractUserProfilePhotoUrl(entityType, entityData, userId);
 
     // Add name field (used by EntityHeaderCard)
     if (profileData.fullName || profileData.name) {
@@ -1820,6 +1848,7 @@ const userAdapter: EntityAdapter = {
               entityId={userId}
               entityData={entityData}
               profileData={profileData}
+              photoUrl={photoUrl}
             />
           ) : (
             <ProfileInfoCard
@@ -1830,6 +1859,7 @@ const userAdapter: EntityAdapter = {
               hideTabs
               borderless
               enabledTabs={['profile']}
+              photoUrl={photoUrl}
             />
           )
         ),

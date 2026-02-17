@@ -64,7 +64,6 @@ import OverviewSummaryModal, { type OverviewSummaryItem } from '../components/ov
 import { buildSupportTickets, mapSupportIssuePayload } from '../shared/support/supportTickets';
 import { uploadProfilePhotoAndSyncLogo } from '../shared/profilePhoto';
 import {
-  CKS_DEFAULT_WATERMARK_URL,
   canRoleEditWatermark,
   sanitizeWatermarkPreferenceWrite,
 } from '../shared/watermark';
@@ -247,7 +246,7 @@ function CenterHubContent({ initialTab = 'dashboard' }: CenterHubProps) {
   );
   const centerEffectiveWatermarkUrl = useMemo(() => {
     const contractorPrefs = loadUserPreferences(contractorWatermarkCode);
-    return contractorPrefs.logoWatermarkUrl?.trim() || CKS_DEFAULT_WATERMARK_URL;
+    return contractorPrefs.logoWatermarkUrl?.trim() || '';
   }, [contractorWatermarkCode]);
 
   // Signal when critical data is loaded

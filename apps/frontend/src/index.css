@@ -26,7 +26,7 @@ html {
   --hub-gutter: var(--page-gutter);
   --hero-gutter: clamp(12px, 2.5vw, 16px);
   --cks-account-watermark-image: none;
-  --cks-account-watermark-opacity: 0.15;
+  --cks-account-watermark-opacity: 0.09;
 }
 
 .dark {
@@ -55,7 +55,7 @@ body::before {
   z-index: 0;
   background-image: var(--cks-account-watermark-image);
   background-repeat: no-repeat;
-  background-position: center 56%;
+  background-position: center center;
   background-size: min(56vw, 860px);
   opacity: var(--cks-account-watermark-opacity);
   filter: grayscale(1);

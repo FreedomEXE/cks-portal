@@ -91,6 +91,7 @@ export interface EditableUserProfileTabProps {
   entityId: string;
   entityData: any;
   profileData: any;
+  photoUrl?: string | null;
 }
 
 export default function EditableUserProfileTab({
@@ -98,6 +99,7 @@ export default function EditableUserProfileTab({
   entityId,
   entityData,
   profileData,
+  photoUrl,
 }: EditableUserProfileTabProps) {
   const { getToken } = useAuth();
   const { mutate } = useSWRConfig();
@@ -206,6 +208,7 @@ export default function EditableUserProfileTab({
       .toUpperCase()
       .slice(0, 2);
   };
+  const normalizedPhotoUrl = typeof photoUrl === 'string' ? photoUrl.trim() : '';
 
   const formatValue = (value: any) => {
     if (value === null || value === undefined || value === '') {
@@ -226,7 +229,8 @@ export default function EditableUserProfileTab({
           width: '160px',
           height: '160px',
           borderRadius: '50%',
-          background: 'linear-gradient(135deg, #f3f4f6, #e5e7eb)',
+          background: normalizedPhotoUrl ? '#f3f4f6' : 'linear-gradient(135deg, #f3f4f6, #e5e7eb)',
+          overflow: 'hidden',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -237,7 +241,22 @@ export default function EditableUserProfileTab({
           border: '3px solid #ffffff',
           boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
         }}>
-          <span style={{ userSelect: 'none' }}>{getInitials()}</span>
+          {normalizedPhotoUrl ? (
+            <img
+              src={normalizedPhotoUrl}
+              alt="Profile"
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'contain',
+                objectPosition: 'center',
+                background: '#ffffff',
+                display: 'block',
+              }}
+            />
+          ) : (
+            <span style={{ userSelect: 'none' }}>{getInitials()}</span>
+          )}
         </div>
       </div>
 

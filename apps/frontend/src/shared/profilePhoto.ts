@@ -1,4 +1,5 @@
 import { saveUserPreferences } from './preferences';
+import { loadUserPreferencesWithFallback } from './preferences';
 import { canRoleEditWatermark } from './watermark';
 import type { WatermarkRole } from './watermark';
 
@@ -40,6 +41,11 @@ async function waitForUpdatedImageUrl(user: ClerkLikeUser): Promise<string> {
   return '';
 }
 
+function shouldSyncProfilePhotoToWatermark(userCode: string | null | undefined): boolean {
+  const prefs = loadUserPreferencesWithFallback(userCode);
+  return prefs.syncProfilePhotoToWatermark !== false;
+}
+
 export async function uploadProfilePhotoAndSyncLogo(
   user: ClerkLikeUser | null | undefined,
   file: File,
@@ -59,7 +65,7 @@ export async function uploadProfilePhotoAndSyncLogo(
   }
 
   // Only sync watermark logo for contractors
-  if (canRoleEditWatermark(role)) {
+  if (canRoleEditWatermark(role) && shouldSyncProfilePhotoToWatermark(userCode)) {
     const nextImageUrl = await waitForUpdatedImageUrl(user);
     if (nextImageUrl) {
       // Save watermark preference (this already emits the change event)

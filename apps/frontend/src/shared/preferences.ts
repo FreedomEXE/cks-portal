@@ -3,6 +3,11 @@ export type UserPreferences = {
   defaultLandingTab?: string;
   theme?: 'light' | 'dark' | 'system';
   logoWatermarkUrl?: string;
+  /**
+   * Contractor-only preference.
+   * When true (default), profile photo uploads also update watermark logo.
+   */
+  syncProfilePhotoToWatermark?: boolean;
 };
 
 const KEY_PREFIX = 'cks_prefs_';
