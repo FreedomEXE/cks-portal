@@ -1,7 +1,6 @@
 import { Forgot, Login, RoleGuard, useAuth } from '@cks/auth';
 import { useEffect, useRef, type ComponentType } from 'react';
 import { Navigate, Route, Routes, useSearchParams } from 'react-router-dom';
-import { useLoading } from './contexts/LoadingContext';
 import { useHubLoading } from './contexts/HubLoadingContext';
 import { ModalProvider } from './contexts/ModalProvider';
 import { AccessGate } from './components/AccessGate';
@@ -112,9 +111,7 @@ function RoleHubRoute(): JSX.Element {
 export function AuthenticatedApp(): JSX.Element {
   console.log('[AuthenticatedApp] Rendering authenticated app');
   const { code, status, role } = useAuth();
-  const { visible } = useLoading();
-  const { isHubLoading } = useHubLoading();
-  useAccountWatermark(code, role, { enabled: status === 'ready' && !visible && !isHubLoading });
+  useAccountWatermark(code, role, { enabled: status === 'ready' });
 
   return (
     <ErrorBoundary>

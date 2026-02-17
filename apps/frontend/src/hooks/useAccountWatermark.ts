@@ -65,12 +65,14 @@ export function useAccountWatermark(
 
   useEffect(() => {
     if (!enabled) {
-      setWatermarkImage(undefined);
+      // Keep a subtle baseline watermark even while auth state is resolving.
+      setWatermarkImage(CKS_DEFAULT_WATERMARK_URL);
       return;
     }
 
     if (!hasWatermarkPolicy) {
-      setWatermarkImage(undefined);
+      // Non-policy roles/routes still receive the global CKS watermark.
+      setWatermarkImage(CKS_DEFAULT_WATERMARK_URL);
       return;
     }
 
