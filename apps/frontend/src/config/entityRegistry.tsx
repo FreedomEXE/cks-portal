@@ -1711,15 +1711,26 @@ const userAdapter: EntityAdapter = {
   getActionDescriptors: (context: EntityActionContext): EntityActionDescriptor[] => {
     const { role, state, entityData } = context;
     const descriptors: EntityActionDescriptor[] = [];
+    const linkedClerkIdRaw = entityData?.clerkUserId ?? null;
+    const isLinkedUser = typeof linkedClerkIdRaw === 'string' && linkedClerkIdRaw.trim().length > 0;
 
     // Admin records use the same modal shell but only support invitation from here.
     if (role === 'admin' && context.entityType === 'admin') {
       const adminCksCodeRaw = entityData?.cksCode ?? context.entityId ?? '';
       const adminCksCode = typeof adminCksCodeRaw === 'string' ? adminCksCodeRaw.trim() : '';
       if (state === 'active') {
+        if (isLinkedUser) {
+          descriptors.push({
+            key: 'linked_status',
+            label: 'User already linked',
+            variant: 'secondary',
+            disabled: true,
+            closeOnSuccess: false,
+          });
+        }
         descriptors.push({
           key: 'invite',
-          label: 'Invite',
+          label: isLinkedUser ? 'Resend Invite' : 'Invite',
           variant: 'primary',
           closeOnSuccess: false,
           payload: {
@@ -1736,21 +1747,43 @@ const userAdapter: EntityAdapter = {
     // Admin actions only
     if (role === 'admin') {
       if (state === 'active') {
+        if (isLinkedUser) {
+          descriptors.push({
+            key: 'linked_status',
+            label: 'User already linked',
+            variant: 'secondary',
+            disabled: true,
+            closeOnSuccess: false,
+          });
+        }
+
         // Invite action
         descriptors.push({
           key: 'invite',
-          label: 'Invite',
+          label: isLinkedUser ? 'Resend Invite' : 'Invite',
           variant: 'primary',
           closeOnSuccess: false,
         });
 
-        descriptors.push({
-          key: 'impersonate',
-          label: 'Impersonate',
-          variant: 'secondary',
-          confirm: 'Impersonate this user? This will switch your session.',
-          closeOnSuccess: true,
-        });
+        if (isLinkedUser) {
+          descriptors.push({
+            key: 'unlink',
+            label: 'Unlink',
+            variant: 'danger',
+            confirm: 'Unlink this user from Clerk sign-in? They will need a new invite to sign in again.',
+            closeOnSuccess: false,
+          });
+        }
+
+        if (isLinkedUser) {
+          descriptors.push({
+            key: 'impersonate',
+            label: 'Impersonate',
+            variant: 'secondary',
+            confirm: 'Impersonate this user? This will switch your session.',
+            closeOnSuccess: true,
+          });
+        }
 
         // Edit action
         descriptors.push({
@@ -1852,6 +1885,7 @@ const userAdapter: EntityAdapter = {
       const fullName = entityData?.fullName ?? entityData?.name ?? entityData?.id ?? 'Admin';
       const cksCode = entityData?.cksCode ?? entityData?.id ?? 'N/A';
       const status = entityData?.status ?? 'active';
+      const linkState = entityData?.clerkUserId ? 'linked' : 'not linked';
 
       return [
         {
@@ -1872,6 +1906,7 @@ const userAdapter: EntityAdapter = {
               <div><strong>Username:</strong> {cksCode}</div>
               <div><strong>Email:</strong> {email}</div>
               <div><strong>Status:</strong> {status}</div>
+              <div><strong>Clerk Link:</strong> {linkState}</div>
             </div>
           ),
         },

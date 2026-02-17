@@ -252,6 +252,30 @@ export async function linkClerkUserToAccount(
   return result.rowCount > 0;
 }
 
+export async function unlinkClerkUserFromAccount(
+  role: IdentityEntity,
+  cksCode: string,
+): Promise<boolean> {
+  const normalizedCode = normalizeIdentity(cksCode);
+  if (!normalizedCode) {
+    return false;
+  }
+
+  const config = ROLE_TABLES.find((entry) => entry.role === role);
+  if (!config) {
+    return false;
+  }
+
+  const result = await query(
+    `UPDATE ${config.tableName}
+     SET clerk_user_id = NULL, updated_at = NOW()
+     WHERE UPPER(${config.codeColumn}) = $1 AND clerk_user_id IS NOT NULL`,
+    [normalizedCode],
+  );
+
+  return result.rowCount > 0;
+}
+
 async function findRoleAccountByClerkId(config: RoleTableConfig, clerkUserId: string): Promise<HubAccountRecord | null> {
   const sql = `SELECT ${selectColumns(config)} FROM ${config.tableName} WHERE clerk_user_id = $1 LIMIT 1`;
   const result = await query<Record<string, unknown>>(sql, [clerkUserId]);

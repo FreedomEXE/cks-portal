@@ -22,7 +22,7 @@ import { useAuth as useClerkAuth, useSignIn, useClerk } from '@clerk/clerk-react
 import { parseEntityId } from '../shared/utils/parseEntityId';
 import { applyHubOrderAction, type OrderActionRequest, acknowledgeItem, resolveReport, applyServiceAction, requestServiceCrew, respondToServiceCrew, respondToOrderCrew, respondToCrewInvite } from '../shared/api/hub';
 import { archiveAPI } from '../shared/api/archive';
-import { createImpersonationToken, sendUserInvite, updateCatalogService } from '../shared/api/admin';
+import { createImpersonationToken, sendUserInvite, unlinkUserAccountLink, updateCatalogService } from '../shared/api/admin';
 
 export interface EntityActionOptions {
   notes?: string;
@@ -573,6 +573,31 @@ async function handleUserAction(
           inviteStatus: invite?.inviteStatus,
           inviteAlreadyPending: invite?.inviteAlreadyPending,
         });
+        options.onSuccess?.();
+        return true;
+      }
+      case 'unlink': {
+        const result = await unlinkUserAccountLink(
+          { entityType, entityId: userId },
+          { getToken: impersonation.getToken }
+        );
+
+        if (result.alreadyUnlinked) {
+          toast.success('User was already unlinked');
+        } else if (result.unlinked) {
+          toast.success('User unlinked successfully');
+        } else {
+          toast.error('Failed to unlink user');
+          return false;
+        }
+
+        mutate((key: any) => typeof key === 'string' && (
+          key.includes('/admin/directory') ||
+          key.includes('/admin/users') ||
+          key.includes('/profile/') ||
+          key.includes(userId)
+        ));
+
         options.onSuccess?.();
         return true;
       }

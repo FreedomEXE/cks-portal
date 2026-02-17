@@ -11,7 +11,12 @@ import {
 } from "./store";
 import { requireActiveAdmin } from "./guards";
 import { clerkClient } from "../../core/clerk/client";
-import { getClerkUserIdByRoleAndCode, getIdentityContactByRoleAndCode, linkClerkUserToAccount } from "../identity";
+import {
+  getClerkUserIdByRoleAndCode,
+  getIdentityContactByRoleAndCode,
+  linkClerkUserToAccount,
+  unlinkClerkUserFromAccount,
+} from "../identity";
 import type { AdminUserCreateInput, AdminUserUpdateInput, AdminUserQueryOptions } from "./types";
 
 function coerceQuery(query: FastifyRequest['query']): AdminUserQueryOptions {
@@ -505,6 +510,64 @@ export async function registerAdminUserRoutes(server: FastifyInstance) {
         inviteStatus: invite.invitation?.status ?? null,
         inviteAlreadyPending: invite.alreadyPending,
         inviteCreatedAt: invite.invitation?.createdAt ?? null,
+      },
+    });
+  });
+
+  server.post("/api/admin/account-links/unlink", async (request, reply) => {
+    const auth = await requireActiveAdmin(request, reply);
+    if (!auth) return;
+
+    const body = request.body as { entityType?: string; entityId?: string };
+    const entityType = String(body?.entityType ?? "").trim().toLowerCase();
+    const entityId = String(body?.entityId ?? "").trim().toUpperCase();
+
+    const allowedEntityTypes = new Set([
+      "manager",
+      "contractor",
+      "customer",
+      "center",
+      "crew",
+      "warehouse",
+    ]);
+
+    if (!allowedEntityTypes.has(entityType)) {
+      reply.code(400).send({ error: "Invalid entity type for unlink" });
+      return;
+    }
+
+    if (!entityId) {
+      reply.code(400).send({ error: "Invalid entity id" });
+      return;
+    }
+
+    const contact = await getIdentityContactByRoleAndCode(entityType as any, entityId);
+    if (!contact) {
+      reply.code(404).send({ error: "User not found" });
+      return;
+    }
+
+    if (!contact.clerkUserId) {
+      reply.send({
+        data: {
+          entityType,
+          entityId,
+          wasLinked: false,
+          unlinked: false,
+          alreadyUnlinked: true,
+        },
+      });
+      return;
+    }
+
+    const unlinked = await unlinkClerkUserFromAccount(entityType as any, entityId);
+    reply.send({
+      data: {
+        entityType,
+        entityId,
+        wasLinked: true,
+        unlinked,
+        alreadyUnlinked: false,
       },
     });
   });

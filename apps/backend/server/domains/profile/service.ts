@@ -131,6 +131,7 @@ function normalizeUserEntity(entityType: string, row: any): any {
     case 'manager':
       return {
         id: formatPrefixedId(row.manager_id, 'MGR'),
+        clerkUserId: toNullableString(row.clerk_user_id ?? row.clerkUserId),
         name: row.name ?? row.manager_id,
         email: toNullableString(row.email),
         phone: toNullableString(row.phone),
@@ -147,6 +148,7 @@ function normalizeUserEntity(entityType: string, row: any): any {
     case 'contractor':
       return {
         id: formatPrefixedId(row.contractor_id, 'CON'),
+        clerkUserId: toNullableString(row.clerk_user_id ?? row.clerkUserId),
         managerId: toNullableString(row.cks_manager),
         name: row.name ?? '',
         mainContact: toNullableString(row.contact_person),
@@ -162,6 +164,7 @@ function normalizeUserEntity(entityType: string, row: any): any {
     case 'customer':
       return {
         id: formatPrefixedId(row.customer_id, 'CUS'),
+        clerkUserId: toNullableString(row.clerk_user_id ?? row.clerkUserId),
         name: toNullableString(row.name),
         managerId: toNullableString(row.cks_manager),
         mainContact: toNullableString(row.main_contact),
@@ -178,6 +181,7 @@ function normalizeUserEntity(entityType: string, row: any): any {
     case 'center':
       return {
         id: formatPrefixedId(row.center_id, 'CEN'),
+        clerkUserId: toNullableString(row.clerk_user_id ?? row.clerkUserId),
         name: toNullableString(row.name),
         mainContact: toNullableString(row.main_contact),
         email: toNullableString(row.email),
@@ -195,6 +199,7 @@ function normalizeUserEntity(entityType: string, row: any): any {
     case 'crew':
       return {
         id: formatPrefixedId(row.crew_id, 'CRW'),
+        clerkUserId: toNullableString(row.clerk_user_id ?? row.clerkUserId),
         name: toNullableString(row.name),
         emergencyContact: toNullableString(row.emergency_contact),
         email: toNullableString(row.email),
@@ -211,6 +216,7 @@ function normalizeUserEntity(entityType: string, row: any): any {
     case 'warehouse':
       return {
         id: formatPrefixedId(row.warehouse_id, 'WHS'),
+        clerkUserId: toNullableString(row.clerk_user_id ?? row.clerkUserId),
         name: toNullableString(row.name),
         managerId: toNullableString(row.manager_id),
         managerName: toNullableString(row.manager),

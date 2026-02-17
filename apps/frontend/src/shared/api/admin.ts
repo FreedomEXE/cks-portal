@@ -98,11 +98,37 @@ export interface InviteResponse {
   inviteCreatedAt?: number | null;
 }
 
+export interface UnlinkAccountRequest {
+  entityType: string;
+  entityId: string;
+}
+
+export interface UnlinkAccountResponse {
+  entityType: string;
+  entityId: string;
+  wasLinked: boolean;
+  unlinked: boolean;
+  alreadyUnlinked: boolean;
+}
+
 export async function sendUserInvite(
   payload: InviteRequest,
   init?: ApiFetchInit,
 ): Promise<InviteResponse> {
   const response = await apiFetch<ApiResponse<InviteResponse>>('/admin/invitations', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    headers: { 'Content-Type': 'application/json', ...(init?.headers || {}) },
+    ...init,
+  });
+  return response.data;
+}
+
+export async function unlinkUserAccountLink(
+  payload: UnlinkAccountRequest,
+  init?: ApiFetchInit,
+): Promise<UnlinkAccountResponse> {
+  const response = await apiFetch<ApiResponse<UnlinkAccountResponse>>('/admin/account-links/unlink', {
     method: 'POST',
     body: JSON.stringify(payload),
     headers: { 'Content-Type': 'application/json', ...(init?.headers || {}) },
