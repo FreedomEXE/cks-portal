@@ -1113,13 +1113,7 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
   }, [user?.id]);
 
   const handleUploadPhoto = useCallback(async (file: File) => {
-    try {
-      await uploadProfilePhotoAndSyncLogo(user, file, authCode);
-      toast.success('Profile photo updated');
-    } catch (e: any) {
-      console.error('[manager] photo upload failed', e);
-      toast.error(e?.message || 'Failed to update photo');
-    }
+    await uploadProfilePhotoAndSyncLogo(user, file, authCode);
   }, [authCode, user]);
 
   const handleSupportSubmit = useCallback(async (payload: any) => {

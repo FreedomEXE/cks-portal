@@ -208,13 +208,7 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
   const { setHubLoading } = useHubLoading();
   const accessGate = useAccessCodeRedemption();
   const handleUploadPhoto = useCallback(async (file: File) => {
-    try {
-      await uploadProfilePhotoAndSyncLogo(user, file, normalizedCode);
-      toast.success('Profile photo updated');
-    } catch (e: any) {
-      console.error('photo upload failed', e);
-      toast.error(e?.message || 'Failed to update photo');
-    }
+    await uploadProfilePhotoAndSyncLogo(user, file, normalizedCode);
   }, [normalizedCode, user]);
 
   // Centralized entity action handler (replaces handleOrderAction)

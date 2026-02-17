@@ -59,6 +59,15 @@ Purpose: keep a single, lightweight list of stubbed modules, their intent, and w
 - `shared/types/customId.d.ts` — formalize ID grammar/types once parser is promoted to shared.
 - `shared/utils/codegen/generate-contracts.ts` — generate OpenAPI/TS contracts post‑MVP.
 
+### Profile Media Storage (Option B - deferred)
+- Current state (quick path): profile photos and watermark logos are synced from Clerk + stored in browser preferences (`localStorage`) per user code.
+- Deferred proper implementation: persist profile photo URL and watermark image metadata in the CKS database (tenant-scoped), expose via API, and hydrate preferences from server instead of local-only storage.
+- Migration target:
+  - Add DB table/fields for profile media and watermark media per account/user.
+  - Use signed upload flow/object storage for raw assets.
+  - Keep Clerk image as identity avatar, but treat CKS profile/watermark as first-class app settings.
+  - Add one-time migration from existing local preferences when server-backed settings are available.
+
 ### Tooling & Scripts
 - `scripts/devctl.js` — developer utility (scaffold, flag toggles, quick auth context setters).
 

@@ -9,6 +9,7 @@
  */
 
 import React, { useEffect, useMemo, useState } from 'react';
+import toast from 'react-hot-toast';
 
 export interface SettingsTabProps {
   primaryColor: string;
@@ -21,7 +22,7 @@ export interface SettingsTabProps {
     theme?: 'light' | 'dark' | 'system';
     logoWatermarkUrl?: string;
   };
-  onSavePreferences?: (prefs: Partial<SettingsTabProps['preferences']>) => void;
+  onSavePreferences?: (prefs: Partial<SettingsTabProps['preferences']>) => Promise<void> | void;
   availableTabs?: Array<{ id: string; label: string }>;
   onSetTheme?: (t: 'light' | 'dark' | 'system') => void;
   passwordResetAvailable?: boolean;
@@ -62,6 +63,10 @@ export function SettingsTab({
   const [accessMessage, setAccessMessage] = useState<string | null>(null);
   const [accessError, setAccessError] = useState<string | null>(null);
   const [isRedeeming, setIsRedeeming] = useState(false);
+  const [isSavingTitle, setIsSavingTitle] = useState(false);
+  const [isSavingLogo, setIsSavingLogo] = useState(false);
+  const [selectedPhotoFile, setSelectedPhotoFile] = useState<File | null>(null);
+  const [isSavingPhoto, setIsSavingPhoto] = useState(false);
   const statusLabel = accessStatus === 'active' ? 'Active' : 'Pending';
   const tierLabel =
     accessTier === 'standard' ? 'Free' : accessTier === 'premium' ? 'Premium' : accessTier;
@@ -132,9 +137,21 @@ export function SettingsTab({
                 <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                   <button
                     style={{ padding: '8px 12px', background: primaryColor, color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}
-                    onClick={() => onSavePreferences?.({ hubTitle: hubTitle.trim() || undefined })}
+                    disabled={isSavingTitle}
+                    onClick={async () => {
+                      setIsSavingTitle(true);
+                      try {
+                        await onSavePreferences?.({ hubTitle: hubTitle.trim() || undefined });
+                        toast.success('Hub title saved');
+                      } catch (error) {
+                        const message = error instanceof Error ? error.message : 'Failed to save hub title';
+                        toast.error(message);
+                      } finally {
+                        setIsSavingTitle(false);
+                      }
+                    }}
                   >
-                    Save Title
+                    {isSavingTitle ? 'Saving...' : 'Save Title'}
                   </button>
                   <button
                     style={{ padding: '8px 12px', background: 'var(--card-muted)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer' }}
@@ -194,7 +211,6 @@ export function SettingsTab({
                             return;
                           }
                           setLogoWatermarkUrl(nextUrl);
-                          onSavePreferences?.({ logoWatermarkUrl: nextUrl });
                         };
                         reader.readAsDataURL(file);
                         e.currentTarget.value = '';
@@ -203,10 +219,20 @@ export function SettingsTab({
                     {logoWatermarkUrl ? (
                       <button
                         style={{ padding: '8px 12px', background: 'var(--card-muted)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer' }}
-                        onClick={() => {
-                          setLogoWatermarkUrl('');
-                          onSavePreferences?.({ logoWatermarkUrl: undefined });
+                        onClick={async () => {
+                          setIsSavingLogo(true);
+                          try {
+                            setLogoWatermarkUrl('');
+                            await onSavePreferences?.({ logoWatermarkUrl: undefined });
+                            toast.success('Watermark logo removed');
+                          } catch (error) {
+                            const message = error instanceof Error ? error.message : 'Failed to remove watermark logo';
+                            toast.error(message);
+                          } finally {
+                            setIsSavingLogo(false);
+                          }
                         }}
+                        disabled={isSavingLogo}
                       >
                         Remove Logo
                       </button>
@@ -222,9 +248,21 @@ export function SettingsTab({
                   <div style={{ display: 'flex', gap: 8 }}>
                     <button
                       style={{ padding: '8px 12px', background: primaryColor, color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}
-                      onClick={() => onSavePreferences?.({ logoWatermarkUrl: logoWatermarkUrl.trim() || undefined })}
+                      disabled={isSavingLogo}
+                      onClick={async () => {
+                        setIsSavingLogo(true);
+                        try {
+                          await onSavePreferences?.({ logoWatermarkUrl: logoWatermarkUrl.trim() || undefined });
+                          toast.success('Watermark logo saved');
+                        } catch (error) {
+                          const message = error instanceof Error ? error.message : 'Failed to save watermark logo';
+                          toast.error(message);
+                        } finally {
+                          setIsSavingLogo(false);
+                        }
+                      }}
                     >
-                      Save Logo
+                      {isSavingLogo ? 'Saving...' : 'Save Logo'}
                     </button>
                   </div>
 
@@ -257,13 +295,40 @@ export function SettingsTab({
               <input
                 type="file"
                 accept="image/*"
-                onChange={async (e) => {
-                  const f = e.target.files?.[0];
-                  if (!f) return;
-                  try { await onUploadPhoto?.(f); } catch {}
+                onChange={(e) => {
+                  setSelectedPhotoFile(e.target.files?.[0] ?? null);
                   e.currentTarget.value = '';
                 }}
               />
+              <div style={{ display: 'flex', gap: 8, marginTop: 10, alignItems: 'center', flexWrap: 'wrap' as const }}>
+                <button
+                  style={{ padding: '8px 12px', background: primaryColor, color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}
+                  disabled={!selectedPhotoFile || isSavingPhoto}
+                  onClick={async () => {
+                    if (!selectedPhotoFile) {
+                      return;
+                    }
+                    setIsSavingPhoto(true);
+                    try {
+                      await onUploadPhoto?.(selectedPhotoFile);
+                      setSelectedPhotoFile(null);
+                      toast.success('Profile photo updated');
+                    } catch (error) {
+                      const message = error instanceof Error ? error.message : 'Failed to update profile photo';
+                      toast.error(message);
+                    } finally {
+                      setIsSavingPhoto(false);
+                    }
+                  }}
+                >
+                  {isSavingPhoto ? 'Saving...' : 'Save Photo'}
+                </button>
+                {selectedPhotoFile ? (
+                  <span style={{ fontSize: 12, color: '#6b7280' }}>{selectedPhotoFile.name}</span>
+                ) : (
+                  <span style={{ fontSize: 12, color: '#6b7280' }}>No photo selected.</span>
+                )}
+              </div>
             </div>
           </section>
         )}

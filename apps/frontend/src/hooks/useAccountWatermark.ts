@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import {
-  loadUserPreferences,
+  codesMatch,
+  loadUserPreferencesWithFallback,
   USER_PREFERENCES_EVENT,
   type UserPreferencesChangeDetail,
 } from '../shared/preferences';
@@ -17,16 +18,21 @@ function setWatermarkImage(url: string | undefined): void {
   root.style.setProperty(WATERMARK_IMAGE_CSS_VAR, `url("${safeUrl}")`);
 }
 
-export function useAccountWatermark(userCode: string | null | undefined): void {
+export function useAccountWatermark(
+  userCode: string | null | undefined,
+  options?: { enabled?: boolean },
+): void {
+  const enabled = options?.enabled ?? true;
+
   useEffect(() => {
-    if (!userCode) {
+    if (!enabled || !userCode) {
       setWatermarkImage(undefined);
       return;
     }
 
     const normalizedCode = userCode.toUpperCase();
     const applyForCurrentUser = () => {
-      const preferences = loadUserPreferences(normalizedCode);
+      const preferences = loadUserPreferencesWithFallback(normalizedCode);
       setWatermarkImage(preferences.logoWatermarkUrl);
     };
 
@@ -34,16 +40,24 @@ export function useAccountWatermark(userCode: string | null | undefined): void {
 
     const onPreferencesChanged = (event: Event) => {
       const detail = (event as CustomEvent<UserPreferencesChangeDetail>).detail;
-      if (!detail || detail.userCode !== normalizedCode) {
+      if (!detail || !codesMatch(detail.userCode, normalizedCode)) {
         return;
       }
       setWatermarkImage(detail.preferences.logoWatermarkUrl);
     };
 
+    const onStorageChanged = (event: StorageEvent) => {
+      if (!event.key || !event.key.startsWith('cks_prefs_')) {
+        return;
+      }
+      applyForCurrentUser();
+    };
+
     window.addEventListener(USER_PREFERENCES_EVENT, onPreferencesChanged as EventListener);
+    window.addEventListener('storage', onStorageChanged);
     return () => {
       window.removeEventListener(USER_PREFERENCES_EVENT, onPreferencesChanged as EventListener);
-      setWatermarkImage(undefined);
+      window.removeEventListener('storage', onStorageChanged);
     };
-  }, [userCode]);
+  }, [enabled, userCode]);
 }
