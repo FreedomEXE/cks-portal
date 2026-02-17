@@ -65,6 +65,7 @@ import { loadUserPreferences, saveUserPreferences } from '../shared/preferences'
 import { useAccessCodeRedemption } from '../hooks/useAccessCodeRedemption';
 import OverviewSummaryModal, { type OverviewSummaryItem } from '../components/overview/OverviewSummaryModal';
 import { buildSupportTickets, mapSupportIssuePayload } from '../shared/support/supportTickets';
+import { uploadProfilePhotoAndSyncLogo } from '../shared/profilePhoto';
 
 interface CrewHubProps {
   initialTab?: string;
@@ -206,7 +207,15 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
   const { user } = useUser();
   const { setHubLoading } = useHubLoading();
   const accessGate = useAccessCodeRedemption();
-  const handleUploadPhoto = useCallback(async (file: File) => { if (!user) { toast.error('User not authenticated'); return; } try { await user.setProfileImage({ file }); toast.success('Profile photo updated'); } catch (e: any) { console.error('photo upload failed', e); toast.error(e?.message || 'Failed to update photo'); } }, [user]);
+  const handleUploadPhoto = useCallback(async (file: File) => {
+    try {
+      await uploadProfilePhotoAndSyncLogo(user, file, normalizedCode);
+      toast.success('Profile photo updated');
+    } catch (e: any) {
+      console.error('photo upload failed', e);
+      toast.error(e?.message || 'Failed to update photo');
+    }
+  }, [normalizedCode, user]);
 
   // Centralized entity action handler (replaces handleOrderAction)
   const { handleAction } = useEntityActions();

@@ -80,6 +80,7 @@ import { applyServiceAction } from '../shared/api/hub';
 import { requestPasswordReset } from '../shared/api/account';
 import { loadUserPreferences, saveUserPreferences } from '../shared/preferences';
 import { buildSupportTickets, mapSupportIssuePayload } from '../shared/support/supportTickets';
+import { uploadProfilePhotoAndSyncLogo } from '../shared/profilePhoto';
 
 interface ManagerHubProps {
   initialTab?: string;
@@ -1112,15 +1113,14 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
   }, [user?.id]);
 
   const handleUploadPhoto = useCallback(async (file: File) => {
-    if (!user) { toast.error('User not authenticated'); return; }
     try {
-      await user.setProfileImage({ file });
+      await uploadProfilePhotoAndSyncLogo(user, file, authCode);
       toast.success('Profile photo updated');
     } catch (e: any) {
       console.error('[manager] photo upload failed', e);
       toast.error(e?.message || 'Failed to update photo');
     }
-  }, [user]);
+  }, [authCode, user]);
 
   const handleSupportSubmit = useCallback(async (payload: any) => {
     const mapped = mapSupportIssuePayload(payload);

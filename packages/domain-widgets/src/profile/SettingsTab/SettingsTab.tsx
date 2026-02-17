@@ -8,7 +8,7 @@
  * Settings and preferences UI for ProfileInfoCard
  */
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 
 export interface SettingsTabProps {
   primaryColor: string;
@@ -19,6 +19,7 @@ export interface SettingsTabProps {
     hubTitle?: string;
     defaultLandingTab?: string;
     theme?: 'light' | 'dark' | 'system';
+    logoWatermarkUrl?: string;
   };
   onSavePreferences?: (prefs: Partial<SettingsTabProps['preferences']>) => void;
   availableTabs?: Array<{ id: string; label: string }>;
@@ -56,6 +57,7 @@ export function SettingsTab({
   const [hubTitle, setHubTitle] = useState(preferences?.hubTitle || '');
   const [defaultTab, setDefaultTab] = useState(preferences?.defaultLandingTab || 'dashboard');
   const [theme, setTheme] = useState<'light' | 'dark' | 'system'>(preferences?.theme || 'light');
+  const [logoWatermarkUrl, setLogoWatermarkUrl] = useState(preferences?.logoWatermarkUrl || '');
   const [accessCode, setAccessCode] = useState('');
   const [accessMessage, setAccessMessage] = useState<string | null>(null);
   const [accessError, setAccessError] = useState<string | null>(null);
@@ -65,6 +67,18 @@ export function SettingsTab({
     accessTier === 'standard' ? 'Free' : accessTier === 'premium' ? 'Premium' : accessTier;
 
   const previewHubName = useMemo(() => hubTitle.trim() || 'My Hub', [hubTitle]);
+
+  useEffect(() => {
+    setHubTitle(preferences?.hubTitle || '');
+    setDefaultTab(preferences?.defaultLandingTab || 'dashboard');
+    setTheme(preferences?.theme || 'light');
+    setLogoWatermarkUrl(preferences?.logoWatermarkUrl || '');
+  }, [
+    preferences?.hubTitle,
+    preferences?.defaultLandingTab,
+    preferences?.theme,
+    preferences?.logoWatermarkUrl,
+  ]);
 
   type Section = 'personalization' | 'photo' | 'security' | 'access' | 'notifications' | 'accessibility';
   const [active, setActive] = useState<Section>('personalization');
@@ -158,6 +172,75 @@ export function SettingsTab({
                   </label>
                 </div>
               </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: 12, color: '#6b7280', marginBottom: 4 }}>
+                  App Watermark Logo
+                </label>
+                <div style={{ display: 'grid', gap: 10 }}>
+                  <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' as const }}>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) {
+                          return;
+                        }
+                        const reader = new FileReader();
+                        reader.onload = () => {
+                          const nextUrl = typeof reader.result === 'string' ? reader.result : '';
+                          if (!nextUrl) {
+                            return;
+                          }
+                          setLogoWatermarkUrl(nextUrl);
+                          onSavePreferences?.({ logoWatermarkUrl: nextUrl });
+                        };
+                        reader.readAsDataURL(file);
+                        e.currentTarget.value = '';
+                      }}
+                    />
+                    {logoWatermarkUrl ? (
+                      <button
+                        style={{ padding: '8px 12px', background: 'var(--card-muted)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer' }}
+                        onClick={() => {
+                          setLogoWatermarkUrl('');
+                          onSavePreferences?.({ logoWatermarkUrl: undefined });
+                        }}
+                      >
+                        Remove Logo
+                      </button>
+                    ) : null}
+                  </div>
+
+                  <input
+                    value={logoWatermarkUrl}
+                    placeholder="Or paste logo image URL"
+                    onChange={(e) => setLogoWatermarkUrl(e.target.value)}
+                    style={{ width: '100%', padding: '8px 10px', border: '1px solid var(--border)', borderRadius: 6, background: 'var(--card-bg)', color: 'var(--text)' }}
+                  />
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      style={{ padding: '8px 12px', background: primaryColor, color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}
+                      onClick={() => onSavePreferences?.({ logoWatermarkUrl: logoWatermarkUrl.trim() || undefined })}
+                    >
+                      Save Logo
+                    </button>
+                  </div>
+
+                  {logoWatermarkUrl ? (
+                    <img
+                      src={logoWatermarkUrl}
+                      alt="Watermark logo preview"
+                      style={{ maxWidth: 220, maxHeight: 100, objectFit: 'contain', opacity: 0.75 }}
+                    />
+                  ) : (
+                    <div style={{ fontSize: 12, color: '#6b7280' }}>
+                      No watermark logo set.
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </section>
         )}
@@ -168,6 +251,9 @@ export function SettingsTab({
               <h3 style={{ margin: 0, fontSize: 16, color: 'var(--text)' }}>Profile Photo</h3>
             </div>
             <div style={{ padding: 16 }}>
+              <p style={{ margin: '0 0 10px 0', fontSize: 12, color: '#6b7280' }}>
+                Updating your profile photo also updates your CKS watermark logo.
+              </p>
               <input
                 type="file"
                 accept="image/*"

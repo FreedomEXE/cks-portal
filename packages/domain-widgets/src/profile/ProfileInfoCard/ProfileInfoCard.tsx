@@ -49,7 +49,12 @@ export interface ProfileInfoCardProps {
   /** Settings integrations */
   onOpenAccountSecurity?: () => void;
   onRequestPasswordReset?: () => void;
-  userPreferences?: { hubTitle?: string; defaultLandingTab?: string; theme?: 'light'|'dark'|'system' };
+  userPreferences?: {
+    hubTitle?: string;
+    defaultLandingTab?: string;
+    theme?: 'light'|'dark'|'system';
+    logoWatermarkUrl?: string;
+  };
   onSaveUserPreferences?: (prefs: Partial<ProfileInfoCardProps['userPreferences']>) => void;
   availableTabs?: Array<{ id: string; label: string }>;
   /** Theme control from frontend (wired to ThemeProvider) */

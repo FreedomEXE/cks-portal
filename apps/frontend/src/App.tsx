@@ -19,6 +19,7 @@ import CKSCatalog from './pages/CKSCatalog';
 import Impersonate from './pages/Impersonate';
 import Memos from './pages/Memos';
 import News from './pages/News';
+import { useAccountWatermark } from './hooks/useAccountWatermark';
 
 type HubComponent = ComponentType<{ initialTab?: string }>;
 
@@ -110,6 +111,8 @@ function RoleHubRoute(): JSX.Element {
 
 export function AuthenticatedApp(): JSX.Element {
   console.log('[AuthenticatedApp] Rendering authenticated app');
+  const { code } = useAuth();
+  useAccountWatermark(code);
 
   return (
     <ErrorBoundary>

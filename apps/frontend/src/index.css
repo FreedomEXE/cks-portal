@@ -25,6 +25,7 @@ html {
   --page-gutter: clamp(12px, 2.5vw, 24px);
   --hub-gutter: var(--page-gutter);
   --hero-gutter: clamp(12px, 2.5vw, 16px);
+  --cks-account-watermark-image: none;
 }
 
 .dark {
@@ -43,6 +44,25 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image: var(--cks-account-watermark-image);
+  background-repeat: no-repeat;
+  background-position: center 56%;
+  background-size: min(60vw, 900px);
+  opacity: 0.06;
+  filter: grayscale(1);
+}
+
+#root {
+  position: relative;
+  z-index: 1;
 }
 
 @media (max-width: 768px) {
