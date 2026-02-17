@@ -156,6 +156,7 @@ export function canSeeTab(tabId: TabId, context: TabVisibilityContext): boolean 
     // Everyone can view user profiles (for their assignments and ecosystem)
     case 'profile':
       return (
+        entityType === 'admin' ||
         entityType === 'manager' || entityType === 'contractor' || entityType === 'customer' ||
         entityType === 'crew' || entityType === 'center' || entityType === 'warehouse'
       );

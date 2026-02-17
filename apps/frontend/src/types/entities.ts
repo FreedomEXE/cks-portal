@@ -23,6 +23,7 @@ export type EntityType =
   | 'crew'
   | 'contractor'
   | 'manager'
+  | 'admin'
   | 'customer';
 
 /**

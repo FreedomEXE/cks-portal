@@ -1712,6 +1712,19 @@ const userAdapter: EntityAdapter = {
     const { role, state, entityData } = context;
     const descriptors: EntityActionDescriptor[] = [];
 
+    // Admin records use the same modal shell but only support invitation from here.
+    if (role === 'admin' && context.entityType === 'admin') {
+      if (state === 'active') {
+        descriptors.push({
+          key: 'invite',
+          label: 'Invite',
+          variant: 'primary',
+          closeOnSuccess: false,
+        });
+      }
+      return descriptors;
+    }
+
     // Admin actions only
     if (role === 'admin') {
       if (state === 'active') {
@@ -1788,6 +1801,7 @@ const userAdapter: EntityAdapter = {
 
     // Map entity type to user role
     const roleMap: Record<string, string> = {
+      admin: 'Admin',
       manager: 'Manager',
       contractor: 'Contractor',
       customer: 'Customer',
@@ -1804,6 +1818,7 @@ const userAdapter: EntityAdapter = {
     // Add role-specific ID
     const userId = profileData.managerId || profileData.contractorId || profileData.customerId ||
                    profileData.centerId || profileData.crewId || profileData.warehouseId ||
+                   entityData?.cksCode ||
                    entityData?.id || '';
 
     // Add name field (used by EntityHeaderCard)
@@ -1823,6 +1838,41 @@ const userAdapter: EntityAdapter = {
 
   getTabDescriptors: (context: TabVisibilityContext, actions: EntityAction[]): TabDescriptor[] => {
     const { entityData, entityType, role } = context;
+
+    if (entityType === 'admin') {
+      const email = entityData?.email ?? 'N/A';
+      const fullName = entityData?.fullName ?? entityData?.name ?? entityData?.id ?? 'Admin';
+      const cksCode = entityData?.cksCode ?? entityData?.id ?? 'N/A';
+      const status = entityData?.status ?? 'active';
+
+      return [
+        {
+          id: 'profile',
+          label: 'Profile',
+          content: (
+            <div
+              style={{
+                border: '1px solid #e2e8f0',
+                borderRadius: 10,
+                padding: 16,
+                background: '#fff',
+                display: 'grid',
+                gap: 10,
+              }}
+            >
+              <div><strong>Name:</strong> {fullName}</div>
+              <div><strong>Username:</strong> {cksCode}</div>
+              <div><strong>Email:</strong> {email}</div>
+              <div><strong>Status:</strong> {status}</div>
+            </div>
+          ),
+        },
+        {
+          /* Quick Actions tab removed: actions are rendered in header via ActionBar */ id: 'actions_removed', label: 'Removed',
+          content: <UserQuickActionsContent actions={actions} />,
+        },
+      ];
+    }
 
     // Get profile data for Profile tab
     const profileData = mapProfileDataForRole(entityType as any, entityData);
@@ -2407,6 +2457,7 @@ export const entityRegistry: EntityRegistry = {
   feedback: reportAdapter, // Feedback uses same adapter as report
   service: serviceAdapter,
   catalogService: catalogServiceAdapter, // ✅ Catalog service definitions (SRV-XXX unscoped)
+  admin: userAdapter,
   manager: userAdapter,
   contractor: userAdapter,
   customer: userAdapter,

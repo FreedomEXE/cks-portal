@@ -160,6 +160,23 @@ export async function getAdminUserByClerkId(clerkUserId: string): Promise<AdminU
 
 export const getAdminUserById = getAdminUserByClerkId;
 
+export async function getAdminUserByCksCode(cksCode: string): Promise<AdminUserRecord | null> {
+  if (!cksCode) {
+    return null;
+  }
+
+  const normalizedCode = cksCode.trim();
+  if (!normalizedCode) {
+    return null;
+  }
+
+  const result = await query(
+    `SELECT ${SELECT_COLUMNS} FROM ${TABLE_NAME} WHERE UPPER(cks_code) = UPPER($1) LIMIT 1`,
+    [normalizedCode],
+  );
+  return mapRow(result.rows[0]);
+}
+
 export async function findAdminUserByClerkIdentifier(options: {
   clerkUserId?: string;
   email?: string;

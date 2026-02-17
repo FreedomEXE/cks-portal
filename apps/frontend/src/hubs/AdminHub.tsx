@@ -1266,9 +1266,24 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
       data: adminRows,
       emptyMessage: 'No admin users found yet.',
       onRowClick: (row: any) => {
-        // Open admin user modal via universal modal system
-        // Admins don't have a specific adapter yet, so skip for now
-        console.log('[AdminHub] Admin user modals not yet migrated:', row.code);
+        const full = (adminUsers || []).find((admin) => admin.id === row.id);
+        if (!full) {
+          return;
+        }
+
+        modals.openEntityModal('admin', row.id, {
+          data: {
+            ...full,
+            id: full.id,
+            cksCode: full.cksCode,
+            fullName: full.fullName ?? null,
+            email: full.email ?? null,
+            status: full.status ?? 'active',
+            role: full.role ?? 'admin',
+            entityType: 'admin',
+          },
+          context: { source: 'directory' },
+        });
       },
     },
     managers: {
@@ -1515,6 +1530,8 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
     procedureRows,
     reportRows,
     feedbackRows,
+    adminUsers,
+    modals,
   ]);
 
   const directoryLoading =
@@ -1716,7 +1733,6 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
     }
     // Determine if this is a user entity that should open UserModal
     const isUserEntity = ['managers', 'contractors', 'customers', 'crew', 'centers', 'warehouses'].includes(directoryTab);
-    const isAdminEntity = directoryTab === 'admins';
 
     // Use section's onRowClick if defined, otherwise use user entity logic
     const onRowClick = section.onRowClick || (isUserEntity ? (row: any) => {

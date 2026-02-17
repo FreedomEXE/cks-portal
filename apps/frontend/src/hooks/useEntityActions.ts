@@ -465,7 +465,7 @@ async function handleUserAction(
   }
 ): Promise<boolean> {
   // Map subtype to archive entity type
-  const validUserTypes = new Set(['manager', 'contractor', 'customer', 'center', 'crew', 'warehouse']);
+  const validUserTypes = new Set(['admin', 'manager', 'contractor', 'customer', 'center', 'crew', 'warehouse']);
   const entityType = (subtype || '').toLowerCase();
   if (!validUserTypes.has(entityType)) {
     console.warn('[useEntityActions] Unsupported user subtype for archive:', subtype);

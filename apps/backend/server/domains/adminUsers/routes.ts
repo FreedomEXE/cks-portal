@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { ZodError } from 'zod';
 import {
   createAdminUser,
+  getAdminUserByCksCode,
   getAdminUserById,
   getAdminUsers,
   removeAdminUser,
@@ -395,6 +396,7 @@ export async function registerAdminUserRoutes(server: FastifyInstance) {
     const entityId = String(body?.entityId ?? "").trim().toUpperCase();
 
     const allowedEntityTypes = new Set([
+      "admin",
       "manager",
       "contractor",
       "customer",
@@ -410,6 +412,32 @@ export async function registerAdminUserRoutes(server: FastifyInstance) {
 
     if (!entityId) {
       reply.code(400).send({ error: "Invalid entity id" });
+      return;
+    }
+
+    if (entityType === "admin") {
+      const adminUser = await getAdminUserByCksCode(entityId);
+      if (!adminUser?.email) {
+        reply.code(404).send({ error: "User email not found" });
+        return;
+      }
+
+      await clerkClient.invitations.createInvitation({
+        emailAddress: adminUser.email,
+        publicMetadata: {
+          cksCode: adminUser.cksCode,
+          role: "admin",
+        },
+        notify: true,
+        ignoreExisting: true,
+      });
+
+      reply.send({
+        data: {
+          userId: adminUser.clerkUserId,
+          email: adminUser.email,
+        },
+      });
       return;
     }
 
