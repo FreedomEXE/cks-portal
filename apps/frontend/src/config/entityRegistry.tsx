@@ -1805,7 +1805,6 @@ const userAdapter: EntityAdapter = {
     const userId = profileData.managerId || profileData.contractorId || profileData.customerId ||
                    profileData.centerId || profileData.crewId || profileData.warehouseId ||
                    entityData?.id || '';
-    const photoUrl = extractUserProfilePhotoUrl(entityType, entityData, userId);
 
     // Add name field (used by EntityHeaderCard)
     if (profileData.fullName || profileData.name) {
@@ -1835,6 +1834,7 @@ const userAdapter: EntityAdapter = {
     const userId = profileData.managerId || profileData.contractorId || profileData.customerId ||
                    profileData.centerId || profileData.crewId || profileData.warehouseId ||
                    entityData?.id || '';
+    const photoUrl = extractUserProfilePhotoUrl(entityType, entityData, userId);
 
     // Build tab descriptors (final order): Profile, Management (admin), History
     const tabs: TabDescriptor[] = [

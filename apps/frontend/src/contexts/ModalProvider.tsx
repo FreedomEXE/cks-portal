@@ -6,7 +6,8 @@
  */
 
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
-import { useAuth } from '@cks/auth';
+import { useAuth as useHubAuth } from '@cks/auth';
+import { useAuth as useClerkAuth } from '@clerk/clerk-react';
 import { useEffect } from 'react';
 import ModalGateway from '../components/ModalGateway';
 import type { EntityType, UserRole, OpenEntityModalOptions } from '../types/entities';
@@ -44,7 +45,8 @@ export interface ModalProviderProps {
 
 export function ModalProvider({ children }: ModalProviderProps) {
   // Get current auth state (reactive to changes)
-  const { code, role: authRole } = useAuth();
+  const { code, role: authRole } = useHubAuth();
+  const { getToken } = useClerkAuth();
   const currentUserId = code || '';
 
   // Normalize external auth roles to our internal union
@@ -66,7 +68,7 @@ export function ModalProvider({ children }: ModalProviderProps) {
     return map[raw] || (raw as UserRole) || 'crew';
   };
 
-  const role = normalizeRole(authRole);
+  const role = normalizeRole(authRole ?? undefined);
 
   console.log('[ModalProvider] Current auth state:', { code, authRole, resolvedRole: role });
 
@@ -101,7 +103,7 @@ export function ModalProvider({ children }: ModalProviderProps) {
             archivedAt?: string;
             archivedBy?: string;
             scheduledDeletion?: string;
-          }>(endpoint));
+          }>(endpoint, { getToken }));
 
           console.log(`[ModalProvider] Fetched ${entityType} data:`, response);
 
@@ -139,7 +141,7 @@ export function ModalProvider({ children }: ModalProviderProps) {
       // For non-fetching entities, just open with provided options
       setCurrentModal({ entityType, entityId, options });
     },
-    []
+    [getToken]
   );
 
   // ID-first open function - automatic type detection
@@ -182,9 +184,7 @@ export function ModalProvider({ children }: ModalProviderProps) {
             deletedBy?: string;
             archivedAt?: string;
             archivedBy?: string;
-          }>(
-            `/profile/${entityType}/${id}`
-          );
+          }>(`/profile/${entityType}/${id}`, { getToken });
 
           console.log(`[ModalProvider] Fetched ${entityType} data:`, response);
 
@@ -222,9 +222,7 @@ export function ModalProvider({ children }: ModalProviderProps) {
         try {
           const response = await apiFetch<{
             data: any;
-          }>(
-            `/catalog/services/${id}/details`
-          );
+          }>(`/catalog/services/${id}/details`, { getToken });
 
           console.log(`[ModalProvider] Fetched catalogService data:`, response);
           console.log(`[ModalProvider] catalogService data keys:`, Object.keys(response.data || {}));
@@ -264,7 +262,7 @@ export function ModalProvider({ children }: ModalProviderProps) {
           try {
             const listResp = await apiFetch<{
               data: { items: any[] };
-            }>(`/catalog/items?type=service&q=${encodeURIComponent(id)}`);
+            }>(`/catalog/items?type=service&q=${encodeURIComponent(id)}`, { getToken });
 
             const match = (listResp?.data?.items || []).find((it: any) =>
               (it?.code || '').toUpperCase() === id.toUpperCase()
@@ -310,7 +308,7 @@ export function ModalProvider({ children }: ModalProviderProps) {
           // Fetch from catalog list
           const listResp = await LoadingService.wrapBlocking(apiFetch<{
             data: { items: any[] };
-          }>(`/catalog/items?type=product&q=${encodeURIComponent(id)}`));
+          }>(`/catalog/items?type=product&q=${encodeURIComponent(id)}`, { getToken }));
 
           const match = (listResp?.data?.items || []).find((it: any) => (it?.code || '').toUpperCase() === id.toUpperCase());
 
@@ -328,7 +326,7 @@ export function ModalProvider({ children }: ModalProviderProps) {
 
             // If admin, fetch inventory
             try {
-              const inv = await apiFetch<{ success: boolean; data: any[] }>(`/admin/catalog/products/${encodeURIComponent(id)}/inventory`);
+              const inv = await apiFetch<{ success: boolean; data: any[] }>(`/admin/catalog/products/${encodeURIComponent(id)}/inventory`, { getToken });
               if (inv?.success && Array.isArray(inv.data)) {
                 data.inventoryData = inv.data;
               }
@@ -355,7 +353,7 @@ export function ModalProvider({ children }: ModalProviderProps) {
       // Delegate to openEntityModal
       openEntityModal(entityType, id, enrichedOptions);
     },
-    [openEntityModal]
+    [getToken, openEntityModal]
   );
 
   // Close function

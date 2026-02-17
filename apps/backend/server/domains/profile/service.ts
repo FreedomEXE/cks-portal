@@ -1,5 +1,7 @@
 ﻿export { getHubProfile } from './store';
 import { getEntityWithFallback } from '../entities/service';
+import { clerkClient } from '../../core/clerk/client';
+import { normalizeIdentity } from '../identity';
 
 type EntityState = 'active' | 'archived' | 'deleted';
 
@@ -26,6 +28,11 @@ export async function getUserDetails(
 
   // Normalize to directory format
   const normalized = normalizeUserEntity(entityType, result.entity);
+  const photoUrl = await resolveProfilePhotoUrl(result.entity as Record<string, unknown>, entityId);
+  if (photoUrl) {
+    normalized.photoUrl = photoUrl;
+    normalized.imageUrl = photoUrl;
+  }
 
   return {
     data: normalized,
@@ -36,6 +43,48 @@ export async function getUserDetails(
     archivedAt: result.archivedAt,
     archivedBy: result.archivedBy,
   };
+}
+
+function toNullableString(value: unknown): string | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  const normalized = String(value).trim();
+  return normalized.length > 0 ? normalized : null;
+}
+
+async function resolveProfilePhotoUrl(
+  entityRow: Record<string, unknown>,
+  entityId: string,
+): Promise<string | null> {
+  const clerkUserId = toNullableString(entityRow.clerk_user_id ?? entityRow.clerkUserId);
+
+  try {
+    if (clerkUserId) {
+      const user = await clerkClient.users.getUser(clerkUserId);
+      const directUrl = toNullableString((user as any)?.imageUrl ?? (user as any)?.profileImageUrl);
+      if (directUrl) {
+        return directUrl;
+      }
+    }
+  } catch (error) {
+    console.warn('[profile] Clerk lookup by user ID failed', { clerkUserId, error });
+  }
+
+  try {
+    const normalizedId = normalizeIdentity(entityId) ?? entityId.trim();
+    if (!normalizedId) {
+      return null;
+    }
+
+    const listResult = await (clerkClient.users as any).getUserList?.({ externalId: [normalizedId] });
+    const users = Array.isArray(listResult) ? listResult : listResult?.data;
+    const firstMatch = Array.isArray(users) ? users[0] : null;
+    return toNullableString(firstMatch?.imageUrl ?? firstMatch?.profileImageUrl);
+  } catch (error) {
+    console.warn('[profile] Clerk lookup by externalId failed', { entityId, error });
+    return null;
+  }
 }
 
 /**
