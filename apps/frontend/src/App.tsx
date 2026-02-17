@@ -7,6 +7,7 @@ import { ModalProvider } from './contexts/ModalProvider';
 import { AccessGate } from './components/AccessGate';
 import BuildBadge from './components/BuildBadge';
 import ErrorBoundary from './components/ErrorBoundary';
+import { Toaster } from 'react-hot-toast';
 
 import AdminHub from './hubs/AdminHub';
 import CenterHub from './hubs/CenterHub';
@@ -125,6 +126,7 @@ export function AuthenticatedApp(): JSX.Element {
     <ErrorBoundary>
       <ModalProvider>
         <BuildBadge />
+        <Toaster position="top-right" />
         <Routes>
           <Route path="/" element={<Navigate to="/hub" replace />} />
           <Route path="/hub" element={<RoleHubRoute />} />
@@ -145,6 +147,7 @@ export function UnauthenticatedApp(): JSX.Element {
     <ErrorBoundary>
       <>
         <BuildBadge />
+        <Toaster position="top-right" />
         <Routes>
           <Route path="/sign-in" element={<Login />} />
           <Route path="/sign-up" element={<Login />} />

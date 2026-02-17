@@ -557,11 +557,22 @@ async function handleUserAction(
         return true;
       }
       case 'invite': {
-        await sendUserInvite(
+        const invite = await sendUserInvite(
           { entityType, entityId: userId },
           { getToken: impersonation.getToken }
         );
-        toast.success('Invite email sent');
+        if (invite?.inviteAlreadyPending) {
+          toast.success(`Invite already pending for ${invite.email}`);
+        } else {
+          toast.success(`Invite email sent to ${invite.email}`);
+        }
+        console.info('[useEntityActions] invite result', {
+          entityType,
+          entityId: userId,
+          invitationId: invite?.invitationId,
+          inviteStatus: invite?.inviteStatus,
+          inviteAlreadyPending: invite?.inviteAlreadyPending,
+        });
         options.onSuccess?.();
         return true;
       }

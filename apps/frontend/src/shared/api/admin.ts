@@ -91,6 +91,11 @@ export interface InviteRequest {
 export interface InviteResponse {
   userId: string;
   email: string;
+  delivery?: 'invitation';
+  invitationId?: string | null;
+  inviteStatus?: string | null;
+  inviteAlreadyPending?: boolean;
+  inviteCreatedAt?: number | null;
 }
 
 export async function sendUserInvite(

@@ -101,6 +101,40 @@ async function ensureTestUserPassword(
   }
 }
 
+async function createOrReuseInvitation(input: {
+  emailAddress: string;
+  cksCode: string;
+  role: string;
+}) {
+  const normalizedEmail = input.emailAddress.trim().toLowerCase();
+  const invitationList = await clerkClient.invitations.getInvitationList({
+    emailAddress: [normalizedEmail],
+    limit: 20,
+  });
+
+  const existingPending = invitationList.data.find((invitation: any) => {
+    const invitationEmail = String(invitation?.emailAddress ?? "").trim().toLowerCase();
+    const invitationStatus = String(invitation?.status ?? "").trim().toLowerCase();
+    return invitationEmail === normalizedEmail && invitationStatus === "pending";
+  });
+
+  if (existingPending) {
+    return { invitation: existingPending, alreadyPending: true };
+  }
+
+  const invitation = await clerkClient.invitations.createInvitation({
+    emailAddress: normalizedEmail,
+    publicMetadata: {
+      cksCode: input.cksCode,
+      role: input.role,
+    },
+    notify: true,
+    ignoreExisting: true,
+  });
+
+  return { invitation, alreadyPending: false };
+}
+
 async function getOrCreateClerkUserForEntity(entityType: string, entityId: string) {
   const contact = await getIdentityContactByRoleAndCode(entityType as any, entityId);
   const emailAddress = contact?.email ?? null;
@@ -422,21 +456,21 @@ export async function registerAdminUserRoutes(server: FastifyInstance) {
         return;
       }
 
-      await clerkClient.invitations.createInvitation({
+      const invite = await createOrReuseInvitation({
         emailAddress: adminUser.email,
-        publicMetadata: {
-          cksCode: adminUser.cksCode,
-          role: "admin",
-        },
-        notify: true,
-        ignoreExisting: true,
+        cksCode: adminUser.cksCode,
+        role: "admin",
       });
 
       reply.send({
         data: {
           userId: adminUser.clerkUserId,
           email: adminUser.email,
-          delivery: 'invitation',
+          delivery: "invitation",
+          invitationId: invite.invitation?.id ?? null,
+          inviteStatus: invite.invitation?.status ?? null,
+          inviteAlreadyPending: invite.alreadyPending,
+          inviteCreatedAt: invite.invitation?.createdAt ?? null,
         },
       });
       return;
@@ -456,20 +490,21 @@ export async function registerAdminUserRoutes(server: FastifyInstance) {
       return;
     }
 
-    await clerkClient.invitations.createInvitation({
+    const invite = await createOrReuseInvitation({
       emailAddress: contact.email,
-      publicMetadata: {
-        cksCode: entityId,
-        role: entityType,
-      },
-      notify: true,
-      ignoreExisting: true,
+      cksCode: entityId,
+      role: entityType,
     });
 
     reply.send({
       data: {
         userId: clerkUser.id,
         email: contact.email,
+        delivery: "invitation",
+        invitationId: invite.invitation?.id ?? null,
+        inviteStatus: invite.invitation?.status ?? null,
+        inviteAlreadyPending: invite.alreadyPending,
+        inviteCreatedAt: invite.invitation?.createdAt ?? null,
       },
     });
   });
