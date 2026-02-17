@@ -213,7 +213,7 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
   const { setHubLoading } = useHubLoading();
   const accessGate = useAccessCodeRedemption();
   const handleUploadPhoto = useCallback(async (file: File) => {
-    await uploadProfilePhotoAndSyncLogo(user, file, normalizedCode);
+    await uploadProfilePhotoAndSyncLogo(user, file, normalizedCode, 'crew');
   }, [normalizedCode, user]);
 
   // Centralized entity action handler (replaces handleOrderAction)

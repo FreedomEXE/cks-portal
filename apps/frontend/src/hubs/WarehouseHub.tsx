@@ -214,7 +214,7 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
   const { setTheme } = useAppTheme();
   const accessGate = useAccessCodeRedemption();
   const handleUploadPhoto = useCallback(async (file: File) => {
-    await uploadProfilePhotoAndSyncLogo(user, file, normalizedCode);
+    await uploadProfilePhotoAndSyncLogo(user, file, normalizedCode, 'warehouse');
   }, [normalizedCode, user]);
 
 

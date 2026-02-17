@@ -1124,7 +1124,7 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
   }, [user?.id]);
 
   const handleUploadPhoto = useCallback(async (file: File) => {
-    await uploadProfilePhotoAndSyncLogo(user, file, authCode);
+    await uploadProfilePhotoAndSyncLogo(user, file, authCode, 'manager');
   }, [authCode, user]);
 
   const handleSupportSubmit = useCallback(async (payload: any) => {

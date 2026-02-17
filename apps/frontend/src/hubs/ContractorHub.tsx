@@ -239,7 +239,7 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
   const accessGate = useAccessCodeRedemption();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
   const handleUploadPhoto = useCallback(async (file: File) => {
-    await uploadProfilePhotoAndSyncLogo(user, file, normalizedCode);
+    await uploadProfilePhotoAndSyncLogo(user, file, normalizedCode, 'contractor');
   }, [normalizedCode, user]);
 
   const {

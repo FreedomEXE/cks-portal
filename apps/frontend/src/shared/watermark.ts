@@ -2,7 +2,7 @@ import type { HubRoleScopeResponse } from './api/hub';
 
 export const CKS_DEFAULT_WATERMARK_URL = '/cks-watermark-logo.svg';
 
-type WatermarkRole = 'contractor' | 'customer' | 'center' | 'warehouse' | 'manager' | 'crew';
+export type WatermarkRole = 'contractor' | 'customer' | 'center' | 'warehouse' | 'manager' | 'crew';
 
 function normalizeRole(role: string | null | undefined): WatermarkRole | null {
   const value = (role || '').trim().toLowerCase();

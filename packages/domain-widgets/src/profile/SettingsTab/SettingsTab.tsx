@@ -11,6 +11,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 
+const POST_SAVE_REFRESH_DELAY_MS = 800;
+
 export interface SettingsTabProps {
   primaryColor: string;
   onOpenAccountSecurity?: () => void;
@@ -76,6 +78,14 @@ export function SettingsTab({
     accessTier === 'standard' ? 'Free' : accessTier === 'premium' ? 'Premium' : accessTier;
 
   const previewHubName = useMemo(() => hubTitle.trim() || 'My Hub', [hubTitle]);
+  const refreshPageAfterDelay = () => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    window.setTimeout(() => {
+      window.location.reload();
+    }, POST_SAVE_REFRESH_DELAY_MS);
+  };
 
   useEffect(() => {
     setHubTitle(preferences?.hubTitle || '');
@@ -231,7 +241,8 @@ export function SettingsTab({
                               try {
                                 setLogoWatermarkUrl('');
                                 await onSavePreferences?.({ logoWatermarkUrl: undefined });
-                                toast.success('Watermark logo removed');
+                                toast.success('Watermark logo removed - refreshing display...');
+                                refreshPageAfterDelay();
                               } catch (error) {
                                 const message = error instanceof Error ? error.message : 'Failed to remove watermark logo';
                                 toast.error(message);
@@ -260,7 +271,8 @@ export function SettingsTab({
                             setIsSavingLogo(true);
                             try {
                               await onSavePreferences?.({ logoWatermarkUrl: logoWatermarkUrl.trim() || undefined });
-                              toast.success('Watermark logo saved');
+                              toast.success('Watermark logo saved - refreshing display...');
+                              refreshPageAfterDelay();
                             } catch (error) {
                               const message = error instanceof Error ? error.message : 'Failed to save watermark logo';
                               toast.error(message);
@@ -321,13 +333,15 @@ export function SettingsTab({
                   disabled={!selectedPhotoFile || isSavingPhoto}
                   onClick={async () => {
                     if (!selectedPhotoFile) {
+                      toast.error('No photo selected');
                       return;
                     }
                     setIsSavingPhoto(true);
                     try {
                       await onUploadPhoto?.(selectedPhotoFile);
                       setSelectedPhotoFile(null);
-                      toast.success('Profile photo updated');
+                      toast.success('Profile photo updated - refreshing page...');
+                      refreshPageAfterDelay();
                     } catch (error) {
                       const message = error instanceof Error ? error.message : 'Failed to update profile photo';
                       toast.error(message);
