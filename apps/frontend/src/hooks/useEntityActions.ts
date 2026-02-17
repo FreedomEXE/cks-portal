@@ -37,6 +37,8 @@ export interface UseEntityActionsReturn {
   isProcessing: boolean;
 }
 
+const USER_SUBTYPES = new Set(['admin', 'manager', 'contractor', 'customer', 'center', 'crew', 'warehouse']);
+
 export function useEntityActions(): UseEntityActionsReturn {
   const { mutate } = useSWRConfig();
   const { getToken, isSignedIn } = useClerkAuth();
@@ -46,7 +48,12 @@ export function useEntityActions(): UseEntityActionsReturn {
   const handleAction = useCallback(
     async (entityId: string, action: string, options: EntityActionOptions = {}): Promise<boolean> => {
       try {
-        const { type, subtype } = parseEntityId(entityId);
+        const targetEntityId = (options.transformedId || entityId || '').trim();
+        const { type, subtype } = parseEntityId(targetEntityId);
+        const metadataEntityTypeRaw = options.metadata?.entityType;
+        const metadataEntityType =
+          typeof metadataEntityTypeRaw === 'string' ? metadataEntityTypeRaw.toLowerCase().trim() : '';
+        const forcedUserSubtype = USER_SUBTYPES.has(metadataEntityType) ? metadataEntityType : undefined;
 
         // Normalize action label to action ID
         // Backend expects lowercase action IDs like "accept", "reject", "cancel"
@@ -54,20 +61,20 @@ export function useEntityActions(): UseEntityActionsReturn {
 
         // Handle different entity types
         if (type === 'order') {
-          return await handleOrderAction(entityId, actionId, options, mutate);
+          return await handleOrderAction(targetEntityId, actionId, options, mutate);
         }
 
         if (type === 'service') {
-          return await handleServiceAction(entityId, actionId, options, mutate);
+          return await handleServiceAction(targetEntityId, actionId, options, mutate);
         }
 
         if (type === 'report') {
-          return await handleReportAction(entityId, actionId, subtype, options, mutate);
+          return await handleReportAction(targetEntityId, actionId, subtype, options, mutate);
         }
 
         // User entities: manager | contractor | customer | center | crew | warehouse
-        if (type === 'user') {
-          return await handleUserAction(entityId, actionId, subtype, options, mutate, {
+        if (type === 'user' || forcedUserSubtype) {
+          return await handleUserAction(targetEntityId, actionId, forcedUserSubtype ?? subtype, options, mutate, {
             getToken,
             signInLoaded,
             signIn,
@@ -78,15 +85,19 @@ export function useEntityActions(): UseEntityActionsReturn {
         }
 
         if (type === 'product') {
-          return await handleProductAction(entityId, actionId, options, mutate);
+          return await handleProductAction(targetEntityId, actionId, options, mutate);
         }
 
         if (type === 'catalogService') {
-          return await handleCatalogServiceAction(entityId, actionId, options, mutate);
+          return await handleCatalogServiceAction(targetEntityId, actionId, options, mutate);
         }
 
         // Unsupported entity type
-        console.warn(`[useEntityActions] Unsupported entity type: ${type}`);
+        console.warn(`[useEntityActions] Unsupported entity type: ${type}`, {
+          entityId: targetEntityId,
+          metadataEntityType,
+        });
+        toast.error('Action unavailable for this record');
         return false;
 
       } catch (error) {
@@ -465,9 +476,8 @@ async function handleUserAction(
   }
 ): Promise<boolean> {
   // Map subtype to archive entity type
-  const validUserTypes = new Set(['admin', 'manager', 'contractor', 'customer', 'center', 'crew', 'warehouse']);
   const entityType = (subtype || '').toLowerCase();
-  if (!validUserTypes.has(entityType)) {
+  if (!USER_SUBTYPES.has(entityType)) {
     console.warn('[useEntityActions] Unsupported user subtype for archive:', subtype);
     return false;
   }

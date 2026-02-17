@@ -436,6 +436,7 @@ export async function registerAdminUserRoutes(server: FastifyInstance) {
         data: {
           userId: adminUser.clerkUserId,
           email: adminUser.email,
+          delivery: 'invitation',
         },
       });
       return;

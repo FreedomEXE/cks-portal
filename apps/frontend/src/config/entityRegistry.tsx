@@ -1714,12 +1714,20 @@ const userAdapter: EntityAdapter = {
 
     // Admin records use the same modal shell but only support invitation from here.
     if (role === 'admin' && context.entityType === 'admin') {
+      const adminCksCodeRaw = entityData?.cksCode ?? context.entityId ?? '';
+      const adminCksCode = typeof adminCksCodeRaw === 'string' ? adminCksCodeRaw.trim() : '';
       if (state === 'active') {
         descriptors.push({
           key: 'invite',
           label: 'Invite',
           variant: 'primary',
           closeOnSuccess: false,
+          payload: {
+            transformedId: adminCksCode || context.entityId,
+            metadata: {
+              entityType: 'admin',
+            },
+          },
         });
       }
       return descriptors;
