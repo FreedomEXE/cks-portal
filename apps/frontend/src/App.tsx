@@ -111,10 +111,10 @@ function RoleHubRoute(): JSX.Element {
 
 export function AuthenticatedApp(): JSX.Element {
   console.log('[AuthenticatedApp] Rendering authenticated app');
-  const { code, status } = useAuth();
+  const { code, status, role } = useAuth();
   const { visible } = useLoading();
   const { isHubLoading } = useHubLoading();
-  useAccountWatermark(code, { enabled: status === 'ready' && !visible && !isHubLoading });
+  useAccountWatermark(code, role, { enabled: status === 'ready' && !visible && !isHubLoading });
 
   return (
     <ErrorBoundary>

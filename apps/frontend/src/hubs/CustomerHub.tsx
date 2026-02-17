@@ -64,6 +64,11 @@ import { useAccessCodeRedemption } from '../hooks/useAccessCodeRedemption';
 import OverviewSummaryModal, { type OverviewSummaryItem } from '../components/overview/OverviewSummaryModal';
 import { buildSupportTickets, mapSupportIssuePayload } from '../shared/support/supportTickets';
 import { uploadProfilePhotoAndSyncLogo } from '../shared/profilePhoto';
+import {
+  CKS_DEFAULT_WATERMARK_URL,
+  canRoleEditWatermark,
+  sanitizeWatermarkPreferenceWrite,
+} from '../shared/watermark';
 
 interface CustomerHubProps {
   initialTab?: string;
@@ -229,6 +234,16 @@ function CustomerHubContent({ initialTab = 'dashboard' }: CustomerHubProps) {
   const {
     data: scopeData,
   } = useHubRoleScope(normalizedCode);
+  const contractorWatermarkCode =
+    scopeData?.role === 'customer' ? scopeData.relationships.contractor?.id : null;
+  const customerPreferences = useMemo(() => {
+    const ownPrefs = loadUserPreferences(userCode ?? normalizedCode);
+    const contractorPrefs = loadUserPreferences(contractorWatermarkCode);
+    return {
+      ...ownPrefs,
+      logoWatermarkUrl: contractorPrefs.logoWatermarkUrl?.trim() || CKS_DEFAULT_WATERMARK_URL,
+    };
+  }, [contractorWatermarkCode, normalizedCode, userCode]);
   const { data: certifiedServicesData, isLoading: certifiedServicesLoading } = useCertifiedServices(normalizedCode, 'customer', 500);
   const { mutate } = useSWRConfig();
   const { data: newsItems = [] } = useNewsFeed();
@@ -648,8 +663,10 @@ function CustomerHubContent({ initialTab = 'dashboard' }: CustomerHubProps) {
                 onOpenAccountSecurity={() => openUserProfile?.()}
                 onRequestPasswordReset={handlePasswordReset}
                 passwordResetAvailable={Boolean(user?.passwordEnabled)}
-                userPreferences={loadUserPreferences(userCode ?? normalizedCode)}
-                onSaveUserPreferences={(prefs) => saveUserPreferences(userCode ?? normalizedCode, prefs)}
+                userPreferences={customerPreferences}
+                onSaveUserPreferences={(prefs) => saveUserPreferences(userCode ?? normalizedCode, sanitizeWatermarkPreferenceWrite('customer', prefs))}
+                canEditWatermark={canRoleEditWatermark('customer')}
+                effectiveWatermarkUrl={customerPreferences.logoWatermarkUrl}
                 availableTabs={tabs.map(t => ({ id: t.id, label: t.label }))}
                 onSetTheme={setTheme}
                 accessStatus={accessStatus}

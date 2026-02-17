@@ -64,6 +64,11 @@ import { useAccessCodeRedemption } from '../hooks/useAccessCodeRedemption';
 import OverviewSummaryModal, { type OverviewSummaryItem } from '../components/overview/OverviewSummaryModal';
 import { buildSupportTickets, mapSupportIssuePayload } from '../shared/support/supportTickets';
 import { uploadProfilePhotoAndSyncLogo } from '../shared/profilePhoto';
+import {
+  CKS_DEFAULT_WATERMARK_URL,
+  canRoleEditWatermark,
+  sanitizeWatermarkPreferenceWrite,
+} from '../shared/watermark';
 
 interface ContractorHubProps {
   initialTab?: string;
@@ -335,6 +340,13 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
 
   
   const userCode = useMemo(() => resolvedUserCode(profile?.cksCode, normalizedCode), [profile?.cksCode, normalizedCode]);
+  const contractorPreferences = useMemo(() => {
+    const prefs = loadUserPreferences(userCode ?? null);
+    return {
+      ...prefs,
+      logoWatermarkUrl: prefs.logoWatermarkUrl?.trim() || CKS_DEFAULT_WATERMARK_URL,
+    };
+  }, [userCode]);
   const welcomeName = profile?.mainContact ?? profile?.name ?? undefined;
 
   // Signal when critical data is loaded (but only if not highlighting an order)
@@ -785,8 +797,10 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
                 onOpenAccountSecurity={() => openUserProfile?.()}
                 onRequestPasswordReset={handlePasswordReset}
                 passwordResetAvailable={Boolean(user?.passwordEnabled)}
-                userPreferences={loadUserPreferences(userCode ?? null)}
-                onSaveUserPreferences={(prefs) => saveUserPreferences(userCode ?? null, prefs)}
+                userPreferences={contractorPreferences}
+                onSaveUserPreferences={(prefs) => saveUserPreferences(userCode ?? null, sanitizeWatermarkPreferenceWrite('contractor', prefs))}
+                canEditWatermark={canRoleEditWatermark('contractor')}
+                effectiveWatermarkUrl={contractorPreferences.logoWatermarkUrl}
                 availableTabs={tabs.map(t => ({ id: t.id, label: t.label }))}
                 onSetTheme={setTheme}
                 accessStatus={accessStatus}

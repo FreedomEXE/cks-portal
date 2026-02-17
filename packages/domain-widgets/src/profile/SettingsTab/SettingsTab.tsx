@@ -30,6 +30,8 @@ export interface SettingsTabProps {
   accessTier?: string | null;
   accessSource?: 'direct' | 'cascade' | null;
   onRedeemAccessCode?: (code: string) => Promise<void> | void;
+  canEditWatermark?: boolean;
+  effectiveWatermarkUrl?: string;
 }
 
 export function SettingsTab({
@@ -54,6 +56,8 @@ export function SettingsTab({
   accessTier,
   accessSource,
   onRedeemAccessCode,
+  canEditWatermark = false,
+  effectiveWatermarkUrl,
 }: SettingsTabProps) {
   const [hubTitle, setHubTitle] = useState(preferences?.hubTitle || '');
   const [defaultTab, setDefaultTab] = useState(preferences?.defaultLandingTab || 'dashboard');
@@ -84,6 +88,7 @@ export function SettingsTab({
     preferences?.theme,
     preferences?.logoWatermarkUrl,
   ]);
+  const displayedWatermarkUrl = (effectiveWatermarkUrl || logoWatermarkUrl || '').trim();
 
   type Section = 'personalization' | 'photo' | 'security' | 'access' | 'notifications' | 'accessibility';
   const [active, setActive] = useState<Section>('personalization');
@@ -195,80 +200,88 @@ export function SettingsTab({
                   App Watermark Logo
                 </label>
                 <div style={{ display: 'grid', gap: 10 }}>
-                  <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' as const }}>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (!file) {
-                          return;
-                        }
-                        const reader = new FileReader();
-                        reader.onload = () => {
-                          const nextUrl = typeof reader.result === 'string' ? reader.result : '';
-                          if (!nextUrl) {
-                            return;
-                          }
-                          setLogoWatermarkUrl(nextUrl);
-                        };
-                        reader.readAsDataURL(file);
-                        e.currentTarget.value = '';
-                      }}
-                    />
-                    {logoWatermarkUrl ? (
-                      <button
-                        style={{ padding: '8px 12px', background: 'var(--card-muted)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer' }}
-                        onClick={async () => {
-                          setIsSavingLogo(true);
-                          try {
-                            setLogoWatermarkUrl('');
-                            await onSavePreferences?.({ logoWatermarkUrl: undefined });
-                            toast.success('Watermark logo removed');
-                          } catch (error) {
-                            const message = error instanceof Error ? error.message : 'Failed to remove watermark logo';
-                            toast.error(message);
-                          } finally {
-                            setIsSavingLogo(false);
-                          }
-                        }}
-                        disabled={isSavingLogo}
-                      >
-                        Remove Logo
-                      </button>
-                    ) : null}
-                  </div>
+                  {canEditWatermark ? (
+                    <>
+                      <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' as const }}>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) {
+                              return;
+                            }
+                            const reader = new FileReader();
+                            reader.onload = () => {
+                              const nextUrl = typeof reader.result === 'string' ? reader.result : '';
+                              if (!nextUrl) {
+                                return;
+                              }
+                              setLogoWatermarkUrl(nextUrl);
+                            };
+                            reader.readAsDataURL(file);
+                            e.currentTarget.value = '';
+                          }}
+                        />
+                        {logoWatermarkUrl ? (
+                          <button
+                            style={{ padding: '8px 12px', background: 'var(--card-muted)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer' }}
+                            onClick={async () => {
+                              setIsSavingLogo(true);
+                              try {
+                                setLogoWatermarkUrl('');
+                                await onSavePreferences?.({ logoWatermarkUrl: undefined });
+                                toast.success('Watermark logo removed');
+                              } catch (error) {
+                                const message = error instanceof Error ? error.message : 'Failed to remove watermark logo';
+                                toast.error(message);
+                              } finally {
+                                setIsSavingLogo(false);
+                              }
+                            }}
+                            disabled={isSavingLogo}
+                          >
+                            Remove Logo
+                          </button>
+                        ) : null}
+                      </div>
 
-                  <input
-                    value={logoWatermarkUrl}
-                    placeholder="Or paste logo image URL"
-                    onChange={(e) => setLogoWatermarkUrl(e.target.value)}
-                    style={{ width: '100%', padding: '8px 10px', border: '1px solid var(--border)', borderRadius: 6, background: 'var(--card-bg)', color: 'var(--text)' }}
-                  />
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button
-                      style={{ padding: '8px 12px', background: primaryColor, color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}
-                      disabled={isSavingLogo}
-                      onClick={async () => {
-                        setIsSavingLogo(true);
-                        try {
-                          await onSavePreferences?.({ logoWatermarkUrl: logoWatermarkUrl.trim() || undefined });
-                          toast.success('Watermark logo saved');
-                        } catch (error) {
-                          const message = error instanceof Error ? error.message : 'Failed to save watermark logo';
-                          toast.error(message);
-                        } finally {
-                          setIsSavingLogo(false);
-                        }
-                      }}
-                    >
-                      {isSavingLogo ? 'Saving...' : 'Save Logo'}
-                    </button>
-                  </div>
+                      <input
+                        value={logoWatermarkUrl}
+                        placeholder="Or paste logo image URL"
+                        onChange={(e) => setLogoWatermarkUrl(e.target.value)}
+                        style={{ width: '100%', padding: '8px 10px', border: '1px solid var(--border)', borderRadius: 6, background: 'var(--card-bg)', color: 'var(--text)' }}
+                      />
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button
+                          style={{ padding: '8px 12px', background: primaryColor, color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}
+                          disabled={isSavingLogo}
+                          onClick={async () => {
+                            setIsSavingLogo(true);
+                            try {
+                              await onSavePreferences?.({ logoWatermarkUrl: logoWatermarkUrl.trim() || undefined });
+                              toast.success('Watermark logo saved');
+                            } catch (error) {
+                              const message = error instanceof Error ? error.message : 'Failed to save watermark logo';
+                              toast.error(message);
+                            } finally {
+                              setIsSavingLogo(false);
+                            }
+                          }}
+                        >
+                          {isSavingLogo ? 'Saving...' : 'Save Logo'}
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <div style={{ fontSize: 12, color: '#6b7280' }}>
+                      Watermark branding is managed by your contractor account.
+                    </div>
+                  )}
 
-                  {logoWatermarkUrl ? (
+                  {displayedWatermarkUrl ? (
                     <img
-                      src={logoWatermarkUrl}
+                      src={displayedWatermarkUrl}
                       alt="Watermark logo preview"
                       style={{ maxWidth: 220, maxHeight: 100, objectFit: 'contain', opacity: 0.75 }}
                     />
@@ -290,7 +303,9 @@ export function SettingsTab({
             </div>
             <div style={{ padding: 16 }}>
               <p style={{ margin: '0 0 10px 0', fontSize: 12, color: '#6b7280' }}>
-                Updating your profile photo also updates your CKS watermark logo.
+                {canEditWatermark
+                  ? 'Updating your profile photo also updates your contractor watermark logo.'
+                  : 'Updating your profile photo does not change ecosystem watermark branding.'}
               </p>
               <input
                 type="file"

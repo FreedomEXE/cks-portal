@@ -65,6 +65,8 @@ export interface ProfileInfoCardProps {
   accessTier?: string | null;
   accessSource?: 'direct' | 'cascade' | null;
   onRedeemAccessCode?: (code: string) => Promise<void> | void;
+  canEditWatermark?: boolean;
+  effectiveWatermarkUrl?: string;
 }
 
 export function ProfileInfoCard({
@@ -90,6 +92,8 @@ export function ProfileInfoCard({
   accessTier,
   accessSource,
   onRedeemAccessCode,
+  canEditWatermark = false,
+  effectiveWatermarkUrl,
 }: ProfileInfoCardProps) {
   const [activeTab, setActiveTab] = useState('profile');
 
@@ -159,6 +163,8 @@ export function ProfileInfoCard({
             accessTier={accessTier}
             accessSource={accessSource}
             onRedeemAccessCode={onRedeemAccessCode}
+            canEditWatermark={canEditWatermark}
+            effectiveWatermarkUrl={effectiveWatermarkUrl}
           />
         );
       default:

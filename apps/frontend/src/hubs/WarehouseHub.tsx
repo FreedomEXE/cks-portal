@@ -48,6 +48,11 @@ import { useAccessCodeRedemption } from '../hooks/useAccessCodeRedemption';
 import OverviewSummaryModal, { type OverviewSummaryItem } from '../components/overview/OverviewSummaryModal';
 import { buildSupportTickets, mapSupportIssuePayload } from '../shared/support/supportTickets';
 import { uploadProfilePhotoAndSyncLogo } from '../shared/profilePhoto';
+import {
+  CKS_DEFAULT_WATERMARK_URL,
+  canRoleEditWatermark,
+  sanitizeWatermarkPreferenceWrite,
+} from '../shared/watermark';
 
 import MyHubSection from '../components/MyHubSection';
 import {
@@ -236,6 +241,13 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
 
   // Resolve final display/user code after profile is available
   const userCode = useMemo(() => resolvedUserCode(profile?.cksCode, normalizedCode), [profile?.cksCode, normalizedCode]);
+  const warehousePreferences = useMemo(() => {
+    const prefs = loadUserPreferences(normalizedCode ?? null);
+    return {
+      ...prefs,
+      logoWatermarkUrl: CKS_DEFAULT_WATERMARK_URL,
+    };
+  }, [normalizedCode]);
 
   // Access modal context
   const modals = useModals();
@@ -845,8 +857,10 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
                 onOpenAccountSecurity={() => openUserProfile?.()}
                 onRequestPasswordReset={handlePasswordReset}
                 passwordResetAvailable={Boolean(user?.passwordEnabled)}
-                userPreferences={loadUserPreferences(normalizedCode ?? null)}
-                onSaveUserPreferences={(prefs) => saveUserPreferences(normalizedCode ?? null, prefs)}
+                userPreferences={warehousePreferences}
+                onSaveUserPreferences={(prefs) => saveUserPreferences(normalizedCode ?? null, sanitizeWatermarkPreferenceWrite('warehouse', prefs))}
+                canEditWatermark={canRoleEditWatermark('warehouse')}
+                effectiveWatermarkUrl={warehousePreferences.logoWatermarkUrl}
                 accessStatus={accessStatus}
                 accessTier={accessTier}
                 accessSource={accessSource}

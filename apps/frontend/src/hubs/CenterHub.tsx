@@ -63,6 +63,11 @@ import { useAccessCodeRedemption } from '../hooks/useAccessCodeRedemption';
 import OverviewSummaryModal, { type OverviewSummaryItem } from '../components/overview/OverviewSummaryModal';
 import { buildSupportTickets, mapSupportIssuePayload } from '../shared/support/supportTickets';
 import { uploadProfilePhotoAndSyncLogo } from '../shared/profilePhoto';
+import {
+  CKS_DEFAULT_WATERMARK_URL,
+  canRoleEditWatermark,
+  sanitizeWatermarkPreferenceWrite,
+} from '../shared/watermark';
 
 interface CenterHubProps {
   initialTab?: string;
@@ -234,6 +239,16 @@ function CenterHubContent({ initialTab = 'dashboard' }: CenterHubProps) {
   const {
     data: scopeData,
   } = useHubRoleScope(normalizedCode);
+  const contractorWatermarkCode =
+    scopeData?.role === 'center' ? scopeData.relationships.contractor?.id : null;
+  const centerPreferences = useMemo(() => {
+    const ownPrefs = loadUserPreferences(userCode ?? normalizedCode);
+    const contractorPrefs = loadUserPreferences(contractorWatermarkCode);
+    return {
+      ...ownPrefs,
+      logoWatermarkUrl: contractorPrefs.logoWatermarkUrl?.trim() || CKS_DEFAULT_WATERMARK_URL,
+    };
+  }, [contractorWatermarkCode, normalizedCode, userCode]);
 
   // Signal when critical data is loaded
   useEffect(() => {
@@ -646,8 +661,10 @@ function CenterHubContent({ initialTab = 'dashboard' }: CenterHubProps) {
                 onOpenAccountSecurity={() => openUserProfile?.()}
                 onRequestPasswordReset={handlePasswordReset}
                 passwordResetAvailable={Boolean(user?.passwordEnabled)}
-                userPreferences={loadUserPreferences(userCode ?? normalizedCode)}
-                onSaveUserPreferences={(prefs) => saveUserPreferences(userCode ?? normalizedCode, prefs)}
+                userPreferences={centerPreferences}
+                onSaveUserPreferences={(prefs) => saveUserPreferences(userCode ?? normalizedCode, sanitizeWatermarkPreferenceWrite('center', prefs))}
+                canEditWatermark={canRoleEditWatermark('center')}
+                effectiveWatermarkUrl={centerPreferences.logoWatermarkUrl}
                 availableTabs={tabs.map(t => ({ id: t.id, label: t.label }))}
                 onSetTheme={setTheme}
                 accessStatus={accessStatus}

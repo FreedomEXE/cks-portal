@@ -66,6 +66,11 @@ import { useAccessCodeRedemption } from '../hooks/useAccessCodeRedemption';
 import OverviewSummaryModal, { type OverviewSummaryItem } from '../components/overview/OverviewSummaryModal';
 import { buildSupportTickets, mapSupportIssuePayload } from '../shared/support/supportTickets';
 import { uploadProfilePhotoAndSyncLogo } from '../shared/profilePhoto';
+import {
+  CKS_DEFAULT_WATERMARK_URL,
+  canRoleEditWatermark,
+  sanitizeWatermarkPreferenceWrite,
+} from '../shared/watermark';
 
 interface CrewHubProps {
   initialTab?: string;
@@ -235,6 +240,13 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
   const { data: reportsData, isLoading: reportsLoading, mutate: mutateReports } = useHubReports(normalizedCode);
   const supportTickets = useMemo(() => buildSupportTickets(reportsData), [reportsData]);
   const userCode = useMemo(() => resolvedUserCode(profile?.cksCode, normalizedCode), [profile?.cksCode, normalizedCode]);
+  const crewPreferences = useMemo(() => {
+    const prefs = loadUserPreferences(userCode ?? normalizedCode);
+    return {
+      ...prefs,
+      logoWatermarkUrl: CKS_DEFAULT_WATERMARK_URL,
+    };
+  }, [normalizedCode, userCode]);
 
   const {
     data: scopeData,
@@ -723,8 +735,10 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
                 onOpenAccountSecurity={() => openUserProfile?.()}
                 onRequestPasswordReset={handlePasswordReset}
                 passwordResetAvailable={Boolean(user?.passwordEnabled)}
-                userPreferences={loadUserPreferences(userCode ?? normalizedCode)}
-                onSaveUserPreferences={(prefs) => saveUserPreferences(userCode ?? normalizedCode, prefs)}
+                userPreferences={crewPreferences}
+                onSaveUserPreferences={(prefs) => saveUserPreferences(userCode ?? normalizedCode, sanitizeWatermarkPreferenceWrite('crew', prefs))}
+                canEditWatermark={canRoleEditWatermark('crew')}
+                effectiveWatermarkUrl={crewPreferences.logoWatermarkUrl}
                 availableTabs={tabs.map(t => ({ id: t.id, label: t.label }))}
                 onSetTheme={setTheme}
                 accessStatus={accessStatus}

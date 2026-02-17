@@ -81,6 +81,11 @@ import { requestPasswordReset } from '../shared/api/account';
 import { loadUserPreferences, saveUserPreferences } from '../shared/preferences';
 import { buildSupportTickets, mapSupportIssuePayload } from '../shared/support/supportTickets';
 import { uploadProfilePhotoAndSyncLogo } from '../shared/profilePhoto';
+import {
+  CKS_DEFAULT_WATERMARK_URL,
+  canRoleEditWatermark,
+  sanitizeWatermarkPreferenceWrite,
+} from '../shared/watermark';
 
 interface ManagerHubProps {
   initialTab?: string;
@@ -514,7 +519,13 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
 
   // Stable fetch key from auth; avoids TDZ on profileData
   const authCode = useMemo(() => resolvedUserCode(null, code), [code]);
-  const managerPrefs = useMemo(() => loadUserPreferences(authCode), [authCode]);
+  const managerPrefs = useMemo(() => {
+    const prefs = loadUserPreferences(authCode);
+    return {
+      ...prefs,
+      logoWatermarkUrl: CKS_DEFAULT_WATERMARK_URL,
+    };
+  }, [authCode]);
 
   // Fetch hub-scoped data
   const {
@@ -1205,7 +1216,9 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
                 onRequestPasswordReset={handlePasswordReset}
                 passwordResetAvailable={Boolean(user?.passwordEnabled)}
                 userPreferences={managerPrefs}
-                onSaveUserPreferences={(prefs) => saveUserPreferences(authCode, prefs)}
+                onSaveUserPreferences={(prefs) => saveUserPreferences(authCode, sanitizeWatermarkPreferenceWrite('manager', prefs))}
+                canEditWatermark={canRoleEditWatermark('manager')}
+                effectiveWatermarkUrl={managerPrefs.logoWatermarkUrl}
                 availableTabs={HUB_TABS.map(t => ({ id: t.id, label: t.label }))}
                 onSetTheme={setTheme}
                 accessStatus={accessStatus}
