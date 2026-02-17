@@ -1,24 +1,12 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git commit:*)",
-      "Bash(git push:*)",
-      "Bash(powershell:*)",
+      "Bash(node:*)",
+      "Bash(render --version)",
+      "Bash(where render)",
       "Bash(git add:*)",
-      "Bash(set PORT=4000)",
-      "Bash(pnpm dev:*)",
-      "Bash(timeout:*)",
-      "Bash(npx tsc:*)",
-      "Bash(npx tsx:*)",
-      "Bash(cat:*)",
-      "Bash(pnpm -F ./apps/frontend build)",
-      "Bash(npx vitest run:*)",
-      "Bash(pnpm typecheck:*)",
-      "Bash(pnpm -F @cks/ui build)",
-      "Bash(pnpm -F @cks/domain-widgets build)",
-      "Bash(pnpm test:*)",
-      "Bash(git log:*)",
-      "Bash(pnpm build:*)"
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ],
     "deny": [],
     "ask": []
