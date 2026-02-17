@@ -519,13 +519,8 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
 
   // Stable fetch key from auth; avoids TDZ on profileData
   const authCode = useMemo(() => resolvedUserCode(null, code), [code]);
-  const managerPrefs = useMemo(() => {
-    const prefs = loadUserPreferences(authCode);
-    return {
-      ...prefs,
-      logoWatermarkUrl: CKS_DEFAULT_WATERMARK_URL,
-    };
-  }, [authCode]);
+  const managerPrefs = useMemo(() => loadUserPreferences(authCode), [authCode]);
+  const managerEffectiveWatermarkUrl = CKS_DEFAULT_WATERMARK_URL;
 
   // Fetch hub-scoped data
   const {
@@ -1157,7 +1152,7 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
   }
 
   return (
-      <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: '#f9fafb' }}>
+      <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: 'transparent' }}>
         <MyHubSection
           hubName={managerPrefs.hubTitle?.trim() || 'Manager Hub'}
           tabs={HUB_TABS}
@@ -1218,7 +1213,7 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
                 userPreferences={managerPrefs}
                 onSaveUserPreferences={(prefs) => saveUserPreferences(authCode, sanitizeWatermarkPreferenceWrite('manager', prefs))}
                 canEditWatermark={canRoleEditWatermark('manager')}
-                effectiveWatermarkUrl={managerPrefs.logoWatermarkUrl}
+                effectiveWatermarkUrl={managerEffectiveWatermarkUrl}
                 availableTabs={HUB_TABS.map(t => ({ id: t.id, label: t.label }))}
                 onSetTheme={setTheme}
                 accessStatus={accessStatus}

@@ -241,14 +241,14 @@ function CenterHubContent({ initialTab = 'dashboard' }: CenterHubProps) {
   } = useHubRoleScope(normalizedCode);
   const contractorWatermarkCode =
     scopeData?.role === 'center' ? scopeData.relationships.contractor?.id : null;
-  const centerPreferences = useMemo(() => {
-    const ownPrefs = loadUserPreferences(userCode ?? normalizedCode);
+  const centerPreferences = useMemo(
+    () => loadUserPreferences(userCode ?? normalizedCode),
+    [normalizedCode, userCode],
+  );
+  const centerEffectiveWatermarkUrl = useMemo(() => {
     const contractorPrefs = loadUserPreferences(contractorWatermarkCode);
-    return {
-      ...ownPrefs,
-      logoWatermarkUrl: contractorPrefs.logoWatermarkUrl?.trim() || CKS_DEFAULT_WATERMARK_URL,
-    };
-  }, [contractorWatermarkCode, normalizedCode, userCode]);
+    return contractorPrefs.logoWatermarkUrl?.trim() || CKS_DEFAULT_WATERMARK_URL;
+  }, [contractorWatermarkCode]);
 
   // Signal when critical data is loaded
   useEffect(() => {
@@ -590,7 +590,7 @@ function CenterHubContent({ initialTab = 'dashboard' }: CenterHubProps) {
   }
 
   return (
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#f8fafc' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'transparent' }}>
             <MyHubSection
               hubName={(loadUserPreferences(userCode ?? normalizedCode).hubTitle?.trim() || 'Center Hub')}
               tabs={tabs}
@@ -664,7 +664,7 @@ function CenterHubContent({ initialTab = 'dashboard' }: CenterHubProps) {
                 userPreferences={centerPreferences}
                 onSaveUserPreferences={(prefs) => saveUserPreferences(userCode ?? normalizedCode, sanitizeWatermarkPreferenceWrite('center', prefs))}
                 canEditWatermark={canRoleEditWatermark('center')}
-                effectiveWatermarkUrl={centerPreferences.logoWatermarkUrl}
+                effectiveWatermarkUrl={centerEffectiveWatermarkUrl}
                 availableTabs={tabs.map(t => ({ id: t.id, label: t.label }))}
                 onSetTheme={setTheme}
                 accessStatus={accessStatus}

@@ -40,6 +40,11 @@ function setWatermarkImage(url: string | undefined): void {
   root.style.setProperty(WATERMARK_IMAGE_CSS_VAR, cssValue);
 }
 
+function resolveWatermarkUrl(logoWatermarkUrl: string | null | undefined): string {
+  const trimmed = typeof logoWatermarkUrl === 'string' ? logoWatermarkUrl.trim() : '';
+  return trimmed || CKS_DEFAULT_WATERMARK_URL;
+}
+
 export function useAccountWatermark(
   userCode: string | null | undefined,
   role: string | null | undefined,
@@ -65,8 +70,7 @@ export function useAccountWatermark(
 
   useEffect(() => {
     if (!enabled) {
-      // Keep a subtle baseline watermark even while auth state is resolving.
-      setWatermarkImage(CKS_DEFAULT_WATERMARK_URL);
+      setWatermarkImage(undefined);
       return;
     }
 
@@ -89,8 +93,7 @@ export function useAccountWatermark(
 
     const applyForOwner = () => {
       const preferences = loadUserPreferencesWithFallback(ownerCode);
-      const logoUrl = preferences.logoWatermarkUrl?.trim() || CKS_DEFAULT_WATERMARK_URL;
-      setWatermarkImage(logoUrl);
+      setWatermarkImage(resolveWatermarkUrl(preferences.logoWatermarkUrl));
     };
 
     applyForOwner();
@@ -100,8 +103,7 @@ export function useAccountWatermark(
       if (!detail || !codesMatch(detail.userCode, ownerCode)) {
         return;
       }
-      const logoUrl = detail.preferences.logoWatermarkUrl?.trim() || CKS_DEFAULT_WATERMARK_URL;
-      setWatermarkImage(logoUrl);
+      setWatermarkImage(resolveWatermarkUrl(detail.preferences.logoWatermarkUrl));
     };
 
     const onStorageChanged = (event: StorageEvent) => {

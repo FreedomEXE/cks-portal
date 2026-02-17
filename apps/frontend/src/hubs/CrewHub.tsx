@@ -240,13 +240,8 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
   const { data: reportsData, isLoading: reportsLoading, mutate: mutateReports } = useHubReports(normalizedCode);
   const supportTickets = useMemo(() => buildSupportTickets(reportsData), [reportsData]);
   const userCode = useMemo(() => resolvedUserCode(profile?.cksCode, normalizedCode), [profile?.cksCode, normalizedCode]);
-  const crewPreferences = useMemo(() => {
-    const prefs = loadUserPreferences(userCode ?? normalizedCode);
-    return {
-      ...prefs,
-      logoWatermarkUrl: CKS_DEFAULT_WATERMARK_URL,
-    };
-  }, [normalizedCode, userCode]);
+  const crewPreferences = useMemo(() => loadUserPreferences(userCode ?? normalizedCode), [normalizedCode, userCode]);
+  const crewEffectiveWatermarkUrl = CKS_DEFAULT_WATERMARK_URL;
 
   const {
     data: scopeData,
@@ -668,7 +663,7 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
   }
 
   return (
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#f8fafc' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'transparent' }}>
             <MyHubSection
               hubName={(loadUserPreferences(userCode ?? normalizedCode).hubTitle?.trim() || 'Crew Hub')}
               tabs={tabs}
@@ -738,7 +733,7 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
                 userPreferences={crewPreferences}
                 onSaveUserPreferences={(prefs) => saveUserPreferences(userCode ?? normalizedCode, sanitizeWatermarkPreferenceWrite('crew', prefs))}
                 canEditWatermark={canRoleEditWatermark('crew')}
-                effectiveWatermarkUrl={crewPreferences.logoWatermarkUrl}
+                effectiveWatermarkUrl={crewEffectiveWatermarkUrl}
                 availableTabs={tabs.map(t => ({ id: t.id, label: t.label }))}
                 onSetTheme={setTheme}
                 accessStatus={accessStatus}

@@ -130,8 +130,9 @@ export function ProfileTab({ role, profileData, primaryColor, photoUrl }: Profil
               style={{
                 width: '100%',
                 height: '100%',
-                objectFit: 'cover',
+                objectFit: 'contain',
                 objectPosition: 'center',
+                background: '#ffffff',
                 display: 'block',
               }}
             />

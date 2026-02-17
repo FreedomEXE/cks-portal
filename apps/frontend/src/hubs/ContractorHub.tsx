@@ -340,13 +340,11 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
 
   
   const userCode = useMemo(() => resolvedUserCode(profile?.cksCode, normalizedCode), [profile?.cksCode, normalizedCode]);
-  const contractorPreferences = useMemo(() => {
-    const prefs = loadUserPreferences(userCode ?? null);
-    return {
-      ...prefs,
-      logoWatermarkUrl: prefs.logoWatermarkUrl?.trim() || CKS_DEFAULT_WATERMARK_URL,
-    };
-  }, [userCode]);
+  const contractorPreferences = useMemo(() => loadUserPreferences(userCode ?? null), [userCode]);
+  const contractorEffectiveWatermarkUrl = useMemo(
+    () => contractorPreferences.logoWatermarkUrl?.trim() || CKS_DEFAULT_WATERMARK_URL,
+    [contractorPreferences.logoWatermarkUrl],
+  );
   const welcomeName = profile?.mainContact ?? profile?.name ?? undefined;
 
   // Signal when critical data is loaded (but only if not highlighting an order)
@@ -725,7 +723,7 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
   }
 
   return (
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#f8fafc' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'transparent' }}>
         <MyHubSection
         hubName={(loadUserPreferences(userCode ?? null).hubTitle?.trim() || 'Contractor Hub')}
         tabs={tabs}
@@ -800,7 +798,7 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
                 userPreferences={contractorPreferences}
                 onSaveUserPreferences={(prefs) => saveUserPreferences(userCode ?? null, sanitizeWatermarkPreferenceWrite('contractor', prefs))}
                 canEditWatermark={canRoleEditWatermark('contractor')}
-                effectiveWatermarkUrl={contractorPreferences.logoWatermarkUrl}
+                effectiveWatermarkUrl={contractorEffectiveWatermarkUrl}
                 availableTabs={tabs.map(t => ({ id: t.id, label: t.label }))}
                 onSetTheme={setTheme}
                 accessStatus={accessStatus}

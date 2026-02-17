@@ -241,13 +241,8 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
 
   // Resolve final display/user code after profile is available
   const userCode = useMemo(() => resolvedUserCode(profile?.cksCode, normalizedCode), [profile?.cksCode, normalizedCode]);
-  const warehousePreferences = useMemo(() => {
-    const prefs = loadUserPreferences(normalizedCode ?? null);
-    return {
-      ...prefs,
-      logoWatermarkUrl: CKS_DEFAULT_WATERMARK_URL,
-    };
-  }, [normalizedCode]);
+  const warehousePreferences = useMemo(() => loadUserPreferences(normalizedCode ?? null), [normalizedCode]);
+  const warehouseEffectiveWatermarkUrl = CKS_DEFAULT_WATERMARK_URL;
 
   // Access modal context
   const modals = useModals();
@@ -788,7 +783,7 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
   const { openUserProfile } = useClerk();
 
   return (
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#f8fafc' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'transparent' }}>
         <MyHubSection
           hubName={(loadUserPreferences(normalizedCode ?? null).hubTitle?.trim() || 'Warehouse Hub')}
           tabs={tabs}
@@ -860,7 +855,7 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
                 userPreferences={warehousePreferences}
                 onSaveUserPreferences={(prefs) => saveUserPreferences(normalizedCode ?? null, sanitizeWatermarkPreferenceWrite('warehouse', prefs))}
                 canEditWatermark={canRoleEditWatermark('warehouse')}
-                effectiveWatermarkUrl={warehousePreferences.logoWatermarkUrl}
+                effectiveWatermarkUrl={warehouseEffectiveWatermarkUrl}
                 accessStatus={accessStatus}
                 accessTier={accessTier}
                 accessSource={accessSource}

@@ -151,7 +151,7 @@ export default function GlobalLoader(): JSX.Element | null {
       role="status"
       aria-live="polite"
       aria-label="Loading"
-      className="fixed inset-0 z-[1000] flex items-center justify-center bg-white/65 backdrop-blur-sm"
+      className="fixed inset-0 z-[1000] flex items-center justify-center bg-white/95 backdrop-blur-sm"
     >
       <div className="flex flex-col items-center">
         {parsedSvg?.paths?.length ? (

@@ -236,14 +236,14 @@ function CustomerHubContent({ initialTab = 'dashboard' }: CustomerHubProps) {
   } = useHubRoleScope(normalizedCode);
   const contractorWatermarkCode =
     scopeData?.role === 'customer' ? scopeData.relationships.contractor?.id : null;
-  const customerPreferences = useMemo(() => {
-    const ownPrefs = loadUserPreferences(userCode ?? normalizedCode);
+  const customerPreferences = useMemo(
+    () => loadUserPreferences(userCode ?? normalizedCode),
+    [normalizedCode, userCode],
+  );
+  const customerEffectiveWatermarkUrl = useMemo(() => {
     const contractorPrefs = loadUserPreferences(contractorWatermarkCode);
-    return {
-      ...ownPrefs,
-      logoWatermarkUrl: contractorPrefs.logoWatermarkUrl?.trim() || CKS_DEFAULT_WATERMARK_URL,
-    };
-  }, [contractorWatermarkCode, normalizedCode, userCode]);
+    return contractorPrefs.logoWatermarkUrl?.trim() || CKS_DEFAULT_WATERMARK_URL;
+  }, [contractorWatermarkCode]);
   const { data: certifiedServicesData, isLoading: certifiedServicesLoading } = useCertifiedServices(normalizedCode, 'customer', 500);
   const { mutate } = useSWRConfig();
   const { data: newsItems = [] } = useNewsFeed();
@@ -592,7 +592,7 @@ function CustomerHubContent({ initialTab = 'dashboard' }: CustomerHubProps) {
   }
 
   return (
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#f8fafc' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'transparent' }}>
       <MyHubSection
         hubName={(loadUserPreferences(userCode ?? normalizedCode).hubTitle?.trim() || 'Customer Hub')}
         tabs={tabs}
@@ -666,7 +666,7 @@ function CustomerHubContent({ initialTab = 'dashboard' }: CustomerHubProps) {
                 userPreferences={customerPreferences}
                 onSaveUserPreferences={(prefs) => saveUserPreferences(userCode ?? normalizedCode, sanitizeWatermarkPreferenceWrite('customer', prefs))}
                 canEditWatermark={canRoleEditWatermark('customer')}
-                effectiveWatermarkUrl={customerPreferences.logoWatermarkUrl}
+                effectiveWatermarkUrl={customerEffectiveWatermarkUrl}
                 availableTabs={tabs.map(t => ({ id: t.id, label: t.label }))}
                 onSetTheme={setTheme}
                 accessStatus={accessStatus}

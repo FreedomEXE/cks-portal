@@ -1842,7 +1842,7 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
   }
 
   return (
-  <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: '#f9fafb' }}>
+  <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: 'transparent' }}>
       <MyHubSection
         hubName="Administrator Hub"
         tabs={HUB_TABS}

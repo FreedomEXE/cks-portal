@@ -8,6 +8,38 @@ type ClerkLikeUser = {
   imageUrl?: string | null;
 };
 
+const IMAGE_URL_SYNC_ATTEMPTS = 5;
+const IMAGE_URL_SYNC_RETRY_DELAY_MS = 250;
+
+function getNormalizedImageUrl(user: ClerkLikeUser): string {
+  return typeof user.imageUrl === 'string' ? user.imageUrl.trim() : '';
+}
+
+async function waitForUpdatedImageUrl(user: ClerkLikeUser): Promise<string> {
+  let imageUrl = getNormalizedImageUrl(user);
+  if (imageUrl) {
+    return imageUrl;
+  }
+
+  const canReload = typeof user.reload === 'function';
+  if (!canReload) {
+    return '';
+  }
+
+  for (let attempt = 0; attempt < IMAGE_URL_SYNC_ATTEMPTS; attempt += 1) {
+    await user.reload?.();
+    imageUrl = getNormalizedImageUrl(user);
+    if (imageUrl) {
+      return imageUrl;
+    }
+    await new Promise<void>((resolve) => {
+      window.setTimeout(resolve, IMAGE_URL_SYNC_RETRY_DELAY_MS);
+    });
+  }
+
+  return '';
+}
+
 export async function uploadProfilePhotoAndSyncLogo(
   user: ClerkLikeUser | null | undefined,
   file: File,
@@ -28,7 +60,7 @@ export async function uploadProfilePhotoAndSyncLogo(
 
   // Only sync watermark logo for contractors
   if (canRoleEditWatermark(role)) {
-    const nextImageUrl = typeof user.imageUrl === 'string' ? user.imageUrl.trim() : '';
+    const nextImageUrl = await waitForUpdatedImageUrl(user);
     if (nextImageUrl) {
       // Save watermark preference (this already emits the change event)
       saveUserPreferences(userCode, { logoWatermarkUrl: nextImageUrl });
