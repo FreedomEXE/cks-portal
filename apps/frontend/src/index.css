@@ -6,6 +6,13 @@ html, body, #root {
   height: 100%;
 }
 
+/* Stacking context for #root ensures wheel/pointer events propagate
+   correctly through the hub flex layout, above the body background layers. */
+#root {
+  position: relative;
+  z-index: 1;
+}
+
 /* Scale typography across common desktop widths without affecting large screens. */
 html {
   font-size: clamp(14px, 0.65vw + 7px, 16px);
