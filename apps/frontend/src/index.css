@@ -48,6 +48,7 @@ html {
 
 body {
   margin: 0;
+  cursor: default;
   background-color: var(--bg);
   background-image:
     linear-gradient(var(--cks-account-watermark-overlay), var(--cks-account-watermark-overlay)),
