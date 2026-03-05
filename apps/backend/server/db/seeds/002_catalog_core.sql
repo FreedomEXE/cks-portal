@@ -5,7 +5,8 @@ BEGIN
     RETURN;
   END IF;
 
-  INSERT INTO catalog_products (
+  IF NOT EXISTS (SELECT 1 FROM catalog_products LIMIT 1) THEN
+    INSERT INTO catalog_products (
     product_id,
     name,
     description,
@@ -33,24 +34,28 @@ BEGIN
     ('PRD-008', 'Disinfectant Wipes Case', 'EPA-registered disinfectant wipes for high-touch wiping (6 canisters per case).', NULL, ARRAY['ppe','infection-control'], 'supplies', 'case', 54.00, 'USD', 'SKU-PRD-008', 'Case of 6 x 75 count canisters', 4, 16, jsonb_build_object('epa_registration', 'CKS-7852A'), jsonb_build_object('category', 'infection-control'), TRUE),
     ('PRD-009', 'Auto-Scrubber Pads (17 inches)', 'Medium-aggressive pads for daily scrubbing with auto-scrubbers (case of 5).', NULL, ARRAY['floor-care','equipment'], 'materials', 'case', 40.00, 'USD', 'SKU-PRD-009', 'Case of 5 pads (17 inches)', 5, 12, jsonb_build_object('pad_grade', 'medium'), jsonb_build_object('category', 'floor-care'), TRUE),
     ('PRD-010', 'Restroom Essentials Combo', 'Bundle of paper towels, toilet tissue, seat covers, and soap refills.', NULL, ARRAY['restroom','bundle'], 'supplies', 'kit', 96.00, 'USD', 'SKU-PRD-010', 'Complete restroom bundle', 5, 14, jsonb_build_object('bundle_items', 4), jsonb_build_object('category', 'restroom'), TRUE)
-  ON CONFLICT (product_id) DO UPDATE SET
-    name = EXCLUDED.name,
-    description = EXCLUDED.description,
-    image_url = EXCLUDED.image_url,
-    tags = EXCLUDED.tags,
-    category = EXCLUDED.category,
-    unit_of_measure = EXCLUDED.unit_of_measure,
-    base_price = EXCLUDED.base_price,
-    currency = EXCLUDED.currency,
-    sku = EXCLUDED.sku,
-    package_size = EXCLUDED.package_size,
-    lead_time_days = EXCLUDED.lead_time_days,
-    reorder_point = EXCLUDED.reorder_point,
-    attributes = EXCLUDED.attributes,
-    metadata = EXCLUDED.metadata,
-    is_active = EXCLUDED.is_active;
+    ON CONFLICT (product_id) DO UPDATE SET
+      name = EXCLUDED.name,
+      description = EXCLUDED.description,
+      image_url = EXCLUDED.image_url,
+      tags = EXCLUDED.tags,
+      category = EXCLUDED.category,
+      unit_of_measure = EXCLUDED.unit_of_measure,
+      base_price = EXCLUDED.base_price,
+      currency = EXCLUDED.currency,
+      sku = EXCLUDED.sku,
+      package_size = EXCLUDED.package_size,
+      lead_time_days = EXCLUDED.lead_time_days,
+      reorder_point = EXCLUDED.reorder_point,
+      attributes = EXCLUDED.attributes,
+      metadata = EXCLUDED.metadata,
+      is_active = EXCLUDED.is_active;
+  ELSE
+    RAISE NOTICE 'catalog_products already populated; skipping core product seed';
+  END IF;
 
-  INSERT INTO catalog_services (
+  IF NOT EXISTS (SELECT 1 FROM catalog_services LIMIT 1) THEN
+    INSERT INTO catalog_services (
     service_id,
     name,
     description,
@@ -67,7 +72,7 @@ BEGIN
     metadata,
     is_active
   ) VALUES
-    ('SRV-001', 'Nightly Janitorial Service', 'Crew-led nightly janitorial reset covering trash, restrooms, floors, and checkpoints.', NULL, ARRAY['janitorial','nightly'], 'janitorial', 'service', 250.00, 'USD', 180, 'Nightly after closing', 3, jsonb_build_object('includes_supply_restock', true), jsonb_build_object('category', 'janitorial'), TRUE),
+    ('SRV-001', 'Daily Maintaining Cleaning', 'Professional daily maintaining cleaning for ceilings pipes and stairs areas with detail-oriented finishing and safety checks.', NULL, ARRAY['high-dusting','interior','daily','maintaining','cleaning'], 'ceilings-pipes-and-stairs', 'service', 120.00, 'USD', 120, 'flex', 2, jsonb_build_object('crew_required', 2), jsonb_build_object('category', 'ceilings-pipes-and-stairs'), TRUE),
     ('SRV-002', 'Quarterly Floor Refinish', 'Strip, neutralize, and refinish resilient floors with high-gloss finish.', NULL, ARRAY['floor-care'], 'floor-care', 'service', 620.00, 'USD', 420, 'Scheduled with manager approval', 4, jsonb_build_object('equipment', 'burnisher + scrubber'), jsonb_build_object('category', 'floor-care'), TRUE),
     ('SRV-003', 'HVAC Filter Replacement', 'Replace standard HVAC filters and inspect RTUs for dust/debris.', NULL, ARRAY['maintenance','hvac'], 'maintenance', 'service', 180.00, 'USD', 120, 'Weekdays 7am-5pm', 2, jsonb_build_object('filters_included', true), jsonb_build_object('category', 'maintenance'), TRUE),
     ('SRV-004', 'Deep Carpet Extraction', 'Hot water extraction for carpeted areas, includes pre-treatment and grooming.', NULL, ARRAY['floor-care','carpet'], 'floor-care', 'service', 420.00, 'USD', 240, 'Weekdays 6pm-2am', 3, jsonb_build_object('dry_time_hours', 6), jsonb_build_object('category', 'floor-care'), TRUE),
@@ -77,19 +82,22 @@ BEGIN
     ('SRV-008', 'Kitchen Degrease & Sanitize', 'Comprehensive BOH kitchen degrease focused on hoods, walls, and floors.', NULL, ARRAY['kitchen','degrease'], 'kitchen', 'service', 360.00, 'USD', 300, 'Weekdays 10pm-6am', 3, jsonb_build_object('hood_certified', true), jsonb_build_object('category', 'kitchen'), TRUE),
     ('SRV-009', 'Preventative Maintenance Inspection', 'PM inspection with punch list for janitorial equipment and consumables.', NULL, ARRAY['maintenance','inspection'], 'maintenance', 'service', 295.00, 'USD', 180, 'Coordinator scheduled', 2, jsonb_build_object('report_delivery', 'PDF + dashboard entry'), jsonb_build_object('category', 'maintenance'), TRUE),
     ('SRV-010', 'Emergency Spill Response', 'Rapid response team for chemical or bio spill containment and remediation.', NULL, ARRAY['emergency','hazmat'], 'emergency', 'service', 195.00, 'USD', 120, '24/7 on-call', 2, jsonb_build_object('ppe_level', 'hazmat'), jsonb_build_object('category', 'emergency'), TRUE)
-  ON CONFLICT (service_id) DO UPDATE SET
-    name = EXCLUDED.name,
-    description = EXCLUDED.description,
-    image_url = EXCLUDED.image_url,
-    tags = EXCLUDED.tags,
-    category = EXCLUDED.category,
-    unit_of_measure = EXCLUDED.unit_of_measure,
-    base_price = EXCLUDED.base_price,
-    currency = EXCLUDED.currency,
-    duration_minutes = EXCLUDED.duration_minutes,
-    service_window = EXCLUDED.service_window,
-    crew_required = EXCLUDED.crew_required,
-    attributes = EXCLUDED.attributes,
-    metadata = EXCLUDED.metadata,
-    is_active = EXCLUDED.is_active;
+    ON CONFLICT (service_id) DO UPDATE SET
+      name = EXCLUDED.name,
+      description = EXCLUDED.description,
+      image_url = EXCLUDED.image_url,
+      tags = EXCLUDED.tags,
+      category = EXCLUDED.category,
+      unit_of_measure = EXCLUDED.unit_of_measure,
+      base_price = EXCLUDED.base_price,
+      currency = EXCLUDED.currency,
+      duration_minutes = EXCLUDED.duration_minutes,
+      service_window = EXCLUDED.service_window,
+      crew_required = EXCLUDED.crew_required,
+      attributes = EXCLUDED.attributes,
+      metadata = EXCLUDED.metadata,
+      is_active = EXCLUDED.is_active;
+  ELSE
+    RAISE NOTICE 'catalog_services already populated; skipping core service seed';
+  END IF;
 END $$;

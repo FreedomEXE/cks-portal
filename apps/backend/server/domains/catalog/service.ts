@@ -1,6 +1,9 @@
-import type { CatalogFilters, CatalogListResult } from './types';
+import type { CatalogFilters, CatalogListResult, CatalogViewerContext } from './types';
 import { fetchCatalogItems } from './store';
 
-export async function getCatalogItems(filters: CatalogFilters): Promise<CatalogListResult> {
-  return fetchCatalogItems(filters);
+export async function getCatalogItems(
+  filters: CatalogFilters,
+  viewer: CatalogViewerContext,
+): Promise<CatalogListResult> {
+  return fetchCatalogItems(filters, viewer);
 }

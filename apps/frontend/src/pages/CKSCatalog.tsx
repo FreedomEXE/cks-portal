@@ -67,6 +67,9 @@ function Card({
   isInCart: boolean;
 }) {
   const subtitle = item.type === "product" ? formatProductInfo(item) : formatDuration(item);
+  const seededImageUrl = item.imageUrl?.trim()
+    ? item.imageUrl
+    : `https://picsum.photos/seed/${encodeURIComponent(item.code)}/640/480`;
 
   // Determine card styling based on type and managedBy
   const getCardStyle = () => {
@@ -113,15 +116,17 @@ function Card({
   return (
     <div className={`group ${cardStyle.bg} rounded-xl border ${cardStyle.border} shadow-sm overflow-hidden hover:shadow-md transition-shadow h-full`}>
       <div className="aspect-[4/3] w-full bg-gray-100 overflow-hidden">
-        {item.imageUrl ? (
-          <img
-            src={item.imageUrl}
-            alt={item.name}
-            className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-300"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-gray-400">No image</div>
-        )}
+        <img
+          src={seededImageUrl}
+          alt={item.name}
+          loading="lazy"
+          onError={(event) => {
+            const img = event.currentTarget;
+            img.onerror = null;
+            img.src = '/portal-icon.svg';
+          }}
+          className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-300"
+        />
       </div>
       <div className="p-4 flex flex-col min-h-[180px]">
         {/* Title + subtitle + badge area: fixed height to align buttons across cards */}

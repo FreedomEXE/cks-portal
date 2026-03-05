@@ -1,4 +1,25 @@
 import { query } from './connection';
+import { readFile } from 'node:fs/promises';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const CURRENT_DIR = dirname(fileURLToPath(import.meta.url));
+const GENERATED_IMPORT_PATH = resolve(CURRENT_DIR, '../../scripts/generated/import_catalog.sql');
+
+async function trySeedFromGeneratedImport(): Promise<boolean> {
+  try {
+    const sql = await readFile(GENERATED_IMPORT_PATH, 'utf8');
+    if (!sql.trim()) {
+      return false;
+    }
+    await query(sql, []);
+    console.log('Catalog seeded from generated import_catalog.sql');
+    return true;
+  } catch {
+    console.warn('Generated catalog import not available, falling back to sample seed');
+    return false;
+  }
+}
 
 export async function seedCatalogData() {
   try {
@@ -18,10 +39,13 @@ export async function seedCatalogData() {
       return;
     }
 
-    console.log('Seeding catalog with sample products...');
+    const seededFromGeneratedImport = await trySeedFromGeneratedImport();
 
-    // Insert sample products
-    await query(`
+    if (!seededFromGeneratedImport) {
+      console.log('Seeding catalog with sample products...');
+
+      // Insert sample products
+      await query(`
       INSERT INTO catalog_products (
         product_id, name, description, image_url, tags, category,
         unit_of_measure, base_price, currency, sku, package_size,
@@ -40,20 +64,21 @@ export async function seedCatalogData() {
       ON CONFLICT (product_id) DO NOTHING
     `, []);
 
-    // Insert sample services
-    await query(`
+      // Insert sample services
+      await query(`
       INSERT INTO catalog_services (
         service_id, name, description, image_url, tags, category,
         unit_of_measure, base_price, currency, duration_minutes,
         service_window, crew_required, attributes, metadata, is_active
       ) VALUES
-        ('SRV-001', 'Daily Cleaning Service', 'Standard daily cleaning for offices and common areas', NULL, ARRAY['cleaning','daily'], 'cleaning', 'hour', 45.00, 'USD', 120, 'evening', 2, '{"frequency": "daily"}'::jsonb, '{"category": "cleaning"}'::jsonb, TRUE),
+        ('SRV-001', 'Daily Maintaining Cleaning', 'Professional daily maintaining cleaning for ceilings pipes and stairs areas with detail-oriented finishing and safety checks.', NULL, ARRAY['high-dusting', 'interior', 'daily', 'maintaining', 'cleaning'], 'ceilings-pipes-and-stairs', 'service', 120.00, 'USD', 120, 'flex', 2, '{"crew_required":2}'::jsonb, '{"category": "ceilings-pipes-and-stairs"}'::jsonb, TRUE),
         ('SRV-002', 'Deep Clean Service', 'Comprehensive deep cleaning service for thorough sanitization', NULL, ARRAY['cleaning','deep'], 'cleaning', 'service', 350.00, 'USD', 240, 'weekend', 4, '{"frequency": "monthly"}'::jsonb, '{"category": "cleaning"}'::jsonb, TRUE),
         ('SRV-003', 'Floor Stripping & Waxing', 'Professional floor stripping and waxing service', NULL, ARRAY['floor-care','specialty'], 'floor-care', 'sq-ft', 0.35, 'USD', 360, 'overnight', 3, '{"equipment_required": true}'::jsonb, '{"category": "floor-care"}'::jsonb, TRUE),
         ('SRV-004', 'Window Cleaning', 'Interior and exterior window cleaning service', NULL, ARRAY['cleaning','windows'], 'cleaning', 'service', 200.00, 'USD', 180, 'morning', 2, '{"height_limit": "3_story"}'::jsonb, '{"category": "specialty"}'::jsonb, TRUE),
         ('SRV-005', 'Carpet Cleaning', 'Hot water extraction carpet cleaning', NULL, ARRAY['carpet','specialty'], 'floor-care', 'sq-ft', 0.25, 'USD', 240, 'daytime', 2, '{"drying_time": "4_hours"}'::jsonb, '{"category": "floor-care"}'::jsonb, TRUE)
       ON CONFLICT (service_id) DO NOTHING
     `, []);
+    }
 
     const finalProductCount = await query(`SELECT COUNT(*) as count FROM catalog_products`, []);
     const serviceCount = await query(`SELECT COUNT(*) as count FROM catalog_services`, []);

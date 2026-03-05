@@ -249,6 +249,66 @@ export async function updateCatalogProduct(
   });
 }
 
+export type CatalogVisibilityType = 'product' | 'service';
+export type CatalogVisibilityMode = 'all' | 'allowlist';
+
+export interface CatalogEcosystem {
+  ecosystemId: string;
+  ecosystemName: string | null;
+}
+
+export interface CatalogVisibilityItem {
+  code: string;
+  name: string;
+  category: string | null;
+  selected: boolean;
+}
+
+export interface CatalogVisibilityConfig {
+  ecosystemManagerId: string;
+  type: CatalogVisibilityType;
+  mode: CatalogVisibilityMode;
+  selectedItemCodes: string[];
+  items: CatalogVisibilityItem[];
+}
+
+export async function fetchCatalogEcosystems(init?: ApiFetchInit): Promise<CatalogEcosystem[]> {
+  const response = await apiFetch<{ success: boolean; data: CatalogEcosystem[] }>(
+    '/admin/catalog/ecosystems',
+    init,
+  );
+  return response.data;
+}
+
+export async function fetchCatalogVisibilityConfig(
+  ecosystemManagerId: string,
+  type: CatalogVisibilityType,
+  init?: ApiFetchInit,
+): Promise<CatalogVisibilityConfig> {
+  const response = await apiFetch<{ success: boolean; data: CatalogVisibilityConfig }>(
+    `/admin/catalog/visibility/${encodeURIComponent(ecosystemManagerId)}?type=${encodeURIComponent(type)}`,
+    init,
+  );
+  return response.data;
+}
+
+export async function updateCatalogVisibilityConfig(
+  ecosystemManagerId: string,
+  payload: {
+    type: CatalogVisibilityType;
+    mode: CatalogVisibilityMode;
+    itemCodes?: string[];
+  },
+  init?: ApiFetchInit,
+) {
+  return apiFetch<{ success: boolean }>(`/admin/catalog/visibility/${encodeURIComponent(ecosystemManagerId)}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+    headers: { 'Content-Type': 'application/json', ...(init?.headers || {}) },
+    ...init,
+  });
+}
+
 export async function fetchServiceCertifications(serviceId: string, init?: ApiFetchInit): Promise<{ managers: string[]; crew: string[]; warehouses: string[] }>{
   const res = await apiFetch<{ success: boolean; data: { managers: string[]; crew: string[]; warehouses: string[] } }>(`/admin/catalog/services/${encodeURIComponent(serviceId)}/certifications`, init);
   return res.data;

@@ -2,8 +2,9 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { requireActiveRole } from '../../core/auth/guards';
 import { requireActiveAdmin } from '../adminUsers/guards';
-import { query } from '../../db/connection';
+import { query, withTransaction } from '../../db/connection';
 import { getCatalogItems } from './service';
+import { isCatalogItemVisible } from './store';
 import { recordActivity } from '../activity/writer';
 
 const querySchema = z.object({
@@ -34,6 +35,26 @@ function normalizeTags(input: unknown): string[] {
   return [];
 }
 
+function normalizeCodes(input: unknown): string[] {
+  if (!Array.isArray(input)) {
+    return [];
+  }
+  const seen = new Set<string>();
+  const normalized: string[] = [];
+  for (const raw of input) {
+    if (typeof raw !== 'string') {
+      continue;
+    }
+    const value = raw.trim().toUpperCase();
+    if (!value || seen.has(value)) {
+      continue;
+    }
+    seen.add(value);
+    normalized.push(value);
+  }
+  return normalized;
+}
+
 export async function registerCatalogRoutes(server: FastifyInstance) {
   server.get('/api/catalog/items', async (request, reply) => {
     const auth = await requireActiveRole(request, reply);
@@ -60,8 +81,223 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
       isTest,
     };
 
-    const result = await getCatalogItems(filters);
+    const result = await getCatalogItems(filters, {
+      role: auth.role,
+      cksCode: auth.cksCode,
+      isAdmin: auth.isAdmin,
+    });
     reply.send({ data: result });
+  });
+
+  server.get('/api/admin/catalog/ecosystems', async (request, reply) => {
+    const admin = await requireActiveAdmin(request, reply);
+    if (!admin) {
+      return;
+    }
+
+    try {
+      const result = await query<{ ecosystem_id: string; ecosystem_name: string | null }>(
+        `SELECT manager_id AS ecosystem_id, name AS ecosystem_name
+         FROM managers
+         WHERE status = 'active'
+         ORDER BY name ASC`,
+        [],
+      );
+      reply.send({
+        success: true,
+        data: result.rows.map((row) => ({
+          ecosystemId: row.ecosystem_id,
+          ecosystemName: row.ecosystem_name,
+        })),
+      });
+    } catch (error) {
+      request.log.error({ err: error }, 'Failed to fetch ecosystem list');
+      reply.code(500).send({ error: 'Failed to fetch ecosystem list' });
+    }
+  });
+
+  server.get('/api/admin/catalog/visibility/:ecosystemManagerId', async (request, reply) => {
+    const admin = await requireActiveAdmin(request, reply);
+    if (!admin) {
+      return;
+    }
+
+    const paramsSchema = z.object({ ecosystemManagerId: z.string().trim().min(1) });
+    const visibilityQuerySchema = z.object({
+      type: z.enum(['product', 'service']),
+    });
+
+    const parsedParams = paramsSchema.safeParse(request.params);
+    const parsedQuery = visibilityQuerySchema.safeParse(request.query);
+    if (!parsedParams.success || !parsedQuery.success) {
+      reply.code(400).send({ error: 'Invalid request' });
+      return;
+    }
+
+    const ecosystemManagerId = parsedParams.data.ecosystemManagerId.trim().toUpperCase();
+    const itemType = parsedQuery.data.type;
+
+    try {
+      const [policyResult, selectedResult, allItemsResult] = await Promise.all([
+        query<{ visibility_mode: 'all' | 'allowlist' }>(
+          `SELECT visibility_mode
+           FROM catalog_ecosystem_visibility_policies
+           WHERE UPPER(ecosystem_manager_id) = UPPER($1) AND item_type = $2
+           LIMIT 1`,
+          [ecosystemManagerId, itemType],
+        ),
+        query<{ item_code: string }>(
+          `SELECT item_code
+           FROM catalog_ecosystem_visibility_items
+           WHERE UPPER(ecosystem_manager_id) = UPPER($1) AND item_type = $2
+           ORDER BY item_code ASC`,
+          [ecosystemManagerId, itemType],
+        ),
+        itemType === 'product'
+          ? query<{ item_code: string; name: string; category: string | null }>(
+              `SELECT product_id AS item_code, name, category
+               FROM catalog_products
+               WHERE is_active = TRUE
+               ORDER BY name ASC`,
+              [],
+            )
+          : query<{ item_code: string; name: string; category: string | null }>(
+              `SELECT service_id AS item_code, name, category
+               FROM catalog_services
+               WHERE is_active = TRUE
+               ORDER BY name ASC`,
+              [],
+            ),
+      ]);
+
+      const mode = policyResult.rows[0]?.visibility_mode ?? 'all';
+      const selectedCodes = selectedResult.rows.map((row) => row.item_code.toUpperCase());
+      const selectedSet = new Set(selectedCodes);
+
+      reply.send({
+        success: true,
+        data: {
+          ecosystemManagerId,
+          type: itemType,
+          mode,
+          selectedItemCodes: selectedCodes,
+          items: allItemsResult.rows.map((row) => ({
+            code: row.item_code,
+            name: row.name,
+            category: row.category,
+            selected: selectedSet.has(row.item_code.toUpperCase()),
+          })),
+        },
+      });
+    } catch (error) {
+      request.log.error({ err: error, ecosystemManagerId, itemType }, 'Failed to fetch catalog visibility');
+      reply.code(500).send({ error: 'Failed to fetch catalog visibility' });
+    }
+  });
+
+  server.put('/api/admin/catalog/visibility/:ecosystemManagerId', async (request, reply) => {
+    const admin = await requireActiveAdmin(request, reply);
+    if (!admin) {
+      return;
+    }
+
+    const paramsSchema = z.object({ ecosystemManagerId: z.string().trim().min(1) });
+    const bodySchema = z.object({
+      type: z.enum(['product', 'service']),
+      mode: z.enum(['all', 'allowlist']),
+      itemCodes: z.array(z.string()).optional(),
+    });
+
+    const parsedParams = paramsSchema.safeParse(request.params);
+    const parsedBody = bodySchema.safeParse(request.body);
+    if (!parsedParams.success || !parsedBody.success) {
+      reply.code(400).send({ error: 'Invalid request' });
+      return;
+    }
+
+    const ecosystemManagerId = parsedParams.data.ecosystemManagerId.trim().toUpperCase();
+    const { type: itemType, mode } = parsedBody.data;
+    const itemCodes = normalizeCodes(parsedBody.data.itemCodes);
+
+    const expectedPrefix = itemType === 'product' ? 'PRD-' : 'SRV-';
+    const malformedCodes = itemCodes.filter((code) => !code.startsWith(expectedPrefix));
+    if (malformedCodes.length > 0) {
+      reply.code(400).send({
+        error: `All ${itemType} codes must start with ${expectedPrefix}`,
+        invalidCodes: malformedCodes,
+      });
+      return;
+    }
+
+    if (mode === 'allowlist' && itemCodes.length > 0) {
+      const existingResult =
+        itemType === 'product'
+          ? await query<{ code: string }>(
+              `SELECT product_id AS code FROM catalog_products WHERE product_id = ANY($1::text[])`,
+              [itemCodes],
+            )
+          : await query<{ code: string }>(
+              `SELECT service_id AS code FROM catalog_services WHERE service_id = ANY($1::text[])`,
+              [itemCodes],
+            );
+
+      const existingSet = new Set(existingResult.rows.map((row) => row.code.toUpperCase()));
+      const missingCodes = itemCodes.filter((code) => !existingSet.has(code));
+      if (missingCodes.length > 0) {
+        reply.code(400).send({
+          error: `Some ${itemType} codes do not exist`,
+          missingCodes,
+        });
+        return;
+      }
+    }
+
+    try {
+      await withTransaction(async (tx) => {
+        await tx(
+          `INSERT INTO catalog_ecosystem_visibility_policies (
+             ecosystem_manager_id, item_type, visibility_mode, updated_by
+           ) VALUES ($1, $2, $3, $4)
+           ON CONFLICT (ecosystem_manager_id, item_type)
+           DO UPDATE SET
+             visibility_mode = EXCLUDED.visibility_mode,
+             updated_by = EXCLUDED.updated_by,
+             updated_at = NOW()`,
+          [ecosystemManagerId, itemType, mode, admin.cksCode ?? 'ADMIN'],
+        );
+
+        await tx(
+          `DELETE FROM catalog_ecosystem_visibility_items
+           WHERE UPPER(ecosystem_manager_id) = UPPER($1) AND item_type = $2`,
+          [ecosystemManagerId, itemType],
+        );
+
+        if (mode === 'allowlist' && itemCodes.length > 0) {
+          await tx(
+            `INSERT INTO catalog_ecosystem_visibility_items (
+               ecosystem_manager_id, item_type, item_code, created_by
+             )
+             SELECT $1, $2, code, $3
+             FROM UNNEST($4::text[]) AS code
+             ON CONFLICT (ecosystem_manager_id, item_type, item_code) DO NOTHING`,
+            [ecosystemManagerId, itemType, admin.cksCode ?? 'ADMIN', itemCodes],
+          );
+        }
+      });
+
+      reply.send({
+        success: true,
+        data: {
+          ecosystemManagerId,
+          type: itemType,
+          mode,
+          selectedCount: mode === 'allowlist' ? itemCodes.length : 0,
+        },
+      });
+    } catch (error) {
+      request.log.error({ err: error, ecosystemManagerId, itemType, mode }, 'Failed to update catalog visibility');
+      reply.code(500).send({ error: 'Failed to update catalog visibility' });
+    }
   });
 
   // Get catalog service details by ID (on-demand fetching for modals)
@@ -87,6 +323,15 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
     console.log('[CATALOG_DETAILS] Fetching service:', normalizedId);
 
     try {
+      const canAccess = await isCatalogItemVisible(
+        { role: user.role, cksCode: user.cksCode, isAdmin: user.isAdmin },
+        'service',
+        normalizedId,
+      );
+      if (!canAccess) {
+        return reply.code(404).send({ error: 'Service not found' });
+      }
+
       // Fetch service from catalog_services table
       console.log('[CATALOG_DETAILS] Step 1: Querying catalog_services table');
       const result = await query<{
@@ -265,6 +510,16 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
     const normalizedId = productId.toUpperCase();
 
     try {
+      const canAccess = await isCatalogItemVisible(
+        { role: user.role, cksCode: user.cksCode, isAdmin: user.isAdmin },
+        'product',
+        normalizedId,
+      );
+      if (!canAccess) {
+        reply.code(404).send({ error: 'Product not found' });
+        return;
+      }
+
       // Fetch product from catalog_products
       const result = await query<{
         product_id: string;

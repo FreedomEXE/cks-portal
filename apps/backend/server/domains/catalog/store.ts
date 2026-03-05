@@ -1,4 +1,5 @@
 import { query } from "../../db/connection";
+import { normalizeIdentity } from "../identity";
 import type {
   CatalogFilters,
   CatalogItem,
@@ -7,6 +8,7 @@ import type {
   CatalogPage,
   CatalogProductDetails,
   CatalogServiceDetails,
+  CatalogViewerContext,
 } from "./types";
 
 interface CatalogItemRow {
@@ -124,7 +126,113 @@ function normalizeOffset(offset: number | undefined): number {
   return numeric;
 }
 
-function buildWhere(filters: CatalogFilters) {
+export async function resolveCatalogEcosystemManagerId(
+  viewer: Pick<CatalogViewerContext, "role" | "cksCode" | "isAdmin">,
+): Promise<string | null> {
+  if (viewer.isAdmin) {
+    return null;
+  }
+
+  const normalizedCode = normalizeIdentity(viewer.cksCode);
+  const normalizedRole = (viewer.role || "").trim().toLowerCase();
+  if (!normalizedCode || !normalizedRole) {
+    return null;
+  }
+
+  switch (normalizedRole) {
+    case "manager":
+      return normalizedCode;
+    case "center": {
+      const result = await query<{ cks_manager: string | null }>(
+        "SELECT cks_manager FROM centers WHERE UPPER(center_id) = UPPER($1) LIMIT 1",
+        [normalizedCode],
+      );
+      return normalizeIdentity(result.rows[0]?.cks_manager ?? null);
+    }
+    case "customer": {
+      const result = await query<{ cks_manager: string | null }>(
+        "SELECT cks_manager FROM customers WHERE UPPER(customer_id) = UPPER($1) LIMIT 1",
+        [normalizedCode],
+      );
+      return normalizeIdentity(result.rows[0]?.cks_manager ?? null);
+    }
+    case "contractor": {
+      const result = await query<{ cks_manager: string | null }>(
+        "SELECT cks_manager FROM contractors WHERE UPPER(contractor_id) = UPPER($1) LIMIT 1",
+        [normalizedCode],
+      );
+      return normalizeIdentity(result.rows[0]?.cks_manager ?? null);
+    }
+    case "crew": {
+      const result = await query<{ assigned_center: string | null }>(
+        "SELECT assigned_center FROM crew WHERE UPPER(crew_id) = UPPER($1) LIMIT 1",
+        [normalizedCode],
+      );
+      const assignedCenter = normalizeIdentity(result.rows[0]?.assigned_center ?? null);
+      if (!assignedCenter) {
+        return null;
+      }
+      const centerResult = await query<{ cks_manager: string | null }>(
+        "SELECT cks_manager FROM centers WHERE UPPER(center_id) = UPPER($1) LIMIT 1",
+        [assignedCenter],
+      );
+      return normalizeIdentity(centerResult.rows[0]?.cks_manager ?? null);
+    }
+    case "warehouse": {
+      const result = await query<{ cks_manager: string | null }>(
+        "SELECT cks_manager FROM warehouses WHERE UPPER(warehouse_id) = UPPER($1) LIMIT 1",
+        [normalizedCode],
+      );
+      return normalizeIdentity(result.rows[0]?.cks_manager ?? null);
+    }
+    default:
+      return null;
+  }
+}
+
+export async function isCatalogItemVisible(
+  viewer: CatalogViewerContext,
+  itemType: "product" | "service",
+  itemCode: string,
+): Promise<boolean> {
+  if (viewer.isAdmin) {
+    return true;
+  }
+
+  const ecosystemManagerId = await resolveCatalogEcosystemManagerId(viewer);
+  if (!ecosystemManagerId) {
+    return true;
+  }
+
+  const result = await query<{ visibility_mode: string | null; is_listed: boolean }>(
+    `WITH policy AS (
+       SELECT visibility_mode
+       FROM catalog_ecosystem_visibility_policies
+       WHERE UPPER(ecosystem_manager_id) = UPPER($1)
+         AND item_type = $2
+       LIMIT 1
+     ),
+     listed AS (
+       SELECT EXISTS (
+         SELECT 1
+         FROM catalog_ecosystem_visibility_items
+         WHERE UPPER(ecosystem_manager_id) = UPPER($1)
+           AND item_type = $2
+           AND UPPER(item_code) = UPPER($3)
+       ) AS is_listed
+     )
+     SELECT
+       (SELECT visibility_mode FROM policy) AS visibility_mode,
+       (SELECT is_listed FROM listed) AS is_listed`,
+    [ecosystemManagerId, itemType, itemCode],
+  );
+
+  const row = result.rows[0];
+  const mode = (row?.visibility_mode ?? "all").toLowerCase();
+  return mode !== "allowlist" || Boolean(row?.is_listed);
+}
+
+function buildWhere(filters: CatalogFilters, ecosystemManagerId: string | null) {
   const where: string[] = ["i.is_active = TRUE"];
   const params: unknown[] = [];
 
@@ -167,6 +275,27 @@ function buildWhere(filters: CatalogFilters) {
   } else if (filters.isTest === false) {
     params.push('%-TEST%');
     where.push(`i.item_code NOT ILIKE $${params.length}`);
+  }
+
+  if (ecosystemManagerId) {
+    params.push(ecosystemManagerId);
+    const ecosystemParam = `$${params.length}`;
+    where.push(`(
+      NOT EXISTS (
+        SELECT 1
+        FROM catalog_ecosystem_visibility_policies p
+        WHERE UPPER(p.ecosystem_manager_id) = UPPER(${ecosystemParam})
+          AND p.item_type = i.item_type
+          AND p.visibility_mode = 'allowlist'
+      )
+      OR EXISTS (
+        SELECT 1
+        FROM catalog_ecosystem_visibility_items vi
+        WHERE UPPER(vi.ecosystem_manager_id) = UPPER(${ecosystemParam})
+          AND vi.item_type = i.item_type
+          AND UPPER(vi.item_code) = UPPER(i.item_code)
+      )
+    )`);
   }
 
   const clause = where.length ? `WHERE ${where.join(" AND ")}` : "";
@@ -240,10 +369,14 @@ const CATALOG_UNION = `
   WHERE s.is_active = TRUE
 `;
 
-export async function fetchCatalogItems(filters: CatalogFilters): Promise<CatalogListResult> {
+export async function fetchCatalogItems(
+  filters: CatalogFilters,
+  viewer: CatalogViewerContext,
+): Promise<CatalogListResult> {
   const limit = normalizeLimit(filters.limit);
   const offset = normalizeOffset(filters.offset);
-  const { clause, params } = buildWhere(filters);
+  const ecosystemManagerId = viewer.isAdmin ? null : await resolveCatalogEcosystemManagerId(viewer);
+  const { clause, params } = buildWhere(filters, ecosystemManagerId);
 
   const countResult = await query<{ count: string }>(
     `WITH catalog_union AS (${CATALOG_UNION})

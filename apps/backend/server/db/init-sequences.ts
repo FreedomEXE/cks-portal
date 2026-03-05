@@ -121,6 +121,32 @@ export async function initializeSequences() {
     `, []);
     console.log('Created/verified catalog_services table');
 
+    await query(`
+      CREATE TABLE IF NOT EXISTS catalog_ecosystem_visibility_policies (
+        ecosystem_manager_id VARCHAR(64) NOT NULL,
+        item_type TEXT NOT NULL CHECK (item_type IN ('product', 'service')),
+        visibility_mode TEXT NOT NULL DEFAULT 'all' CHECK (visibility_mode IN ('all', 'allowlist')),
+        updated_by VARCHAR(64),
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        PRIMARY KEY (ecosystem_manager_id, item_type)
+      )
+    `, []);
+    console.log('Created/verified catalog_ecosystem_visibility_policies table');
+
+    await query(`
+      CREATE TABLE IF NOT EXISTS catalog_ecosystem_visibility_items (
+        id BIGSERIAL PRIMARY KEY,
+        ecosystem_manager_id VARCHAR(64) NOT NULL,
+        item_type TEXT NOT NULL CHECK (item_type IN ('product', 'service')),
+        item_code VARCHAR(32) NOT NULL,
+        created_by VARCHAR(64),
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        UNIQUE(ecosystem_manager_id, item_type, item_code)
+      )
+    `, []);
+    console.log('Created/verified catalog_ecosystem_visibility_items table');
+
     // Service certifications (per individual)
     await query(`
       CREATE TABLE IF NOT EXISTS service_certifications (

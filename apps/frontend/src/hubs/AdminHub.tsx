@@ -52,6 +52,7 @@ import '../shared/api/test-archive'; // Temporary test import
 import { isFeatureEnabled } from '../config/featureFlags';
 import AdminAssignSection from './components/AdminAssignSection';
 import AdminCreateSection from './components/AdminCreateSection';
+import CatalogVisibilitySection from './components/CatalogVisibilitySection';
 import { useHubLoading } from '../contexts/HubLoadingContext';
 import { buildOrderActions } from '@cks/domain-widgets';
 import { mapProfileDataForRole, type DirectoryRole, directoryTabToRole } from '../shared/utils/profileMapping';
@@ -222,6 +223,7 @@ const DIRECTORY_TABS: Array<{ id: string; label: string; color: string; hasDropd
     dropdownOptions: [
       { id: 'catalog-services', label: 'Catalog Services' },
       { id: 'active-services', label: 'Active Services' },
+      { id: 'catalog-visibility', label: 'Catalog Visibility' },
     ]
   },
   { id: 'products', label: 'Products', color: '#d946ef' },
@@ -1577,10 +1579,7 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
     // Handle Services dropdown
     if (directoryTab === 'services') {
       const activeSubTab = servicesSubTab;
-      const section = (directoryConfig as any)[activeSubTab];
-      if (!section) {
-        return <div style={{ color: '#64748b', fontSize: 14 }}>No data available.</div>;
-      }
+      const section = activeSubTab === 'catalog-visibility' ? null : (directoryConfig as any)[activeSubTab];
       return (
         <>
           <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
@@ -1598,19 +1597,35 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
             >
               Active Services
             </Button>
+            <Button
+              variant={servicesSubTab === 'catalog-visibility' ? 'primary' : 'secondary'}
+              size="small"
+              onClick={() => setServicesSubTab('catalog-visibility')}
+            >
+              Catalog Visibility
+            </Button>
           </div>
-          <DataTable
-            columns={section.columns}
-            data={section.data}
-            emptyMessage={section.emptyMessage}
-            searchPlaceholder={`Search ${servicesSubTab === 'catalog-services' ? 'catalog services' : 'active services'}...`}
-            maxItems={25}
-            showSearch
-            onRowClick={(row) => {
-              // Use openById for all services to fetch full details (including admin lists)
-              modals.openById(row.id);
-            }}
-          />
+          {activeSubTab === 'catalog-visibility' ? (
+            <CatalogVisibilitySection onNotify={(message) => {
+              setToast(message);
+              setTimeout(() => setToast(null), 3500);
+            }} />
+          ) : !section ? (
+            <div style={{ color: '#64748b', fontSize: 14 }}>No data available.</div>
+          ) : (
+            <DataTable
+              columns={section.columns}
+              data={section.data}
+              emptyMessage={section.emptyMessage}
+              searchPlaceholder={`Search ${servicesSubTab === 'catalog-services' ? 'catalog services' : 'active services'}...`}
+              maxItems={25}
+              showSearch
+              onRowClick={(row) => {
+                // Use openById for all services to fetch full details (including admin lists)
+                modals.openById(row.id);
+              }}
+            />
+          )}
         </>
       );
     }

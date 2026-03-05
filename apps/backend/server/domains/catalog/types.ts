@@ -48,6 +48,12 @@ export interface CatalogFilters {
   isTest?: boolean;
 }
 
+export interface CatalogViewerContext {
+  role: string;
+  cksCode: string;
+  isAdmin: boolean;
+}
+
 export interface CatalogPage {
   total: number;
   limit: number;
