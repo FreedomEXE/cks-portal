@@ -1,25 +1,19 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@cks/ui';
 import {
-  fetchCatalogEcosystems,
   fetchCatalogVisibilityConfig,
   updateCatalogVisibilityConfig,
-  type CatalogEcosystem,
   type CatalogVisibilityItem,
   type CatalogVisibilityMode,
   type CatalogVisibilityType,
 } from '../../shared/api/admin';
 
 interface CatalogVisibilitySectionProps {
+  ecosystemId: string;
   onNotify?: (message: string) => void;
 }
 
-export default function CatalogVisibilitySection({ onNotify }: CatalogVisibilitySectionProps) {
-  const [ecosystems, setEcosystems] = useState<CatalogEcosystem[]>([]);
-  const [ecosystemsLoading, setEcosystemsLoading] = useState(true);
-  const [ecosystemsError, setEcosystemsError] = useState<string | null>(null);
-
-  const [selectedEcosystemId, setSelectedEcosystemId] = useState<string>('');
+export default function CatalogVisibilitySection({ ecosystemId, onNotify }: CatalogVisibilitySectionProps) {
   const [itemType, setItemType] = useState<CatalogVisibilityType>('product');
   const [mode, setMode] = useState<CatalogVisibilityMode>('all');
   const [items, setItems] = useState<CatalogVisibilityItem[]>([]);
@@ -31,35 +25,7 @@ export default function CatalogVisibilitySection({ onNotify }: CatalogVisibility
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      setEcosystemsLoading(true);
-      setEcosystemsError(null);
-      try {
-        const result = await fetchCatalogEcosystems();
-        if (cancelled) return;
-        setEcosystems(result);
-        if (!selectedEcosystemId && result.length > 0) {
-          setSelectedEcosystemId(result[0].ecosystemId);
-        }
-      } catch (error) {
-        if (cancelled) return;
-        const message = error instanceof Error ? error.message : 'Failed to load ecosystems';
-        setEcosystemsError(message);
-      } finally {
-        if (!cancelled) {
-          setEcosystemsLoading(false);
-        }
-      }
-    };
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!selectedEcosystemId) {
+    if (!ecosystemId) {
       setMode('all');
       setItems([]);
       setSelectedCodes(new Set());
@@ -72,7 +38,7 @@ export default function CatalogVisibilitySection({ onNotify }: CatalogVisibility
       setConfigLoading(true);
       setConfigError(null);
       try {
-        const config = await fetchCatalogVisibilityConfig(selectedEcosystemId, itemType);
+        const config = await fetchCatalogVisibilityConfig(ecosystemId, itemType);
         if (cancelled) return;
         setMode(config.mode);
         setItems(config.items);
@@ -91,7 +57,7 @@ export default function CatalogVisibilitySection({ onNotify }: CatalogVisibility
     return () => {
       cancelled = true;
     };
-  }, [selectedEcosystemId, itemType]);
+  }, [ecosystemId, itemType]);
 
   const filteredItems = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -143,17 +109,17 @@ export default function CatalogVisibilitySection({ onNotify }: CatalogVisibility
   };
 
   const handleSave = async () => {
-    if (!selectedEcosystemId || saving) return;
+    if (!ecosystemId || saving) return;
     setSaving(true);
     setConfigError(null);
     try {
-      await updateCatalogVisibilityConfig(selectedEcosystemId, {
+      await updateCatalogVisibilityConfig(ecosystemId, {
         type: itemType,
         mode,
         itemCodes: mode === 'allowlist' ? Array.from(selectedCodes).sort() : [],
       });
       onNotify?.(
-        `Saved ${itemType} visibility for ${selectedEcosystemId}: ${mode === 'all' ? 'all items visible' : `${selectedCodes.size} selected`}.`,
+        `Saved ${itemType} visibility for ${ecosystemId}: ${mode === 'all' ? 'all items visible' : `${selectedCodes.size} selected`}.`,
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to save visibility config';
@@ -165,27 +131,7 @@ export default function CatalogVisibilitySection({ onNotify }: CatalogVisibility
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(260px, 1fr) 180px 180px auto', gap: 12, alignItems: 'end' }}>
-        <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <span style={{ fontSize: 12, fontWeight: 600, color: '#475569', textTransform: 'uppercase' }}>Ecosystem</span>
-          <select
-            value={selectedEcosystemId}
-            onChange={(event) => setSelectedEcosystemId(event.target.value)}
-            disabled={ecosystemsLoading || ecosystems.length === 0}
-            style={{ border: '1px solid #cbd5e1', borderRadius: 10, padding: '10px 12px', fontSize: 14, background: '#fff' }}
-          >
-            {ecosystems.length === 0 ? (
-              <option value="">No ecosystems found</option>
-            ) : (
-              ecosystems.map((eco) => (
-                <option key={eco.ecosystemId} value={eco.ecosystemId}>
-                  {eco.ecosystemName ? `${eco.ecosystemName} (${eco.ecosystemId})` : eco.ecosystemId}
-                </option>
-              ))
-            )}
-          </select>
-        </label>
-
+      <div style={{ display: 'grid', gridTemplateColumns: '180px 180px auto', gap: 12, alignItems: 'end' }}>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <span style={{ fontSize: 12, fontWeight: 600, color: '#475569', textTransform: 'uppercase' }}>Catalog Type</span>
           <select
@@ -210,7 +156,7 @@ export default function CatalogVisibilitySection({ onNotify }: CatalogVisibility
           </select>
         </label>
 
-        <Button variant="primary" size="small" onClick={handleSave} disabled={!selectedEcosystemId || saving || configLoading}>
+        <Button variant="primary" size="small" onClick={handleSave} disabled={!ecosystemId || saving || configLoading}>
           {saving ? 'Saving...' : 'Save Visibility'}
         </Button>
       </div>
@@ -236,7 +182,6 @@ export default function CatalogVisibilitySection({ onNotify }: CatalogVisibility
           : `${selectedCodes.size} of ${items.length} ${itemType}s selected.`}
       </div>
 
-      {ecosystemsError && <div style={{ color: '#dc2626', fontSize: 13 }}>{ecosystemsError}</div>}
       {configError && <div style={{ color: '#dc2626', fontSize: 13 }}>{configError}</div>}
 
       <div style={{ border: '1px solid #e2e8f0', borderRadius: 12, background: '#fff', maxHeight: 420, overflowY: 'auto' }}>

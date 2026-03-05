@@ -223,7 +223,6 @@ const DIRECTORY_TABS: Array<{ id: string; label: string; color: string; hasDropd
     dropdownOptions: [
       { id: 'catalog-services', label: 'Catalog Services' },
       { id: 'active-services', label: 'Active Services' },
-      { id: 'catalog-visibility', label: 'Catalog Visibility' },
     ]
   },
   { id: 'products', label: 'Products', color: '#d946ef' },
@@ -1579,7 +1578,7 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
     // Handle Services dropdown
     if (directoryTab === 'services') {
       const activeSubTab = servicesSubTab;
-      const section = activeSubTab === 'catalog-visibility' ? null : (directoryConfig as any)[activeSubTab];
+      const section = (directoryConfig as any)[activeSubTab];
       return (
         <>
           <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
@@ -1597,20 +1596,8 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
             >
               Active Services
             </Button>
-            <Button
-              variant={servicesSubTab === 'catalog-visibility' ? 'primary' : 'secondary'}
-              size="small"
-              onClick={() => setServicesSubTab('catalog-visibility')}
-            >
-              Catalog Visibility
-            </Button>
           </div>
-          {activeSubTab === 'catalog-visibility' ? (
-            <CatalogVisibilitySection onNotify={(message) => {
-              setToast(message);
-              setTimeout(() => setToast(null), 3500);
-            }} />
-          ) : !section ? (
+          {!section ? (
             <div style={{ color: '#64748b', fontSize: 14 }}>No data available.</div>
           ) : (
             <DataTable
@@ -2038,6 +2025,22 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
                   </div>
                 )}
               </div>
+              {selectedEcosystemId && (
+                <div style={{ marginTop: 24 }}>
+                  <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.6, color: '#64748b', marginBottom: 8 }}>
+                    Catalog Visibility
+                  </div>
+                  <div style={{ borderRadius: 16, border: '1px solid #e2e8f0', background: '#f8fafc', padding: 16 }}>
+                    <CatalogVisibilitySection
+                      ecosystemId={selectedEcosystemId}
+                      onNotify={(message) => {
+                        setToast(message);
+                        setTimeout(() => setToast(null), 3500);
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
             </PageWrapper>
           ) : activeTab === 'directory' ? (
             <PageWrapper title="Directory" showHeader>
