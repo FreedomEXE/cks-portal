@@ -1152,7 +1152,7 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
   }
 
   return (
-      <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'transparent' }}>
+      <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: 'transparent' }}>
         <MyHubSection
           hubName={managerPrefs.hubTitle?.trim() || 'Manager Hub'}
           tabs={HUB_TABS}
