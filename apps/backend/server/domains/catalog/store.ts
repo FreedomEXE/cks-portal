@@ -178,13 +178,9 @@ export async function resolveCatalogEcosystemManagerId(
       );
       return normalizeIdentity(centerResult.rows[0]?.cks_manager ?? null);
     }
-    case "warehouse": {
-      const result = await query<{ cks_manager: string | null }>(
-        "SELECT cks_manager FROM warehouses WHERE UPPER(warehouse_id) = UPPER($1) LIMIT 1",
-        [normalizedCode],
-      );
-      return normalizeIdentity(result.rows[0]?.cks_manager ?? null);
-    }
+    case "warehouse":
+      // Warehouses see the full catalog regardless of ecosystem visibility rules
+      return null;
     default:
       return null;
   }
