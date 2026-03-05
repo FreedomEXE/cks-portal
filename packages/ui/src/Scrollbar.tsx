@@ -52,7 +52,7 @@ export function Scrollbar({ scrollbarClassName = 'hub-scroll', className, style,
   return (
     <div
       className={combinedClass}
-      style={{ overflowY: 'auto', overscrollBehavior: 'contain', ...style }}
+      style={{ minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', ...style }}
       {...rest}
     />
   );

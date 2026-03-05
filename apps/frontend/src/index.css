@@ -27,6 +27,7 @@ html {
   --hero-gutter: clamp(12px, 2.5vw, 16px);
   --cks-account-watermark-image: none;
   --cks-account-watermark-opacity: 0.09;
+  --cks-account-watermark-overlay: rgba(248, 250, 252, 0.91);
 }
 
 .dark {
@@ -35,35 +36,24 @@ html {
   --card-bg: #111827;
   --card-muted: #0f172a;
   --border: #1f2937;
+  --cks-account-watermark-overlay: rgba(11, 18, 32, 0.9);
 }
 
 body {
   margin: 0;
   background-color: var(--bg);
+  background-image:
+    linear-gradient(var(--cks-account-watermark-overlay), var(--cks-account-watermark-overlay)),
+    var(--cks-account-watermark-image);
+  background-repeat: no-repeat, no-repeat;
+  background-position: center center, center center;
+  background-size: 100% 100%, min(56vw, 860px);
+  background-attachment: scroll, fixed;
   color: var(--text);
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
-}
-
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  background-image: var(--cks-account-watermark-image);
-  background-repeat: no-repeat;
-  background-position: center center;
-  background-size: min(56vw, 860px);
-  opacity: var(--cks-account-watermark-opacity);
-  filter: grayscale(1);
-}
-
-#root {
-  position: relative;
-  z-index: 1;
 }
 
 @media (max-width: 768px) {
