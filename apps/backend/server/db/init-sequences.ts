@@ -13,6 +13,9 @@ export async function initializeSequences() {
     await query(`CREATE SEQUENCE IF NOT EXISTS support_ticket_id_seq AS BIGINT START 1`, []);
     console.log('Created/verified support_ticket_id_seq');
 
+    await query(`CREATE SEQUENCE IF NOT EXISTS catalog_service_request_sequence AS BIGINT START 1`, []);
+    console.log('Created/verified catalog_service_request_sequence');
+
     await fixOrdersTable();
 
     await query(`
@@ -179,6 +182,39 @@ export async function initializeSequences() {
     console.log('Created/verified contractor_service_offerings table');
 
     await query(`
+      CREATE TABLE IF NOT EXISTS catalog_service_requests (
+        id BIGSERIAL PRIMARY KEY,
+        request_id VARCHAR(32) NOT NULL UNIQUE,
+        manager_id VARCHAR(64) NOT NULL,
+        service_name TEXT NOT NULL,
+        description TEXT,
+        category TEXT NOT NULL,
+        unit_of_measure TEXT,
+        base_price NUMERIC(12,2),
+        duration_minutes INTEGER,
+        service_window TEXT,
+        crew_required INTEGER,
+        status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+        approved_service_id VARCHAR(32) REFERENCES catalog_services(service_id) ON DELETE SET NULL,
+        reviewed_by VARCHAR(64),
+        review_notes TEXT,
+        metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+        requested_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        reviewed_at TIMESTAMPTZ
+      )
+    `, []);
+    console.log('Created/verified catalog_service_requests table');
+
+    await query(`
+      CREATE INDEX IF NOT EXISTS idx_catalog_service_requests_status_requested
+      ON catalog_service_requests (status, requested_at DESC)
+    `, []);
+    await query(`
+      CREATE INDEX IF NOT EXISTS idx_catalog_service_requests_manager_status
+      ON catalog_service_requests (manager_id, status, requested_at DESC)
+    `, []);
+
+    await query(`
       CREATE TABLE IF NOT EXISTS warehouses (
         warehouse_id VARCHAR(50) PRIMARY KEY,
         name VARCHAR(255),
@@ -208,10 +244,12 @@ export async function initializeSequences() {
         description TEXT NOT NULL,
         steps_to_reproduce TEXT,
         screenshot_url TEXT,
-        status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'in_progress', 'resolved', 'closed')),
+        status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'in_progress', 'waiting_on_user', 'escalated', 'resolved', 'closed', 'cancelled')),
         created_by_role TEXT NOT NULL,
         created_by_id VARCHAR(64) NOT NULL,
         cks_manager VARCHAR(64),
+        assigned_to VARCHAR(64),
+        reopened_count INTEGER NOT NULL DEFAULT 0,
         resolution_notes TEXT,
         action_taken TEXT,
         resolved_by_id VARCHAR(64),
@@ -224,6 +262,44 @@ export async function initializeSequences() {
     console.log('Created/verified support_tickets table');
 
     await query(`
+      ALTER TABLE support_tickets
+        ADD COLUMN IF NOT EXISTS assigned_to VARCHAR(64),
+        ADD COLUMN IF NOT EXISTS reopened_count INTEGER NOT NULL DEFAULT 0
+    `, []);
+
+    await query(`
+      UPDATE support_tickets
+      SET status = 'in_progress'
+      WHERE LOWER(status) = 'in-progress'
+    `, []);
+
+    await query(`
+      DO $$
+      BEGIN
+        ALTER TABLE support_tickets DROP CONSTRAINT IF EXISTS support_tickets_status_check;
+        ALTER TABLE support_tickets
+          ADD CONSTRAINT support_tickets_status_check
+          CHECK (status IN ('open', 'in_progress', 'waiting_on_user', 'escalated', 'resolved', 'closed', 'cancelled'));
+      EXCEPTION WHEN duplicate_object THEN
+        -- Constraint already present with same name/signature
+        NULL;
+      END $$;
+    `, []);
+
+    await query(`
+      CREATE TABLE IF NOT EXISTS support_ticket_comments (
+        comment_id BIGSERIAL PRIMARY KEY,
+        ticket_id VARCHAR(64) NOT NULL REFERENCES support_tickets(ticket_id) ON DELETE CASCADE,
+        author_id VARCHAR(64) NOT NULL,
+        author_role VARCHAR(64) NOT NULL,
+        body TEXT NOT NULL,
+        is_internal BOOLEAN NOT NULL DEFAULT FALSE,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `, []);
+    console.log('Created/verified support_ticket_comments table');
+
+    await query(`
       CREATE INDEX IF NOT EXISTS idx_support_tickets_manager_status
       ON support_tickets (cks_manager, status, created_at DESC)
       WHERE archived_at IS NULL
@@ -232,6 +308,20 @@ export async function initializeSequences() {
       CREATE INDEX IF NOT EXISTS idx_support_tickets_creator
       ON support_tickets (created_by_id, created_at DESC)
       WHERE archived_at IS NULL
+    `, []);
+    await query(`
+      CREATE INDEX IF NOT EXISTS idx_support_tickets_assigned
+      ON support_tickets (assigned_to, status, updated_at DESC)
+      WHERE archived_at IS NULL
+    `, []);
+    await query(`
+      CREATE INDEX IF NOT EXISTS idx_support_tickets_priority_status
+      ON support_tickets (priority, status)
+      WHERE archived_at IS NULL
+    `, []);
+    await query(`
+      CREATE INDEX IF NOT EXISTS idx_support_ticket_comments_ticket
+      ON support_ticket_comments (ticket_id, created_at)
     `, []);
 
     await seedCatalogData();

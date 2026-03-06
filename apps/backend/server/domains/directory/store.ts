@@ -283,6 +283,9 @@ const activityTypeCategory: Record<string, string> = {
   catalog_service_created: 'action',
   catalog_service_certified: 'success',
   catalog_service_decertified: 'warning',
+  catalog_service_request_submitted: 'action',
+  catalog_service_request_approved: 'success',
+  catalog_service_request_rejected: 'warning',
 
   // Success/completion activities
   order_delivered: 'success',
@@ -296,8 +299,13 @@ const activityTypeCategory: Record<string, string> = {
   order_rejected: 'warning',
   order_failed: 'warning',
   service_cancelled: 'warning',
+  support_ticket_status_changed: 'warning',
+  support_ticket_reopened: 'warning',
   support_ticket_updated: 'warning',
   support_ticket_created: 'warning',
+  support_ticket_submitted: 'action',
+  support_ticket_assigned: 'action',
+  support_ticket_comment_added: 'info',
   support_ticket_resolved: 'success',
 
   // Update activities

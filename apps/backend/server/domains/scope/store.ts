@@ -104,6 +104,9 @@ const activityTypeCategory: Record<string, string> = {
   order_created: 'action',
   service_created: 'action',
   catalog_service_created: 'action',
+  catalog_service_request_submitted: 'action',
+  catalog_service_request_approved: 'success',
+  catalog_service_request_rejected: 'warning',
   product_created: 'action',
   report_created: 'warning',
   feedback_created: 'info',
@@ -128,8 +131,15 @@ const activityTypeCategory: Record<string, string> = {
   service_cancelled: 'warning',
   crew_unassigned_from_service: 'warning',
   catalog_service_decertified: 'warning',
+  support_ticket_status_changed: 'warning',
+  support_ticket_reopened: 'warning',
   support_ticket_updated: 'warning',
   support_ticket_created: 'warning',
+  support_ticket_submitted: 'action',
+  support_ticket_assigned: 'action',
+  support_ticket_comment_added: 'info',
+  support_ticket_resolved: 'success',
+  product_inventory_adjusted: 'info',
 
   // Update activities
   order_updated: 'info',
@@ -137,8 +147,6 @@ const activityTypeCategory: Record<string, string> = {
   profile_updated: 'info',
   report_acknowledged: 'info',
   feedback_acknowledged: 'info',
-  support_ticket_resolved: 'success',
-  product_inventory_adjusted: 'info',
 };
 
 function isTestCode(value: string | null | undefined): boolean {
@@ -176,6 +184,17 @@ function buildTestOrderFilter(viewerCode: string): string {
   `;
   return isTestViewer ? `AND ${testClause}` : `AND NOT ${testClause}`;
 }
+
+const SUPPORT_TICKET_VISIBILITY_CLAUSE = `
+     AND (
+       activity_type NOT LIKE 'support_ticket_%'
+       OR (
+         target_type = 'support_ticket'
+         AND metadata ? 'createdById'
+         AND UPPER(metadata->>'createdById') = $2
+       )
+     )
+`;
 type ActivityRow = {
   activity_id: number;
   description: string;
@@ -529,6 +548,7 @@ async function getManagerActivities(cksCode: string): Promise<HubRoleActivitiesP
       )
      )
      ${testFilter}
+     ${SUPPORT_TICKET_VISIBILITY_CLAUSE}
      AND NOT EXISTS (
        SELECT 1 FROM activity_dismissals ad
        WHERE ad.activity_id = system_activity.activity_id AND ad.user_id = $2
@@ -1204,6 +1224,7 @@ async function getContractorActivities(cksCode: string): Promise<HubRoleActiviti
        )
      )
      ${testFilter}
+     ${SUPPORT_TICKET_VISIBILITY_CLAUSE}
      AND NOT EXISTS (
        SELECT 1 FROM activity_dismissals ad
        WHERE ad.activity_id = system_activity.activity_id AND ad.user_id = $2
@@ -1316,6 +1337,7 @@ async function getCustomerActivities(cksCode: string): Promise<HubRoleActivities
        )
      )
      ${testFilter}
+     ${SUPPORT_TICKET_VISIBILITY_CLAUSE}
      AND NOT EXISTS (
        SELECT 1 FROM activity_dismissals ad
        WHERE ad.activity_id = system_activity.activity_id AND ad.user_id = $2
@@ -1419,6 +1441,7 @@ async function getCenterActivities(cksCode: string): Promise<HubRoleActivitiesPa
        )
      )
      ${testFilter}
+     ${SUPPORT_TICKET_VISIBILITY_CLAUSE}
      AND NOT EXISTS (
        SELECT 1 FROM activity_dismissals ad
        WHERE ad.activity_id = system_activity.activity_id AND ad.user_id = $2
@@ -1531,6 +1554,7 @@ async function getCrewActivities(cksCode: string): Promise<HubRoleActivitiesPayl
       )
      )
      ${testFilter}
+     ${SUPPORT_TICKET_VISIBILITY_CLAUSE}
      AND NOT EXISTS (
        SELECT 1 FROM activity_dismissals ad
        WHERE ad.activity_id = system_activity.activity_id AND ad.user_id = $2
@@ -1640,6 +1664,7 @@ async function getWarehouseActivities(cksCode: string): Promise<HubRoleActivitie
        )
      )
      ${testFilter}
+     ${SUPPORT_TICKET_VISIBILITY_CLAUSE}
      AND NOT EXISTS (
        SELECT 1 FROM activity_dismissals ad
        WHERE ad.activity_id = system_activity.activity_id AND ad.user_id = $2

@@ -26,10 +26,14 @@ import {
 } from '../../shared/api/provisioning';
 import { createAccessCode } from '../../shared/api/access';
 import {
+  approveCatalogServiceRequest,
   createCatalogProduct,
   createCatalogService,
   getCatalogCategories,
+  listCatalogServiceRequests,
+  rejectCatalogServiceRequest,
   uploadCatalogImage,
+  type CatalogServiceRequestItem,
   type CreateCatalogProductPayload,
   type CreateCatalogServicePayload,
 } from '../../shared/api/admin';
@@ -511,7 +515,10 @@ function buildTabConfigs(): TabConfig<unknown>[] {
         return createCatalogService(payload, { getToken });
       },
       resetValues: buildFieldValues(serviceFields),
-      successMessage: (record: any) => `Service created: ${record.serviceId ?? ''}`.trim(),
+      successMessage: (record: any) =>
+        record?.status === 'pending_approval'
+          ? `Service request submitted: ${record.requestId ?? ''}`.trim()
+          : `Service created: ${record?.serviceId ?? ''}`.trim(),
       mutateKeys: ['/catalog/items', '/catalog/categories'],
     },
     {
@@ -574,6 +581,10 @@ export default function AdminCreateSection() {
   const [forms, setForms] = useState<FormState>(initialForms);
   const [statuses, setStatuses] = useState<SubmissionMap>(initialStatus);
   const { mutate } = useSWRConfig();
+  const [serviceRequests, setServiceRequests] = useState<CatalogServiceRequestItem[]>([]);
+  const [serviceRequestsLoading, setServiceRequestsLoading] = useState(false);
+  const [serviceRequestsError, setServiceRequestsError] = useState<string | null>(null);
+  const [serviceRequestActionId, setServiceRequestActionId] = useState<string | null>(null);
 
   // ── Category dropdown data ──────────────────────────────────────────
   const [productCategories, setProductCategories] = useState<string[]>([]);
@@ -589,6 +600,34 @@ export default function AdminCreateSection() {
     }).catch(() => {
       // Keep "Add New Category" available even if category fetch fails.
     });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, getToken]);
+
+  useEffect(() => {
+    if (activeTab !== 'services') return;
+    let cancelled = false;
+    const load = async () => {
+      setServiceRequestsLoading(true);
+      setServiceRequestsError(null);
+      try {
+        const rows = await listCatalogServiceRequests({ status: 'pending', limit: 200 }, { getToken });
+        if (!cancelled) {
+          setServiceRequests(rows);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          const message = error instanceof Error ? error.message : 'Failed to load service requests';
+          setServiceRequestsError(message);
+        }
+      } finally {
+        if (!cancelled) {
+          setServiceRequestsLoading(false);
+        }
+      }
+    };
+    load();
     return () => {
       cancelled = true;
     };
@@ -648,6 +687,67 @@ export default function AdminCreateSection() {
   }
 
   const isCatalogTab = CATALOG_TABS.includes(activeTab);
+
+  async function refreshServiceRequests() {
+    try {
+      const rows = await listCatalogServiceRequests({ status: 'pending', limit: 200 }, { getToken });
+      setServiceRequests(rows);
+      setServiceRequestsError(null);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to load service requests';
+      setServiceRequestsError(message);
+    }
+  }
+
+  async function handleApproveServiceRequest(requestId: string) {
+    setServiceRequestActionId(requestId);
+    try {
+      const result = await approveCatalogServiceRequest(requestId, {}, { getToken });
+      await Promise.all([
+        mutate('/catalog/items', undefined, { revalidate: true }),
+        mutate('/catalog/categories', undefined, { revalidate: true }),
+      ]);
+      setStatuses((prev) => ({
+        ...prev,
+        services: {
+          loading: false,
+          error: null,
+          success: `Approved request ${result.data.requestId} -> ${result.data.serviceId}`,
+        },
+      }));
+      await refreshServiceRequests();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to approve service request';
+      setServiceRequestsError(message);
+    } finally {
+      setServiceRequestActionId(null);
+    }
+  }
+
+  async function handleRejectServiceRequest(requestId: string) {
+    const notes = window.prompt('Enter rejection reason (required):', '');
+    if (!notes || !notes.trim()) {
+      return;
+    }
+    setServiceRequestActionId(requestId);
+    try {
+      await rejectCatalogServiceRequest(requestId, { notes: notes.trim() }, { getToken });
+      setStatuses((prev) => ({
+        ...prev,
+        services: {
+          loading: false,
+          error: null,
+          success: `Rejected request ${requestId}`,
+        },
+      }));
+      await refreshServiceRequests();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to reject service request';
+      setServiceRequestsError(message);
+    } finally {
+      setServiceRequestActionId(null);
+    }
+  }
 
   async function handleSubmit(event: React.FormEvent, tab: TabKey) {
     event.preventDefault();
@@ -729,98 +829,176 @@ export default function AdminCreateSection() {
       <div style={{ marginTop: 24 }}>
         <StatusMessage state={activeStatus} />
         {activeConfig ? (
-          <form onSubmit={(event) => handleSubmit(event, activeConfig.key)}>
-            <div
-              style={{
-                padding: 24,
-                background: '#fff',
-                borderRadius: 8,
-                border: '1px solid #e5e7eb',
-                boxShadow: '0 1px 1px rgba(15, 23, 42, 0.04)',
-              }}
-            >
-              <FormTable
-                fields={resolvedFields}
-                values={activeValues}
-                disabled={activeStatus.loading}
-                onChange={(name, value) => updateField(activeConfig.key, name, value)}
-              />
+          <>
+            <form onSubmit={(event) => handleSubmit(event, activeConfig.key)}>
+              <div
+                style={{
+                  padding: 24,
+                  background: '#fff',
+                  borderRadius: 8,
+                  border: '1px solid #e5e7eb',
+                  boxShadow: '0 1px 1px rgba(15, 23, 42, 0.04)',
+                }}
+              >
+                <FormTable
+                  fields={resolvedFields}
+                  values={activeValues}
+                  disabled={activeStatus.loading}
+                  onChange={(name, value) => updateField(activeConfig.key, name, value)}
+                />
 
-              {showNewCategoryInput && (
-                <table style={{ width: '100%', borderSpacing: '0 16px' }}>
-                  <tbody>
-                    <tr>
-                      <td style={{ width: 150, verticalAlign: 'top', paddingRight: 16 }}>
-                        <label style={{ fontWeight: 500, color: '#374151', fontSize: 14 }}>New Category *</label>
-                      </td>
-                      <td>
-                        <input
-                          type="text"
-                          value={activeValues._newCategory ?? ''}
-                          onChange={(e) => updateField(activeConfig.key, '_newCategory', e.target.value)}
-                          placeholder="Enter new category name"
-                          disabled={activeStatus.loading}
-                          style={{ width: '320px', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 14 }}
-                        />
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              )}
-
-              {isCatalogTab && (
-                <table style={{ width: '100%', borderSpacing: '0 16px' }}>
-                  <tbody>
-                    <tr>
-                      <td style={{ width: 150, verticalAlign: 'top', paddingRight: 16 }}>
-                        <label style={{ fontWeight: 500, color: '#374151', fontSize: 14 }}>Photo</label>
-                      </td>
-                      <td>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                {showNewCategoryInput && (
+                  <table style={{ width: '100%', borderSpacing: '0 16px' }}>
+                    <tbody>
+                      <tr>
+                        <td style={{ width: 150, verticalAlign: 'top', paddingRight: 16 }}>
+                          <label style={{ fontWeight: 500, color: '#374151', fontSize: 14 }}>New Category *</label>
+                        </td>
+                        <td>
                           <input
-                            ref={fileInputRef}
-                            type="file"
-                            accept="image/*"
-                            onChange={handlePhotoSelect}
+                            type="text"
+                            value={activeValues._newCategory ?? ''}
+                            onChange={(e) => updateField(activeConfig.key, '_newCategory', e.target.value)}
+                            placeholder="Enter new category name"
                             disabled={activeStatus.loading}
-                            style={{ fontSize: 13 }}
+                            style={{ width: '320px', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 14 }}
                           />
-                          {photoPreview && (
-                            <div style={{ position: 'relative' }}>
-                              <img
-                                src={photoPreview}
-                                alt="Preview"
-                                style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 6, border: '1px solid #e2e8f0' }}
-                              />
-                              <button
-                                type="button"
-                                onClick={clearPhoto}
-                                style={{
-                                  position: 'absolute', top: -6, right: -6,
-                                  width: 20, height: 20, borderRadius: '50%',
-                                  background: '#ef4444', color: '#fff', border: 'none',
-                                  fontSize: 12, cursor: 'pointer', display: 'flex',
-                                  alignItems: 'center', justifyContent: 'center',
-                                }}
-                              >
-                                x
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              )}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                )}
 
-              <div style={{ marginTop: 24 }}>
-                <Button type="submit" variant="primary" roleColor={activeConfig.color} disabled={activeStatus.loading}>
-                  {activeConfig.submitLabel}
-                </Button>
+                {isCatalogTab && (
+                  <table style={{ width: '100%', borderSpacing: '0 16px' }}>
+                    <tbody>
+                      <tr>
+                        <td style={{ width: 150, verticalAlign: 'top', paddingRight: 16 }}>
+                          <label style={{ fontWeight: 500, color: '#374151', fontSize: 14 }}>Photo</label>
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                            <input
+                              ref={fileInputRef}
+                              type="file"
+                              accept="image/*"
+                              onChange={handlePhotoSelect}
+                              disabled={activeStatus.loading}
+                              style={{ fontSize: 13 }}
+                            />
+                            {photoPreview && (
+                              <div style={{ position: 'relative' }}>
+                                <img
+                                  src={photoPreview}
+                                  alt="Preview"
+                                  style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 6, border: '1px solid #e2e8f0' }}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={clearPhoto}
+                                  style={{
+                                    position: 'absolute', top: -6, right: -6,
+                                    width: 20, height: 20, borderRadius: '50%',
+                                    background: '#ef4444', color: '#fff', border: 'none',
+                                    fontSize: 12, cursor: 'pointer', display: 'flex',
+                                    alignItems: 'center', justifyContent: 'center',
+                                  }}
+                                >
+                                  x
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                )}
+
+                <div style={{ marginTop: 24 }}>
+                  <Button type="submit" variant="primary" roleColor={activeConfig.color} disabled={activeStatus.loading}>
+                    {activeConfig.submitLabel}
+                  </Button>
+                </div>
               </div>
-            </div>
-          </form>
+            </form>
+
+            {activeTab === 'services' && (
+              <div
+                style={{
+                  marginTop: 16,
+                  padding: 20,
+                  background: '#fff',
+                  borderRadius: 8,
+                  border: '1px solid #e5e7eb',
+                  boxShadow: '0 1px 1px rgba(15, 23, 42, 0.04)',
+                }}
+              >
+                <div style={{ fontSize: 16, fontWeight: 600, color: '#0f172a', marginBottom: 10 }}>
+                  Pending Manager Service Requests
+                </div>
+                {serviceRequestsLoading ? (
+                  <div style={{ fontSize: 13, color: '#2563eb' }}>Loading pending requests...</div>
+                ) : serviceRequestsError ? (
+                  <div style={{ fontSize: 13, color: '#dc2626' }}>{serviceRequestsError}</div>
+                ) : serviceRequests.length === 0 ? (
+                  <div style={{ fontSize: 13, color: '#64748b' }}>No pending requests.</div>
+                ) : (
+                  <div style={{ display: 'grid', gap: 10 }}>
+                    {serviceRequests.map((item) => {
+                      const isActioning = serviceRequestActionId === item.requestId;
+                      return (
+                        <div
+                          key={item.requestId}
+                          style={{
+                            border: '1px solid #e2e8f0',
+                            borderRadius: 8,
+                            padding: 12,
+                            display: 'grid',
+                            gap: 8,
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                            <div style={{ fontSize: 14, fontWeight: 600, color: '#111827' }}>
+                              {item.serviceName}
+                            </div>
+                            <div style={{ fontFamily: 'monospace', fontSize: 12, color: '#475569' }}>
+                              {item.requestId}
+                            </div>
+                          </div>
+                          <div style={{ fontSize: 12, color: '#475569' }}>
+                            Manager: {item.managerName || item.managerId} | Category: {item.category} | Requested:{' '}
+                            {new Date(item.requestedAt).toLocaleDateString()}
+                          </div>
+                          {item.description ? (
+                            <div style={{ fontSize: 13, color: '#1f2937' }}>{item.description}</div>
+                          ) : null}
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            <Button
+                              variant="primary"
+                              size="small"
+                              onClick={() => handleApproveServiceRequest(item.requestId)}
+                              disabled={isActioning}
+                            >
+                              {isActioning ? 'Working...' : 'Approve'}
+                            </Button>
+                            <Button
+                              variant="secondary"
+                              size="small"
+                              onClick={() => handleRejectServiceRequest(item.requestId)}
+                              disabled={isActioning}
+                            >
+                              Reject
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+          </>
         ) : null}
       </div>
     </PageWrapper>

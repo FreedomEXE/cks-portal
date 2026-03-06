@@ -512,7 +512,9 @@ export interface CreateCatalogServicePayload {
 }
 
 export interface CreateCatalogServiceResult {
-  serviceId: string;
+  serviceId?: string;
+  requestId?: string;
+  status: 'created' | 'pending_approval';
   name: string;
   category: string | null;
 }
@@ -528,6 +530,70 @@ export async function createCatalogService(
     ...init,
   });
   return response.data;
+}
+
+export type CatalogServiceRequestStatus = 'pending' | 'approved' | 'rejected';
+
+export interface CatalogServiceRequestItem {
+  requestId: string;
+  managerId: string;
+  managerName: string | null;
+  serviceName: string;
+  description: string | null;
+  category: string;
+  status: CatalogServiceRequestStatus;
+  approvedServiceId: string | null;
+  requestedAt: string;
+  reviewedAt: string | null;
+  reviewedBy: string | null;
+  reviewNotes: string | null;
+}
+
+export async function listCatalogServiceRequests(
+  params?: { status?: CatalogServiceRequestStatus | 'all'; limit?: number },
+  init?: ApiFetchInit,
+): Promise<CatalogServiceRequestItem[]> {
+  const qs = new URLSearchParams();
+  if (params?.status) qs.set('status', params.status);
+  if (typeof params?.limit === 'number') qs.set('limit', String(params.limit));
+  const suffix = qs.toString() ? `?${qs.toString()}` : '';
+  const response = await apiFetch<{ success: boolean; data: CatalogServiceRequestItem[] }>(
+    `/admin/catalog/service-requests${suffix}`,
+    init,
+  );
+  return response.data;
+}
+
+export async function approveCatalogServiceRequest(
+  requestId: string,
+  payload?: { notes?: string },
+  init?: ApiFetchInit,
+) {
+  return apiFetch<{ success: boolean; data: { requestId: string; serviceId: string; managerId: string; serviceName: string } }>(
+    `/admin/catalog/service-requests/${encodeURIComponent(requestId)}/approve`,
+    {
+      method: 'POST',
+      body: JSON.stringify(payload ?? {}),
+      headers: { 'Content-Type': 'application/json', ...(init?.headers || {}) },
+      ...init,
+    },
+  );
+}
+
+export async function rejectCatalogServiceRequest(
+  requestId: string,
+  payload: { notes: string },
+  init?: ApiFetchInit,
+) {
+  return apiFetch<{ success: boolean; data: { requestId: string; managerId: string; serviceName: string } }>(
+    `/admin/catalog/service-requests/${encodeURIComponent(requestId)}/reject`,
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      headers: { 'Content-Type': 'application/json', ...(init?.headers || {}) },
+      ...init,
+    },
+  );
 }
 
 export interface ProductInventory {

@@ -286,14 +286,37 @@ function personalizeMessage(item: HubActivityItem, viewerId?: string | null): st
     return `Feedback acknowledged`;
   }
 
-  if (activityType === 'support_ticket_created') {
+  if (activityType === 'support_ticket_submitted' || activityType === 'support_ticket_created') {
     if (isActor) return 'You submitted a support ticket';
     return 'Support ticket submitted';
+  }
+
+  if (activityType === 'support_ticket_status_changed') {
+    const oldStatus = (metadata.oldStatus as string | undefined) || 'open';
+    const newStatus = (metadata.newStatus as string | undefined) || 'updated';
+    if (isActor) return `You changed ticket status: ${oldStatus} -> ${newStatus}`;
+    return `Ticket status changed: ${oldStatus} -> ${newStatus}`;
+  }
+
+  if (activityType === 'support_ticket_assigned') {
+    const assignedTo = (metadata.assignedTo as string | undefined) || 'Unassigned';
+    if (isActor) return `You updated ticket assignment: ${assignedTo}`;
+    return `Ticket assigned to ${assignedTo}`;
   }
 
   if (activityType === 'support_ticket_resolved') {
     if (isActor) return 'You resolved a support ticket';
     return 'Support ticket resolved';
+  }
+
+  if (activityType === 'support_ticket_reopened') {
+    if (isActor) return 'You reopened a support ticket';
+    return 'Support ticket reopened';
+  }
+
+  if (activityType === 'support_ticket_comment_added') {
+    if (isActor) return 'You added a ticket comment';
+    return 'New comment on support ticket';
   }
 
   // Order activities
@@ -434,6 +457,37 @@ function personalizeMessage(item: HubActivityItem, viewerId?: string | null): st
       return 'You have been assigned to a service';
     }
     return 'Crew assigned to a service';
+  }
+
+  if (activityType === 'catalog_service_request_submitted') {
+    const managerId = (metadata.managerId as string | undefined)?.toUpperCase();
+    if (isActor || managerId === normalizedViewerId) {
+      return 'You requested a new catalog service';
+    }
+    return 'Manager requested a new catalog service';
+  }
+
+  if (activityType === 'catalog_service_request_approved') {
+    const managerId = (metadata.managerId as string | undefined)?.toUpperCase();
+    const serviceId = (metadata.serviceId as string | undefined) || item.targetId || 'service';
+    if (managerId === normalizedViewerId) {
+      return `Your service request was approved: ${serviceId}`;
+    }
+    if (isActor) {
+      return `You approved a service request: ${serviceId}`;
+    }
+    return 'Manager service request approved';
+  }
+
+  if (activityType === 'catalog_service_request_rejected') {
+    const managerId = (metadata.managerId as string | undefined)?.toUpperCase();
+    if (managerId === normalizedViewerId) {
+      return 'Your service request was rejected';
+    }
+    if (isActor) {
+      return 'You rejected a service request';
+    }
+    return 'Manager service request rejected';
   }
 
   // Archive/Restore/Delete activities

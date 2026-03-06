@@ -76,6 +76,12 @@ async function isManagerCertifiedForCatalogService(managerCode: string, serviceI
   return result.rowCount > 0;
 }
 
+function createHttpError(statusCode: number, message: string): Error & { statusCode: number } {
+  const error = new Error(message) as Error & { statusCode: number };
+  error.statusCode = statusCode;
+  return error;
+}
+
 export async function registerCatalogRoutes(server: FastifyInstance) {
   server.get('/api/catalog/items', async (request, reply) => {
     const auth = await requireActiveRole(request, reply);
@@ -838,6 +844,341 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
     reply.send({ success: true });
   });
 
+  server.get('/api/admin/catalog/service-requests', async (request, reply) => {
+    const admin = await requireActiveAdmin(request, reply);
+    if (!admin) return;
+
+    const querySchema = z.object({
+      status: z.enum(['pending', 'approved', 'rejected', 'all']).default('pending'),
+      limit: z.coerce.number().int().min(1).max(500).default(100),
+    });
+
+    const parsed = querySchema.safeParse(request.query);
+    if (!parsed.success) {
+      reply.code(400).send({ error: 'Invalid request' });
+      return;
+    }
+
+    const { status, limit } = parsed.data;
+    const hasStatusFilter = status !== 'all';
+
+    try {
+      const sql = `
+        SELECT
+          r.request_id,
+          r.manager_id,
+          m.name AS manager_name,
+          r.service_name,
+          r.description,
+          r.category,
+          r.status,
+          r.approved_service_id,
+          r.requested_at,
+          r.reviewed_at,
+          r.reviewed_by,
+          r.review_notes
+        FROM catalog_service_requests r
+        LEFT JOIN managers m ON UPPER(m.manager_id) = UPPER(r.manager_id)
+        ${hasStatusFilter ? 'WHERE r.status = $1' : ''}
+        ORDER BY r.requested_at DESC
+        LIMIT $${hasStatusFilter ? '2' : '1'}
+      `;
+      const params = hasStatusFilter ? [status, limit] : [limit];
+      const result = await query<{
+        request_id: string;
+        manager_id: string;
+        manager_name: string | null;
+        service_name: string;
+        description: string | null;
+        category: string;
+        status: 'pending' | 'approved' | 'rejected';
+        approved_service_id: string | null;
+        requested_at: Date | string;
+        reviewed_at: Date | string | null;
+        reviewed_by: string | null;
+        review_notes: string | null;
+      }>(sql, params);
+
+      reply.send({
+        success: true,
+        data: result.rows.map((row) => ({
+          requestId: row.request_id,
+          managerId: row.manager_id,
+          managerName: row.manager_name,
+          serviceName: row.service_name,
+          description: row.description,
+          category: row.category,
+          status: row.status,
+          approvedServiceId: row.approved_service_id,
+          requestedAt: row.requested_at,
+          reviewedAt: row.reviewed_at,
+          reviewedBy: row.reviewed_by,
+          reviewNotes: row.review_notes,
+        })),
+      });
+    } catch (error) {
+      request.log.error({ err: error }, 'Failed to list catalog service requests');
+      reply.code(500).send({ error: 'Failed to list service requests' });
+    }
+  });
+
+  server.post('/api/admin/catalog/service-requests/:requestId/approve', async (request, reply) => {
+    const admin = await requireActiveAdmin(request, reply);
+    if (!admin) return;
+
+    const paramsSchema = z.object({ requestId: z.string().trim().min(1) });
+    const bodySchema = z.object({ notes: z.string().trim().max(500).optional() });
+    const parsedParams = paramsSchema.safeParse(request.params);
+    const parsedBody = bodySchema.safeParse(request.body ?? {});
+    if (!parsedParams.success || !parsedBody.success) {
+      reply.code(400).send({ error: 'Invalid request' });
+      return;
+    }
+
+    const requestId = parsedParams.data.requestId.trim().toUpperCase();
+    const notes = parsedBody.data.notes || null;
+    const actorId = admin.cksCode || 'ADMIN';
+
+    try {
+      const approved = await withTransaction(async (txQuery) => {
+        const requestResult = await txQuery<{
+          request_id: string;
+          manager_id: string;
+          service_name: string;
+          description: string | null;
+          category: string;
+          unit_of_measure: string | null;
+          base_price: string | null;
+          duration_minutes: number | null;
+          service_window: string | null;
+          crew_required: number | null;
+          status: 'pending' | 'approved' | 'rejected';
+        }>(
+          `SELECT request_id, manager_id, service_name, description, category, unit_of_measure,
+                  base_price, duration_minutes, service_window, crew_required, status
+           FROM catalog_service_requests
+           WHERE UPPER(request_id) = UPPER($1)
+           FOR UPDATE`,
+          [requestId],
+        );
+
+        if (!requestResult.rowCount) {
+          throw createHttpError(404, 'Service request not found');
+        }
+
+        const serviceRequest = requestResult.rows[0];
+        if (serviceRequest.status !== 'pending') {
+          throw createHttpError(409, `Service request is already ${serviceRequest.status}`);
+        }
+
+        const maxResult = await txQuery<{ max_num: string | null }>(
+          `SELECT MAX(CAST(SUBSTRING(service_id FROM 5) AS INTEGER)) AS max_num
+           FROM catalog_services
+           WHERE service_id ~ '^SRV-[0-9]+$'`,
+          [],
+        );
+        const nextNum = (Number(maxResult.rows[0]?.max_num) || 0) + 1;
+        const serviceId = `SRV-${String(nextNum).padStart(3, '0')}`;
+
+        await txQuery(
+          `INSERT INTO catalog_services (
+            service_id, name, description, category, unit_of_measure,
+            base_price, duration_minutes, service_window, crew_required,
+            is_active, created_at, updated_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, TRUE, NOW(), NOW())`,
+          [
+            serviceId,
+            serviceRequest.service_name,
+            serviceRequest.description || null,
+            serviceRequest.category || null,
+            serviceRequest.unit_of_measure || null,
+            serviceRequest.base_price || null,
+            serviceRequest.duration_minutes ?? null,
+            serviceRequest.service_window || null,
+            serviceRequest.crew_required ?? null,
+          ],
+        );
+
+        await txQuery(
+          `INSERT INTO service_certifications (service_id, user_id, role)
+           VALUES ($1, $2, 'manager')
+           ON CONFLICT (service_id, user_id, role)
+           DO UPDATE SET archived_at = NULL, created_at = NOW()`,
+          [serviceId, serviceRequest.manager_id.trim().toUpperCase()],
+        );
+
+        await txQuery(
+          `UPDATE catalog_service_requests
+           SET status = 'approved',
+               approved_service_id = $2,
+               reviewed_by = $3,
+               review_notes = $4,
+               reviewed_at = NOW()
+           WHERE UPPER(request_id) = UPPER($1)`,
+          [requestId, serviceId, actorId, notes],
+        );
+
+        await recordActivity({
+          activityType: 'catalog_service_request_approved',
+          description: `Manager Requested Service approved: ${serviceId} "${serviceRequest.service_name}"`,
+          actorId,
+          actorRole: 'admin',
+          targetId: requestId,
+          targetType: 'catalogServiceRequest',
+          metadata: {
+            requestId,
+            serviceId,
+            serviceName: serviceRequest.service_name,
+            managerId: serviceRequest.manager_id,
+            category: serviceRequest.category,
+          },
+        }, { txQuery });
+
+        await recordActivity({
+          activityType: 'catalog_service_created',
+          description: `New service ${serviceId} "${serviceRequest.service_name}" created`,
+          actorId,
+          actorRole: 'admin',
+          targetId: serviceId,
+          targetType: 'catalogService',
+          metadata: {
+            serviceId,
+            name: serviceRequest.service_name,
+            category: serviceRequest.category || null,
+            createdBy: actorId,
+            requestedBy: serviceRequest.manager_id,
+            sourceRequestId: requestId,
+          },
+        }, { txQuery });
+
+        await recordActivity({
+          activityType: 'catalog_service_certified',
+          description: `Certified ${serviceRequest.manager_id} for ${serviceId}`,
+          actorId,
+          actorRole: 'admin',
+          targetId: serviceId,
+          targetType: 'catalogService',
+          metadata: {
+            userId: serviceRequest.manager_id,
+            role: 'manager',
+            serviceName: serviceRequest.service_name,
+            serviceId,
+          },
+        }, { txQuery });
+
+        return {
+          requestId,
+          serviceId,
+          managerId: serviceRequest.manager_id,
+          serviceName: serviceRequest.service_name,
+        };
+      });
+
+      reply.send({ success: true, data: approved });
+    } catch (error) {
+      const statusCode =
+        error && typeof error === 'object' && 'statusCode' in error
+          ? Number((error as { statusCode: unknown }).statusCode)
+          : 500;
+      if (statusCode === 404 || statusCode === 409) {
+        reply.code(statusCode).send({ error: (error as Error).message });
+        return;
+      }
+      request.log.error({ err: error, requestId }, 'Failed to approve catalog service request');
+      reply.code(500).send({ error: 'Failed to approve service request' });
+    }
+  });
+
+  server.post('/api/admin/catalog/service-requests/:requestId/reject', async (request, reply) => {
+    const admin = await requireActiveAdmin(request, reply);
+    if (!admin) return;
+
+    const paramsSchema = z.object({ requestId: z.string().trim().min(1) });
+    const bodySchema = z.object({ notes: z.string().trim().min(1).max(500) });
+    const parsedParams = paramsSchema.safeParse(request.params);
+    const parsedBody = bodySchema.safeParse(request.body ?? {});
+    if (!parsedParams.success || !parsedBody.success) {
+      reply.code(400).send({ error: 'Invalid request' });
+      return;
+    }
+
+    const requestId = parsedParams.data.requestId.trim().toUpperCase();
+    const notes = parsedBody.data.notes;
+    const actorId = admin.cksCode || 'ADMIN';
+
+    try {
+      const rejected = await withTransaction(async (txQuery) => {
+        const requestResult = await txQuery<{
+          request_id: string;
+          manager_id: string;
+          service_name: string;
+          category: string;
+          status: 'pending' | 'approved' | 'rejected';
+        }>(
+          `SELECT request_id, manager_id, service_name, category, status
+           FROM catalog_service_requests
+           WHERE UPPER(request_id) = UPPER($1)
+           FOR UPDATE`,
+          [requestId],
+        );
+
+        if (!requestResult.rowCount) {
+          throw createHttpError(404, 'Service request not found');
+        }
+
+        const serviceRequest = requestResult.rows[0];
+        if (serviceRequest.status !== 'pending') {
+          throw createHttpError(409, `Service request is already ${serviceRequest.status}`);
+        }
+
+        await txQuery(
+          `UPDATE catalog_service_requests
+           SET status = 'rejected',
+               reviewed_by = $2,
+               review_notes = $3,
+               reviewed_at = NOW()
+           WHERE UPPER(request_id) = UPPER($1)`,
+          [requestId, actorId, notes],
+        );
+
+        await recordActivity({
+          activityType: 'catalog_service_request_rejected',
+          description: `Manager Requested Service rejected: "${serviceRequest.service_name}"`,
+          actorId,
+          actorRole: 'admin',
+          targetId: requestId,
+          targetType: 'catalogServiceRequest',
+          metadata: {
+            requestId,
+            managerId: serviceRequest.manager_id,
+            serviceName: serviceRequest.service_name,
+            category: serviceRequest.category,
+            notes,
+          },
+        }, { txQuery });
+
+        return {
+          requestId,
+          managerId: serviceRequest.manager_id,
+          serviceName: serviceRequest.service_name,
+        };
+      });
+
+      reply.send({ success: true, data: rejected });
+    } catch (error) {
+      const statusCode =
+        error && typeof error === 'object' && 'statusCode' in error
+          ? Number((error as { statusCode: unknown }).statusCode)
+          : 500;
+      if (statusCode === 404 || statusCode === 409) {
+        reply.code(statusCode).send({ error: (error as Error).message });
+        return;
+      }
+      request.log.error({ err: error, requestId }, 'Failed to reject catalog service request');
+      reply.code(500).send({ error: 'Failed to reject service request' });
+    }
+  });
+
   // Admin: Get inventory data for a product across all warehouses
   server.get('/api/admin/catalog/products/:productId/inventory', async (request, reply) => {
     const admin = await requireActiveAdmin(request, reply);
@@ -1309,7 +1650,108 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
     const { name, description, category, unitOfMeasure, basePrice, durationMinutes, serviceWindow, crewRequired } = b.data;
 
     try {
-      // Auto-generate next service ID (SRV-XXX)
+      const normalizedName = name.trim();
+      const normalizedCategory = (category || '').trim();
+      const actorId = account.cksCode || role.toUpperCase();
+
+      if (role === 'manager') {
+        const managerId = (account.cksCode ?? '').trim().toUpperCase();
+        if (!managerId) {
+          reply.code(403).send({ error: 'Manager account is missing a valid manager code' });
+          return;
+        }
+        if (!normalizedCategory) {
+          reply.code(400).send({ error: 'Category is required for manager service requests' });
+          return;
+        }
+
+        const existingService = await query<{ service_id: string }>(
+          `SELECT service_id
+           FROM catalog_services
+           WHERE UPPER(name) = UPPER($1)
+             AND COALESCE(UPPER(category), '') = COALESCE(UPPER($2), '')
+             AND is_active = TRUE
+           LIMIT 1`,
+          [normalizedName, normalizedCategory || null],
+        );
+        if (existingService.rowCount > 0) {
+          reply.code(409).send({
+            error: `Service already exists in catalog (${existingService.rows[0].service_id})`,
+          });
+          return;
+        }
+
+        const existingRequest = await query<{ request_id: string }>(
+          `SELECT request_id
+           FROM catalog_service_requests
+           WHERE UPPER(manager_id) = UPPER($1)
+             AND UPPER(service_name) = UPPER($2)
+             AND COALESCE(UPPER(category), '') = COALESCE(UPPER($3), '')
+             AND status = 'pending'
+           LIMIT 1`,
+          [managerId, normalizedName, normalizedCategory || null],
+        );
+        if (existingRequest.rowCount > 0) {
+          reply.code(409).send({
+            error: `A pending request already exists (${existingRequest.rows[0].request_id})`,
+          });
+          return;
+        }
+
+        const requestSeq = await query<{ next_num: string }>(
+          `SELECT LPAD(nextval('catalog_service_request_sequence')::text, 6, '0') AS next_num`,
+          [],
+        );
+        const requestId = `CSR-${requestSeq.rows[0]?.next_num ?? '000001'}`;
+
+        await query(
+          `INSERT INTO catalog_service_requests (
+            request_id, manager_id, service_name, description, category, unit_of_measure,
+            base_price, duration_minutes, service_window, crew_required, metadata, requested_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, NOW())`,
+          [
+            requestId,
+            managerId,
+            normalizedName,
+            description || null,
+            normalizedCategory,
+            unitOfMeasure || null,
+            basePrice || null,
+            durationMinutes ?? null,
+            serviceWindow || null,
+            crewRequired ?? null,
+            JSON.stringify({ requestedBy: managerId }),
+          ],
+        );
+
+        await recordActivity({
+          activityType: 'catalog_service_request_submitted',
+          description: `Manager Requested Service: "${normalizedName}"`,
+          actorId,
+          actorRole: role,
+          targetId: requestId,
+          targetType: 'catalogServiceRequest',
+          metadata: {
+            requestId,
+            managerId,
+            serviceName: normalizedName,
+            category: normalizedCategory || null,
+          },
+        });
+
+        reply.send({
+          success: true,
+          data: {
+            requestId,
+            status: 'pending_approval',
+            name: normalizedName,
+            category: normalizedCategory || null,
+          },
+        });
+        return;
+      }
+
+      // Admin path: create the service immediately.
       const maxResult = await query<{ max_num: string | null }>(
         `SELECT MAX(CAST(SUBSTRING(service_id FROM 5) AS INTEGER)) AS max_num
          FROM catalog_services
@@ -1326,40 +1768,30 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
           is_active, created_at, updated_at
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, TRUE, NOW(), NOW())`,
         [
-          serviceId, name, description || null, category || null,
+          serviceId, normalizedName, description || null, normalizedCategory || null,
           unitOfMeasure || null, basePrice || null,
           durationMinutes ?? null, serviceWindow || null, crewRequired ?? null,
         ],
       );
 
-      // When a manager creates a catalog service, auto-certify them for that service.
-      if (role === 'manager') {
-        const creatorCode = (account.cksCode ?? '').trim().toUpperCase();
-        if (creatorCode) {
-          await query(
-            `INSERT INTO service_certifications (service_id, user_id, role)
-             VALUES ($1, $2, 'manager')
-             ON CONFLICT (service_id, user_id, role)
-             DO UPDATE SET archived_at = NULL, created_at = NOW()`,
-            [serviceId, creatorCode],
-          );
-        }
-      }
-
-      // Record activity
       await recordActivity({
         activityType: 'catalog_service_created',
-        description: `New service ${serviceId} "${name}" created`,
-        actorId: account.cksCode || role.toUpperCase(),
+        description: `New service ${serviceId} "${normalizedName}" created`,
+        actorId,
         actorRole: role,
         targetId: serviceId,
         targetType: 'catalogService',
-        metadata: { serviceId, name, category: category || null, createdBy: account.cksCode },
+        metadata: { serviceId, name: normalizedName, category: normalizedCategory || null, createdBy: account.cksCode },
       });
 
       reply.send({
         success: true,
-        data: { serviceId, name, category: category || null },
+        data: {
+          serviceId,
+          status: 'created',
+          name: normalizedName,
+          category: normalizedCategory || null,
+        },
       });
     } catch (error) {
       request.log.error({ err: error }, 'Failed to create catalog service');

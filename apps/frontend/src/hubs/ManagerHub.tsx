@@ -1203,8 +1203,15 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
           console.warn('Photo upload failed after service creation');
         }
       }
+      if (servicePhotoFile && !result.serviceId) {
+        rhToast.success('Service request submitted. Add photo after admin approval.');
+      }
 
-      rhToast.success(`Service created: ${result.serviceId}`);
+      if (result.status === 'pending_approval') {
+        rhToast.success(`Service request submitted: ${result.requestId ?? 'Pending review'}`);
+      } else {
+        rhToast.success(`Service created: ${result.serviceId}`);
+      }
       setCreateServiceForm({ name: '', category: '', description: '', _newCategory: '' });
       clearServicePhoto();
       setShowCreateService(false);
@@ -1345,7 +1352,10 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
                   border: '1px solid #e5e7eb',
                   boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
                 }}>
-                  <div style={{ fontSize: 15, fontWeight: 600, color: '#0f172a', marginBottom: 14 }}>Create New Service</div>
+                  <div style={{ fontSize: 15, fontWeight: 600, color: '#0f172a', marginBottom: 4 }}>Request New Service</div>
+                  <div style={{ fontSize: 12, color: '#64748b', marginBottom: 14 }}>
+                    New services require admin approval before they appear in the catalog.
+                  </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                     <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                       <span style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>Service Name *</span>
@@ -1415,7 +1425,7 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
                   <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14, gap: 10 }}>
                     <Button variant="secondary" onClick={() => setShowCreateService(false)} disabled={creatingService}>Cancel</Button>
                     <Button variant="primary" roleColor={MANAGER_PRIMARY_COLOR} onClick={handleCreateService} disabled={creatingService}>
-                      {creatingService ? 'Creating...' : 'Create Service'}
+                      {creatingService ? 'Submitting...' : 'Submit Request'}
                     </Button>
                   </div>
                 </div>
