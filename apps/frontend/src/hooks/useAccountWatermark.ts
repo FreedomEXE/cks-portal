@@ -19,7 +19,7 @@
 -----------------------------------------------*/
 
 import { useEffect, useMemo } from 'react';
-import { useHubRoleScope } from '../shared/api/hub';
+import { useHubProfile, useHubRoleScope } from '../shared/api/hub';
 import {
   codesMatch,
   fetchUserPreferencesFromApi,
@@ -93,9 +93,12 @@ export function useAccountWatermark(
   const { data: scopeData } = useHubRoleScope(
     shouldResolveContractorScope ? normalizedViewerCode : null,
   );
+  const { data: profileData } = useHubProfile(
+    shouldResolveContractorScope ? normalizedViewerCode : null,
+  );
   const watermarkOwnerCode = useMemo(
-    () => resolveWatermarkOwnerCode(normalizedRole, normalizedViewerCode, scopeData),
-    [normalizedRole, normalizedViewerCode, scopeData],
+    () => resolveWatermarkOwnerCode(normalizedRole, normalizedViewerCode, scopeData, profileData),
+    [normalizedRole, normalizedViewerCode, scopeData, profileData],
   );
 
   useEffect(() => {

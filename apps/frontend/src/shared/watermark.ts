@@ -1,4 +1,4 @@
-import type { HubRoleScopeResponse } from './api/hub';
+import type { HubProfileResponse, HubRoleScopeResponse } from './api/hub';
 
 export const CKS_DEFAULT_WATERMARK_URL = '/cks-watermark-logo.svg';
 
@@ -41,6 +41,7 @@ export function resolveWatermarkOwnerCode(
   role: string | null | undefined,
   viewerCode: string | null | undefined,
   scopeData: HubRoleScopeResponse | null | undefined,
+  profileData?: HubProfileResponse | null,
 ): string | null {
   const normalizedRole = normalizeRole(role);
   const normalizedViewerCode = normalizeCode(viewerCode);
@@ -53,11 +54,32 @@ export function resolveWatermarkOwnerCode(
   }
 
   if (normalizedRole === 'customer' && scopeData?.role === 'customer') {
-    return normalizeCode(scopeData.relationships?.contractor?.id);
+    const directContractor = normalizeCode(scopeData.relationships?.contractor?.id);
+    if (directContractor) {
+      return directContractor;
+    }
+
+    for (const center of scopeData.relationships?.centers ?? []) {
+      const centerContractor = normalizeCode(center.contractorId);
+      if (centerContractor) {
+        return centerContractor;
+      }
+    }
+  }
+
+  if (normalizedRole === 'customer' && profileData?.role === 'customer') {
+    return normalizeCode(profileData.contractor?.id);
   }
 
   if (normalizedRole === 'center' && scopeData?.role === 'center') {
-    return normalizeCode(scopeData.relationships?.contractor?.id);
+    const directContractor = normalizeCode(scopeData.relationships?.contractor?.id);
+    if (directContractor) {
+      return directContractor;
+    }
+  }
+
+  if (normalizedRole === 'center' && profileData?.role === 'center') {
+    return normalizeCode(profileData.contractor?.id);
   }
 
   return null;
