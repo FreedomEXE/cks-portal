@@ -578,18 +578,21 @@ export default function AdminCreateSection() {
   // ── Category dropdown data ──────────────────────────────────────────
   const [productCategories, setProductCategories] = useState<string[]>([]);
   const [serviceCategories, setServiceCategories] = useState<string[]>([]);
-  const categoriesFetched = useRef(false);
 
   useEffect(() => {
-    if (categoriesFetched.current) return;
-    categoriesFetched.current = true;
+    if (!CATALOG_TABS.includes(activeTab)) return;
+    let cancelled = false;
     getCatalogCategories({ getToken }).then((data) => {
+      if (cancelled) return;
       setProductCategories(data.products);
       setServiceCategories(data.services);
     }).catch(() => {
-      // Categories will just show empty dropdown — user can still type new
+      // Keep "Add New Category" available even if category fetch fails.
     });
-  }, [getToken]);
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, getToken]);
 
   // ── Photo upload state (products/services only) ─────────────────────
   const [photoFile, setPhotoFile] = useState<File | null>(null);

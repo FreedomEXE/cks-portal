@@ -523,16 +523,20 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
   const { setHubLoading } = useHubLoading();
   const accessGate = useAccessCodeRedemption();
 
-  // Fetch service categories once for create-service dropdown
-  const serviceCatsFetched = useRef(false);
+  // Fetch service categories when opening create-service form
   useEffect(() => {
-    if (serviceCatsFetched.current) return;
-    serviceCatsFetched.current = true;
-    getCatalogCategories({ getToken }).then((data) => {
-      setServiceCategories(data.services);
-    }).catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (activeTab !== 'services' || !showCreateService) return;
+    let cancelled = false;
+    getCatalogCategories({ getToken })
+      .then((data) => {
+        if (cancelled) return;
+        setServiceCategories(data.services);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, getToken, showCreateService]);
 
   // Access modal context
   const modals = useModals();

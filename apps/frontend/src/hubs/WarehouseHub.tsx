@@ -206,13 +206,19 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
   const { getToken } = useClerkAuth();
 
   // ── Fetch product categories for dropdown ─────────────────────────
-  const productCatsFetched = useRef(false);
   useEffect(() => {
-    if (productCatsFetched.current) return;
-    productCatsFetched.current = true;
-    getCatalogCategories({ getToken }).then((d) => setProductCategories(d.products)).catch(() => {});
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (activeTab !== 'inventory' || !showCreateProduct) return;
+    let cancelled = false;
+    getCatalogCategories({ getToken })
+      .then((d) => {
+        if (cancelled) return;
+        setProductCategories(d.products);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, getToken, showCreateProduct]);
   const { code: authCode, accessStatus, accessTier, accessSource } = useAuth();
   const { user } = useUser();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
