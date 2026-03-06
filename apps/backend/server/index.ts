@@ -140,6 +140,7 @@ export async function buildServer() {
         cb(new Error('Not allowed by CORS'), false);
       }
     },
+    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
     credentials: true,
   });
 

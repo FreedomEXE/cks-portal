@@ -407,7 +407,7 @@ export async function registerOrdersRoutes(server: FastifyInstance) {
         return;
       }
 
-      const status = (order.status ?? '').toString().trim().toLowerCase();
+      const status = String(order.status ?? '').trim().toLowerCase();
       const finalStatuses = new Set([
         'delivered',
         'cancelled',
