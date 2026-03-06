@@ -56,7 +56,7 @@ export async function registerInventoryRoutes(server: FastifyInstance) {
     reply.send({ data: inventory });
   });
 
-  // POST /api/hub/inventory/update - Update inventory quantity (Admin only)
+  // POST /api/hub/inventory/update - Update inventory quantity (admin + warehouse)
   const updateBodySchema = z.object({
     warehouseId: z.string().min(1),
     itemId: z.string().min(1),
@@ -83,9 +83,20 @@ export async function registerInventoryRoutes(server: FastifyInstance) {
       return;
     }
 
+    const normalizedAccountCode = (account.cksCode ?? '').trim().toUpperCase();
+    if (role === 'warehouse' && !normalizedAccountCode) {
+      reply.code(403).send({ error: 'Warehouse account is missing a valid warehouse code' });
+      return;
+    }
+
+    // Never trust client-provided warehouseId for warehouse users.
+    const effectiveWarehouseId =
+      role === 'warehouse' ? normalizedAccountCode : parsed.data.warehouseId;
+
     try {
       await updateInventoryQuantity({
         ...parsed.data,
+        warehouseId: effectiveWarehouseId,
         actorId: account.cksCode || (role === 'warehouse' ? 'WAREHOUSE' : 'ADMIN'),
         actorRole: role,
       });

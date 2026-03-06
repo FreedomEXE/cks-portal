@@ -38,7 +38,7 @@ export default function ProductManagementTab({
   const { getToken } = useAuth();
   const isWarehouseUser = role === 'warehouse';
   // Warehouse users can only adjust their own warehouse; admins see the full list
-  const { data: adminWarehouses = [] } = useWarehouses();
+  const { data: adminWarehouses = [] } = useWarehouses(!isWarehouseUser);
   // For warehouse users, build a single-item list from their own code
   const warehouses = isWarehouseUser && viewerCode
     ? [{ id: viewerCode, name: viewerCode }]
@@ -67,6 +67,14 @@ export default function ProductManagementTab({
     setDraftDescription(description ?? '');
     setDraftImageUrl(imageUrl ?? '');
   }, [name, description, imageUrl]);
+
+  useEffect(() => {
+    return () => {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl]);
 
   const baseInventoryMap = useMemo(() => {
     const map = new Map<string, InventoryRow>();
@@ -294,7 +302,12 @@ export default function ProductManagementTab({
                       const file = e.target.files?.[0];
                       if (!file) return;
                       setSelectedFile(file);
-                      setPreviewUrl(URL.createObjectURL(file));
+                      setPreviewUrl((previousUrl) => {
+                        if (previousUrl) {
+                          URL.revokeObjectURL(previousUrl);
+                        }
+                        return URL.createObjectURL(file);
+                      });
                       e.currentTarget.value = '';
                     }}
                   />
@@ -325,7 +338,12 @@ export default function ProductManagementTab({
                           const result = await uploadCatalogImage(selectedFile, 'product', productId, { getToken });
                           setDraftImageUrl(result.imageUrl);
                           setSelectedFile(null);
-                          setPreviewUrl(null);
+                          setPreviewUrl((previousUrl) => {
+                            if (previousUrl) {
+                              URL.revokeObjectURL(previousUrl);
+                            }
+                            return null;
+                          });
                           window.dispatchEvent(new CustomEvent('cks:modal:refresh'));
                           toast.success('Photo uploaded');
                         } catch (err: any) {

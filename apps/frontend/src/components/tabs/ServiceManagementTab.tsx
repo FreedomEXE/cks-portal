@@ -40,6 +40,14 @@ export default function ServiceManagementTab({
     setDraftImageUrl(imageUrl ?? '');
   }, [name, description, category, imageUrl]);
 
+  useEffect(() => {
+    return () => {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl]);
+
   const hasChanges = useMemo(() => {
     return (draftName ?? '') !== (name ?? '') ||
       (draftDescription ?? '') !== (description ?? '') ||
@@ -158,7 +166,12 @@ export default function ServiceManagementTab({
                       const file = e.target.files?.[0];
                       if (!file) return;
                       setSelectedFile(file);
-                      setPreviewUrl(URL.createObjectURL(file));
+                      setPreviewUrl((previousUrl) => {
+                        if (previousUrl) {
+                          URL.revokeObjectURL(previousUrl);
+                        }
+                        return URL.createObjectURL(file);
+                      });
                       e.currentTarget.value = '';
                     }}
                   />
@@ -189,7 +202,12 @@ export default function ServiceManagementTab({
                           const result = await uploadCatalogImage(selectedFile, 'service', serviceId, { getToken });
                           setDraftImageUrl(result.imageUrl);
                           setSelectedFile(null);
-                          setPreviewUrl(null);
+                          setPreviewUrl((previousUrl) => {
+                            if (previousUrl) {
+                              URL.revokeObjectURL(previousUrl);
+                            }
+                            return null;
+                          });
                           window.dispatchEvent(new CustomEvent('cks:modal:refresh'));
                           toast.success('Photo uploaded');
                         } catch (err: any) {

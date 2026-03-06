@@ -236,7 +236,7 @@ type DirectoryHookResult<T> = {
 function createDirectoryResource<TResponse, TMapped = TResponse>(
   config: DirectoryResourceConfig<TResponse, TMapped>,
 ) {
-  function useResource(): DirectoryHookResult<TMapped> {
+  function useResource(enabled = true): DirectoryHookResult<TMapped> {
     const { getToken } = useClerkAuth();
     const fetcher = useCallback(
       (endpoint: string) =>
@@ -247,7 +247,8 @@ function createDirectoryResource<TResponse, TMapped = TResponse>(
       [getToken],
     );
 
-    const { data, error, isLoading } = useSWR<TMapped[], Error>(config.path, fetcher, {
+    const key = enabled ? config.path : null;
+    const { data, error, isLoading } = useSWR<TMapped[], Error>(key, fetcher, {
       revalidateOnFocus: false,
       revalidateOnReconnect: true,
       revalidateIfStale: false,

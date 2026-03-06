@@ -4,7 +4,7 @@ import { requireActiveRole } from '../../core/auth/guards';
 import { requireActiveAdmin } from '../adminUsers/guards';
 import { query, withTransaction } from '../../db/connection';
 import { getCatalogItems } from './service';
-import { isCatalogItemVisible } from './store';
+import { isCatalogItemVisible, resolveCatalogEcosystemManagerId } from './store';
 import { recordActivity } from '../activity/writer';
 import { uploadImageToCloudinary } from '../../shared/cloudinary';
 
@@ -54,6 +54,26 @@ function normalizeCodes(input: unknown): string[] {
     normalized.push(value);
   }
   return normalized;
+}
+
+async function isManagerCertifiedForCatalogService(managerCode: string, serviceId: string): Promise<boolean> {
+  const normalizedManagerCode = managerCode.trim().toUpperCase();
+  const normalizedServiceId = serviceId.trim().toUpperCase();
+  if (!normalizedManagerCode || !normalizedServiceId) {
+    return false;
+  }
+
+  const result = await query<{ exists: number }>(
+    `SELECT 1 AS exists
+     FROM service_certifications
+     WHERE UPPER(service_id) = UPPER($1)
+       AND UPPER(user_id) = UPPER($2)
+       AND role = 'manager'
+       AND archived_at IS NULL
+     LIMIT 1`,
+    [normalizedServiceId, normalizedManagerCode],
+  );
+  return result.rowCount > 0;
 }
 
 export async function registerCatalogRoutes(server: FastifyInstance) {
@@ -424,6 +444,13 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
       const archivedBy = row.archived_by || undefined;
       const deletionScheduled = row.deletion_scheduled ? row.deletion_scheduled.toISOString() : undefined;
 
+      const normalizedViewerCode = (user.cksCode ?? '').trim().toUpperCase();
+      const normalizedViewerRole = (user.role ?? '').trim().toLowerCase();
+      const canManagerEditCatalogService =
+        normalizedViewerRole === 'manager' &&
+        (await isManagerCertifiedForCatalogService(normalizedViewerCode, normalizedId));
+      data.canManageCatalogService = normalizedViewerRole === 'admin' || canManagerEditCatalogService;
+
       // If admin, include certifications AND full directory lists
       const isAdmin = (user.role || '').toLowerCase() === 'admin';
       console.log('[CATALOG_DETAILS] Admin check:', { userRole: user.role, isAdmin });
@@ -605,10 +632,10 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
     }
   });
 
-  // Admin: update catalog service metadata/fields
+  // Admin or certified manager: update catalog service metadata/fields
   server.patch('/api/admin/catalog/services/:serviceId', async (request, reply) => {
-    const admin = await requireActiveAdmin(request, reply);
-    if (!admin) {
+    const account = await requireActiveRole(request, reply, {});
+    if (!account) {
       return;
     }
 
@@ -630,8 +657,26 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
       return;
     }
 
-    const { serviceId } = p.data;
+    const serviceId = p.data.serviceId.trim().toUpperCase();
     const { name, category, description, imageUrl, tags, isActive, metadata } = b.data;
+    const role = (account.role ?? '').trim().toLowerCase();
+    const normalizedAccountCode = (account.cksCode ?? '').trim().toUpperCase();
+
+    if (role !== 'admin') {
+      if (role !== 'manager') {
+        reply.code(403).send({ error: 'Only admins or certified managers can update services' });
+        return;
+      }
+      const canManage = await isManagerCertifiedForCatalogService(normalizedAccountCode, serviceId);
+      if (!canManage) {
+        reply.code(403).send({ error: 'You can only edit services you are certified for' });
+        return;
+      }
+      if (isActive !== undefined || metadata !== undefined) {
+        reply.code(403).send({ error: 'Managers can only edit service details and images' });
+        return;
+      }
+    }
 
     console.log('[CATALOG] PATCH service:', serviceId);
     console.log('[CATALOG] Received metadata:', JSON.stringify(metadata, null, 2));
@@ -659,11 +704,15 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
     try {
       const sql = `UPDATE catalog_services
          SET ${sets.join(', ')}, updated_at = NOW()
-         WHERE service_id = $${params.length}`;
+         WHERE UPPER(service_id) = UPPER($${params.length})`;
       console.log('[CATALOG] Executing SQL:', sql);
       console.log('[CATALOG] With params:', params);
 
-      await query(sql, params);
+      const updateResult = await query(sql, params);
+      if (updateResult.rowCount === 0) {
+        reply.code(404).send({ error: `Service ${serviceId} not found` });
+        return;
+      }
 
       console.log('[CATALOG] Update successful for service:', serviceId);
       reply.send({ success: true });
@@ -910,6 +959,7 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
     const fields = data.fields as Record<string, { value?: string } | undefined>;
     const itemType = (fields['type']?.value ?? '').trim().toLowerCase();
     const itemId = (fields['itemId']?.value ?? '').trim();
+    const normalizedItemId = itemId.toUpperCase();
 
     if (!itemId) {
       reply.code(400).send({ error: 'Missing itemId field' });
@@ -925,8 +975,66 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
       return;
     }
     if (itemType === 'service' && role !== 'admin' && role !== 'manager') {
-      reply.code(403).send({ error: 'Only admins and manager users can upload service images' });
+      reply.code(403).send({ error: 'Only admins and certified managers can upload service images' });
       return;
+    }
+
+    const normalizedAccountCode = (account.cksCode ?? '').trim().toUpperCase();
+    if (itemType === 'product') {
+      const productExists = await query<{ exists: number }>(
+        `SELECT 1 AS exists
+         FROM catalog_products
+         WHERE UPPER(product_id) = UPPER($1)
+         LIMIT 1`,
+        [normalizedItemId],
+      );
+      if (productExists.rowCount === 0) {
+        reply.code(404).send({ error: `Product ${normalizedItemId} not found` });
+        return;
+      }
+
+      if (role === 'warehouse') {
+        if (!normalizedAccountCode) {
+          reply.code(403).send({ error: 'Warehouse account is missing a valid warehouse code' });
+          return;
+        }
+        const inventoryCheck = await query<{ exists: number }>(
+          `SELECT 1 AS exists
+           FROM inventory_items
+           WHERE UPPER(warehouse_id) = UPPER($1)
+             AND UPPER(item_id) = UPPER($2)
+             AND status = 'active'
+           LIMIT 1`,
+          [normalizedAccountCode, normalizedItemId],
+        );
+        if (inventoryCheck.rowCount === 0) {
+          reply.code(403).send({ error: 'You can only upload images for products in your inventory' });
+          return;
+        }
+      }
+    } else {
+      const serviceExists = await query<{ exists: number }>(
+        `SELECT 1 AS exists
+         FROM catalog_services
+         WHERE UPPER(service_id) = UPPER($1)
+         LIMIT 1`,
+        [normalizedItemId],
+      );
+      if (serviceExists.rowCount === 0) {
+        reply.code(404).send({ error: `Service ${normalizedItemId} not found` });
+        return;
+      }
+      if (role === 'manager') {
+        if (!normalizedAccountCode) {
+          reply.code(403).send({ error: 'Manager account is missing a valid manager code' });
+          return;
+        }
+        const canManage = await isManagerCertifiedForCatalogService(normalizedAccountCode, normalizedItemId);
+        if (!canManage) {
+          reply.code(403).send({ error: 'You can only upload images for services you are certified for' });
+          return;
+        }
+      }
     }
 
     // Validate MIME type
@@ -948,22 +1056,32 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
       const folder = itemType === 'product' ? 'cks-catalog/products' : 'cks-catalog/services';
       const result = await uploadImageToCloudinary(buffer, {
         folder,
-        publicId: itemId,
+        publicId: normalizedItemId,
       });
 
       const imageUrl = result.secure_url;
 
       // Update the database record
+      let updateResult;
       if (itemType === 'product') {
-        await query(
+        updateResult = await query(
           'UPDATE catalog_products SET image_url = $1, updated_at = NOW() WHERE product_id = $2',
-          [imageUrl, itemId],
+          [imageUrl, normalizedItemId],
         );
       } else {
-        await query(
+        updateResult = await query(
           'UPDATE catalog_services SET image_url = $1, updated_at = NOW() WHERE service_id = $2',
-          [imageUrl, itemId],
+          [imageUrl, normalizedItemId],
         );
+      }
+      if (updateResult.rowCount === 0) {
+        reply.code(404).send({
+          error:
+            itemType === 'product'
+              ? `Product ${normalizedItemId} not found`
+              : `Service ${normalizedItemId} not found`,
+        });
+        return;
       }
 
       reply.send({ success: true, imageUrl });
@@ -984,6 +1102,44 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
     if (!account) return;
 
     try {
+      const ecosystemManagerId = await resolveCatalogEcosystemManagerId({
+        role: account.role,
+        cksCode: account.cksCode,
+        isAdmin: account.isAdmin,
+      });
+      const isTest = Boolean(account.cksCode && account.cksCode.toUpperCase().includes('-TEST'));
+
+      const buildCatalogVisibilityClause = (itemType: 'product' | 'service', itemCodeExpression: string) => {
+        if (!ecosystemManagerId) {
+          return { clause: '', params: [] as string[] };
+        }
+
+        return {
+          clause: `AND (
+            NOT EXISTS (
+              SELECT 1
+              FROM catalog_ecosystem_visibility_policies p
+              WHERE UPPER(p.ecosystem_manager_id) = UPPER($2)
+                AND p.item_type = '${itemType}'
+                AND p.visibility_mode = 'allowlist'
+            )
+            OR EXISTS (
+              SELECT 1
+              FROM catalog_ecosystem_visibility_items vi
+              WHERE UPPER(vi.ecosystem_manager_id) = UPPER($2)
+                AND vi.item_type = '${itemType}'
+                AND UPPER(vi.item_code) = UPPER(${itemCodeExpression})
+            )
+          )`,
+          params: [ecosystemManagerId],
+        };
+      };
+
+      const productCodeFilter = isTest ? 'p.product_id ILIKE $1' : 'p.product_id NOT ILIKE $1';
+      const serviceCodeFilter = isTest ? 's.service_id ILIKE $1' : 's.service_id NOT ILIKE $1';
+      const productVisibility = buildCatalogVisibilityClause('product', 'p.product_id');
+      const serviceVisibility = buildCatalogVisibilityClause('service', 's.service_id');
+
       const [productCats, serviceCats] = await Promise.all([
         query<{ category: string }>(
           `SELECT DISTINCT normalized.category
@@ -993,11 +1149,14 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
                  NULLIF(BTRIM(category), ''),
                  NULLIF(BTRIM(metadata->>'category'), '')
                ) AS category
-             FROM catalog_products
-             WHERE COALESCE(is_active, TRUE) = TRUE
+             FROM catalog_products p
+             WHERE COALESCE(p.is_active, TRUE) = TRUE
+               AND ${productCodeFilter}
+               ${productVisibility.clause}
            ) AS normalized
            WHERE normalized.category IS NOT NULL
            ORDER BY normalized.category`,
+          ['%-TEST%', ...productVisibility.params],
         ),
         query<{ category: string }>(
           `SELECT DISTINCT normalized.category
@@ -1007,11 +1166,14 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
                  NULLIF(BTRIM(category), ''),
                  NULLIF(BTRIM(metadata->>'category'), '')
                ) AS category
-             FROM catalog_services
-             WHERE COALESCE(is_active, TRUE) = TRUE
+             FROM catalog_services s
+             WHERE COALESCE(s.is_active, TRUE) = TRUE
+               AND ${serviceCodeFilter}
+               ${serviceVisibility.clause}
            ) AS normalized
            WHERE normalized.category IS NOT NULL
            ORDER BY normalized.category`,
+          ['%-TEST%', ...serviceVisibility.params],
         ),
       ]);
 
@@ -1161,6 +1323,20 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
           durationMinutes ?? null, serviceWindow || null, crewRequired ?? null,
         ],
       );
+
+      // When a manager creates a catalog service, auto-certify them for that service.
+      if (role === 'manager') {
+        const creatorCode = (account.cksCode ?? '').trim().toUpperCase();
+        if (creatorCode) {
+          await query(
+            `INSERT INTO service_certifications (service_id, user_id, role)
+             VALUES ($1, $2, 'manager')
+             ON CONFLICT (service_id, user_id, role)
+             DO UPDATE SET archived_at = NULL, created_at = NOW()`,
+            [serviceId, creatorCode],
+          );
+        }
+      }
 
       // Record activity
       await recordActivity({

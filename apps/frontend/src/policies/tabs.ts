@@ -20,7 +20,7 @@ import { TabId, TabVisibilityContext, UserRole, EntityType } from '../types/enti
  * @returns true if tab should be visible, false otherwise
  */
 export function canSeeTab(tabId: TabId, context: TabVisibilityContext): boolean {
-  const { role, lifecycle, entityType, entityId, viewerId, hasActions } = context;
+  const { role, lifecycle, entityType, entityId, viewerId, hasActions, entityData } = context;
 
   // Universal tab visibility rules
   switch (tabId) {
@@ -95,6 +95,9 @@ export function canSeeTab(tabId: TabId, context: TabVisibilityContext): boolean 
     // Admin-only for most entities; admin + warehouse for products
     case 'management': {
       const manageableEntityTypes: EntityType[] = ['manager', 'contractor', 'customer', 'center', 'crew', 'warehouse', 'product', 'catalogService'];
+      if (entityType === 'catalogService') {
+        return role === 'admin' || (role === 'manager' && Boolean(entityData?.canManageCatalogService));
+      }
       if (entityType === 'product') {
         return (role === 'admin' || role === 'warehouse') && manageableEntityTypes.includes(entityType);
       }

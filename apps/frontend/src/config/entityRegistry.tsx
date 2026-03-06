@@ -2215,7 +2215,8 @@ const catalogServiceAdapter: EntityAdapter = {
       ),
     });
 
-    if (role === 'admin') {
+    const canManageCatalogService = role === 'admin' || (role === 'manager' && Boolean(entityData?.canManageCatalogService));
+    if (canManageCatalogService) {
       tabs.push({
         id: 'management',
         label: 'Management',

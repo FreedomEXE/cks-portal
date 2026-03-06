@@ -210,7 +210,7 @@ export async function fetchAdminOrderById(orderId: string, init?: ApiFetchInit) 
   return response.data;
 }
 
-// Update catalog service fields/metadata (admin only)
+// Update catalog service fields/metadata (admin or certified manager)
 export async function updateCatalogService(
   serviceId: string,
   payload: {
