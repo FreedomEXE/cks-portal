@@ -460,34 +460,66 @@ function personalizeMessage(item: HubActivityItem, viewerId?: string | null): st
   }
 
   if (activityType === 'catalog_service_request_submitted') {
+    const requesterRole = ((metadata.requesterRole as string | undefined) || 'manager').toLowerCase();
+    const requesterId = (
+      (metadata.requesterId as string | undefined) ||
+      (metadata.requestedBy as string | undefined) ||
+      (metadata.managerId as string | undefined) ||
+      ''
+    ).toUpperCase();
     const managerId = (metadata.managerId as string | undefined)?.toUpperCase();
-    if (isActor || managerId === normalizedViewerId) {
+    if (isActor || requesterId === normalizedViewerId) {
       return 'You requested a new catalog service';
     }
-    return 'Manager requested a new catalog service';
+    if (managerId === normalizedViewerId) {
+      return requesterRole === 'warehouse'
+        ? 'A warehouse requested a new catalog service'
+        : 'A manager requested a new catalog service';
+    }
+    return requesterRole === 'warehouse'
+      ? 'Warehouse requested a new catalog service'
+      : 'Manager requested a new catalog service';
   }
 
   if (activityType === 'catalog_service_request_approved') {
+    const requesterRole = ((metadata.requesterRole as string | undefined) || 'manager').toLowerCase();
+    const requesterId = (
+      (metadata.requesterId as string | undefined) ||
+      (metadata.requestedBy as string | undefined) ||
+      (metadata.managerId as string | undefined) ||
+      ''
+    ).toUpperCase();
     const managerId = (metadata.managerId as string | undefined)?.toUpperCase();
     const serviceId = (metadata.serviceId as string | undefined) || item.targetId || 'service';
-    if (managerId === normalizedViewerId) {
+    if (requesterId === normalizedViewerId || managerId === normalizedViewerId) {
       return `Your service request was approved: ${serviceId}`;
     }
     if (isActor) {
       return `You approved a service request: ${serviceId}`;
     }
-    return 'Manager service request approved';
+    return requesterRole === 'warehouse'
+      ? 'Warehouse service request approved'
+      : 'Manager service request approved';
   }
 
   if (activityType === 'catalog_service_request_rejected') {
+    const requesterRole = ((metadata.requesterRole as string | undefined) || 'manager').toLowerCase();
+    const requesterId = (
+      (metadata.requesterId as string | undefined) ||
+      (metadata.requestedBy as string | undefined) ||
+      (metadata.managerId as string | undefined) ||
+      ''
+    ).toUpperCase();
     const managerId = (metadata.managerId as string | undefined)?.toUpperCase();
-    if (managerId === normalizedViewerId) {
+    if (requesterId === normalizedViewerId || managerId === normalizedViewerId) {
       return 'Your service request was rejected';
     }
     if (isActor) {
       return 'You rejected a service request';
     }
-    return 'Manager service request rejected';
+    return requesterRole === 'warehouse'
+      ? 'Warehouse service request rejected'
+      : 'Manager service request rejected';
   }
 
   // Archive/Restore/Delete activities

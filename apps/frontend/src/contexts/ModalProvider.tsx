@@ -311,6 +311,10 @@ export function ModalProvider({ children }: ModalProviderProps) {
               requestId: string;
               managerId: string;
               managerName: string | null;
+              requesterId: string;
+              requesterRole: 'manager' | 'warehouse';
+              requesterName: string | null;
+              managedBy: 'manager' | 'warehouse';
               serviceName: string;
               description: string | null;
               category: string;
@@ -320,6 +324,7 @@ export function ModalProvider({ children }: ModalProviderProps) {
               reviewedAt: string | null;
               reviewedBy: string | null;
               reviewNotes: string | null;
+              approvalStages?: Array<{ role: string; status: string; user?: string | null; timestamp?: string | null; label?: string }>;
             };
           }>(`/catalog/service-requests/${id}`, { getToken });
 

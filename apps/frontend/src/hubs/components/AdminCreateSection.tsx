@@ -937,7 +937,7 @@ export default function AdminCreateSection() {
                 }}
               >
                 <div style={{ fontSize: 16, fontWeight: 600, color: '#0f172a', marginBottom: 10 }}>
-                  Pending Manager Service Requests
+                  Pending Service Requests
                 </div>
                 {serviceRequestsLoading ? (
                   <div style={{ fontSize: 13, color: '#2563eb' }}>Loading pending requests...</div>
@@ -969,7 +969,7 @@ export default function AdminCreateSection() {
                             </div>
                           </div>
                           <div style={{ fontSize: 12, color: '#475569' }}>
-                            Manager: {item.managerName || item.managerId} | Category: {item.category} | Requested:{' '}
+                            {item.requesterRole === 'warehouse' ? 'Warehouse' : 'Manager'}: {item.requesterName || item.requesterId || item.managerName || item.managerId} | Category: {item.category} | Requested:{' '}
                             {new Date(item.requestedAt).toLocaleDateString()}
                           </div>
                           {item.description ? (

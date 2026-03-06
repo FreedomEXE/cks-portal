@@ -2672,12 +2672,16 @@ const catalogServiceRequestAdapter: EntityAdapter = {
   getHeaderConfig: (context: TabVisibilityContext): HeaderConfig => {
     const { entityData } = context;
     const fields: HeaderField[] = [];
+    const requesterLabel = entityData?.requesterRole === 'warehouse' ? 'Warehouse' : 'Manager';
 
     fields.push({ label: 'Service Name', value: entityData?.serviceName || '-' });
-    fields.push({ label: 'Manager', value: entityData?.managerName || entityData?.managerId || '-' });
+    fields.push({ label: requesterLabel, value: entityData?.requesterName || entityData?.requesterId || entityData?.managerName || entityData?.managerId || '-' });
 
     if (entityData?.category) {
       fields.push({ label: 'Category', value: entityData.category });
+    }
+    if (entityData?.managedBy) {
+      fields.push({ label: 'Managed By', value: String(entityData.managedBy) });
     }
     if (entityData?.requestedAt) {
       fields.push({ label: 'Requested At', value: String(entityData.requestedAt) });
@@ -2697,6 +2701,23 @@ const catalogServiceRequestAdapter: EntityAdapter = {
   getDetailsSections: (context: TabVisibilityContext): import('@cks/ui').SectionDescriptor[] => {
     const { entityData } = context;
     const sections: import('@cks/ui').SectionDescriptor[] = [];
+
+    sections.push({
+      id: 'summary',
+      type: 'key-value-grid',
+      title: 'Request Summary',
+      columns: 2,
+      fields: [
+        { label: 'Request ID', value: entityData?.requestId || '-' },
+        { label: 'Service Name', value: entityData?.serviceName || '-' },
+        { label: 'Requester', value: entityData?.requesterName || entityData?.requesterId || entityData?.managerName || entityData?.managerId || '-' },
+        { label: 'Requester Role', value: entityData?.requesterRole || 'manager' },
+        { label: 'Category', value: entityData?.category || '-' },
+        { label: 'Status', value: entityData?.status || 'pending' },
+        { label: 'Managed By', value: entityData?.managedBy || '-' },
+        { label: 'Approved Service', value: entityData?.approvedServiceId || '-' },
+      ],
+    });
 
     sections.push({
       id: 'description',

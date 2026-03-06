@@ -327,10 +327,24 @@ function buildWhere(filters: CatalogFilters, ecosystemManagerId: string | null) 
 
   if (filters.isTest === true) {
     params.push('%-TEST%');
-    where.push(`i.item_code ILIKE $${params.length}`);
+    const testParam = `$${params.length}`;
+    where.push(`(
+      i.item_code ILIKE ${testParam}
+      OR COALESCE(i.metadata->>'ecosystemManagerId', '') ILIKE ${testParam}
+      OR COALESCE(i.metadata->>'requesterId', '') ILIKE ${testParam}
+      OR COALESCE(i.metadata->>'requestedBy', '') ILIKE ${testParam}
+      OR COALESCE(i.metadata->>'createdBy', '') ILIKE ${testParam}
+    )`);
   } else if (filters.isTest === false) {
     params.push('%-TEST%');
-    where.push(`i.item_code NOT ILIKE $${params.length}`);
+    const testParam = `$${params.length}`;
+    where.push(`(
+      i.item_code NOT ILIKE ${testParam}
+      AND COALESCE(i.metadata->>'ecosystemManagerId', '') NOT ILIKE ${testParam}
+      AND COALESCE(i.metadata->>'requesterId', '') NOT ILIKE ${testParam}
+      AND COALESCE(i.metadata->>'requestedBy', '') NOT ILIKE ${testParam}
+      AND COALESCE(i.metadata->>'createdBy', '') NOT ILIKE ${testParam}
+    )`);
   }
 
   if (ecosystemManagerId) {

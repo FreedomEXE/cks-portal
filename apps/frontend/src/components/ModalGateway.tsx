@@ -779,13 +779,7 @@ export function ModalGateway({
         tabs={visibleTabs}
         headerExtras={headerExtras}
         headerActions={actions as any}
-        headerWorkflowStages={
-          entityType === 'order'
-            ? ((data as any)?.approvalStages as any)
-            : entityType === 'service'
-              ? (((data as any)?.approvalStages || (data as any)?.metadata?.approvalStages) as any)
-              : undefined
-        }
+        headerWorkflowStages={(((data as any)?.approvalStages || (data as any)?.metadata?.approvalStages) as any) || undefined}
       />
     );
   }

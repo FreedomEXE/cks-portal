@@ -523,6 +523,7 @@ export async function archiveEntity(operation: ArchiveOperation): Promise<{ succ
 
   // Special handling for catalogService/catalog_products so archived metadata is persisted
   let updateResult;
+  let catalogProductArchiveCount = 0;
   if (operation.entityType === 'catalogService') {
     // Persist archived_at/archived_by/deletion_scheduled and deactivate for consistent lifecycle UX
     updateResult = await query(
@@ -563,7 +564,7 @@ export async function archiveEntity(operation: ArchiveOperation): Promise<{ succ
   // Ensure catalog products reflect archived state for UI (independent of inventory tables)
   if (operation.entityType === 'product') {
     if (idParamList) {
-      await query(
+      const catalogArchiveResult = await query(
         `UPDATE catalog_products
          SET archived_at = NOW(),
              archived_by = $1,
@@ -574,8 +575,9 @@ export async function archiveEntity(operation: ArchiveOperation): Promise<{ succ
          WHERE product_id = $4 OR product_id = $5`,
         [actorId, operation.reason || 'Manual archive', deletionScheduled, idParamList[0], idParamList[1]]
       );
+      catalogProductArchiveCount = catalogArchiveResult.rowCount ?? 0;
     } else {
-      await query(
+      const catalogArchiveResult = await query(
         `UPDATE catalog_products
          SET archived_at = NOW(),
              archived_by = $1,
@@ -586,11 +588,16 @@ export async function archiveEntity(operation: ArchiveOperation): Promise<{ succ
          WHERE product_id = $4`,
         [actorId, operation.reason || 'Manual archive', deletionScheduled, normalizedId]
       );
+      catalogProductArchiveCount = catalogArchiveResult.rowCount ?? 0;
     }
   }
 
   // Fallback: if archiving a product and no inventory_items updated, try products table
   if ((!updateResult || (updateResult.rowCount ?? 0) === 0) && operation.entityType === 'product') {
+    // catalog_products is the primary table for product entities in this app.
+    if (catalogProductArchiveCount > 0) {
+      // Nothing else to do: no inventory rows is valid for newly created products.
+    } else {
     const fallbackResult = idParamList
       ? await query(
           `UPDATE products
@@ -610,11 +617,12 @@ export async function archiveEntity(operation: ArchiveOperation): Promise<{ succ
                deletion_scheduled = $3,
                updated_at = NOW()
            WHERE product_id = $4`,
-          [actorId, operation.reason || 'Manual archive', deletionScheduled, normalizedId]
+        [actorId, operation.reason || 'Manual archive', deletionScheduled, normalizedId]
         );
 
     if (!fallbackResult || (fallbackResult.rowCount ?? 0) === 0) {
       throw new Error(`Archive failed: ${operation.entityType} ${normalizedId} not found or already archived`);
+    }
     }
   } else if ((!updateResult || (updateResult.rowCount ?? 0) === 0) && operation.entityType === 'service') {
     // Fallback for services: deactivate in catalog_services
@@ -1039,6 +1047,19 @@ export async function hardDeleteEntity(
 
   // Resolve effective entity ID and check archived state
   let effectiveId = normalizedId;
+  let productIdCandidates: string[] | null = null;
+  if (operation.entityType === 'product') {
+    const m = normalizedId.match(/^(PRD)-(\d+)$/i);
+    if (m) {
+      const prefix = m[1].toUpperCase();
+      const digits = m[2];
+      const padded = `${prefix}-${digits.padStart(8, '0')}`;
+      productIdCandidates = normalizedId === padded ? [normalizedId] : [normalizedId, padded];
+    } else {
+      productIdCandidates = [normalizedId];
+    }
+  }
+
   if (operation.entityType === 'order') {
     const candidates = getOrderIdCandidates(normalizedId) || [normalizedId];
     const check = await query<{ id: string; archived_at: Date | null }>(
@@ -1058,6 +1079,46 @@ export async function hardDeleteEntity(
       [normalizedId]
     );
     if (checkResult.rows[0]?.is_active !== false) {
+      throw new Error('Entity must be archived before hard deletion');
+    }
+  } else if (operation.entityType === 'product') {
+    const candidates = productIdCandidates || [normalizedId];
+    const [catalogCheck, inventoryCheck, legacyCheck] = await Promise.all([
+      query<{ id: string; archived_at: Date | null }>(
+        `SELECT product_id AS id, archived_at
+         FROM catalog_products
+         WHERE product_id = ANY($1::text[])
+         LIMIT 1`,
+        [candidates]
+      ),
+      query<{ id: string; archived_at: Date | null }>(
+        `SELECT item_id AS id, archived_at
+         FROM inventory_items
+         WHERE item_id = ANY($1::text[])
+         LIMIT 1`,
+        [candidates]
+      ),
+      query<{ id: string; archived_at: Date | null }>(
+        `SELECT product_id AS id, archived_at
+         FROM products
+         WHERE product_id = ANY($1::text[])
+         LIMIT 1`,
+        [candidates]
+      ),
+    ]);
+
+    const catalogRow = catalogCheck.rows[0];
+    const inventoryRow = inventoryCheck.rows[0];
+    const legacyRow = legacyCheck.rows[0];
+    const resolvedRow = catalogRow || inventoryRow || legacyRow;
+
+    if (!resolvedRow) {
+      throw new Error(`Entity not found: ${normalizedId}`);
+    }
+    effectiveId = resolvedRow.id;
+
+    const archivedAt = catalogRow?.archived_at ?? inventoryRow?.archived_at ?? legacyRow?.archived_at ?? null;
+    if (!archivedAt) {
       throw new Error('Entity must be archived before hard deletion');
     }
   } else {
@@ -1083,13 +1144,38 @@ export async function hardDeleteEntity(
     // 1. Capture entity snapshot BEFORE deleting
     let snapshot: any = null;
 
-    // Capture simple snapshot for all entity types
-    // (Complex enrichment queries can fail on schema mismatches with old data)
-    const snapshotResult = await txQuery(
-      `SELECT * FROM ${tableName} WHERE ${idColumn} = $1`,
-      [effectiveId]
-    );
-    snapshot = snapshotResult.rows[0] || null;
+    // Capture simple snapshot for all entity types.
+    // For products, prefer catalog_products because product entities can exist without inventory rows.
+    if (operation.entityType === 'product') {
+      const candidates = productIdCandidates || [effectiveId];
+      const catalogSnapshot = await txQuery(
+        `SELECT * FROM catalog_products WHERE product_id = ANY($1::text[]) LIMIT 1`,
+        [candidates]
+      );
+      if (catalogSnapshot.rows[0]) {
+        snapshot = catalogSnapshot.rows[0];
+      } else {
+        const inventorySnapshot = await txQuery(
+          `SELECT * FROM inventory_items WHERE item_id = ANY($1::text[]) LIMIT 1`,
+          [candidates]
+        );
+        if (inventorySnapshot.rows[0]) {
+          snapshot = inventorySnapshot.rows[0];
+        } else {
+          const legacySnapshot = await txQuery(
+            `SELECT * FROM products WHERE product_id = ANY($1::text[]) LIMIT 1`,
+            [candidates]
+          );
+          snapshot = legacySnapshot.rows[0] || null;
+        }
+      }
+    } else {
+      const snapshotResult = await txQuery(
+        `SELECT * FROM ${tableName} WHERE ${idColumn} = $1`,
+        [effectiveId]
+      );
+      snapshot = snapshotResult.rows[0] || null;
+    }
 
     if (!snapshot) {
       throw new Error(`Entity not found: ${normalizedId}`);
@@ -1140,13 +1226,35 @@ export async function hardDeleteEntity(
         `DELETE FROM service_certifications WHERE service_id = $1`,
         [normalizedId]
       );
+    } else if (operation.entityType === 'product') {
+      const candidates = productIdCandidates || [effectiveId];
+      await txQuery(
+        `DELETE FROM inventory_items WHERE item_id = ANY($1::text[])`,
+        [candidates]
+      );
+      await txQuery(
+        `DELETE FROM products WHERE product_id = ANY($1::text[])`,
+        [candidates]
+      );
+      await txQuery(
+        `DELETE FROM catalog_products WHERE product_id = ANY($1::text[])`,
+        [candidates]
+      );
+      await txQuery(
+        `DELETE FROM catalog_ecosystem_visibility_items
+         WHERE item_type = 'product'
+           AND UPPER(item_code) = ANY($1::text[])`,
+        [candidates.map((c) => c.toUpperCase())]
+      );
     }
 
     // 4. Perform hard delete of main entity
+    if (operation.entityType !== 'product') {
       await txQuery(
         `DELETE FROM ${tableName} WHERE ${idColumn} = $1`,
         [effectiveId]
       );
+    }
 
     // 5. Clean up relationships
     await txQuery(

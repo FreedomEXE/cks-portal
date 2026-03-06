@@ -538,6 +538,10 @@ export interface CatalogServiceRequestItem {
   requestId: string;
   managerId: string;
   managerName: string | null;
+  requesterId: string;
+  requesterRole: 'manager' | 'warehouse';
+  requesterName: string | null;
+  managedBy: 'manager' | 'warehouse';
   serviceName: string;
   description: string | null;
   category: string;
@@ -547,6 +551,7 @@ export interface CatalogServiceRequestItem {
   reviewedAt: string | null;
   reviewedBy: string | null;
   reviewNotes: string | null;
+  approvalStages?: Array<{ role: string; status: string; user?: string | null; timestamp?: string | null; label?: string }>;
 }
 
 export async function listCatalogServiceRequests(
@@ -580,7 +585,7 @@ export async function approveCatalogServiceRequest(
   payload?: { notes?: string },
   init?: ApiFetchInit,
 ) {
-  return apiFetch<{ success: boolean; data: { requestId: string; serviceId: string; managerId: string; serviceName: string } }>(
+  return apiFetch<{ success: boolean; data: { requestId: string; serviceId: string; managerId: string; requesterId: string; requesterRole: 'manager' | 'warehouse'; serviceName: string } }>(
     `/admin/catalog/service-requests/${encodeURIComponent(requestId)}/approve`,
     {
       method: 'POST',
@@ -596,7 +601,7 @@ export async function rejectCatalogServiceRequest(
   payload: { notes: string },
   init?: ApiFetchInit,
 ) {
-  return apiFetch<{ success: boolean; data: { requestId: string; managerId: string; serviceName: string } }>(
+  return apiFetch<{ success: boolean; data: { requestId: string; managerId: string; requesterId: string; requesterRole: 'manager' | 'warehouse'; serviceName: string } }>(
     `/admin/catalog/service-requests/${encodeURIComponent(requestId)}/reject`,
     {
       method: 'POST',

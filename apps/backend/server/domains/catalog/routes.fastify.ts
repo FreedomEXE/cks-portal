@@ -82,6 +82,166 @@ function createHttpError(statusCode: number, message: string): Error & { statusC
   return error;
 }
 
+type ServiceRequestMetadata = {
+  requesterRole: 'manager' | 'warehouse';
+  requesterId: string;
+  requesterName?: string | null;
+  ecosystemManagerId: string;
+  managedBy: 'manager' | 'warehouse';
+};
+
+function parseServiceRequestMetadata(raw: unknown, fallbackManagerId: string): ServiceRequestMetadata {
+  const metadata = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+  const requesterRole = String(metadata.requesterRole || 'manager').toLowerCase() === 'warehouse' ? 'warehouse' : 'manager';
+  const requesterId = String(metadata.requesterId || fallbackManagerId).trim().toUpperCase();
+  const ecosystemManagerId = String(metadata.ecosystemManagerId || fallbackManagerId).trim().toUpperCase();
+  const requesterName = typeof metadata.requesterName === 'string' ? metadata.requesterName : null;
+  const managedBy = String(metadata.managedBy || requesterRole).toLowerCase() === 'warehouse' ? 'warehouse' : 'manager';
+
+  return {
+    requesterRole,
+    requesterId,
+    requesterName,
+    ecosystemManagerId: ecosystemManagerId || fallbackManagerId,
+    managedBy,
+  };
+}
+
+function buildServiceRequestApprovalStages(
+  status: 'pending' | 'approved' | 'rejected',
+  requesterRole: 'manager' | 'warehouse',
+  requesterName?: string | null,
+  requesterId?: string | null,
+  reviewedBy?: string | null,
+  requestedAt?: Date | string | null,
+  reviewedAt?: Date | string | null,
+) {
+  const requestRoleLabel = requesterRole === 'warehouse' ? 'warehouse' : 'manager';
+  const requestStage = {
+    role: requestRoleLabel,
+    status: 'requested',
+    label: 'Requested',
+    user: requesterName || requesterId || undefined,
+    timestamp: requestedAt ? String(requestedAt) : undefined,
+  };
+
+  if (status === 'approved') {
+    return [
+      requestStage,
+      {
+        role: 'admin',
+        status: 'approved',
+        label: 'Accepted',
+        user: reviewedBy || undefined,
+        timestamp: reviewedAt ? String(reviewedAt) : undefined,
+      },
+    ];
+  }
+
+  if (status === 'rejected') {
+    return [
+      requestStage,
+      {
+        role: 'admin',
+        status: 'rejected',
+        label: 'Rejected',
+        user: reviewedBy || undefined,
+        timestamp: reviewedAt ? String(reviewedAt) : undefined,
+      },
+    ];
+  }
+
+  return [
+    requestStage,
+    {
+      role: 'admin',
+      status: 'pending',
+      label: 'Pending',
+    },
+  ];
+}
+
+async function resolveWarehouseContext(
+  warehouseId: string,
+): Promise<{ managerId: string | null; warehouseName: string | null }> {
+  const normalizedWarehouseId = warehouseId.trim().toUpperCase();
+  if (!normalizedWarehouseId) {
+    return { managerId: null, warehouseName: null };
+  }
+
+  const byManagerId = await query<{ manager_id: string | null; name: string | null }>(
+    `SELECT manager_id, name
+     FROM warehouses
+     WHERE UPPER(warehouse_id) = UPPER($1)
+     LIMIT 1`,
+    [normalizedWarehouseId],
+  );
+  if (byManagerId.rowCount > 0) {
+    const row = byManagerId.rows[0];
+    const managerId = row.manager_id?.trim().toUpperCase() || null;
+    return { managerId, warehouseName: row.name ?? null };
+  }
+
+  try {
+    const legacy = await query<{ cks_manager: string | null; name: string | null }>(
+      `SELECT cks_manager, name
+       FROM warehouses
+       WHERE UPPER(warehouse_id) = UPPER($1)
+       LIMIT 1`,
+      [normalizedWarehouseId],
+    );
+    if (legacy.rowCount > 0) {
+      const row = legacy.rows[0];
+      const managerId = row.cks_manager?.trim().toUpperCase() || null;
+      return { managerId, warehouseName: row.name ?? null };
+    }
+  } catch {
+    // Legacy cks_manager column is optional across environments; ignore query failure.
+  }
+
+  return { managerId: null, warehouseName: null };
+}
+
+async function ensureEcosystemAllowlistItem(
+  itemType: 'product' | 'service',
+  itemCode: string,
+  ecosystemManagerId: string | null | undefined,
+  actorId: string,
+  txQuery?: typeof query,
+): Promise<void> {
+  const managerId = (ecosystemManagerId || '').trim().toUpperCase();
+  const normalizedItemCode = itemCode.trim().toUpperCase();
+  if (!managerId || !normalizedItemCode) {
+    return;
+  }
+
+  const queryFn = txQuery ?? query;
+  const policyResult = await queryFn<{ visibility_mode: 'all' | 'allowlist' }>(
+    `SELECT visibility_mode
+     FROM catalog_ecosystem_visibility_policies
+     WHERE UPPER(ecosystem_manager_id) = UPPER($1)
+       AND item_type = $2
+     LIMIT 1`,
+    [managerId, itemType],
+  );
+
+  const mode = (policyResult.rows[0]?.visibility_mode ?? 'all').toLowerCase();
+  if (mode !== 'allowlist') {
+    return;
+  }
+
+  await queryFn(
+    `INSERT INTO catalog_ecosystem_visibility_items (
+       ecosystem_manager_id,
+       item_type,
+       item_code,
+       created_by
+     ) VALUES ($1, $2, $3, $4)
+     ON CONFLICT (ecosystem_manager_id, item_type, item_code) DO NOTHING`,
+    [managerId, itemType, normalizedItemCode, actorId],
+  );
+}
+
 export async function registerCatalogRoutes(server: FastifyInstance) {
   server.get('/api/catalog/items', async (request, reply) => {
     const auth = await requireActiveRole(request, reply);
@@ -419,6 +579,12 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
       }
 
       const row = result.rows[0];
+      const serviceMetadata = (row.metadata && typeof row.metadata === 'object')
+        ? (row.metadata as Record<string, unknown>)
+        : {};
+      const approvalStages = Array.isArray(serviceMetadata.approvalStages)
+        ? serviceMetadata.approvalStages
+        : [];
 
       // Build response data
       const data: any = {
@@ -428,7 +594,7 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
         description: row.description,
         tags: row.tags || [],
         status: row.is_active ? 'active' : 'inactive',
-        metadata: row.metadata || {},
+        metadata: serviceMetadata,
         imageUrl: row.image_url,
         price: row.base_price ? {
           amount: row.base_price,
@@ -440,6 +606,7 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
         attributes: row.attributes,
         crewRequired: row.crew_required,
         managedBy: row.managed_by || 'manager',
+        approvalStages,
         createdAt: row.created_at?.toISOString(),
         updatedAt: row.updated_at?.toISOString()
       };
@@ -582,6 +749,12 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
       }
 
       const product = result.rows[0];
+      const productMetadata = (product.metadata && typeof product.metadata === 'object')
+        ? (product.metadata as Record<string, unknown>)
+        : {};
+      const approvalStages = Array.isArray(productMetadata.approvalStages)
+        ? productMetadata.approvalStages
+        : [];
 
       // Fetch inventory data for this product across warehouses
       const inventoryResult = await query<{
@@ -624,7 +797,8 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
           category: canonicalizeCatalogCategory('product', product.category, product.product_id),
           unitOfMeasure: product.unit_of_measure,
           status: state, // Keep in data for backward compat
-          metadata: product.metadata,
+          metadata: productMetadata,
+          approvalStages,
           inventoryData,
         },
         state, // Lifecycle state at root level for ModalProvider
@@ -868,17 +1042,22 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
           r.request_id,
           r.manager_id,
           m.name AS manager_name,
+          w.name AS warehouse_name,
           r.service_name,
           r.description,
           r.category,
           r.status,
           r.approved_service_id,
+          r.metadata,
           r.requested_at,
           r.reviewed_at,
           r.reviewed_by,
           r.review_notes
         FROM catalog_service_requests r
         LEFT JOIN managers m ON UPPER(m.manager_id) = UPPER(r.manager_id)
+        LEFT JOIN warehouses w
+          ON LOWER(COALESCE(r.metadata->>'requesterRole', 'manager')) = 'warehouse'
+         AND UPPER(w.warehouse_id) = UPPER(r.metadata->>'requesterId')
         ${hasStatusFilter ? 'WHERE r.status = $1' : ''}
         ORDER BY r.requested_at DESC
         LIMIT $${hasStatusFilter ? '2' : '1'}
@@ -888,11 +1067,13 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
         request_id: string;
         manager_id: string;
         manager_name: string | null;
+        warehouse_name: string | null;
         service_name: string;
         description: string | null;
         category: string;
         status: 'pending' | 'approved' | 'rejected';
         approved_service_id: string | null;
+        metadata: Record<string, unknown> | null;
         requested_at: Date | string;
         reviewed_at: Date | string | null;
         reviewed_by: string | null;
@@ -901,20 +1082,41 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
 
       reply.send({
         success: true,
-        data: result.rows.map((row) => ({
-          requestId: row.request_id,
-          managerId: row.manager_id,
-          managerName: row.manager_name,
-          serviceName: row.service_name,
-          description: row.description,
-          category: row.category,
-          status: row.status,
-          approvedServiceId: row.approved_service_id,
-          requestedAt: row.requested_at,
-          reviewedAt: row.reviewed_at,
-          reviewedBy: row.reviewed_by,
-          reviewNotes: row.review_notes,
-        })),
+        data: result.rows.map((row) => {
+          const requestMeta = parseServiceRequestMetadata(row.metadata, row.manager_id);
+          const requesterName =
+            requestMeta.requesterRole === 'warehouse'
+              ? row.warehouse_name || requestMeta.requesterName || requestMeta.requesterId
+              : row.manager_name || requestMeta.requesterName || requestMeta.requesterId;
+
+          return {
+            requestId: row.request_id,
+            managerId: row.manager_id,
+            managerName: row.manager_name,
+            requesterId: requestMeta.requesterId,
+            requesterRole: requestMeta.requesterRole,
+            requesterName,
+            managedBy: requestMeta.managedBy,
+            serviceName: row.service_name,
+            description: row.description,
+            category: row.category,
+            status: row.status,
+            approvedServiceId: row.approved_service_id,
+            requestedAt: row.requested_at,
+            reviewedAt: row.reviewed_at,
+            reviewedBy: row.reviewed_by,
+            reviewNotes: row.review_notes,
+            approvalStages: buildServiceRequestApprovalStages(
+              row.status,
+              requestMeta.requesterRole,
+              requesterName,
+              requestMeta.requesterId,
+              row.reviewed_by,
+              row.requested_at,
+              row.reviewed_at,
+            ),
+          };
+        }),
       });
     } catch (error) {
       request.log.error({ err: error }, 'Failed to list catalog service requests');
@@ -927,8 +1129,8 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
     if (!account) return;
 
     const role = (account.role ?? '').trim().toLowerCase();
-    if (role !== 'admin' && role !== 'manager') {
-      reply.code(403).send({ error: 'Only admins and managers can view service requests' });
+    if (role !== 'admin' && role !== 'manager' && role !== 'warehouse') {
+      reply.code(403).send({ error: 'Only admins, managers, and warehouses can view service requests' });
       return;
     }
 
@@ -947,11 +1149,13 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
         request_id: string;
         manager_id: string;
         manager_name: string | null;
+        warehouse_name: string | null;
         service_name: string;
         description: string | null;
         category: string;
         status: 'pending' | 'approved' | 'rejected';
         approved_service_id: string | null;
+        metadata: Record<string, unknown> | null;
         requested_at: Date | string;
         reviewed_at: Date | string | null;
         reviewed_by: string | null;
@@ -961,17 +1165,22 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
            r.request_id,
            r.manager_id,
            m.name AS manager_name,
+           w.name AS warehouse_name,
            r.service_name,
            r.description,
            r.category,
            r.status,
            r.approved_service_id,
+           r.metadata,
            r.requested_at,
            r.reviewed_at,
            r.reviewed_by,
            r.review_notes
          FROM catalog_service_requests r
          LEFT JOIN managers m ON UPPER(m.manager_id) = UPPER(r.manager_id)
+         LEFT JOIN warehouses w
+           ON LOWER(COALESCE(r.metadata->>'requesterRole', 'manager')) = 'warehouse'
+          AND UPPER(w.warehouse_id) = UPPER(r.metadata->>'requesterId')
          WHERE UPPER(r.request_id) = UPPER($1)
          LIMIT 1`,
         [requestId],
@@ -983,9 +1192,23 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
       }
 
       const row = result.rows[0];
+      const requestMeta = parseServiceRequestMetadata(row.metadata, row.manager_id);
+      const requesterName =
+        requestMeta.requesterRole === 'warehouse'
+          ? row.warehouse_name || requestMeta.requesterName || requestMeta.requesterId
+          : row.manager_name || requestMeta.requesterName || requestMeta.requesterId;
       if (role === 'manager' && row.manager_id.trim().toUpperCase() !== viewerCode) {
         reply.code(404).send({ error: 'Service request not found' });
         return;
+      }
+      if (role === 'warehouse') {
+        const isOwner =
+          requestMeta.requesterRole === 'warehouse' &&
+          requestMeta.requesterId.trim().toUpperCase() === viewerCode;
+        if (!isOwner) {
+          reply.code(404).send({ error: 'Service request not found' });
+          return;
+        }
       }
 
       reply.send({
@@ -994,6 +1217,10 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
           requestId: row.request_id,
           managerId: row.manager_id,
           managerName: row.manager_name,
+          requesterId: requestMeta.requesterId,
+          requesterRole: requestMeta.requesterRole,
+          requesterName,
+          managedBy: requestMeta.managedBy,
           serviceName: row.service_name,
           description: row.description,
           category: row.category,
@@ -1003,6 +1230,15 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
           reviewedAt: row.reviewed_at,
           reviewedBy: row.reviewed_by,
           reviewNotes: row.review_notes,
+          approvalStages: buildServiceRequestApprovalStages(
+            row.status,
+            requestMeta.requesterRole,
+            requesterName,
+            requestMeta.requesterId,
+            row.reviewed_by,
+            row.requested_at,
+            row.reviewed_at,
+          ),
         },
       });
     } catch (error) {
@@ -1041,10 +1277,11 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
           duration_minutes: number | null;
           service_window: string | null;
           crew_required: number | null;
+          metadata: Record<string, unknown> | null;
           status: 'pending' | 'approved' | 'rejected';
         }>(
           `SELECT request_id, manager_id, service_name, description, category, unit_of_measure,
-                  base_price, duration_minutes, service_window, crew_required, status
+                  base_price, duration_minutes, service_window, crew_required, metadata, status
            FROM catalog_service_requests
            WHERE UPPER(request_id) = UPPER($1)
            FOR UPDATE`,
@@ -1059,6 +1296,7 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
         if (serviceRequest.status !== 'pending') {
           throw createHttpError(409, `Service request is already ${serviceRequest.status}`);
         }
+        const requestMeta = parseServiceRequestMetadata(serviceRequest.metadata, serviceRequest.manager_id);
 
         const maxResult = await txQuery<{ max_num: string | null }>(
           `SELECT MAX(CAST(SUBSTRING(service_id FROM 5) AS INTEGER)) AS max_num
@@ -1073,8 +1311,8 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
           `INSERT INTO catalog_services (
             service_id, name, description, category, unit_of_measure,
             base_price, duration_minutes, service_window, crew_required,
-            is_active, created_at, updated_at
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, TRUE, NOW(), NOW())`,
+            metadata, managed_by, is_active, created_at, updated_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11, TRUE, NOW(), NOW())`,
           [
             serviceId,
             serviceRequest.service_name,
@@ -1085,16 +1323,43 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
             serviceRequest.duration_minutes ?? null,
             serviceRequest.service_window || null,
             serviceRequest.crew_required ?? null,
+            JSON.stringify({
+              sourceRequestId: requestId,
+              ecosystemManagerId: requestMeta.ecosystemManagerId,
+              requestedById: requestMeta.requesterId,
+              requestedByRole: requestMeta.requesterRole,
+              requesterName: requestMeta.requesterName || null,
+              approvalStages: buildServiceRequestApprovalStages(
+                'approved',
+                requestMeta.requesterRole,
+                requestMeta.requesterName,
+                requestMeta.requesterId,
+                actorId,
+                new Date().toISOString(),
+                new Date().toISOString(),
+              ),
+            }),
+            requestMeta.managedBy,
           ],
         );
 
-        await txQuery(
-          `INSERT INTO service_certifications (service_id, user_id, role)
-           VALUES ($1, $2, 'manager')
-           ON CONFLICT (service_id, user_id, role)
-           DO UPDATE SET archived_at = NULL, created_at = NOW()`,
-          [serviceId, serviceRequest.manager_id.trim().toUpperCase()],
-        );
+        if (requestMeta.requesterRole === 'manager') {
+          await txQuery(
+            `INSERT INTO service_certifications (service_id, user_id, role)
+             VALUES ($1, $2, 'manager')
+             ON CONFLICT (service_id, user_id, role)
+             DO UPDATE SET archived_at = NULL, created_at = NOW()`,
+            [serviceId, requestMeta.requesterId],
+          );
+        } else {
+          await txQuery(
+            `INSERT INTO service_certifications (service_id, user_id, role)
+             VALUES ($1, $2, 'warehouse')
+             ON CONFLICT (service_id, user_id, role)
+             DO UPDATE SET archived_at = NULL, created_at = NOW()`,
+            [serviceId, requestMeta.requesterId],
+          );
+        }
 
         await txQuery(
           `UPDATE catalog_service_requests
@@ -1107,9 +1372,17 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
           [requestId, serviceId, actorId, notes],
         );
 
+        await ensureEcosystemAllowlistItem(
+          'service',
+          serviceId,
+          requestMeta.ecosystemManagerId,
+          actorId,
+          txQuery,
+        );
+
         await recordActivity({
           activityType: 'catalog_service_request_approved',
-          description: `Manager Requested Service approved: ${serviceId} "${serviceRequest.service_name}"`,
+          description: `${requestMeta.requesterRole === 'warehouse' ? 'Warehouse Requested Service' : 'Manager Requested Service'} approved: ${serviceId} "${serviceRequest.service_name}"`,
           actorId,
           actorRole: 'admin',
           targetId: requestId,
@@ -1120,6 +1393,9 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
             serviceId,
             serviceName: serviceRequest.service_name,
             managerId: serviceRequest.manager_id,
+            requesterRole: requestMeta.requesterRole,
+            requesterId: requestMeta.requesterId,
+            requesterName: requestMeta.requesterName || null,
             category: serviceRequest.category,
             targetType: 'catalogServiceRequest',
           },
@@ -1137,21 +1413,23 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
             name: serviceRequest.service_name,
             category: serviceRequest.category || null,
             createdBy: actorId,
-            requestedBy: serviceRequest.manager_id,
+            requestedBy: requestMeta.requesterId,
+            requestedByRole: requestMeta.requesterRole,
+            managedBy: requestMeta.managedBy,
             sourceRequestId: requestId,
           },
         }, { txQuery });
 
         await recordActivity({
           activityType: 'catalog_service_certified',
-          description: `Certified ${serviceRequest.manager_id} for ${serviceId}`,
+          description: `Certified ${requestMeta.requesterId} for ${serviceId}`,
           actorId,
           actorRole: 'admin',
           targetId: serviceId,
           targetType: 'catalogService',
           metadata: {
-            userId: serviceRequest.manager_id,
-            role: 'manager',
+            userId: requestMeta.requesterId,
+            role: requestMeta.requesterRole,
             serviceName: serviceRequest.service_name,
             serviceId,
           },
@@ -1161,6 +1439,8 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
           requestId,
           serviceId,
           managerId: serviceRequest.manager_id,
+          requesterId: requestMeta.requesterId,
+          requesterRole: requestMeta.requesterRole,
           serviceName: serviceRequest.service_name,
         };
       });
@@ -1204,9 +1484,10 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
           manager_id: string;
           service_name: string;
           category: string;
+          metadata: Record<string, unknown> | null;
           status: 'pending' | 'approved' | 'rejected';
         }>(
-          `SELECT request_id, manager_id, service_name, category, status
+          `SELECT request_id, manager_id, service_name, category, metadata, status
            FROM catalog_service_requests
            WHERE UPPER(request_id) = UPPER($1)
            FOR UPDATE`,
@@ -1221,6 +1502,7 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
         if (serviceRequest.status !== 'pending') {
           throw createHttpError(409, `Service request is already ${serviceRequest.status}`);
         }
+        const requestMeta = parseServiceRequestMetadata(serviceRequest.metadata, serviceRequest.manager_id);
 
         await txQuery(
           `UPDATE catalog_service_requests
@@ -1234,7 +1516,7 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
 
         await recordActivity({
           activityType: 'catalog_service_request_rejected',
-          description: `Manager Requested Service rejected: "${serviceRequest.service_name}"`,
+          description: `${requestMeta.requesterRole === 'warehouse' ? 'Warehouse Requested Service' : 'Manager Requested Service'} rejected: "${serviceRequest.service_name}"`,
           actorId,
           actorRole: 'admin',
           targetId: requestId,
@@ -1243,6 +1525,9 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
           metadata: {
             requestId,
             managerId: serviceRequest.manager_id,
+            requesterRole: requestMeta.requesterRole,
+            requesterId: requestMeta.requesterId,
+            requesterName: requestMeta.requesterName || null,
             serviceName: serviceRequest.service_name,
             category: serviceRequest.category,
             notes,
@@ -1253,6 +1538,8 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
         return {
           requestId,
           managerId: serviceRequest.manager_id,
+          requesterId: requestMeta.requesterId,
+          requesterRole: requestMeta.requesterRole,
           serviceName: serviceRequest.service_name,
         };
       });
@@ -1585,8 +1872,28 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
         };
       };
 
-      const productCodeFilter = isTest ? 'p.product_id ILIKE $1' : 'p.product_id NOT ILIKE $1';
-      const serviceCodeFilter = isTest ? 's.service_id ILIKE $1' : 's.service_id NOT ILIKE $1';
+      const productCodeFilter = isTest
+        ? `(p.product_id ILIKE $1
+            OR COALESCE(p.metadata->>'ecosystemManagerId', '') ILIKE $1
+            OR COALESCE(p.metadata->>'requesterId', '') ILIKE $1
+            OR COALESCE(p.metadata->>'requestedBy', '') ILIKE $1
+            OR COALESCE(p.metadata->>'createdBy', '') ILIKE $1)`
+        : `(p.product_id NOT ILIKE $1
+            AND COALESCE(p.metadata->>'ecosystemManagerId', '') NOT ILIKE $1
+            AND COALESCE(p.metadata->>'requesterId', '') NOT ILIKE $1
+            AND COALESCE(p.metadata->>'requestedBy', '') NOT ILIKE $1
+            AND COALESCE(p.metadata->>'createdBy', '') NOT ILIKE $1)`;
+      const serviceCodeFilter = isTest
+        ? `(s.service_id ILIKE $1
+            OR COALESCE(s.metadata->>'ecosystemManagerId', '') ILIKE $1
+            OR COALESCE(s.metadata->>'requesterId', '') ILIKE $1
+            OR COALESCE(s.metadata->>'requestedBy', '') ILIKE $1
+            OR COALESCE(s.metadata->>'createdBy', '') ILIKE $1)`
+        : `(s.service_id NOT ILIKE $1
+            AND COALESCE(s.metadata->>'ecosystemManagerId', '') NOT ILIKE $1
+            AND COALESCE(s.metadata->>'requesterId', '') NOT ILIKE $1
+            AND COALESCE(s.metadata->>'requestedBy', '') NOT ILIKE $1
+            AND COALESCE(s.metadata->>'createdBy', '') NOT ILIKE $1)`;
       const productVisibility = buildCatalogVisibilityClause('product', 'p.product_id');
       const serviceVisibility = buildCatalogVisibilityClause('service', 's.service_id');
 
@@ -1692,28 +1999,66 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
       const nextNum = (Number(maxResult.rows[0]?.max_num) || 0) + 1;
       const productId = `PRD-${String(nextNum).padStart(3, '0')}`;
 
+      const actorId = account.cksCode || role.toUpperCase();
+      let ecosystemManagerId: string | null = null;
+      if (role === 'warehouse' && account.cksCode) {
+        const warehouseContext = await resolveWarehouseContext(account.cksCode);
+        ecosystemManagerId = warehouseContext.managerId;
+      }
+
+      const productMetadata = {
+        createdBy: account.cksCode || null,
+        createdByRole: role,
+        ecosystemManagerId,
+        approvalStages: [
+          {
+            role,
+            status: 'requested',
+            label: role === 'warehouse' ? 'Warehouse Created' : 'Created',
+            user: account.cksCode || null,
+            timestamp: new Date().toISOString(),
+          },
+        ],
+      };
+
       await query(
         `INSERT INTO catalog_products (
           product_id, name, description, category, unit_of_measure,
           base_price, sku, package_size, lead_time_days, reorder_point,
-          is_active, created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, TRUE, NOW(), NOW())`,
+          metadata, is_active, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, TRUE, NOW(), NOW())`,
         [
           productId, name, description || null, category || null,
           unitOfMeasure || null, basePrice || null, sku || null,
           packageSize || null, leadTimeDays ?? null, reorderPoint ?? null,
+          JSON.stringify(productMetadata),
         ],
+      );
+
+      await ensureEcosystemAllowlistItem(
+        'product',
+        productId,
+        ecosystemManagerId,
+        actorId,
       );
 
       // Record activity
       await recordActivity({
         activityType: 'product_created',
-        description: `New product ${productId} "${name}" created`,
-        actorId: account.cksCode || role.toUpperCase(),
+        description: `${role === 'warehouse' ? 'Warehouse Created Product' : 'New product'} ${productId} "${name}"`,
+        actorId,
         actorRole: role,
         targetId: productId,
         targetType: 'product',
-        metadata: { productId, name, category: category || null, createdBy: account.cksCode },
+        metadata: {
+          productId,
+          name,
+          category: category || null,
+          createdBy: account.cksCode,
+          createdByRole: role,
+          ecosystemManagerId,
+          approvalStages: productMetadata.approvalStages,
+        },
       });
 
       reply.send({
@@ -1728,14 +2073,14 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
 
   // ── Create catalog service ──────────────────────────────────────────
   // POST /api/catalog/services
-  // Allowed: admin, manager
+  // Allowed: admin, manager, warehouse (manager/warehouse require admin approval)
   server.post('/api/catalog/services', async (request, reply) => {
     const account = await requireActiveRole(request, reply, {});
     if (!account) return;
 
     const role = (account.role ?? '').trim().toLowerCase();
-    if (role !== 'admin' && role !== 'manager') {
-      reply.code(403).send({ error: 'Only admins and managers can create services' });
+    if (role !== 'admin' && role !== 'manager' && role !== 'warehouse') {
+      reply.code(403).send({ error: 'Only admins, managers, and warehouses can create services' });
       return;
     }
 
@@ -1763,15 +2108,29 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
       const normalizedCategory = (category || '').trim();
       const actorId = account.cksCode || role.toUpperCase();
 
-      if (role === 'manager') {
-        const managerId = (account.cksCode ?? '').trim().toUpperCase();
-        if (!managerId) {
-          reply.code(403).send({ error: 'Manager account is missing a valid manager code' });
+      if (role !== 'admin') {
+        const requesterId = (account.cksCode ?? '').trim().toUpperCase();
+        if (!requesterId) {
+          reply.code(403).send({ error: `${role} account is missing a valid code` });
           return;
         }
         if (!normalizedCategory) {
-          reply.code(400).send({ error: 'Category is required for manager service requests' });
+          reply.code(400).send({ error: 'Category is required for service requests' });
           return;
+        }
+
+        let ecosystemManagerId = requesterId;
+        let requesterName: string | null = null;
+        let managedBy: 'manager' | 'warehouse' = role === 'warehouse' ? 'warehouse' : 'manager';
+
+        if (role === 'warehouse') {
+          const warehouseContext = await resolveWarehouseContext(requesterId);
+          requesterName = warehouseContext.warehouseName;
+          ecosystemManagerId = warehouseContext.managerId || '';
+          if (!ecosystemManagerId) {
+            reply.code(400).send({ error: 'Warehouse must be assigned to a manager before requesting services' });
+            return;
+          }
         }
 
         const existingService = await query<{ service_id: string }>(
@@ -1796,9 +2155,11 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
            WHERE UPPER(manager_id) = UPPER($1)
              AND UPPER(service_name) = UPPER($2)
              AND COALESCE(UPPER(category), '') = COALESCE(UPPER($3), '')
+             AND LOWER(COALESCE(metadata->>'requesterRole', 'manager')) = LOWER($4)
+             AND UPPER(COALESCE(metadata->>'requesterId', manager_id)) = UPPER($5)
              AND status = 'pending'
            LIMIT 1`,
-          [managerId, normalizedName, normalizedCategory || null],
+          [ecosystemManagerId, normalizedName, normalizedCategory || null, role, requesterId],
         );
         if (existingRequest.rowCount > 0) {
           reply.code(409).send({
@@ -1820,7 +2181,7 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, NOW())`,
           [
             requestId,
-            managerId,
+            ecosystemManagerId,
             normalizedName,
             description || null,
             normalizedCategory,
@@ -1829,13 +2190,26 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
             durationMinutes ?? null,
             serviceWindow || null,
             crewRequired ?? null,
-            JSON.stringify({ requestedBy: managerId }),
+            JSON.stringify({
+              requestedBy: requesterId,
+              requesterId,
+              requesterRole: role,
+              requesterName: requesterName || null,
+              ecosystemManagerId,
+              managedBy,
+              approvalStages: buildServiceRequestApprovalStages(
+                'pending',
+                role === 'warehouse' ? 'warehouse' : 'manager',
+                requesterName,
+                requesterId,
+              ),
+            }),
           ],
         );
 
         await recordActivity({
           activityType: 'catalog_service_request_submitted',
-          description: `Manager Requested Service: "${normalizedName}"`,
+          description: `${role === 'warehouse' ? 'Warehouse Requested Service' : 'Manager Requested Service'}: "${normalizedName}"`,
           actorId,
           actorRole: role,
           targetId: requestId,
@@ -1843,9 +2217,19 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
           targetType: 'catalogService',
           metadata: {
             requestId,
-            managerId,
+            managerId: ecosystemManagerId,
+            requesterId,
+            requesterRole: role,
+            requesterName: requesterName || null,
+            managedBy,
             serviceName: normalizedName,
             category: normalizedCategory || null,
+            approvalStages: buildServiceRequestApprovalStages(
+              'pending',
+              role === 'warehouse' ? 'warehouse' : 'manager',
+              requesterName,
+              requesterId,
+            ),
             targetType: 'catalogServiceRequest',
           },
         });
@@ -1876,12 +2260,26 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
         `INSERT INTO catalog_services (
           service_id, name, description, category, unit_of_measure,
           base_price, duration_minutes, service_window, crew_required,
-          is_active, created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, TRUE, NOW(), NOW())`,
+          metadata, managed_by, is_active, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, 'manager', TRUE, NOW(), NOW())`,
         [
           serviceId, normalizedName, description || null, normalizedCategory || null,
           unitOfMeasure || null, basePrice || null,
           durationMinutes ?? null, serviceWindow || null, crewRequired ?? null,
+          JSON.stringify({
+            createdBy: account.cksCode || 'ADMIN',
+            createdByRole: 'admin',
+            managedBy: 'manager',
+            approvalStages: [
+              {
+                role: 'admin',
+                status: 'approved',
+                label: 'Created',
+                user: account.cksCode || 'ADMIN',
+                timestamp: new Date().toISOString(),
+              },
+            ],
+          }),
         ],
       );
 

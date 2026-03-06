@@ -72,7 +72,14 @@ import ProfileSkeleton from '../components/ProfileSkeleton';
 // Legacy ActivityModalGateway removed - use universal ModalGateway via modals.openById()
 import { useEntityActions } from '../hooks/useEntityActions';
 import { createReport as apiCreateReport, createFeedback as apiCreateFeedback, acknowledgeItem as apiAcknowledgeItem, resolveReport as apiResolveReport, createSupportTicket as apiCreateSupportTicket, fetchServicesForReports, fetchProceduresForReports, fetchOrdersForReports } from '../shared/api/hub';
-import { createCatalogProduct, getCatalogCategories, uploadCatalogImage, type CreateCatalogProductPayload } from '../shared/api/admin';
+import {
+  createCatalogProduct,
+  createCatalogService,
+  getCatalogCategories,
+  uploadCatalogImage,
+  type CreateCatalogProductPayload,
+  type CreateCatalogServicePayload,
+} from '../shared/api/admin';
 
 interface WarehouseHubProps {
   initialTab?: string;
@@ -193,6 +200,13 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
   const [productPhotoFile, setProductPhotoFile] = useState<File | null>(null);
   const [productPhotoPreview, setProductPhotoPreview] = useState<string | null>(null);
   const productFileInputRef = useRef<HTMLInputElement>(null);
+  const [showCreateService, setShowCreateService] = useState(false);
+  const [createServiceForm, setCreateServiceForm] = useState({ name: '', category: '', description: '', _newCategory: '' });
+  const [creatingService, setCreatingService] = useState(false);
+  const [serviceCategories, setServiceCategories] = useState<string[]>([]);
+  const [servicePhotoFile, setServicePhotoFile] = useState<File | null>(null);
+  const [servicePhotoPreview, setServicePhotoPreview] = useState<string | null>(null);
+  const serviceFileInputRef = useRef<HTMLInputElement>(null);
   const [overviewModal, setOverviewModal] = useState<{
     id: string;
     title: string;
@@ -220,6 +234,20 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
       cancelled = true;
     };
   }, [activeTab, getToken, showCreateProduct]);
+
+  useEffect(() => {
+    if (activeTab !== 'services' || !showCreateService) return;
+    let cancelled = false;
+    getCatalogCategories({ getToken })
+      .then((d) => {
+        if (cancelled) return;
+        setServiceCategories(d.services);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, getToken, showCreateService]);
   const { code: authCode, accessStatus, accessTier, accessSource } = useAuth();
   const { user } = useUser();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
@@ -402,6 +430,21 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
     setProductPhotoPreview(URL.createObjectURL(file));
   }, [productPhotoPreview]);
 
+  const clearServicePhoto = useCallback(() => {
+    setServicePhotoFile(null);
+    if (servicePhotoPreview) URL.revokeObjectURL(servicePhotoPreview);
+    setServicePhotoPreview(null);
+    if (serviceFileInputRef.current) serviceFileInputRef.current.value = '';
+  }, [servicePhotoPreview]);
+
+  const handleServicePhotoSelect = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (servicePhotoPreview) URL.revokeObjectURL(servicePhotoPreview);
+    setServicePhotoFile(file);
+    setServicePhotoPreview(URL.createObjectURL(file));
+  }, [servicePhotoPreview]);
+
   const handleCreateProduct = useCallback(async () => {
     if (!createProductForm.name.trim()) {
       toast.error('Product name is required');
@@ -444,11 +487,69 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
     }
   }, [createProductForm, productPhotoFile, getToken, mutate, clearProductPhoto]);
 
+  const handleCreateService = useCallback(async () => {
+    if (!createServiceForm.name.trim()) {
+      toast.error('Service name is required');
+      return;
+    }
+    const resolvedCategory = createServiceForm.category === '__new__'
+      ? (createServiceForm._newCategory.trim() || undefined)
+      : (createServiceForm.category.trim() || undefined);
+    if (!resolvedCategory) {
+      toast.error('Category is required');
+      return;
+    }
+
+    setCreatingService(true);
+    try {
+      const payload: CreateCatalogServicePayload = {
+        name: createServiceForm.name.trim(),
+        description: createServiceForm.description.trim() || undefined,
+        category: resolvedCategory,
+      };
+      const result = await createCatalogService(payload, { getToken });
+
+      if (servicePhotoFile && result.serviceId) {
+        try {
+          await uploadCatalogImage(servicePhotoFile, 'service', result.serviceId, { getToken });
+        } catch {
+          console.warn('Photo upload failed after service request approval target creation');
+        }
+      }
+      if (servicePhotoFile && !result.serviceId) {
+        toast.success('Service request submitted. Add photo after admin approval.');
+      }
+
+      if (result.status === 'pending_approval') {
+        toast.success(`Service request submitted: ${result.requestId ?? 'Pending review'}`);
+      } else {
+        toast.success(`Service created: ${result.serviceId}`);
+      }
+      setCreateServiceForm({ name: '', category: '', description: '', _newCategory: '' });
+      clearServicePhoto();
+      setShowCreateService(false);
+      await Promise.all([
+        mutate((key: unknown) => typeof key === 'string' && key.includes('/catalog'), undefined, { revalidate: true }),
+        mutateActivities(),
+      ]);
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to create service');
+    } finally {
+      setCreatingService(false);
+    }
+  }, [clearServicePhoto, createServiceForm, getToken, mutate, mutateActivities, servicePhotoFile]);
+
   useEffect(() => {
     if (activeTab !== 'inventory' || !showCreateProduct) {
       clearProductPhoto();
     }
   }, [activeTab, clearProductPhoto, showCreateProduct]);
+
+  useEffect(() => {
+    if (activeTab !== 'services' || !showCreateService) {
+      clearServicePhoto();
+    }
+  }, [activeTab, clearServicePhoto, showCreateService]);
 
   const handleSupportSubmit = useCallback(async (payload: any) => {
     const mapped = await mapSupportIssuePayload(payload);
@@ -1232,6 +1333,102 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
               {ordersErrorMessage && (
                 <div style={{ marginBottom: 12, color: '#dc2626' }}>{ordersErrorMessage}</div>
               )}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+                <Button
+                  variant="primary"
+                  roleColor="#8b5cf6"
+                  onClick={() => setShowCreateService((v) => !v)}
+                >
+                  {showCreateService ? 'Cancel' : '+ Request Service'}
+                </Button>
+              </div>
+
+              {showCreateService && (
+                <div style={{
+                  marginBottom: 16,
+                  padding: 20,
+                  background: '#fff',
+                  borderRadius: 10,
+                  border: '1px solid #e5e7eb',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                }}>
+                  <div style={{ fontSize: 15, fontWeight: 600, color: '#0f172a', marginBottom: 14 }}>Request New Service</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                    <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <span style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>Service Name *</span>
+                      <input
+                        value={createServiceForm.name}
+                        onChange={(e) => setCreateServiceForm((p) => ({ ...p, name: e.target.value }))}
+                        placeholder="e.g. Elevator Ceiling Cleaning"
+                        disabled={creatingService}
+                        style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: '8px 10px', fontSize: 13 }}
+                      />
+                    </label>
+                    <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <span style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>Category *</span>
+                      <select
+                        value={createServiceForm.category}
+                        onChange={(e) => setCreateServiceForm((p) => ({ ...p, category: e.target.value }))}
+                        disabled={creatingService}
+                        style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: '8px 10px', fontSize: 13, background: 'white' }}
+                      >
+                        <option value="">Select category</option>
+                        {serviceCategories.map((c) => <option key={c} value={c}>{c}</option>)}
+                        <option value="__new__">+ Add New Category</option>
+                      </select>
+                    </label>
+                    {createServiceForm.category === '__new__' && (
+                      <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        <span style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>New Category *</span>
+                        <input
+                          value={createServiceForm._newCategory}
+                          onChange={(e) => setCreateServiceForm((p) => ({ ...p, _newCategory: e.target.value }))}
+                          placeholder="Enter new category name"
+                          disabled={creatingService}
+                          style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: '8px 10px', fontSize: 13 }}
+                        />
+                      </label>
+                    )}
+                    <label style={{ display: 'flex', flexDirection: 'column', gap: 4, gridColumn: '1 / -1' }}>
+                      <span style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>Description</span>
+                      <textarea
+                        value={createServiceForm.description}
+                        onChange={(e) => setCreateServiceForm((p) => ({ ...p, description: e.target.value }))}
+                        placeholder="Describe the service, scope, and any requirements..."
+                        disabled={creatingService}
+                        rows={2}
+                        style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: '8px 10px', fontSize: 13, resize: 'vertical' }}
+                      />
+                    </label>
+                    <label style={{ display: 'flex', flexDirection: 'column', gap: 4, gridColumn: '1 / -1' }}>
+                      <span style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>Photo</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <input
+                          ref={serviceFileInputRef}
+                          type="file"
+                          accept="image/*"
+                          onChange={handleServicePhotoSelect}
+                          disabled={creatingService}
+                          style={{ fontSize: 13 }}
+                        />
+                        {servicePhotoPreview && (
+                          <div style={{ position: 'relative' }}>
+                            <img src={servicePhotoPreview} alt="Preview" style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 6, border: '1px solid #e2e8f0' }} />
+                            <button type="button" onClick={clearServicePhoto} style={{ position: 'absolute', top: -6, right: -6, width: 18, height: 18, borderRadius: '50%', background: '#ef4444', color: '#fff', border: 'none', fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>x</button>
+                          </div>
+                        )}
+                      </div>
+                    </label>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14, gap: 10 }}>
+                    <Button variant="secondary" onClick={() => setShowCreateService(false)} disabled={creatingService}>Cancel</Button>
+                    <Button variant="primary" roleColor="#8b5cf6" onClick={handleCreateService} disabled={creatingService}>
+                      {creatingService ? 'Submitting...' : 'Request Service'}
+                    </Button>
+                  </div>
+                </div>
+              )}
+
               <TabSection
                 tabs={[
                   { id: 'my', label: 'My Services', count: myCertifiedServices.length },
