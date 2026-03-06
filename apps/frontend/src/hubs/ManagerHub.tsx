@@ -67,10 +67,11 @@ import {
   useHubOrders,
   useHubProfile,
   useHubDashboard,
+  useHubSupportTickets,
   type HubReportItem,
   type HubOrderItem,
 } from '../shared/api/hub';
-import { createReport as apiCreateReport, createFeedback as apiCreateFeedback, acknowledgeItem as apiAcknowledgeItem, resolveReport as apiResolveReport, fetchServicesForReports, fetchProceduresForReports, fetchOrdersForReports } from '../shared/api/hub';
+import { createReport as apiCreateReport, createFeedback as apiCreateFeedback, acknowledgeItem as apiAcknowledgeItem, resolveReport as apiResolveReport, createSupportTicket as apiCreateSupportTicket, fetchServicesForReports, fetchProceduresForReports, fetchOrdersForReports } from '../shared/api/hub';
 import { useSWRConfig } from 'swr';
 import { buildEcosystemTree } from '../shared/utils/ecosystem';
 import { useHubLoading } from '../contexts/HubLoadingContext';
@@ -683,7 +684,8 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
 
   // Fetch reports data
   const { data: reportsData, isLoading: reportsLoading, mutate: mutateReports } = useHubReports(userCode);
-  const supportTickets = useMemo(() => buildSupportTickets(reportsData), [reportsData]);
+  const { data: supportData, mutate: mutateSupportTickets } = useHubSupportTickets(userCode);
+  const supportTickets = useMemo(() => buildSupportTickets(supportData), [supportData]);
   const { data: newsItems = [] } = useNewsFeed();
   const newsPreviewItems = useMemo(
     () =>
@@ -1148,22 +1150,9 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
 
   const handleSupportSubmit = useCallback(async (payload: any) => {
     const mapped = await mapSupportIssuePayload(payload);
-    if (mapped.type === 'report') {
-      await apiCreateReport({
-        title: mapped.title,
-        description: mapped.description,
-        category: mapped.category,
-        priority: mapped.priority,
-      });
-    } else {
-      await apiCreateFeedback({
-        title: mapped.title,
-        message: mapped.description,
-        category: mapped.category,
-      });
-    }
-    await mutateReports();
-  }, [mutateReports]);
+    await apiCreateSupportTicket(mapped);
+    await mutateSupportTickets();
+  }, [mutateSupportTickets]);
 
   const clearServicePhoto = useCallback(() => {
     setServicePhotoFile(null);
@@ -1598,6 +1587,7 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
                 primaryColor={MANAGER_PRIMARY_COLOR}
                 tickets={supportTickets}
                 onSubmitTicket={handleSupportSubmit}
+                onTicketClick={(ticket) => modals.openById(ticket.ticketId)}
               />
             </PageWrapper>
           ) : activeTab === 'reports' ? (

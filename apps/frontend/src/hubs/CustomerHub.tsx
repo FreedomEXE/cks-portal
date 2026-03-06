@@ -36,7 +36,7 @@ import { useClerk, useUser } from '@clerk/clerk-react';
 import { useSWRConfig } from 'swr';
 import { requestPasswordReset } from '../shared/api/account';
 import { useNewsFeed } from '../shared/api/news';
-import { createReport as apiCreateReport, createFeedback as apiCreateFeedback, acknowledgeItem as apiAcknowledgeItem, resolveReport as apiResolveReport, fetchServicesForReports, fetchProceduresForReports, fetchOrdersForReports } from '../shared/api/hub';
+import { createReport as apiCreateReport, createFeedback as apiCreateFeedback, acknowledgeItem as apiAcknowledgeItem, resolveReport as apiResolveReport, createSupportTicket as apiCreateSupportTicket, fetchServicesForReports, fetchProceduresForReports, fetchOrdersForReports } from '../shared/api/hub';
 import { useFormattedActivities } from '../shared/activity/useFormattedActivities';
 import { ActivityFeed } from '../components/ActivityFeed';
 import ProfileSkeleton from '../components/ProfileSkeleton';
@@ -50,6 +50,7 @@ import {
   useHubOrders,
   useHubProfile,
   useHubReports,
+  useHubSupportTickets,
   useHubRoleScope,
   type HubOrderItem,
 } from '../shared/api/hub';
@@ -222,9 +223,10 @@ function CustomerHubContent({ initialTab = 'dashboard' }: CustomerHubProps) {
     isLoading: reportsLoading,
     mutate: mutateReports,
   } = useHubReports(normalizedCode);
+  const { data: supportData, mutate: mutateSupportTickets } = useHubSupportTickets(normalizedCode);
 
   const userCode = useMemo(() => resolvedUserCode(profile?.cksCode, normalizedCode), [profile?.cksCode, normalizedCode]);
-  const supportTickets = useMemo(() => buildSupportTickets(reportsData), [reportsData]);
+  const supportTickets = useMemo(() => buildSupportTickets(supportData), [supportData]);
   
 
   // Access modal context
@@ -404,25 +406,10 @@ function CustomerHubContent({ initialTab = 'dashboard' }: CustomerHubProps) {
   }, [user?.id]);
 
   const handleSupportSubmit = useCallback(async (payload: any) => {
-    const mapped = mapSupportIssuePayload(payload);
-    if (mapped.type === 'report') {
-      await apiCreateReport({
-        title: mapped.title,
-        description: mapped.description,
-        category: mapped.category,
-        priority: mapped.priority,
-        customerId: normalizedCode ?? undefined,
-      });
-    } else {
-      await apiCreateFeedback({
-        title: mapped.title,
-        message: mapped.description,
-        category: mapped.category,
-        customerId: normalizedCode ?? undefined,
-      });
-    }
-    await mutateReports();
-  }, [mutateReports, normalizedCode]);
+    const mapped = await mapSupportIssuePayload(payload);
+    await apiCreateSupportTicket(mapped);
+    await mutateSupportTickets();
+  }, [mutateSupportTickets]);
 
   const customerScope = scopeData?.role === 'customer' ? scopeData : null;
 
@@ -965,6 +952,7 @@ function CustomerHubContent({ initialTab = 'dashboard' }: CustomerHubProps) {
                 primaryColor="#eab308"
                 tickets={supportTickets}
                 onSubmitTicket={handleSupportSubmit}
+                onTicketClick={(ticket) => modals.openById(ticket.ticketId)}
               />
             </PageWrapper>
           ) : (

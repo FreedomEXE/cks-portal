@@ -82,7 +82,6 @@ function jsonLiteral(obj) {
 
 const PRODUCT_CATEGORY_TAGS = {
   'garbage-bags': ['waste', 'liners', 'janitorial'],
-  'garbage-bags-clear': ['waste', 'liners', 'clear'],
   'cleaning-solutions': ['chemicals', 'cleaner', 'janitorial'],
   'cleaning-equipment': ['equipment', 'tools', 'janitorial'],
   'roll-towels': ['paper', 'restroom', 'dispensers'],
@@ -96,6 +95,7 @@ const PRODUCT_CATEGORY_TAGS = {
 };
 
 const SERVICE_GROUP_TAGS = {
+  daily: ['daily', 'interior'],
   'ceilings-pipes-and-stairs': ['high-dusting', 'interior'],
   'walls': ['interior', 'surface'],
   'window': ['glass', 'interior'],
@@ -118,7 +118,7 @@ const SERVICE_GROUP_TAGS = {
 
 const PRODUCT_CATEGORY_LABELS = new Map([
   ['GARBAGE BAGS', 'garbage-bags'],
-  ['GARBAGE BAGS CLEAR', 'garbage-bags-clear'],
+  ['GARBAGE BAGS CLEAR', 'garbage-bags'],
   ['CHLEANING SOLUTION (LIQUIDS)', 'cleaning-solutions'],
   ['CLEANING SOLUTION (LIQUIDS)', 'cleaning-solutions'],
   ['CLEANING EQUIPMENT', 'cleaning-equipment'],

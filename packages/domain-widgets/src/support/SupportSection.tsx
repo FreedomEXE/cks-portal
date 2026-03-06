@@ -22,6 +22,7 @@ export interface SupportTicketFormPayload {
   subject: string;
   description: string;
   stepsToReproduce: string;
+  screenshotFile?: File | null;
 }
 
 interface SupportSectionProps {
@@ -46,7 +47,8 @@ const SupportSection: React.FC<SupportSectionProps> = ({
     priority: 'Medium',
     subject: '',
     description: '',
-    stepsToReproduce: ''
+    stepsToReproduce: '',
+    screenshotFile: null as File | null
   });
   const [submitState, setSubmitState] = useState<{
     status: 'idle' | 'submitting' | 'success' | 'error';
@@ -244,7 +246,8 @@ const SupportSection: React.FC<SupportSectionProps> = ({
         priority: 'Medium',
         subject: '',
         description: '',
-        stepsToReproduce: ''
+        stepsToReproduce: '',
+        screenshotFile: null
       });
     } catch (error: any) {
       const message = error?.message || 'Failed to submit support ticket.';
@@ -258,7 +261,8 @@ const SupportSection: React.FC<SupportSectionProps> = ({
       priority: 'Medium',
       subject: '',
       description: '',
-      stepsToReproduce: ''
+      stepsToReproduce: '',
+      screenshotFile: null
     });
   };
 
@@ -527,6 +531,42 @@ const SupportSection: React.FC<SupportSectionProps> = ({
                 fontFamily: 'inherit'
               }}
             />
+          </div>
+        </div>
+
+        <div>
+          <label style={{
+            display: 'block',
+            fontSize: '14px',
+            fontWeight: 500,
+            color: '#374151',
+            marginBottom: '6px'
+          }}>
+            Screenshot (Optional)
+          </label>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => {
+              const file = e.target.files?.[0] ?? null;
+              setTicketForm({ ...ticketForm, screenshotFile: file });
+            }}
+            style={{
+              width: '100%',
+              padding: '10px 12px',
+              border: '1px solid #e5e7eb',
+              borderRadius: '6px',
+              fontSize: '14px',
+              backgroundColor: '#ffffff'
+            }}
+          />
+          {ticketForm.screenshotFile ? (
+            <div style={{ marginTop: 8, fontSize: '12px', color: '#6b7280' }}>
+              Attached: {ticketForm.screenshotFile.name}
+            </div>
+          ) : null}
+          <div style={{ marginTop: 4, fontSize: '12px', color: '#6b7280' }}>
+            PNG, JPG, or WebP. Max 5 MB.
           </div>
         </div>
 

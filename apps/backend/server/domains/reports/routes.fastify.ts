@@ -6,8 +6,54 @@ import { createReport, createFeedback, updateReportStatus, updateFeedbackStatus,
 import type { HubRole } from '../profile/types';
 import { query } from '../../db/connection';
 import { hasActionAccess } from '../access/service';
+import { uploadImageToCloudinary } from '../../shared/cloudinary';
 
 export async function reportsRoutes(fastify: FastifyInstance) {
+  // Upload screenshot for support tickets
+  fastify.post('/support/upload-screenshot', async (request, reply) => {
+    const account = await requireActiveRole(request, reply);
+    if (!account) {
+      return;
+    }
+
+    const data = await request.file();
+    if (!data) {
+      reply.code(400).send({ error: 'No file uploaded' });
+      return;
+    }
+
+    const mime = data.mimetype ?? '';
+    if (!mime.startsWith('image/')) {
+      reply.code(400).send({ error: 'File must be an image (png, jpg, webp, etc.)' });
+      return;
+    }
+
+    try {
+      const chunks: Buffer[] = [];
+      for await (const chunk of data.file) {
+        chunks.push(chunk);
+      }
+      const buffer = Buffer.concat(chunks);
+
+      const normalizedCode = (account.cksCode ?? 'unknown').replace(/[^A-Za-z0-9_-]/g, '_');
+      const result = await uploadImageToCloudinary(buffer, {
+        folder: 'cks-support/screenshots',
+        publicId: `${normalizedCode}-${Date.now()}`,
+      });
+
+      reply.send({
+        success: true,
+        imageUrl: result.secure_url,
+      });
+    } catch (error) {
+      request.log.error({ err: error, userCode: account.cksCode ?? null }, 'support screenshot upload failed');
+      reply.code(500).send({
+        error: 'Failed to upload screenshot',
+        details: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
   // Get single report/feedback by ID (on-demand fetching for modals)
   // Session-based auth pattern (matches how orders work)
   fastify.get('/reports/:reportId/details', async (request, reply) => {
@@ -281,10 +327,11 @@ export async function reportsRoutes(fastify: FastifyInstance) {
     if (!account) return;
 
     const role = account.role.toLowerCase();
+    const isAdmin = role === 'admin';
 
-    // Only managers and warehouses can resolve reports
-    if (role !== 'manager' && role !== 'warehouse') {
-      reply.code(403).send({ error: 'Only managers and warehouses can resolve reports' });
+    // Admin can resolve any report. Non-admin resolution remains scoped to manager/warehouse.
+    if (!isAdmin && role !== 'manager' && role !== 'warehouse') {
+      reply.code(403).send({ error: 'Only admin, managers, and warehouses can resolve reports' });
       return;
     }
 
@@ -307,45 +354,49 @@ export async function reportsRoutes(fastify: FastifyInstance) {
     const relatedEntityId = reportCheck.rows[0]?.related_entity_id as string | null;
     const createdById = reportCheck.rows[0]?.created_by_id as string | null;
 
-    if (reportCategory === 'order') {
-      if (account.role.toLowerCase() !== 'warehouse') {
-        reply.code(403).send({ error: 'Only warehouse can resolve order reports' });
-        return;
-      }
-    } else if (reportCategory === 'service') {
-      // Determine if the service is warehouse-managed by checking services.managed_by
-      let managedBy: string | null = null;
-      if (relatedEntityId) {
-        const svc = await query<{ managed_by: string | null }>('SELECT managed_by FROM services WHERE UPPER(service_id) = UPPER($1)', [relatedEntityId]);
-        managedBy = svc.rows[0]?.managed_by ?? null;
-      }
-      const isWarehouseManaged = !!managedBy && (managedBy.toLowerCase() === 'warehouse' || managedBy.toUpperCase().startsWith('WHS-'));
-      if (isWarehouseManaged) {
+    if (!isAdmin) {
+      if (reportCategory === 'order') {
         if (account.role.toLowerCase() !== 'warehouse') {
-          reply.code(403).send({ error: 'Only warehouse can resolve warehouse-managed service reports' });
+          reply.code(403).send({ error: 'Only warehouse can resolve order reports' });
           return;
         }
-      } else {
+      } else if (reportCategory === 'service') {
+        // Determine if the service is warehouse-managed by checking services.managed_by
+        let managedBy: string | null = null;
+        if (relatedEntityId) {
+          const svc = await query<{ managed_by: string | null }>('SELECT managed_by FROM services WHERE UPPER(service_id) = UPPER($1)', [relatedEntityId]);
+          managedBy = svc.rows[0]?.managed_by ?? null;
+        }
+        const isWarehouseManaged = !!managedBy && (managedBy.toLowerCase() === 'warehouse' || managedBy.toUpperCase().startsWith('WHS-'));
+        if (isWarehouseManaged) {
+          if (account.role.toLowerCase() !== 'warehouse') {
+            reply.code(403).send({ error: 'Only warehouse can resolve warehouse-managed service reports' });
+            return;
+          }
+        } else {
+          if (account.role.toLowerCase() !== 'manager') {
+            reply.code(403).send({ error: 'Only manager can resolve manager-managed service reports' });
+            return;
+          }
+        }
+      } else if (reportCategory === 'procedure') {
         if (account.role.toLowerCase() !== 'manager') {
-          reply.code(403).send({ error: 'Only manager can resolve manager-managed service reports' });
+          reply.code(403).send({ error: 'Only manager can resolve procedure reports' });
           return;
         }
-      }
-    } else if (reportCategory === 'procedure') {
-      if (account.role.toLowerCase() !== 'manager') {
-        reply.code(403).send({ error: 'Only manager can resolve procedure reports' });
-        return;
       }
     }
 
-    // Enforce "everyone acknowledged" before resolution
-    const { total, acknowledged } = await getReportAcknowledgmentStatus(params.data.id);
-    if (total > 0 && acknowledged < total) {
-      reply.code(400).send({
-        error: 'All stakeholders must acknowledge before this report can be resolved',
-        detail: { acknowledged, total }
-      });
-      return;
+    // Admin can force resolution. Non-admins require stakeholder acknowledgment first.
+    if (!isAdmin) {
+      const { total, acknowledged } = await getReportAcknowledgmentStatus(params.data.id);
+      if (total > 0 && acknowledged < total) {
+        reply.code(400).send({
+          error: 'All stakeholders must acknowledge before this report can be resolved',
+          detail: { acknowledged, total }
+        });
+        return;
+      }
     }
 
     const bodySchema = z.object({

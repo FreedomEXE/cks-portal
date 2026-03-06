@@ -10,6 +10,9 @@ export async function initializeSequences() {
     await query(`CREATE SEQUENCE IF NOT EXISTS order_service_sequence AS BIGINT START 1`, []);
     console.log('Created/verified order_service_sequence');
 
+    await query(`CREATE SEQUENCE IF NOT EXISTS support_ticket_id_seq AS BIGINT START 1`, []);
+    console.log('Created/verified support_ticket_id_seq');
+
     await fixOrdersTable();
 
     await query(`
@@ -195,6 +198,41 @@ export async function initializeSequences() {
       )
     `, []);
     console.log('Created/verified user_preferences table');
+
+    await query(`
+      CREATE TABLE IF NOT EXISTS support_tickets (
+        ticket_id VARCHAR(64) PRIMARY KEY,
+        issue_type TEXT NOT NULL,
+        priority TEXT NOT NULL DEFAULT 'MEDIUM' CHECK (priority IN ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL')),
+        subject TEXT NOT NULL,
+        description TEXT NOT NULL,
+        steps_to_reproduce TEXT,
+        screenshot_url TEXT,
+        status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'in_progress', 'resolved', 'closed')),
+        created_by_role TEXT NOT NULL,
+        created_by_id VARCHAR(64) NOT NULL,
+        cks_manager VARCHAR(64),
+        resolution_notes TEXT,
+        action_taken TEXT,
+        resolved_by_id VARCHAR(64),
+        resolved_at TIMESTAMPTZ,
+        archived_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `, []);
+    console.log('Created/verified support_tickets table');
+
+    await query(`
+      CREATE INDEX IF NOT EXISTS idx_support_tickets_manager_status
+      ON support_tickets (cks_manager, status, created_at DESC)
+      WHERE archived_at IS NULL
+    `, []);
+    await query(`
+      CREATE INDEX IF NOT EXISTS idx_support_tickets_creator
+      ON support_tickets (created_by_id, created_at DESC)
+      WHERE archived_at IS NULL
+    `, []);
 
     await seedCatalogData();
 

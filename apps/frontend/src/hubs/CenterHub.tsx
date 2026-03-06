@@ -49,10 +49,11 @@ import {
   useHubOrders,
   useHubProfile,
   useHubReports,
+  useHubSupportTickets,
   useHubRoleScope,
   type HubOrderItem,
 } from '../shared/api/hub';
-import { createReport as apiCreateReport, createFeedback as apiCreateFeedback, acknowledgeItem as apiAcknowledgeItem, resolveReport as apiResolveReport, fetchServicesForReports, fetchProceduresForReports, fetchOrdersForReports } from '../shared/api/hub';
+import { createReport as apiCreateReport, createFeedback as apiCreateFeedback, acknowledgeItem as apiAcknowledgeItem, resolveReport as apiResolveReport, createSupportTicket as apiCreateSupportTicket, fetchServicesForReports, fetchProceduresForReports, fetchOrdersForReports } from '../shared/api/hub';
 
 import { buildEcosystemTree, DEFAULT_ROLE_COLOR_MAP } from '../shared/utils/ecosystem';
 import { useHubLoading } from '../contexts/HubLoadingContext';
@@ -228,7 +229,8 @@ function CenterHubContent({ initialTab = 'dashboard' }: CenterHubProps) {
     error: ordersError,
   } = useHubOrders(normalizedCode);
   const { data: reportsData, isLoading: reportsLoading, mutate: mutateReports } = useHubReports(normalizedCode);
-  const supportTickets = useMemo(() => buildSupportTickets(reportsData), [reportsData]);
+  const { data: supportData, mutate: mutateSupportTickets } = useHubSupportTickets(normalizedCode);
+  const supportTickets = useMemo(() => buildSupportTickets(supportData), [supportData]);
   // Resolved user code for preferences and identity
   const userCode = useMemo(() => profile?.cksCode ?? normalizedCode, [profile?.cksCode, normalizedCode]);
 
@@ -390,25 +392,10 @@ function CenterHubContent({ initialTab = 'dashboard' }: CenterHubProps) {
   }, [user?.id]);
 
   const handleSupportSubmit = useCallback(async (payload: any) => {
-    const mapped = mapSupportIssuePayload(payload);
-    if (mapped.type === 'report') {
-      await apiCreateReport({
-        title: mapped.title,
-        description: mapped.description,
-        category: mapped.category,
-        priority: mapped.priority,
-        centerId: normalizedCode ?? undefined,
-      });
-    } else {
-      await apiCreateFeedback({
-        title: mapped.title,
-        message: mapped.description,
-        category: mapped.category,
-        centerId: normalizedCode ?? undefined,
-      });
-    }
-    await mutateReports();
-  }, [mutateReports, normalizedCode]);
+    const mapped = await mapSupportIssuePayload(payload);
+    await apiCreateSupportTicket(mapped);
+    await mutateSupportTickets();
+  }, [mutateSupportTickets]);
 
   const centerScope = scopeData?.role === 'center' ? scopeData : null;
 
@@ -967,6 +954,7 @@ function CenterHubContent({ initialTab = 'dashboard' }: CenterHubProps) {
                 primaryColor="#f97316"
                 tickets={supportTickets}
                 onSubmitTicket={handleSupportSubmit}
+                onTicketClick={(ticket) => modals.openById(ticket.ticketId)}
               />
             </PageWrapper>
           ) : (

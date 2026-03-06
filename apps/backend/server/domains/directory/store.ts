@@ -297,6 +297,8 @@ const activityTypeCategory: Record<string, string> = {
   order_failed: 'warning',
   service_cancelled: 'warning',
   support_ticket_updated: 'warning',
+  support_ticket_created: 'warning',
+  support_ticket_resolved: 'success',
 
   // Update activities
   order_updated: 'info',

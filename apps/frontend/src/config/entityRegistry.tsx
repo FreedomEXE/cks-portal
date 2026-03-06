@@ -886,11 +886,20 @@ const reportAdapter: EntityAdapter = {
 
     const reportType = entityData?.type || 'report';
     const reportLabel = reportType === 'feedback' ? 'Feedback' : 'Report';
+    const isSupportTicket = entityData?.reportCategory === 'support' || entityData?.metadata?.supportTicket === true;
 
     // Admin actions
     if (role === 'admin') {
       if (state === 'active') {
-        if (can(reportType, 'archive', role, { state, entityData })) {
+        if (reportType === 'report' && entityData?.status === 'open') {
+          descriptors.push({
+            key: 'resolve',
+            label: 'Resolve',
+            variant: 'primary',
+            closeOnSuccess: false,
+          });
+        }
+        if (!isSupportTicket && can(reportType, 'archive', role, { state, entityData })) {
           descriptors.push({
             key: 'archive',
             label: `Archive ${reportLabel}`,
@@ -900,7 +909,7 @@ const reportAdapter: EntityAdapter = {
           });
         }
       } else if (state === 'archived') {
-        if (can(reportType, 'restore', role, { state, entityData })) {
+        if (!isSupportTicket && can(reportType, 'restore', role, { state, entityData })) {
           descriptors.push({
             key: 'restore',
             label: `Restore ${reportLabel}`,
@@ -908,7 +917,7 @@ const reportAdapter: EntityAdapter = {
             closeOnSuccess: true,
           });
         }
-        if (can(reportType, 'delete', role, { state, entityData })) {
+        if (!isSupportTicket && can(reportType, 'delete', role, { state, entityData })) {
           descriptors.push({
             key: 'delete',
             label: `Permanently Delete ${reportLabel}`,

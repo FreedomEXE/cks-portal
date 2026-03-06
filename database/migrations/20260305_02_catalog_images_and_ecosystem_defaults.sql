@@ -13,10 +13,6 @@
 UPDATE catalog_products SET image_url = 'https://images.unsplash.com/photo-1532996122724-e3c354a0b15b?w=640&h=480&fit=crop&auto=format'
 WHERE category = 'garbage-bags' AND (image_url IS NULL OR image_url = '');
 
--- garbage-bags-clear
-UPDATE catalog_products SET image_url = 'https://images.unsplash.com/photo-1618477461853-cf6ed80faba5?w=640&h=480&fit=crop&auto=format'
-WHERE category = 'garbage-bags-clear' AND (image_url IS NULL OR image_url = '');
-
 -- cleaning-solutions (chemicals, liquid cleaners)
 UPDATE catalog_products SET image_url = 'https://images.unsplash.com/photo-1585421514738-01798e348b17?w=640&h=480&fit=crop&auto=format'
 WHERE category = 'cleaning-solutions' AND (image_url IS NULL OR image_url = '');
@@ -61,6 +57,10 @@ WHERE category = 'hygiene-products' AND (image_url IS NULL OR image_url = '');
 -- ============================================================
 -- 2. SERVICE IMAGE URLs (by category)
 -- ============================================================
+
+-- daily
+UPDATE catalog_services SET image_url = 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=640&h=480&fit=crop&auto=format'
+WHERE category = 'daily' AND (image_url IS NULL OR image_url = '');
 
 -- ceilings-pipes-and-stairs (high dusting, cobweb removal)
 UPDATE catalog_services SET image_url = 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=640&h=480&fit=crop&auto=format'

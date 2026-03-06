@@ -129,6 +129,7 @@ const activityTypeCategory: Record<string, string> = {
   crew_unassigned_from_service: 'warning',
   catalog_service_decertified: 'warning',
   support_ticket_updated: 'warning',
+  support_ticket_created: 'warning',
 
   // Update activities
   order_updated: 'info',
@@ -136,6 +137,7 @@ const activityTypeCategory: Record<string, string> = {
   profile_updated: 'info',
   report_acknowledged: 'info',
   feedback_acknowledged: 'info',
+  support_ticket_resolved: 'success',
   product_inventory_adjusted: 'info',
 };
 

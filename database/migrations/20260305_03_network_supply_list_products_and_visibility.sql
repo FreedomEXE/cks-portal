@@ -63,7 +63,7 @@ VALUES
   -- GARBAGE BAGS (2 items from spreadsheet)
   ('MGR-001', 'product', 'PRD-001'),  -- 22X24 Black Garbage Bags Regular
   ('MGR-001', 'product', 'PRD-006'),  -- 35X47 Black Garbage Bags Strong
-  -- GARBAGE BAGS CLEAR (2 items)
+  -- GARBAGE BAGS (clear variants, 2 items)
   ('MGR-001', 'product', 'PRD-012'),  -- 22X24 Clear Garbage Bags Regular
   ('MGR-001', 'product', 'PRD-015'),  -- 35X47 Clear Garbage Bags Strong
   -- CHEMICALS (14 items)

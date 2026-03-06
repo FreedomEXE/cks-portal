@@ -169,6 +169,30 @@ export interface HubReportsResponse {
   feedback: HubReportItem[];
 }
 
+export interface HubSupportTicketItem {
+  id: string;
+  issueType: string;
+  priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  subject: string;
+  description: string;
+  stepsToReproduce: string | null;
+  screenshotUrl: string | null;
+  status: 'open' | 'in_progress' | 'resolved' | 'closed';
+  submittedBy: string;
+  submittedDate: string;
+  updatedDate: string;
+  resolvedBy: string | null;
+  resolvedAt: string | null;
+  resolutionNotes: string | null;
+  actionTaken: string | null;
+}
+
+export interface HubSupportTicketsResponse {
+  role: string;
+  cksCode: string;
+  tickets: HubSupportTicketItem[];
+}
+
 export interface HubInventoryItem {
   productId: string;
   name: string;
@@ -592,6 +616,22 @@ export async function fetchHubReports(cksCode: string, init?: ApiFetchInit) {
   return response.data;
 }
 
+export function useHubSupportTickets(cksCode?: string | null) {
+  const key = sectionPath('support', cksCode);
+  const result = useHubSWR<HubSupportTicketsResponse>(key);
+  return {
+    data: result.data ?? null,
+    isLoading: result.isLoading,
+    error: result.error,
+    mutate: result.mutate,
+  };
+}
+
+export async function fetchHubSupportTickets(cksCode: string, init?: ApiFetchInit) {
+  const response = await apiFetch<ApiResponse<HubSupportTicketsResponse>>(`/hub/support/${encodeURIComponent(cksCode)}`, init);
+  return response.data;
+}
+
 // Reports & Feedback actions
 function normalizeReportType(category: string): string {
   const map: Record<string, string> = {
@@ -719,13 +759,40 @@ export async function createFeedback(payload: {
   await apiFetch<ApiResponse<{ id: string }>>('/feedback', { method: 'POST', body: JSON.stringify(body) });
 }
 
+export async function createSupportTicket(payload: {
+  issueType: string;
+  priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  subject: string;
+  description: string;
+  stepsToReproduce?: string;
+  screenshotUrl?: string;
+}) {
+  const body = {
+    issueType: payload.issueType,
+    priority: payload.priority,
+    subject: payload.subject,
+    description: payload.description,
+    ...(payload.stepsToReproduce ? { stepsToReproduce: payload.stepsToReproduce } : {}),
+    ...(payload.screenshotUrl ? { screenshotUrl: payload.screenshotUrl } : {}),
+  };
+  const response = await apiFetch<ApiResponse<{ id: string }>>('/support/tickets', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+  return response.data;
+}
+
 export async function acknowledgeItem(id: string, type: 'report' | 'feedback') {
   const path = type === 'report' ? `/reports/${encodeURIComponent(id)}/acknowledge` : `/feedback/${encodeURIComponent(id)}/acknowledge`;
   await apiFetch<ApiResponse<{ id: string }>>(path, { method: 'POST' });
 }
 
 export async function resolveReport(id: string, details?: { actionTaken?: string; notes?: string }) {
-  await apiFetch<ApiResponse<{ id: string }>>(`/reports/${encodeURIComponent(id)}/resolve`, {
+  const isSupportTicket = id.toUpperCase().includes('-TKT-');
+  const path = isSupportTicket
+    ? `/support/tickets/${encodeURIComponent(id)}/resolve`
+    : `/reports/${encodeURIComponent(id)}/resolve`;
+  await apiFetch<ApiResponse<{ id: string }>>(path, {
     method: 'POST',
     body: JSON.stringify({
       resolution_notes: details?.notes,
@@ -748,6 +815,16 @@ export async function fetchOrdersForReports() {
 export async function fetchProceduresForReports() {
   const response = await apiFetch<ApiResponse<any[]>>('/reports/entities/procedures');
   return response.data || [];
+}
+
+export async function uploadSupportScreenshot(file: File): Promise<{ success: boolean; imageUrl: string }> {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  return apiFetch<{ success: boolean; imageUrl: string }>('/support/upload-screenshot', {
+    method: 'POST',
+    body: formData,
+  });
 }
 
 export function useHubInventory(cksCode?: string | null) {

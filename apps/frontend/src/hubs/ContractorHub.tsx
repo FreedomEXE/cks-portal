@@ -32,7 +32,7 @@ import { Button, DataTable, PageHeader, PageWrapper, Scrollbar, TabSection } fro
 import { useModals } from '../contexts';
 import { useTheme as useAppTheme } from '../contexts/ThemeContext';
 import { useSWRConfig } from 'swr';
-import { createReport as apiCreateReport, createFeedback as apiCreateFeedback, acknowledgeItem as apiAcknowledgeItem, resolveReport as apiResolveReport, fetchServicesForReports, fetchProceduresForReports, fetchOrdersForReports } from '../shared/api/hub';
+import { createReport as apiCreateReport, createFeedback as apiCreateFeedback, acknowledgeItem as apiAcknowledgeItem, resolveReport as apiResolveReport, createSupportTicket as apiCreateSupportTicket, fetchServicesForReports, fetchProceduresForReports, fetchOrdersForReports } from '../shared/api/hub';
 import { useAuth } from '@cks/auth';
 import { useClerk, useUser } from '@clerk/clerk-react';
 import { useFormattedActivities } from '../shared/activity/useFormattedActivities';
@@ -50,6 +50,7 @@ import {
   useHubOrders,
   useHubProfile,
   useHubReports,
+  useHubSupportTickets,
   useHubRoleScope,
   type HubOrderItem,
 } from '../shared/api/hub';
@@ -273,7 +274,8 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
     data: reportsData,
     isLoading: reportsLoading,
     mutate: mutateReports } = useHubReports(normalizedCode);
-  const supportTickets = useMemo(() => buildSupportTickets(reportsData), [reportsData]);
+  const { data: supportData, mutate: mutateSupportTickets } = useHubSupportTickets(normalizedCode);
+  const supportTickets = useMemo(() => buildSupportTickets(supportData), [supportData]);
 
   // Access modal context
   const modals = useModals();
@@ -319,23 +321,10 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
   }, [user?.id]);
 
   const handleSupportSubmit = useCallback(async (payload: any) => {
-    const mapped = mapSupportIssuePayload(payload);
-    if (mapped.type === 'report') {
-      await apiCreateReport({
-        title: mapped.title,
-        description: mapped.description,
-        category: mapped.category,
-        priority: mapped.priority,
-      });
-    } else {
-      await apiCreateFeedback({
-        title: mapped.title,
-        message: mapped.description,
-        category: mapped.category,
-      });
-    }
-    await mutateReports();
-  }, [mutateReports]);
+    const mapped = await mapSupportIssuePayload(payload);
+    await apiCreateSupportTicket(mapped);
+    await mutateSupportTickets();
+  }, [mutateSupportTickets]);
 
   
   const userCode = useMemo(() => resolvedUserCode(profile?.cksCode, normalizedCode), [profile?.cksCode, normalizedCode]);
@@ -1113,6 +1102,7 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
                 primaryColor="#10b981"
                 tickets={supportTickets}
                 onSubmitTicket={handleSupportSubmit}
+                onTicketClick={(ticket) => modals.openById(ticket.ticketId)}
               />
             </PageWrapper>
           ) : (

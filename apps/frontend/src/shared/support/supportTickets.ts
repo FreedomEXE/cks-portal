@@ -1,4 +1,4 @@
-import type { HubReportsResponse, HubReportItem } from '../api/hub';
+import { uploadSupportScreenshot, type HubSupportTicketsResponse } from '../api/hub';
 import type { SupportTicket, SupportTicketFormPayload } from '@cks/domain-widgets';
 
 type TicketStatus = 'Open' | 'In Progress' | 'Resolved';
@@ -25,69 +25,56 @@ function mapSupportStatus(status?: string | null): TicketStatus {
   return 'Open';
 }
 
-function mapIssueType(item: HubReportItem): string {
-  const category = item.category?.trim();
-  if (category) {
-    return category;
-  }
-  return item.type === 'feedback' ? 'Feature Request' : 'Support Request';
-}
-
-export function buildSupportTickets(reportsData?: HubReportsResponse | null): SupportTicket[] {
-  if (!reportsData) {
+export function buildSupportTickets(supportData?: HubSupportTicketsResponse | null): SupportTicket[] {
+  if (!supportData) {
     return [];
   }
 
-  const items = [...(reportsData.reports ?? []), ...(reportsData.feedback ?? [])];
-  return items.map((item) => ({
+  return (supportData.tickets ?? []).map((item) => ({
     ticketId: item.id,
-    subject: item.title || 'Untitled',
-    issueType: mapIssueType(item),
-    priority: 'Medium',
+    subject: item.subject || 'Untitled',
+    issueType: item.issueType || 'Support Request',
+    priority: (item.priority || 'MEDIUM').charAt(0) + (item.priority || 'MEDIUM').slice(1).toLowerCase(),
     status: mapSupportStatus(item.status),
     dateCreated: formatSupportDate(item.submittedDate),
-    lastUpdated: formatSupportDate(item.submittedDate),
+    lastUpdated: formatSupportDate(item.updatedDate || item.submittedDate),
   }));
 }
 
-export function mapSupportIssuePayload(payload: SupportTicketFormPayload): {
-  type: 'report' | 'feedback';
-  category: string;
-  title: string;
+const MAX_SUPPORT_SCREENSHOT_BYTES = 5 * 1024 * 1024;
+
+export async function mapSupportIssuePayload(payload: SupportTicketFormPayload): Promise<{
+  issueType: string;
+  priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  subject: string;
   description: string;
-  priority?: 'LOW' | 'MEDIUM' | 'HIGH';
-} {
-  const issueType = payload.issueType.trim();
-  const description = payload.stepsToReproduce
-    ? `${payload.description}\n\nSteps to reproduce:\n${payload.stepsToReproduce}`
-    : payload.description;
-
-  if (issueType === 'Feature Request') {
-    return {
-      type: 'feedback',
-      category: 'System Enhancement',
-      title: payload.subject.trim(),
-      description,
-    };
-  }
-
-  let category = 'Other';
-  if (issueType === 'Bug Report' || issueType === 'Technical Support') {
-    category = 'System Bug';
-  } else if (issueType === 'Account Issue') {
-    category = 'Other';
-  } else if (issueType === 'General Question') {
-    category = 'Other';
+  stepsToReproduce?: string;
+  screenshotUrl?: string;
+}> {
+  let screenshotUrl = '';
+  const screenshotFile = payload.screenshotFile ?? null;
+  if (screenshotFile) {
+    if (screenshotFile.size > MAX_SUPPORT_SCREENSHOT_BYTES) {
+      throw new Error('Screenshot must be 5 MB or smaller.');
+    }
+    const upload = await uploadSupportScreenshot(screenshotFile);
+    screenshotUrl = upload.imageUrl ?? '';
   }
 
   const priorityValue = payload.priority.toUpperCase();
-  const priority = priorityValue === 'LOW' || priorityValue === 'HIGH' ? priorityValue : 'MEDIUM';
+  const priority =
+    priorityValue === 'LOW' || priorityValue === 'HIGH' || priorityValue === 'CRITICAL'
+      ? priorityValue
+      : 'MEDIUM';
 
-  return {
-    type: 'report',
-    category,
-    title: payload.subject.trim(),
-    description,
+  const mapped = {
+    issueType: payload.issueType.trim() || 'General Question',
     priority,
+    subject: payload.subject.trim(),
+    description: payload.description.trim(),
+    stepsToReproduce: payload.stepsToReproduce.trim() || undefined,
+    screenshotUrl: screenshotUrl.trim() || undefined,
   };
+
+  return mapped;
 }

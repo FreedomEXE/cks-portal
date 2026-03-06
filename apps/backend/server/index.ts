@@ -38,6 +38,7 @@ import { resolveAccessStatus } from "./domains/access/service";
 import { registerMemosRoutes } from "./domains/memos/routes.fastify";
 import { registerNewsRoutes } from "./domains/news/routes.fastify";
 import { registerPreferencesRoutes } from "./domains/preferences/routes.fastify";
+import { registerSupportRoutes } from "./domains/support/routes.fastify";
 import { initializeSequences } from "./db/init-sequences";
 
 type BootstrapResponse = {
@@ -298,6 +299,7 @@ export async function buildServer() {
   await registerMemosRoutes(server);
   await registerNewsRoutes(server);
   registerPreferencesRoutes(server);
+  await registerSupportRoutes(server);
   await server.register(reportsRoutes, { prefix: '/api' });
   await server.register(entityRoutes, { prefix: '/api' });
 

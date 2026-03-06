@@ -123,6 +123,13 @@ export function ActivityFeed({
         return;
       }
 
+      // Handle support ticket activities (TKT IDs)
+      if (targetType === 'support_ticket') {
+        console.log('[ActivityFeed] Opening support ticket via openById():', targetId);
+        modals.openById(targetId);
+        return;
+      }
+
       // Handle product activities (universal modal)
       if (targetType === 'product') {
         // Open product modal by ID via ModalProvider

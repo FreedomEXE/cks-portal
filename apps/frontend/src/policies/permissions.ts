@@ -258,10 +258,15 @@ function canUserReport(
   const alreadyAcknowledged = Array.isArray(entityData?.acknowledgments)
     ? entityData.acknowledgments.some((ack: any) => (ack.userId || '').toUpperCase() === (viewerId || '').toUpperCase())
     : false;
+  const isSupportTicket = entityData?.reportCategory === 'support' || entityData?.metadata?.supportTicket === true;
 
   switch (role) {
     case 'manager':
       // Managers can acknowledge (not own) and resolve reports once required acknowledgers finished
+      if (isSupportTicket) {
+        if (action === 'resolve' && status === 'open') return true;
+        return false;
+      }
       if (action === 'acknowledge' && status === 'open') return !isCreator && !alreadyAcknowledged;
       if (action === 'resolve' && status === 'open') return hasAllRequiredAcknowledgments(entityData);
       if (action === 'close' && status === 'resolved') return true;
@@ -269,6 +274,10 @@ function canUserReport(
 
     case 'warehouse':
       // Warehouse can acknowledge (not own) and resolve once acknowledgments complete
+      if (isSupportTicket) {
+        if (action === 'resolve' && status === 'open') return true;
+        return false;
+      }
       if (action === 'acknowledge' && status === 'open') return !isCreator && !alreadyAcknowledged;
       if (action === 'resolve' && status === 'open') return hasAllRequiredAcknowledgments(entityData);
       if (action === 'close' && status === 'resolved') return true;
@@ -278,11 +287,13 @@ function canUserReport(
     case 'contractor':
     case 'crew':
       // Can acknowledge reports (not own), cannot resolve
+      if (isSupportTicket) return false;
       if (action === 'acknowledge' && status === 'open') return !isCreator && !alreadyAcknowledged && kind === 'report';
       return false;
 
     case 'customer':
       // Customers can only acknowledge feedback
+      if (isSupportTicket) return false;
       if (action === 'acknowledge' && status === 'open') return !isCreator && !alreadyAcknowledged && kind === 'feedback';
       return false;
 

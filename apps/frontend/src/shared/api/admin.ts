@@ -429,14 +429,43 @@ export interface CatalogCategories {
   services: string[];
 }
 
+function normalizeCategoryList(input: unknown): string[] {
+  if (!Array.isArray(input)) return [];
+  const seen = new Set<string>();
+  const values: string[] = [];
+  for (const raw of input) {
+    if (typeof raw !== 'string') continue;
+    const normalized = raw.trim();
+    if (!normalized) continue;
+    const key = normalized.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    values.push(normalized);
+  }
+  return values.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+}
+
 export async function getCatalogCategories(
   init?: ApiFetchInit,
 ): Promise<CatalogCategories> {
-  const response = await apiFetch<{ success: boolean; data: CatalogCategories }>('/catalog/categories', {
+  const response = await apiFetch<{ success?: boolean; data?: any }>('/catalog/categories', {
     method: 'GET',
     ...init,
   });
-  return response.data;
+  const data = response?.data ?? {};
+  const products = normalizeCategoryList(
+    data.products ??
+    data.productCategories ??
+    data?.categories?.products ??
+    data?.categories?.productCategories
+  );
+  const services = normalizeCategoryList(
+    data.services ??
+    data.serviceCategories ??
+    data?.categories?.services ??
+    data?.categories?.serviceCategories
+  );
+  return { products, services };
 }
 
 // ── Create catalog product/service ──────────────────────────────────

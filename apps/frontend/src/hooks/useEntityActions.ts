@@ -1203,6 +1203,7 @@ async function handleReportAction(
           if (typeof key === 'string') {
             return key.includes('/reports') ||
                    key.includes('/feedback') ||
+                   key.includes('/support') ||
                    key.includes('/admin/directory/activities') ||
                    key.includes('/api/hub/activities') ||
                    key.includes('/hub/activities') ||
@@ -1228,6 +1229,7 @@ async function handleReportAction(
           if (typeof key === 'string') {
             return key.includes('/reports') ||
                    key.includes('/feedback') ||
+                   key.includes('/support') ||
                    key.includes('/admin/directory/activities') ||
                    key.includes('/api/hub/activities') ||
                    key.includes('/hub/activities') ||

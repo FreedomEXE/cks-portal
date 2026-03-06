@@ -126,40 +126,38 @@ const ReportCard: React.FC<ReportCardProps> = ({
 
   // Determine who can resolve based on report category
   const canResolve = (() => {
-    if (report.status !== 'open' || report.type !== 'report' || !hasAcknowledged) {
+    if (report.status !== 'open' || report.type !== 'report') {
+      return false;
+    }
+
+    const normalizedRole = userRole.toLowerCase();
+    if (normalizedRole === 'admin') {
+      return true;
+    }
+    if (!hasAcknowledged) {
       return false;
     }
 
     // If structured report, check category-based permissions
     if (report.reportCategory) {
       if (report.reportCategory === 'order') {
-        return userRole === 'warehouse'; // Only warehouse resolves order reports
+        return normalizedRole === 'warehouse'; // Only warehouse resolves order reports
       }
       if (report.reportCategory === 'service') {
         // Service reports: check who manages the service
         if (isWarehouseManaged(report.serviceManagedBy)) {
-          return userRole === 'warehouse'; // Warehouse resolves warehouse-managed services
+          return normalizedRole === 'warehouse'; // Warehouse resolves warehouse-managed services
         }
-        return userRole === 'manager'; // Manager resolves manager-managed services
+        return normalizedRole === 'manager'; // Manager resolves manager-managed services
       }
       if (report.reportCategory === 'procedure') {
-        return userRole === 'manager'; // Only manager resolves procedure reports
+        return normalizedRole === 'manager'; // Only manager resolves procedure reports
       }
     }
 
     // Fallback for legacy reports without category: both can resolve
-    return userRole === 'manager' || userRole === 'warehouse';
+    return normalizedRole === 'manager' || normalizedRole === 'warehouse';
   })();
-
-  // Debug: surface permission evaluation inputs/outputs
-  console.log('DEBUG canResolve:', {
-    userRole,
-    reportCategory: report.reportCategory,
-    status: report.status,
-    type: report.type,
-    hasAcknowledged,
-    canResolve,
-  });
 
   const isCreator = report.submittedBy === currentUser;
 

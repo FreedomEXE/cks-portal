@@ -60,6 +60,7 @@ import {
   useHubOrders,
   useHubProfile,
   useHubReports,
+  useHubSupportTickets,
   useHubRoleScope,
   useHubInventory,
   type HubOrderItem,
@@ -70,7 +71,7 @@ import { ActivityFeed } from '../components/ActivityFeed';
 import ProfileSkeleton from '../components/ProfileSkeleton';
 // Legacy ActivityModalGateway removed - use universal ModalGateway via modals.openById()
 import { useEntityActions } from '../hooks/useEntityActions';
-import { createReport as apiCreateReport, createFeedback as apiCreateFeedback, acknowledgeItem as apiAcknowledgeItem, resolveReport as apiResolveReport, fetchServicesForReports, fetchProceduresForReports, fetchOrdersForReports } from '../shared/api/hub';
+import { createReport as apiCreateReport, createFeedback as apiCreateFeedback, acknowledgeItem as apiAcknowledgeItem, resolveReport as apiResolveReport, createSupportTicket as apiCreateSupportTicket, fetchServicesForReports, fetchProceduresForReports, fetchOrdersForReports } from '../shared/api/hub';
 import { createCatalogProduct, getCatalogCategories, uploadCatalogImage, type CreateCatalogProductPayload } from '../shared/api/admin';
 
 interface WarehouseHubProps {
@@ -261,7 +262,8 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
     mutate: refreshOrders,
   } = useHubOrders(normalizedCode);
   const { data: reportsData, isLoading: reportsLoading, mutate: mutateReports } = useHubReports(normalizedCode);
-  const supportTickets = useMemo(() => buildSupportTickets(reportsData), [reportsData]);
+  const { data: supportData, mutate: mutateSupportTickets } = useHubSupportTickets(normalizedCode);
+  const supportTickets = useMemo(() => buildSupportTickets(supportData), [supportData]);
 
   // Resolve final display/user code after profile is available
   const userCode = useMemo(() => resolvedUserCode(profile?.cksCode, normalizedCode), [profile?.cksCode, normalizedCode]);
@@ -450,22 +452,9 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
 
   const handleSupportSubmit = useCallback(async (payload: any) => {
     const mapped = await mapSupportIssuePayload(payload);
-    if (mapped.type === 'report') {
-      await apiCreateReport({
-        title: mapped.title,
-        description: mapped.description,
-        category: mapped.category,
-        priority: mapped.priority,
-      });
-    } else {
-      await apiCreateFeedback({
-        title: mapped.title,
-        message: mapped.description,
-        category: mapped.category,
-      });
-    }
-    await mutateReports();
-  }, [mutateReports]);
+    await apiCreateSupportTicket(mapped);
+    await mutateSupportTickets();
+  }, [mutateSupportTickets]);
 
   const { pendingDeliveries, completedDeliveries } = useMemo(() => {
     const pending: Array<{
@@ -1457,6 +1446,7 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
                 primaryColor="#8b5cf6"
                 tickets={supportTickets}
                 onSubmitTicket={handleSupportSubmit}
+                onTicketClick={(ticket) => modals.openById(ticket.ticketId)}
               />
             </PageWrapper>
           ) : (

@@ -286,6 +286,16 @@ function personalizeMessage(item: HubActivityItem, viewerId?: string | null): st
     return `Feedback acknowledged`;
   }
 
+  if (activityType === 'support_ticket_created') {
+    if (isActor) return 'You submitted a support ticket';
+    return 'Support ticket submitted';
+  }
+
+  if (activityType === 'support_ticket_resolved') {
+    if (isActor) return 'You resolved a support ticket';
+    return 'Support ticket resolved';
+  }
+
   // Order activities
   if (activityType === 'order_created') {
     const crewId = (metadata.crewId as string | undefined)?.toUpperCase();

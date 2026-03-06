@@ -986,10 +986,32 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
     try {
       const [productCats, serviceCats] = await Promise.all([
         query<{ category: string }>(
-          `SELECT DISTINCT category FROM catalog_products WHERE category IS NOT NULL AND category != '' AND is_active = TRUE ORDER BY category`,
+          `SELECT DISTINCT normalized.category
+           FROM (
+             SELECT
+               COALESCE(
+                 NULLIF(BTRIM(category), ''),
+                 NULLIF(BTRIM(metadata->>'category'), '')
+               ) AS category
+             FROM catalog_products
+             WHERE COALESCE(is_active, TRUE) = TRUE
+           ) AS normalized
+           WHERE normalized.category IS NOT NULL
+           ORDER BY normalized.category`,
         ),
         query<{ category: string }>(
-          `SELECT DISTINCT category FROM catalog_services WHERE category IS NOT NULL AND category != '' AND is_active = TRUE ORDER BY category`,
+          `SELECT DISTINCT normalized.category
+           FROM (
+             SELECT
+               COALESCE(
+                 NULLIF(BTRIM(category), ''),
+                 NULLIF(BTRIM(metadata->>'category'), '')
+               ) AS category
+             FROM catalog_services
+             WHERE COALESCE(is_active, TRUE) = TRUE
+           ) AS normalized
+           WHERE normalized.category IS NOT NULL
+           ORDER BY normalized.category`,
         ),
       ]);
 

@@ -98,6 +98,38 @@ export async function generateReportFeedbackId(
   return `${normalizedCreatorId}-${descriptor.prefix}-${digits}`;
 }
 
+/**
+ * Generate a prefixed ID for support tickets that includes the creator's ID.
+ * Format: CREATOR_ID-TKT-NNN (e.g., CEN-001-TKT-001)
+ */
+export async function generateSupportTicketId(creatorId: string): Promise<string> {
+  const normalizedCreatorId = normalizeIdentity(creatorId);
+  if (!normalizedCreatorId) {
+    throw new Error('Invalid creator ID provided');
+  }
+
+  const baseSequence = 'support_ticket_id_seq';
+  const creatorSequence = `${baseSequence}_${normalizedCreatorId.toLowerCase().replace(/-/g, '_')}`;
+
+  if (!/^[a-z0-9_]+$/.test(creatorSequence)) {
+    throw new Error(`Invalid sequence name format: ${creatorSequence}`);
+  }
+  await query(`CREATE SEQUENCE IF NOT EXISTS ${creatorSequence} AS BIGINT START WITH 1 INCREMENT BY 1 OWNED BY NONE`);
+
+  const result = await query<{ value: string }>(`SELECT nextval('${creatorSequence}') AS value`);
+  const record = result.rows[0];
+  if (!record) {
+    throw new Error(`Failed to fetch next value for sequence ${creatorSequence}`);
+  }
+  const value = Number(record.value);
+  if (Number.isNaN(value)) {
+    throw new Error(`Sequence ${creatorSequence} returned non-numeric value`);
+  }
+
+  const digits = Math.max(0, value).toString().padStart(3, '0');
+  return `${normalizedCreatorId}-TKT-${digits}`;
+}
+
 export async function generatePrefixedId(entity: IdentityEntity): Promise<string> {
   const descriptor = IDENTITY_DESCRIPTORS[entity];
   if (!descriptor) {

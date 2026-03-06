@@ -65,6 +65,12 @@ export function parseEntityId(id: string | null | undefined): ParsedEntityId {
     return { type: 'report', id, subtype: 'feedback', scope };
   }
 
+  // Support Ticket IDs: TKT-### or ###-TKT-###
+  // Reuse report modal pipeline while keeping ticket IDs distinct from reports.
+  if (normalizedId.includes('-TKT-') || normalizedId.startsWith('TKT-')) {
+    return { type: 'report', id, subtype: 'report', scope };
+  }
+
   // Procedure IDs: PRO-###
   if (normalizedId.startsWith('PRO-')) {
     return { type: 'procedure', id, scope };
@@ -103,6 +109,7 @@ export function parseEntityId(id: string | null | undefined): ParsedEntityId {
           segment === 'SO' ||
           segment === 'RPT' ||
           segment === 'FBK' ||
+          segment === 'TKT' ||
           segment === 'SRV' ||
           segment === 'PRO' ||
           segment === 'TRN' ||
@@ -203,6 +210,7 @@ export function isValidId(id: string | null | undefined): boolean {
         segment === 'SO' ||
         segment === 'RPT' ||
         segment === 'FBK' ||
+        segment === 'TKT' ||
         segment === 'SRV' ||
         segment === 'PRO' ||
         segment === 'TRN' ||
