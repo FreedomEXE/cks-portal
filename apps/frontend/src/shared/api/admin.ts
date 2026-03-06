@@ -249,6 +249,29 @@ export async function updateCatalogProduct(
   });
 }
 
+/**
+ * Upload an image file for a catalog product or service.
+ * Sends multipart/form-data to the backend which uploads to Cloudinary.
+ */
+export async function uploadCatalogImage(
+  file: File,
+  itemType: 'product' | 'service',
+  itemId: string,
+  init?: ApiFetchInit,
+): Promise<{ success: boolean; imageUrl: string }> {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('type', itemType);
+  formData.append('itemId', itemId);
+
+  return apiFetch<{ success: boolean; imageUrl: string }>('/catalog/upload-image', {
+    method: 'POST',
+    body: formData,
+    // Do NOT set Content-Type — the browser sets it automatically with the boundary
+    ...init,
+  });
+}
+
 export type CatalogVisibilityType = 'product' | 'service';
 export type CatalogVisibilityMode = 'all' | 'allowlist';
 

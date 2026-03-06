@@ -10,6 +10,7 @@ console.log('DATABASE_URL loaded?', !!process.env.DATABASE_URL ? 'yes' : 'no');
 import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
 import helmet from "@fastify/helmet";
+import multipart from "@fastify/multipart";
 import rateLimit from "@fastify/rate-limit";
 import Fastify from "fastify";
 import z from "zod";
@@ -143,6 +144,7 @@ export async function buildServer() {
   });
 
   await server.register(cookie);
+  await server.register(multipart, { limits: { fileSize: 5 * 1024 * 1024 } }); // 5 MB max
 
   // Security headers with Helmet
   await server.register(helmet, {

@@ -6,6 +6,7 @@ import { query, withTransaction } from '../../db/connection';
 import { getCatalogItems } from './service';
 import { isCatalogItemVisible } from './store';
 import { recordActivity } from '../activity/writer';
+import { uploadImageToCloudinary } from '../../shared/cloudinary';
 
 const querySchema = z.object({
   type: z.enum(['product', 'service']).optional(),
@@ -887,6 +888,86 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
     } catch (error) {
       request.log.error({ err: error, productId }, 'update catalog product failed');
       reply.code(500).send({ error: 'Failed to update catalog product' });
+    }
+  });
+
+  // ── Catalog image upload (products & services) ────────────────────────
+  // POST /api/catalog/upload-image
+  // Accepts multipart/form-data with fields: file (image), type (product|service), itemId
+  server.post('/api/catalog/upload-image', async (request, reply) => {
+    const account = await requireActiveRole(request, reply, {});
+    if (!account) return;
+
+    const role = (account.role ?? '').trim().toLowerCase();
+    if (role !== 'admin' && role !== 'warehouse') {
+      reply.code(403).send({ error: 'Only admins and warehouse users can upload catalog images' });
+      return;
+    }
+
+    const data = await request.file();
+    if (!data) {
+      reply.code(400).send({ error: 'No file uploaded' });
+      return;
+    }
+
+    // Read fields from the multipart stream
+    const fields = data.fields as Record<string, { value?: string } | undefined>;
+    const itemType = (fields['type']?.value ?? '').trim().toLowerCase();
+    const itemId = (fields['itemId']?.value ?? '').trim();
+
+    if (!itemId) {
+      reply.code(400).send({ error: 'Missing itemId field' });
+      return;
+    }
+    if (itemType !== 'product' && itemType !== 'service') {
+      reply.code(400).send({ error: 'type must be "product" or "service"' });
+      return;
+    }
+
+    // Validate MIME type
+    const mime = data.mimetype ?? '';
+    if (!mime.startsWith('image/')) {
+      reply.code(400).send({ error: 'File must be an image (png, jpg, webp, etc.)' });
+      return;
+    }
+
+    try {
+      // Consume stream into buffer
+      const chunks: Buffer[] = [];
+      for await (const chunk of data.file) {
+        chunks.push(chunk);
+      }
+      const buffer = Buffer.concat(chunks);
+
+      // Upload to Cloudinary
+      const folder = itemType === 'product' ? 'cks-catalog/products' : 'cks-catalog/services';
+      const result = await uploadImageToCloudinary(buffer, {
+        folder,
+        publicId: itemId,
+      });
+
+      const imageUrl = result.secure_url;
+
+      // Update the database record
+      if (itemType === 'product') {
+        await query(
+          'UPDATE catalog_products SET image_url = $1, updated_at = NOW() WHERE product_id = $2',
+          [imageUrl, itemId],
+        );
+      } else {
+        await query(
+          'UPDATE catalog_services SET image_url = $1, updated_at = NOW() WHERE service_id = $2',
+          [imageUrl, itemId],
+        );
+      }
+
+      reply.send({ success: true, imageUrl });
+    } catch (error) {
+      request.log.error({ err: error, itemId, itemType }, 'catalog image upload failed');
+      reply.code(500).send({
+        error: 'Failed to upload image',
+        details: error instanceof Error ? error.message : String(error),
+      });
     }
   });
 }

@@ -132,7 +132,7 @@ export async function apiFetch<T>(path: string, init?: ApiFetchInit): Promise<T>
   if (!headers.has('Accept')) {
     headers.set('Accept', 'application/json');
   }
-  if (restInit.body && !headers.has('Content-Type')) {
+  if (restInit.body && !headers.has('Content-Type') && !(restInit.body instanceof FormData)) {
     headers.set('Content-Type', 'application/json');
   }
 
