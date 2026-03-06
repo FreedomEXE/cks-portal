@@ -19,6 +19,10 @@ interface ProductManagementTabProps {
   imageUrl?: string | null;
   inventoryData?: InventoryRow[];
   onInventoryRefresh?: (data: InventoryRow[]) => void;
+  /** Viewer role — warehouse users get auto-selected warehouse */
+  role?: string;
+  /** Viewer's CKS code (e.g. WHS-004) — used as warehouse ID for warehouse users */
+  viewerCode?: string | null;
 }
 
 export default function ProductManagementTab({
@@ -28,9 +32,17 @@ export default function ProductManagementTab({
   imageUrl,
   inventoryData = [],
   onInventoryRefresh,
+  role,
+  viewerCode,
 }: ProductManagementTabProps) {
   const { getToken } = useAuth();
-  const { data: warehouses = [] } = useWarehouses();
+  const isWarehouseUser = role === 'warehouse';
+  // Warehouse users can only adjust their own warehouse; admins see the full list
+  const { data: adminWarehouses = [] } = useWarehouses();
+  // For warehouse users, build a single-item list from their own code
+  const warehouses = isWarehouseUser && viewerCode
+    ? [{ id: viewerCode, name: viewerCode }]
+    : adminWarehouses;
 
   const [detailsOpen, setDetailsOpen] = useState(true);
   const [inventoryOpen, setInventoryOpen] = useState(true);

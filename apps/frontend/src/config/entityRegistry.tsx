@@ -2479,6 +2479,8 @@ const productAdapter: EntityAdapter = {
               description={entityData?.description}
               imageUrl={entityData?.imageUrl}
               inventoryData={entityData?.inventoryData || []}
+              role={role}
+              viewerCode={context.viewerId}
               onInventoryRefresh={(data) => {
                 (entityData as any).inventoryData = data;
               }}
