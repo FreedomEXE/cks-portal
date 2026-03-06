@@ -22,7 +22,14 @@ import { useAuth as useClerkAuth, useSignIn, useClerk } from '@clerk/clerk-react
 import { parseEntityId } from '../shared/utils/parseEntityId';
 import { addTicketComment, applyHubOrderAction, assignTicket, type OrderActionRequest, acknowledgeItem, reopenTicket, resolveReport, resolveTicket, unassignTicket, updateTicketStatus, applyServiceAction, requestServiceCrew, respondToServiceCrew, respondToOrderCrew, respondToCrewInvite } from '../shared/api/hub';
 import { archiveAPI } from '../shared/api/archive';
-import { createImpersonationToken, sendUserInvite, unlinkUserAccountLink, updateCatalogService } from '../shared/api/admin';
+import {
+  approveCatalogServiceRequest,
+  createImpersonationToken,
+  rejectCatalogServiceRequest,
+  sendUserInvite,
+  unlinkUserAccountLink,
+  updateCatalogService
+} from '../shared/api/admin';
 
 export interface EntityActionOptions {
   notes?: string;
@@ -94,6 +101,10 @@ export function useEntityActions(): UseEntityActionsReturn {
 
         if (type === 'catalogService') {
           return await handleCatalogServiceAction(targetEntityId, actionId, options, mutate);
+        }
+
+        if (type === 'catalogServiceRequest') {
+          return await handleCatalogServiceRequestAction(targetEntityId, actionId, options, mutate);
         }
 
         // Unsupported entity type
@@ -1204,6 +1215,67 @@ async function handleCatalogServiceAction(
   } catch (error) {
     console.error(`[useEntityActions] Catalog service action "${actionId}" failed:`, error);
     toast.error(`Failed to ${actionId} catalog service`);
+    throw error;
+  }
+}
+
+async function handleCatalogServiceRequestAction(
+  requestId: string,
+  actionId: string,
+  options: EntityActionOptions,
+  mutate: any
+): Promise<boolean> {
+  try {
+    switch (actionId) {
+      case 'approve': {
+        const notes = options.notes?.trim();
+        await approveCatalogServiceRequest(
+          requestId,
+          notes ? { notes } : {},
+        );
+        toast.success('Service request approved');
+        break;
+      }
+
+      case 'reject': {
+        let notes = options.notes?.trim();
+        if (!notes) {
+          notes = window.prompt('Please provide a reason for rejection:')?.trim() || '';
+        }
+        if (!notes) {
+          toast.error('Rejection reason is required');
+          return false;
+        }
+        await rejectCatalogServiceRequest(requestId, { notes });
+        toast.success('Service request rejected');
+        break;
+      }
+
+      default:
+        console.warn('[useEntityActions] Unknown action for catalogServiceRequest:', actionId);
+        toast.error(`Action "${actionId}" not supported for service requests`);
+        return false;
+    }
+
+    mutate((key: any) => {
+      if (typeof key === 'string') {
+        return key.includes('/admin/catalog/service-requests') ||
+          key.includes('/catalog/service-requests/') ||
+          key.includes('/catalog/items') ||
+          key.includes('/catalog/categories') ||
+          key.includes('/admin/directory/activities') ||
+          key.includes('/api/hub/activities') ||
+          key.includes('/hub/activities') ||
+          key.includes(requestId);
+      }
+      return false;
+    });
+
+    options.onSuccess?.();
+    return true;
+  } catch (error) {
+    console.error(`[useEntityActions] Service request action "${actionId}" failed:`, error);
+    toast.error(`Failed to ${actionId} service request`);
     throw error;
   }
 }

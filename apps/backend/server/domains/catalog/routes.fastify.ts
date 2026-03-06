@@ -922,6 +922,95 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
     }
   });
 
+  server.get('/api/catalog/service-requests/:requestId', async (request, reply) => {
+    const account = await requireActiveRole(request, reply, {});
+    if (!account) return;
+
+    const role = (account.role ?? '').trim().toLowerCase();
+    if (role !== 'admin' && role !== 'manager') {
+      reply.code(403).send({ error: 'Only admins and managers can view service requests' });
+      return;
+    }
+
+    const paramsSchema = z.object({ requestId: z.string().trim().min(1) });
+    const parsedParams = paramsSchema.safeParse(request.params);
+    if (!parsedParams.success) {
+      reply.code(400).send({ error: 'Invalid request ID' });
+      return;
+    }
+
+    const requestId = parsedParams.data.requestId.trim().toUpperCase();
+    const viewerCode = (account.cksCode ?? '').trim().toUpperCase();
+
+    try {
+      const result = await query<{
+        request_id: string;
+        manager_id: string;
+        manager_name: string | null;
+        service_name: string;
+        description: string | null;
+        category: string;
+        status: 'pending' | 'approved' | 'rejected';
+        approved_service_id: string | null;
+        requested_at: Date | string;
+        reviewed_at: Date | string | null;
+        reviewed_by: string | null;
+        review_notes: string | null;
+      }>(
+        `SELECT
+           r.request_id,
+           r.manager_id,
+           m.name AS manager_name,
+           r.service_name,
+           r.description,
+           r.category,
+           r.status,
+           r.approved_service_id,
+           r.requested_at,
+           r.reviewed_at,
+           r.reviewed_by,
+           r.review_notes
+         FROM catalog_service_requests r
+         LEFT JOIN managers m ON UPPER(m.manager_id) = UPPER(r.manager_id)
+         WHERE UPPER(r.request_id) = UPPER($1)
+         LIMIT 1`,
+        [requestId],
+      );
+
+      if (!result.rowCount) {
+        reply.code(404).send({ error: 'Service request not found' });
+        return;
+      }
+
+      const row = result.rows[0];
+      if (role === 'manager' && row.manager_id.trim().toUpperCase() !== viewerCode) {
+        reply.code(404).send({ error: 'Service request not found' });
+        return;
+      }
+
+      reply.send({
+        success: true,
+        data: {
+          requestId: row.request_id,
+          managerId: row.manager_id,
+          managerName: row.manager_name,
+          serviceName: row.service_name,
+          description: row.description,
+          category: row.category,
+          status: row.status,
+          approvedServiceId: row.approved_service_id,
+          requestedAt: row.requested_at,
+          reviewedAt: row.reviewed_at,
+          reviewedBy: row.reviewed_by,
+          reviewNotes: row.review_notes,
+        },
+      });
+    } catch (error) {
+      request.log.error({ err: error, requestId }, 'Failed to fetch catalog service request');
+      reply.code(500).send({ error: 'Failed to fetch service request' });
+    }
+  });
+
   server.post('/api/admin/catalog/service-requests/:requestId/approve', async (request, reply) => {
     const admin = await requireActiveAdmin(request, reply);
     if (!admin) return;

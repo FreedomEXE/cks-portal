@@ -298,6 +298,39 @@ export function ModalProvider({ children }: ModalProviderProps) {
             console.error('[ModalProvider] Fallback catalog items lookup failed', fallbackErr);
           }
         }
+      } else if (type === 'catalogServiceRequest') {
+        // Catalog Service Request entities: fetch request details for admin/manager activity actions
+        entityType = 'catalogServiceRequest' as EntityType;
+
+        console.log(`[ModalProvider] Fetching catalogServiceRequest for ID: ${id}`);
+
+        try {
+          const response = await apiFetch<{
+            success: boolean;
+            data: {
+              requestId: string;
+              managerId: string;
+              managerName: string | null;
+              serviceName: string;
+              description: string | null;
+              category: string;
+              status: 'pending' | 'approved' | 'rejected';
+              approvedServiceId: string | null;
+              requestedAt: string;
+              reviewedAt: string | null;
+              reviewedBy: string | null;
+              reviewNotes: string | null;
+            };
+          }>(`/catalog/service-requests/${id}`, { getToken });
+
+          enrichedOptions = {
+            ...options,
+            data: response.data,
+            ...(options?.state ? {} : { state: 'active' }),
+          } as any;
+        } catch (error) {
+          console.error(`[ModalProvider] Failed to fetch catalogServiceRequest ${id}:`, error);
+        }
       } else if (type === 'product') {
         // Product catalog items: fetch from catalog list + admin inventory (if admin)
         entityType = 'product' as EntityType;

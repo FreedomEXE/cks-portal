@@ -19,6 +19,7 @@ export type EntityType =
   | 'feedback'
   | 'service'
   | 'catalogService' // Catalog service definitions (SRV-XXX unscoped)
+  | 'catalogServiceRequest'
   | 'ticket'
   | 'user'
   | 'product'

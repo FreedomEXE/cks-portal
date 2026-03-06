@@ -1215,13 +1215,16 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
       setCreateServiceForm({ name: '', category: '', description: '', _newCategory: '' });
       clearServicePhoto();
       setShowCreateService(false);
-      mutate((key: unknown) => typeof key === 'string' && key.includes('/catalog'), undefined, { revalidate: true });
+      await Promise.all([
+        mutate((key: unknown) => typeof key === 'string' && key.includes('/catalog'), undefined, { revalidate: true }),
+        mutateActivities(),
+      ]);
     } catch (err: any) {
       rhToast.error(err?.message || 'Failed to create service');
     } finally {
       setCreatingService(false);
     }
-  }, [clearServicePhoto, createServiceForm, getToken, mutate, servicePhotoFile]);
+  }, [clearServicePhoto, createServiceForm, getToken, mutate, mutateActivities, servicePhotoFile]);
 
   useEffect(() => {
     if (activeTab !== 'services' || !showCreateService) {

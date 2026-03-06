@@ -15,4 +15,10 @@ describe('parseEntityId user id handling', () => {
     expect(parseEntityId('CON-001-SRV-004').type).toBe('service');
     expect(parseEntityId('CON-001-RPT-004').type).toBe('report');
   });
+
+  it('parses catalog service request identifiers', () => {
+    const parsed = parseEntityId('CSR-000001');
+    expect(parsed.type).toBe('catalogServiceRequest');
+    expect(isValidId('CSR-000001')).toBe(true);
+  });
 });

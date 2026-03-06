@@ -495,7 +495,7 @@ function buildTabConfigs(): TabConfig<unknown>[] {
       },
       resetValues: buildFieldValues(productFields),
       successMessage: (record: any) => `Product created: ${record.productId ?? ''}`.trim(),
-      mutateKeys: ['/catalog/items', '/catalog/categories'],
+      mutateKeys: ['/catalog/items', '/catalog/categories', '/admin/directory/activities'],
     },
     {
       key: 'services',
@@ -519,7 +519,7 @@ function buildTabConfigs(): TabConfig<unknown>[] {
         record?.status === 'pending_approval'
           ? `Service request submitted: ${record.requestId ?? ''}`.trim()
           : `Service created: ${record?.serviceId ?? ''}`.trim(),
-      mutateKeys: ['/catalog/items', '/catalog/categories'],
+      mutateKeys: ['/catalog/items', '/catalog/categories', '/admin/directory/activities'],
     },
     {
       key: 'accessCodes',
@@ -706,6 +706,7 @@ export default function AdminCreateSection() {
       await Promise.all([
         mutate('/catalog/items', undefined, { revalidate: true }),
         mutate('/catalog/categories', undefined, { revalidate: true }),
+        mutate('/admin/directory/activities', undefined, { revalidate: true }),
       ]);
       setStatuses((prev) => ({
         ...prev,
@@ -732,6 +733,7 @@ export default function AdminCreateSection() {
     setServiceRequestActionId(requestId);
     try {
       await rejectCatalogServiceRequest(requestId, { notes: notes.trim() }, { getToken });
+      await mutate('/admin/directory/activities', undefined, { revalidate: true });
       setStatuses((prev) => ({
         ...prev,
         services: {

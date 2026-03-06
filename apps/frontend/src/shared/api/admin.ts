@@ -564,6 +564,17 @@ export async function listCatalogServiceRequests(
   return response.data;
 }
 
+export async function getCatalogServiceRequest(
+  requestId: string,
+  init?: ApiFetchInit,
+): Promise<CatalogServiceRequestItem> {
+  const response = await apiFetch<{ success: boolean; data: CatalogServiceRequestItem }>(
+    `/catalog/service-requests/${encodeURIComponent(requestId)}`,
+    init,
+  );
+  return response.data;
+}
+
 export async function approveCatalogServiceRequest(
   requestId: string,
   payload?: { notes?: string },

@@ -17,7 +17,7 @@
  */
 
 export interface ParsedEntityId {
-  type: 'order' | 'service' | 'catalogService' | 'report' | 'ticket' | 'user' | 'procedure' | 'training' | 'product' | 'unknown';
+  type: 'order' | 'service' | 'catalogService' | 'catalogServiceRequest' | 'report' | 'ticket' | 'user' | 'procedure' | 'training' | 'product' | 'unknown';
   id: string;
   subtype?: 'product' | 'service' | 'report' | 'feedback' | 'manager' | 'contractor' | 'customer' | 'center' | 'crew' | 'warehouse';
   scope?: string; // e.g., "CON-010" from "CON-010-FBK-001"
@@ -121,6 +121,11 @@ export function parseEntityId(id: string | null | undefined): ParsedEntityId {
     }
   }
 
+  // Catalog Service Request IDs: CSR-######
+  if (normalizedId.startsWith('CSR-')) {
+    return { type: 'catalogServiceRequest', id, scope };
+  }
+
   // Fallback: unknown type
   return { type: 'unknown', id, scope };
 }
@@ -133,6 +138,7 @@ export function getEntityTypeName(type: ParsedEntityId['type']): string {
     order: 'Order',
     service: 'Service',
     catalogService: 'Service',
+    catalogServiceRequest: 'Service Request',
     report: 'Report/Feedback',
     ticket: 'Support Ticket',
     user: 'User',
@@ -148,7 +154,7 @@ export function getEntityTypeName(type: ParsedEntityId['type']): string {
  * Check if entity type supports actions
  */
 export function supportsActions(type: ParsedEntityId['type']): boolean {
-  return ['order', 'service', 'report', 'ticket'].includes(type);
+  return ['order', 'service', 'catalogServiceRequest', 'report', 'ticket'].includes(type);
 }
 
 /**

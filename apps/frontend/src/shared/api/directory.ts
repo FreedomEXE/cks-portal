@@ -225,6 +225,7 @@ interface ActivityApiItem {
 type DirectoryResourceConfig<TResponse, TMapped> = {
   path: string;
   transform?: (items: TResponse[]) => TMapped[];
+  refreshIntervalMs?: number;
 };
 
 type DirectoryHookResult<T> = {
@@ -253,6 +254,7 @@ function createDirectoryResource<TResponse, TMapped = TResponse>(
       revalidateOnReconnect: true,
       revalidateIfStale: false,
       dedupingInterval: 10000,
+      ...(config.refreshIntervalMs ? { refreshInterval: config.refreshIntervalMs } : {}),
     });
     const fallbackData = useMemo<TMapped[]>(() => [], []);
     const safeData = data ?? fallbackData;
@@ -359,6 +361,7 @@ const feedbackResource = createDirectoryResource<FeedbackEntry, FeedbackEntry>({
 const activitiesResource = createDirectoryResource<ActivityApiItem, Activity>({
   path: '/admin/directory/activities',
   transform: mapActivities,
+  refreshIntervalMs: 10000,
 });
 
 export const useManagers = managersResource.useResource;

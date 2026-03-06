@@ -2643,6 +2643,100 @@ const catalogServiceAdapter: EntityAdapter = {
   // No legacy component support for catalog services
 };
 
+const catalogServiceRequestAdapter: EntityAdapter = {
+  getActionDescriptors: (context: EntityActionContext): EntityActionDescriptor[] => {
+    const { role, entityData } = context;
+    const descriptors: EntityActionDescriptor[] = [];
+    const status = (entityData?.status || '').toLowerCase();
+
+    if (role === 'admin' && status === 'pending') {
+      descriptors.push({
+        key: 'approve',
+        label: 'Approve Request',
+        variant: 'primary',
+        prompt: 'Optional: Add approval notes',
+        closeOnSuccess: true,
+      });
+      descriptors.push({
+        key: 'reject',
+        label: 'Reject Request',
+        variant: 'danger',
+        prompt: 'Provide rejection reason:',
+        closeOnSuccess: true,
+      });
+    }
+
+    return descriptors;
+  },
+
+  getHeaderConfig: (context: TabVisibilityContext): HeaderConfig => {
+    const { entityData } = context;
+    const fields: HeaderField[] = [];
+
+    fields.push({ label: 'Service Name', value: entityData?.serviceName || '-' });
+    fields.push({ label: 'Manager', value: entityData?.managerName || entityData?.managerId || '-' });
+
+    if (entityData?.category) {
+      fields.push({ label: 'Category', value: entityData.category });
+    }
+    if (entityData?.requestedAt) {
+      fields.push({ label: 'Requested At', value: String(entityData.requestedAt) });
+    }
+    if (entityData?.approvedServiceId) {
+      fields.push({ label: 'Approved Service', value: entityData.approvedServiceId });
+    }
+
+    return {
+      id: entityData?.requestId || '',
+      type: 'Catalog Service Request',
+      status: entityData?.status || 'pending',
+      fields,
+    };
+  },
+
+  getDetailsSections: (context: TabVisibilityContext): import('@cks/ui').SectionDescriptor[] => {
+    const { entityData } = context;
+    const sections: import('@cks/ui').SectionDescriptor[] = [];
+
+    sections.push({
+      id: 'description',
+      type: 'rich-text',
+      title: 'Request Description',
+      content: entityData?.description || 'No request description provided.',
+    });
+
+    if (entityData?.reviewNotes || entityData?.reviewedBy || entityData?.reviewedAt) {
+      sections.push({
+        id: 'notes',
+        type: 'notes',
+        title: 'Review Notes',
+        content: entityData?.reviewNotes || 'No review notes provided.',
+        author: entityData?.reviewedBy || undefined,
+        timestamp: entityData?.reviewedAt || undefined,
+      } as any);
+    }
+
+    return sections;
+  },
+
+  getTabDescriptors: (context: TabVisibilityContext): TabDescriptor[] => {
+    const detailsSections = filterVisibleSections(catalogServiceRequestAdapter.getDetailsSections(context), {
+      entityType: context.entityType,
+      role: context.role,
+      lifecycle: context.lifecycle,
+      entityData: context.entityData,
+    });
+
+    return [
+      {
+        id: 'details',
+        label: 'Details',
+        content: <DetailsComposer sections={detailsSections} />,
+      },
+    ];
+  },
+};
+
 /**
  * Product Details Sections Builder (unified)
  */
@@ -2819,6 +2913,7 @@ export const entityRegistry: EntityRegistry = {
   ticket: ticketAdapter,
   service: serviceAdapter,
   catalogService: catalogServiceAdapter, // ✅ Catalog service definitions (SRV-XXX unscoped)
+  catalogServiceRequest: catalogServiceRequestAdapter,
   admin: userAdapter,
   manager: userAdapter,
   contractor: userAdapter,
