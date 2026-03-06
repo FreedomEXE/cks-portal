@@ -2,7 +2,7 @@
   Property of CKS  Ac 2025
 -----------------------------------------------*/
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import rhToast from 'react-hot-toast';
 import { useAuth } from '@cks/auth';
@@ -78,7 +78,7 @@ import { dismissActivity, dismissAllActivities } from '../shared/api/directory';
 import { apiFetch } from '../shared/api/client';
 import { applyServiceAction } from '../shared/api/hub';
 import { requestPasswordReset } from '../shared/api/account';
-import { createCatalogService, type CreateCatalogServicePayload } from '../shared/api/admin';
+import { createCatalogService, getCatalogCategories, uploadCatalogImage, type CreateCatalogServicePayload } from '../shared/api/admin';
 import { loadUserPreferences, saveUserPreferences } from '../shared/preferences';
 import { buildSupportTickets, mapSupportIssuePayload } from '../shared/support/supportTickets';
 import { uploadProfilePhotoAndSyncLogo } from '../shared/profilePhoto';
@@ -472,8 +472,12 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
   const [servicesTab, setServicesTab] = useState<'my' | 'active' | 'history'>('my');
   const [servicesSearchQuery, setServicesSearchQuery] = useState('');
   const [showCreateService, setShowCreateService] = useState(false);
-  const [createServiceForm, setCreateServiceForm] = useState({ name: '', category: '', description: '', unitOfMeasure: '', basePrice: '', durationMinutes: '' });
+  const [createServiceForm, setCreateServiceForm] = useState({ name: '', category: '', description: '', _newCategory: '' });
   const [creatingService, setCreatingService] = useState(false);
+  const [serviceCategories, setServiceCategories] = useState<string[]>([]);
+  const [servicePhotoFile, setServicePhotoFile] = useState<File | null>(null);
+  const [servicePhotoPreview, setServicePhotoPreview] = useState<string | null>(null);
+  const serviceFileInputRef = useRef<HTMLInputElement>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [overviewModal, setOverviewModal] = useState<{
     id: string;
@@ -518,6 +522,17 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
   const logout = useLogout();
   const { setHubLoading } = useHubLoading();
   const accessGate = useAccessCodeRedemption();
+
+  // Fetch service categories once for create-service dropdown
+  const serviceCatsFetched = useRef(false);
+  useEffect(() => {
+    if (serviceCatsFetched.current) return;
+    serviceCatsFetched.current = true;
+    getCatalogCategories({ getToken }).then((data) => {
+      setServiceCategories(data.services);
+    }).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Access modal context
   const modals = useModals();
@@ -1128,7 +1143,7 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
   }, [authCode, user]);
 
   const handleSupportSubmit = useCallback(async (payload: any) => {
-    const mapped = mapSupportIssuePayload(payload);
+    const mapped = await mapSupportIssuePayload(payload);
     if (mapped.type === 'report') {
       await apiCreateReport({
         title: mapped.title,
@@ -1146,9 +1161,37 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
     await mutateReports();
   }, [mutateReports]);
 
+  const clearServicePhoto = useCallback(() => {
+    setServicePhotoFile(null);
+    if (servicePhotoPreview) {
+      URL.revokeObjectURL(servicePhotoPreview);
+    }
+    setServicePhotoPreview(null);
+    if (serviceFileInputRef.current) {
+      serviceFileInputRef.current.value = '';
+    }
+  }, [servicePhotoPreview]);
+
+  const handleServicePhotoSelect = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (servicePhotoPreview) {
+      URL.revokeObjectURL(servicePhotoPreview);
+    }
+    setServicePhotoFile(file);
+    setServicePhotoPreview(URL.createObjectURL(file));
+  }, [servicePhotoPreview]);
+
   const handleCreateService = useCallback(async () => {
     if (!createServiceForm.name.trim()) {
       rhToast.error('Service name is required');
+      return;
+    }
+    const resolvedCategory = createServiceForm.category === '__new__'
+      ? (createServiceForm._newCategory.trim() || undefined)
+      : (createServiceForm.category.trim() || undefined);
+    if (!resolvedCategory) {
+      rhToast.error('Category is required');
       return;
     }
     setCreatingService(true);
@@ -1156,14 +1199,21 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
       const payload: CreateCatalogServicePayload = {
         name: createServiceForm.name.trim(),
         description: createServiceForm.description.trim() || undefined,
-        category: createServiceForm.category.trim() || undefined,
-        unitOfMeasure: createServiceForm.unitOfMeasure.trim() || undefined,
-        basePrice: createServiceForm.basePrice.trim() || undefined,
-        durationMinutes: createServiceForm.durationMinutes ? Number(createServiceForm.durationMinutes) : undefined,
+        category: resolvedCategory,
       };
       const result = await createCatalogService(payload, { getToken });
+
+      if (servicePhotoFile && result.serviceId) {
+        try {
+          await uploadCatalogImage(servicePhotoFile, 'service', result.serviceId, { getToken });
+        } catch {
+          console.warn('Photo upload failed after service creation');
+        }
+      }
+
       rhToast.success(`Service created: ${result.serviceId}`);
-      setCreateServiceForm({ name: '', category: '', description: '', unitOfMeasure: '', basePrice: '', durationMinutes: '' });
+      setCreateServiceForm({ name: '', category: '', description: '', _newCategory: '' });
+      clearServicePhoto();
       setShowCreateService(false);
       mutate((key: unknown) => typeof key === 'string' && key.includes('/catalog'), undefined, { revalidate: true });
     } catch (err: any) {
@@ -1171,7 +1221,13 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
     } finally {
       setCreatingService(false);
     }
-  }, [createServiceForm, getToken, mutate]);
+  }, [clearServicePhoto, createServiceForm, getToken, mutate, servicePhotoFile]);
+
+  useEffect(() => {
+    if (activeTab !== 'services' || !showCreateService) {
+      clearServicePhoto();
+    }
+  }, [activeTab, clearServicePhoto, showCreateService]);
 
   // Note: Crew request and service creation handlers removed
   // Services are now auto-created on manager accept
@@ -1300,27 +1356,67 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                     <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                       <span style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>Service Name *</span>
-                      <input value={createServiceForm.name} onChange={(e) => setCreateServiceForm(p => ({ ...p, name: e.target.value }))} placeholder="Enter service name" disabled={creatingService} style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: '8px 10px', fontSize: 13 }} />
+                      <input value={createServiceForm.name} onChange={(e) => setCreateServiceForm(p => ({ ...p, name: e.target.value }))} placeholder="e.g. Deep Carpet Extraction" disabled={creatingService} style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: '8px 10px', fontSize: 13 }} />
                     </label>
                     <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                      <span style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>Category</span>
-                      <input value={createServiceForm.category} onChange={(e) => setCreateServiceForm(p => ({ ...p, category: e.target.value }))} placeholder="e.g. Cleaning" disabled={creatingService} style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: '8px 10px', fontSize: 13 }} />
+                      <span style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>Category *</span>
+                      <select
+                        value={createServiceForm.category}
+                        onChange={(e) => setCreateServiceForm((p) => ({ ...p, category: e.target.value }))}
+                        disabled={creatingService}
+                        style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: '8px 10px', fontSize: 13, background: 'white' }}
+                      >
+                        <option value="">Select category</option>
+                        {serviceCategories.map((category) => (
+                          <option key={category} value={category}>{category}</option>
+                        ))}
+                        <option value="__new__">+ Add New Category</option>
+                      </select>
                     </label>
+                    {createServiceForm.category === '__new__' && (
+                      <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        <span style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>New Category *</span>
+                        <input
+                          value={createServiceForm._newCategory}
+                          onChange={(e) => setCreateServiceForm((p) => ({ ...p, _newCategory: e.target.value }))}
+                          placeholder="Enter new category name"
+                          disabled={creatingService}
+                          style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: '8px 10px', fontSize: 13 }}
+                        />
+                      </label>
+                    )}
                     <label style={{ display: 'flex', flexDirection: 'column', gap: 4, gridColumn: '1 / -1' }}>
                       <span style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>Description</span>
-                      <textarea value={createServiceForm.description} onChange={(e) => setCreateServiceForm(p => ({ ...p, description: e.target.value }))} placeholder="Brief description" disabled={creatingService} rows={2} style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: '8px 10px', fontSize: 13, resize: 'vertical' }} />
+                      <textarea value={createServiceForm.description} onChange={(e) => setCreateServiceForm(p => ({ ...p, description: e.target.value }))} placeholder="Describe the service, scope, and any requirements..." disabled={creatingService} rows={2} style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: '8px 10px', fontSize: 13, resize: 'vertical' }} />
                     </label>
-                    <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                      <span style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>Unit of Measure</span>
-                      <input value={createServiceForm.unitOfMeasure} onChange={(e) => setCreateServiceForm(p => ({ ...p, unitOfMeasure: e.target.value }))} placeholder="Per Visit, Per Hour" disabled={creatingService} style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: '8px 10px', fontSize: 13 }} />
-                    </label>
-                    <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                      <span style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>Base Price</span>
-                      <input value={createServiceForm.basePrice} onChange={(e) => setCreateServiceForm(p => ({ ...p, basePrice: e.target.value }))} placeholder="150.00" disabled={creatingService} style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: '8px 10px', fontSize: 13 }} />
-                    </label>
-                    <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                      <span style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>Duration (minutes)</span>
-                      <input value={createServiceForm.durationMinutes} onChange={(e) => setCreateServiceForm(p => ({ ...p, durationMinutes: e.target.value }))} placeholder="120" disabled={creatingService} style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: '8px 10px', fontSize: 13 }} />
+                    <label style={{ display: 'flex', flexDirection: 'column', gap: 4, gridColumn: '1 / -1' }}>
+                      <span style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>Photo</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <input
+                          ref={serviceFileInputRef}
+                          type="file"
+                          accept="image/*"
+                          onChange={handleServicePhotoSelect}
+                          disabled={creatingService}
+                          style={{ fontSize: 13 }}
+                        />
+                        {servicePhotoPreview && (
+                          <div style={{ position: 'relative' }}>
+                            <img
+                              src={servicePhotoPreview}
+                              alt="Preview"
+                              style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 6, border: '1px solid #e2e8f0' }}
+                            />
+                            <button
+                              type="button"
+                              onClick={clearServicePhoto}
+                              style={{ position: 'absolute', top: -6, right: -6, width: 18, height: 18, borderRadius: '50%', background: '#ef4444', color: '#fff', border: 'none', fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                            >
+                              x
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </label>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14, gap: 10 }}>

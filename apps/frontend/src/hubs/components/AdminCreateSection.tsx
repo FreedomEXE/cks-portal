@@ -8,7 +8,7 @@ function stringOrUndefined(val: string | undefined): string | undefined {
 }
 import { Button, NavigationTab, PageWrapper, TabContainer } from '@cks/ui';
 import { useAuth } from '@clerk/clerk-react';
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSWRConfig } from 'swr';
 import {
   createCenter,
@@ -28,6 +28,8 @@ import { createAccessCode } from '../../shared/api/access';
 import {
   createCatalogProduct,
   createCatalogService,
+  getCatalogCategories,
+  uploadCatalogImage,
   type CreateCatalogProductPayload,
   type CreateCatalogServicePayload,
 } from '../../shared/api/admin';
@@ -285,26 +287,15 @@ function buildTabConfigs(): TabConfig<unknown>[] {
   ];
 
   const productFields: FieldConfig[] = [
-    { name: 'name', label: 'Product Name', required: true, placeholder: 'Premium Cleaning Solution' },
-    { name: 'category', label: 'Category', placeholder: 'Cleaning Supplies' },
-    { name: 'description', label: 'Description', multiline: true, placeholder: 'Describe the product...' },
-    { name: 'unitOfMeasure', label: 'Unit of Measure', placeholder: 'Each, Case, Gallon' },
-    { name: 'basePrice', label: 'Base Price', placeholder: '29.99' },
-    { name: 'sku', label: 'SKU', placeholder: 'CLN-PRM-001' },
-    { name: 'packageSize', label: 'Package Size', placeholder: '1 Gallon' },
-    { name: 'leadTimeDays', label: 'Lead Time (days)', placeholder: '3' },
-    { name: 'reorderPoint', label: 'Reorder Point', placeholder: '10' },
+    { name: 'name', label: 'Product Name', required: true, placeholder: 'e.g. HEPA Vacuum Bags (Box of 10)' },
+    { name: 'category', label: 'Category', required: true, control: 'select', options: [], placeholder: 'Select category' },
+    { name: 'description', label: 'Description', multiline: true, placeholder: 'Describe the product, including packaging/quantity details...' },
   ];
 
   const serviceFields: FieldConfig[] = [
-    { name: 'name', label: 'Service Name', required: true, placeholder: 'Deep Cleaning Service' },
-    { name: 'category', label: 'Category', placeholder: 'Cleaning' },
-    { name: 'description', label: 'Description', multiline: true, placeholder: 'Describe the service...' },
-    { name: 'unitOfMeasure', label: 'Unit of Measure', placeholder: 'Per Visit, Per Hour' },
-    { name: 'basePrice', label: 'Base Price', placeholder: '150.00' },
-    { name: 'durationMinutes', label: 'Duration (minutes)', placeholder: '120' },
-    { name: 'serviceWindow', label: 'Service Window', placeholder: 'Mon-Fri 8am-5pm' },
-    { name: 'crewRequired', label: 'Crew Required', placeholder: '2' },
+    { name: 'name', label: 'Service Name', required: true, placeholder: 'e.g. Deep Carpet Extraction' },
+    { name: 'category', label: 'Category', required: true, control: 'select', options: [], placeholder: 'Select category' },
+    { name: 'description', label: 'Description', multiline: true, placeholder: 'Describe the service, scope, and any requirements...' },
   ];
 
   const accessCodeFields: FieldConfig[] = [
@@ -488,22 +479,19 @@ function buildTabConfigs(): TabConfig<unknown>[] {
       fields: productFields,
       submitLabel: 'Create Product',
       create: async (values, getToken) => {
+        if (values.category === '__new__' && !stringOrUndefined(values._newCategory)) {
+          throw new Error('New category is required');
+        }
         const payload: CreateCatalogProductPayload = {
           name: values.name.trim(),
           description: stringOrUndefined(values.description),
-          category: stringOrUndefined(values.category),
-          unitOfMeasure: stringOrUndefined(values.unitOfMeasure),
-          basePrice: stringOrUndefined(values.basePrice),
-          sku: stringOrUndefined(values.sku),
-          packageSize: stringOrUndefined(values.packageSize),
-          leadTimeDays: values.leadTimeDays ? Number(values.leadTimeDays) : undefined,
-          reorderPoint: values.reorderPoint ? Number(values.reorderPoint) : undefined,
+          category: values.category === '__new__' ? stringOrUndefined(values._newCategory) : stringOrUndefined(values.category),
         };
         return createCatalogProduct(payload, { getToken });
       },
       resetValues: buildFieldValues(productFields),
       successMessage: (record: any) => `Product created: ${record.productId ?? ''}`.trim(),
-      mutateKeys: ['/catalog/items'],
+      mutateKeys: ['/catalog/items', '/catalog/categories'],
     },
     {
       key: 'services',
@@ -512,21 +500,19 @@ function buildTabConfigs(): TabConfig<unknown>[] {
       fields: serviceFields,
       submitLabel: 'Create Service',
       create: async (values, getToken) => {
+        if (values.category === '__new__' && !stringOrUndefined(values._newCategory)) {
+          throw new Error('New category is required');
+        }
         const payload: CreateCatalogServicePayload = {
           name: values.name.trim(),
           description: stringOrUndefined(values.description),
-          category: stringOrUndefined(values.category),
-          unitOfMeasure: stringOrUndefined(values.unitOfMeasure),
-          basePrice: stringOrUndefined(values.basePrice),
-          durationMinutes: values.durationMinutes ? Number(values.durationMinutes) : undefined,
-          serviceWindow: stringOrUndefined(values.serviceWindow),
-          crewRequired: values.crewRequired ? Number(values.crewRequired) : undefined,
+          category: values.category === '__new__' ? stringOrUndefined(values._newCategory) : stringOrUndefined(values.category),
         };
         return createCatalogService(payload, { getToken });
       },
       resetValues: buildFieldValues(serviceFields),
       successMessage: (record: any) => `Service created: ${record.serviceId ?? ''}`.trim(),
-      mutateKeys: ['/catalog/items'],
+      mutateKeys: ['/catalog/items', '/catalog/categories'],
     },
     {
       key: 'accessCodes',
@@ -554,6 +540,8 @@ function buildTabConfigs(): TabConfig<unknown>[] {
 
   return configs;
 }
+
+const CATALOG_TABS: TabKey[] = ['products', 'services'];
 
 export default function AdminCreateSection() {
   const { getToken } = useAuth();
@@ -587,6 +575,49 @@ export default function AdminCreateSection() {
   const [statuses, setStatuses] = useState<SubmissionMap>(initialStatus);
   const { mutate } = useSWRConfig();
 
+  // ── Category dropdown data ──────────────────────────────────────────
+  const [productCategories, setProductCategories] = useState<string[]>([]);
+  const [serviceCategories, setServiceCategories] = useState<string[]>([]);
+  const categoriesFetched = useRef(false);
+
+  useEffect(() => {
+    if (categoriesFetched.current) return;
+    categoriesFetched.current = true;
+    getCatalogCategories({ getToken }).then((data) => {
+      setProductCategories(data.products);
+      setServiceCategories(data.services);
+    }).catch(() => {
+      // Categories will just show empty dropdown — user can still type new
+    });
+  }, [getToken]);
+
+  // ── Photo upload state (products/services only) ─────────────────────
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handlePhotoSelect = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (photoPreview) URL.revokeObjectURL(photoPreview);
+    setPhotoFile(file);
+    const url = URL.createObjectURL(file);
+    setPhotoPreview(url);
+  }, [photoPreview]);
+
+  const clearPhoto = useCallback(() => {
+    setPhotoFile(null);
+    if (photoPreview) URL.revokeObjectURL(photoPreview);
+    setPhotoPreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  }, [photoPreview]);
+
+  // Clear photo when switching tabs
+  useEffect(() => {
+    clearPhoto();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
   function updateField(tab: TabKey, field: string, value: string) {
     setForms((prev) => ({
       ...prev,
@@ -596,6 +627,24 @@ export default function AdminCreateSection() {
       },
     }));
   }
+
+  // Resolve dynamic category options for product/service tabs
+  function getFieldsWithCategories(config: TabConfig<unknown>): FieldConfig[] {
+    if (config.key !== 'products' && config.key !== 'services') return config.fields;
+    const cats = config.key === 'products' ? productCategories : serviceCategories;
+    return config.fields.map((field) => {
+      if (field.name !== 'category') return field;
+      return {
+        ...field,
+        options: [
+          ...cats.map((c) => ({ value: c, label: c })),
+          { value: '__new__', label: '+ Add New Category' },
+        ],
+      };
+    });
+  }
+
+  const isCatalogTab = CATALOG_TABS.includes(activeTab);
 
   async function handleSubmit(event: React.FormEvent, tab: TabKey) {
     event.preventDefault();
@@ -613,6 +662,20 @@ export default function AdminCreateSection() {
 
     try {
       const record = await config.create(values, getToken);
+
+      // Upload photo if one was selected (products/services only)
+      if (photoFile && CATALOG_TABS.includes(tab)) {
+        const itemType = tab === 'products' ? 'product' : 'service';
+        const itemId = (record as any).productId ?? (record as any).serviceId;
+        if (itemId) {
+          try {
+            await uploadCatalogImage(photoFile, itemType as 'product' | 'service', itemId, { getToken });
+          } catch (uploadError) {
+            console.warn('Photo upload failed after creation:', uploadError);
+          }
+        }
+      }
+
       setStatuses((prev) => ({
         ...prev,
         [tab]: {
@@ -625,6 +688,7 @@ export default function AdminCreateSection() {
         ...prev,
         [tab]: { ...config.resetValues },
       }));
+      clearPhoto();
       try {
         await Promise.all(config.mutateKeys.map((key) => mutate(key, undefined, { revalidate: true })));
       } catch (mutateError) {
@@ -642,6 +706,8 @@ export default function AdminCreateSection() {
   const activeConfig = tabMap[activeTab];
   const activeStatus = statuses[activeTab];
   const activeValues = forms[activeTab];
+  const resolvedFields = activeConfig ? getFieldsWithCategories(activeConfig) : [];
+  const showNewCategoryInput = isCatalogTab && activeValues?.category === '__new__';
 
   return (
     <PageWrapper title="Create" headerSrOnly>
@@ -671,11 +737,80 @@ export default function AdminCreateSection() {
               }}
             >
               <FormTable
-                fields={activeConfig.fields}
+                fields={resolvedFields}
                 values={activeValues}
                 disabled={activeStatus.loading}
                 onChange={(name, value) => updateField(activeConfig.key, name, value)}
               />
+
+              {showNewCategoryInput && (
+                <table style={{ width: '100%', borderSpacing: '0 16px' }}>
+                  <tbody>
+                    <tr>
+                      <td style={{ width: 150, verticalAlign: 'top', paddingRight: 16 }}>
+                        <label style={{ fontWeight: 500, color: '#374151', fontSize: 14 }}>New Category *</label>
+                      </td>
+                      <td>
+                        <input
+                          type="text"
+                          value={activeValues._newCategory ?? ''}
+                          onChange={(e) => updateField(activeConfig.key, '_newCategory', e.target.value)}
+                          placeholder="Enter new category name"
+                          disabled={activeStatus.loading}
+                          style={{ width: '320px', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 14 }}
+                        />
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              )}
+
+              {isCatalogTab && (
+                <table style={{ width: '100%', borderSpacing: '0 16px' }}>
+                  <tbody>
+                    <tr>
+                      <td style={{ width: 150, verticalAlign: 'top', paddingRight: 16 }}>
+                        <label style={{ fontWeight: 500, color: '#374151', fontSize: 14 }}>Photo</label>
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                          <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/*"
+                            onChange={handlePhotoSelect}
+                            disabled={activeStatus.loading}
+                            style={{ fontSize: 13 }}
+                          />
+                          {photoPreview && (
+                            <div style={{ position: 'relative' }}>
+                              <img
+                                src={photoPreview}
+                                alt="Preview"
+                                style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 6, border: '1px solid #e2e8f0' }}
+                              />
+                              <button
+                                type="button"
+                                onClick={clearPhoto}
+                                style={{
+                                  position: 'absolute', top: -6, right: -6,
+                                  width: 20, height: 20, borderRadius: '50%',
+                                  background: '#ef4444', color: '#fff', border: 'none',
+                                  fontSize: 12, cursor: 'pointer', display: 'flex',
+                                  alignItems: 'center', justifyContent: 'center',
+                                }}
+                              >
+                                x
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              )}
+
               <div style={{ marginTop: 24 }}>
                 <Button type="submit" variant="primary" roleColor={activeConfig.color} disabled={activeStatus.loading}>
                   {activeConfig.submitLabel}

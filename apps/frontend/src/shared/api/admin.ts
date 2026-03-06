@@ -423,6 +423,22 @@ export async function getServiceCertifications(serviceId: string, init?: ApiFetc
   });
 }
 
+// ── Catalog categories ──────────────────────────────────────────────
+export interface CatalogCategories {
+  products: string[];
+  services: string[];
+}
+
+export async function getCatalogCategories(
+  init?: ApiFetchInit,
+): Promise<CatalogCategories> {
+  const response = await apiFetch<{ success: boolean; data: CatalogCategories }>('/catalog/categories', {
+    method: 'GET',
+    ...init,
+  });
+  return response.data;
+}
+
 // ── Create catalog product/service ──────────────────────────────────
 export interface CreateCatalogProductPayload {
   name: string;

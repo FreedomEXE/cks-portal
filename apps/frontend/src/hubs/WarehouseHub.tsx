@@ -11,7 +11,7 @@
   Manifested by Freedom_EXE
 -----------------------------------------------*/
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useHubLoading } from '../contexts/HubLoadingContext';
@@ -70,8 +70,8 @@ import { ActivityFeed } from '../components/ActivityFeed';
 import ProfileSkeleton from '../components/ProfileSkeleton';
 // Legacy ActivityModalGateway removed - use universal ModalGateway via modals.openById()
 import { useEntityActions } from '../hooks/useEntityActions';
-import { createFeedback as apiCreateFeedback, acknowledgeItem as apiAcknowledgeItem, resolveReport as apiResolveReport, fetchServicesForReports, fetchProceduresForReports, fetchOrdersForReports } from '../shared/api/hub';
-import { createCatalogProduct, type CreateCatalogProductPayload } from '../shared/api/admin';
+import { createReport as apiCreateReport, createFeedback as apiCreateFeedback, acknowledgeItem as apiAcknowledgeItem, resolveReport as apiResolveReport, fetchServicesForReports, fetchProceduresForReports, fetchOrdersForReports } from '../shared/api/hub';
+import { createCatalogProduct, getCatalogCategories, uploadCatalogImage, type CreateCatalogProductPayload } from '../shared/api/admin';
 
 interface WarehouseHubProps {
   initialTab?: string;
@@ -186,8 +186,12 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
   const [inventorySearchQuery, setInventorySearchQuery] = useState('');
   const [inventoryFilter, setInventoryFilter] = useState<string>('');
   const [showCreateProduct, setShowCreateProduct] = useState(false);
-  const [createProductForm, setCreateProductForm] = useState({ name: '', category: '', description: '', unitOfMeasure: '', basePrice: '', sku: '' });
+  const [createProductForm, setCreateProductForm] = useState({ name: '', category: '', description: '', _newCategory: '' });
   const [creatingProduct, setCreatingProduct] = useState(false);
+  const [productCategories, setProductCategories] = useState<string[]>([]);
+  const [productPhotoFile, setProductPhotoFile] = useState<File | null>(null);
+  const [productPhotoPreview, setProductPhotoPreview] = useState<string | null>(null);
+  const productFileInputRef = useRef<HTMLInputElement>(null);
   const [overviewModal, setOverviewModal] = useState<{
     id: string;
     title: string;
@@ -200,6 +204,15 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
 
   // identity + helpers
   const { getToken } = useClerkAuth();
+
+  // ── Fetch product categories for dropdown ─────────────────────────
+  const productCatsFetched = useRef(false);
+  useEffect(() => {
+    if (productCatsFetched.current) return;
+    productCatsFetched.current = true;
+    getCatalogCategories({ getToken }).then((d) => setProductCategories(d.products)).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const { code: authCode, accessStatus, accessTier, accessSource } = useAuth();
   const { user } = useUser();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
@@ -366,9 +379,31 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
     }
   }, [user?.id]);
 
+  const clearProductPhoto = useCallback(() => {
+    setProductPhotoFile(null);
+    if (productPhotoPreview) URL.revokeObjectURL(productPhotoPreview);
+    setProductPhotoPreview(null);
+    if (productFileInputRef.current) productFileInputRef.current.value = '';
+  }, [productPhotoPreview]);
+
+  const handleProductPhotoSelect = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (productPhotoPreview) URL.revokeObjectURL(productPhotoPreview);
+    setProductPhotoFile(file);
+    setProductPhotoPreview(URL.createObjectURL(file));
+  }, [productPhotoPreview]);
+
   const handleCreateProduct = useCallback(async () => {
     if (!createProductForm.name.trim()) {
       toast.error('Product name is required');
+      return;
+    }
+    const resolvedCategory = createProductForm.category === '__new__'
+      ? (createProductForm._newCategory.trim() || undefined)
+      : (createProductForm.category.trim() || undefined);
+    if (!resolvedCategory) {
+      toast.error('Category is required');
       return;
     }
     setCreatingProduct(true);
@@ -376,26 +411,39 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
       const payload: CreateCatalogProductPayload = {
         name: createProductForm.name.trim(),
         description: createProductForm.description.trim() || undefined,
-        category: createProductForm.category.trim() || undefined,
-        unitOfMeasure: createProductForm.unitOfMeasure.trim() || undefined,
-        basePrice: createProductForm.basePrice.trim() || undefined,
-        sku: createProductForm.sku.trim() || undefined,
+        category: resolvedCategory,
       };
       const result = await createCatalogProduct(payload, { getToken });
+
+      // Upload photo if selected
+      if (productPhotoFile && result.productId) {
+        try {
+          await uploadCatalogImage(productPhotoFile, 'product', result.productId, { getToken });
+        } catch {
+          console.warn('Photo upload failed after product creation');
+        }
+      }
+
       toast.success(`Product created: ${result.productId}`);
-      setCreateProductForm({ name: '', category: '', description: '', unitOfMeasure: '', basePrice: '', sku: '' });
+      setCreateProductForm({ name: '', category: '', description: '', _newCategory: '' });
+      clearProductPhoto();
       setShowCreateProduct(false);
-      // Refresh inventory + catalog
       mutate((key: unknown) => typeof key === 'string' && (key.includes('/inventory') || key.includes('/catalog')), undefined, { revalidate: true });
     } catch (err: any) {
       toast.error(err?.message || 'Failed to create product');
     } finally {
       setCreatingProduct(false);
     }
-  }, [createProductForm, getToken, mutate]);
+  }, [createProductForm, productPhotoFile, getToken, mutate, clearProductPhoto]);
+
+  useEffect(() => {
+    if (activeTab !== 'inventory' || !showCreateProduct) {
+      clearProductPhoto();
+    }
+  }, [activeTab, clearProductPhoto, showCreateProduct]);
 
   const handleSupportSubmit = useCallback(async (payload: any) => {
-    const mapped = mapSupportIssuePayload(payload);
+    const mapped = await mapSupportIssuePayload(payload);
     if (mapped.type === 'report') {
       await apiCreateReport({
         title: mapped.title,
@@ -929,27 +977,37 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                     <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                       <span style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>Product Name *</span>
-                      <input value={createProductForm.name} onChange={(e) => setCreateProductForm(p => ({ ...p, name: e.target.value }))} placeholder="Enter product name" disabled={creatingProduct} style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: '8px 10px', fontSize: 13 }} />
+                      <input value={createProductForm.name} onChange={(e) => setCreateProductForm(p => ({ ...p, name: e.target.value }))} placeholder="e.g. HEPA Vacuum Bags (Box of 10)" disabled={creatingProduct} style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: '8px 10px', fontSize: 13 }} />
                     </label>
                     <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                      <span style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>Category</span>
-                      <input value={createProductForm.category} onChange={(e) => setCreateProductForm(p => ({ ...p, category: e.target.value }))} placeholder="e.g. Cleaning Supplies" disabled={creatingProduct} style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: '8px 10px', fontSize: 13 }} />
+                      <span style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>Category *</span>
+                      <select value={createProductForm.category} onChange={(e) => setCreateProductForm(p => ({ ...p, category: e.target.value }))} disabled={creatingProduct} style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: '8px 10px', fontSize: 13, background: 'white' }}>
+                        <option value="">Select category</option>
+                        {productCategories.map((c) => <option key={c} value={c}>{c}</option>)}
+                        <option value="__new__">+ Add New Category</option>
+                      </select>
                     </label>
+                    {createProductForm.category === '__new__' && (
+                      <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        <span style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>New Category *</span>
+                        <input value={createProductForm._newCategory} onChange={(e) => setCreateProductForm(p => ({ ...p, _newCategory: e.target.value }))} placeholder="Enter new category name" disabled={creatingProduct} style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: '8px 10px', fontSize: 13 }} />
+                      </label>
+                    )}
                     <label style={{ display: 'flex', flexDirection: 'column', gap: 4, gridColumn: '1 / -1' }}>
                       <span style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>Description</span>
-                      <textarea value={createProductForm.description} onChange={(e) => setCreateProductForm(p => ({ ...p, description: e.target.value }))} placeholder="Brief description" disabled={creatingProduct} rows={2} style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: '8px 10px', fontSize: 13, resize: 'vertical' }} />
+                      <textarea value={createProductForm.description} onChange={(e) => setCreateProductForm(p => ({ ...p, description: e.target.value }))} placeholder="Describe the product, including packaging/quantity details..." disabled={creatingProduct} rows={2} style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: '8px 10px', fontSize: 13, resize: 'vertical' }} />
                     </label>
-                    <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                      <span style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>Unit of Measure</span>
-                      <input value={createProductForm.unitOfMeasure} onChange={(e) => setCreateProductForm(p => ({ ...p, unitOfMeasure: e.target.value }))} placeholder="Each, Case, Gallon" disabled={creatingProduct} style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: '8px 10px', fontSize: 13 }} />
-                    </label>
-                    <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                      <span style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>Base Price</span>
-                      <input value={createProductForm.basePrice} onChange={(e) => setCreateProductForm(p => ({ ...p, basePrice: e.target.value }))} placeholder="29.99" disabled={creatingProduct} style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: '8px 10px', fontSize: 13 }} />
-                    </label>
-                    <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                      <span style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>SKU</span>
-                      <input value={createProductForm.sku} onChange={(e) => setCreateProductForm(p => ({ ...p, sku: e.target.value }))} placeholder="CLN-PRM-001" disabled={creatingProduct} style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: '8px 10px', fontSize: 13 }} />
+                    <label style={{ display: 'flex', flexDirection: 'column', gap: 4, gridColumn: '1 / -1' }}>
+                      <span style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>Photo</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <input ref={productFileInputRef} type="file" accept="image/*" onChange={handleProductPhotoSelect} disabled={creatingProduct} style={{ fontSize: 13 }} />
+                        {productPhotoPreview && (
+                          <div style={{ position: 'relative' }}>
+                            <img src={productPhotoPreview} alt="Preview" style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 6, border: '1px solid #e2e8f0' }} />
+                            <button type="button" onClick={clearProductPhoto} style={{ position: 'absolute', top: -6, right: -6, width: 18, height: 18, borderRadius: '50%', background: '#ef4444', color: '#fff', border: 'none', fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>x</button>
+                          </div>
+                        )}
+                      </div>
                     </label>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14, gap: 10 }}>

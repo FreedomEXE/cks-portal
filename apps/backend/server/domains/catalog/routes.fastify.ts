@@ -899,10 +899,6 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
     if (!account) return;
 
     const role = (account.role ?? '').trim().toLowerCase();
-    if (role !== 'admin' && role !== 'warehouse') {
-      reply.code(403).send({ error: 'Only admins and warehouse users can upload catalog images' });
-      return;
-    }
 
     const data = await request.file();
     if (!data) {
@@ -921,6 +917,15 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
     }
     if (itemType !== 'product' && itemType !== 'service') {
       reply.code(400).send({ error: 'type must be "product" or "service"' });
+      return;
+    }
+
+    if (itemType === 'product' && role !== 'admin' && role !== 'warehouse') {
+      reply.code(403).send({ error: 'Only admins and warehouse users can upload product images' });
+      return;
+    }
+    if (itemType === 'service' && role !== 'admin' && role !== 'manager') {
+      reply.code(403).send({ error: 'Only admins and manager users can upload service images' });
       return;
     }
 
@@ -968,6 +973,36 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
         error: 'Failed to upload image',
         details: error instanceof Error ? error.message : String(error),
       });
+    }
+  });
+
+  // ── Catalog categories ──────────────────────────────────────────────
+  // GET /api/catalog/categories
+  // Returns distinct categories for products and services
+  server.get('/api/catalog/categories', async (request, reply) => {
+    const account = await requireActiveRole(request, reply, {});
+    if (!account) return;
+
+    try {
+      const [productCats, serviceCats] = await Promise.all([
+        query<{ category: string }>(
+          `SELECT DISTINCT category FROM catalog_products WHERE category IS NOT NULL AND category != '' AND is_active = TRUE ORDER BY category`,
+        ),
+        query<{ category: string }>(
+          `SELECT DISTINCT category FROM catalog_services WHERE category IS NOT NULL AND category != '' AND is_active = TRUE ORDER BY category`,
+        ),
+      ]);
+
+      reply.send({
+        success: true,
+        data: {
+          products: productCats.rows.map((r) => r.category),
+          services: serviceCats.rows.map((r) => r.category),
+        },
+      });
+    } catch (error) {
+      request.log.error({ err: error }, 'Failed to fetch catalog categories');
+      reply.code(500).send({ error: 'Failed to fetch categories' });
     }
   });
 
