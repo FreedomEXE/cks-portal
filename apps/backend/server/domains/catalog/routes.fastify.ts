@@ -4,7 +4,7 @@ import { requireActiveRole } from '../../core/auth/guards';
 import { requireActiveAdmin } from '../adminUsers/guards';
 import { query, withTransaction } from '../../db/connection';
 import { getCatalogItems } from './service';
-import { isCatalogItemVisible, resolveCatalogEcosystemManagerId } from './store';
+import { canonicalizeCatalogCategory, isCatalogItemVisible, resolveCatalogEcosystemManagerId } from './store';
 import { recordActivity } from '../activity/writer';
 import { uploadImageToCloudinary } from '../../shared/cloudinary';
 
@@ -418,7 +418,7 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
       const data: any = {
         serviceId: row.service_id,
         name: row.name,
-        category: row.category,
+        category: canonicalizeCatalogCategory('service', row.category, row.service_id),
         description: row.description,
         tags: row.tags || [],
         status: row.is_active ? 'active' : 'inactive',
@@ -615,7 +615,7 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
           name: product.name,
           description: product.description,
           imageUrl: product.image_url,
-          category: product.category,
+          category: canonicalizeCatalogCategory('product', product.category, product.product_id),
           unitOfMeasure: product.unit_of_measure,
           status: state, // Keep in data for backward compat
           metadata: product.metadata,
@@ -1141,47 +1141,55 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
       const serviceVisibility = buildCatalogVisibilityClause('service', 's.service_id');
 
       const [productCats, serviceCats] = await Promise.all([
-        query<{ category: string }>(
-          `SELECT DISTINCT normalized.category
-           FROM (
-             SELECT
-               COALESCE(
-                 NULLIF(BTRIM(category), ''),
-                 NULLIF(BTRIM(metadata->>'category'), '')
-               ) AS category
-             FROM catalog_products p
-             WHERE COALESCE(p.is_active, TRUE) = TRUE
-               AND ${productCodeFilter}
-               ${productVisibility.clause}
-           ) AS normalized
-           WHERE normalized.category IS NOT NULL
-           ORDER BY normalized.category`,
+        query<{ item_code: string; category: string | null }>(
+          `SELECT
+             p.product_id AS item_code,
+             COALESCE(
+               NULLIF(BTRIM(p.category), ''),
+               NULLIF(BTRIM(p.metadata->>'category'), '')
+             ) AS category
+           FROM catalog_products p
+           WHERE COALESCE(p.is_active, TRUE) = TRUE
+             AND ${productCodeFilter}
+             ${productVisibility.clause}`,
           ['%-TEST%', ...productVisibility.params],
         ),
-        query<{ category: string }>(
-          `SELECT DISTINCT normalized.category
-           FROM (
-             SELECT
-               COALESCE(
-                 NULLIF(BTRIM(category), ''),
-                 NULLIF(BTRIM(metadata->>'category'), '')
-               ) AS category
-             FROM catalog_services s
-             WHERE COALESCE(s.is_active, TRUE) = TRUE
-               AND ${serviceCodeFilter}
-               ${serviceVisibility.clause}
-           ) AS normalized
-           WHERE normalized.category IS NOT NULL
-           ORDER BY normalized.category`,
+        query<{ item_code: string; category: string | null }>(
+          `SELECT
+             s.service_id AS item_code,
+             COALESCE(
+               NULLIF(BTRIM(s.category), ''),
+               NULLIF(BTRIM(s.metadata->>'category'), '')
+             ) AS category
+           FROM catalog_services s
+           WHERE COALESCE(s.is_active, TRUE) = TRUE
+             AND ${serviceCodeFilter}
+             ${serviceVisibility.clause}`,
           ['%-TEST%', ...serviceVisibility.params],
         ),
       ]);
 
+      const productCategories = Array.from(
+        new Set(
+          productCats.rows
+            .map((row) => canonicalizeCatalogCategory('product', row.category, row.item_code))
+            .filter((value): value is string => Boolean(value)),
+        ),
+      ).sort((a, b) => a.localeCompare(b));
+
+      const serviceCategories = Array.from(
+        new Set(
+          serviceCats.rows
+            .map((row) => canonicalizeCatalogCategory('service', row.category, row.item_code))
+            .filter((value): value is string => Boolean(value)),
+        ),
+      ).sort((a, b) => a.localeCompare(b));
+
       reply.send({
         success: true,
         data: {
-          products: productCats.rows.map((r) => r.category),
-          services: serviceCats.rows.map((r) => r.category),
+          products: productCategories,
+          services: serviceCategories,
         },
       });
     } catch (error) {

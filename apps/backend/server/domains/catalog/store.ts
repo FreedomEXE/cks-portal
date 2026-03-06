@@ -38,6 +38,39 @@ interface CatalogItemRow {
   stock_on_hand: number | null;
 }
 
+export function normalizeCategorySlug(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const normalized = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return normalized.length > 0 ? normalized : null;
+}
+
+export function canonicalizeCatalogCategory(
+  itemType: "product" | "service",
+  category: unknown,
+  itemCode?: string | null,
+): string | null {
+  if (itemType === "service" && typeof itemCode === "string" && itemCode.trim().toUpperCase() === "SRV-001") {
+    return "daily";
+  }
+
+  const normalized = normalizeCategorySlug(category);
+  if (!normalized) {
+    return null;
+  }
+
+  if (itemType === "product" && (normalized === "garbage-bags-clear" || normalized === "garbage-bags")) {
+    return "garbage-bags";
+  }
+
+  return normalized;
+}
+
 function toPrice(row: CatalogItemRow): CatalogItemPrice | null {
   if (row.base_price === null || row.base_price === undefined) {
     return null;
@@ -77,19 +110,20 @@ function toServiceDetails(row: CatalogItemRow): CatalogServiceDetails | null {
 }
 
 function mapCatalogRow(row: CatalogItemRow): CatalogItem {
+  const canonicalCategory = canonicalizeCatalogCategory(row.item_type, row.category, row.item_code);
   const tags = Array.isArray(row.tags)
     ? row.tags.filter((tag): tag is string => typeof tag === "string")
     : [];
 
-  if (row.category && !tags.includes(row.category)) {
-    tags.unshift(row.category);
+  if (canonicalCategory && !tags.includes(canonicalCategory)) {
+    tags.unshift(canonicalCategory);
   }
 
   return {
     code: row.item_code,
     name: row.name,
     type: row.item_type,
-    category: row.category ?? null,
+    category: canonicalCategory,
     description: row.description ?? null,
     tags,
     imageUrl: row.image_url ?? null,
@@ -232,16 +266,42 @@ function buildWhere(filters: CatalogFilters, ecosystemManagerId: string | null) 
   const where: string[] = ["i.is_active = TRUE"];
   const params: unknown[] = [];
 
+  const categorySlugSql = `NULLIF(
+    REGEXP_REPLACE(
+      REGEXP_REPLACE(
+        LOWER(COALESCE(i.category, '')),
+        '[^a-z0-9]+',
+        '-',
+        'g'
+      ),
+      '(^-+|-+$)',
+      '',
+      'g'
+    ),
+    ''
+  )`;
+  const canonicalCategorySql = `(
+    CASE
+      WHEN i.item_type = 'service' AND UPPER(i.item_code) = 'SRV-001' THEN 'daily'
+      WHEN ${categorySlugSql} IN ('garbage-bags', 'garbage-bags-clear') THEN 'garbage-bags'
+      ELSE ${categorySlugSql}
+    END
+  )`;
+
   if (filters.type) {
     params.push(filters.type);
     where.push(`i.item_type = $${params.length}`);
   }
 
   if (filters.category) {
-    const normalizedCategory = filters.category.trim();
-    if (normalizedCategory.length > 0) {
+    const rawCategory = normalizeCategorySlug(filters.category);
+    const normalizedCategory =
+      rawCategory === "garbage-bags-clear" || rawCategory === "garbage-bags"
+        ? "garbage-bags"
+        : rawCategory;
+    if (normalizedCategory) {
       params.push(normalizedCategory);
-      where.push(`i.category = $${params.length}`);
+      where.push(`${canonicalCategorySql} = $${params.length}`);
     }
   }
 
@@ -318,7 +378,10 @@ const CATALOG_UNION = `
     NULL::integer AS duration_minutes,
     NULL::text AS service_window,
     NULL::jsonb AS service_attributes,
-    p.category,
+    COALESCE(
+      NULLIF(BTRIM(p.category), ''),
+      NULLIF(BTRIM(p.metadata->>'category'), '')
+    ) AS category,
     NULL::integer AS crew_required,
     NULL::text AS managed_by,
     p.is_active,
@@ -355,7 +418,10 @@ const CATALOG_UNION = `
     s.duration_minutes,
     s.service_window,
     s.attributes AS service_attributes,
-    s.category,
+    COALESCE(
+      NULLIF(BTRIM(s.category), ''),
+      NULLIF(BTRIM(s.metadata->>'category'), '')
+    ) AS category,
     s.crew_required,
     s.managed_by,
     s.is_active,
