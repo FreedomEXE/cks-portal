@@ -1113,13 +1113,15 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
           actorId,
           actorRole: 'admin',
           targetId: requestId,
-          targetType: 'catalogServiceRequest',
+          // system_activity.target_type is VARCHAR(20); catalogServiceRequest exceeds it
+          targetType: 'catalogService',
           metadata: {
             requestId,
             serviceId,
             serviceName: serviceRequest.service_name,
             managerId: serviceRequest.manager_id,
             category: serviceRequest.category,
+            targetType: 'catalogServiceRequest',
           },
         }, { txQuery });
 
@@ -1236,13 +1238,15 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
           actorId,
           actorRole: 'admin',
           targetId: requestId,
-          targetType: 'catalogServiceRequest',
+          // system_activity.target_type is VARCHAR(20); catalogServiceRequest exceeds it
+          targetType: 'catalogService',
           metadata: {
             requestId,
             managerId: serviceRequest.manager_id,
             serviceName: serviceRequest.service_name,
             category: serviceRequest.category,
             notes,
+            targetType: 'catalogServiceRequest',
           },
         }, { txQuery });
 
@@ -1835,12 +1839,14 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
           actorId,
           actorRole: role,
           targetId: requestId,
-          targetType: 'catalogServiceRequest',
+          // system_activity.target_type is VARCHAR(20); catalogServiceRequest exceeds it
+          targetType: 'catalogService',
           metadata: {
             requestId,
             managerId,
             serviceName: normalizedName,
             category: normalizedCategory || null,
+            targetType: 'catalogServiceRequest',
           },
         });
 
