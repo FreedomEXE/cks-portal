@@ -1442,12 +1442,28 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
     const account = await requireActiveRole(request, reply, {});
     if (!account) return;
 
+    const categoryQuerySchema = z.object({
+      scope: z.enum(['visible', 'all']).optional(),
+    });
+    const parsedQuery = categoryQuerySchema.safeParse(request.query ?? {});
+    if (!parsedQuery.success) {
+      reply.code(400).send({ error: 'Invalid category query' });
+      return;
+    }
+
     try {
-      const ecosystemManagerId = await resolveCatalogEcosystemManagerId({
-        role: account.role,
-        cksCode: account.cksCode,
-        isAdmin: account.isAdmin,
-      });
+      const normalizedRole = (account.role ?? '').trim().toLowerCase();
+      const canRequestAllScope =
+        normalizedRole === 'admin' || normalizedRole === 'manager' || normalizedRole === 'warehouse';
+      const includeAllCategories = parsedQuery.data.scope === 'all' && canRequestAllScope;
+
+      const ecosystemManagerId = includeAllCategories
+        ? null
+        : await resolveCatalogEcosystemManagerId({
+            role: account.role,
+            cksCode: account.cksCode,
+            isAdmin: account.isAdmin,
+          });
       const isTest = Boolean(account.cksCode && account.cksCode.toUpperCase().includes('-TEST'));
 
       const buildCatalogVisibilityClause = (itemType: 'product' | 'service', itemCodeExpression: string) => {

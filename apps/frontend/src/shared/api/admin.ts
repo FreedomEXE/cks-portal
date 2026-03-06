@@ -448,7 +448,7 @@ function normalizeCategoryList(input: unknown): string[] {
 export async function getCatalogCategories(
   init?: ApiFetchInit,
 ): Promise<CatalogCategories> {
-  const response = await apiFetch<{ success?: boolean; data?: any }>('/catalog/categories', {
+  const response = await apiFetch<{ success?: boolean; data?: any }>('/catalog/categories?scope=all', {
     method: 'GET',
     ...init,
   });
