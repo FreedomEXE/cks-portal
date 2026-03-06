@@ -2158,6 +2158,7 @@ const catalogServiceAdapter: EntityAdapter = {
       type: 'Service',
       status: entityData?.status || 'active',
       fields,
+      imageUrl: entityData?.imageUrl || undefined,
     };
   },
 
@@ -2430,6 +2431,7 @@ const productAdapter: EntityAdapter = {
       type: 'Product',
       status: entityData?.status || 'active',
       fields,
+      imageUrl: entityData?.imageUrl || undefined,
     };
   },
 

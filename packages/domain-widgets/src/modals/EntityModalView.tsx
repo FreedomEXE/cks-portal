@@ -148,6 +148,7 @@ export function EntityModalView({
       typeLabel={headerConfig.type?.toUpperCase() || entityType.toUpperCase()}
       name={nameString}
       accentColor={accentColor}
+      imageUrl={headerConfig.imageUrl}
       status={
         displayStatus
           ? { value: displayStatus, text: displayStatusText || displayStatus.toUpperCase() }

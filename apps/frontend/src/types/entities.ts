@@ -130,6 +130,9 @@ export interface HeaderConfig {
 
   /** Optional badges (priority, rating, etc.) */
   badges?: React.ReactNode[];
+
+  /** Optional image URL displayed as a thumbnail in the header */
+  imageUrl?: string;
 }
 
 /**

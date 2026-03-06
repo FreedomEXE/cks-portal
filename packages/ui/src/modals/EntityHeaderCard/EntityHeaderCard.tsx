@@ -38,6 +38,9 @@ export interface EntityHeaderCardProps {
     text?: string;
   };
 
+  /** Optional image URL to display as a thumbnail */
+  imageUrl?: string;
+
   /** Optional additional content slot */
   children?: React.ReactNode;
 }
@@ -48,8 +51,12 @@ export function EntityHeaderCard({
   name,
   accentColor,
   status,
+  imageUrl,
   children,
 }: EntityHeaderCardProps) {
+  const [imgError, setImgError] = React.useState(false);
+  const showImage = !!imageUrl && !imgError;
+
   return (
     <div className={styles.card}>
       {/* Accent bar at top */}
@@ -78,9 +85,22 @@ export function EntityHeaderCard({
           )}
         </div>
 
-        {/* Name (if provided) */}
-        {name && (
-          <div className={styles.name}>{name}</div>
+        {/* Image + Name row (if image provided) */}
+        {showImage ? (
+          <div className={styles.imageRow}>
+            <img
+              src={imageUrl}
+              alt={name || id}
+              className={styles.thumbnail}
+              onError={() => setImgError(true)}
+            />
+            <div className={styles.imageRowText}>
+              {name && <div className={styles.name}>{name}</div>}
+            </div>
+          </div>
+        ) : (
+          /* Name only (no image) */
+          name && <div className={styles.name}>{name}</div>
         )}
 
         {/* Additional content slot */}

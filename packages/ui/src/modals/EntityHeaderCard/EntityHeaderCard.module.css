@@ -56,6 +56,34 @@
   margin-top: 4px;
 }
 
+.imageRow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 8px;
+}
+
+.imageRowText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.imageRow .name {
+  margin-top: 0;
+}
+
+.thumbnail {
+  width: 64px;
+  height: 64px;
+  border-radius: 10px;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+}
+
 .statusBadge {
   padding: 4px 12px;
   border-radius: 12px;

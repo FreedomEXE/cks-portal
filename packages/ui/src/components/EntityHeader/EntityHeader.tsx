@@ -27,6 +27,8 @@ export interface HeaderConfig {
   statusText?: string;
   fields: HeaderField[];
   badges?: React.ReactNode[];
+  /** Optional image URL displayed as a thumbnail in the header */
+  imageUrl?: string;
 }
 
 export interface EntityHeaderProps {
