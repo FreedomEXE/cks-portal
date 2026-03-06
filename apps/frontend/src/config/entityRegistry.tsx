@@ -1775,15 +1775,15 @@ const userAdapter: EntityAdapter = {
           });
         }
 
-        if (isLinkedUser) {
-          descriptors.push({
-            key: 'impersonate',
-            label: 'Impersonate',
-            variant: 'secondary',
-            confirm: 'Impersonate this user? This will switch your session.',
-            closeOnSuccess: true,
-          });
-        }
+        // Admins can impersonate any user — the backend auto-provisions a
+        // Clerk account if one doesn't exist yet (getOrCreateClerkUserForEntity).
+        descriptors.push({
+          key: 'impersonate',
+          label: 'Impersonate',
+          variant: 'secondary',
+          confirm: 'Impersonate this user? This will switch your session.',
+          closeOnSuccess: true,
+        });
 
         // Edit action
         descriptors.push({
