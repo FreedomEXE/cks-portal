@@ -62,9 +62,9 @@ export function canSeeTab(tabId: TabId, context: TabVisibilityContext): boolean 
         return role === 'admin';
       }
 
-      // Products: admin-only history timeline
+      // Products: admin and warehouse can see history
       if (entityType === 'product') {
-        return role === 'admin';
+        return role === 'admin' || role === 'warehouse';
       }
 
       // Other non-user entities (orders, services, reports): everyone can see history
@@ -92,9 +92,12 @@ export function canSeeTab(tabId: TabId, context: TabVisibilityContext): boolean 
       return false;
 
     // ===== MANAGEMENT TAB =====
-    // Admin-only: account status/tier management for user entities
+    // Admin-only for most entities; admin + warehouse for products
     case 'management': {
       const manageableEntityTypes: EntityType[] = ['manager', 'contractor', 'customer', 'center', 'crew', 'warehouse', 'product', 'catalogService'];
+      if (entityType === 'product') {
+        return (role === 'admin' || role === 'warehouse') && manageableEntityTypes.includes(entityType);
+      }
       return role === 'admin' && manageableEntityTypes.includes(entityType);
     }
 
