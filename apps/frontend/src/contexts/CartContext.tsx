@@ -94,3 +94,19 @@ export function useCart() {
   }
   return context;
 }
+
+/** Safe variant that returns a no-op fallback outside CartProvider (e.g. tests). */
+const NOOP_CART: CartContextType = {
+  items: [],
+  addItem: () => {},
+  removeItem: () => {},
+  updateQuantity: () => {},
+  clearCart: () => {},
+  getTotalItems: () => 0,
+  isInCart: () => false,
+};
+
+export function useCartSafe() {
+  const context = useContext(CartContext);
+  return context ?? NOOP_CART;
+}

@@ -21,13 +21,14 @@
  * - etc.
  */
 
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { EntityType, UserRole, EntityState, Lifecycle, OpenEntityModalOptions } from '../types/entities';
 import { entityRegistry } from '../config/entityRegistry';
 import { useOrderDetails } from '../hooks/useOrderDetails';
 import { useReportDetails } from '../hooks/useReportDetails';
 import { useServiceDetails } from '../hooks/useServiceDetails';
 import { useEntityActions } from '../hooks/useEntityActions';
+import { useCartSafe } from '../contexts/CartContext';
 import { filterVisibleTabs } from '../policies/tabs';
 import { EntityModalView } from '@cks/domain-widgets';
 import ReportHeaderExtras from './ReportHeaderExtras';
@@ -113,6 +114,11 @@ export function ModalGateway({
 
   // Get action handler hook at top level (NO LONGER in adapters!)
   const { handleAction } = useEntityActions();
+  const cart = useCartSafe();
+  const [addedToCart, setAddedToCart] = useState(false);
+
+  // Reset local "added" feedback when opening a different product
+  useEffect(() => { setAddedToCart(false); }, [entityId]);
 
   const orderDetails = useOrderDetails({
     orderId: entityType === 'order' ? entityId : null
@@ -446,28 +452,74 @@ export function ModalGateway({
     return null;
   }, [adapter, role, lifecycle, entityType, data, actions, entityId]);
 
+  // Shopping roles that can add products to cart (not admin/warehouse — they manage inventory)
+  const isShoppingRole = role !== 'admin' && role !== 'warehouse';
+  const productInCart = entityType === 'product' && entityId ? cart.isInCart(entityId) : false;
+
   const headerExtras = useMemo(() => {
-    if (
-      !adapter ||
-      !data ||
-      !entityType ||
-      !entityId ||
-      (entityType !== 'report' && entityType !== 'feedback')
-    ) {
+    if (!adapter || !data || !entityType || !entityId) {
       return null;
     }
 
-    return (
-      <ReportHeaderExtras
-        acknowledgments={data.acknowledgments}
-        resolvedBy={data.resolvedBy}
-        resolvedAt={data.resolvedAt}
-        resolution={data.resolution}
-        resolution_notes={data.resolution_notes}
-        currentUserId={currentUserId}
-      />
-    );
-  }, [adapter, data, entityType, entityId, currentUserId]);
+    const extras: JSX.Element[] = [];
+
+    // Add to Cart button for product modals (shopping roles only)
+    if (entityType === 'product' && isShoppingRole && lifecycle?.state !== 'archived' && lifecycle?.state !== 'deleted') {
+      const inCart = productInCart || addedToCart;
+      extras.push(
+        <button
+          key="add-to-cart"
+          type="button"
+          onClick={() => {
+            cart.addItem({
+              code: data.productId || entityId,
+              name: data.name || 'Product',
+              type: 'product',
+              category: data.category || null,
+              description: data.description || null,
+              tags: [],
+              imageUrl: data.imageUrl || null,
+              unitOfMeasure: data.unitOfMeasure || null,
+              price: data.price || null,
+              metadata: null,
+            });
+            setAddedToCart(true);
+          }}
+          style={{
+            width: '100%',
+            padding: '10px 16px',
+            borderRadius: 10,
+            border: 'none',
+            background: inCart ? '#059669' : '#111827',
+            color: '#fff',
+            fontSize: 14,
+            fontWeight: 600,
+            cursor: 'pointer',
+            transition: 'background 0.15s',
+          }}
+        >
+          {inCart ? 'Added to Cart' : 'Add to Cart'}
+        </button>
+      );
+    }
+
+    // Report/Feedback extras
+    if (entityType === 'report' || entityType === 'feedback') {
+      extras.push(
+        <ReportHeaderExtras
+          key="report-extras"
+          acknowledgments={data.acknowledgments}
+          resolvedBy={data.resolvedBy}
+          resolvedAt={data.resolvedAt}
+          resolution={data.resolution}
+          resolution_notes={data.resolution_notes}
+          currentUserId={currentUserId}
+        />
+      );
+    }
+
+    return extras.length > 0 ? <>{extras}</> : null;
+  }, [adapter, data, entityType, entityId, currentUserId, isShoppingRole, lifecycle, productInCart, addedToCart, cart]);
 
   // LEGACY: Map data to component props (for backward compatibility with old modals)
   const componentProps = useMemo(() => {
