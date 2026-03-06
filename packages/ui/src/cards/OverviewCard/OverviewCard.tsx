@@ -100,7 +100,7 @@ export default function OverviewCard({
         padding: 16,
         textAlign: 'center',
         cursor: isClickable ? 'pointer' : 'default',
-        transition: 'all 0.2s',
+        transition: 'transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease',
         userSelect: 'none',
         WebkitUserSelect: 'none'
       }}
@@ -112,17 +112,17 @@ export default function OverviewCard({
       }}
       onMouseLeave={(e) => {
         if (!isClickable) return;
-        e.currentTarget.style.transform = 'translateY(0)';
+        e.currentTarget.style.transform = '';
         e.currentTarget.style.boxShadow = '';
         e.currentTarget.style.background = '';
       }}
       onMouseDown={(e) => {
         if (!isClickable) return;
-        e.currentTarget.style.transform = 'translateY(0) scale(0.98)';
+        e.currentTarget.style.transform = 'scale(0.97)';
       }}
       onMouseUp={(e) => {
         if (!isClickable) return;
-        e.currentTarget.style.transform = 'translateY(-2px) scale(1)';
+        e.currentTarget.style.transform = 'translateY(-2px)';
       }}
     >
       <div style={{

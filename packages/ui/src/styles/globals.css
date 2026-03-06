@@ -11,33 +11,13 @@
     box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1);
   }
 
-/* Modal background transform and motion tokens */
+/* Modal background tokens — scale transform removed to prevent layout
+   shift / stuck-card glitch when overview cards open modals.  The blur
+   backdrop in ModalRoot already provides sufficient visual separation. */
 :root {
   --cks-modal-ease: cubic-bezier(0.2, 0, 0, 1);
   --cks-modal-duration: 220ms;
   --cks-modal-duration-exit: 180ms;
-}
-
-/* Smooth background transform when a modal is open */
-#root {
-  transition:
-    transform var(--cks-modal-duration) var(--cks-modal-ease),
-    filter var(--cks-modal-duration) var(--cks-modal-ease);
-}
-
-body.modal-open #root {
-  transform: scale(0.985);
-  filter: saturate(0.95);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  #root {
-    transition: none;
-  }
-  body.modal-open #root {
-    transform: none;
-    filter: none;
-  }
 }
 
   .btn {
