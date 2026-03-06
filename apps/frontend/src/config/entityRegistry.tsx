@@ -2468,7 +2468,7 @@ const productAdapter: EntityAdapter = {
       },
     ];
 
-      if (role === 'admin') {
+      if (role === 'admin' || role === 'warehouse') {
         tabs.push({
           id: 'management',
           label: 'Management',

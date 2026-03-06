@@ -840,8 +840,14 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
   });
 
   server.patch('/api/admin/catalog/products/:productId', async (request, reply) => {
-    const admin = await requireActiveAdmin(request, reply);
-    if (!admin) return;
+    // Allow admin and warehouse users to update product details (name, description, image)
+    const account = await requireActiveRole(request, reply, {});
+    if (!account) return;
+    const patchRole = (account.role ?? '').trim().toLowerCase();
+    if (patchRole !== 'admin' && patchRole !== 'warehouse') {
+      reply.code(403).send({ error: 'Only admins and warehouse users can update products' });
+      return;
+    }
 
     const paramsSchema = z.object({ productId: z.string().min(1) });
     const bodySchema = z.object({

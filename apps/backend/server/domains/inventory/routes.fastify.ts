@@ -70,10 +70,10 @@ export async function registerInventoryRoutes(server: FastifyInstance) {
       return;
     }
 
-    // Only admin can update inventory
+    // Admin and warehouse users can update inventory
     const role = (account.role ?? '').trim().toLowerCase() as HubRole;
-    if (role !== 'admin') {
-      reply.code(403).send({ error: 'Only admins can update inventory' });
+    if (role !== 'admin' && role !== 'warehouse') {
+      reply.code(403).send({ error: 'Only admins and warehouse users can update inventory' });
       return;
     }
 
@@ -86,8 +86,8 @@ export async function registerInventoryRoutes(server: FastifyInstance) {
     try {
       await updateInventoryQuantity({
         ...parsed.data,
-        actorId: account.cksCode || 'ADMIN',
-        actorRole: 'admin',
+        actorId: account.cksCode || (role === 'warehouse' ? 'WAREHOUSE' : 'ADMIN'),
+        actorRole: role,
       });
       reply.send({ success: true, message: 'Inventory updated successfully' });
     } catch (error) {
