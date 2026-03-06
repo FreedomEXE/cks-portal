@@ -39,6 +39,7 @@ import {
   HistoryTab,
   OrderActionsContent,
   ReportQuickActions,
+  StatusBadge,
   UserModal,
   UserQuickActions,
   ServiceDetails,
@@ -61,6 +62,7 @@ import ServiceTrainingTab from '../components/tabs/ServiceTrainingTab/ServiceTra
 import ServiceProductsTab from '../components/tabs/ServiceProductsTab/ServiceProductsTab';
 import ServiceTasksTab from '../components/tabs/ServiceTasksTab/ServiceTasksTab';
 import ServiceCrewTasksTab from '../components/tabs/ServiceCrewTasksTab/ServiceCrewTasksTab';
+import TicketMessagesTab from '../components/tabs/TicketMessagesTab';
 import EditableUserProfileTab from '../components/tabs/UserProfileTab/EditableUserProfileTab';
 import UserManagementTab from '../components/tabs/UserManagementTab/UserManagementTab';
 
@@ -1101,6 +1103,284 @@ const reportAdapter: EntityAdapter = {
       entityType: data?.type || 'report',
       entityId: data?.id,
     };
+  },
+};
+
+function formatTicketIssueType(value?: string | null): string {
+  const normalized = (value || '').trim().replace(/_/g, ' ');
+  if (!normalized) {
+    return 'General Question';
+  }
+  return normalized
+    .split(' ')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(' ');
+}
+
+function formatTicketDate(value?: string | null): string {
+  if (!value) return 'N/A';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function buildTicketDetailsSections(context: TabVisibilityContext): import('@cks/ui').SectionDescriptor[] {
+  const ticket = context.entityData;
+  const sections: import('@cks/ui').SectionDescriptor[] = [];
+
+  sections.push({
+    id: 'ticket-summary',
+    type: 'key-value-grid',
+    title: 'Ticket Summary',
+    columns: 2,
+    fields: [
+      { label: 'Issue Type', value: formatTicketIssueType(ticket?.issueType) },
+      { label: 'Priority', value: ticket?.priority || 'MEDIUM' },
+      { label: 'Subject', value: ticket?.subject || '-' },
+      { label: 'Submitted By', value: ticket?.createdById || '-' },
+      { label: 'Submitted Role', value: ticket?.createdByRole || '-' },
+      { label: 'Date Submitted', value: formatTicketDate(ticket?.submittedDate) },
+      { label: 'Status', value: ticket?.status || 'open' },
+      { label: 'Assigned To', value: ticket?.assignedTo || 'Unassigned' },
+    ],
+  });
+
+  if (ticket?.description) {
+    sections.push({
+      id: 'ticket-description',
+      type: 'rich-text',
+      title: 'Description',
+      content: ticket.description,
+    });
+  }
+
+  if (ticket?.stepsToReproduce) {
+    sections.push({
+      id: 'ticket-steps',
+      type: 'rich-text',
+      title: 'Steps To Reproduce',
+      content: ticket.stepsToReproduce,
+    });
+  }
+
+  if (ticket?.status === 'resolved' || ticket?.status === 'closed') {
+    sections.push({
+      id: 'ticket-resolution',
+      type: 'key-value-grid',
+      title: 'Resolution',
+      columns: 2,
+      fields: [
+        { label: 'Resolved By', value: ticket?.resolvedBy || '-' },
+        { label: 'Resolved At', value: formatTicketDate(ticket?.resolvedAt) },
+        { label: 'Resolution Notes', value: ticket?.resolutionNotes || '-' },
+        { label: 'Action Taken', value: ticket?.actionTaken || '-' },
+      ],
+    });
+  }
+
+  return sections;
+}
+
+const ticketAdapter: EntityAdapter = {
+  getActionDescriptors: (context: EntityActionContext): EntityActionDescriptor[] => {
+    const { role, entityData, viewerId } = context;
+    const descriptors: EntityActionDescriptor[] = [];
+    const status = String(entityData?.status || 'open').toLowerCase();
+    const isTerminal = status === 'closed' || status === 'cancelled';
+    const isSubmitter =
+      String(entityData?.createdById || '').toUpperCase() === String(viewerId || '').toUpperCase();
+
+    if (role === 'admin') {
+      if (!entityData?.assignedTo && !isTerminal) {
+        descriptors.push({
+          key: 'assign',
+          label: 'Assign',
+          variant: 'secondary',
+          prompt: 'Assignee ID',
+          closeOnSuccess: false,
+        });
+      } else if (entityData?.assignedTo && !isTerminal) {
+        descriptors.push({
+          key: 'unassign',
+          label: 'Unassign',
+          variant: 'secondary',
+          confirm: 'Unassign this ticket?',
+          closeOnSuccess: false,
+        });
+      }
+
+      if (['open', 'in_progress', 'waiting_on_user', 'escalated'].includes(status)) {
+        descriptors.push({
+          key: 'resolve',
+          label: 'Resolve',
+          variant: 'primary',
+          prompt: 'Resolution notes',
+          closeOnSuccess: false,
+        });
+      }
+
+      if (status === 'resolved') {
+        descriptors.push({
+          key: 'reopen',
+          label: 'Reopen',
+          variant: 'secondary',
+          prompt: 'Optional: reason for reopening',
+          closeOnSuccess: false,
+        });
+      }
+
+      if (!isTerminal) {
+        descriptors.push({
+          key: 'change_status',
+          label: 'Change Status',
+          variant: 'secondary',
+          prompt: 'New status (open, in_progress, waiting_on_user, escalated, resolved, closed, cancelled)',
+          closeOnSuccess: false,
+        });
+      }
+
+      descriptors.push({
+        key: 'add_comment',
+        label: 'Add Comment',
+        variant: 'secondary',
+        prompt: 'Comment text',
+        closeOnSuccess: false,
+      });
+      descriptors.push({
+        key: 'add_internal_comment',
+        label: 'Add Internal Note',
+        variant: 'secondary',
+        prompt: 'Internal note text',
+        closeOnSuccess: false,
+      });
+    } else {
+      descriptors.push({
+        key: 'add_comment',
+        label: 'Add Comment',
+        variant: 'primary',
+        prompt: 'Comment text',
+        closeOnSuccess: false,
+      });
+
+      if (isSubmitter && status === 'open') {
+        descriptors.push({
+          key: 'cancel',
+          label: 'Cancel Ticket',
+          variant: 'danger',
+          confirm: 'Cancel this ticket?',
+          prompt: 'Optional: reason for cancellation',
+          closeOnSuccess: false,
+        });
+      }
+    }
+
+    return descriptors;
+  },
+
+  getHeaderConfig: (context: TabVisibilityContext): HeaderConfig => {
+    const ticket = context.entityData;
+    const badges: React.ReactNode[] = [];
+
+    if (ticket?.priority) {
+      badges.push(
+        <span
+          key="ticket-priority"
+          style={{
+            padding: '2px 8px',
+            borderRadius: 4,
+            fontSize: 11,
+            fontWeight: 600,
+            background: '#e0f2fe',
+            color: '#075985',
+          }}
+        >
+          {ticket.priority}
+        </span>,
+      );
+    }
+
+    if (Number(ticket?.reopenedCount || 0) > 0) {
+      badges.push(
+        <span
+          key="ticket-reopens"
+          style={{
+            padding: '2px 8px',
+            borderRadius: 4,
+            fontSize: 11,
+            fontWeight: 600,
+            background: '#fef3c7',
+            color: '#92400e',
+          }}
+        >
+          Reopened {ticket.reopenedCount}x
+        </span>,
+      );
+    }
+
+    badges.push(<StatusBadge key="ticket-status-badge" status={ticket?.status || 'open'} variant="badge" />);
+
+    return {
+      id: ticket?.ticketId || ticket?.id || '',
+      type: 'Support Ticket',
+      status: ticket?.status || 'open',
+      fields: [
+        { label: 'Issue Type', value: formatTicketIssueType(ticket?.issueType) },
+        { label: 'Submitted By', value: ticket?.createdById || '-' },
+        { label: 'Assigned To', value: ticket?.assignedTo || 'Unassigned' },
+      ],
+      badges,
+    };
+  },
+
+  getDetailsSections: buildTicketDetailsSections,
+
+  getTabDescriptors: (context: TabVisibilityContext): TabDescriptor[] => {
+    const ticket = context.entityData;
+    const sections = buildTicketDetailsSections(context);
+
+    return [
+      {
+        id: 'details',
+        label: 'Details',
+        content: (
+          <DetailsComposer
+            sections={filterVisibleSections(sections, {
+              entityType: context.entityType,
+              role: context.role,
+              lifecycle: context.lifecycle,
+              entityData: ticket,
+            })}
+          />
+        ),
+      },
+      {
+        id: 'messages',
+        label: 'Messages',
+        content: (
+          <TicketMessagesTab
+            ticketId={ticket?.ticketId || ticket?.id}
+            viewerRole={context.role}
+          />
+        ),
+      },
+      {
+        id: 'history',
+        label: 'History',
+        content: (
+          <HistoryTab
+            entityType="support_ticket"
+            entityId={ticket?.ticketId || ticket?.id}
+          />
+        ),
+      },
+    ];
   },
 };
 
@@ -2536,6 +2816,7 @@ export const entityRegistry: EntityRegistry = {
   order: orderAdapter,
   report: reportAdapter,
   feedback: reportAdapter, // Feedback uses same adapter as report
+  ticket: ticketAdapter,
   service: serviceAdapter,
   catalogService: catalogServiceAdapter, // ✅ Catalog service definitions (SRV-XXX unscoped)
   admin: userAdapter,

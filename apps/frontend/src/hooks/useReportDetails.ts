@@ -171,12 +171,7 @@ export function useReportDetails(params: UseReportDetailsParams): UseReportDetai
   // Construct SWR key: only fetch if we have reportId
   // Session-based auth pattern (matches how orders work)
   const shouldFetch = !!(reportId && reportType);
-  const isSupportTicket = !!reportId && reportId.toUpperCase().includes('-TKT-');
-  const swrKey = shouldFetch
-    ? (isSupportTicket
-      ? `/support/tickets/${reportId}/details`
-      : `/reports/${reportId}/details`)
-    : null;
+  const swrKey = shouldFetch ? `/reports/${reportId}/details` : null;
 
   // Fetch on-demand from backend (apiFetch handles tombstone fallback on 404)
   const { data, error, isLoading, mutate } = useSWR<ApiResponse<any>>(

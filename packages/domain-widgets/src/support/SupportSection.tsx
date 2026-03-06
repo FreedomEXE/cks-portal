@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { DataTable, TabSection } from '@cks/ui';
 
 interface FAQ {
@@ -12,6 +12,11 @@ export interface SupportTicket {
   issueType: string;
   priority: string;
   status: string;
+  statusCode?: string;
+  submittedBy?: string;
+  assignedTo?: string | null;
+  commentCount?: number;
+  resolvedAt?: string | null;
   dateCreated: string;
   lastUpdated: string;
 }
@@ -57,6 +62,16 @@ const SupportSection: React.FC<SupportSectionProps> = ({
     status: 'idle',
     message: null
   });
+  const screenshotInputRef = useRef<HTMLInputElement | null>(null);
+  const [screenshotPreviewUrl, setScreenshotPreviewUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (screenshotPreviewUrl) {
+        URL.revokeObjectURL(screenshotPreviewUrl);
+      }
+    };
+  }, [screenshotPreviewUrl]);
 
   // FAQ data based on role
   const getFAQs = (role: string): FAQ[] => {
@@ -231,6 +246,35 @@ const SupportSection: React.FC<SupportSectionProps> = ({
   // TODO: Fetch real tickets from backend API
   const myTickets = tickets ?? [];
 
+  const resetScreenshotState = () => {
+    setScreenshotPreviewUrl((current) => {
+      if (current) {
+        URL.revokeObjectURL(current);
+      }
+      return null;
+    });
+    if (screenshotInputRef.current) {
+      screenshotInputRef.current.value = '';
+    }
+  };
+
+  const handleScreenshotChange = (file: File | null) => {
+    setTicketForm((prev) => ({ ...prev, screenshotFile: file }));
+    setScreenshotPreviewUrl((current) => {
+      if (current) {
+        URL.revokeObjectURL(current);
+      }
+      return file ? URL.createObjectURL(file) : null;
+    });
+  };
+
+  const removeScreenshot = () => {
+    handleScreenshotChange(null);
+    if (screenshotInputRef.current) {
+      screenshotInputRef.current.value = '';
+    }
+  };
+
   const handleSubmitTicket = async () => {
     if (!onSubmitTicket) {
       setSubmitState({ status: 'error', message: 'Support submission is not configured.' });
@@ -249,6 +293,7 @@ const SupportSection: React.FC<SupportSectionProps> = ({
         stepsToReproduce: '',
         screenshotFile: null
       });
+      resetScreenshotState();
     } catch (error: any) {
       const message = error?.message || 'Failed to submit support ticket.';
       setSubmitState({ status: 'error', message });
@@ -264,6 +309,7 @@ const SupportSection: React.FC<SupportSectionProps> = ({
       stepsToReproduce: '',
       screenshotFile: null
     });
+    resetScreenshotState();
   };
 
   const renderKnowledgeBase = () => (
@@ -318,18 +364,30 @@ const SupportSection: React.FC<SupportSectionProps> = ({
           {
             key: 'status',
             label: 'STATUS',
-            render: (value) => (
-              <span style={{
-                padding: '4px 8px',
-                borderRadius: '4px',
-                fontSize: '12px',
-                fontWeight: 500,
-                backgroundColor: value === 'Resolved' ? '#dcfce7' : value === 'In Progress' ? '#fef3c7' : '#fee2e2',
-                color: value === 'Resolved' ? '#16a34a' : value === 'In Progress' ? '#d97706' : '#dc2626'
-              }}>
-                {value}
-              </span>
-            )
+            render: (value, row) => {
+              const status = String((row as any)?.statusCode || value || '').toLowerCase();
+              const palette = status === 'resolved' || status === 'closed'
+                ? { bg: '#dcfce7', fg: '#166534' }
+                : status === 'in_progress' || status === 'waiting_on_user'
+                  ? { bg: '#fef3c7', fg: '#92400e' }
+                  : status === 'escalated'
+                    ? { bg: '#fee2e2', fg: '#991b1b' }
+                    : status === 'cancelled'
+                      ? { bg: '#e5e7eb', fg: '#374151' }
+                      : { bg: '#e0f2fe', fg: '#075985' };
+              return (
+                <span style={{
+                  padding: '4px 8px',
+                  borderRadius: '4px',
+                  fontSize: '12px',
+                  fontWeight: 500,
+                  backgroundColor: palette.bg,
+                  color: palette.fg,
+                }}>
+                  {value}
+                </span>
+              );
+            }
           },
           { key: 'dateCreated', label: 'DATE CREATED' },
           { key: 'lastUpdated', label: 'LAST UPDATED' }
@@ -545,11 +603,12 @@ const SupportSection: React.FC<SupportSectionProps> = ({
             Screenshot (Optional)
           </label>
           <input
+            ref={screenshotInputRef}
             type="file"
             accept="image/*"
             onChange={(e) => {
               const file = e.target.files?.[0] ?? null;
-              setTicketForm({ ...ticketForm, screenshotFile: file });
+              handleScreenshotChange(file);
             }}
             style={{
               width: '100%',
@@ -561,8 +620,63 @@ const SupportSection: React.FC<SupportSectionProps> = ({
             }}
           />
           {ticketForm.screenshotFile ? (
-            <div style={{ marginTop: 8, fontSize: '12px', color: '#6b7280' }}>
-              Attached: {ticketForm.screenshotFile.name}
+            <div style={{ marginTop: 8, display: 'grid', gap: 8 }}>
+              {screenshotPreviewUrl ? (
+                <img
+                  src={screenshotPreviewUrl}
+                  alt="Support ticket screenshot preview"
+                  style={{
+                    width: '100%',
+                    maxWidth: 360,
+                    maxHeight: 200,
+                    objectFit: 'cover',
+                    borderRadius: '8px',
+                    border: '1px solid #e5e7eb',
+                  }}
+                />
+              ) : null}
+              <div style={{ fontSize: '12px', color: '#6b7280' }}>
+                Attached: {ticketForm.screenshotFile.name}
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (screenshotInputRef.current) {
+                      screenshotInputRef.current.value = '';
+                      screenshotInputRef.current.click();
+                    }
+                  }}
+                  style={{
+                    padding: '6px 12px',
+                    fontSize: '12px',
+                    fontWeight: 500,
+                    borderRadius: '6px',
+                    border: '1px solid #d1d5db',
+                    backgroundColor: '#ffffff',
+                    color: '#374151',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Replace
+                </button>
+                <button
+                  type="button"
+                  onClick={removeScreenshot}
+                  style={{
+                    padding: '6px 12px',
+                    fontSize: '12px',
+                    fontWeight: 500,
+                    borderRadius: '6px',
+                    border: '1px solid #fecaca',
+                    backgroundColor: '#fff1f2',
+                    color: '#b91c1c',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Remove
+                </button>
+              </div>
             </div>
           ) : null}
           <div style={{ marginTop: 4, fontSize: '12px', color: '#6b7280' }}>

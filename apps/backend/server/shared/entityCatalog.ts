@@ -116,6 +116,28 @@ export const ENTITY_CATALOG: Record<string, EntityDefinition> = {
     }
   },
 
+  support_ticket: {
+    type: 'support_ticket',
+    displayName: 'Support Ticket',
+    displayNamePlural: 'Support Tickets',
+    idToken: 'TKT',
+    idPattern: /^(?:[A-Z]{3}-\d{3}-)?TKT-\d+$/i,
+    backendTable: 'support_tickets',
+    backendIdColumn: 'ticket_id',
+    supportsDetailFetch: true,
+    supportsArchive: false,
+    supportsDelete: false,
+    supportsRestore: false,
+    supportsHistory: true,
+    supportsTombstone: false,
+    activityTypes: {
+      created: 'support_ticket_submitted',
+      archived: 'support_ticket_archived',
+      restored: 'support_ticket_restored',
+      deleted: 'support_ticket_deleted'
+    }
+  },
+
   service: {
     type: 'service',
     displayName: 'Service',

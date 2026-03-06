@@ -19,6 +19,7 @@ export type EntityType =
   | 'feedback'
   | 'service'
   | 'catalogService' // Catalog service definitions (SRV-XXX unscoped)
+  | 'ticket'
   | 'user'
   | 'product'
   | 'warehouse'
@@ -73,6 +74,7 @@ export type TabId =
   | 'products'
   | 'procedures'
   | 'training'
+  | 'messages'
   | 'notes'
   | 'overview'
   | 'audit';

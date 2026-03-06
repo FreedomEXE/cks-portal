@@ -20,7 +20,7 @@ import { useSWRConfig } from 'swr';
 import toast from 'react-hot-toast';
 import { useAuth as useClerkAuth, useSignIn, useClerk } from '@clerk/clerk-react';
 import { parseEntityId } from '../shared/utils/parseEntityId';
-import { applyHubOrderAction, type OrderActionRequest, acknowledgeItem, resolveReport, applyServiceAction, requestServiceCrew, respondToServiceCrew, respondToOrderCrew, respondToCrewInvite } from '../shared/api/hub';
+import { addTicketComment, applyHubOrderAction, assignTicket, type OrderActionRequest, acknowledgeItem, reopenTicket, resolveReport, resolveTicket, unassignTicket, updateTicketStatus, applyServiceAction, requestServiceCrew, respondToServiceCrew, respondToOrderCrew, respondToCrewInvite } from '../shared/api/hub';
 import { archiveAPI } from '../shared/api/archive';
 import { createImpersonationToken, sendUserInvite, unlinkUserAccountLink, updateCatalogService } from '../shared/api/admin';
 
@@ -70,6 +70,10 @@ export function useEntityActions(): UseEntityActionsReturn {
 
         if (type === 'report') {
           return await handleReportAction(targetEntityId, actionId, subtype, options, mutate);
+        }
+
+        if (type === 'ticket') {
+          return await handleTicketAction(targetEntityId, actionId, options, mutate);
         }
 
         // User entities: manager | contractor | customer | center | crew | warehouse
@@ -378,6 +382,131 @@ async function handleOrderAction(
     console.error(`[useEntityActions] Order action "${actionId}" failed:`, error);
     // Don't show alert here - let the caller handle it
     // alert(`Failed to ${actionId} order. Please try again.`);
+    throw error;
+  }
+}
+
+async function handleTicketAction(
+  ticketId: string,
+  actionId: string,
+  options: EntityActionOptions,
+  mutate: any,
+): Promise<boolean> {
+  const normalizeStatus = (value: string) => value.trim().toLowerCase().replace(/[\s-]+/g, '_');
+  const allowedStatuses = new Set([
+    'open',
+    'in_progress',
+    'waiting_on_user',
+    'escalated',
+    'resolved',
+    'closed',
+    'cancelled',
+  ]);
+
+  try {
+    switch (actionId) {
+      case 'resolve': {
+        const notes = (options.notes || '').trim();
+        if (!notes) {
+          toast.error('Resolution notes are required');
+          return false;
+        }
+        const actionTaken =
+          (options.metadata?.actionTaken as string | undefined) ??
+          window.prompt('Optional: Action taken')?.trim() ??
+          undefined;
+        await resolveTicket(ticketId, { notes, actionTaken });
+        toast.success('Ticket resolved');
+        break;
+      }
+      case 'assign': {
+        const assigneeId = (options.notes || '').trim();
+        if (!assigneeId) {
+          toast.error('Assignee ID is required');
+          return false;
+        }
+        await assignTicket(ticketId, assigneeId);
+        toast.success('Ticket assigned');
+        break;
+      }
+      case 'unassign': {
+        await unassignTicket(ticketId);
+        toast.success('Ticket unassigned');
+        break;
+      }
+      case 'reopen': {
+        await reopenTicket(ticketId, options.notes?.trim() || undefined);
+        toast.success('Ticket reopened');
+        break;
+      }
+      case 'cancel': {
+        await updateTicketStatus(ticketId, { status: 'cancelled', notes: options.notes?.trim() || undefined });
+        toast.success('Ticket cancelled');
+        break;
+      }
+      case 'change_status':
+      case 'status': {
+        const statusInput = normalizeStatus(options.notes || '');
+        if (!allowedStatuses.has(statusInput)) {
+          toast.error('Enter a valid status (open, in_progress, waiting_on_user, escalated, resolved, closed, cancelled)');
+          return false;
+        }
+        const notes =
+          statusInput === 'resolved'
+            ? (window.prompt('Resolution notes are required:')?.trim() || options.notes?.trim() || '')
+            : undefined;
+        const actionTaken =
+          statusInput === 'resolved'
+            ? (window.prompt('Optional: Action taken')?.trim() || undefined)
+            : undefined;
+        await updateTicketStatus(ticketId, {
+          status: statusInput,
+          notes,
+          actionTaken,
+        });
+        toast.success('Ticket status updated');
+        break;
+      }
+      case 'add_comment': {
+        const body = (options.notes || '').trim();
+        if (!body) {
+          toast.error('Comment cannot be empty');
+          return false;
+        }
+        await addTicketComment(ticketId, body, false);
+        toast.success('Comment added');
+        break;
+      }
+      case 'add_internal_comment': {
+        const body = (options.notes || '').trim();
+        if (!body) {
+          toast.error('Comment cannot be empty');
+          return false;
+        }
+        await addTicketComment(ticketId, body, true);
+        toast.success('Internal note added');
+        break;
+      }
+      default: {
+        console.warn('[useEntityActions] Unknown action for ticket:', actionId);
+        return false;
+      }
+    }
+
+    mutate((key: any) => {
+      if (typeof key !== 'string') return false;
+      return key.includes('/hub/support/') ||
+        key.includes('/support/tickets/') ||
+        key.includes('/api/hub/activities') ||
+        key.includes('/hub/activities') ||
+        key.includes(ticketId);
+    });
+
+    options.onSuccess?.();
+    return true;
+  } catch (error) {
+    console.error(`[useEntityActions] Ticket action "${actionId}" failed:`, error);
+    toast.error(`Failed to ${actionId.replace(/_/g, ' ')} ticket`);
     throw error;
   }
 }

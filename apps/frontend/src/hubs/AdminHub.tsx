@@ -22,10 +22,8 @@ import {
   NewsPreview,
   OverviewSection,
   ProfileTab,
-  ReportsSection,
   adminOverviewCards,
   type Activity,
-  type ReportFeedback,
 } from '@cks/domain-widgets';
 import {
   ActionModal,
@@ -80,8 +78,6 @@ import {
 } from '../shared/api/directory';
 import { dismissActivity, dismissAllActivities } from '../shared/api/directory';
 import {
-  acknowledgeItem as apiAcknowledgeItem,
-  resolveReport as apiResolveReport,
   applyHubOrderAction,
   updateOrderFields,
   useHubProfile,
@@ -329,18 +325,10 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
   const { data: trainingRecords, isLoading: trainingLoading, error: trainingError } = useTraining();
   const { data: procedures, isLoading: proceduresLoading, error: proceduresError } = useProcedures();
   // Use hub endpoint for complete report data (same as all other roles)
-  const { data: reportsData, isLoading: reportsLoading, mutate: mutateReports } = useHubReports(code || 'ADMIN');
+  const { data: reportsData, isLoading: reportsLoading } = useHubReports(code || 'ADMIN');
   const { data: supportData } = useHubSupportTickets(code || 'ADMIN');
   const { data: activityItems, isLoading: activitiesLoading, error: activitiesError } = useActivities();
   const supportTickets = useMemo(() => buildSupportTickets(supportData), [supportData]);
-  const adminReports = useMemo<ReportFeedback[]>(
-    () => (reportsData?.reports ?? []) as unknown as ReportFeedback[],
-    [reportsData],
-  );
-  const adminFeedback = useMemo<ReportFeedback[]>(
-    () => (reportsData?.feedback ?? []) as unknown as ReportFeedback[],
-    [reportsData],
-  );
   const supportItems = useMemo(() => {
     const tickets = supportData?.tickets ?? [];
     return tickets.map((ticket) => ({
@@ -2121,32 +2109,11 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
       />
           ) : activeTab === 'support' ? (
             <PageWrapper title="Support" headerSrOnly>
-              <div style={{ display: 'grid', gap: 24 }}>
-                <AdminSupportSection
-                  primaryColor="#6366f1"
-                  tickets={supportTickets}
-                  onTicketClick={(ticket) => modals.openById(ticket.ticketId)}
-                />
-                <ReportsSection
-                  role="admin"
-                  userId={code || 'ADMIN'}
-                  primaryColor="#6366f1"
-                  reports={adminReports}
-                  feedback={adminFeedback}
-                  isLoading={reportsLoading}
-                  onAcknowledge={async (id, type) => {
-                    await apiAcknowledgeItem(id, type);
-                    await mutateReports();
-                  }}
-                  onResolve={async (id, details) => {
-                    await apiResolveReport(id, details);
-                    await mutateReports();
-                  }}
-                  onReportClick={(reportId) => {
-                    modals.openById(reportId);
-                  }}
-                />
-              </div>
+              <AdminSupportSection
+                primaryColor="#6366f1"
+                tickets={supportTickets}
+                onTicketClick={(ticket) => modals.openById(ticket.ticketId)}
+              />
             </PageWrapper>
           ) : (
             <PageWrapper title={activeTab} showHeader>

@@ -17,7 +17,7 @@
  */
 
 export interface ParsedEntityId {
-  type: 'order' | 'service' | 'catalogService' | 'report' | 'user' | 'procedure' | 'training' | 'product' | 'unknown';
+  type: 'order' | 'service' | 'catalogService' | 'report' | 'ticket' | 'user' | 'procedure' | 'training' | 'product' | 'unknown';
   id: string;
   subtype?: 'product' | 'service' | 'report' | 'feedback' | 'manager' | 'contractor' | 'customer' | 'center' | 'crew' | 'warehouse';
   scope?: string; // e.g., "CON-010" from "CON-010-FBK-001"
@@ -66,9 +66,8 @@ export function parseEntityId(id: string | null | undefined): ParsedEntityId {
   }
 
   // Support Ticket IDs: TKT-### or ###-TKT-###
-  // Reuse report modal pipeline while keeping ticket IDs distinct from reports.
   if (normalizedId.includes('-TKT-') || normalizedId.startsWith('TKT-')) {
-    return { type: 'report', id, subtype: 'report', scope };
+    return { type: 'ticket', id, scope };
   }
 
   // Procedure IDs: PRO-###
@@ -135,6 +134,7 @@ export function getEntityTypeName(type: ParsedEntityId['type']): string {
     service: 'Service',
     catalogService: 'Service',
     report: 'Report/Feedback',
+    ticket: 'Support Ticket',
     user: 'User',
     procedure: 'Procedure',
     training: 'Training',
@@ -148,7 +148,7 @@ export function getEntityTypeName(type: ParsedEntityId['type']): string {
  * Check if entity type supports actions
  */
 export function supportsActions(type: ParsedEntityId['type']): boolean {
-  return ['order', 'service', 'report'].includes(type);
+  return ['order', 'service', 'report', 'ticket'].includes(type);
 }
 
 /**

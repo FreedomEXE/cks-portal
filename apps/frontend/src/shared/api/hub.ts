@@ -177,20 +177,34 @@ export interface HubSupportTicketItem {
   description: string;
   stepsToReproduce: string | null;
   screenshotUrl: string | null;
-  status: 'open' | 'in_progress' | 'resolved' | 'closed';
+  status: 'open' | 'in_progress' | 'waiting_on_user' | 'escalated' | 'resolved' | 'closed' | 'cancelled';
   submittedBy: string;
+  submittedRole?: string | null;
+  assignedTo?: string | null;
   submittedDate: string;
   updatedDate: string;
   resolvedBy: string | null;
   resolvedAt: string | null;
   resolutionNotes: string | null;
   actionTaken: string | null;
+  reopenedCount?: number;
+  commentCount?: number;
 }
 
 export interface HubSupportTicketsResponse {
   role: string;
   cksCode: string;
   tickets: HubSupportTicketItem[];
+}
+
+export interface TicketComment {
+  commentId: number;
+  ticketId: string;
+  authorId: string;
+  authorRole: string;
+  body: string;
+  isInternal: boolean;
+  createdAt: string;
 }
 
 export interface HubInventoryItem {
@@ -788,17 +802,72 @@ export async function acknowledgeItem(id: string, type: 'report' | 'feedback') {
 }
 
 export async function resolveReport(id: string, details?: { actionTaken?: string; notes?: string }) {
-  const isSupportTicket = id.toUpperCase().includes('-TKT-');
-  const path = isSupportTicket
-    ? `/support/tickets/${encodeURIComponent(id)}/resolve`
-    : `/reports/${encodeURIComponent(id)}/resolve`;
-  await apiFetch<ApiResponse<{ id: string }>>(path, {
+  await apiFetch<ApiResponse<{ id: string }>>(`/reports/${encodeURIComponent(id)}/resolve`, {
     method: 'POST',
     body: JSON.stringify({
       resolution_notes: details?.notes,
       action_taken: details?.actionTaken
     })
   });
+}
+
+export async function resolveTicket(id: string, details?: { actionTaken?: string; notes?: string }) {
+  const response = await apiFetch<ApiResponse<{ id: string; status: string }>>(`/support/tickets/${encodeURIComponent(id)}/resolve`, {
+    method: 'POST',
+    body: JSON.stringify({
+      resolution_notes: details?.notes,
+      action_taken: details?.actionTaken,
+    }),
+  });
+  return response.data;
+}
+
+export async function updateTicketStatus(id: string, payload: { status: string; notes?: string; actionTaken?: string }) {
+  const response = await apiFetch<ApiResponse<{ id: string; status: string }>>(`/support/tickets/${encodeURIComponent(id)}/status`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+  return response.data;
+}
+
+export async function assignTicket(id: string, assigneeId: string) {
+  const response = await apiFetch<ApiResponse<{ id: string; status: string }>>(`/support/tickets/${encodeURIComponent(id)}/assign`, {
+    method: 'POST',
+    body: JSON.stringify({ assigneeId }),
+  });
+  return response.data;
+}
+
+export async function unassignTicket(id: string) {
+  const response = await apiFetch<ApiResponse<{ id: string; status: string }>>(`/support/tickets/${encodeURIComponent(id)}/assign`, {
+    method: 'DELETE',
+  });
+  return response.data;
+}
+
+export async function reopenTicket(id: string, reason?: string) {
+  const response = await apiFetch<ApiResponse<{ id: string; status: string }>>(`/support/tickets/${encodeURIComponent(id)}/reopen`, {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  });
+  return response.data;
+}
+
+export async function fetchTicketComments(id: string, options?: { limit?: number; before?: string }) {
+  const params = new URLSearchParams();
+  if (options?.limit) params.set('limit', String(options.limit));
+  if (options?.before) params.set('before', options.before);
+  const suffix = params.toString() ? `?${params.toString()}` : '';
+  const response = await apiFetch<ApiResponse<TicketComment[]>>(`/support/tickets/${encodeURIComponent(id)}/comments${suffix}`);
+  return response.data || [];
+}
+
+export async function addTicketComment(id: string, body: string, isInternal = false) {
+  const response = await apiFetch<ApiResponse<TicketComment>>(`/support/tickets/${encodeURIComponent(id)}/comments`, {
+    method: 'POST',
+    body: JSON.stringify({ body, isInternal }),
+  });
+  return response.data;
 }
 
 // Fetch entities for structured report/feedback dropdowns

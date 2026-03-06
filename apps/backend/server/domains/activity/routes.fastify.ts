@@ -13,7 +13,7 @@ import { dismissActivity } from '../directory/store';
 
 const EntityTypeSchema = z.enum([
   'manager', 'contractor', 'customer', 'center', 'crew', 'warehouse',
-  'service', 'catalogService', 'product', 'order', 'report', 'feedback'
+  'service', 'catalogService', 'product', 'order', 'report', 'feedback', 'support_ticket'
 ]);
 
 export function registerActivityRoutes(fastify: FastifyInstance) {

@@ -144,6 +144,11 @@ export function canSeeTab(tabId: TabId, context: TabVisibilityContext): boolean 
         (role === 'admin' || role === 'manager' || role === 'contractor')
       );
 
+    // ===== MESSAGES TAB =====
+    // Ticket-specific conversation thread
+    case 'messages':
+      return entityType === 'ticket';
+
     // ===== PARTICIPANTS TAB =====
     // Order-specific: visible to admin, manager
     case 'participants':
@@ -208,6 +213,10 @@ export function getDefaultTabOrder(entityType: EntityType): TabId[] {
     case 'report':
     case 'feedback':
       return ['details', 'history'];
+
+    // Support tickets: details + thread + timeline
+    case 'ticket':
+      return ['details', 'messages', 'history'];
 
     // Default: Details → History → Actions
     default:

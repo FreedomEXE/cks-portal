@@ -1,7 +1,7 @@
 import { uploadSupportScreenshot, type HubSupportTicketsResponse } from '../api/hub';
 import type { SupportTicket, SupportTicketFormPayload } from '@cks/domain-widgets';
 
-type TicketStatus = 'Open' | 'In Progress' | 'Resolved';
+type TicketStatus = 'Open' | 'In Progress' | 'Waiting On User' | 'Escalated' | 'Resolved' | 'Closed' | 'Cancelled';
 
 function formatSupportDate(value?: string | null): string {
   if (!value) {
@@ -16,13 +16,35 @@ function formatSupportDate(value?: string | null): string {
 
 function mapSupportStatus(status?: string | null): TicketStatus {
   const normalized = (status || '').toLowerCase();
-  if (normalized === 'closed' || normalized === 'resolved') {
+  if (normalized === 'resolved') {
     return 'Resolved';
+  }
+  if (normalized === 'closed') {
+    return 'Closed';
+  }
+  if (normalized === 'cancelled') {
+    return 'Cancelled';
+  }
+  if (normalized === 'escalated') {
+    return 'Escalated';
+  }
+  if (normalized === 'waiting_on_user' || normalized === 'waiting-on-user') {
+    return 'Waiting On User';
   }
   if (normalized === 'in-progress' || normalized === 'in_progress') {
     return 'In Progress';
   }
   return 'Open';
+}
+
+function formatIssueType(value?: string | null): string {
+  const normalized = (value || '').trim().replace(/_/g, ' ');
+  if (!normalized) return 'Support Request';
+  return normalized
+    .split(' ')
+    .filter(Boolean)
+    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1).toLowerCase())
+    .join(' ');
 }
 
 export function buildSupportTickets(supportData?: HubSupportTicketsResponse | null): SupportTicket[] {
@@ -33,9 +55,14 @@ export function buildSupportTickets(supportData?: HubSupportTicketsResponse | nu
   return (supportData.tickets ?? []).map((item) => ({
     ticketId: item.id,
     subject: item.subject || 'Untitled',
-    issueType: item.issueType || 'Support Request',
+    issueType: formatIssueType(item.issueType),
     priority: (item.priority || 'MEDIUM').charAt(0) + (item.priority || 'MEDIUM').slice(1).toLowerCase(),
     status: mapSupportStatus(item.status),
+    statusCode: item.status,
+    submittedBy: item.submittedBy,
+    assignedTo: item.assignedTo || null,
+    commentCount: Number(item.commentCount || 0),
+    resolvedAt: item.resolvedAt || null,
     dateCreated: formatSupportDate(item.submittedDate),
     lastUpdated: formatSupportDate(item.updatedDate || item.submittedDate),
   }));

@@ -30,6 +30,7 @@ import { entityRegistry } from '../config/entityRegistry';
 import { useOrderDetails } from '../hooks/useOrderDetails';
 import { useReportDetails } from '../hooks/useReportDetails';
 import { useServiceDetails } from '../hooks/useServiceDetails';
+import { useTicketDetails } from '../hooks/useTicketDetails';
 import { useEntityActions } from '../hooks/useEntityActions';
 import { useCartSafe } from '../contexts/CartContext';
 import { filterVisibleTabs } from '../policies/tabs';
@@ -145,6 +146,10 @@ export function ModalGateway({
     serviceId: entityType === 'service' ? entityId : null,
   });
 
+  const ticketDetails = useTicketDetails({
+    ticketId: entityType === 'ticket' ? entityId : null,
+  });
+
   // ===== STEP 2: Select the right data based on entityType =====
   // NOTE: User entities (manager/contractor/customer/center/crew/warehouse) are now
   // fetched by ModalProvider.openById and passed via options?.data.
@@ -179,6 +184,12 @@ export function ModalGateway({
       isLoading: serviceDetails.isLoading || false,
       error: serviceDetails.error || null,
       lifecycle: extractLifecycle(serviceDetails.service, null),
+    },
+    ticket: {
+      data: ticketDetails.ticket,
+      isLoading: ticketDetails.isLoading || false,
+      error: ticketDetails.error || null,
+      lifecycle: extractLifecycle(ticketDetails.ticket, null),
     },
   };
 
@@ -438,6 +449,8 @@ export function ModalGateway({
                   await orderDetails.refresh?.();
                 } else if (entityType === 'service') {
                   await serviceDetails.refresh?.();
+                } else if (entityType === 'ticket') {
+                  await ticketDetails.refresh?.();
                 } else if (entityType === 'report' || entityType === 'feedback') {
                   await reportDetails.refresh?.();
                 }
@@ -476,6 +489,10 @@ export function ModalGateway({
     cart,
     data,
     scheduleContext,
+    orderDetails.refresh,
+    serviceDetails.refresh,
+    reportDetails.refresh,
+    ticketDetails.refresh,
   ]);
 
   // ===== STEP 5: Build tabs from adapter and filter via RBAC policy =====
