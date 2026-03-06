@@ -95,7 +95,15 @@ export default function OverviewCard({
   return (
     <div
       className="ui-card"
-      onClick={onClick}
+      onClick={(e) => {
+        if (!isClickable) return;
+        // Reset all inline styles before firing callback so the card
+        // never gets stuck in a pressed/hover state when a modal steals focus.
+        e.currentTarget.style.transform = '';
+        e.currentTarget.style.boxShadow = '';
+        e.currentTarget.style.background = '';
+        onClick?.();
+      }}
       style={{
         padding: 16,
         textAlign: 'center',
@@ -115,14 +123,6 @@ export default function OverviewCard({
         e.currentTarget.style.transform = '';
         e.currentTarget.style.boxShadow = '';
         e.currentTarget.style.background = '';
-      }}
-      onMouseDown={(e) => {
-        if (!isClickable) return;
-        e.currentTarget.style.transform = 'scale(0.97)';
-      }}
-      onMouseUp={(e) => {
-        if (!isClickable) return;
-        e.currentTarget.style.transform = 'translateY(-2px)';
       }}
     >
       <div style={{
