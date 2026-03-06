@@ -1,3 +1,6 @@
+/*-----------------------------------------------
+  Property of Freedom_EXE  (c) 2026
+-----------------------------------------------*/
 /**
  * Entity Types & Adapter Interface
  *
@@ -162,6 +165,9 @@ export interface EntityActionDescriptor {
 
   /** Button visual variant */
   variant: 'primary' | 'secondary' | 'danger';
+
+  /** Optional size override for action button */
+  size?: 'sm' | 'md' | 'lg';
 
   /** Optional confirmation prompt before executing */
   confirm?: string;

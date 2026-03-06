@@ -1,3 +1,6 @@
+/*-----------------------------------------------
+  Property of Freedom_EXE  (c) 2026
+-----------------------------------------------*/
 import useSWR from "swr";
 import { apiFetch, type ApiResponse } from "./client";
 
@@ -51,6 +54,11 @@ export interface CatalogListResult {
   page: CatalogPage;
 }
 
+export interface CatalogCategoriesResult {
+  products: string[];
+  services: string[];
+}
+
 export interface FetchCatalogParams {
   type?: CatalogType;
   category?: string;
@@ -99,6 +107,23 @@ export function useCatalogItems(params: FetchCatalogParams) {
   ];
   const fetcher = () => fetchCatalogItems(params);
   const { data, error, isLoading } = useSWR<CatalogListResult>(key, fetcher);
+  return {
+    data: data ?? null,
+    isLoading,
+    error,
+  };
+}
+
+export async function fetchCatalogCategories(): Promise<CatalogCategoriesResult> {
+  const response = await apiFetch<ApiResponse<CatalogCategoriesResult>>("/catalog/categories");
+  return response.data;
+}
+
+export function useCatalogCategories() {
+  const { data, error, isLoading } = useSWR<CatalogCategoriesResult>(
+    ["catalog", "categories"],
+    fetchCatalogCategories
+  );
   return {
     data: data ?? null,
     isLoading,

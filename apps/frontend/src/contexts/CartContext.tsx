@@ -1,3 +1,6 @@
+/*-----------------------------------------------
+  Property of Freedom_EXE  (c) 2026
+-----------------------------------------------*/
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import type { CatalogItem } from '../shared/api/catalog';
 
@@ -11,7 +14,7 @@ export interface CartItem {
 
 interface CartContextType {
   items: CartItem[];
-  addItem: (item: CatalogItem) => void;
+  addItem: (item: CatalogItem, quantity?: number) => void;
   removeItem: (catalogCode: string) => void;
   updateQuantity: (catalogCode: string, quantity: number) => void;
   clearCart: () => void;
@@ -24,20 +27,20 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
 
-  const addItem = useCallback((item: CatalogItem) => {
+  const addItem = useCallback((item: CatalogItem, quantity: number = 1) => {
     setItems(prev => {
       const existing = prev.find(i => i.catalogCode === item.code);
       if (existing) {
         return prev.map(i =>
           i.catalogCode === item.code
-            ? { ...i, quantity: i.quantity + 1 }
+            ? { ...i, quantity: i.quantity + quantity }
             : i
         );
       }
       return [...prev, {
         catalogCode: item.code,
         name: item.name,
-        quantity: 1,
+        quantity,
         price: item.price?.amount,
         unitOfMeasure: item.unitOfMeasure || undefined
       }];

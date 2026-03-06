@@ -1,3 +1,6 @@
+/*-----------------------------------------------
+  Property of Freedom_EXE  (c) 2026
+-----------------------------------------------*/
 /**
  * Entity Registry - Maps entity types to their modal adapters
  *
@@ -2102,7 +2105,17 @@ const catalogServiceAdapter: EntityAdapter = {
 
     console.log('[CatalogServiceAdapter] getActionDescriptors:', { role, state });
 
-    // Admin-only actions
+    if (state === 'active') {
+      // Scheduling action for service ordering flow
+      descriptors.push({
+        key: 'schedule_service',
+        label: 'Schedule Service',
+        variant: 'primary',
+        closeOnSuccess: true,
+      });
+    }
+
+    // Admin-only lifecycle actions
     if (role === 'admin') {
       if (state === 'active') {
         console.log('[CatalogServiceAdapter] Adding Edit + Archive actions for active state');
@@ -2413,6 +2426,17 @@ const productAdapter: EntityAdapter = {
   getActionDescriptors: (context: EntityActionContext): EntityActionDescriptor[] => {
     const { role, state } = context;
     const descriptors: EntityActionDescriptor[] = [];
+
+    if (state === 'active' && role !== 'admin' && role !== 'warehouse') {
+      descriptors.push({
+        key: 'add_to_cart',
+        label: 'Add to Cart',
+        variant: 'primary',
+        size: 'sm',
+        closeOnSuccess: false,
+      });
+    }
+
     if (role === 'admin') {
       if (state === 'active') {
         // Keep parity with services: Edit + Archive

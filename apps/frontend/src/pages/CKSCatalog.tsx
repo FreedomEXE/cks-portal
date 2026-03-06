@@ -1,17 +1,23 @@
+/*-----------------------------------------------
+  Property of Freedom_EXE  (c) 2026
+-----------------------------------------------*/
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { useSWRConfig } from 'swr';
-import { useCatalogItems, type CatalogItem } from "../shared/api/catalog";
+import {
+  useCatalogItems,
+  useCatalogCategories,
+  type CatalogItem,
+  type FetchCatalogParams,
+} from "../shared/api/catalog";
 import { useCart } from "../contexts/CartContext";
 import { createHubOrder } from "../shared/api/hub";
-import { useAuth as useClerkAuth, useUser } from "@clerk/clerk-react";
 import { useAuth as useCksAuth } from "@cks/auth";
 import { useHubRoleScope } from "../shared/api/hub";
 import { useLoading } from "../contexts/LoadingContext";
 import { useHubLoading } from "../contexts/HubLoadingContext";
 import { useModals } from "../contexts/ModalProvider";
-import { Button } from "@cks/ui";
 import { fetchHubOrders } from "../shared/api/hub";
 
 type CatalogKind = "products" | "services";
@@ -42,6 +48,19 @@ function formatDuration(item: CatalogItem): string | undefined {
   return `${minutes} min`;
 }
 
+function formatCategoryLabel(category: string): string {
+  return category
+    .split("-")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function normalizeQuantity(value: number): number {
+  if (!Number.isFinite(value)) return 1;
+  return Math.max(1, Math.floor(value));
+}
+
 function TabButton({ active, children, onClick }: { active: boolean; children: React.ReactNode; onClick: () => void }) {
   return (
     <button
@@ -60,16 +79,21 @@ function Card({
   onView,
   onAdd,
   isInCart,
+  quantity,
+  onQuantityChange,
 }: {
   item: CatalogItem;
   onView: () => void;
-  onAdd: () => void;
+  onAdd: (quantity?: number) => void;
   isInCart: boolean;
+  quantity: number;
+  onQuantityChange: (quantity: number) => void;
 }) {
   const subtitle = item.type === "product" ? formatProductInfo(item) : formatDuration(item);
   const seededImageUrl = item.imageUrl?.trim()
     ? item.imageUrl
     : `https://picsum.photos/seed/${encodeURIComponent(item.code)}/640/480`;
+  const isProduct = item.type === "product";
 
   // Determine card styling based on type and managedBy
   const getCardStyle = () => {
@@ -148,24 +172,69 @@ function Card({
         </div>
 
         {/* Buttons - Always at same position */}
-        <div className="flex gap-2 mt-3">
-          <button
-            onClick={onView}
-            className="flex-1 h-9 px-3 rounded-md border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50 transition-colors"
-          >
-            View
-          </button>
-          <button
-            onClick={onAdd}
-            className={`flex-1 h-9 px-3 rounded-md text-sm font-medium transition-colors ${
-              isInCart
-                ? "bg-green-600 text-white hover:bg-green-700"
-                : "bg-black text-white hover:bg-neutral-800"
-            }`}
-          >
-            {isInCart ? "Added" : "Add"}
-          </button>
-        </div>
+        {isProduct ? (
+          <div className="mt-3 space-y-2">
+            <button
+              onClick={onView}
+              className="w-full h-9 px-3 rounded-md border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50 transition-colors"
+            >
+              View
+            </button>
+            <div className="flex gap-2">
+              <div className="inline-flex items-center h-9 rounded-md border border-gray-300 overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => onQuantityChange(normalizeQuantity(quantity - 1))}
+                  className="h-9 w-8 text-sm font-semibold text-gray-700 bg-gray-50 hover:bg-gray-100 transition-colors"
+                  aria-label={`Decrease quantity for ${item.name}`}
+                >
+                  -
+                </button>
+                <input
+                  type="number"
+                  min={1}
+                  value={quantity}
+                  onChange={(event) => onQuantityChange(normalizeQuantity(Number(event.target.value)))}
+                  className="h-9 w-12 text-center text-sm font-medium text-gray-900 border-x border-gray-300 focus:outline-none"
+                  aria-label={`Quantity for ${item.name}`}
+                />
+                <button
+                  type="button"
+                  onClick={() => onQuantityChange(normalizeQuantity(quantity + 1))}
+                  className="h-9 w-8 text-sm font-semibold text-gray-700 bg-gray-50 hover:bg-gray-100 transition-colors"
+                  aria-label={`Increase quantity for ${item.name}`}
+                >
+                  +
+                </button>
+              </div>
+              <button
+                onClick={() => onAdd(quantity)}
+                className={`flex-1 h-9 px-3 rounded-md text-sm font-medium transition-colors ${
+                  isInCart
+                    ? "bg-green-600 text-white hover:bg-green-700"
+                    : "bg-black text-white hover:bg-neutral-800"
+                }`}
+              >
+                {isInCart ? "Add More" : "Add"}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex gap-2 mt-3">
+            <button
+              onClick={onView}
+              className="flex-1 h-9 px-3 rounded-md border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50 transition-colors"
+            >
+              View
+            </button>
+            <button
+              onClick={() => onAdd(1)}
+              className="flex-1 h-9 px-3 rounded-md text-sm font-medium transition-colors bg-black text-white hover:bg-neutral-800"
+            >
+              Add
+            </button>
+          </div>
+        )}
 
         {/* Tags - limit count to keep row heights aligned */}
         {displayTags.length > 0 && (
@@ -775,8 +844,6 @@ const PAGE_SIZE = 20;
 export default function CKSCatalog() {
   const navigate = useNavigate();
   const cart = useCart();
-  const { getToken } = useClerkAuth();
-  const { user } = useUser();
   const { role: authRole, code: authCode} = useCksAuth();
   const normalizedCode = useMemo(() => (authCode ? authCode.trim().toUpperCase() : null), [authCode]);
   const { data: scope } = useHubRoleScope(normalizedCode || undefined);
@@ -810,6 +877,7 @@ export default function CKSCatalog() {
     }
   }, [selectedServiceIdFromQuery, catalogMode]);
   const [selectedService, setSelectedService] = useState<CatalogItem | null>(null);
+  const [productQuantities, setProductQuantities] = useState<Record<string, number>>({});
   // Legacy product modal state removed; use universal modal
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [managerServices, setManagerServices] = useState<ServiceOption[]>([]);
@@ -822,6 +890,10 @@ export default function CKSCatalog() {
   useEffect(() => {
     setCurrentPage(1);
   }, [kind, debouncedQuery, selectedCategory]);
+
+  useEffect(() => {
+    setSelectedCategory(null);
+  }, [kind]);
 
   // Fetch active services for managers/contractors when cart is opened
   useEffect(() => {
@@ -866,7 +938,7 @@ export default function CKSCatalog() {
     })();
   }, [showCart, authRole, normalizedCode]);
 
-  const params = useMemo(
+  const params = useMemo<FetchCatalogParams>(
     () => ({
       type: kind === "products" ? "product" : "service",
       category: selectedCategory || undefined,
@@ -877,12 +949,19 @@ export default function CKSCatalog() {
     [kind, selectedCategory, debouncedQuery, currentPage],
   );
 
+  const { data: categoryData } = useCatalogCategories();
   const { data, isLoading, error } = useCatalogItems(params);
   const items = data?.items ?? [];
   const categories = useMemo(() => {
-    const unique = new Set(items.map((item) => item.category).filter((value): value is string => Boolean(value)));
+    const source = kind === "services" ? categoryData?.services : categoryData?.products;
+    const unique = new Set((source ?? []).filter((value): value is string => Boolean(value)));
     return Array.from(unique).sort((a, b) => a.localeCompare(b));
-  }, [items]);
+  }, [categoryData, kind]);
+  useEffect(() => {
+    if (selectedCategory && !categories.includes(selectedCategory)) {
+      setSelectedCategory(null);
+    }
+  }, [categories, selectedCategory]);
   const pageData = data?.page ?? null;
   const total = pageData?.total ?? 0;
   const limit = pageData?.limit ?? PAGE_SIZE;
@@ -907,8 +986,20 @@ export default function CKSCatalog() {
     };
   }, [isLoading, start]);
 
-  const handleAddProduct = (item: CatalogItem) => {
-    cart.addItem(item);
+  const handleProductQuantityChange = (itemCode: string, quantity: number) => {
+    setProductQuantities((prev) => ({
+      ...prev,
+      [itemCode]: normalizeQuantity(quantity),
+    }));
+  };
+
+  const handleAddProduct = (item: CatalogItem, quantity: number = 1) => {
+    const finalQuantity = normalizeQuantity(quantity);
+    cart.addItem(item, finalQuantity);
+    setProductQuantities((prev) => ({
+      ...prev,
+      [item.code]: finalQuantity,
+    }));
   };
 
   const handleAddService = (item: CatalogItem) => {
@@ -1139,7 +1230,7 @@ export default function CKSCatalog() {
                 <option value="">All Categories</option>
                 {categories.map((category) => (
                   <option key={category} value={category}>
-                    {category}
+                    {formatCategoryLabel(category)}
                   </option>
                 ))}
               </select>
@@ -1190,13 +1281,19 @@ export default function CKSCatalog() {
                   item={item}
                   onView={() => {
                     if (item.type === 'service') {
-                      modals.openById(item.code);
+                      modals.openById(item.code, {
+                        context: {
+                          onScheduleService: () => handleAddService(item),
+                        },
+                      });
                     } else {
                       modals.openEntityModal('product', item.code);
                     }
                   }}
-                  onAdd={() => item.type === "product" ? handleAddProduct(item) : handleAddService(item)}
+                  onAdd={(quantity = 1) => item.type === "product" ? handleAddProduct(item, quantity) : handleAddService(item)}
                   isInCart={cart.isInCart(item.code)}
+                  quantity={item.type === "product" ? (productQuantities[item.code] ?? 1) : 1}
+                  onQuantityChange={(quantity) => handleProductQuantityChange(item.code, quantity)}
                 />
               ))}
             </div>

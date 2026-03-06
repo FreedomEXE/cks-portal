@@ -1,3 +1,6 @@
+/*-----------------------------------------------
+  Property of Freedom_EXE  (c) 2026
+-----------------------------------------------*/
 /**
  * ModalGateway - Universal Modal Orchestrator
  *
@@ -76,6 +79,11 @@ function extractLifecycle(data: any, archiveMetadata: any): Lifecycle {
   return { state: 'active' };
 }
 
+function clampQuantity(value: number): number {
+  if (!Number.isFinite(value)) return 1;
+  return Math.max(1, Math.floor(value));
+}
+
 export interface ModalGatewayProps {
   /** Whether modal is open */
   isOpen: boolean;
@@ -116,9 +124,13 @@ export function ModalGateway({
   const { handleAction } = useEntityActions();
   const cart = useCartSafe();
   const [addedToCart, setAddedToCart] = useState(false);
+  const [modalProductQuantity, setModalProductQuantity] = useState(1);
 
   // Reset local "added" feedback when opening a different product
-  useEffect(() => { setAddedToCart(false); }, [entityId]);
+  useEffect(() => {
+    setAddedToCart(false);
+    setModalProductQuantity(1);
+  }, [entityId]);
 
   const orderDetails = useOrderDetails({
     orderId: entityType === 'order' ? entityId : null
@@ -274,6 +286,26 @@ export function ModalGateway({
 
   // Get adapter from registry (before useMemo hooks!)
   const adapter = entityType ? entityRegistry[entityType] : null;
+  const productCode =
+    entityType === 'product'
+      ? ((data?.productId as string | undefined) || entityId || null)
+      : null;
+  const cartProductItem = useMemo(() => {
+    if (!productCode) return null;
+    return cart.items.find((item) => item.catalogCode === productCode) || null;
+  }, [cart.items, productCode]);
+  const cartProductQuantity = cartProductItem?.quantity ?? 0;
+  const scheduleContext = options?.context as { onScheduleService?: (serviceData?: any) => void } | undefined;
+  const hasScheduleHandler = typeof scheduleContext?.onScheduleService === 'function';
+
+  useEffect(() => {
+    if (!productCode) return;
+    if (cartProductQuantity > 0) {
+      setModalProductQuantity(clampQuantity(cartProductQuantity));
+    } else {
+      setModalProductQuantity(1);
+    }
+  }, [productCode, cartProductQuantity]);
 
   // ===== STEP 3: Get pure descriptors from adapter (NO HOOKS in adapter!) =====
   const descriptors = useMemo(() => {
@@ -307,10 +339,21 @@ export function ModalGateway({
   // ===== STEP 4: Bind descriptors to handlers (hooks called HERE, not in adapters) =====
   const actions = useMemo(() => {
     return descriptors.map((desc) => {
+      const scheduleActionMissingHandler =
+        desc.key === 'schedule_service' &&
+        entityType === 'catalogService' &&
+        !hasScheduleHandler;
+      const label =
+        desc.key === 'add_to_cart' && cartProductQuantity > 0
+          ? 'Update Cart'
+          : desc.label;
+
       return {
-        label: desc.label,
+        id: desc.key,
+        label,
         variant: desc.variant,
-        disabled: desc.disabled,
+        size: desc.size,
+        disabled: desc.disabled || scheduleActionMissingHandler,
         onClick: async () => {
           console.log('[ModalGateway] Action onClick triggered:', {
             key: desc.key,
@@ -320,6 +363,36 @@ export function ModalGateway({
             confirm: desc.confirm,
             prompt: desc.prompt
           });
+
+          if (desc.key === 'add_to_cart' && entityType === 'product' && productCode) {
+            const requestedQuantity = clampQuantity(modalProductQuantity);
+            if (cartProductQuantity > 0) {
+              cart.updateQuantity(productCode, requestedQuantity);
+            } else {
+              cart.addItem({
+                code: productCode,
+                name: data?.name || 'Product',
+                type: 'product',
+                category: data?.category || null,
+                description: data?.description || null,
+                tags: [],
+                imageUrl: data?.imageUrl || null,
+                unitOfMeasure: data?.unitOfMeasure || null,
+                price: data?.price || null,
+                metadata: data?.metadata || null,
+              }, requestedQuantity);
+            }
+            setAddedToCart(true);
+            return;
+          }
+
+          if (desc.key === 'schedule_service' && entityType === 'catalogService') {
+            if (typeof scheduleContext?.onScheduleService === 'function') {
+              onClose();
+              scheduleContext.onScheduleService(data);
+            }
+            return;
+          }
 
           // Handle confirmation dialog
           if (desc.confirm) {
@@ -390,7 +463,20 @@ export function ModalGateway({
         },
       };
     });
-  }, [descriptors, handleAction, entityId, onClose]);
+  }, [
+    descriptors,
+    entityType,
+    hasScheduleHandler,
+    handleAction,
+    entityId,
+    onClose,
+    productCode,
+    modalProductQuantity,
+    cartProductQuantity,
+    cart,
+    data,
+    scheduleContext,
+  ]);
 
   // ===== STEP 5: Build tabs from adapter and filter via RBAC policy =====
   const visibleTabs = useMemo(() => {
@@ -454,7 +540,7 @@ export function ModalGateway({
 
   // Shopping roles that can add products to cart (not admin/warehouse — they manage inventory)
   const isShoppingRole = role !== 'admin' && role !== 'warehouse';
-  const productInCart = entityType === 'product' && entityId ? cart.isInCart(entityId) : false;
+  const productInCart = entityType === 'product' && cartProductQuantity > 0;
 
   const headerExtras = useMemo(() => {
     if (!adapter || !data || !entityType || !entityId) {
@@ -463,43 +549,95 @@ export function ModalGateway({
 
     const extras: JSX.Element[] = [];
 
-    // Add to Cart button for product modals (shopping roles only)
+    // Quantity stepper for product actions (actual add/update button is in ActionBar)
     if (entityType === 'product' && isShoppingRole && lifecycle?.state !== 'archived' && lifecycle?.state !== 'deleted') {
-      const inCart = productInCart || addedToCart;
       extras.push(
-        <button
-          key="add-to-cart"
-          type="button"
-          onClick={() => {
-            cart.addItem({
-              code: data.productId || entityId,
-              name: data.name || 'Product',
-              type: 'product',
-              category: data.category || null,
-              description: data.description || null,
-              tags: [],
-              imageUrl: data.imageUrl || null,
-              unitOfMeasure: data.unitOfMeasure || null,
-              price: data.price || null,
-              metadata: null,
-            });
-            setAddedToCart(true);
-          }}
+        <div
+          key="product-quantity"
           style={{
             width: '100%',
-            padding: '10px 16px',
-            borderRadius: 10,
-            border: 'none',
-            background: inCart ? '#059669' : '#111827',
-            color: '#fff',
-            fontSize: 14,
-            fontWeight: 600,
-            cursor: 'pointer',
-            transition: 'background 0.15s',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 8,
           }}
         >
-          {inCart ? 'Added to Cart' : 'Add to Cart'}
-        </button>
+          <div style={{ fontSize: 12, fontWeight: 600, color: '#4b5563' }}>Quantity</div>
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              border: '1px solid #d1d5db',
+              borderRadius: 8,
+              overflow: 'hidden',
+              width: 150,
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => setModalProductQuantity((prev) => clampQuantity(prev - 1))}
+              style={{
+                width: 34,
+                height: 34,
+                border: 'none',
+                background: '#f9fafb',
+                cursor: 'pointer',
+                fontSize: 16,
+                fontWeight: 700,
+                color: '#111827',
+              }}
+              aria-label="Decrease quantity"
+            >
+              -
+            </button>
+            <input
+              type="number"
+              min={1}
+              value={modalProductQuantity}
+              onChange={(event) => setModalProductQuantity(clampQuantity(Number(event.target.value)))}
+              style={{
+                width: 82,
+                height: 34,
+                border: 'none',
+                borderLeft: '1px solid #e5e7eb',
+                borderRight: '1px solid #e5e7eb',
+                textAlign: 'center',
+                fontSize: 14,
+                fontWeight: 600,
+                color: '#111827',
+              }}
+              aria-label="Product quantity"
+            />
+            <button
+              type="button"
+              onClick={() => setModalProductQuantity((prev) => clampQuantity(prev + 1))}
+              style={{
+                width: 34,
+                height: 34,
+                border: 'none',
+                background: '#f9fafb',
+                cursor: 'pointer',
+                fontSize: 16,
+                fontWeight: 700,
+                color: '#111827',
+              }}
+              aria-label="Increase quantity"
+            >
+              +
+            </button>
+          </div>
+          <div
+            style={{
+              fontSize: 12,
+              color: '#6b7280',
+            }}
+          >
+            {productInCart
+              ? `In cart: ${cartProductQuantity}`
+              : addedToCart
+                ? 'Added to cart'
+                : 'Not in cart yet'}
+          </div>
+        </div>
       );
     }
 
@@ -519,7 +657,19 @@ export function ModalGateway({
     }
 
     return extras.length > 0 ? <>{extras}</> : null;
-  }, [adapter, data, entityType, entityId, currentUserId, isShoppingRole, lifecycle, productInCart, addedToCart, cart]);
+  }, [
+    adapter,
+    data,
+    entityType,
+    entityId,
+    currentUserId,
+    isShoppingRole,
+    lifecycle,
+    productInCart,
+    addedToCart,
+    cartProductQuantity,
+    modalProductQuantity,
+  ]);
 
   // LEGACY: Map data to component props (for backward compatibility with old modals)
   const componentProps = useMemo(() => {
@@ -547,7 +697,6 @@ export function ModalGateway({
     console.error(`[ModalGateway] Error loading ${entityType}:`, error);
     // Still render modal with error state
   }
-
   // ===== NEW PATTERN: Render EntityModalView directly =====
   if (adapter.getHeaderConfig) {
     // Smooth loading: show lightweight skeleton tabs while data fetch resolves

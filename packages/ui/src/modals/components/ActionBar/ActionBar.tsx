@@ -1,5 +1,8 @@
+/*-----------------------------------------------
+  Property of Freedom_EXE  (c) 2026
+-----------------------------------------------*/
 import React from 'react';
-import Button from '../../../buttons/Button';
+import Button, { type ButtonProps } from '../../../buttons/Button';
 
 export type ActionKind = 'primary' | 'secondary' | 'danger';
 
@@ -8,6 +11,7 @@ export interface ActionDescriptor {
   label: string;
   onClick: () => void | Promise<void>;
   variant?: ActionKind;
+  size?: ButtonProps['size'];
   disabled?: boolean;
   title?: string; // tooltip
 }
@@ -33,6 +37,7 @@ export function ActionBar({ actions, align = 'left' }: ActionBarProps) {
         <Button
           key={a.id || `${a.label}-${idx}`}
           variant={a.variant === 'danger' ? 'danger' : a.variant === 'secondary' ? 'secondary' : 'primary'}
+          size={a.size || 'md'}
           onClick={a.onClick}
           disabled={a.disabled}
           title={a.title}
@@ -45,4 +50,3 @@ export function ActionBar({ actions, align = 'left' }: ActionBarProps) {
 }
 
 export default ActionBar;
-
