@@ -15,7 +15,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useHubLoading } from '../contexts/HubLoadingContext';
-import { useClerk, useUser } from '@clerk/clerk-react';
+import { useAuth as useClerkAuth, useClerk, useUser } from '@clerk/clerk-react';
 import { loadUserPreferences, saveUserPreferences } from '../shared/preferences';
 import { requestPasswordReset } from '../shared/api/account';
 import { useNewsFeed } from '../shared/api/news';
@@ -71,6 +71,7 @@ import ProfileSkeleton from '../components/ProfileSkeleton';
 // Legacy ActivityModalGateway removed - use universal ModalGateway via modals.openById()
 import { useEntityActions } from '../hooks/useEntityActions';
 import { createFeedback as apiCreateFeedback, acknowledgeItem as apiAcknowledgeItem, resolveReport as apiResolveReport, fetchServicesForReports, fetchProceduresForReports, fetchOrdersForReports } from '../shared/api/hub';
+import { createCatalogProduct, type CreateCatalogProductPayload } from '../shared/api/admin';
 
 interface WarehouseHubProps {
   initialTab?: string;
@@ -184,6 +185,9 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
   const [inventoryTab, setInventoryTab] = useState<'active' | 'archive'>('active');
   const [inventorySearchQuery, setInventorySearchQuery] = useState('');
   const [inventoryFilter, setInventoryFilter] = useState<string>('');
+  const [showCreateProduct, setShowCreateProduct] = useState(false);
+  const [createProductForm, setCreateProductForm] = useState({ name: '', category: '', description: '', unitOfMeasure: '', basePrice: '', sku: '' });
+  const [creatingProduct, setCreatingProduct] = useState(false);
   const [overviewModal, setOverviewModal] = useState<{
     id: string;
     title: string;
@@ -195,6 +199,7 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
   const [pendingAction, setPendingAction] = useState<{ orderId: string; action: OrderActionType } | null>(null);
 
   // identity + helpers
+  const { getToken } = useClerkAuth();
   const { code: authCode, accessStatus, accessTier, accessSource } = useAuth();
   const { user } = useUser();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
@@ -360,6 +365,34 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
       toast.error(error instanceof Error ? error.message : 'Failed to send password reset email');
     }
   }, [user?.id]);
+
+  const handleCreateProduct = useCallback(async () => {
+    if (!createProductForm.name.trim()) {
+      toast.error('Product name is required');
+      return;
+    }
+    setCreatingProduct(true);
+    try {
+      const payload: CreateCatalogProductPayload = {
+        name: createProductForm.name.trim(),
+        description: createProductForm.description.trim() || undefined,
+        category: createProductForm.category.trim() || undefined,
+        unitOfMeasure: createProductForm.unitOfMeasure.trim() || undefined,
+        basePrice: createProductForm.basePrice.trim() || undefined,
+        sku: createProductForm.sku.trim() || undefined,
+      };
+      const result = await createCatalogProduct(payload, { getToken });
+      toast.success(`Product created: ${result.productId}`);
+      setCreateProductForm({ name: '', category: '', description: '', unitOfMeasure: '', basePrice: '', sku: '' });
+      setShowCreateProduct(false);
+      // Refresh inventory + catalog
+      mutate((key: unknown) => typeof key === 'string' && (key.includes('/inventory') || key.includes('/catalog')), undefined, { revalidate: true });
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to create product');
+    } finally {
+      setCreatingProduct(false);
+    }
+  }, [createProductForm, getToken, mutate]);
 
   const handleSupportSubmit = useCallback(async (payload: any) => {
     const mapped = mapSupportIssuePayload(payload);
@@ -873,6 +906,61 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
               {inventoryErrorMessage && (
                 <div style={{ marginBottom: 12, color: '#dc2626' }}>{inventoryErrorMessage}</div>
               )}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+                <Button
+                  variant="primary"
+                  roleColor="#8b5cf6"
+                  onClick={() => setShowCreateProduct((v) => !v)}
+                >
+                  {showCreateProduct ? 'Cancel' : '+ New Product'}
+                </Button>
+              </div>
+
+              {showCreateProduct && (
+                <div style={{
+                  marginBottom: 16,
+                  padding: 20,
+                  background: '#fff',
+                  borderRadius: 10,
+                  border: '1px solid #e5e7eb',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                }}>
+                  <div style={{ fontSize: 15, fontWeight: 600, color: '#0f172a', marginBottom: 14 }}>Create New Product</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                    <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <span style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>Product Name *</span>
+                      <input value={createProductForm.name} onChange={(e) => setCreateProductForm(p => ({ ...p, name: e.target.value }))} placeholder="Enter product name" disabled={creatingProduct} style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: '8px 10px', fontSize: 13 }} />
+                    </label>
+                    <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <span style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>Category</span>
+                      <input value={createProductForm.category} onChange={(e) => setCreateProductForm(p => ({ ...p, category: e.target.value }))} placeholder="e.g. Cleaning Supplies" disabled={creatingProduct} style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: '8px 10px', fontSize: 13 }} />
+                    </label>
+                    <label style={{ display: 'flex', flexDirection: 'column', gap: 4, gridColumn: '1 / -1' }}>
+                      <span style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>Description</span>
+                      <textarea value={createProductForm.description} onChange={(e) => setCreateProductForm(p => ({ ...p, description: e.target.value }))} placeholder="Brief description" disabled={creatingProduct} rows={2} style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: '8px 10px', fontSize: 13, resize: 'vertical' }} />
+                    </label>
+                    <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <span style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>Unit of Measure</span>
+                      <input value={createProductForm.unitOfMeasure} onChange={(e) => setCreateProductForm(p => ({ ...p, unitOfMeasure: e.target.value }))} placeholder="Each, Case, Gallon" disabled={creatingProduct} style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: '8px 10px', fontSize: 13 }} />
+                    </label>
+                    <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <span style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>Base Price</span>
+                      <input value={createProductForm.basePrice} onChange={(e) => setCreateProductForm(p => ({ ...p, basePrice: e.target.value }))} placeholder="29.99" disabled={creatingProduct} style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: '8px 10px', fontSize: 13 }} />
+                    </label>
+                    <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <span style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>SKU</span>
+                      <input value={createProductForm.sku} onChange={(e) => setCreateProductForm(p => ({ ...p, sku: e.target.value }))} placeholder="CLN-PRM-001" disabled={creatingProduct} style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: '8px 10px', fontSize: 13 }} />
+                    </label>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14, gap: 10 }}>
+                    <Button variant="secondary" onClick={() => setShowCreateProduct(false)} disabled={creatingProduct}>Cancel</Button>
+                    <Button variant="primary" roleColor="#8b5cf6" onClick={handleCreateProduct} disabled={creatingProduct}>
+                      {creatingProduct ? 'Creating...' : 'Create Product'}
+                    </Button>
+                  </div>
+                </div>
+              )}
+
               <TabSection
                 tabs={[
                   { id: 'active', label: 'Product Inventory', count: filteredActiveInventoryData.length },

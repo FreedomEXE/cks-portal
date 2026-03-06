@@ -1,4 +1,6 @@
-# Claude Configuration Instructions
+# Claude Configuration — CKS Portal
+
+> **IMPORTANT:** Also read `.claude/AGENTS.md` before doing any work. It contains design standards, engineering quality bar, craft standard, and file header requirements that apply to all agents including Claude.
 
 ## CRITICAL: Process Management Safety
 
@@ -112,38 +114,39 @@ powershell -ExecutionPolicy Bypass -File "scripts/notify-complete.ps1" -Message 
 powershell -ExecutionPolicy Bypass -File "scripts/notify-complete-modern.ps1" -Message "Phase C frontend activity routing complete. All 6 role hubs now have clickable activities with smart navigation. DeletedBanner component shows deletion info for admins. Ready for testing."
 ```
 
-**Note:** All scripts automatically add a random greeting at the start (e.g., "Hello Freedom", "Hello Daddy", "Hey Freedom", etc.).
+**Note:** All scripts automatically add a random greeting at the start (e.g., "Hello Freedom", "Hey Freedom", etc.).
 
 ## Voice Response Protocol
 
 **CRITICAL: Use voice notification on EVERY response to the user!**
 
-### Automatic Voice Response:
 ```powershell
 powershell -ExecutionPolicy Bypass -File "scripts/notify-response.ps1" -Message "Your response summary"
 ```
 
 ### When to Use:
-- ✅ **EVERY TIME** you respond to the user (MANDATORY)
-- ✅ Before starting any task or investigation
-- ✅ After reading files or analyzing code
-- ✅ After answering questions
-- ✅ Before and after executing tasks
-- ✅ When making decisions or analyzing options
-- ✅ When encountering errors or issues
-- ✅ When completing builds or tests
-- ✅ When providing status updates during long operations
-- ✅ When suggesting next steps or alternatives
-- ✅ When asking for clarification or approval
-- ✅ When discovering important findings in code
+- **EVERY TIME** you respond to the user (MANDATORY)
+- **BEFORE starting any task** — acknowledge what you're about to do
+- **DURING long tasks** — provide progress updates on important milestones
+- **AFTER completing work** — summarize what was done
+- Before and after executing tasks
+- After reading files or analyzing code
+- After answering questions
+- When encountering errors or issues
+- When providing status updates
+- When discovering important findings in code
+
+### Voice Timing:
+- **Acknowledgement first** — speak before you begin working, not just after
+- **Mid-task updates** — if a task takes multiple steps, voice important progress
+- **Completion summary** — use `notify-complete-modern.ps1` for major completions
 
 ### Message Content:
 - Brief summary of your response (1-2 sentences)
-- Or the actual answer if it's short
+- Use "Freedom" when addressing the user
 - Can be conversational and engaging
-- Use "daddy" or "Freedom" when addressing user
 
-**IMPORTANT:** This is MANDATORY for all user interactions, not optional. Use voice notifications FREQUENTLY throughout conversations to keep the user engaged and motivated. DO NOT set a timeout - let the voice command complete naturally.
+**IMPORTANT:** This is MANDATORY for all user interactions, not optional. DO NOT set a timeout — let the voice command complete naturally.
 
 ## Session Context Awareness
 
@@ -195,6 +198,16 @@ powershell -ExecutionPolicy Bypass -File "scripts/notify-response.ps1" -Message 
    - If you think there is a better way or lack clarification, ask me first!
    - If you need to do research on a topic before coding something, do IT. This will help produce better code
 
+## Component Reuse Policy
+
+**ALWAYS reuse existing components. NEVER create new wrapper components or "shared" components when existing ones already handle the job.**
+
+- Before creating any new component, check what already exists in `@cks/ui`, `@cks/domain-widgets`, and `apps/frontend/src/components/`
+- Use `Button`, `DataTable`, `TabSection`, `PageWrapper`, `TabContainer`, `NavigationTab` etc. from `@cks/ui`
+- Inline forms with standard HTML elements (input, textarea, select) + existing Button components — don't create form wrapper components
+- If you need a pattern used in multiple places, keep it inline rather than creating a "shared" component unless it's genuinely complex (50+ lines of logic)
+- Avoid "slop" — unnecessary abstraction layers, wrappers, or utility components that add no real value
+
 ## Other Important Notes
 
 ### Testing Commands
@@ -207,3 +220,9 @@ powershell -ExecutionPolicy Bypass -File "scripts/notify-response.ps1" -Message 
 - Frontend: Check package.json for specific commands
 
 Remember: Being surgical and specific with process management prevents accidental self-termination!
+
+## Documentation Protocol
+
+- **Extensive documentation is MANDATORY** for anything we build that would require it. If docs don't already exist for a system/feature and they should, create them proactively.
+- On every major git push, create or update a changelog entry in `docs/` summarizing what changed and why.
+- Keep docs organized by domain in the `docs/` folder.

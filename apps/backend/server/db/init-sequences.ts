@@ -187,6 +187,15 @@ export async function initializeSequences() {
 
     // No longer inserting a default warehouse - warehouses should be created through proper registration
 
+    await query(`
+      CREATE TABLE IF NOT EXISTS user_preferences (
+        user_code VARCHAR(64) PRIMARY KEY,
+        preferences JSONB NOT NULL DEFAULT '{}'::jsonb,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `, []);
+    console.log('Created/verified user_preferences table');
+
     await seedCatalogData();
 
     console.log('Database sequences and tables initialized successfully');

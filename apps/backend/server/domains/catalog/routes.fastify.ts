@@ -970,4 +970,159 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
       });
     }
   });
+
+  // ── Create catalog product ──────────────────────────────────────────
+  // POST /api/catalog/products
+  // Allowed: admin, warehouse
+  server.post('/api/catalog/products', async (request, reply) => {
+    const account = await requireActiveRole(request, reply, {});
+    if (!account) return;
+
+    const role = (account.role ?? '').trim().toLowerCase();
+    if (role !== 'admin' && role !== 'warehouse') {
+      reply.code(403).send({ error: 'Only admins and warehouse users can create products' });
+      return;
+    }
+
+    const bodySchema = z.object({
+      name: z.string().trim().min(1, 'Name is required'),
+      description: z.string().trim().optional(),
+      category: z.string().trim().optional(),
+      unitOfMeasure: z.string().trim().optional(),
+      basePrice: z.string().trim().optional(),
+      sku: z.string().trim().optional(),
+      packageSize: z.string().trim().optional(),
+      leadTimeDays: z.coerce.number().int().optional(),
+      reorderPoint: z.coerce.number().int().optional(),
+    });
+
+    const b = bodySchema.safeParse(request.body);
+    if (!b.success) {
+      reply.code(400).send({ error: b.error.issues[0]?.message || 'Invalid request' });
+      return;
+    }
+
+    const { name, description, category, unitOfMeasure, basePrice, sku, packageSize, leadTimeDays, reorderPoint } = b.data;
+
+    try {
+      // Auto-generate next product ID (PRD-XXX)
+      const maxResult = await query<{ max_num: string | null }>(
+        `SELECT MAX(CAST(SUBSTRING(product_id FROM 5) AS INTEGER)) AS max_num
+         FROM catalog_products
+         WHERE product_id ~ '^PRD-[0-9]+$'`,
+        [],
+      );
+      const nextNum = (Number(maxResult.rows[0]?.max_num) || 0) + 1;
+      const productId = `PRD-${String(nextNum).padStart(3, '0')}`;
+
+      await query(
+        `INSERT INTO catalog_products (
+          product_id, name, description, category, unit_of_measure,
+          base_price, sku, package_size, lead_time_days, reorder_point,
+          is_active, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, TRUE, NOW(), NOW())`,
+        [
+          productId, name, description || null, category || null,
+          unitOfMeasure || null, basePrice || null, sku || null,
+          packageSize || null, leadTimeDays ?? null, reorderPoint ?? null,
+        ],
+      );
+
+      // Record activity
+      await recordActivity({
+        activityType: 'product_created',
+        description: `New product ${productId} "${name}" created`,
+        actorId: account.cksCode || role.toUpperCase(),
+        actorRole: role,
+        targetId: productId,
+        targetType: 'product',
+        metadata: { productId, name, category: category || null, createdBy: account.cksCode },
+      });
+
+      reply.send({
+        success: true,
+        data: { productId, name, category: category || null },
+      });
+    } catch (error) {
+      request.log.error({ err: error }, 'Failed to create catalog product');
+      reply.code(500).send({ error: 'Failed to create product' });
+    }
+  });
+
+  // ── Create catalog service ──────────────────────────────────────────
+  // POST /api/catalog/services
+  // Allowed: admin, manager
+  server.post('/api/catalog/services', async (request, reply) => {
+    const account = await requireActiveRole(request, reply, {});
+    if (!account) return;
+
+    const role = (account.role ?? '').trim().toLowerCase();
+    if (role !== 'admin' && role !== 'manager') {
+      reply.code(403).send({ error: 'Only admins and managers can create services' });
+      return;
+    }
+
+    const bodySchema = z.object({
+      name: z.string().trim().min(1, 'Name is required'),
+      description: z.string().trim().optional(),
+      category: z.string().trim().optional(),
+      unitOfMeasure: z.string().trim().optional(),
+      basePrice: z.string().trim().optional(),
+      durationMinutes: z.coerce.number().int().optional(),
+      serviceWindow: z.string().trim().optional(),
+      crewRequired: z.coerce.number().int().optional(),
+    });
+
+    const b = bodySchema.safeParse(request.body);
+    if (!b.success) {
+      reply.code(400).send({ error: b.error.issues[0]?.message || 'Invalid request' });
+      return;
+    }
+
+    const { name, description, category, unitOfMeasure, basePrice, durationMinutes, serviceWindow, crewRequired } = b.data;
+
+    try {
+      // Auto-generate next service ID (SRV-XXX)
+      const maxResult = await query<{ max_num: string | null }>(
+        `SELECT MAX(CAST(SUBSTRING(service_id FROM 5) AS INTEGER)) AS max_num
+         FROM catalog_services
+         WHERE service_id ~ '^SRV-[0-9]+$'`,
+        [],
+      );
+      const nextNum = (Number(maxResult.rows[0]?.max_num) || 0) + 1;
+      const serviceId = `SRV-${String(nextNum).padStart(3, '0')}`;
+
+      await query(
+        `INSERT INTO catalog_services (
+          service_id, name, description, category, unit_of_measure,
+          base_price, duration_minutes, service_window, crew_required,
+          is_active, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, TRUE, NOW(), NOW())`,
+        [
+          serviceId, name, description || null, category || null,
+          unitOfMeasure || null, basePrice || null,
+          durationMinutes ?? null, serviceWindow || null, crewRequired ?? null,
+        ],
+      );
+
+      // Record activity
+      await recordActivity({
+        activityType: 'catalog_service_created',
+        description: `New service ${serviceId} "${name}" created`,
+        actorId: account.cksCode || role.toUpperCase(),
+        actorRole: role,
+        targetId: serviceId,
+        targetType: 'catalogService',
+        metadata: { serviceId, name, category: category || null, createdBy: account.cksCode },
+      });
+
+      reply.send({
+        success: true,
+        data: { serviceId, name, category: category || null },
+      });
+    } catch (error) {
+      request.log.error({ err: error }, 'Failed to create catalog service');
+      reply.code(500).send({ error: 'Failed to create service' });
+    }
+  });
 }

@@ -56,7 +56,7 @@ import { createReport as apiCreateReport, createFeedback as apiCreateFeedback, a
 
 import { buildEcosystemTree, DEFAULT_ROLE_COLOR_MAP } from '../shared/utils/ecosystem';
 import { useHubLoading } from '../contexts/HubLoadingContext';
-import { loadUserPreferences, saveUserPreferences } from '../shared/preferences';
+import { fetchUserPreferencesFromApi, loadUserPreferences, saveUserPreferences } from '../shared/preferences';
 import { buildCenterOverviewData } from '../shared/overview/builders';
 import { dismissActivity, dismissAllActivities } from '../shared/api/directory';
 import { useAccessCodeRedemption } from '../hooks/useAccessCodeRedemption';
@@ -244,10 +244,52 @@ function CenterHubContent({ initialTab = 'dashboard' }: CenterHubProps) {
     () => loadUserPreferences(userCode ?? normalizedCode),
     [normalizedCode, userCode],
   );
-  const centerEffectiveWatermarkUrl = useMemo(() => {
+  const centerLocalWatermarkUrl = useMemo(() => {
     const contractorPrefs = loadUserPreferences(contractorWatermarkCode);
     return contractorPrefs.logoWatermarkUrl?.trim() || '';
   }, [contractorWatermarkCode]);
+  const [centerApiWatermarkUrl, setCenterApiWatermarkUrl] = useState('');
+  const centerEffectiveWatermarkUrl = centerLocalWatermarkUrl || centerApiWatermarkUrl;
+
+  useEffect(() => {
+    setCenterApiWatermarkUrl('');
+    if (centerLocalWatermarkUrl || !contractorWatermarkCode) {
+      return;
+    }
+
+    let cancelled = false;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const fetchFromApi = async (attempt: number) => {
+      try {
+        const apiPrefs = await fetchUserPreferencesFromApi(contractorWatermarkCode);
+        if (cancelled) {
+          return;
+        }
+        const apiUrl = apiPrefs.logoWatermarkUrl?.trim() || '';
+        if (apiUrl) {
+          setCenterApiWatermarkUrl(apiUrl);
+          return;
+        }
+      } catch {
+        // Already handled in preferences helper
+      }
+
+      if (!cancelled && attempt < 2) {
+        retryTimer = setTimeout(() => {
+          void fetchFromApi(attempt + 1);
+        }, (attempt + 1) * 500);
+      }
+    };
+
+    void fetchFromApi(0);
+    return () => {
+      cancelled = true;
+      if (retryTimer) {
+        clearTimeout(retryTimer);
+      }
+    };
+  }, [contractorWatermarkCode, centerLocalWatermarkUrl]);
 
   // Signal when critical data is loaded
   useEffect(() => {

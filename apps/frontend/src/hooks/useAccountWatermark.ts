@@ -1,7 +1,28 @@
+/*-----------------------------------------------
+  Property of Freedom_EXE  (c) 2026
+-----------------------------------------------*/
+/**
+ * File: useAccountWatermark.ts
+ *
+ * Description:
+ * Hook that resolves and applies the account watermark CSS variable.
+ * For contractors: uses their own watermark.
+ * For customers/centers: uses their contractor's watermark.
+ * For manager/warehouse/crew: uses CKS default.
+ *
+ * Preferences are loaded from localStorage first (fast, sync), then
+ * fetched from the API if localStorage is empty (handles cross-browser/
+ * cross-admin scenarios like impersonation).
+ */
+/*-----------------------------------------------
+  Manifested by Freedom_EXE
+-----------------------------------------------*/
+
 import { useEffect, useMemo } from 'react';
 import { useHubRoleScope } from '../shared/api/hub';
 import {
   codesMatch,
+  fetchUserPreferencesFromApi,
   loadUserPreferencesWithFallback,
   USER_PREFERENCES_EVENT,
   type UserPreferencesChangeDetail,
@@ -84,7 +105,6 @@ export function useAccountWatermark(
     }
 
     if (!hasWatermarkPolicy) {
-      // Roles outside the ecosystem watermark policy do not render a fallback watermark.
       setWatermarkImage(undefined);
       return;
     }
@@ -100,13 +120,48 @@ export function useAccountWatermark(
       return;
     }
 
-    const applyForOwner = () => {
+    // 1. Apply from localStorage immediately (fast, sync)
+    const applyFromLocal = () => {
       const preferences = loadUserPreferencesWithFallback(ownerCode);
       setWatermarkImage(resolveWatermarkUrl(preferences.logoWatermarkUrl));
+      return preferences;
     };
 
-    applyForOwner();
+    const localPrefs = applyFromLocal();
 
+    let cancelled = false;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+
+    // 2. If localStorage is empty for this owner, fetch from API.
+    // Retry a few times to survive initial auth-token timing races.
+    const needsFetch = !localPrefs.logoWatermarkUrl;
+    if (needsFetch) {
+      const fetchFromApi = async (attempt: number) => {
+        try {
+          const apiPrefs = await fetchUserPreferencesFromApi(ownerCode);
+          if (cancelled) {
+            return;
+          }
+          const resolved = resolveWatermarkUrl(apiPrefs.logoWatermarkUrl);
+          if (resolved) {
+            setWatermarkImage(resolved);
+            return;
+          }
+        } catch {
+          // Already logged/handled in preferences helper
+        }
+
+        if (!cancelled && attempt < 2) {
+          retryTimer = setTimeout(() => {
+            void fetchFromApi(attempt + 1);
+          }, (attempt + 1) * 500);
+        }
+      };
+
+      void fetchFromApi(0);
+    }
+
+    // Listen for preference changes (same-tab edits, storage events)
     const onPreferencesChanged = (event: Event) => {
       const detail = (event as CustomEvent<UserPreferencesChangeDetail>).detail;
       if (!detail || !codesMatch(detail.userCode, ownerCode)) {
@@ -119,12 +174,16 @@ export function useAccountWatermark(
       if (!event.key || !event.key.startsWith('cks_prefs_')) {
         return;
       }
-      applyForOwner();
+      applyFromLocal();
     };
 
     window.addEventListener(USER_PREFERENCES_EVENT, onPreferencesChanged as EventListener);
     window.addEventListener('storage', onStorageChanged);
     return () => {
+      cancelled = true;
+      if (retryTimer) {
+        clearTimeout(retryTimer);
+      }
       window.removeEventListener(USER_PREFERENCES_EVENT, onPreferencesChanged as EventListener);
       window.removeEventListener('storage', onStorageChanged);
     };

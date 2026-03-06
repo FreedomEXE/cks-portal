@@ -25,8 +25,14 @@ import {
   type WarehouseCreatePayload
 } from '../../shared/api/provisioning';
 import { createAccessCode } from '../../shared/api/access';
+import {
+  createCatalogProduct,
+  createCatalogService,
+  type CreateCatalogProductPayload,
+  type CreateCatalogServicePayload,
+} from '../../shared/api/admin';
 
-type TabKey = 'managers' | 'contractors' | 'customers' | 'centers' | 'crew' | 'warehouses' | 'accessCodes';
+type TabKey = 'managers' | 'contractors' | 'customers' | 'centers' | 'crew' | 'warehouses' | 'accessCodes' | 'products' | 'services';
 
 type FieldConfig = {
   name: string;
@@ -278,6 +284,29 @@ function buildTabConfigs(): TabConfig<unknown>[] {
     { name: 'address', label: 'Address', required: true, placeholder: 'Street, City, State' },
   ];
 
+  const productFields: FieldConfig[] = [
+    { name: 'name', label: 'Product Name', required: true, placeholder: 'Premium Cleaning Solution' },
+    { name: 'category', label: 'Category', placeholder: 'Cleaning Supplies' },
+    { name: 'description', label: 'Description', multiline: true, placeholder: 'Describe the product...' },
+    { name: 'unitOfMeasure', label: 'Unit of Measure', placeholder: 'Each, Case, Gallon' },
+    { name: 'basePrice', label: 'Base Price', placeholder: '29.99' },
+    { name: 'sku', label: 'SKU', placeholder: 'CLN-PRM-001' },
+    { name: 'packageSize', label: 'Package Size', placeholder: '1 Gallon' },
+    { name: 'leadTimeDays', label: 'Lead Time (days)', placeholder: '3' },
+    { name: 'reorderPoint', label: 'Reorder Point', placeholder: '10' },
+  ];
+
+  const serviceFields: FieldConfig[] = [
+    { name: 'name', label: 'Service Name', required: true, placeholder: 'Deep Cleaning Service' },
+    { name: 'category', label: 'Category', placeholder: 'Cleaning' },
+    { name: 'description', label: 'Description', multiline: true, placeholder: 'Describe the service...' },
+    { name: 'unitOfMeasure', label: 'Unit of Measure', placeholder: 'Per Visit, Per Hour' },
+    { name: 'basePrice', label: 'Base Price', placeholder: '150.00' },
+    { name: 'durationMinutes', label: 'Duration (minutes)', placeholder: '120' },
+    { name: 'serviceWindow', label: 'Service Window', placeholder: 'Mon-Fri 8am-5pm' },
+    { name: 'crewRequired', label: 'Crew Required', placeholder: '2' },
+  ];
+
   const accessCodeFields: FieldConfig[] = [
     {
       name: 'targetRole',
@@ -451,6 +480,53 @@ function buildTabConfigs(): TabConfig<unknown>[] {
       resetValues: buildFieldValues(warehouseFields),
       successMessage: () => 'Warehouse created',
       mutateKeys: ['/admin/directory/warehouses'],
+    },
+    {
+      key: 'products',
+      label: 'Products',
+      color: '#0891b2',
+      fields: productFields,
+      submitLabel: 'Create Product',
+      create: async (values, getToken) => {
+        const payload: CreateCatalogProductPayload = {
+          name: values.name.trim(),
+          description: stringOrUndefined(values.description),
+          category: stringOrUndefined(values.category),
+          unitOfMeasure: stringOrUndefined(values.unitOfMeasure),
+          basePrice: stringOrUndefined(values.basePrice),
+          sku: stringOrUndefined(values.sku),
+          packageSize: stringOrUndefined(values.packageSize),
+          leadTimeDays: values.leadTimeDays ? Number(values.leadTimeDays) : undefined,
+          reorderPoint: values.reorderPoint ? Number(values.reorderPoint) : undefined,
+        };
+        return createCatalogProduct(payload, { getToken });
+      },
+      resetValues: buildFieldValues(productFields),
+      successMessage: (record: any) => `Product created: ${record.productId ?? ''}`.trim(),
+      mutateKeys: ['/catalog/items'],
+    },
+    {
+      key: 'services',
+      label: 'Services',
+      color: '#d946ef',
+      fields: serviceFields,
+      submitLabel: 'Create Service',
+      create: async (values, getToken) => {
+        const payload: CreateCatalogServicePayload = {
+          name: values.name.trim(),
+          description: stringOrUndefined(values.description),
+          category: stringOrUndefined(values.category),
+          unitOfMeasure: stringOrUndefined(values.unitOfMeasure),
+          basePrice: stringOrUndefined(values.basePrice),
+          durationMinutes: values.durationMinutes ? Number(values.durationMinutes) : undefined,
+          serviceWindow: stringOrUndefined(values.serviceWindow),
+          crewRequired: values.crewRequired ? Number(values.crewRequired) : undefined,
+        };
+        return createCatalogService(payload, { getToken });
+      },
+      resetValues: buildFieldValues(serviceFields),
+      successMessage: (record: any) => `Service created: ${record.serviceId ?? ''}`.trim(),
+      mutateKeys: ['/catalog/items'],
     },
     {
       key: 'accessCodes',

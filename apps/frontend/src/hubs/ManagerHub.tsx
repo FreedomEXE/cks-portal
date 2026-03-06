@@ -4,9 +4,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import toast from 'react-hot-toast';
+import rhToast from 'react-hot-toast';
 import { useAuth } from '@cks/auth';
-import { useClerk, useUser } from '@clerk/clerk-react';
+import { useAuth as useClerkAuth, useClerk, useUser } from '@clerk/clerk-react';
 import { EcosystemTree } from '@cks/domain-widgets';
 import { useTheme as useAppTheme } from '../contexts/ThemeContext';
 import { useFormattedActivities } from '../shared/activity/useFormattedActivities';
@@ -78,6 +78,7 @@ import { dismissActivity, dismissAllActivities } from '../shared/api/directory';
 import { apiFetch } from '../shared/api/client';
 import { applyServiceAction } from '../shared/api/hub';
 import { requestPasswordReset } from '../shared/api/account';
+import { createCatalogService, type CreateCatalogServicePayload } from '../shared/api/admin';
 import { loadUserPreferences, saveUserPreferences } from '../shared/preferences';
 import { buildSupportTickets, mapSupportIssuePayload } from '../shared/support/supportTickets';
 import { uploadProfilePhotoAndSyncLogo } from '../shared/profilePhoto';
@@ -470,6 +471,9 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
   const [activeTab, setActiveTab] = useState(initialTab);
   const [servicesTab, setServicesTab] = useState<'my' | 'active' | 'history'>('my');
   const [servicesSearchQuery, setServicesSearchQuery] = useState('');
+  const [showCreateService, setShowCreateService] = useState(false);
+  const [createServiceForm, setCreateServiceForm] = useState({ name: '', category: '', description: '', unitOfMeasure: '', basePrice: '', durationMinutes: '' });
+  const [creatingService, setCreatingService] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [overviewModal, setOverviewModal] = useState<{
     id: string;
@@ -507,6 +511,7 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
   }, []);
 
   const { code, fullName, firstName, accessStatus, accessTier, accessSource } = useAuth();
+  const { getToken } = useClerkAuth();
   const { openUserProfile } = useClerk();
   const { setTheme } = useAppTheme();
   const { user } = useUser();
@@ -1105,16 +1110,16 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
 
   const handlePasswordReset = useCallback(async () => {
     if (!user?.id) {
-      toast.error('User not authenticated');
+      rhToast.error('User not authenticated');
       return;
     }
 
     try {
       const result = await requestPasswordReset(user.id);
-      toast.success(result.message || 'Password reset email sent successfully');
+      rhToast.success(result.message || 'Password reset email sent successfully');
     } catch (error) {
       console.error('[manager] Failed to request password reset', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to send password reset email');
+      rhToast.error(error instanceof Error ? error.message : 'Failed to send password reset email');
     }
   }, [user?.id]);
 
@@ -1140,6 +1145,33 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
     }
     await mutateReports();
   }, [mutateReports]);
+
+  const handleCreateService = useCallback(async () => {
+    if (!createServiceForm.name.trim()) {
+      rhToast.error('Service name is required');
+      return;
+    }
+    setCreatingService(true);
+    try {
+      const payload: CreateCatalogServicePayload = {
+        name: createServiceForm.name.trim(),
+        description: createServiceForm.description.trim() || undefined,
+        category: createServiceForm.category.trim() || undefined,
+        unitOfMeasure: createServiceForm.unitOfMeasure.trim() || undefined,
+        basePrice: createServiceForm.basePrice.trim() || undefined,
+        durationMinutes: createServiceForm.durationMinutes ? Number(createServiceForm.durationMinutes) : undefined,
+      };
+      const result = await createCatalogService(payload, { getToken });
+      rhToast.success(`Service created: ${result.serviceId}`);
+      setCreateServiceForm({ name: '', category: '', description: '', unitOfMeasure: '', basePrice: '', durationMinutes: '' });
+      setShowCreateService(false);
+      mutate((key: unknown) => typeof key === 'string' && key.includes('/catalog'), undefined, { revalidate: true });
+    } catch (err: any) {
+      rhToast.error(err?.message || 'Failed to create service');
+    } finally {
+      setCreatingService(false);
+    }
+  }, [createServiceForm, getToken, mutate]);
 
   // Note: Crew request and service creation handlers removed
   // Services are now auto-created on manager accept
@@ -1190,7 +1222,7 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
                 onClearAll={handleClearAll}
                 isLoading={activitiesLoading}
                 error={activitiesError}
-                onError={(msg) => toast.error(msg)}
+                onError={(msg) => rhToast.error(msg)}
               />
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 24 }}>
@@ -1245,6 +1277,61 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
             </PageWrapper>
           ) : activeTab === 'services' ? (
             <PageWrapper title="My Services" showHeader headerSrOnly>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+                <Button
+                  variant="primary"
+                  roleColor={MANAGER_PRIMARY_COLOR}
+                  onClick={() => setShowCreateService((v) => !v)}
+                >
+                  {showCreateService ? 'Cancel' : '+ New Service'}
+                </Button>
+              </div>
+
+              {showCreateService && (
+                <div style={{
+                  marginBottom: 16,
+                  padding: 20,
+                  background: '#fff',
+                  borderRadius: 10,
+                  border: '1px solid #e5e7eb',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                }}>
+                  <div style={{ fontSize: 15, fontWeight: 600, color: '#0f172a', marginBottom: 14 }}>Create New Service</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                    <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <span style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>Service Name *</span>
+                      <input value={createServiceForm.name} onChange={(e) => setCreateServiceForm(p => ({ ...p, name: e.target.value }))} placeholder="Enter service name" disabled={creatingService} style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: '8px 10px', fontSize: 13 }} />
+                    </label>
+                    <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <span style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>Category</span>
+                      <input value={createServiceForm.category} onChange={(e) => setCreateServiceForm(p => ({ ...p, category: e.target.value }))} placeholder="e.g. Cleaning" disabled={creatingService} style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: '8px 10px', fontSize: 13 }} />
+                    </label>
+                    <label style={{ display: 'flex', flexDirection: 'column', gap: 4, gridColumn: '1 / -1' }}>
+                      <span style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>Description</span>
+                      <textarea value={createServiceForm.description} onChange={(e) => setCreateServiceForm(p => ({ ...p, description: e.target.value }))} placeholder="Brief description" disabled={creatingService} rows={2} style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: '8px 10px', fontSize: 13, resize: 'vertical' }} />
+                    </label>
+                    <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <span style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>Unit of Measure</span>
+                      <input value={createServiceForm.unitOfMeasure} onChange={(e) => setCreateServiceForm(p => ({ ...p, unitOfMeasure: e.target.value }))} placeholder="Per Visit, Per Hour" disabled={creatingService} style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: '8px 10px', fontSize: 13 }} />
+                    </label>
+                    <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <span style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>Base Price</span>
+                      <input value={createServiceForm.basePrice} onChange={(e) => setCreateServiceForm(p => ({ ...p, basePrice: e.target.value }))} placeholder="150.00" disabled={creatingService} style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: '8px 10px', fontSize: 13 }} />
+                    </label>
+                    <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <span style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>Duration (minutes)</span>
+                      <input value={createServiceForm.durationMinutes} onChange={(e) => setCreateServiceForm(p => ({ ...p, durationMinutes: e.target.value }))} placeholder="120" disabled={creatingService} style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: '8px 10px', fontSize: 13 }} />
+                    </label>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14, gap: 10 }}>
+                    <Button variant="secondary" onClick={() => setShowCreateService(false)} disabled={creatingService}>Cancel</Button>
+                    <Button variant="primary" roleColor={MANAGER_PRIMARY_COLOR} onClick={handleCreateService} disabled={creatingService}>
+                      {creatingService ? 'Creating...' : 'Create Service'}
+                    </Button>
+                  </div>
+                </div>
+              )}
+
               <TabSection
                 tabs={[
                   { id: 'my', label: 'My Services', count: myServicesData.length },

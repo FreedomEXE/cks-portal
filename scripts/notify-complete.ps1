@@ -37,11 +37,10 @@ $synthesizer.Volume = 100   # 0 to 100
 # Random greeting selection
 $greetings = @(
     "Hello Freedom",
-    "Hello Daddy",
     "Hey Freedom",
-    "Hi Daddy",
+    "Hi Freedom",
     "Greetings Freedom",
-    "What's up Daddy"
+    "What's up Freedom"
 )
 $greeting = $greetings | Get-Random
 $fullMessage = "$greeting. $Message"

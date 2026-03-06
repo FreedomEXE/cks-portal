@@ -57,7 +57,7 @@ import { buildEcosystemTree } from '../shared/utils/ecosystem';
 import { useCatalogItems } from '../shared/api/catalog';
 import { useCertifiedServices } from '../hooks/useCertifiedServices';
 import { useHubLoading } from '../contexts/HubLoadingContext';
-import { loadUserPreferences, saveUserPreferences } from '../shared/preferences';
+import { fetchUserPreferencesFromApi, loadUserPreferences, saveUserPreferences } from '../shared/preferences';
 import { dismissActivity, dismissAllActivities } from '../shared/api/directory';
 import { buildContractorOverviewData } from '../shared/overview/builders';
 import { useAccessCodeRedemption } from '../hooks/useAccessCodeRedemption';
@@ -340,10 +340,53 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
   
   const userCode = useMemo(() => resolvedUserCode(profile?.cksCode, normalizedCode), [profile?.cksCode, normalizedCode]);
   const contractorPreferences = useMemo(() => loadUserPreferences(userCode ?? null), [userCode]);
-  const contractorEffectiveWatermarkUrl = useMemo(
+  const contractorLocalWatermarkUrl = useMemo(
     () => contractorPreferences.logoWatermarkUrl?.trim() || '',
     [contractorPreferences.logoWatermarkUrl],
   );
+  const [contractorApiWatermarkUrl, setContractorApiWatermarkUrl] = useState('');
+  const contractorEffectiveWatermarkUrl = contractorLocalWatermarkUrl || contractorApiWatermarkUrl;
+
+  useEffect(() => {
+    setContractorApiWatermarkUrl('');
+    if (contractorLocalWatermarkUrl || !userCode) {
+      return;
+    }
+
+    let cancelled = false;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const fetchFromApi = async (attempt: number) => {
+      try {
+        const apiPrefs = await fetchUserPreferencesFromApi(userCode);
+        if (cancelled) {
+          return;
+        }
+        const apiUrl = apiPrefs.logoWatermarkUrl?.trim() || '';
+        if (apiUrl) {
+          setContractorApiWatermarkUrl(apiUrl);
+          return;
+        }
+      } catch {
+        // Already handled in preferences helper
+      }
+
+      if (!cancelled && attempt < 2) {
+        retryTimer = setTimeout(() => {
+          void fetchFromApi(attempt + 1);
+        }, (attempt + 1) * 500);
+      }
+    };
+
+    void fetchFromApi(0);
+    return () => {
+      cancelled = true;
+      if (retryTimer) {
+        clearTimeout(retryTimer);
+      }
+    };
+  }, [contractorLocalWatermarkUrl, userCode]);
+
   const welcomeName = profile?.mainContact ?? profile?.name ?? undefined;
 
   // Signal when critical data is loaded (but only if not highlighting an order)

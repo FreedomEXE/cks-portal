@@ -7,11 +7,10 @@ param(
 # Random greeting selection
 $greetings = @(
     "Hello Freedom",
-    "Hello Daddy",
     "Hey Freedom",
-    "Hi Daddy",
+    "Hi Freedom",
     "Greetings Freedom",
-    "What's up Daddy"
+    "What's up Freedom"
 )
 $greeting = $greetings | Get-Random
 $fullMessage = "$greeting. $Message"
@@ -24,7 +23,8 @@ $tempAudio = [System.IO.Path]::GetTempFileName() -replace '\.tmp$', '.mp3'
 
 try {
     # Generate speech with edge-tts (using SSL-bypass script)
-    python "scripts/edge-tts-fix.py" $Voice $fullMessage $tempAudio 2>&1 | Out-Null
+    $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+    python "$scriptDir/edge-tts-fix.py" $Voice $fullMessage $tempAudio 2>&1 | Out-Null
 
     if (Test-Path $tempAudio) {
         # Play audio (Windows Media Player)
@@ -36,9 +36,22 @@ try {
         $mediaPlayer.Open([uri]$absolutePath)
         $mediaPlayer.Play()
 
-        # Wait for audio to finish (estimate based on text length with generous buffer)
-        $estimatedDuration = [Math]::Max(5, ($fullMessage.Length / 8))  # ~8 chars per second + buffer
-        Start-Sleep -Seconds $estimatedDuration
+        # Get actual MP3 duration using Shell COM object (no dependencies)
+        $shell = New-Object -ComObject Shell.Application
+        $folder = $shell.Namespace((Split-Path $absolutePath))
+        $file = $folder.ParseName((Split-Path $absolutePath -Leaf))
+        $durationStr = $folder.GetDetailsOf($file, 27)  # Property 27 = Duration
+
+        if ($durationStr -match '(\d+):(\d+):(\d+)') {
+            $actualSeconds = [int]$Matches[1] * 3600 + [int]$Matches[2] * 60 + [int]$Matches[3]
+        } elseif ($durationStr -match '(\d+):(\d+)') {
+            $actualSeconds = [int]$Matches[1] * 60 + [int]$Matches[2]
+        } else {
+            $actualSeconds = [Math]::Ceiling(($fullMessage.Length / 10) * 1.5)
+        }
+
+        $waitDuration = [Math]::Max(5, $actualSeconds + 3)
+        Start-Sleep -Seconds $waitDuration
 
         $mediaPlayer.Stop()
         $mediaPlayer.Close()

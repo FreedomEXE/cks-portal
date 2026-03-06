@@ -58,7 +58,7 @@ import { useCertifiedServices } from '../hooks/useCertifiedServices';
 import { buildEcosystemTree, DEFAULT_ROLE_COLOR_MAP } from '../shared/utils/ecosystem';
 import { buildCustomerOverviewData } from '../shared/overview/builders';
 import { useHubLoading } from '../contexts/HubLoadingContext';
-import { loadUserPreferences, saveUserPreferences } from '../shared/preferences';
+import { fetchUserPreferencesFromApi, loadUserPreferences, saveUserPreferences } from '../shared/preferences';
 import { dismissActivity, dismissAllActivities } from '../shared/api/directory';
 import { useAccessCodeRedemption } from '../hooks/useAccessCodeRedemption';
 import OverviewSummaryModal, { type OverviewSummaryItem } from '../components/overview/OverviewSummaryModal';
@@ -239,10 +239,53 @@ function CustomerHubContent({ initialTab = 'dashboard' }: CustomerHubProps) {
     () => loadUserPreferences(userCode ?? normalizedCode),
     [normalizedCode, userCode],
   );
-  const customerEffectiveWatermarkUrl = useMemo(() => {
+  const customerLocalWatermarkUrl = useMemo(() => {
     const contractorPrefs = loadUserPreferences(contractorWatermarkCode);
     return contractorPrefs.logoWatermarkUrl?.trim() || '';
   }, [contractorWatermarkCode]);
+  const [customerApiWatermarkUrl, setCustomerApiWatermarkUrl] = useState('');
+  const customerEffectiveWatermarkUrl = customerLocalWatermarkUrl || customerApiWatermarkUrl;
+
+  useEffect(() => {
+    setCustomerApiWatermarkUrl('');
+    if (customerLocalWatermarkUrl || !contractorWatermarkCode) {
+      return;
+    }
+
+    let cancelled = false;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const fetchFromApi = async (attempt: number) => {
+      try {
+        const apiPrefs = await fetchUserPreferencesFromApi(contractorWatermarkCode);
+        if (cancelled) {
+          return;
+        }
+        const apiUrl = apiPrefs.logoWatermarkUrl?.trim() || '';
+        if (apiUrl) {
+          setCustomerApiWatermarkUrl(apiUrl);
+          return;
+        }
+      } catch {
+        // Already handled in preferences helper
+      }
+
+      if (!cancelled && attempt < 2) {
+        retryTimer = setTimeout(() => {
+          void fetchFromApi(attempt + 1);
+        }, (attempt + 1) * 500);
+      }
+    };
+
+    void fetchFromApi(0);
+    return () => {
+      cancelled = true;
+      if (retryTimer) {
+        clearTimeout(retryTimer);
+      }
+    };
+  }, [contractorWatermarkCode, customerLocalWatermarkUrl]);
+
   const { data: certifiedServicesData, isLoading: certifiedServicesLoading } = useCertifiedServices(normalizedCode, 'customer', 500);
   const { mutate } = useSWRConfig();
   const { data: newsItems = [] } = useNewsFeed();

@@ -423,6 +423,68 @@ export async function getServiceCertifications(serviceId: string, init?: ApiFetc
   });
 }
 
+// ── Create catalog product/service ──────────────────────────────────
+export interface CreateCatalogProductPayload {
+  name: string;
+  description?: string;
+  category?: string;
+  unitOfMeasure?: string;
+  basePrice?: string;
+  sku?: string;
+  packageSize?: string;
+  leadTimeDays?: number;
+  reorderPoint?: number;
+}
+
+export interface CreateCatalogProductResult {
+  productId: string;
+  name: string;
+  category: string | null;
+}
+
+export async function createCatalogProduct(
+  payload: CreateCatalogProductPayload,
+  init?: ApiFetchInit,
+): Promise<CreateCatalogProductResult> {
+  const response = await apiFetch<{ success: boolean; data: CreateCatalogProductResult }>('/catalog/products', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    headers: { 'Content-Type': 'application/json', ...(init?.headers || {}) },
+    ...init,
+  });
+  return response.data;
+}
+
+export interface CreateCatalogServicePayload {
+  name: string;
+  description?: string;
+  category?: string;
+  unitOfMeasure?: string;
+  basePrice?: string;
+  durationMinutes?: number;
+  serviceWindow?: string;
+  crewRequired?: number;
+}
+
+export interface CreateCatalogServiceResult {
+  serviceId: string;
+  name: string;
+  category: string | null;
+}
+
+export async function createCatalogService(
+  payload: CreateCatalogServicePayload,
+  init?: ApiFetchInit,
+): Promise<CreateCatalogServiceResult> {
+  const response = await apiFetch<{ success: boolean; data: CreateCatalogServiceResult }>('/catalog/services', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    headers: { 'Content-Type': 'application/json', ...(init?.headers || {}) },
+    ...init,
+  });
+  return response.data;
+}
+
 export interface ProductInventory {
   warehouseId: string;
   warehouseName: string;
