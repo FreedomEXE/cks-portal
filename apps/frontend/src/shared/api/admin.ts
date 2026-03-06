@@ -260,9 +260,11 @@ export async function uploadCatalogImage(
   init?: ApiFetchInit,
 ): Promise<{ success: boolean; imageUrl: string }> {
   const formData = new FormData();
-  formData.append('file', file);
+  // Text fields MUST come before the file — @fastify/multipart stops
+  // reading fields once it encounters the file stream.
   formData.append('type', itemType);
   formData.append('itemId', itemId);
+  formData.append('file', file);
 
   return apiFetch<{ success: boolean; imageUrl: string }>('/catalog/upload-image', {
     method: 'POST',
