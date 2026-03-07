@@ -1,5 +1,6 @@
 import { useAuth as useClerkAuth } from '@clerk/clerk-react';
 import { useCallback } from 'react';
+import { mutate as globalMutate } from 'swr';
 import * as LoadingService from '../loading';
 import { ENTITY_CATALOG } from '../constants/entityCatalog';
 
@@ -34,6 +35,38 @@ export type ApiFetchInit = RequestInit & {
 };
 
 const DEFAULT_TIMEOUT_MS = Number(((import.meta as any).env?.VITE_API_TIMEOUT_MS as string | undefined) || '25000');
+
+function isActivityKey(key: unknown): boolean {
+  if (typeof key === 'string') {
+    return key.includes('/hub/activities/') || key.includes('/admin/directory/activities');
+  }
+  if (Array.isArray(key)) {
+    return key.some((part) =>
+      typeof part === 'string' &&
+      (part.includes('/hub/activities/') || part.includes('/admin/directory/activities')),
+    );
+  }
+  return false;
+}
+
+function triggerGlobalActivityRefresh(method: string): void {
+  const normalizedMethod = (method || 'GET').toUpperCase();
+  if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(normalizedMethod)) {
+    return;
+  }
+
+  // Standardized app-wide behavior:
+  // any successful mutation revalidates activity feeds immediately.
+  void globalMutate(isActivityKey, undefined, { revalidate: true });
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(
+      new CustomEvent('cks:activity:refresh', {
+        detail: { source: 'apiFetch', method: normalizedMethod, at: new Date().toISOString() },
+      }),
+    );
+  }
+}
 
 /**
  * Check if a URL path matches a catalog-backed detail endpoint
@@ -273,6 +306,8 @@ export async function apiFetch<T>(path: string, init?: ApiFetchInit): Promise<T>
     console.error('[apiFetch] Request failed:', response.status, message);
     throw Object.assign(new Error(message || 'Request failed with ' + response.status), { status: response.status });
   }
+
+  triggerGlobalActivityRefresh(String(restInit.method || 'GET'));
 
   const data = await response.json();
   return data as T;

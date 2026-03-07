@@ -699,6 +699,37 @@ export function ModalGateway({
     };
   }, [adapter, data, actions, onClose, lifecycle, visibleTabs]);
 
+  const headerWorkflowStages = useMemo(() => {
+    const stages = (((data as any)?.approvalStages || (data as any)?.metadata?.approvalStages) as any) || undefined;
+    if (!stages) {
+      return undefined;
+    }
+
+    // Restrict workflow visibility for catalog services that originated
+    // from manager/warehouse requests: only requester and admins can view.
+    if (entityType === 'catalogService') {
+      const metadata = (data as any)?.metadata && typeof (data as any).metadata === 'object'
+        ? ((data as any).metadata as Record<string, unknown>)
+        : {};
+      const requestedByRole = String(
+        metadata.requestedByRole || metadata.requesterRole || '',
+      ).trim().toLowerCase();
+      const requestedById = String(
+        metadata.requestedById || metadata.requestedBy || metadata.requesterId || '',
+      ).trim().toUpperCase();
+      const viewerId = (currentUserId || '').trim().toUpperCase();
+
+      const isRequestWorkflow = requestedByRole === 'manager' || requestedByRole === 'warehouse';
+      if (isRequestWorkflow) {
+        const isAdminViewer = role === 'admin';
+        const isRequesterViewer = Boolean(viewerId && requestedById && viewerId === requestedById);
+        return isAdminViewer || isRequesterViewer ? stages : undefined;
+      }
+    }
+
+    return stages;
+  }, [data, entityType, currentUserId, role]);
+
   // ===== STEP 7: Early returns AFTER all hooks =====
   if (!isOpen || !entityType || !entityId) {
     return null;
@@ -779,7 +810,7 @@ export function ModalGateway({
         tabs={visibleTabs}
         headerExtras={headerExtras}
         headerActions={actions as any}
-        headerWorkflowStages={(((data as any)?.approvalStages || (data as any)?.metadata?.approvalStages) as any) || undefined}
+        headerWorkflowStages={headerWorkflowStages}
       />
     );
   }
