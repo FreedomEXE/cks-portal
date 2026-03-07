@@ -226,6 +226,101 @@ async function resolveWarehouseContext(
   return { managerId: null, warehouseName: null };
 }
 
+type CatalogEcosystemOption = {
+  ecosystemId: string;
+  ecosystemName: string | null;
+};
+
+async function listCatalogManagerEcosystems(): Promise<CatalogEcosystemOption[]> {
+  const result = await query<{ ecosystem_id: string; ecosystem_name: string | null }>(
+    `SELECT manager_id AS ecosystem_id, name AS ecosystem_name
+     FROM managers
+     WHERE LOWER(COALESCE(status, 'active')) <> 'archived'
+     ORDER BY name ASC`,
+    [],
+  );
+  return result.rows.map((row) => ({
+    ecosystemId: row.ecosystem_id,
+    ecosystemName: row.ecosystem_name,
+  }));
+}
+
+async function collectWarehouseEcosystemIds(warehouseId: string): Promise<string[]> {
+  const normalizedWarehouseId = warehouseId.trim().toUpperCase();
+  if (!normalizedWarehouseId) {
+    return [];
+  }
+
+  const ecosystemIds = new Set<string>();
+  const context = await resolveWarehouseContext(normalizedWarehouseId);
+  if (context.managerId) {
+    ecosystemIds.add(context.managerId);
+  }
+
+  const byManagerId = await query<{ manager_id: string | null }>(
+    `SELECT manager_id
+     FROM warehouses
+     WHERE UPPER(warehouse_id) = UPPER($1)
+       AND manager_id IS NOT NULL
+     LIMIT 1`,
+    [normalizedWarehouseId],
+  );
+  if (byManagerId.rowCount > 0) {
+    const managerId = byManagerId.rows[0].manager_id?.trim().toUpperCase();
+    if (managerId) {
+      ecosystemIds.add(managerId);
+    }
+  }
+
+  try {
+    const byLegacyManagerId = await query<{ cks_manager: string | null }>(
+      `SELECT cks_manager
+       FROM warehouses
+       WHERE UPPER(warehouse_id) = UPPER($1)
+         AND cks_manager IS NOT NULL
+       LIMIT 1`,
+      [normalizedWarehouseId],
+    );
+    if (byLegacyManagerId.rowCount > 0) {
+      const managerId = byLegacyManagerId.rows[0].cks_manager?.trim().toUpperCase();
+      if (managerId) {
+        ecosystemIds.add(managerId);
+      }
+    }
+  } catch {
+    // Legacy cks_manager column is optional across environments; ignore query failure.
+  }
+
+  try {
+    const fromOrders = await query<{ manager_id: string | null }>(
+      `SELECT DISTINCT manager_id
+       FROM orders
+       WHERE UPPER(assigned_warehouse) = UPPER($1)
+         AND manager_id IS NOT NULL`,
+      [normalizedWarehouseId],
+    );
+    for (const row of fromOrders.rows) {
+      const managerId = row.manager_id?.trim().toUpperCase();
+      if (managerId) {
+        ecosystemIds.add(managerId);
+      }
+    }
+  } catch {
+    // orders table fallback is best-effort only.
+  }
+
+  return Array.from(ecosystemIds);
+}
+
+async function isWarehouseEcosystemAllowed(warehouseId: string, ecosystemManagerId: string): Promise<boolean> {
+  const normalizedEcosystemManagerId = ecosystemManagerId.trim().toUpperCase();
+  if (!normalizedEcosystemManagerId) {
+    return false;
+  }
+  const ecosystemIds = await collectWarehouseEcosystemIds(warehouseId);
+  return ecosystemIds.includes(normalizedEcosystemManagerId);
+}
+
 async function ensureEcosystemAllowlistItem(
   itemType: 'product' | 'service',
   itemCode: string,
@@ -335,19 +430,10 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
     }
 
     try {
-      const result = await query<{ ecosystem_id: string; ecosystem_name: string | null }>(
-        `SELECT manager_id AS ecosystem_id, name AS ecosystem_name
-         FROM managers
-         WHERE LOWER(COALESCE(status, 'active')) <> 'archived'
-         ORDER BY name ASC`,
-        [],
-      );
+      const result = await listCatalogManagerEcosystems();
       reply.send({
         success: true,
-        data: result.rows.map((row) => ({
-          ecosystemId: row.ecosystem_id,
-          ecosystemName: row.ecosystem_name,
-        })),
+        data: result,
       });
     } catch (error) {
       request.log.error({ err: error }, 'Failed to fetch ecosystem list');
@@ -367,19 +453,10 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
 
     try {
       if (role === 'admin') {
-        const result = await query<{ ecosystem_id: string; ecosystem_name: string | null }>(
-          `SELECT manager_id AS ecosystem_id, name AS ecosystem_name
-           FROM managers
-           WHERE LOWER(COALESCE(status, 'active')) <> 'archived'
-           ORDER BY name ASC`,
-          [],
-        );
+        const result = await listCatalogManagerEcosystems();
         reply.send({
           success: true,
-          data: result.rows.map((row) => ({
-            ecosystemId: row.ecosystem_id,
-            ecosystemName: row.ecosystem_name,
-          })),
+          data: result,
         });
         return;
       }
@@ -407,19 +484,49 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
         return;
       }
 
-      const result = await query<{ ecosystem_id: string; ecosystem_name: string | null }>(
-        `SELECT manager_id AS ecosystem_id, name AS ecosystem_name
-         FROM managers
-         WHERE LOWER(COALESCE(status, 'active')) <> 'archived'
-         ORDER BY name ASC`,
-        [],
-      );
+      const result = await listCatalogManagerEcosystems();
+      const warehouseId = (account.cksCode ?? '').trim().toUpperCase();
+      if (!warehouseId) {
+        reply.send({ success: true, data: result });
+        return;
+      }
+
+      const fallbackEcosystemIds = await collectWarehouseEcosystemIds(warehouseId);
+      if (fallbackEcosystemIds.length === 0) {
+        reply.send({ success: true, data: result });
+        return;
+      }
+
+      const knownIds = new Set(result.map((entry) => entry.ecosystemId.trim().toUpperCase()));
+      const fallbackRowsById = new Map<string, string | null>();
+      const missingIds = fallbackEcosystemIds.filter((id) => !knownIds.has(id));
+
+      if (missingIds.length > 0) {
+        const fallbackRows = await query<{ ecosystem_id: string; ecosystem_name: string | null }>(
+          `SELECT manager_id AS ecosystem_id, name AS ecosystem_name
+           FROM managers
+           WHERE UPPER(manager_id) = ANY($1::text[])`,
+          [missingIds],
+        );
+        for (const row of fallbackRows.rows) {
+          fallbackRowsById.set(row.ecosystem_id.trim().toUpperCase(), row.ecosystem_name ?? null);
+        }
+      }
+
+      const merged = [...result];
+      for (const ecosystemId of fallbackEcosystemIds) {
+        if (knownIds.has(ecosystemId)) {
+          continue;
+        }
+        merged.push({
+          ecosystemId,
+          ecosystemName: fallbackRowsById.get(ecosystemId) ?? ecosystemId,
+        });
+      }
+
       reply.send({
         success: true,
-        data: result.rows.map((row) => ({
-          ecosystemId: row.ecosystem_id,
-          ecosystemName: row.ecosystem_name,
-        })),
+        data: merged,
       });
     } catch (error) {
       request.log.error({ err: error }, 'Failed to fetch creation ecosystems');
@@ -2144,8 +2251,19 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
          LIMIT 1`,
         [selectedEcosystemManagerId],
       );
-      if (ecosystemExists.rowCount === 0) {
-        reply.code(400).send({ error: `Ecosystem not found: ${selectedEcosystemManagerId}` });
+      let ecosystemIsAllowed = ecosystemExists.rowCount > 0;
+      if (!ecosystemIsAllowed && role === 'warehouse') {
+        const warehouseId = (account.cksCode ?? '').trim().toUpperCase();
+        if (warehouseId) {
+          ecosystemIsAllowed = await isWarehouseEcosystemAllowed(warehouseId, selectedEcosystemManagerId);
+        }
+      }
+      if (!ecosystemIsAllowed) {
+        reply.code(400).send({
+          error: role === 'warehouse'
+            ? `Ecosystem not available to warehouse: ${selectedEcosystemManagerId}`
+            : `Ecosystem not found: ${selectedEcosystemManagerId}`,
+        });
         return;
       }
 
@@ -2298,8 +2416,12 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
              LIMIT 1`,
             [ecosystemManagerId],
           );
-          if (ecosystemExists.rowCount === 0) {
-            reply.code(400).send({ error: `Ecosystem not found: ${ecosystemManagerId}` });
+          let ecosystemIsAllowed = ecosystemExists.rowCount > 0;
+          if (!ecosystemIsAllowed) {
+            ecosystemIsAllowed = await isWarehouseEcosystemAllowed(requesterId, ecosystemManagerId);
+          }
+          if (!ecosystemIsAllowed) {
+            reply.code(400).send({ error: `Ecosystem not available to warehouse: ${ecosystemManagerId}` });
             return;
           }
         }
