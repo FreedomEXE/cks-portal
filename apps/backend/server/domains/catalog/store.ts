@@ -225,6 +225,11 @@ export async function isCatalogItemVisible(
   itemType: "product" | "service",
   itemCode: string,
 ): Promise<boolean> {
+  // Current MVP rule: services are globally visible across ecosystems.
+  if (itemType === "service") {
+    return true;
+  }
+
   if (viewer.isAdmin) {
     return true;
   }
@@ -351,18 +356,19 @@ function buildWhere(filters: CatalogFilters, ecosystemManagerId: string | null) 
     params.push(ecosystemManagerId);
     const ecosystemParam = `$${params.length}`;
     where.push(`(
-      NOT EXISTS (
+      i.item_type = 'service'
+      OR NOT EXISTS (
         SELECT 1
         FROM catalog_ecosystem_visibility_policies p
         WHERE UPPER(p.ecosystem_manager_id) = UPPER(${ecosystemParam})
-          AND p.item_type = i.item_type
+          AND p.item_type = 'product'
           AND p.visibility_mode = 'allowlist'
       )
       OR EXISTS (
         SELECT 1
         FROM catalog_ecosystem_visibility_items vi
         WHERE UPPER(vi.ecosystem_manager_id) = UPPER(${ecosystemParam})
-          AND vi.item_type = i.item_type
+          AND vi.item_type = 'product'
           AND UPPER(vi.item_code) = UPPER(i.item_code)
       )
     )`);

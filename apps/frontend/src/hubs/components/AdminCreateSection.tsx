@@ -29,6 +29,7 @@ import {
   approveCatalogServiceRequest,
   createCatalogProduct,
   createCatalogService,
+  getCatalogCreationEcosystems,
   getCatalogCategories,
   listCatalogServiceRequests,
   rejectCatalogServiceRequest,
@@ -292,6 +293,7 @@ function buildTabConfigs(): TabConfig<unknown>[] {
 
   const productFields: FieldConfig[] = [
     { name: 'name', label: 'Product Name', required: true, placeholder: 'e.g. HEPA Vacuum Bags (Box of 10)' },
+    { name: 'ecosystemManagerId', label: 'Ecosystem', required: true, control: 'select', options: [], placeholder: 'Select ecosystem' },
     { name: 'category', label: 'Category', required: true, control: 'select', options: [], placeholder: 'Select category' },
     { name: 'description', label: 'Description', multiline: true, placeholder: 'Describe the product, including packaging/quantity details...' },
   ];
@@ -486,8 +488,12 @@ function buildTabConfigs(): TabConfig<unknown>[] {
         if (values.category === '__new__' && !stringOrUndefined(values._newCategory)) {
           throw new Error('New category is required');
         }
+        if (!stringOrUndefined(values.ecosystemManagerId)) {
+          throw new Error('Ecosystem is required');
+        }
         const payload: CreateCatalogProductPayload = {
           name: values.name.trim(),
+          ecosystemManagerId: values.ecosystemManagerId.trim(),
           description: stringOrUndefined(values.description),
           category: values.category === '__new__' ? stringOrUndefined(values._newCategory) : stringOrUndefined(values.category),
         };
@@ -589,14 +595,32 @@ export default function AdminCreateSection() {
   // ── Category dropdown data ──────────────────────────────────────────
   const [productCategories, setProductCategories] = useState<string[]>([]);
   const [serviceCategories, setServiceCategories] = useState<string[]>([]);
+  const [catalogCreationEcosystems, setCatalogCreationEcosystems] = useState<Array<{ ecosystemId: string; ecosystemName: string | null }>>([]);
 
   useEffect(() => {
     if (!CATALOG_TABS.includes(activeTab)) return;
     let cancelled = false;
-    getCatalogCategories({ getToken }).then((data) => {
+    Promise.all([
+      getCatalogCategories({ getToken }),
+      getCatalogCreationEcosystems({ getToken }),
+    ]).then(([categories, ecosystems]) => {
       if (cancelled) return;
-      setProductCategories(data.products);
-      setServiceCategories(data.services);
+      setProductCategories(categories.products);
+      setServiceCategories(categories.services);
+      setCatalogCreationEcosystems(ecosystems);
+      setForms((prev) => {
+        const currentValue = prev.products?.ecosystemManagerId?.trim();
+        if (currentValue || ecosystems.length === 0) {
+          return prev;
+        }
+        return {
+          ...prev,
+          products: {
+            ...prev.products,
+            ecosystemManagerId: ecosystems[0].ecosystemId,
+          },
+        };
+      });
     }).catch(() => {
       // Keep "Add New Category" available even if category fetch fails.
     });
@@ -675,6 +699,17 @@ export default function AdminCreateSection() {
     if (config.key !== 'products' && config.key !== 'services') return config.fields;
     const cats = config.key === 'products' ? productCategories : serviceCategories;
     return config.fields.map((field) => {
+      if (config.key === 'products' && field.name === 'ecosystemManagerId') {
+        return {
+          ...field,
+          options: catalogCreationEcosystems.map((ecosystem) => ({
+            value: ecosystem.ecosystemId,
+            label: ecosystem.ecosystemName
+              ? `${ecosystem.ecosystemName} (${ecosystem.ecosystemId})`
+              : ecosystem.ecosystemId,
+          })),
+        };
+      }
       if (field.name !== 'category') return field;
       return {
         ...field,

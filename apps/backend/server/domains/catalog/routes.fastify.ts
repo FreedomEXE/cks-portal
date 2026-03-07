@@ -242,6 +242,34 @@ async function ensureEcosystemAllowlistItem(
   );
 }
 
+async function ensureAllowlistItemForAllEcosystems(
+  itemType: 'product' | 'service',
+  itemCode: string,
+  actorId: string,
+  txQuery?: typeof query,
+): Promise<void> {
+  const normalizedItemCode = itemCode.trim().toUpperCase();
+  if (!normalizedItemCode) {
+    return;
+  }
+
+  const queryFn = txQuery ?? query;
+  await queryFn(
+    `INSERT INTO catalog_ecosystem_visibility_items (
+       ecosystem_manager_id,
+       item_type,
+       item_code,
+       created_by
+     )
+     SELECT p.ecosystem_manager_id, p.item_type, $2, $3
+     FROM catalog_ecosystem_visibility_policies p
+     WHERE p.item_type = $1
+       AND p.visibility_mode = 'allowlist'
+     ON CONFLICT (ecosystem_manager_id, item_type, item_code) DO NOTHING`,
+    [itemType, normalizedItemCode, actorId],
+  );
+}
+
 export async function registerCatalogRoutes(server: FastifyInstance) {
   server.get('/api/catalog/items', async (request, reply) => {
     const auth = await requireActiveRole(request, reply);
@@ -300,6 +328,90 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
     } catch (error) {
       request.log.error({ err: error }, 'Failed to fetch ecosystem list');
       reply.code(500).send({ error: 'Failed to fetch ecosystem list' });
+    }
+  });
+
+  server.get('/api/catalog/creation-ecosystems', async (request, reply) => {
+    const account = await requireActiveRole(request, reply, {});
+    if (!account) return;
+
+    const role = (account.role ?? '').trim().toLowerCase();
+    if (role !== 'admin' && role !== 'manager' && role !== 'warehouse') {
+      reply.code(403).send({ error: 'Only admins, managers, and warehouses can view creation ecosystems' });
+      return;
+    }
+
+    try {
+      if (role === 'admin') {
+        const result = await query<{ ecosystem_id: string; ecosystem_name: string | null }>(
+          `SELECT manager_id AS ecosystem_id, name AS ecosystem_name
+           FROM managers
+           WHERE status = 'active'
+           ORDER BY name ASC`,
+          [],
+        );
+        reply.send({
+          success: true,
+          data: result.rows.map((row) => ({
+            ecosystemId: row.ecosystem_id,
+            ecosystemName: row.ecosystem_name,
+          })),
+        });
+        return;
+      }
+
+      if (role === 'manager') {
+        const managerId = (account.cksCode ?? '').trim().toUpperCase();
+        if (!managerId) {
+          reply.send({ success: true, data: [] });
+          return;
+        }
+        const manager = await query<{ name: string | null }>(
+          `SELECT name
+           FROM managers
+           WHERE UPPER(manager_id) = UPPER($1)
+           LIMIT 1`,
+          [managerId],
+        );
+        reply.send({
+          success: true,
+          data: [{
+            ecosystemId: managerId,
+            ecosystemName: manager.rows[0]?.name ?? managerId,
+          }],
+        });
+        return;
+      }
+
+      const warehouseId = (account.cksCode ?? '').trim().toUpperCase();
+      if (!warehouseId) {
+        reply.send({ success: true, data: [] });
+        return;
+      }
+      const warehouseContext = await resolveWarehouseContext(warehouseId);
+      const managerId = (warehouseContext.managerId ?? '').trim().toUpperCase();
+      if (!managerId) {
+        reply.send({ success: true, data: [] });
+        return;
+      }
+
+      const manager = await query<{ name: string | null }>(
+        `SELECT name
+         FROM managers
+         WHERE UPPER(manager_id) = UPPER($1)
+         LIMIT 1`,
+        [managerId],
+      );
+      reply.send({
+        success: true,
+        data: [{
+          ecosystemId: managerId,
+          ecosystemName: manager.rows[0]?.name ?? managerId,
+        }],
+      });
+    } catch (error) {
+      request.log.error({ err: error }, 'Failed to fetch creation ecosystems');
+      reply.code(500).send({ error: 'Failed to fetch creation ecosystems' });
     }
   });
 
@@ -1372,10 +1484,9 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
           [requestId, serviceId, actorId, notes],
         );
 
-        await ensureEcosystemAllowlistItem(
+        await ensureAllowlistItemForAllEcosystems(
           'service',
           serviceId,
-          requestMeta.ecosystemManagerId,
           actorId,
           txQuery,
         );
@@ -1847,7 +1958,7 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
       const isTest = Boolean(account.cksCode && account.cksCode.toUpperCase().includes('-TEST'));
 
       const buildCatalogVisibilityClause = (itemType: 'product' | 'service', itemCodeExpression: string) => {
-        if (!ecosystemManagerId) {
+        if (!ecosystemManagerId || itemType === 'service') {
           return { clause: '', params: [] as string[] };
         }
 
@@ -1970,6 +2081,7 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
 
     const bodySchema = z.object({
       name: z.string().trim().min(1, 'Name is required'),
+      ecosystemManagerId: z.string().trim().min(1, 'Ecosystem is required'),
       description: z.string().trim().optional(),
       category: z.string().trim().optional(),
       unitOfMeasure: z.string().trim().optional(),
@@ -1986,7 +2098,18 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
       return;
     }
 
-    const { name, description, category, unitOfMeasure, basePrice, sku, packageSize, leadTimeDays, reorderPoint } = b.data;
+    const {
+      name,
+      ecosystemManagerId: requestedEcosystemManagerId,
+      description,
+      category,
+      unitOfMeasure,
+      basePrice,
+      sku,
+      packageSize,
+      leadTimeDays,
+      reorderPoint,
+    } = b.data;
 
     try {
       // Auto-generate next product ID (PRD-XXX)
@@ -2000,10 +2123,32 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
       const productId = `PRD-${String(nextNum).padStart(3, '0')}`;
 
       const actorId = account.cksCode || role.toUpperCase();
-      let ecosystemManagerId: string | null = null;
+      const selectedEcosystemManagerId = requestedEcosystemManagerId.trim().toUpperCase();
+
+      const ecosystemExists = await query<{ exists: number }>(
+        `SELECT 1 AS exists
+         FROM managers
+         WHERE UPPER(manager_id) = UPPER($1)
+         LIMIT 1`,
+        [selectedEcosystemManagerId],
+      );
+      if (ecosystemExists.rowCount === 0) {
+        reply.code(400).send({ error: `Ecosystem not found: ${selectedEcosystemManagerId}` });
+        return;
+      }
+
+      let ecosystemManagerId: string | null = selectedEcosystemManagerId;
       if (role === 'warehouse' && account.cksCode) {
         const warehouseContext = await resolveWarehouseContext(account.cksCode);
-        ecosystemManagerId = warehouseContext.managerId;
+        const warehouseManagerId = (warehouseContext.managerId || '').trim().toUpperCase();
+        if (!warehouseManagerId) {
+          reply.code(400).send({ error: 'Warehouse must be assigned to an ecosystem manager' });
+          return;
+        }
+        if (warehouseManagerId !== selectedEcosystemManagerId) {
+          reply.code(403).send({ error: 'Warehouse can only create products for its assigned ecosystem' });
+          return;
+        }
       }
 
       const productMetadata = {
@@ -2063,7 +2208,7 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
 
       reply.send({
         success: true,
-        data: { productId, name, category: category || null },
+        data: { productId, name, category: category || null, ecosystemManagerId },
       });
     } catch (error) {
       request.log.error({ err: error }, 'Failed to create catalog product');
@@ -2281,6 +2426,12 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
             ],
           }),
         ],
+      );
+
+      await ensureAllowlistItemForAllEcosystems(
+        'service',
+        serviceId,
+        actorId,
       );
 
       await recordActivity({

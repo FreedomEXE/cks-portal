@@ -75,6 +75,7 @@ import { createReport as apiCreateReport, createFeedback as apiCreateFeedback, a
 import {
   createCatalogProduct,
   createCatalogService,
+  getCatalogCreationEcosystems,
   getCatalogCategories,
   uploadCatalogImage,
   type CreateCatalogProductPayload,
@@ -194,9 +195,10 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
   const [inventorySearchQuery, setInventorySearchQuery] = useState('');
   const [inventoryFilter, setInventoryFilter] = useState<string>('');
   const [showCreateProduct, setShowCreateProduct] = useState(false);
-  const [createProductForm, setCreateProductForm] = useState({ name: '', category: '', description: '', _newCategory: '' });
+  const [createProductForm, setCreateProductForm] = useState({ name: '', ecosystemManagerId: '', category: '', description: '', _newCategory: '' });
   const [creatingProduct, setCreatingProduct] = useState(false);
   const [productCategories, setProductCategories] = useState<string[]>([]);
+  const [productCreationEcosystems, setProductCreationEcosystems] = useState<Array<{ ecosystemId: string; ecosystemName: string | null }>>([]);
   const [productPhotoFile, setProductPhotoFile] = useState<File | null>(null);
   const [productPhotoPreview, setProductPhotoPreview] = useState<string | null>(null);
   const productFileInputRef = useRef<HTMLInputElement>(null);
@@ -220,14 +222,24 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
   // identity + helpers
   const { getToken } = useClerkAuth();
 
-  // ── Fetch product categories for dropdown ─────────────────────────
+  // ── Fetch product categories + ecosystems for dropdowns ───────────
   useEffect(() => {
     if (activeTab !== 'inventory' || !showCreateProduct) return;
     let cancelled = false;
-    getCatalogCategories({ getToken })
-      .then((d) => {
+    Promise.all([
+      getCatalogCategories({ getToken }),
+      getCatalogCreationEcosystems({ getToken }),
+    ])
+      .then(([categories, ecosystems]) => {
         if (cancelled) return;
-        setProductCategories(d.products);
+        setProductCategories(categories.products);
+        setProductCreationEcosystems(ecosystems);
+        setCreateProductForm((prev) => {
+          if (prev.ecosystemManagerId || ecosystems.length === 0) {
+            return prev;
+          }
+          return { ...prev, ecosystemManagerId: ecosystems[0].ecosystemId };
+        });
       })
       .catch(() => {});
     return () => {
@@ -453,6 +465,11 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
     const resolvedCategory = createProductForm.category === '__new__'
       ? (createProductForm._newCategory.trim() || undefined)
       : (createProductForm.category.trim() || undefined);
+    const selectedEcosystem = createProductForm.ecosystemManagerId.trim();
+    if (!selectedEcosystem) {
+      toast.error('Ecosystem is required');
+      return;
+    }
     if (!resolvedCategory) {
       toast.error('Category is required');
       return;
@@ -461,6 +478,7 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
     try {
       const payload: CreateCatalogProductPayload = {
         name: createProductForm.name.trim(),
+        ecosystemManagerId: selectedEcosystem,
         description: createProductForm.description.trim() || undefined,
         category: resolvedCategory,
       };
@@ -476,7 +494,13 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
       }
 
       toast.success(`Product created: ${result.productId}`);
-      setCreateProductForm({ name: '', category: '', description: '', _newCategory: '' });
+      setCreateProductForm((prev) => ({
+        name: '',
+        ecosystemManagerId: prev.ecosystemManagerId,
+        category: '',
+        description: '',
+        _newCategory: '',
+      }));
       clearProductPhoto();
       setShowCreateProduct(false);
       mutate((key: unknown) => typeof key === 'string' && (key.includes('/inventory') || key.includes('/catalog')), undefined, { revalidate: true });
@@ -1074,6 +1098,22 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
                     <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                       <span style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>Product Name *</span>
                       <input value={createProductForm.name} onChange={(e) => setCreateProductForm(p => ({ ...p, name: e.target.value }))} placeholder="e.g. HEPA Vacuum Bags (Box of 10)" disabled={creatingProduct} style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: '8px 10px', fontSize: 13 }} />
+                    </label>
+                    <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <span style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>Ecosystem *</span>
+                      <select
+                        value={createProductForm.ecosystemManagerId}
+                        onChange={(e) => setCreateProductForm(p => ({ ...p, ecosystemManagerId: e.target.value }))}
+                        disabled={creatingProduct || productCreationEcosystems.length === 0}
+                        style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: '8px 10px', fontSize: 13, background: 'white' }}
+                      >
+                        <option value="">{productCreationEcosystems.length === 0 ? 'No ecosystems available' : 'Select ecosystem'}</option>
+                        {productCreationEcosystems.map((eco) => (
+                          <option key={eco.ecosystemId} value={eco.ecosystemId}>
+                            {eco.ecosystemName || eco.ecosystemId} ({eco.ecosystemId})
+                          </option>
+                        ))}
+                      </select>
                     </label>
                     <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                       <span style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>Category *</span>
