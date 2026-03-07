@@ -203,7 +203,7 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
   const [productPhotoPreview, setProductPhotoPreview] = useState<string | null>(null);
   const productFileInputRef = useRef<HTMLInputElement>(null);
   const [showCreateService, setShowCreateService] = useState(false);
-  const [createServiceForm, setCreateServiceForm] = useState({ name: '', category: '', description: '', _newCategory: '' });
+  const [createServiceForm, setCreateServiceForm] = useState({ name: '', ecosystemManagerId: '', category: '', description: '', _newCategory: '' });
   const [creatingService, setCreatingService] = useState(false);
   const [serviceCategories, setServiceCategories] = useState<string[]>([]);
   const [servicePhotoFile, setServicePhotoFile] = useState<File | null>(null);
@@ -250,10 +250,20 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
   useEffect(() => {
     if (activeTab !== 'services' || !showCreateService) return;
     let cancelled = false;
-    getCatalogCategories({ getToken })
-      .then((d) => {
+    Promise.all([
+      getCatalogCategories({ getToken }),
+      getCatalogCreationEcosystems({ getToken }),
+    ])
+      .then(([categories, ecosystems]) => {
         if (cancelled) return;
-        setServiceCategories(d.services);
+        setServiceCategories(categories.services);
+        setProductCreationEcosystems(ecosystems);
+        setCreateServiceForm((prev) => {
+          if (prev.ecosystemManagerId || ecosystems.length === 0) {
+            return prev;
+          }
+          return { ...prev, ecosystemManagerId: ecosystems[0].ecosystemId };
+        });
       })
       .catch(() => {});
     return () => {
@@ -519,6 +529,11 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
     const resolvedCategory = createServiceForm.category === '__new__'
       ? (createServiceForm._newCategory.trim() || undefined)
       : (createServiceForm.category.trim() || undefined);
+    const selectedEcosystem = createServiceForm.ecosystemManagerId.trim();
+    if (!selectedEcosystem) {
+      toast.error('Ecosystem is required');
+      return;
+    }
     if (!resolvedCategory) {
       toast.error('Category is required');
       return;
@@ -528,6 +543,7 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
     try {
       const payload: CreateCatalogServicePayload = {
         name: createServiceForm.name.trim(),
+        ecosystemManagerId: selectedEcosystem,
         description: createServiceForm.description.trim() || undefined,
         category: resolvedCategory,
       };
@@ -549,7 +565,13 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
       } else {
         toast.success(`Service created: ${result.serviceId}`);
       }
-      setCreateServiceForm({ name: '', category: '', description: '', _newCategory: '' });
+      setCreateServiceForm((prev) => ({
+        name: '',
+        ecosystemManagerId: prev.ecosystemManagerId,
+        category: '',
+        description: '',
+        _newCategory: '',
+      }));
       clearServicePhoto();
       setShowCreateService(false);
       await Promise.all([
@@ -1403,6 +1425,18 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
                         disabled={creatingService}
                         style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: '8px 10px', fontSize: 13 }}
                       />
+                    </label>
+                    <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <span style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>Ecosystem *</span>
+                      <select
+                        value={createServiceForm.ecosystemManagerId}
+                        onChange={(e) => setCreateServiceForm((p) => ({ ...p, ecosystemManagerId: e.target.value }))}
+                        disabled={creatingService || productCreationEcosystems.length === 0}
+                        style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: '8px 10px', fontSize: 13, background: 'white' }}
+                      >
+                        <option value="">{productCreationEcosystems.length === 0 ? 'No ecosystems available' : 'Select ecosystem'}</option>
+                        {productCreationEcosystems.map((eco) => <option key={eco.ecosystemId} value={eco.ecosystemId}>{eco.ecosystemName || eco.ecosystemId} ({eco.ecosystemId})</option>)}
+                      </select>
                     </label>
                     <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                       <span style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>Category *</span>

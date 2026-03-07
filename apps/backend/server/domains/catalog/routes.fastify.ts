@@ -179,7 +179,9 @@ async function resolveWarehouseContext(
   if (byManagerId.rowCount > 0) {
     const row = byManagerId.rows[0];
     const managerId = row.manager_id?.trim().toUpperCase() || null;
-    return { managerId, warehouseName: row.name ?? null };
+    if (managerId) {
+      return { managerId, warehouseName: row.name ?? null };
+    }
   }
 
   try {
@@ -193,10 +195,32 @@ async function resolveWarehouseContext(
     if (legacy.rowCount > 0) {
       const row = legacy.rows[0];
       const managerId = row.cks_manager?.trim().toUpperCase() || null;
-      return { managerId, warehouseName: row.name ?? null };
+      if (managerId) {
+        return { managerId, warehouseName: row.name ?? null };
+      }
     }
   } catch {
     // Legacy cks_manager column is optional across environments; ignore query failure.
+  }
+
+  try {
+    const fallback = await query<{ manager_id: string | null }>(
+      `SELECT manager_id
+       FROM orders
+       WHERE UPPER(assigned_warehouse) = UPPER($1)
+         AND manager_id IS NOT NULL
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [normalizedWarehouseId],
+    );
+    if (fallback.rowCount > 0) {
+      return {
+        managerId: fallback.rows[0].manager_id?.trim().toUpperCase() || null,
+        warehouseName: byManagerId.rows[0]?.name ?? null,
+      };
+    }
+  } catch {
+    // orders table fallback is best-effort only.
   }
 
   return { managerId: null, warehouseName: null };
@@ -314,7 +338,7 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
       const result = await query<{ ecosystem_id: string; ecosystem_name: string | null }>(
         `SELECT manager_id AS ecosystem_id, name AS ecosystem_name
          FROM managers
-         WHERE status = 'active'
+         WHERE LOWER(COALESCE(status, 'active')) <> 'archived'
          ORDER BY name ASC`,
         [],
       );
@@ -346,7 +370,7 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
         const result = await query<{ ecosystem_id: string; ecosystem_name: string | null }>(
           `SELECT manager_id AS ecosystem_id, name AS ecosystem_name
            FROM managers
-           WHERE status = 'active'
+           WHERE LOWER(COALESCE(status, 'active')) <> 'archived'
            ORDER BY name ASC`,
           [],
         );
@@ -383,31 +407,19 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
         return;
       }
 
-      const warehouseId = (account.cksCode ?? '').trim().toUpperCase();
-      if (!warehouseId) {
-        reply.send({ success: true, data: [] });
-        return;
-      }
-      const warehouseContext = await resolveWarehouseContext(warehouseId);
-      const managerId = (warehouseContext.managerId ?? '').trim().toUpperCase();
-      if (!managerId) {
-        reply.send({ success: true, data: [] });
-        return;
-      }
-
-      const manager = await query<{ name: string | null }>(
-        `SELECT name
+      const result = await query<{ ecosystem_id: string; ecosystem_name: string | null }>(
+        `SELECT manager_id AS ecosystem_id, name AS ecosystem_name
          FROM managers
-         WHERE UPPER(manager_id) = UPPER($1)
-         LIMIT 1`,
-        [managerId],
+         WHERE LOWER(COALESCE(status, 'active')) <> 'archived'
+         ORDER BY name ASC`,
+        [],
       );
       reply.send({
         success: true,
-        data: [{
-          ecosystemId: managerId,
-          ecosystemName: manager.rows[0]?.name ?? managerId,
-        }],
+        data: result.rows.map((row) => ({
+          ecosystemId: row.ecosystem_id,
+          ecosystemName: row.ecosystem_name,
+        })),
       });
     } catch (error) {
       request.log.error({ err: error }, 'Failed to fetch creation ecosystems');
@@ -2137,19 +2149,7 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
         return;
       }
 
-      let ecosystemManagerId: string | null = selectedEcosystemManagerId;
-      if (role === 'warehouse' && account.cksCode) {
-        const warehouseContext = await resolveWarehouseContext(account.cksCode);
-        const warehouseManagerId = (warehouseContext.managerId || '').trim().toUpperCase();
-        if (!warehouseManagerId) {
-          reply.code(400).send({ error: 'Warehouse must be assigned to an ecosystem manager' });
-          return;
-        }
-        if (warehouseManagerId !== selectedEcosystemManagerId) {
-          reply.code(403).send({ error: 'Warehouse can only create products for its assigned ecosystem' });
-          return;
-        }
-      }
+      const ecosystemManagerId: string | null = selectedEcosystemManagerId;
 
       const productMetadata = {
         createdBy: account.cksCode || null,
@@ -2231,6 +2231,7 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
 
     const bodySchema = z.object({
       name: z.string().trim().min(1, 'Name is required'),
+      ecosystemManagerId: z.string().trim().optional(),
       description: z.string().trim().optional(),
       category: z.string().trim().optional(),
       unitOfMeasure: z.string().trim().optional(),
@@ -2246,7 +2247,17 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
       return;
     }
 
-    const { name, description, category, unitOfMeasure, basePrice, durationMinutes, serviceWindow, crewRequired } = b.data;
+    const {
+      name,
+      ecosystemManagerId: requestedEcosystemManagerId,
+      description,
+      category,
+      unitOfMeasure,
+      basePrice,
+      durationMinutes,
+      serviceWindow,
+      crewRequired,
+    } = b.data;
 
     try {
       const normalizedName = name.trim();
@@ -2264,16 +2275,31 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
           return;
         }
 
-        let ecosystemManagerId = requesterId;
+        let ecosystemManagerId = role === 'manager'
+          ? requesterId
+          : (requestedEcosystemManagerId || '').trim().toUpperCase();
         let requesterName: string | null = null;
         let managedBy: 'manager' | 'warehouse' = role === 'warehouse' ? 'warehouse' : 'manager';
 
         if (role === 'warehouse') {
           const warehouseContext = await resolveWarehouseContext(requesterId);
           requesterName = warehouseContext.warehouseName;
-          ecosystemManagerId = warehouseContext.managerId || '';
           if (!ecosystemManagerId) {
-            reply.code(400).send({ error: 'Warehouse must be assigned to a manager before requesting services' });
+            ecosystemManagerId = (warehouseContext.managerId || '').trim().toUpperCase();
+          }
+          if (!ecosystemManagerId) {
+            reply.code(400).send({ error: 'Select an ecosystem before requesting services' });
+            return;
+          }
+          const ecosystemExists = await query<{ exists: number }>(
+            `SELECT 1 AS exists
+             FROM managers
+             WHERE UPPER(manager_id) = UPPER($1)
+             LIMIT 1`,
+            [ecosystemManagerId],
+          );
+          if (ecosystemExists.rowCount === 0) {
+            reply.code(400).send({ error: `Ecosystem not found: ${ecosystemManagerId}` });
             return;
           }
         }

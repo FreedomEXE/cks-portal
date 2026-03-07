@@ -519,6 +519,7 @@ export async function getCatalogCreationEcosystems(
 
 export interface CreateCatalogServicePayload {
   name: string;
+  ecosystemManagerId?: string;
   description?: string;
   category?: string;
   unitOfMeasure?: string;
