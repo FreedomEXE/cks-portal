@@ -20,6 +20,7 @@
 /*-----------------------------------------------
   Manifested by Freedom_EXE
 -----------------------------------------------*/
+import type { ReactNode } from 'react';
 import { useModals } from '../../contexts/ModalProvider';
 import { useCalendarAgenda } from '../../shared/api/calendar';
 import { useCalendarContext } from './CalendarProvider';
@@ -47,6 +48,7 @@ export function CalendarAgenda({
   description = 'Read-only projection of scheduled activity across the platform.',
   emptyMessage = 'No scheduled events in this window yet.',
   showWindowSelector = true,
+  headerActions,
 }: {
   scopeType?: string;
   scopeId?: string;
@@ -54,6 +56,7 @@ export function CalendarAgenda({
   description?: string;
   emptyMessage?: string;
   showWindowSelector?: boolean;
+  headerActions?: ReactNode;
 }) {
   const { days, setDays } = useCalendarContext();
   const { data, isLoading, error } = useCalendarAgenda(days, scopeType, scopeId);
@@ -66,17 +69,20 @@ export function CalendarAgenda({
           <div className="text-lg font-bold text-slate-900">{title}</div>
           <div className="text-sm text-slate-500">{description}</div>
         </div>
-        {showWindowSelector ? (
-          <select
-            value={days}
-            onChange={(event) => setDays(Number(event.target.value))}
-            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-slate-400 focus:outline-none"
-          >
-            <option value={7}>Next 7 days</option>
-            <option value={14}>Next 14 days</option>
-            <option value={30}>Next 30 days</option>
-          </select>
-        ) : null}
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          {headerActions}
+          {showWindowSelector ? (
+            <select
+              value={days}
+              onChange={(event) => setDays(Number(event.target.value))}
+              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-slate-400 focus:outline-none"
+            >
+              <option value={7}>Next 7 days</option>
+              <option value={14}>Next 14 days</option>
+              <option value={30}>Next 30 days</option>
+            </select>
+          ) : null}
+        </div>
       </div>
 
       {isLoading ? (

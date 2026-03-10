@@ -195,6 +195,15 @@ function buildScopeClause(scopeType: CalendarScopeType | undefined, scopeId: str
   params.push(scopeId);
   const ref = `$${params.length}`;
   switch (scopeType) {
+    case 'manager':
+    case 'contractor':
+    case 'customer':
+      return ` AND EXISTS (
+        SELECT 1 FROM calendar_event_participants ep
+        WHERE ep.event_id = e.event_id
+          AND UPPER(ep.participant_id) = UPPER(${ref})
+          AND ep.participant_role = '${scopeType}'
+      )`;
     case 'center':
       return ` AND (UPPER(e.center_id) = UPPER(${ref}) OR EXISTS (
         SELECT 1 FROM calendar_event_participants ep
@@ -260,7 +269,8 @@ function buildFilters(input: CalendarEventsQuery | CalendarAgendaQuery, params: 
   return clause;
 }
 
-async function runEventsQuery(whereClause: string, params: unknown[]): Promise<CalendarEventRecord[]> {
+async function runEventsQuery(whereClause: string, params: unknown[], limit: number): Promise<CalendarEventRecord[]> {
+  const queryParams = [...params, limit];
   const result = await query<EventRow>(
     `
       SELECT
@@ -305,8 +315,9 @@ async function runEventsQuery(whereClause: string, params: unknown[]): Promise<C
       ${whereClause}
       GROUP BY e.event_id
       ORDER BY e.planned_start_at ASC, e.event_id ASC
+      LIMIT $${queryParams.length}
     `,
-    params,
+    queryParams,
   );
   return result.rows.map(mapEventRow);
 }
@@ -315,9 +326,7 @@ export async function listCalendarEvents(input: CalendarEventsQuery): Promise<Ca
   const params: unknown[] = [];
   let whereClause = buildVisibilityClause(input.viewerRole, input.viewerCode, input.accessibleIds, params);
   whereClause += buildFilters(input, params);
-  params.push(input.limit ?? 250);
-  whereClause += ` LIMIT $${params.length}`;
-  return runEventsQuery(whereClause, params);
+  return runEventsQuery(whereClause, params, input.limit ?? 250);
 }
 
 export async function getCalendarEventById(input: {
@@ -330,7 +339,7 @@ export async function getCalendarEventById(input: {
   const whereClause =
     ` AND UPPER(e.event_id) = UPPER($1)` +
     buildVisibilityClause(input.viewerRole, input.viewerCode, input.accessibleIds, params);
-  const events = await runEventsQuery(whereClause, params);
+  const events = await runEventsQuery(whereClause, params, 1);
   return events[0] ?? null;
 }
 

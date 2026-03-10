@@ -32,6 +32,14 @@ import type {
   CalendarSummary,
 } from './types.js';
 
+function isCalendarInfraUnavailable(error: unknown): boolean {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+  const code = 'code' in error ? String((error as { code?: unknown }).code ?? '') : '';
+  return code === '42P01' || code === '42703';
+}
+
 function collectScopeIds(value: unknown, ids: Set<string>, parentKey?: string): void {
   if (!value) return;
   if (Array.isArray(value)) {
@@ -74,10 +82,17 @@ async function resolveAccessibleIds(viewerRole: HubRole, viewerCode: string | nu
 }
 
 export async function fetchCalendarEvents(input: CalendarEventsQuery): Promise<CalendarEventRecord[]> {
-  return listCalendarEvents({
-    ...input,
-    accessibleIds: await resolveAccessibleIds(input.viewerRole, input.viewerCode),
-  });
+  try {
+    return await listCalendarEvents({
+      ...input,
+      accessibleIds: await resolveAccessibleIds(input.viewerRole, input.viewerCode),
+    });
+  } catch (error) {
+    if (isCalendarInfraUnavailable(error)) {
+      return [];
+    }
+    throw error;
+  }
 }
 
 export async function fetchCalendarEventById(input: {
@@ -85,22 +100,49 @@ export async function fetchCalendarEventById(input: {
   viewerRole: HubRole;
   viewerCode: string | null;
 }): Promise<CalendarEventRecord | null> {
-  return getCalendarEventById({
-    ...input,
-    accessibleIds: await resolveAccessibleIds(input.viewerRole, input.viewerCode),
-  });
+  try {
+    return await getCalendarEventById({
+      ...input,
+      accessibleIds: await resolveAccessibleIds(input.viewerRole, input.viewerCode),
+    });
+  } catch (error) {
+    if (isCalendarInfraUnavailable(error)) {
+      return null;
+    }
+    throw error;
+  }
 }
 
 export async function fetchCalendarAgenda(input: CalendarAgendaQuery): Promise<CalendarAgendaDay[]> {
-  return listCalendarAgenda({
-    ...input,
-    accessibleIds: await resolveAccessibleIds(input.viewerRole, input.viewerCode),
-  });
+  try {
+    return await listCalendarAgenda({
+      ...input,
+      accessibleIds: await resolveAccessibleIds(input.viewerRole, input.viewerCode),
+    });
+  } catch (error) {
+    if (isCalendarInfraUnavailable(error)) {
+      return [];
+    }
+    throw error;
+  }
 }
 
 export async function fetchCalendarSummary(input: CalendarAgendaQuery): Promise<CalendarSummary> {
-  return getCalendarSummary({
-    ...input,
-    accessibleIds: await resolveAccessibleIds(input.viewerRole, input.viewerCode),
-  });
+  try {
+    return await getCalendarSummary({
+      ...input,
+      accessibleIds: await resolveAccessibleIds(input.viewerRole, input.viewerCode),
+    });
+  } catch (error) {
+    if (isCalendarInfraUnavailable(error)) {
+      return {
+        total: 0,
+        scheduled: 0,
+        inProgress: 0,
+        completed: 0,
+        cancelled: 0,
+      };
+    }
+    throw error;
+  }
 }

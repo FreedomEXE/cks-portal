@@ -22,7 +22,16 @@
 -----------------------------------------------*/
 import type { HubRole } from '../profile/types.js';
 
-export type CalendarScopeType = 'user' | 'center' | 'service' | 'crew' | 'order' | 'warehouse';
+export type CalendarScopeType =
+  | 'user'
+  | 'manager'
+  | 'contractor'
+  | 'customer'
+  | 'center'
+  | 'service'
+  | 'crew'
+  | 'order'
+  | 'warehouse';
 
 export interface CalendarEventParticipant {
   participantId: string;

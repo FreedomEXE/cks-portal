@@ -276,6 +276,7 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
   const [reportsSubTab, setReportsSubTab] = useState('reports');
   const [showTestEcosystems, setShowTestEcosystems] = useState(false);
   const [selectedEcosystemId, setSelectedEcosystemId] = useState<string | null>(null);
+  const [selectedCalendarEcosystemId, setSelectedCalendarEcosystemId] = useState<string | null>(null);
   const [ecosystemSubTab, setEcosystemSubTab] = useState<'tree' | 'catalog'>('tree');
 
   const [showActionModal, setShowActionModal] = useState(false);
@@ -1123,6 +1124,23 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
       setSelectedEcosystemId(ecosystemRows[0].managerId);
     }
   }, [ecosystemRows, selectedEcosystemId]);
+
+  useEffect(() => {
+    if (ecosystemRows.length === 0) {
+      if (selectedCalendarEcosystemId) {
+        setSelectedCalendarEcosystemId(null);
+      }
+      return;
+    }
+    if (!selectedCalendarEcosystemId) {
+      return;
+    }
+    const normalizedSelected = normalizeId(selectedCalendarEcosystemId) ?? '';
+    const exists = ecosystemRows.some((row) => normalizeId(row.managerId) === normalizedSelected);
+    if (!exists) {
+      setSelectedCalendarEcosystemId(null);
+    }
+  }, [ecosystemRows, selectedCalendarEcosystemId]);
 
   const selectedManager = useMemo(() => {
     const target = normalizeId(selectedEcosystemId ?? '');
@@ -2087,7 +2105,42 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
               </div>
             </PageWrapper>
           ) : activeTab === 'calendar' ? (
-            <CalendarTab title="Calendar" />
+            <CalendarTab
+              title="Calendar"
+              scopeType={selectedCalendarEcosystemId ? 'manager' : undefined}
+              scopeId={selectedCalendarEcosystemId ?? undefined}
+              agendaTitle={selectedCalendarEcosystemId ? 'Ecosystem Events' : 'All Ecosystem Events'}
+              agendaDescription={
+                selectedCalendarEcosystemId
+                  ? 'Read-only projection of scheduled activity for the selected ecosystem.'
+                  : 'Read-only projection of scheduled activity across all ecosystems.'
+              }
+              agendaEmptyMessage={
+                selectedCalendarEcosystemId
+                  ? 'No scheduled events in this ecosystem for the selected window yet.'
+                  : 'No scheduled events across the platform in this window yet.'
+              }
+              headerActions={
+                <div className="flex items-center gap-2">
+                  <label htmlFor="admin-calendar-ecosystem" className="text-xs font-bold uppercase tracking-[0.08em] text-slate-500">
+                    View
+                  </label>
+                  <select
+                    id="admin-calendar-ecosystem"
+                    value={selectedCalendarEcosystemId ?? ''}
+                    onChange={(event) => setSelectedCalendarEcosystemId(event.target.value || null)}
+                    className="min-w-[260px] rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-slate-400 focus:outline-none"
+                  >
+                    <option value="">All ecosystems</option>
+                    {ecosystemRows.map((row) => (
+                      <option key={row.managerId} value={row.managerId}>
+                        {row.ecosystem} ({row.managerId})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              }
+            />
           ) : activeTab === 'create' ? (
             <AdminCreateSection />
           ) : activeTab === 'assign' ? (

@@ -21,7 +21,17 @@
 -----------------------------------------------*/
 import { z } from 'zod';
 
-export const calendarScopeTypeSchema = z.enum(['user', 'center', 'service', 'crew', 'order', 'warehouse']);
+export const calendarScopeTypeSchema = z.enum([
+  'user',
+  'manager',
+  'contractor',
+  'customer',
+  'center',
+  'service',
+  'crew',
+  'order',
+  'warehouse',
+]);
 
 export const calendarEventsQuerySchema = z.object({
   start: z.string().trim().min(1),

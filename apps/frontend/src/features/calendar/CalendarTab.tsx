@@ -21,6 +21,7 @@
   Manifested by Freedom_EXE
 -----------------------------------------------*/
 import { PageWrapper } from '@cks/ui';
+import type { ReactNode } from 'react';
 import { useCalendarSummary } from '../../shared/api/calendar';
 import { CalendarProvider, useCalendarContext } from './CalendarProvider';
 import CalendarAgenda from './CalendarAgenda';
@@ -34,7 +35,21 @@ function SummaryCard({ label, value }: { label: string; value: number }) {
   );
 }
 
-function CalendarTabContent({ scopeType, scopeId }: { scopeType?: string; scopeId?: string }) {
+function CalendarTabContent({
+  scopeType,
+  scopeId,
+  agendaTitle,
+  agendaDescription,
+  agendaEmptyMessage,
+  headerActions,
+}: {
+  scopeType?: string;
+  scopeId?: string;
+  agendaTitle?: string;
+  agendaDescription?: string;
+  agendaEmptyMessage?: string;
+  headerActions?: ReactNode;
+}) {
   const { days } = useCalendarContext();
   const { data } = useCalendarSummary(days, scopeType, scopeId);
 
@@ -46,16 +61,46 @@ function CalendarTabContent({ scopeType, scopeId }: { scopeType?: string; scopeI
         <SummaryCard label="In Progress" value={data?.inProgress ?? 0} />
         <SummaryCard label="Completed" value={data?.completed ?? 0} />
       </div>
-      <CalendarAgenda scopeType={scopeType} scopeId={scopeId} />
+      <CalendarAgenda
+        scopeType={scopeType}
+        scopeId={scopeId}
+        title={agendaTitle}
+        description={agendaDescription}
+        emptyMessage={agendaEmptyMessage}
+        headerActions={headerActions}
+      />
     </div>
   );
 }
 
-export function CalendarTab({ title = 'Calendar', scopeType, scopeId }: { title?: string; scopeType?: string; scopeId?: string }) {
+export function CalendarTab({
+  title = 'Calendar',
+  scopeType,
+  scopeId,
+  agendaTitle,
+  agendaDescription,
+  agendaEmptyMessage,
+  headerActions,
+}: {
+  title?: string;
+  scopeType?: string;
+  scopeId?: string;
+  agendaTitle?: string;
+  agendaDescription?: string;
+  agendaEmptyMessage?: string;
+  headerActions?: ReactNode;
+}) {
   return (
     <PageWrapper title={title} showHeader headerSrOnly>
       <CalendarProvider>
-        <CalendarTabContent scopeType={scopeType} scopeId={scopeId} />
+        <CalendarTabContent
+          scopeType={scopeType}
+          scopeId={scopeId}
+          agendaTitle={agendaTitle}
+          agendaDescription={agendaDescription}
+          agendaEmptyMessage={agendaEmptyMessage}
+          headerActions={headerActions}
+        />
       </CalendarProvider>
     </PageWrapper>
   );
