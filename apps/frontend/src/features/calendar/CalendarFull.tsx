@@ -355,12 +355,14 @@ function DayView({ events }: { events: CalendarEventItem[] }) {
 export function CalendarFull({
   scopeType,
   scopeId,
+  testMode,
   title = 'Calendar',
   description = 'Read-only projection of scheduled activity across the platform.',
   headerActions,
 }: {
   scopeType?: string;
   scopeId?: string;
+  testMode?: 'include' | 'exclude' | 'only';
   title?: string;
   description?: string;
   headerActions?: ReactNode;
@@ -372,6 +374,7 @@ export function CalendarFull({
     end: range.end,
     scopeType,
     scopeId,
+    testMode,
     limit: 500,
   });
   const grouped = groupEventsByDate(data);

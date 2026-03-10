@@ -31,6 +31,7 @@ import type {
   CalendarProjectionParticipant,
   CalendarScopeType,
   CalendarSummary,
+  CalendarTestMode,
   UpsertCalendarProjectionInput,
 } from './types.js';
 
@@ -241,6 +242,26 @@ function buildScopeClause(scopeType: CalendarScopeType | undefined, scopeId: str
   }
 }
 
+function buildTestModeClause(testMode: CalendarTestMode | undefined): string {
+  if (!testMode || testMode === 'include') {
+    return '';
+  }
+  const testSignal = `(
+    UPPER(COALESCE(e.source_id, '')) LIKE '%-TEST%'
+    OR UPPER(COALESCE(e.center_id, '')) LIKE '%-TEST%'
+    OR UPPER(COALESCE(e.warehouse_id, '')) LIKE '%-TEST%'
+    OR UPPER(COALESCE(e.metadata->>'orderId', '')) LIKE '%-TEST%'
+    OR UPPER(COALESCE(e.metadata->>'serviceId', '')) LIKE '%-TEST%'
+    OR EXISTS (
+      SELECT 1
+      FROM calendar_event_participants ept
+      WHERE ept.event_id = e.event_id
+        AND UPPER(ept.participant_id) LIKE '%-TEST%'
+    )
+  )`;
+  return testMode === 'only' ? ` AND ${testSignal}` : ` AND NOT ${testSignal}`;
+}
+
 function buildFilters(input: CalendarEventsQuery | CalendarAgendaQuery, params: unknown[]): string {
   let clause = '';
 
@@ -265,6 +286,7 @@ function buildFilters(input: CalendarEventsQuery | CalendarAgendaQuery, params: 
     clause += ` AND e.status = ANY($${params.length}::text[])`;
   }
 
+  clause += buildTestModeClause(input.testMode);
   clause += buildScopeClause(input.scopeType, input.scopeId, params);
   return clause;
 }

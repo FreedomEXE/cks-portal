@@ -44,6 +44,7 @@ function formatEventTime(start: string, end: string | null): string {
 export function CalendarAgenda({
   scopeType,
   scopeId,
+  testMode,
   title = 'Upcoming Events',
   description = 'Read-only projection of scheduled activity across the platform.',
   emptyMessage = 'No scheduled events in this window yet.',
@@ -52,6 +53,7 @@ export function CalendarAgenda({
 }: {
   scopeType?: string;
   scopeId?: string;
+  testMode?: 'include' | 'exclude' | 'only';
   title?: string;
   description?: string;
   emptyMessage?: string;
@@ -59,7 +61,7 @@ export function CalendarAgenda({
   headerActions?: ReactNode;
 }) {
   const { days, setDays } = useCalendarContext();
-  const { data, isLoading, error } = useCalendarAgenda(days, scopeType, scopeId);
+  const { data, isLoading, error } = useCalendarAgenda(days, scopeType, scopeId, testMode);
   const modals = useModals();
 
   return (

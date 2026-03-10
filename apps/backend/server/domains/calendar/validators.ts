@@ -33,11 +33,14 @@ export const calendarScopeTypeSchema = z.enum([
   'warehouse',
 ]);
 
+export const calendarTestModeSchema = z.enum(['include', 'exclude', 'only']);
+
 export const calendarEventsQuerySchema = z.object({
   start: z.string().trim().min(1),
   end: z.string().trim().min(1),
   scopeType: calendarScopeTypeSchema.optional(),
   scopeId: z.string().trim().min(1).optional(),
+  testMode: calendarTestModeSchema.optional(),
   eventTypes: z.union([z.string().trim().min(1), z.array(z.string().trim().min(1))]).optional(),
   statuses: z.union([z.string().trim().min(1), z.array(z.string().trim().min(1))]).optional(),
   limit: z.coerce.number().int().min(1).max(500).optional(),
@@ -49,6 +52,7 @@ export const calendarAgendaQuerySchema = z.object({
   days: z.coerce.number().int().min(1).max(90).optional(),
   scopeType: calendarScopeTypeSchema.optional(),
   scopeId: z.string().trim().min(1).optional(),
+  testMode: calendarTestModeSchema.optional(),
   limit: z.coerce.number().int().min(1).max(500).optional(),
 });
 

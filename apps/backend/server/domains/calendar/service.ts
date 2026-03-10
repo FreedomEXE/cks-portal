@@ -30,6 +30,7 @@ import type {
   CalendarEventRecord,
   CalendarEventsQuery,
   CalendarSummary,
+  CalendarTestMode,
 } from './types.js';
 
 function isCalendarInfraUnavailable(error: unknown): boolean {
@@ -81,10 +82,23 @@ async function resolveAccessibleIds(viewerRole: HubRole, viewerCode: string | nu
   return Array.from(ids);
 }
 
+function deriveTestMode(
+  viewerRole: HubRole,
+  viewerCode: string | null,
+  requestedMode: CalendarTestMode | undefined,
+): CalendarTestMode {
+  if (viewerRole === 'admin') {
+    return requestedMode ?? 'exclude';
+  }
+  const normalizedViewerCode = normalizeIdentity(viewerCode ?? null);
+  return normalizedViewerCode?.includes('-TEST') ? 'only' : 'exclude';
+}
+
 export async function fetchCalendarEvents(input: CalendarEventsQuery): Promise<CalendarEventRecord[]> {
   try {
     return await listCalendarEvents({
       ...input,
+      testMode: deriveTestMode(input.viewerRole, input.viewerCode, input.testMode),
       accessibleIds: await resolveAccessibleIds(input.viewerRole, input.viewerCode),
     });
   } catch (error) {
@@ -117,6 +131,7 @@ export async function fetchCalendarAgenda(input: CalendarAgendaQuery): Promise<C
   try {
     return await listCalendarAgenda({
       ...input,
+      testMode: deriveTestMode(input.viewerRole, input.viewerCode, input.testMode),
       accessibleIds: await resolveAccessibleIds(input.viewerRole, input.viewerCode),
     });
   } catch (error) {
@@ -131,6 +146,7 @@ export async function fetchCalendarSummary(input: CalendarAgendaQuery): Promise<
   try {
     return await getCalendarSummary({
       ...input,
+      testMode: deriveTestMode(input.viewerRole, input.viewerCode, input.testMode),
       accessibleIds: await resolveAccessibleIds(input.viewerRole, input.viewerCode),
     });
   } catch (error) {

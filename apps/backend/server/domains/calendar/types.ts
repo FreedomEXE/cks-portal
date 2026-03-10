@@ -33,6 +33,8 @@ export type CalendarScopeType =
   | 'order'
   | 'warehouse';
 
+export type CalendarTestMode = 'include' | 'exclude' | 'only';
+
 export interface CalendarEventParticipant {
   participantId: string;
   participantRole: string;
@@ -88,6 +90,7 @@ export interface CalendarEventsQuery {
   viewerRole: HubRole;
   viewerCode: string | null;
   accessibleIds?: string[];
+  testMode?: CalendarTestMode;
   start: string;
   end: string;
   scopeType?: CalendarScopeType;
@@ -101,6 +104,7 @@ export interface CalendarAgendaQuery {
   viewerRole: HubRole;
   viewerCode: string | null;
   accessibleIds?: string[];
+  testMode?: CalendarTestMode;
   start?: string;
   end?: string;
   days?: number;

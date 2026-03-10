@@ -81,6 +81,7 @@ export interface CalendarQueryRange {
   days?: number;
   scopeType?: string;
   scopeId?: string;
+  testMode?: 'include' | 'exclude' | 'only';
   limit?: number;
 }
 
@@ -94,25 +95,25 @@ function buildQuery(params: Record<string, string | number | undefined>): string
   return query ? `?${query}` : '';
 }
 
-export function useCalendarAgenda(days = 14, scopeType?: string, scopeId?: string) {
+export function useCalendarAgenda(days = 14, scopeType?: string, scopeId?: string, testMode?: CalendarQueryRange['testMode']) {
   const { getToken } = useClerkAuth();
-  const key = `/calendar/agenda${buildQuery({ days, scopeType, scopeId })}`;
+  const key = `/calendar/agenda${buildQuery({ days, scopeType, scopeId, testMode })}`;
   return useSWR(key, (path: string) =>
     apiFetch<ApiResponse<CalendarAgendaDay[]>>(path, { getToken }).then((response) => response.data ?? []),
   );
 }
 
-export function useCalendarEvents({ start, end, scopeType, scopeId, limit = 500 }: CalendarQueryRange) {
+export function useCalendarEvents({ start, end, scopeType, scopeId, testMode, limit = 500 }: CalendarQueryRange) {
   const { getToken } = useClerkAuth();
-  const key = `/calendar/events${buildQuery({ start, end, scopeType, scopeId, limit })}`;
+  const key = `/calendar/events${buildQuery({ start, end, scopeType, scopeId, testMode, limit })}`;
   return useSWR(key, (path: string) =>
     apiFetch<ApiResponse<CalendarEventItem[]>>(path, { getToken }).then((response) => response.data ?? []),
   );
 }
 
-export function useCalendarSummary({ days = 30, start, end, scopeType, scopeId, limit = 500 }: CalendarQueryRange) {
+export function useCalendarSummary({ days = 30, start, end, scopeType, scopeId, testMode, limit = 500 }: CalendarQueryRange) {
   const { getToken } = useClerkAuth();
-  const key = `/calendar/summary${buildQuery({ days, start, end, scopeType, scopeId, limit })}`;
+  const key = `/calendar/summary${buildQuery({ days, start, end, scopeType, scopeId, testMode, limit })}`;
   return useSWR(key, (path: string) =>
     apiFetch<ApiResponse<CalendarSummary>>(path, { getToken }).then((response) => response.data),
   );

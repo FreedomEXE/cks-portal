@@ -77,9 +77,25 @@ export const seededTestUsers = {
     code: 'MGR-001-TEST',
     role: 'manager' as const,
   },
+  contractor: {
+    code: 'CON-001-TEST',
+    role: 'contractor' as const,
+  },
+  customer: {
+    code: 'CUS-001-TEST',
+    role: 'customer' as const,
+  },
+  center: {
+    code: 'CEN-001-TEST',
+    role: 'center' as const,
+  },
   crew: {
     code: 'CRW-001-TEST',
     role: 'crew' as const,
+  },
+  warehouse: {
+    code: 'WHS-001-TEST',
+    role: 'warehouse' as const,
   },
 };
 

@@ -2109,6 +2109,7 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
               title="Calendar"
               scopeType={selectedCalendarEcosystemId ? 'manager' : undefined}
               scopeId={selectedCalendarEcosystemId ?? undefined}
+              testMode={selectedCalendarEcosystemId && isTestId(selectedCalendarEcosystemId) ? 'only' : 'exclude'}
               agendaTitle={selectedCalendarEcosystemId ? 'Ecosystem Events' : 'All Ecosystem Events'}
               agendaDescription={
                 selectedCalendarEcosystemId

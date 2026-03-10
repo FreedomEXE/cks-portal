@@ -130,6 +130,7 @@ function CalendarHeaderControls({ extraActions }: { extraActions?: ReactNode }) 
 function CalendarTabContent({
   scopeType,
   scopeId,
+  testMode,
   agendaTitle,
   agendaDescription,
   agendaEmptyMessage,
@@ -137,6 +138,7 @@ function CalendarTabContent({
 }: {
   scopeType?: string;
   scopeId?: string;
+  testMode?: 'include' | 'exclude' | 'only';
   agendaTitle?: string;
   agendaDescription?: string;
   agendaEmptyMessage?: string;
@@ -146,8 +148,8 @@ function CalendarTabContent({
   const range = getCalendarRange(view, anchorDate, days);
   const { data } = useCalendarSummary(
     view === 'agenda'
-      ? { days, scopeType, scopeId }
-      : { start: range.start, end: range.end, scopeType, scopeId, limit: 500 },
+      ? { days, scopeType, scopeId, testMode }
+      : { start: range.start, end: range.end, scopeType, scopeId, testMode, limit: 500 },
   );
   const controls = <CalendarHeaderControls extraActions={headerActions} />;
 
@@ -188,6 +190,7 @@ function CalendarTabContent({
         <CalendarAgenda
           scopeType={scopeType}
           scopeId={scopeId}
+          testMode={testMode}
           title={agendaTitle}
           description={agendaDescription}
           emptyMessage={agendaEmptyMessage}
@@ -197,6 +200,7 @@ function CalendarTabContent({
         <CalendarFull
           scopeType={scopeType}
           scopeId={scopeId}
+          testMode={testMode}
           title={agendaTitle}
           description={agendaDescription}
           headerActions={undefined}
@@ -210,6 +214,7 @@ export function CalendarTab({
   title = 'Calendar',
   scopeType,
   scopeId,
+  testMode,
   agendaTitle,
   agendaDescription,
   agendaEmptyMessage,
@@ -218,6 +223,7 @@ export function CalendarTab({
   title?: string;
   scopeType?: string;
   scopeId?: string;
+  testMode?: 'include' | 'exclude' | 'only';
   agendaTitle?: string;
   agendaDescription?: string;
   agendaEmptyMessage?: string;
@@ -229,6 +235,7 @@ export function CalendarTab({
         <CalendarTabContent
           scopeType={scopeType}
           scopeId={scopeId}
+          testMode={testMode}
           agendaTitle={agendaTitle}
           agendaDescription={agendaDescription}
           agendaEmptyMessage={agendaEmptyMessage}
