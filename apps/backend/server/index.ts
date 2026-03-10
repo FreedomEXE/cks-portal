@@ -17,7 +17,7 @@ import z from "zod";
 import { authenticate } from "./core/auth/authenticate";
 import { registerAdminUserRoutes } from "./domains/adminUsers/routes";
 import { getAdminUserByClerkId } from "./domains/adminUsers/store";
-import { getHubAccountByClerkId } from "./domains/identity";
+import { getHubAccountByClerkId, getHubAccountByCode } from "./domains/identity";
 import { registerAssignmentRoutes } from "./domains/assignments";
 import { registerDirectoryRoutes } from "./domains/directory/routes.fastify";
 import { registerProvisioningRoutes } from "./domains/provisioning";
@@ -29,6 +29,7 @@ import { registerScopeRoutes } from "./domains/scope/routes.fastify";
 import { registerOrdersRoutes } from "./domains/orders/routes.fastify";
 import { registerServicesRoutes } from "./domains/services/routes.fastify";
 import { registerCatalogRoutes } from "./domains/catalog/routes.fastify";
+import { registerCalendarRoutes } from "./domains/calendar/index.js";
 import { reportsRoutes } from "./domains/reports/routes.fastify";
 import { registerInventoryRoutes } from "./domains/inventory/routes.fastify";
 import entityRoutes from "./domains/entities/routes.fastify";
@@ -54,8 +55,12 @@ type BootstrapResponse = {
   accessSource: "direct" | "cascade" | null;
 };
 
+const DEV_AUTH_ENABLED = String(process.env.CKS_ENABLE_DEV_AUTH ?? 'false') === 'true' && process.env.NODE_ENV !== 'production';
+
 const bootstrapSchema = z.object({
-  Authorization: z.string().startsWith('Bearer '),
+  Authorization: z.string().startsWith('Bearer ').optional(),
+  devRole: z.string().trim().optional(),
+  devCode: z.string().trim().optional(),
 });
 
 const bootstrapResponseSchema = z.object({
@@ -185,7 +190,9 @@ export async function buildServer() {
         Authorization:
           (request.headers.authorization as string | undefined) ??
           (request.headers.Authorization as string | undefined) ??
-          '',
+          undefined,
+        devRole: typeof request.headers["x-cks-dev-role"] === "string" ? request.headers["x-cks-dev-role"] : undefined,
+        devCode: typeof request.headers["x-cks-dev-code"] === "string" ? request.headers["x-cks-dev-code"] : undefined,
       });
 
       if (!headerSchema.success) {
@@ -201,42 +208,17 @@ export async function buildServer() {
       }
 
       const authContext = auth.ok ? auth : null;
-      if (!authContext) {
-        return reply.code(401).send({ error: 'Unauthorized' });
-      }
 
-      const adminUser = await getAdminUserByClerkId(authContext.userId);
-      if (adminUser) {
-        if (adminUser.status !== 'active') {
-          return reply.code(403).send({ error: 'Inactive' });
+      let hubAccount = authContext ? await getHubAccountByClerkId(authContext.userId) : null;
+      if (!hubAccount && DEV_AUTH_ENABLED && headerSchema.data.devRole) {
+        hubAccount = await getHubAccountByCode(headerSchema.data.devCode ?? '');
+        if (!hubAccount) {
+          return reply.code(404).send({ error: 'Not provisioned' });
         }
-
-        const resolvedEmail = adminUser.email ?? authContext.email ?? null;
-        const firstName = resolveFirstName({
-          fullName: adminUser.fullName,
-          email: resolvedEmail,
-          fallback: adminUser.cksCode ?? authContext.userId,
-        });
-
-        const response: BootstrapResponse = {
-          role: adminUser.role,
-          code: adminUser.cksCode ?? null,
-          email: resolvedEmail,
-          status: adminUser.status ?? 'active',
-          fullName: adminUser.fullName ?? null,
-          firstName,
-          ownerFirstName: firstName,
-          accessStatus: "active",
-          accessTier: "premium",
-          accessSource: "direct",
-        };
-
-        return reply.send(bootstrapResponseSchema.parse(response));
       }
 
-      const hubAccount = await getHubAccountByClerkId(authContext.userId);
       if (!hubAccount) {
-        return reply.code(404).send({ error: 'Not provisioned' });
+        return reply.code(401).send({ error: 'Unauthorized' });
       }
 
       const normalizedStatus = (hubAccount.status ?? '').trim().toLowerCase();
@@ -245,9 +227,9 @@ export async function buildServer() {
         return reply.code(403).send({ error: 'Inactive', status: hubAccount.status });
       }
 
-      const resolvedEmail = hubAccount.email ?? authContext.email ?? null;
+      const resolvedEmail = hubAccount.email ?? authContext?.email ?? null;
       const responseCode = hubAccount.cksCode ?? null;
-      const fallback = responseCode ?? authContext.userId;
+      const fallback = responseCode ?? authContext?.userId ?? headerSchema.data.devCode ?? null;
       const firstName = resolveFirstName({
         fullName: hubAccount.fullName,
         email: resolvedEmail,
@@ -262,12 +244,12 @@ export async function buildServer() {
         fullName: hubAccount.fullName ?? null,
         firstName,
         ownerFirstName: firstName,
-        accessStatus: "locked",
-        accessTier: null,
-        accessSource: null,
+        accessStatus: hubAccount.role === 'admin' ? "active" : "locked",
+        accessTier: hubAccount.role === 'admin' ? "premium" : null,
+        accessSource: hubAccount.role === 'admin' ? "direct" : null,
       };
 
-      if (responseCode) {
+      if (responseCode && hubAccount.role !== 'admin') {
         const access = await resolveAccessStatus(hubAccount.role, responseCode);
         response.accessStatus = access.status;
         response.accessTier = access.tier;
@@ -293,6 +275,7 @@ export async function buildServer() {
   await registerOrdersRoutes(server);
   await registerServicesRoutes(server);
   await registerCatalogRoutes(server);
+  await registerCalendarRoutes(server);
   await registerInventoryRoutes(server);
   await registerAccountRoutes(server);
   await registerAccessRoutes(server);

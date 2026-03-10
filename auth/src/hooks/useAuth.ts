@@ -53,9 +53,10 @@ const SIGNED_OUT_STATE: InternalAuthState = {
 const DEV_PROXY_BASE = '/api';
 const RAW_API_BASE = import.meta.env.VITE_API_URL || DEV_PROXY_BASE;
 const API_BASE = RAW_API_BASE.replace(/\/+$/, '');
+const DEV_AUTH_ENABLED = ((import.meta as any).env?.VITE_CKS_ENABLE_DEV_AUTH ?? 'false') === 'true';
 const MAX_BOOTSTRAP_RETRIES = Number(import.meta.env.VITE_BOOTSTRAP_MAX_RETRIES ?? 8);
 const BOOTSTRAP_RETRY_BASE_MS = Number(import.meta.env.VITE_BOOTSTRAP_RETRY_BASE_MS ?? 250);
-const SESSION_KEYS = ['role', 'code', 'cks_login_draft', 'cks_impersonation_active', 'cks_impersonation_ticket', 'cks_impersonation_return', 'cks_impersonation_attempt'];
+const SESSION_KEYS = ['role', 'code', 'cks_login_draft', 'cks_impersonation_active', 'cks_impersonation_ticket', 'cks_impersonation_return', 'cks_impersonation_attempt', 'cks_dev_role', 'cks_dev_code'];
 const LOCAL_PRESERVE_KEYS = new Set(['userLoggedOut']);
 
 function clearAuthStorage(): void {
@@ -156,6 +157,22 @@ function isAbortError(error: unknown): boolean {
   return name === 'AbortError';
 }
 
+function readDevOverride(): { role: string; code: string | null } | null {
+  if (!DEV_AUTH_ENABLED || typeof window === 'undefined') {
+    return null;
+  }
+
+  const role = sanitizePreservingCase(window.sessionStorage?.getItem('cks_dev_role'));
+  if (!role) {
+    return null;
+  }
+
+  return {
+    role,
+    code: sanitizePreservingCase(window.sessionStorage?.getItem('cks_dev_code')),
+  };
+}
+
 export function useAuth(): AuthState {
   const { isLoaded: authLoaded, isSignedIn, getToken } = useClerkAuth();
   const { user, isLoaded: userLoaded } = useUser();
@@ -187,7 +204,8 @@ export function useAuth(): AuthState {
       return;
     }
 
-    if (!isSignedIn) {
+    const devOverride = readDevOverride();
+    if (!isSignedIn && !devOverride) {
       console.log('[useAuth] User not signed in, resetting state');
       abortRef.current?.abort();
       fetchingRef.current = false;
@@ -221,9 +239,16 @@ export function useAuth(): AuthState {
     let timeout: ReturnType<typeof setTimeout> | null = null;
 
     try {
-      const token = await getToken().catch(() => null);
-      if (token) {
-        headers.set('Authorization', `Bearer ${token}`);
+      if (devOverride) {
+        headers.set('x-cks-dev-role', devOverride.role);
+        if (devOverride.code) {
+          headers.set('x-cks-dev-code', devOverride.code.toUpperCase());
+        }
+      } else {
+        const token = await getToken().catch(() => null);
+        if (token) {
+          headers.set('Authorization', `Bearer ${token}`);
+        }
       }
       if (user?.id) {
         headers.set('x-user-id', user.id);
@@ -235,7 +260,7 @@ export function useAuth(): AuthState {
       timeout = setTimeout(() => controller.abort(), 15_000);
 
       const bootstrapUrl = `${API_BASE}/me/bootstrap`;
-      console.log('[useAuth] Calling bootstrap:', bootstrapUrl, { hasToken: !!token });
+      console.log('[useAuth] Calling bootstrap:', bootstrapUrl, { hasDevOverride: !!devOverride, hasToken: headers.has('Authorization') });
 
       const response = await fetch(bootstrapUrl, {
         credentials: 'include',
@@ -414,10 +439,12 @@ export function useAuth(): AuthState {
   }, [authLoaded, getToken, isSignedIn, user, userLoaded]);
 
   useEffect(() => {
+    const devOverride = readDevOverride();
     console.log('[useAuth] useEffect triggered:', {
       authLoaded,
       userLoaded,
       isSignedIn,
+      hasDevOverride: !!devOverride,
       stateRole: state.role,
       stateStatus: state.status,
       fetchingRef: fetchingRef.current,
@@ -428,7 +455,7 @@ export function useAuth(): AuthState {
       return;
     }
 
-    if (!isSignedIn) {
+    if (!isSignedIn && !devOverride) {
       console.log('[useAuth] Not signed in - resetting');
       abortRef.current?.abort();
       fetchingRef.current = false;

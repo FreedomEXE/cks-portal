@@ -65,6 +65,7 @@ import { useAccessCodeRedemption } from '../hooks/useAccessCodeRedemption';
 import OverviewSummaryModal, { type OverviewSummaryItem } from '../components/overview/OverviewSummaryModal';
 import { buildSupportTickets, mapSupportIssuePayload } from '../shared/support/supportTickets';
 import { uploadProfilePhotoAndSyncLogo } from '../shared/profilePhoto';
+import CalendarTab from '../features/calendar/CalendarTab';
 import {
   canRoleEditWatermark,
   sanitizeWatermarkPreferenceWrite,
@@ -573,6 +574,7 @@ function CustomerHubContent({ initialTab = 'dashboard' }: CustomerHubProps) {
     { id: 'dashboard', label: 'Dashboard', path: '/customer/dashboard' },
     { id: 'profile', label: 'My Profile', path: '/customer/profile' },
     { id: 'ecosystem', label: 'My Ecosystem', path: '/customer/ecosystem' },
+    { id: 'calendar', label: 'Calendar', path: '/customer/calendar' },
     { id: 'services', label: 'Services', path: '/customer/services' },
     { id: 'orders', label: 'Orders', path: '/customer/orders' },
     { id: 'reports', label: 'Reports', path: '/customer/reports' },
@@ -721,6 +723,8 @@ function CustomerHubContent({ initialTab = 'dashboard' }: CustomerHubProps) {
                 roleColorMap={DEFAULT_ROLE_COLOR_MAP}
               />
             </PageWrapper>
+          ) : activeTab === 'calendar' ? (
+            <CalendarTab title="Calendar" />
           ) : activeTab === 'services' ? (
 
             <PageWrapper headerSrOnly>

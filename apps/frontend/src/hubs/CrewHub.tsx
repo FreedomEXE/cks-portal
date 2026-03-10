@@ -67,6 +67,9 @@ import { useAccessCodeRedemption } from '../hooks/useAccessCodeRedemption';
 import OverviewSummaryModal, { type OverviewSummaryItem } from '../components/overview/OverviewSummaryModal';
 import { buildSupportTickets, mapSupportIssuePayload } from '../shared/support/supportTickets';
 import { uploadProfilePhotoAndSyncLogo } from '../shared/profilePhoto';
+import CalendarTab from '../features/calendar/CalendarTab';
+import { CalendarProvider } from '../features/calendar/CalendarProvider';
+import CalendarAgenda from '../features/calendar/CalendarAgenda';
 import {
   CKS_DEFAULT_WATERMARK_URL,
   canRoleEditWatermark,
@@ -583,6 +586,7 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
     { id: 'dashboard', label: 'Dashboard', path: '/crew/dashboard' },
     { id: 'profile', label: 'My Profile', path: '/crew/profile' },
     { id: 'ecosystem', label: 'My Ecosystem', path: '/crew/ecosystem' },
+    { id: 'calendar', label: 'Calendar', path: '/crew/calendar' },
     { id: 'services', label: 'Services', path: '/crew/services' },
     { id: 'orders', label: 'Orders', path: '/crew/orders' },
     { id: 'reports', label: 'Reports', path: '/crew/reports' },
@@ -645,10 +649,12 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
   const myServicesColumns = MY_SERVICES_COLUMNS_BASE;
 
 
-  // Don't render anything until we have critical data
-  if (!profile || !dashboard) {
-    console.log('[CrewHub.tsx] Waiting for critical data...');
-    return <ProfileSkeleton />;
+  const requiresProfileData = activeTab === 'dashboard' || activeTab === 'profile' || activeTab === 'ecosystem';
+  const requiresDashboardData = activeTab === 'dashboard';
+
+  if ((requiresProfileData && !profile) || (requiresDashboardData && !dashboard)) {
+    console.log('[CrewHub.tsx] Waiting for tab-specific critical data...', { activeTab });
+    return activeTab === 'profile' ? <ProfileSkeleton /> : null;
   }
 
   return (
@@ -733,6 +739,17 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
                 onScheduleMeeting={() => undefined}
                 photoUrl={user?.imageUrl}
               />
+              <div className="mt-6">
+                <CalendarProvider initialDays={14}>
+                  <CalendarAgenda
+                    scopeType="crew"
+                    scopeId={userCode ?? normalizedCode ?? undefined}
+                    title="My Schedule"
+                    description="Upcoming calendar events tied to your crew assignments and accepted work."
+                    emptyMessage="No scheduled crew events in this window yet."
+                  />
+                </CalendarProvider>
+              </div>
             </PageWrapper>
           ) : activeTab === 'ecosystem' ? (
             <PageWrapper headerSrOnly>
@@ -748,6 +765,8 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
                 roleColorMap={DEFAULT_ROLE_COLOR_MAP}
               />
             </PageWrapper>
+          ) : activeTab === 'calendar' ? (
+            <CalendarTab title="Calendar" />
           ) : activeTab === 'services' ? (
 
             <PageWrapper headerSrOnly>

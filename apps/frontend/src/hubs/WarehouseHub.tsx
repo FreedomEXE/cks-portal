@@ -48,6 +48,7 @@ import { useAccessCodeRedemption } from '../hooks/useAccessCodeRedemption';
 import OverviewSummaryModal, { type OverviewSummaryItem } from '../components/overview/OverviewSummaryModal';
 import { buildSupportTickets, mapSupportIssuePayload } from '../shared/support/supportTickets';
 import { uploadProfilePhotoAndSyncLogo } from '../shared/profilePhoto';
+import CalendarTab from '../features/calendar/CalendarTab';
 import {
   CKS_DEFAULT_WATERMARK_URL,
   canRoleEditWatermark,
@@ -947,6 +948,7 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
   const tabs = useMemo(() => [
     { id: 'dashboard', label: 'Dashboard', path: '/warehouse/dashboard' },
     { id: 'profile', label: 'My Profile', path: '/warehouse/profile' },
+    { id: 'calendar', label: 'Calendar', path: '/warehouse/calendar' },
     { id: 'inventory', label: 'Inventory', path: '/warehouse/inventory' },
     { id: 'services', label: 'Services', path: '/warehouse/services' },
     { id: 'deliveries', label: 'Deliveries', path: '/warehouse/deliveries' },
@@ -1088,6 +1090,8 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
                 photoUrl={user?.imageUrl}
               />
             </PageWrapper>
+          ) : activeTab === 'calendar' ? (
+            <CalendarTab title="Calendar" />
           ) : activeTab === 'inventory' ? (
             <PageWrapper headerSrOnly>
               {inventoryLoadMessage && (

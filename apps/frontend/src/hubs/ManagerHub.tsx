@@ -83,6 +83,7 @@ import { createCatalogService, getCatalogCategories, uploadCatalogImage, type Cr
 import { loadUserPreferences, saveUserPreferences } from '../shared/preferences';
 import { buildSupportTickets, mapSupportIssuePayload } from '../shared/support/supportTickets';
 import { uploadProfilePhotoAndSyncLogo } from '../shared/profilePhoto';
+import CalendarTab from '../features/calendar/CalendarTab';
 import {
   CKS_DEFAULT_WATERMARK_URL,
   canRoleEditWatermark,
@@ -144,6 +145,7 @@ const HUB_TABS = [
   { id: 'dashboard', label: 'Dashboard', path: '/manager/dashboard' },
   { id: 'profile', label: 'My Profile', path: '/manager/profile' },
   { id: 'ecosystem', label: 'My Ecosystem', path: '/manager/ecosystem' },
+  { id: 'calendar', label: 'Calendar', path: '/manager/calendar' },
   { id: 'services', label: 'My Services', path: '/manager/services' },
   // Removed per request: Procedures & Training
   { id: 'orders', label: 'Orders', path: '/manager/orders' },
@@ -1236,10 +1238,12 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
   // Services are now auto-created on manager accept
   // Crew, procedures, training are managed from Active Services section
 
-  // Don't render anything until we have critical data
-  if (!profileData || !dashboardData) {
-    console.log('[ManagerHub] Waiting for critical data...');
-    return null;
+  const requiresProfileData = activeTab === 'dashboard' || activeTab === 'profile' || activeTab === 'ecosystem';
+  const requiresDashboardData = activeTab === 'dashboard';
+
+  if ((requiresProfileData && !profileData) || (requiresDashboardData && !dashboardData)) {
+    console.log('[ManagerHub] Waiting for tab-specific critical data...', { activeTab });
+    return activeTab === 'profile' ? <ProfileSkeleton /> : null;
   }
 
   return (
@@ -1334,6 +1338,8 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
                 }}
               />
             </PageWrapper>
+          ) : activeTab === 'calendar' ? (
+            <CalendarTab title="Calendar" />
           ) : activeTab === 'services' ? (
             <PageWrapper title="My Services" showHeader headerSrOnly>
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>

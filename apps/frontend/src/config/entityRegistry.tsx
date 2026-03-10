@@ -65,6 +65,8 @@ import ServiceCrewTasksTab from '../components/tabs/ServiceCrewTasksTab/ServiceC
 import TicketMessagesTab from '../components/tabs/TicketMessagesTab';
 import EditableUserProfileTab from '../components/tabs/UserProfileTab/EditableUserProfileTab';
 import UserManagementTab from '../components/tabs/UserManagementTab/UserManagementTab';
+import { CalendarProvider } from '../features/calendar/CalendarProvider';
+import CalendarAgenda from '../features/calendar/CalendarAgenda';
 
 /**
  * Order Details Sections Builder
@@ -1711,6 +1713,22 @@ const serviceAdapter: EntityAdapter = {
               entityData,
             })}
           />
+        ),
+      },
+      {
+        id: 'schedule',
+        label: 'Schedule',
+        content: (
+          <CalendarProvider initialDays={30}>
+            <CalendarAgenda
+              scopeType="service"
+              scopeId={entityData?.serviceId}
+              title="Service Schedule"
+              description="Calendar events materialized for this service from existing scheduling workflows."
+              emptyMessage="No calendar events have been materialized for this service yet."
+              showWindowSelector={false}
+            />
+          </CalendarProvider>
         ),
       },
       // Assigned Crew tab: everyone can view, managers/warehouse can edit when they manage

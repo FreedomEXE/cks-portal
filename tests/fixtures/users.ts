@@ -16,6 +16,11 @@ export interface TestUser {
   role: Role;
 }
 
+export interface LoginUser {
+  code: string;
+  role?: Role;
+}
+
 /**
  * Test user accounts
  */
@@ -65,11 +70,50 @@ export const testUsers: Record<Role, TestUser> = {
 };
 
 /**
+ * Seeded TEST ecosystem accounts used for smoke tests that must not touch live-ish fixture users.
+ */
+export const seededTestUsers = {
+  manager: {
+    code: 'MGR-001-TEST',
+    role: 'manager' as const,
+  },
+  crew: {
+    code: 'CRW-001-TEST',
+    role: 'crew' as const,
+  },
+};
+
+/**
  * Get test password from environment variable
  */
 function getTestPassword(): string {
   const password = process.env.TEST_PASSWORD || 'CksTest!2026-Alpha';
   return password;
+}
+
+async function submitLogin(page: Page, code: string, password: string): Promise<void> {
+  await page.goto('/login');
+  await page.waitForLoadState('networkidle');
+
+  const usernameInput = page.locator('input[type="text"]').first();
+  await usernameInput.waitFor({ state: 'visible', timeout: 10000 });
+  await usernameInput.fill(code);
+
+  const passwordInput = page.locator('input[type="password"]').first();
+  await passwordInput.fill(password);
+
+  await page.click('button:has-text("Sign in")');
+  await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 30000 });
+  await page.waitForLoadState('networkidle');
+}
+
+export async function loginWithCode(page: Page, code: string): Promise<void> {
+  await submitLogin(page, code, getTestPassword());
+}
+
+export async function loginAsUser(page: Page, user: LoginUser): Promise<LoginUser> {
+  await submitLogin(page, user.code, getTestPassword());
+  return user;
 }
 
 /**
@@ -83,32 +127,7 @@ function getTestPassword(): string {
  */
 export async function loginAs(page: Page, role: Role): Promise<TestUser> {
   const user = testUsers[role];
-  const password = getTestPassword();
-
-  // Navigate to login page
-  await page.goto('/login');
-
-  // Wait for login form to be visible
-  await page.waitForLoadState('networkidle');
-
-  // Fill in username (use CKS code, not email)
-  const usernameInput = page.locator('input[type="text"]').first();
-  await usernameInput.waitFor({ state: 'visible', timeout: 10000 });
-  await usernameInput.fill(user.code);
-
-  // Fill in password
-  const passwordInput = page.locator('input[type="password"]').first();
-  await passwordInput.fill(password);
-
-  // Click sign in button
-  await page.click('button:has-text("Sign in")');
-
-  // Wait for navigation away from login page (don't force a specific URL)
-  await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 30000 });
-
-  // Give the page a moment to fully load
-  await page.waitForLoadState('networkidle');
-
+  await submitLogin(page, user.code, getTestPassword());
   return user;
 }
 

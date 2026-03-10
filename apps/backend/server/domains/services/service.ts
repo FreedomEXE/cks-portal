@@ -3,6 +3,15 @@ import type { HubRole } from '../profile/types';
 import { normalizeIdentity } from '../identity';
 import { z } from 'zod';
 import { recordActivity } from '../activity/writer';
+import { syncServiceCalendarProjection } from '../calendar/index.js';
+
+async function syncCalendarProjectionSafely(serviceId: string): Promise<void> {
+  try {
+    await syncServiceCalendarProjection(serviceId);
+  } catch (error) {
+    console.warn('[calendar] failed to sync service projection', { serviceId, error });
+  }
+}
 
 export async function applyServiceAction(input: {
   serviceId: string;
@@ -165,6 +174,8 @@ export async function applyServiceAction(input: {
       metadata: { notes: input.notes },
     });
   }
+
+  await syncCalendarProjectionSafely(serviceId);
 
   return {
     orderId: row.order_id,
@@ -345,6 +356,7 @@ export async function updateServiceMetadata(input: {
       }
     }
   } catch {}
+  await syncCalendarProjectionSafely(input.serviceId);
   return { ...service, metadata: meta };
 }
 
@@ -435,6 +447,8 @@ export async function addServiceCrewRequests(input: {
         },
       });
   }
+
+  await syncCalendarProjectionSafely(input.serviceId);
 
   return { ...service, metadata: updatedMetadata };
 }
@@ -548,8 +562,10 @@ export async function respondToServiceCrewRequest(input: {
         managerId: managerId || undefined,
         // Optionally include center if available in future
       },
-    });
+      });
   }
+
+  await syncCalendarProjectionSafely(input.serviceId);
 
   return { ...service, metadata: updatedMetadata };
 }

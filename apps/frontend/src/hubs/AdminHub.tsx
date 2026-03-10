@@ -53,6 +53,7 @@ import { isFeatureEnabled } from '../config/featureFlags';
 import AdminAssignSection from './components/AdminAssignSection';
 import AdminCreateSection from './components/AdminCreateSection';
 import CatalogVisibilitySection from './components/CatalogVisibilitySection';
+import CalendarTab from '../features/calendar/CalendarTab';
 import { useHubLoading } from '../contexts/HubLoadingContext';
 import { buildOrderActions } from '@cks/domain-widgets';
 import { mapProfileDataForRole, type DirectoryRole, directoryTabToRole } from '../shared/utils/profileMapping';
@@ -201,6 +202,7 @@ function isTestId(value?: string | null): boolean {
 const HUB_TABS = [
   { id: 'dashboard', label: 'Dashboard', path: '/dashboard' },
   { id: 'ecosystems', label: 'Ecosystems', path: '/ecosystems' },
+  { id: 'calendar', label: 'Calendar', path: '/calendar' },
   { id: 'directory', label: 'Directory', path: '/directory' },
   { id: 'create', label: 'Create', path: '/create' },
   { id: 'assign', label: 'Assign', path: '/assign' },
@@ -2084,6 +2086,8 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
                 {renderDirectoryBody()}
               </div>
             </PageWrapper>
+          ) : activeTab === 'calendar' ? (
+            <CalendarTab title="Calendar" />
           ) : activeTab === 'create' ? (
             <AdminCreateSection />
           ) : activeTab === 'assign' ? (

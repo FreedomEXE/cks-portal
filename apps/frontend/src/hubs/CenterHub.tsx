@@ -64,6 +64,7 @@ import { useAccessCodeRedemption } from '../hooks/useAccessCodeRedemption';
 import OverviewSummaryModal, { type OverviewSummaryItem } from '../components/overview/OverviewSummaryModal';
 import { buildSupportTickets, mapSupportIssuePayload } from '../shared/support/supportTickets';
 import { uploadProfilePhotoAndSyncLogo } from '../shared/profilePhoto';
+import CalendarTab from '../features/calendar/CalendarTab';
 import {
   canRoleEditWatermark,
   sanitizeWatermarkPreferenceWrite,
@@ -569,6 +570,7 @@ function CenterHubContent({ initialTab = 'dashboard' }: CenterHubProps) {
     { id: 'dashboard', label: 'Dashboard', path: '/center/dashboard' },
     { id: 'profile', label: 'My Profile', path: '/center/profile' },
     { id: 'ecosystem', label: 'My Ecosystem', path: '/center/ecosystem' },
+    { id: 'calendar', label: 'Calendar', path: '/center/calendar' },
     { id: 'services', label: 'Services', path: '/center/services' },
     { id: 'orders', label: 'Orders', path: '/center/orders' },
     { id: 'reports', label: 'Reports', path: '/center/reports' },
@@ -718,6 +720,8 @@ function CenterHubContent({ initialTab = 'dashboard' }: CenterHubProps) {
                 roleColorMap={DEFAULT_ROLE_COLOR_MAP}
               />
             </PageWrapper>
+          ) : activeTab === 'calendar' ? (
+            <CalendarTab title="Calendar" />
           ) : activeTab === 'services' ? (
 
             <PageWrapper headerSrOnly>

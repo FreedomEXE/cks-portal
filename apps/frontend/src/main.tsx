@@ -2,7 +2,7 @@ import '@cks/ui/styles/globals.css';
 import '@cks/ui/assets/ui.css';
 import { ClerkProvider, SignedIn, SignedOut } from '@clerk/clerk-react';
 import { SWRConfig } from 'swr';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { AuthenticatedApp, UnauthenticatedApp } from './App';
@@ -16,6 +16,8 @@ import { HubLoadingProvider } from './contexts/HubLoadingContext';
 
 // Read the Clerk publishable key from Vite env. Do not hardcode or fall back to a dummy key.
 const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined;
+const DEV_AUTH_ENABLED = ((import.meta as any).env?.VITE_CKS_ENABLE_DEV_AUTH ?? 'false') === 'true' && !import.meta.env.PROD;
+const DEV_AUTH_EVENT = 'cks:dev-auth-changed';
 if (!PUBLISHABLE_KEY) {
   throw new Error('Missing VITE_CLERK_PUBLISHABLE_KEY. Define it in frontend/.env or .env.local and restart the dev server.');
 }
@@ -29,6 +31,48 @@ const root = ReactDOM.createRoot(rootElement);
 
 // Expose API base for shared UI package components (e.g., HistoryTab)
 try { (window as any).__CKS_API_BASE = API_BASE; } catch {}
+
+function hasDevAuthSession(): boolean {
+  if (!DEV_AUTH_ENABLED || typeof window === 'undefined') {
+    return false;
+  }
+  return Boolean(window.sessionStorage?.getItem('cks_dev_role'));
+}
+
+function AppRouterGate() {
+  const [devSessionActive, setDevSessionActive] = useState(() => hasDevAuthSession());
+
+  useEffect(() => {
+    if (!DEV_AUTH_ENABLED || typeof window === 'undefined') {
+      return;
+    }
+
+    const sync = () => setDevSessionActive(hasDevAuthSession());
+    window.addEventListener(DEV_AUTH_EVENT, sync);
+    window.addEventListener('storage', sync);
+    sync();
+
+    return () => {
+      window.removeEventListener(DEV_AUTH_EVENT, sync);
+      window.removeEventListener('storage', sync);
+    };
+  }, []);
+
+  if (devSessionActive) {
+    return <AuthenticatedApp />;
+  }
+
+  return (
+    <>
+      <SignedIn>
+        <AuthenticatedApp />
+      </SignedIn>
+      <SignedOut>
+        <UnauthenticatedApp />
+      </SignedOut>
+    </>
+  );
+}
 
 root.render(
   <React.StrictMode>
@@ -55,12 +99,7 @@ root.render(
             <LoadingProvider>
               <CartProvider>
                 <BrowserRouter>
-                  <SignedIn>
-                    <AuthenticatedApp />
-                  </SignedIn>
-                  <SignedOut>
-                    <UnauthenticatedApp />
-                  </SignedOut>
+                  <AppRouterGate />
                 </BrowserRouter>
                 <GlobalLoader />
               </CartProvider>

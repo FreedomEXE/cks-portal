@@ -26,11 +26,20 @@ import type {
   OrderAction,
   OrderType as PolicyOrderType
 } from '@cks/policies';
+import { syncOrderCalendarProjection } from '../calendar/index.js';
 
 const FINAL_STATUSES = new Set<OrderStatus>(["rejected", "cancelled", "delivered"]);
 const HUB_ROLES: readonly HubRole[] = ["manager", "contractor", "customer", "center", "crew", "warehouse"];
 const HUB_ROLE_SET = new Set<string>(HUB_ROLES);
 const ACTOR_ROLES = new Set<HubRole>(['warehouse', 'manager', 'contractor', 'crew']);
+
+async function syncCalendarProjectionSafely(orderId: string): Promise<void> {
+  try {
+    await syncOrderCalendarProjection(orderId);
+  } catch (error) {
+    console.warn('[calendar] failed to sync order projection', { orderId, error });
+  }
+}
 
 // Using OrderParticipant from @cks/policies instead
 // type ParticipationType = 'creator' | 'destination' | 'actor' | 'watcher';
@@ -1644,6 +1653,9 @@ export async function createOrder(input: CreateOrderInput): Promise<HubOrderItem
 
   const sequenceName = input.orderType === "product" ? PRODUCT_SEQUENCE : SERVICE_SEQUENCE;
   const typePrefix = input.orderType === "product" ? PRODUCT_PREFIX : SERVICE_PREFIX;
+  // Calendar projections are intentionally not synced on initial order creation.
+  // Orders become calendar-worthy only after downstream workflow steps confirm or
+  // update actionable dates, which are already covered by the update/action paths.
 
   const seqResult = await query<{ nextval: string }>(`SELECT nextval('${sequenceName}')::text AS nextval`);
   const seqNum = seqResult.rows[0]?.nextval ?? "1";
@@ -2668,6 +2680,8 @@ export async function applyOrderAction(input: OrderActionInput): Promise<HubOrde
     });
   }
 
+  await syncCalendarProjectionSafely(input.orderId);
+
   return fetchOrderById(input.orderId, { viewerRole: input.actorRole, viewerCode: actorCodeNormalized });
 }
 
@@ -2710,6 +2724,7 @@ export async function updateOrderFields(
   `;
 
   await query(updateQuery, values);
+  await syncCalendarProjectionSafely(orderId.toUpperCase());
 
   // Return the updated order
   return fetchOrderById(orderId, {});
@@ -2783,6 +2798,8 @@ export async function requestCrewAssignment(
   for (const code of crewCodes) {
     await ensureParticipant({ orderId, role: 'crew', code, participationType: 'actor' });
   }
+
+  await syncCalendarProjectionSafely(orderId);
 
   return fetchOrderById(orderId, { viewerRole: 'manager', viewerCode: managerCode });
 }
@@ -2867,6 +2884,8 @@ export async function respondToCrewRequest(
       [orderId, normalizedCrewCode]
     );
   }
+
+  await syncCalendarProjectionSafely(orderId);
 
   return fetchOrderById(orderId, { viewerRole: 'crew', viewerCode: crewCode });
 }
