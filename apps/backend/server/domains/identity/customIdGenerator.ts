@@ -1,5 +1,5 @@
-import { query } from '../../db/connection';
-import type { IdentityDescriptor, IdentityEntity } from './types';
+import { query } from '../../db/connection.js';
+import type { IdentityDescriptor, IdentityEntity } from './types.js';
 
 const IDENTITY_DESCRIPTORS: Record<IdentityEntity, IdentityDescriptor> = {
   manager: { prefix: 'MGR', sequence: 'manager_id_seq' },
@@ -8,6 +8,7 @@ const IDENTITY_DESCRIPTORS: Record<IdentityEntity, IdentityDescriptor> = {
   center: { prefix: 'CEN', sequence: 'center_id_seq' },
   crew: { prefix: 'CRW', sequence: 'crew_id_seq' },
   warehouse: { prefix: 'WHS', sequence: 'warehouse_id_seq' },
+  scheduleBlock: { prefix: 'BLK', sequence: 'schedule_block_id_seq' },
   // System records
   report: { prefix: 'RPT', sequence: 'report_id_seq' },
   feedback: { prefix: 'FBK', sequence: 'feedback_id_seq' },
@@ -138,6 +139,37 @@ export async function generatePrefixedId(entity: IdentityEntity): Promise<string
   await ensureSequence(descriptor.sequence);
   const value = await nextSerial(descriptor.sequence);
   return formatSerial(descriptor.prefix, value);
+}
+
+export async function generateScheduleBlockId(options?: { test?: boolean }): Promise<string> {
+  const blockId = await generatePrefixedId('scheduleBlock');
+  return options?.test ? `${blockId}-TEST` : blockId;
+}
+
+export async function generateScheduleTaskId(blockId: string): Promise<string> {
+  const normalizedBlockId = normalizeIdentity(blockId);
+  if (!normalizedBlockId || !/^BLK-\d+(?:-TEST)?$/.test(normalizedBlockId)) {
+    throw new Error(`Invalid schedule block ID provided: ${blockId}`);
+  }
+
+  const taskSequence = `schedule_task_id_seq_${normalizedBlockId.toLowerCase().replace(/-/g, '_')}`;
+  if (!/^[a-z0-9_]+$/.test(taskSequence)) {
+    throw new Error(`Invalid sequence name format: ${taskSequence}`);
+  }
+
+  await query(`CREATE SEQUENCE IF NOT EXISTS ${taskSequence} AS BIGINT START WITH 1 INCREMENT BY 1 OWNED BY NONE`);
+  const result = await query<{ value: string }>(`SELECT nextval('${taskSequence}') AS value`);
+  const record = result.rows[0];
+  if (!record) {
+    throw new Error(`Failed to fetch next value for sequence ${taskSequence}`);
+  }
+
+  const value = Number(record.value);
+  if (Number.isNaN(value)) {
+    throw new Error(`Sequence ${taskSequence} returned non-numeric value`);
+  }
+
+  return `${normalizedBlockId}-TSK-${Math.max(0, value).toString().padStart(3, '0')}`;
 }
 
 export function normalizeIdentity(value: string | null | undefined): string | null {

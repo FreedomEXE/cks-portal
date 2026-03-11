@@ -1,4 +1,9 @@
-import { generatePrefixedId, normalizeIdentity } from './customIdGenerator';
+import {
+  generatePrefixedId,
+  generateScheduleBlockId,
+  generateScheduleTaskId,
+  normalizeIdentity,
+} from './customIdGenerator.js';
 import {
   getClerkUserIdByRoleAndCode,
   getHubAccountByClerkId,
@@ -6,12 +11,14 @@ import {
   getIdentityContactByRoleAndCode,
   linkClerkUserToAccount,
   unlinkClerkUserFromAccount,
-} from './repository';
-import type { IdentityEntity } from './types';
+} from './repository.js';
+import type { IdentityEntity } from './types.js';
 
 export async function nextIdentityId(entity: IdentityEntity): Promise<string> {
   return generatePrefixedId(entity);
 }
+
+export { generateScheduleBlockId, generateScheduleTaskId };
 
 export {
   normalizeIdentity,
@@ -23,4 +30,4 @@ export {
   unlinkClerkUserFromAccount,
 };
 
-export type { HubAccountRecord, HubAccountRole } from './repository';
+export type { HubAccountRecord, HubAccountRole } from './repository.js';

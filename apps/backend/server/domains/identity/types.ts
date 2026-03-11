@@ -5,6 +5,7 @@ export type IdentityEntity =
   | 'center'
   | 'crew'
   | 'warehouse'
+  | 'scheduleBlock'
   // Extended entities for system records
   | 'report'
   | 'feedback';
