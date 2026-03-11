@@ -7,6 +7,7 @@ type ErrorBoundaryProps = {
 type ErrorBoundaryState = {
   hasError: boolean;
   error: Error | null;
+  mode: 'session' | 'generic';
 };
 
 const IS_DEV = import.meta.env.DEV;
@@ -52,18 +53,40 @@ async function clearClerkSession(): Promise<void> {
   }
 }
 
+function isSessionError(error: Error | null): boolean {
+  if (!error) {
+    return false;
+  }
+
+  const status = (error as any)?.status;
+  if (status === 401 || status === 403) {
+    return true;
+  }
+
+  const message = String(error.message || '').toLowerCase();
+  return (
+    message.includes('unauthorized') ||
+    message.includes('forbidden') ||
+    message.includes('session') ||
+    message.includes('token expired') ||
+    message.includes('authentication') ||
+    message.includes('clerk')
+  );
+}
+
 export default class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
   private redirectTimeout: number | null = null;
 
   constructor(props: ErrorBoundaryProps) {
     super(props);
-    this.state = { hasError: false, error: null };
+    this.state = { hasError: false, error: null, mode: 'generic' };
   }
 
   static getDerivedStateFromError(error: Error): ErrorBoundaryState {
     return {
       hasError: true,
       error,
+      mode: isSessionError(error) ? 'session' : 'generic',
     };
   }
 
@@ -74,12 +97,14 @@ export default class ErrorBoundary extends React.Component<ErrorBoundaryProps, E
       return;
     }
 
-    clearAuthStorage();
-    void clearClerkSession();
+    if (isSessionError(error)) {
+      clearAuthStorage();
+      void clearClerkSession();
 
-    this.redirectTimeout = window.setTimeout(() => {
-      window.location.assign('/login');
-    }, LOGIN_REDIRECT_DELAY_MS);
+      this.redirectTimeout = window.setTimeout(() => {
+        window.location.assign('/login');
+      }, LOGIN_REDIRECT_DELAY_MS);
+    }
   }
 
   componentWillUnmount(): void {
@@ -108,7 +133,29 @@ export default class ErrorBoundary extends React.Component<ErrorBoundaryProps, E
             fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
           }}
         >
-          <p>Your session has expired. Redirecting to login...</p>
+          {this.state.mode === 'session' ? (
+            <p>Your session has expired. Redirecting to login...</p>
+          ) : (
+            <div>
+              <p>Something went wrong loading this view.</p>
+              <button
+                type="button"
+                onClick={() => window.location.reload()}
+                style={{
+                  marginTop: '0.75rem',
+                  padding: '0.55rem 0.9rem',
+                  borderRadius: '0.5rem',
+                  border: '1px solid #cbd5e1',
+                  background: '#ffffff',
+                  color: '#0f172a',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                }}
+              >
+                Reload app
+              </button>
+            </div>
+          )}
         </div>
       );
     }
