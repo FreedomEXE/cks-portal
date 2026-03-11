@@ -162,7 +162,7 @@ function EmptyRangeNotice({ message }: { message: string }) {
 }
 
 function MonthView({ events }: { events: CalendarEventItem[] }) {
-  const { anchorDate } = useCalendarContext();
+  const { anchorDate, focusDate } = useCalendarContext();
   const monthStart = startOfMonth(anchorDate);
   const range = getCalendarRange('month', anchorDate, 42);
   const gridStart = new Date(range.start);
@@ -198,16 +198,18 @@ function MonthView({ events }: { events: CalendarEventItem[] }) {
                   : isCurrentMonth
                     ? 'border-slate-200/80 bg-white/95 shadow-[0_10px_28px_rgba(15,23,42,0.06)]'
                     : 'border-slate-100 bg-slate-50/90'
-              }`}
+              } hover:border-slate-300 hover:shadow-[0_18px_40px_rgba(15,23,42,0.1)]`}
             >
               <div className="flex items-center justify-between">
-                <span
-                  className={`flex h-9 w-9 items-center justify-center rounded-2xl text-sm font-black ${
+                <button
+                  type="button"
+                  onClick={() => focusDate(date, 'day')}
+                  className={`flex h-9 w-9 items-center justify-center rounded-2xl text-sm font-black transition-transform hover:scale-[1.03] ${
                     isToday ? 'bg-slate-900 text-white' : isCurrentMonth ? 'text-slate-900' : 'text-slate-400'
                   }`}
                 >
                   {date.getUTCDate()}
-                </span>
+                </button>
                 <div className="flex items-center gap-1">
                   {isToday ? (
                     <span className="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] text-white">
@@ -239,7 +241,7 @@ function MonthView({ events }: { events: CalendarEventItem[] }) {
 }
 
 function WeekView({ events }: { events: CalendarEventItem[] }) {
-  const { anchorDate } = useCalendarContext();
+  const { anchorDate, focusDate } = useCalendarContext();
   const range = getCalendarRange('week', anchorDate, 7);
   const weekStart = new Date(range.start);
   const dates = Array.from({ length: 7 }, (_, index) => addDays(weekStart, index));
@@ -259,15 +261,19 @@ function WeekView({ events }: { events: CalendarEventItem[] }) {
               key={key}
               className={`overflow-hidden rounded-[26px] border shadow-[0_18px_48px_rgba(15,23,42,0.08)] ${
                 isToday ? 'border-slate-900 bg-white' : 'border-slate-200/80 bg-white/95'
-              }`}
+              } transition-shadow hover:border-slate-300 hover:shadow-[0_18px_48px_rgba(15,23,42,0.12)]`}
             >
               <div className={`border-b px-4 py-4 ${isToday ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-slate-50'}`}>
                 <div className={`text-xs font-black uppercase tracking-[0.12em] ${isToday ? 'text-white/70' : 'text-slate-500'}`}>
                   {date.toLocaleDateString('en-CA', { weekday: 'short', timeZone: 'UTC' })}
                 </div>
-                <div className={`mt-1 text-sm font-black tracking-[-0.02em] ${isToday ? 'text-white' : 'text-slate-900'}`}>
+                <button
+                  type="button"
+                  onClick={() => focusDate(date, 'day')}
+                  className={`mt-1 text-sm font-black tracking-[-0.02em] ${isToday ? 'text-white' : 'text-slate-900'} hover:underline`}
+                >
                   {formatDayLabel(date, false)}
-                </div>
+                </button>
               </div>
               <div className="flex min-h-[220px] flex-col gap-2 p-3">
                 {dayEvents.length === 0 ? (

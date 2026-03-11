@@ -27,6 +27,27 @@ import { CalendarProvider, getCalendarRange, type CalendarView, useCalendarConte
 import CalendarAgenda from './CalendarAgenda';
 import CalendarFull from './CalendarFull';
 
+function formatHeaderTitle(view: CalendarView, anchorDate: Date, days: number): string {
+  const range = getCalendarRange(view, anchorDate, days);
+  if (view === 'agenda') {
+    return `Next ${days} days`;
+  }
+  return range.label;
+}
+
+function formatHeaderSubtitle(view: CalendarView): string {
+  if (view === 'day') {
+    return 'Daily schedule';
+  }
+  if (view === 'week') {
+    return 'Weekly schedule';
+  }
+  if (view === 'month') {
+    return 'Monthly schedule';
+  }
+  return 'Upcoming schedule';
+}
+
 function SummaryCard({
   label,
   value,
@@ -84,8 +105,7 @@ function ViewButton({
 }
 
 function CalendarHeaderControls({ extraActions }: { extraActions?: ReactNode }) {
-  const { view, setView, anchorDate, days, goToToday, shiftRange } = useCalendarContext();
-  const range = getCalendarRange(view, anchorDate, days);
+  const { view, setView, goToToday, shiftRange } = useCalendarContext();
 
   return (
     <div className="flex flex-col gap-3">
@@ -117,9 +137,6 @@ function CalendarHeaderControls({ extraActions }: { extraActions?: ReactNode }) 
           <ViewButton value="month" label="Month" activeView={view} onSelect={setView} />
           <ViewButton value="week" label="Week" activeView={view} onSelect={setView} />
           <ViewButton value="day" label="Day" activeView={view} onSelect={setView} />
-        </div>
-        <div className="rounded-full bg-slate-900 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-white shadow-sm">
-          {range.label}
         </div>
       </div>
     </div>
@@ -153,19 +170,16 @@ function CalendarTabContent({
       : { start: range.start, end: range.end, scopeType, scopeId, testMode, limit: 500 },
   );
   const controls = <CalendarHeaderControls extraActions={headerActions} />;
+  const headerTitle = formatHeaderTitle(view, anchorDate, days);
+  const headerSubtitle = formatHeaderSubtitle(view);
 
   return (
     <div className="flex flex-col gap-4">
       <section className="rounded-[28px] border border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.94))] p-4 shadow-[0_18px_44px_rgba(15,23,42,0.06)]">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div className="space-y-1">
-            <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Calendar</div>
-            <div className="text-xl font-black tracking-[-0.03em] text-slate-950">
-              {agendaTitle || title}
-            </div>
-            <div className="text-sm text-slate-500">
-              {agendaDescription || 'Read-only schedule view across the selected scope.'}
-            </div>
+            <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">{headerSubtitle}</div>
+            <div className="text-2xl font-black tracking-[-0.04em] text-slate-950">{headerTitle}</div>
           </div>
           {controls}
         </div>

@@ -137,6 +137,7 @@ type CalendarContextValue = {
   setAnchorDate: (value: Date) => void;
   goToToday: () => void;
   shiftRange: (direction: -1 | 1) => void;
+  focusDate: (value: Date, nextView?: CalendarView) => void;
 };
 
 const CalendarContext = createContext<CalendarContextValue | null>(null);
@@ -175,6 +176,12 @@ export function CalendarProvider({
         }
         return addDays(current, direction * days);
       });
+    },
+    focusDate: (value: Date, nextView?: CalendarView) => {
+      setAnchorDate(value);
+      if (nextView) {
+        setView(nextView);
+      }
     },
   };
 

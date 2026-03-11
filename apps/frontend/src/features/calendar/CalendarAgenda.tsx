@@ -62,7 +62,7 @@ export function CalendarAgenda({
   showHeader?: boolean;
   headerActions?: ReactNode;
 }) {
-  const { days, setDays } = useCalendarContext();
+  const { days, setDays, focusDate } = useCalendarContext();
   const { data, isLoading, error } = useCalendarAgenda(days, scopeType, scopeId, testMode);
   const modals = useModals();
 
@@ -112,7 +112,13 @@ export function CalendarAgenda({
           >
             <div className="border-b border-slate-200/80 bg-[linear-gradient(90deg,rgba(248,250,252,0.95),rgba(255,255,255,0.9))] px-5 py-4">
               <div className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">Day slate</div>
-              <div className="mt-1 text-sm font-black tracking-[-0.02em] text-slate-950">{day.label}</div>
+              <button
+                type="button"
+                onClick={() => focusDate(new Date(`${day.date}T00:00:00Z`), 'day')}
+                className="mt-1 text-sm font-black tracking-[-0.02em] text-slate-950 hover:underline"
+              >
+                {day.label}
+              </button>
             </div>
             <div className="flex flex-col px-2 py-2">
               {day.events.map((event) => {
