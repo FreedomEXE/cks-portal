@@ -586,7 +586,7 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
     { id: 'dashboard', label: 'Dashboard', path: '/crew/dashboard' },
     { id: 'profile', label: 'My Profile', path: '/crew/profile' },
     { id: 'ecosystem', label: 'My Ecosystem', path: '/crew/ecosystem' },
-    { id: 'calendar', label: 'Schedule', path: '/crew/calendar' },
+    { id: 'calendar', label: 'Schedule', path: '/crew/schedule' },
     { id: 'services', label: 'Services', path: '/crew/services' },
     { id: 'orders', label: 'Orders', path: '/crew/orders' },
     { id: 'reports', label: 'Reports', path: '/crew/reports' },

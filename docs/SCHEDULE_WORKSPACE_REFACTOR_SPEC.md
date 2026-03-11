@@ -652,7 +652,12 @@ Examples:
 - `/schedule?scope=manager:MGR-001&view=month&date=2026-03-01`
 - `/schedule?scope=center:CEN-001&view=day&date=2026-03-10`
 - `/schedule?scope=center:CEN-001&view=day&date=2026-03-10&block=BLK-001`
-- `/schedule?scope=center:CEN-001&view=day&date=2026-03-10&block=BLK-001&task=TSK-004`
+- `/schedule?scope=center:CEN-001&view=day&date=2026-03-10&block=BLK-001&task=BLK-001-TSK-004`
+
+Implementation rule:
+
+- the user-facing route should settle on `/schedule`, not `/calendar`
+- legacy `calendar` tab/query references can be aliased during transition, but new deep links should use `schedule`
 
 ## 11.2 Important IDs
 
@@ -996,8 +1001,13 @@ Recommended task-instance example:
 
 Recommended TEST pattern:
 
-- `{testBlockId}-TSK-001`
-  - or equivalent pattern once aligned with the broader custom ID rules and TEST block ID conventions
+- `BLK-001-TEST`
+- `BLK-001-TEST-TSK-001`
+
+Required TEST rule:
+
+- test schedule blocks should use the same `-TEST` suffix convention used elsewhere in CKS IDs
+- test task instances should inherit the owning TEST block ID, not invent a separate standalone test task prefix
 
 This must be reviewed against the global CKS ID system before implementation, but the Schedule spec should reserve for it now.
 

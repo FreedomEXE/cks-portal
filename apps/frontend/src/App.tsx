@@ -39,7 +39,13 @@ function sanitizeTab(value: string | null): string | undefined {
     return undefined;
   }
   const trimmed = value.trim();
-  return trimmed ? trimmed : undefined;
+  if (!trimmed) {
+    return undefined;
+  }
+  if (trimmed.toLowerCase() === 'schedule') {
+    return 'calendar';
+  }
+  return trimmed;
 }
 
 function HubLoader({ initialTab }: { initialTab?: string }): JSX.Element | null {

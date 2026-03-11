@@ -202,7 +202,7 @@ function isTestId(value?: string | null): boolean {
 const HUB_TABS = [
   { id: 'dashboard', label: 'Dashboard', path: '/dashboard' },
   { id: 'ecosystems', label: 'Ecosystems', path: '/ecosystems' },
-  { id: 'calendar', label: 'Schedule', path: '/calendar' },
+  { id: 'calendar', label: 'Schedule', path: '/schedule' },
   { id: 'directory', label: 'Directory', path: '/directory' },
   { id: 'create', label: 'Create', path: '/create' },
   { id: 'assign', label: 'Assign', path: '/assign' },

@@ -948,7 +948,7 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
   const tabs = useMemo(() => [
     { id: 'dashboard', label: 'Dashboard', path: '/warehouse/dashboard' },
     { id: 'profile', label: 'My Profile', path: '/warehouse/profile' },
-    { id: 'calendar', label: 'Schedule', path: '/warehouse/calendar' },
+    { id: 'calendar', label: 'Schedule', path: '/warehouse/schedule' },
     { id: 'inventory', label: 'Inventory', path: '/warehouse/inventory' },
     { id: 'services', label: 'Services', path: '/warehouse/services' },
     { id: 'deliveries', label: 'Deliveries', path: '/warehouse/deliveries' },

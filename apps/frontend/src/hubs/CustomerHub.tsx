@@ -574,7 +574,7 @@ function CustomerHubContent({ initialTab = 'dashboard' }: CustomerHubProps) {
     { id: 'dashboard', label: 'Dashboard', path: '/customer/dashboard' },
     { id: 'profile', label: 'My Profile', path: '/customer/profile' },
     { id: 'ecosystem', label: 'My Ecosystem', path: '/customer/ecosystem' },
-    { id: 'calendar', label: 'Schedule', path: '/customer/calendar' },
+    { id: 'calendar', label: 'Schedule', path: '/customer/schedule' },
     { id: 'services', label: 'Services', path: '/customer/services' },
     { id: 'orders', label: 'Orders', path: '/customer/orders' },
     { id: 'reports', label: 'Reports', path: '/customer/reports' },

@@ -622,7 +622,7 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
     { id: 'dashboard', label: 'Dashboard', path: '/contractor/dashboard' },
     { id: 'profile', label: 'My Profile', path: '/contractor/profile' },
     { id: 'ecosystem', label: 'My Ecosystem', path: '/contractor/ecosystem' },
-    { id: 'calendar', label: 'Schedule', path: '/contractor/calendar' },
+    { id: 'calendar', label: 'Schedule', path: '/contractor/schedule' },
     { id: 'services', label: 'Services', path: '/contractor/services' },
     { id: 'orders', label: 'Orders', path: '/contractor/orders' },
     { id: 'reports', label: 'Reports', path: '/contractor/reports' },

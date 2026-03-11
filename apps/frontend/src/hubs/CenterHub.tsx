@@ -570,7 +570,7 @@ function CenterHubContent({ initialTab = 'dashboard' }: CenterHubProps) {
     { id: 'dashboard', label: 'Dashboard', path: '/center/dashboard' },
     { id: 'profile', label: 'My Profile', path: '/center/profile' },
     { id: 'ecosystem', label: 'My Ecosystem', path: '/center/ecosystem' },
-    { id: 'calendar', label: 'Schedule', path: '/center/calendar' },
+    { id: 'calendar', label: 'Schedule', path: '/center/schedule' },
     { id: 'services', label: 'Services', path: '/center/services' },
     { id: 'orders', label: 'Orders', path: '/center/orders' },
     { id: 'reports', label: 'Reports', path: '/center/reports' },

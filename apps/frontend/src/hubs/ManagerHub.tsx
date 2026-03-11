@@ -145,7 +145,7 @@ const HUB_TABS = [
   { id: 'dashboard', label: 'Dashboard', path: '/manager/dashboard' },
   { id: 'profile', label: 'My Profile', path: '/manager/profile' },
   { id: 'ecosystem', label: 'My Ecosystem', path: '/manager/ecosystem' },
-  { id: 'calendar', label: 'Schedule', path: '/manager/calendar' },
+  { id: 'calendar', label: 'Schedule', path: '/manager/schedule' },
   { id: 'services', label: 'My Services', path: '/manager/services' },
   // Removed per request: Procedures & Training
   { id: 'orders', label: 'Orders', path: '/manager/orders' },

@@ -161,6 +161,10 @@ Orders represent the temporary state when services or products are requested but
   - `BLK-001`
   - `BLK-024`
   - `BLK-1500`
+- **TEST Format:** `BLK-XXXX+-TEST`
+- **TEST Examples:**
+  - `BLK-001-TEST`
+  - `BLK-024-TEST`
 - **Purpose:** First-class operational schedule blocks authored in the Schedule workspace
 - **Ownership:** Schedule planning layer, not the upstream demand layer
 - **Projection Rule:** Blocks project into `calendar_events` using `generator_key = 'block:{blockId}'`
@@ -174,6 +178,10 @@ Orders represent the temporary state when services or products are requested but
   - `BLK-001-TSK-001`
   - `BLK-001-TSK-002`
   - `BLK-157-TSK-014`
+- **TEST Format:** `{TestBlockID}-TSK-XXXX+`
+- **TEST Examples:**
+  - `BLK-001-TEST-TSK-001`
+  - `BLK-024-TEST-TSK-007`
 - **Purpose:** Atomic crew-facing task instances tied to a specific scheduled block or service occurrence
 - **Ownership:** Schedule execution layer
 - **Scope Rule:** Tasks are block-scoped, not center-scoped
@@ -219,8 +227,8 @@ const ID_PATTERNS = {
   product: /^PRD-\d{3,}$/,            // PRD-001, PRD-1234, etc.
   training: /^TRN-\d{3,}$/,           // TRN-001, TRN-1234, etc.
   procedure: /^PRO-\d{3,}$/,          // PRO-001, PRO-1234, etc.
-  scheduleBlock: /^BLK-\d{3,}$/,      // BLK-001, BLK-1234, etc.
-  scheduleTask: /^BLK-\d{3,}-TSK-\d{3,}$/, // BLK-001-TSK-001
+  scheduleBlock: /^BLK-\d{3,}(?:-TEST)?$/,      // BLK-001, BLK-001-TEST
+  scheduleTask: /^BLK-\d{3,}(?:-TEST)?-TSK-\d{3,}$/, // BLK-001-TSK-001, BLK-001-TEST-TSK-001
   centerService: /^CEN\d{3,}-SRV\d{3,}$/,      // CEN001-SRV001, CEN1234-SRV5678
   centerProduct: /^CEN\d{3,}-PRD\d{3,}$/,      // CEN001-PRD001, CEN1234-PRD5678
   serviceOrder: /^CEN\d{3,}-ORD-SRV\d{3,}$/,   // CEN001-ORD-SRV001, CEN025-ORD-SRV005
@@ -247,11 +255,11 @@ function deriveRole(cksId: string): string {
     return 'unknown';
   }
 
-  if (/^BLK-\d{3,}-TSK-\d{3,}$/i.test(cksId)) {
+  if (/^BLK-\d{3,}(?:-TEST)?-TSK-\d{3,}$/i.test(cksId)) {
     return 'schedule-task';
   }
 
-  if (/^BLK-\d{3,}$/i.test(cksId)) {
+  if (/^BLK-\d{3,}(?:-TEST)?$/i.test(cksId)) {
     return 'schedule-block';
   }
 
