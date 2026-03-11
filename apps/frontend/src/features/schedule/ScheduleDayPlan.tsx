@@ -24,12 +24,14 @@ import { useSWRConfig } from 'swr';
 import { useAuth as useClerkAuth } from '@clerk/clerk-react';
 import type { HubRole } from '../../shared/api/hub';
 import {
+  fetchScheduleBuildingWeeklyExport,
   fetchScheduleCrewDailyExport,
   saveScheduleBlock,
   useScheduleDayPlan,
   type ScheduleBlockDetail,
 } from '../../shared/api/schedule';
-import { useCalendarContext } from '../calendar/CalendarProvider';
+import { getCalendarRange, useCalendarContext } from '../calendar/CalendarProvider';
+import { buildBuildingWeeklyPrintDocument } from './buildingWeeklyPrint';
 import { buildCrewDailyPrintDocument } from './crewDailyPrint';
 
 interface ScheduleTreeNode { user: { id: string; role: string; name: string }; type?: string; children?: ScheduleTreeNode[]; }
@@ -214,6 +216,7 @@ export default function ScheduleDayPlan({ viewerRole, scopeType, scopeId, scopeI
   const [editorBlockId, setEditorBlockId] = useState<string | null>(null);
   const [isEditorDirty, setIsEditorDirty] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [exportingBuildingKey, setExportingBuildingKey] = useState<string | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
 
   const allBlocks = useMemo(
@@ -264,12 +267,16 @@ export default function ScheduleDayPlan({ viewerRole, scopeType, scopeId, scopeI
     setIsExporting(true);
     setExportError(null);
     try {
-      const data = await fetchScheduleCrewDailyExport({
+      const exported = await fetchScheduleCrewDailyExport({
         date,
         crewId: scopeId,
         testMode,
         getToken,
       });
+      const data = {
+        ...exported,
+        crewName: labelById.get(scopeId) ?? exported.crewName,
+      };
       const printWindow = window.open('', '_blank');
       if (!printWindow) {
         throw new Error('Unable to open print window. Check your popup settings and try again.');
@@ -282,6 +289,39 @@ export default function ScheduleDayPlan({ viewerRole, scopeType, scopeId, scopeI
       setExportError(failure instanceof Error ? failure.message : 'Failed to export crew schedule.');
     } finally {
       setIsExporting(false);
+    }
+  }
+
+  async function handleExportBuildingWeek(building: { buildingName: string; areaName: string | null; buildingKey: string }) {
+    setExportingBuildingKey(building.buildingKey);
+    setExportError(null);
+    try {
+      const weekStart = getCalendarRange('week', anchorDate, 7).start.slice(0, 10);
+      const exported = await fetchScheduleBuildingWeeklyExport({
+        weekStart,
+        buildingName: building.buildingName,
+        areaName: building.areaName ?? undefined,
+        scopeType,
+        scopeId,
+        scopeIds,
+        testMode,
+        getToken,
+      });
+      const participantLabels = Object.fromEntries(labelById.entries());
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) {
+        throw new Error('Unable to open print window. Check your popup settings and try again.');
+      }
+      printWindow.document.open();
+      printWindow.document.write(
+        buildBuildingWeeklyPrintDocument(exported, { participantLabels }),
+      );
+      printWindow.document.close();
+      printWindow.focus();
+    } catch (failure) {
+      setExportError(failure instanceof Error ? failure.message : 'Failed to export building schedule.');
+    } finally {
+      setExportingBuildingKey(null);
     }
   }
 
@@ -559,7 +599,21 @@ export default function ScheduleDayPlan({ viewerRole, scopeType, scopeId, scopeI
         <div className="flex flex-col gap-4">
           {(data?.buildings ?? []).map((building) => (
             <section key={building.buildingKey} className="rounded-[30px] border border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.92))] p-4 shadow-[0_18px_48px_rgba(15,23,42,0.08)]">
-              <div className="border-b border-slate-200 pb-3"><div className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">Building</div><div className="mt-1 text-xl font-black tracking-[-0.03em] text-slate-950">{building.buildingName}</div>{building.areaName ? <div className="mt-1 text-sm text-slate-500">{building.areaName}</div> : null}</div>
+              <div className="flex flex-col gap-3 border-b border-slate-200 pb-3 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <div className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">Building</div>
+                  <div className="mt-1 text-xl font-black tracking-[-0.03em] text-slate-950">{building.buildingName}</div>
+                  {building.areaName ? <div className="mt-1 text-sm text-slate-500">{building.areaName}</div> : null}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleExportBuildingWeek(building)}
+                  disabled={exportingBuildingKey === building.buildingKey}
+                  className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-900 shadow-[0_10px_24px_rgba(15,23,42,0.08)] transition hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {exportingBuildingKey === building.buildingKey ? 'Preparing week...' : 'Export building week'}
+                </button>
+              </div>
               <div className="mt-4 grid gap-3 xl:grid-cols-2">
                 {building.lanes.map((lane) => <div key={lane.laneId} className="rounded-[24px] border border-slate-200 bg-white/95 p-4 shadow-[0_12px_32px_rgba(15,23,42,0.05)]"><div className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">{lane.participantRole ?? 'Lane'}</div><div className="mt-1 text-sm font-black tracking-[-0.02em] text-slate-950">{lane.participantId ? labelById.get(lane.participantId) ?? lane.participantId : 'Unassigned'}</div><div className="mt-3 flex flex-col gap-2">{lane.blocks.map((block) => <BlockCard key={block.blockId} block={block} label={lane.participantId ? labelById.get(lane.participantId) ?? lane.participantId : 'Unassigned'} onOpen={(next) => updateZoomParams({ blockId: next.blockId, taskId: null })} />)}</div></div>)}
                 {building.unassignedBlocks.length > 0 ? <div className="rounded-[24px] border border-dashed border-slate-300 bg-slate-50/80 p-4"><div className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Unassigned</div><div className="mt-3 flex flex-col gap-2">{building.unassignedBlocks.map((block) => <BlockCard key={block.blockId} block={block} label="Unassigned" onOpen={(next) => updateZoomParams({ blockId: next.blockId, taskId: null })} />)}</div></div> : null}

@@ -172,6 +172,68 @@ export interface ScheduleCrewDailyExportResponse {
   blocks: ScheduleCrewDailyExportBlock[];
 }
 
+export interface ScheduleBuildingWeeklyExportTask {
+  taskId: string;
+  sequence: number;
+  title: string;
+  description: string | null;
+  areaName: string | null;
+  estimatedMinutes: number | null;
+  status: 'pending' | 'in_progress' | 'completed' | 'cancelled' | 'skipped';
+  taskType: string;
+  categoryLabel: string;
+}
+
+export interface ScheduleBuildingWeeklyExportBlock {
+  blockId: string;
+  blockType: string;
+  title: string;
+  description: string | null;
+  status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
+  priority: 'low' | 'normal' | 'high' | 'urgent';
+  startAt: string;
+  endAt: string | null;
+  timezone: string;
+  centerId: string | null;
+  sourceType: string | null;
+  sourceId: string | null;
+  tasks: ScheduleBuildingWeeklyExportTask[];
+}
+
+export interface ScheduleBuildingWeeklyExportLane {
+  laneId: string;
+  participantId: string | null;
+  participantRole: string | null;
+  blocks: ScheduleBuildingWeeklyExportBlock[];
+}
+
+export interface ScheduleBuildingWeeklyExportDay {
+  date: string;
+  weekdayLabel: string;
+  blockCount: number;
+  taskCount: number;
+  lanes: ScheduleBuildingWeeklyExportLane[];
+  unassignedBlocks: ScheduleBuildingWeeklyExportBlock[];
+}
+
+export interface ScheduleBuildingWeeklyExportResponse {
+  weekStart: string;
+  weekEnd: string;
+  buildingName: string;
+  areaName: string | null;
+  scopeType?: string;
+  scopeId?: string;
+  generatedAt: string;
+  summary: {
+    dayCount: number;
+    blockCount: number;
+    taskCount: number;
+    assignedBlockCount: number;
+    unassignedBlockCount: number;
+  };
+  days: ScheduleBuildingWeeklyExportDay[];
+}
+
 export interface SaveScheduleBlockInput {
   blockId?: string;
   expectedVersion?: number | null;
@@ -284,6 +346,31 @@ export async function fetchScheduleCrewDailyExport(input: {
     `/schedule/export/crew-daily${buildQuery({
       date: input.date,
       crewId: input.crewId,
+      testMode: input.testMode,
+    })}`,
+    { getToken: input.getToken },
+  );
+  return response.data;
+}
+
+export async function fetchScheduleBuildingWeeklyExport(input: {
+  weekStart: string;
+  buildingName: string;
+  areaName?: string;
+  scopeType?: string;
+  scopeId?: string;
+  scopeIds?: string[];
+  testMode?: 'include' | 'exclude' | 'only';
+  getToken?: () => Promise<string | null>;
+}) {
+  const response = await apiFetch<ApiResponse<ScheduleBuildingWeeklyExportResponse>>(
+    `/schedule/export/building-weekly${buildQuery({
+      weekStart: input.weekStart,
+      buildingName: input.buildingName,
+      areaName: input.areaName,
+      scopeType: input.scopeType,
+      scopeId: input.scopeId,
+      scopeIds: input.scopeIds,
       testMode: input.testMode,
     })}`,
     { getToken: input.getToken },

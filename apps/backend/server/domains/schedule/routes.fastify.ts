@@ -23,6 +23,7 @@ import { requireActiveRole } from '../../core/auth/guards.js';
 import type { HubRole } from '../profile/types.js';
 import {
   cancelBlocksForSource,
+  fetchBuildingWeeklyExport,
   fetchScheduleBlockById,
   fetchScheduleBlocks,
   fetchCrewDailyExport,
@@ -33,6 +34,7 @@ import {
 import {
   scheduleBlockBodySchema,
   scheduleBlockParamsSchema,
+  scheduleBuildingWeeklyExportQuerySchema,
   scheduleCrewDailyExportQuerySchema,
   scheduleDayPlanQuerySchema,
   scheduleReadQuerySchema,
@@ -133,6 +135,36 @@ export async function registerScheduleRoutes(server: FastifyInstance) {
 
     if (!data) {
       reply.code(404).send({ error: 'Crew daily export not found' });
+      return;
+    }
+
+    reply.send({ data });
+  });
+
+  server.get('/api/schedule/export/building-weekly', async (request, reply) => {
+    const account = await requireActiveRole(request, reply, {});
+    if (!account) return;
+
+    const viewerRole = normalizeRole(account.role ?? null);
+    if (!viewerRole) {
+      reply.code(403).send({ error: 'Unsupported role for schedule access' });
+      return;
+    }
+
+    const parsed = scheduleBuildingWeeklyExportQuerySchema.safeParse(request.query);
+    if (!parsed.success) {
+      reply.code(400).send({ error: 'Invalid building export query', details: parsed.error.flatten() });
+      return;
+    }
+
+    const data = await fetchBuildingWeeklyExport({
+      viewerRole,
+      viewerCode: account.cksCode ?? null,
+      query: parsed.data,
+    });
+
+    if (!data) {
+      reply.code(404).send({ error: 'Building weekly export not found' });
       return;
     }
 

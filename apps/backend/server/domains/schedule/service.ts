@@ -38,6 +38,11 @@ import type {
   ListScheduleBlocksQuery,
   ScheduleBlockDetail,
   ScheduleBlockRecord,
+  ScheduleBuildingWeeklyExportBlock,
+  ScheduleBuildingWeeklyExportDay,
+  ScheduleBuildingWeeklyExportLane,
+  ScheduleBuildingWeeklyExportResponse,
+  ScheduleBuildingWeeklyExportTask,
   ScheduleCrewDailyExportBlock,
   ScheduleCrewDailyExportResponse,
   ScheduleCrewDailyExportTask,
@@ -77,6 +82,13 @@ function normalizeIds(values: string[] | undefined): string[] {
         .filter((value): value is string => Boolean(value)),
     ),
   );
+}
+
+function normalizeTextKey(value?: string | null): string {
+  return String(value ?? '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toUpperCase();
 }
 
 function collectScopeIds(value: unknown, ids: Set<string>, parentKey?: string): void {
@@ -216,6 +228,41 @@ function primaryLaneForBlock(block: ScheduleBlockDetail): { participantId: strin
     participantId: preferred.participantId,
     participantRole: preferred.participantRole,
     laneId: `${preferred.participantRole}:${preferred.participantId}`,
+  };
+}
+
+function mapBuildingWeeklyTasks(block: ScheduleBlockDetail): ScheduleBuildingWeeklyExportTask[] {
+  return block.tasks
+    .slice()
+    .sort((left, right) => left.sequence - right.sequence || left.taskId.localeCompare(right.taskId))
+    .map((task) => ({
+      taskId: task.taskId,
+      sequence: task.sequence,
+      title: task.title,
+      description: task.description,
+      areaName: task.areaName,
+      estimatedMinutes: task.estimatedMinutes,
+      status: task.status,
+      taskType: task.taskType,
+      categoryLabel: formatCategoryLabel(task.catalogItemType || task.taskType || 'General'),
+    }));
+}
+
+function mapBuildingWeeklyBlock(block: ScheduleBlockDetail): ScheduleBuildingWeeklyExportBlock {
+  return {
+    blockId: block.blockId,
+    blockType: block.blockType,
+    title: block.title,
+    description: block.description,
+    status: block.status,
+    priority: block.priority,
+    startAt: block.startAt,
+    endAt: block.endAt,
+    timezone: block.timezone,
+    centerId: block.centerId,
+    sourceType: block.sourceType,
+    sourceId: block.sourceId,
+    tasks: mapBuildingWeeklyTasks(block),
   };
 }
 
@@ -540,6 +587,145 @@ export async function fetchCrewDailyExport(input: {
         scheduledMinutes,
       },
       blocks: exportBlocks,
+    };
+  } catch (error) {
+    if (isScheduleInfraUnavailable(error)) {
+      return null;
+    }
+    throw error;
+  }
+}
+
+export async function fetchBuildingWeeklyExport(input: {
+  viewerRole: HubRole;
+  viewerCode: string | null;
+  query: {
+    weekStart: string;
+    buildingName: string;
+    areaName?: string;
+    scopeType?: ScheduleReadQuery['scopeType'];
+    scopeId?: string;
+    scopeIds?: string[];
+    testMode?: ScheduleReadQuery['testMode'];
+  };
+}): Promise<ScheduleBuildingWeeklyExportResponse | null> {
+  try {
+    const weekStartDate = new Date(`${input.query.weekStart}T00:00:00.000Z`);
+    if (Number.isNaN(weekStartDate.getTime())) {
+      return null;
+    }
+    const weekEndDate = new Date(weekStartDate.getTime());
+    weekEndDate.setUTCDate(weekEndDate.getUTCDate() + 7);
+    const weekEnd = weekEndDate.toISOString().slice(0, 10);
+
+    const blocks = await fetchScheduleBlocks({
+      viewerRole: input.viewerRole,
+      viewerCode: input.viewerCode,
+      query: {
+        start: weekStartDate.toISOString(),
+        end: weekEndDate.toISOString(),
+        scopeType: input.query.scopeType,
+        scopeId: input.query.scopeId,
+        scopeIds: input.query.scopeIds,
+        testMode: input.query.testMode,
+        limit: 500,
+      },
+    });
+
+    const buildingNameKey = normalizeTextKey(input.query.buildingName);
+    const areaNameKey = normalizeTextKey(input.query.areaName ?? null);
+    const filteredBlocks = blocks.filter((block) => {
+      if (normalizeTextKey(block.buildingName) !== buildingNameKey) {
+        return false;
+      }
+      if (areaNameKey && normalizeTextKey(block.areaName) !== areaNameKey) {
+        return false;
+      }
+      return true;
+    });
+
+    const dayBuckets = new Map<string, ScheduleBuildingWeeklyExportDay>();
+    let assignedBlockCount = 0;
+    let unassignedBlockCount = 0;
+    let totalTaskCount = 0;
+
+    for (let index = 0; index < 7; index += 1) {
+      const currentDate = new Date(weekStartDate.getTime());
+      currentDate.setUTCDate(currentDate.getUTCDate() + index);
+      const date = currentDate.toISOString().slice(0, 10);
+      dayBuckets.set(date, {
+        date,
+        weekdayLabel: currentDate.toLocaleDateString('en-CA', {
+          weekday: 'long',
+          month: 'short',
+          day: 'numeric',
+          timeZone: 'UTC',
+        }),
+        blockCount: 0,
+        taskCount: 0,
+        lanes: [],
+        unassignedBlocks: [],
+      });
+    }
+
+    for (const block of filteredBlocks.sort((left, right) => left.startAt.localeCompare(right.startAt) || left.blockId.localeCompare(right.blockId))) {
+      const dateKey = block.startAt.slice(0, 10);
+      const day = dayBuckets.get(dateKey);
+      if (!day) {
+        continue;
+      }
+      const exportBlock = mapBuildingWeeklyBlock(block);
+      const laneMeta = primaryLaneForBlock(block);
+      day.blockCount += 1;
+      day.taskCount += exportBlock.tasks.length;
+      totalTaskCount += exportBlock.tasks.length;
+
+      if (!laneMeta.participantId || !laneMeta.participantRole) {
+        day.unassignedBlocks.push(exportBlock);
+        unassignedBlockCount += 1;
+        continue;
+      }
+
+      let lane = day.lanes.find((entry) => entry.laneId === laneMeta.laneId);
+      if (!lane) {
+        lane = {
+          laneId: laneMeta.laneId,
+          participantId: laneMeta.participantId,
+          participantRole: laneMeta.participantRole,
+          blocks: [],
+        } satisfies ScheduleBuildingWeeklyExportLane;
+        day.lanes.push(lane);
+      }
+      lane.blocks.push(exportBlock);
+      assignedBlockCount += 1;
+    }
+
+    const days = Array.from(dayBuckets.values()).map((day) => ({
+      ...day,
+      lanes: [...day.lanes].sort((left, right) => {
+        const leftLabel = `${left.participantRole ?? ''}:${left.participantId ?? ''}`;
+        const rightLabel = `${right.participantRole ?? ''}:${right.participantId ?? ''}`;
+        return leftLabel.localeCompare(rightLabel);
+      }),
+      unassignedBlocks: [...day.unassignedBlocks],
+    }));
+
+    return {
+      weekStart: input.query.weekStart,
+      weekEnd,
+      buildingName: input.query.buildingName.trim(),
+      areaName: input.query.areaName?.trim() || null,
+      scopeType: input.query.scopeType,
+      scopeId: input.query.scopeId,
+      generatedAt: new Date().toISOString(),
+      summary: {
+        dayCount: days.length,
+        blockCount: filteredBlocks.length,
+        taskCount: totalTaskCount,
+        assignedBlockCount,
+        unassignedBlockCount,
+      },
+      days,
     };
   } catch (error) {
     if (isScheduleInfraUnavailable(error)) {

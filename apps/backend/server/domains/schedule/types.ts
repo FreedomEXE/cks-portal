@@ -294,3 +294,65 @@ export interface ScheduleCrewDailyExportResponse {
   };
   blocks: ScheduleCrewDailyExportBlock[];
 }
+
+export interface ScheduleBuildingWeeklyExportTask {
+  taskId: string;
+  sequence: number;
+  title: string;
+  description: string | null;
+  areaName: string | null;
+  estimatedMinutes: number | null;
+  status: ScheduleTaskStatus;
+  taskType: string;
+  categoryLabel: string;
+}
+
+export interface ScheduleBuildingWeeklyExportBlock {
+  blockId: string;
+  blockType: string;
+  title: string;
+  description: string | null;
+  status: ScheduleBlockStatus;
+  priority: SchedulePriority;
+  startAt: string;
+  endAt: string | null;
+  timezone: string;
+  centerId: string | null;
+  sourceType: string | null;
+  sourceId: string | null;
+  tasks: ScheduleBuildingWeeklyExportTask[];
+}
+
+export interface ScheduleBuildingWeeklyExportLane {
+  laneId: string;
+  participantId: string | null;
+  participantRole: string | null;
+  blocks: ScheduleBuildingWeeklyExportBlock[];
+}
+
+export interface ScheduleBuildingWeeklyExportDay {
+  date: string;
+  weekdayLabel: string;
+  blockCount: number;
+  taskCount: number;
+  lanes: ScheduleBuildingWeeklyExportLane[];
+  unassignedBlocks: ScheduleBuildingWeeklyExportBlock[];
+}
+
+export interface ScheduleBuildingWeeklyExportResponse {
+  weekStart: string;
+  weekEnd: string;
+  buildingName: string;
+  areaName: string | null;
+  scopeType?: ScheduleScopeType;
+  scopeId?: string;
+  generatedAt: string;
+  summary: {
+    dayCount: number;
+    blockCount: number;
+    taskCount: number;
+    assignedBlockCount: number;
+    unassignedBlockCount: number;
+  };
+  days: ScheduleBuildingWeeklyExportDay[];
+}
