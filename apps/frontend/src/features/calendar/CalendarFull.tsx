@@ -154,12 +154,9 @@ function CalendarEventPill({ event, compact = false }: { event: CalendarEventIte
 
 function EmptyRangeNotice({ message }: { message: string }) {
   return (
-    <div className="rounded-[28px] border border-dashed border-slate-300/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.92))] px-6 py-8 text-center shadow-[0_18px_48px_rgba(15,23,42,0.06)]">
-      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-900 text-[10px] font-black uppercase tracking-[0.14em] text-white">
-        0
-      </div>
-      <div className="mt-4 text-sm font-semibold text-slate-900">No events in this range</div>
-      <div className="mt-1 text-sm text-slate-500">{message}</div>
+    <div className="rounded-[24px] border border-dashed border-slate-300 bg-white/90 px-5 py-5 text-sm text-slate-500 shadow-[0_12px_30px_rgba(15,23,42,0.04)]">
+      <div className="font-semibold text-slate-900">No events in this view</div>
+      <div className="mt-1">{message}</div>
     </div>
   );
 }
@@ -358,6 +355,7 @@ export function CalendarFull({
   testMode,
   title = 'Calendar',
   description = 'Read-only projection of scheduled activity across the platform.',
+  showHeader = true,
   headerActions,
 }: {
   scopeType?: string;
@@ -365,6 +363,7 @@ export function CalendarFull({
   testMode?: 'include' | 'exclude' | 'only';
   title?: string;
   description?: string;
+  showHeader?: boolean;
   headerActions?: ReactNode;
 }) {
   const { view, anchorDate, days } = useCalendarContext();
@@ -384,15 +383,17 @@ export function CalendarFull({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <div className="text-lg font-black tracking-[-0.03em] text-slate-950">{title}</div>
-          <div className="text-sm text-slate-500">{description}</div>
+      {showHeader ? (
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="text-lg font-black tracking-[-0.03em] text-slate-950">{title}</div>
+            <div className="text-sm text-slate-500">{description}</div>
+          </div>
+          <div className="flex flex-col gap-2 sm:items-end">
+            {headerActions}
+          </div>
         </div>
-        <div className="flex flex-col gap-2 sm:items-end">
-          {headerActions}
-        </div>
-      </div>
+      ) : null}
 
       {isLoading ? (
         <div className="rounded-[28px] border border-slate-200/80 bg-white px-6 py-6 text-sm text-slate-500 shadow-[0_18px_48px_rgba(15,23,42,0.08)]">
