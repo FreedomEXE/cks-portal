@@ -56,6 +56,8 @@ const API_BASE = RAW_API_BASE.replace(/\/+$/, '');
 const DEV_AUTH_ENABLED = ((import.meta as any).env?.VITE_CKS_ENABLE_DEV_AUTH ?? 'false') === 'true';
 const MAX_BOOTSTRAP_RETRIES = Number(import.meta.env.VITE_BOOTSTRAP_MAX_RETRIES ?? 8);
 const BOOTSTRAP_RETRY_BASE_MS = Number(import.meta.env.VITE_BOOTSTRAP_RETRY_BASE_MS ?? 250);
+const TOKEN_RETRY_ATTEMPTS = Number(import.meta.env.VITE_BOOTSTRAP_TOKEN_RETRY_ATTEMPTS ?? 4);
+const TOKEN_RETRY_BASE_MS = Number(import.meta.env.VITE_BOOTSTRAP_TOKEN_RETRY_BASE_MS ?? 150);
 const SESSION_KEYS = ['role', 'code', 'cks_login_draft', 'cks_impersonation_active', 'cks_impersonation_ticket', 'cks_impersonation_return', 'cks_impersonation_attempt', 'cks_dev_role', 'cks_dev_code'];
 const LOCAL_PRESERVE_KEYS = new Set(['userLoggedOut']);
 
@@ -157,6 +159,32 @@ function isAbortError(error: unknown): boolean {
   return name === 'AbortError';
 }
 
+async function delay(ms: number): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function resolveBootstrapToken(
+  getToken: () => Promise<string | null>,
+  attempts = TOKEN_RETRY_ATTEMPTS,
+): Promise<string | null> {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      const token = await getToken().catch(() => null);
+      if (token && token.trim()) {
+        return token;
+      }
+    } catch {
+      // ignore and retry
+    }
+
+    if (attempt < attempts - 1) {
+      await delay((attempt + 1) * TOKEN_RETRY_BASE_MS);
+    }
+  }
+
+  return null;
+}
+
 function readDevOverride(): { role: string; code: string | null } | null {
   if (!DEV_AUTH_ENABLED || typeof window === 'undefined') {
     return null;
@@ -245,7 +273,7 @@ export function useAuth(): AuthState {
           headers.set('x-cks-dev-code', devOverride.code.toUpperCase());
         }
       } else {
-        const token = await getToken().catch(() => null);
+        const token = await resolveBootstrapToken(getToken);
         if (token) {
           headers.set('Authorization', `Bearer ${token}`);
         }
@@ -272,6 +300,19 @@ export function useAuth(): AuthState {
 
       if (!response.ok) {
         if (response.status === 401) {
+          const hadAuthHeader = headers.has('Authorization');
+          if (!hadAuthHeader && isSignedIn) {
+            if (bootstrapRetriesRef.current < MAX_BOOTSTRAP_RETRIES) {
+              const delay = Math.min(5000, BOOTSTRAP_RETRY_BASE_MS * 2 ** bootstrapRetriesRef.current);
+              bootstrapRetriesRef.current += 1;
+              setTimeout(() => {
+                void refresh();
+              }, delay);
+              setState((current) => ({ ...current, status: 'loading', error: null }));
+              return;
+            }
+          }
+
           console.log('[useAuth] 401 Unauthorized - invalid session');
           clearAuthStorage();
           lastResolvedRef.current = null;
