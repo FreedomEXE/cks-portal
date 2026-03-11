@@ -10,7 +10,7 @@ vi.mock('@cks/auth', () => ({
 }));
 
 vi.mock('../hubs/AdminHub', () => ({
-  default: () => <div>admin hub view</div>,
+  default: ({ initialTab }: { initialTab?: string }) => <div>admin hub view:{initialTab ?? 'none'}</div>,
 }));
 
 vi.mock('../hubs/ContractorHub', () => ({
@@ -48,6 +48,16 @@ describe('App routing', () => {
     );
 
     expect(html).toContain('admin hub view');
+  });
+
+  it('aliases tab=schedule to the internal calendar tab key', () => {
+    const html = renderToString(
+      <ProvidersWrapper route="/hub?tab=schedule" currentUserId="TEST-ADMIN" role="admin">
+        <AuthenticatedApp />
+      </ProvidersWrapper>
+    );
+
+    expect(html).toContain('admin hub view:<!-- -->calendar');
   });
 
   it('shows contractor stub when role is contractor', () => {

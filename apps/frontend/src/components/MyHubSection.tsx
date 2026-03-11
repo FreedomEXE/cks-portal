@@ -1,5 +1,5 @@
 import { useCallback, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@cks/auth';
 import { useUser } from '@clerk/clerk-react';
 import { MyHubSection as BaseMyHubSection, type MyHubSectionProps } from '@cks/ui';
@@ -13,12 +13,14 @@ export default function MyHubSection({
   role: providedRole,
   onLogout: providedOnLogout,
   onTabClick,
+  activeTab,
   ...rest
 }: Props) {
   const logout = useLogout();
   const { code, firstName, ownerFirstName, role } = useAuth();
   const { user } = useUser();
   const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const onLogout = providedOnLogout ?? logout;
   const welcomeName = providedWelcomeName ?? ownerFirstName ?? firstName ?? undefined;
   const userId = code ?? providedUserId ?? user?.username ?? undefined;
@@ -31,6 +33,19 @@ export default function MyHubSection({
       onTabClick(tabFromState);
     }
   }, [location.state, onTabClick]);
+
+  useEffect(() => {
+    if (!activeTab) {
+      return;
+    }
+    const queryTab = activeTab === 'calendar' ? 'schedule' : activeTab;
+    if (searchParams.get('tab') === queryTab) {
+      return;
+    }
+    const next = new URLSearchParams(searchParams);
+    next.set('tab', queryTab);
+    setSearchParams(next, { replace: true });
+  }, [activeTab, searchParams, setSearchParams]);
 
   useEffect(() => {
     try {

@@ -12,7 +12,7 @@
   Manifested by Freedom_EXE
 -----------------------------------------------*/
 
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useNewsFeed } from '../shared/api/news';
 import {
   AdminSupportSection,
@@ -254,11 +254,24 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
   return <AdminHubContent initialTab={initialTab} />;
 }
 
+function parseAdminScheduleScope(searchParams: URLSearchParams): string | null {
+  const scopeValue = searchParams.get('scope');
+  if (!scopeValue) {
+    return null;
+  }
+  const [scopeType, scopeId] = scopeValue.split(':', 2);
+  if (scopeType !== 'manager' || !scopeId) {
+    return null;
+  }
+  return normalizeId(scopeId);
+}
+
 // Inner component that has access to modal context
 function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
   const { code, firstName, fullName } = useAuth();
   const { setHubLoading } = useHubLoading();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   // Local tab state (no URL changes)
   const [activeTab, setActiveTab] = useState(initialTab);
@@ -276,7 +289,9 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
   const [reportsSubTab, setReportsSubTab] = useState('reports');
   const [showTestEcosystems, setShowTestEcosystems] = useState(false);
   const [selectedEcosystemId, setSelectedEcosystemId] = useState<string | null>(null);
-  const [selectedCalendarEcosystemId, setSelectedCalendarEcosystemId] = useState<string | null>(null);
+  const [selectedCalendarEcosystemId, setSelectedCalendarEcosystemId] = useState<string | null>(() =>
+    parseAdminScheduleScope(searchParams),
+  );
   const [ecosystemSubTab, setEcosystemSubTab] = useState<'tree' | 'catalog'>('tree');
 
   const [showActionModal, setShowActionModal] = useState(false);
@@ -1141,6 +1156,41 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
       setSelectedCalendarEcosystemId(null);
     }
   }, [ecosystemRows, selectedCalendarEcosystemId]);
+
+  useEffect(() => {
+    if (activeTab !== 'calendar') {
+      return;
+    }
+    const urlScope = parseAdminScheduleScope(searchParams);
+    if (urlScope && isTestId(urlScope) && !showTestEcosystems) {
+      setShowTestEcosystems(true);
+    }
+  }, [activeTab, searchParams, showTestEcosystems]);
+
+  useEffect(() => {
+    if (activeTab !== 'calendar') {
+      return;
+    }
+    const urlScope = parseAdminScheduleScope(searchParams);
+    if (urlScope !== selectedCalendarEcosystemId) {
+      setSelectedCalendarEcosystemId(urlScope);
+    }
+  }, [activeTab, searchParams, selectedCalendarEcosystemId]);
+
+  useEffect(() => {
+    if (activeTab !== 'calendar') {
+      return;
+    }
+    const next = new URLSearchParams(searchParams);
+    if (selectedCalendarEcosystemId) {
+      next.set('scope', `manager:${selectedCalendarEcosystemId}`);
+    } else {
+      next.delete('scope');
+    }
+    if (next.toString() !== searchParams.toString()) {
+      setSearchParams(next, { replace: true });
+    }
+  }, [activeTab, searchParams, selectedCalendarEcosystemId, setSearchParams]);
 
   const selectedManager = useMemo(() => {
     const target = normalizeId(selectedEcosystemId ?? '');

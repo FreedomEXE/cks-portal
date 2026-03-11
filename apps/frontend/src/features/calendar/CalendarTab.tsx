@@ -224,6 +224,11 @@ export function CalendarTab({
   agendaDescription,
   agendaEmptyMessage,
   headerActions,
+  initialDays,
+  initialView,
+  initialAnchorDate,
+  providerKey,
+  onStateChange,
 }: {
   title?: string;
   scopeType?: string;
@@ -233,10 +238,21 @@ export function CalendarTab({
   agendaDescription?: string;
   agendaEmptyMessage?: string;
   headerActions?: ReactNode;
+  initialDays?: number;
+  initialView?: CalendarView;
+  initialAnchorDate?: Date;
+  providerKey?: string;
+  onStateChange?: (state: { days: number; view: CalendarView; anchorDate: Date }) => void;
 }) {
   return (
     <PageWrapper title={title} showHeader headerSrOnly>
-      <CalendarProvider initialView="month">
+      <CalendarProvider
+        key={providerKey}
+        initialDays={initialDays}
+        initialView={initialView ?? 'month'}
+        initialAnchorDate={initialAnchorDate}
+        onStateChange={onStateChange}
+      >
         <CalendarTabContent
           scopeType={scopeType}
           scopeId={scopeId}

@@ -20,7 +20,7 @@
 /*-----------------------------------------------
   Manifested by Freedom_EXE
 -----------------------------------------------*/
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 
 export type CalendarView = 'agenda' | 'month' | 'week' | 'day';
 
@@ -146,14 +146,22 @@ export function CalendarProvider({
   children,
   initialDays = 14,
   initialView = 'agenda',
+  initialAnchorDate,
+  onStateChange,
 }: {
   children: React.ReactNode;
   initialDays?: number;
   initialView?: CalendarView;
+  initialAnchorDate?: Date;
+  onStateChange?: (state: { days: number; view: CalendarView; anchorDate: Date }) => void;
 }) {
   const [days, setDays] = useState(initialDays);
   const [view, setView] = useState<CalendarView>(initialView);
-  const [anchorDate, setAnchorDate] = useState(() => new Date());
+  const [anchorDate, setAnchorDate] = useState(() => initialAnchorDate ?? new Date());
+
+  useEffect(() => {
+    onStateChange?.({ days, view, anchorDate });
+  }, [anchorDate, days, onStateChange, view]);
 
   const value = {
     days,

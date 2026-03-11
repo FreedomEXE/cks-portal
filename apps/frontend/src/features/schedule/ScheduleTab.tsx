@@ -23,7 +23,38 @@
   Manifested by Freedom_EXE
 -----------------------------------------------*/
 import type { ReactNode } from 'react';
+import { useCallback, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import CalendarTab from '../calendar/CalendarTab';
+import type { CalendarView } from '../calendar/CalendarProvider';
+
+const VALID_VIEWS: CalendarView[] = ['agenda', 'month', 'week', 'day'];
+
+function parseView(value: string | null): CalendarView {
+  if (value && VALID_VIEWS.includes(value as CalendarView)) {
+    return value as CalendarView;
+  }
+  return 'month';
+}
+
+function parseDays(value: string | null): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return 14;
+  }
+  return parsed;
+}
+
+function parseAnchorDate(value: string | null): Date {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return new Date();
+  }
+  const parsed = new Date(`${value}T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime())) {
+    return new Date();
+  }
+  return parsed;
+}
 
 export function ScheduleTab({
   title = 'Schedule',
@@ -44,6 +75,28 @@ export function ScheduleTab({
   scopeId?: string;
   testMode?: 'include' | 'exclude' | 'only';
 }) {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialView = parseView(searchParams.get('view'));
+  const initialDays = parseDays(searchParams.get('days'));
+  const initialAnchorDate = parseAnchorDate(searchParams.get('date'));
+  const providerKey = useMemo(
+    () => `${initialView}:${initialDays}:${initialAnchorDate.toISOString().slice(0, 10)}`,
+    [initialAnchorDate, initialDays, initialView],
+  );
+  const handleStateChange = useCallback(
+    (state: { days: number; view: CalendarView; anchorDate: Date }) => {
+      const next = new URLSearchParams(searchParams);
+      next.set('tab', 'schedule');
+      next.set('view', state.view);
+      next.set('date', state.anchorDate.toISOString().slice(0, 10));
+      next.set('days', String(state.days));
+      if (next.toString() !== searchParams.toString()) {
+        setSearchParams(next, { replace: true });
+      }
+    },
+    [searchParams, setSearchParams],
+  );
+
   return (
     <CalendarTab
       title={title}
@@ -54,6 +107,11 @@ export function ScheduleTab({
       scopeType={scopeType}
       scopeId={scopeId}
       testMode={testMode}
+      initialView={initialView}
+      initialDays={initialDays}
+      initialAnchorDate={initialAnchorDate}
+      providerKey={providerKey}
+      onStateChange={handleStateChange}
     />
   );
 }
