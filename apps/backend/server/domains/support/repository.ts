@@ -98,6 +98,62 @@ const VALID_STATUS_TRANSITIONS: Record<TicketStatus, TicketStatus[]> = {
   cancelled: [],
 };
 
+let supportSchemaCapabilitiesPromise: Promise<{ hasScreenshotUrl: boolean }> | null = null;
+
+async function getSupportSchemaCapabilities(): Promise<{ hasScreenshotUrl: boolean }> {
+  if (!supportSchemaCapabilitiesPromise) {
+    supportSchemaCapabilitiesPromise = (async () => {
+      const result = await query<{ exists: boolean }>(
+        `SELECT EXISTS (
+           SELECT 1
+           FROM information_schema.columns
+           WHERE table_schema = 'public'
+             AND table_name = 'support_tickets'
+             AND column_name = 'screenshot_url'
+         ) AS exists`,
+      );
+      return {
+        hasScreenshotUrl: Boolean(result.rows[0]?.exists),
+      };
+    })().catch((error) => {
+      supportSchemaCapabilitiesPromise = null;
+      throw error;
+    });
+  }
+
+  return supportSchemaCapabilitiesPromise;
+}
+
+async function selectTicketColumns(): Promise<string> {
+  const capabilities = await getSupportSchemaCapabilities();
+  if (capabilities.hasScreenshotUrl) {
+    return TICKET_SELECT_COLUMNS;
+  }
+
+  return `
+    ticket_id,
+    issue_type,
+    priority,
+    subject,
+    description,
+    steps_to_reproduce,
+    NULL::text AS screenshot_url,
+    status,
+    created_by_role,
+    created_by_id,
+    cks_manager,
+    assigned_to,
+    resolution_notes,
+    action_taken,
+    resolved_by_id,
+    resolved_at,
+    reopened_count,
+    archived_at,
+    created_at,
+    updated_at
+  `;
+}
+
 function isAdminRole(role: string | null | undefined): boolean {
   return String(role || '').trim().toLowerCase() === 'admin';
 }
@@ -250,8 +306,10 @@ async function getTicketRow(ticketId: string): Promise<SupportTicketRow | null> 
   const normalized = normalizeIdentity(ticketId);
   if (!normalized) return null;
 
+  const columns = await selectTicketColumns();
+
   const result = await query<SupportTicketRow>(
-    `SELECT ${TICKET_SELECT_COLUMNS}
+    `SELECT ${columns}
      FROM support_tickets
      WHERE UPPER(ticket_id) = UPPER($1)
      LIMIT 1`,
@@ -289,55 +347,103 @@ export async function createSupportTicket(input: CreateSupportTicketInput): Prom
   const ticketId = await generateSupportTicketId(normalizedCreator);
   const now = new Date().toISOString();
   const cksManager = await resolveManagerForUser(normalizedCreator, creatorRole);
+  const capabilities = await getSupportSchemaCapabilities();
+  const returningColumns = await selectTicketColumns();
 
   const result = await query<SupportTicketRow>(
-    `INSERT INTO support_tickets (
-      ticket_id,
-      issue_type,
-      priority,
-      subject,
-      description,
-      steps_to_reproduce,
-      screenshot_url,
-      status,
-      created_by_role,
-      created_by_id,
-      cks_manager,
-      assigned_to,
-      reopened_count,
-      created_at,
-      updated_at
-    ) VALUES (
-      $1,
-      $2,
-      $3,
-      $4,
-      $5,
-      $6,
-      $7,
-      'open',
-      $8,
-      $9,
-      $10,
-      NULL,
-      0,
-      $11,
-      $11
-    )
-    RETURNING ${TICKET_SELECT_COLUMNS}, 0::int AS comment_count`,
-    [
-      ticketId,
-      normalizeIssueType(input.issueType),
-      normalizePriority(input.priority),
-      input.subject.trim(),
-      input.description.trim(),
-      input.stepsToReproduce?.trim() || null,
-      input.screenshotUrl?.trim() || null,
-      creatorRole,
-      normalizedCreator,
-      cksManager,
-      now,
-    ],
+    capabilities.hasScreenshotUrl
+      ? `INSERT INTO support_tickets (
+           ticket_id,
+           issue_type,
+           priority,
+           subject,
+           description,
+           steps_to_reproduce,
+           screenshot_url,
+           status,
+           created_by_role,
+           created_by_id,
+           cks_manager,
+           assigned_to,
+           reopened_count,
+           created_at,
+           updated_at
+         ) VALUES (
+           $1,
+           $2,
+           $3,
+           $4,
+           $5,
+           $6,
+           $7,
+           'open',
+           $8,
+           $9,
+           $10,
+           NULL,
+           0,
+           $11,
+           $11
+         )
+         RETURNING ${returningColumns}, 0::int AS comment_count`
+      : `INSERT INTO support_tickets (
+           ticket_id,
+           issue_type,
+           priority,
+           subject,
+           description,
+           steps_to_reproduce,
+           status,
+           created_by_role,
+           created_by_id,
+           cks_manager,
+           assigned_to,
+           reopened_count,
+           created_at,
+           updated_at
+         ) VALUES (
+           $1,
+           $2,
+           $3,
+           $4,
+           $5,
+           $6,
+           'open',
+           $7,
+           $8,
+           $9,
+           NULL,
+           0,
+           $10,
+           $10
+         )
+         RETURNING ${returningColumns}, 0::int AS comment_count`,
+    capabilities.hasScreenshotUrl
+      ? [
+          ticketId,
+          normalizeIssueType(input.issueType),
+          normalizePriority(input.priority),
+          input.subject.trim(),
+          input.description.trim(),
+          input.stepsToReproduce?.trim() || null,
+          input.screenshotUrl?.trim() || null,
+          creatorRole,
+          normalizedCreator,
+          cksManager,
+          now,
+        ]
+      : [
+          ticketId,
+          normalizeIssueType(input.issueType),
+          normalizePriority(input.priority),
+          input.subject.trim(),
+          input.description.trim(),
+          input.stepsToReproduce?.trim() || null,
+          creatorRole,
+          normalizedCreator,
+          cksManager,
+          now,
+        ],
   );
 
   const row = result.rows[0];
@@ -354,10 +460,12 @@ export async function getHubSupportTickets(role: HubRole, cksCode: string): Prom
     return null;
   }
 
+  const columns = await selectTicketColumns();
+
   let result;
   if (isAdminRole(role)) {
     result = await query<SupportTicketRow>(
-      `SELECT ${TICKET_SELECT_COLUMNS},
+      `SELECT ${columns},
               COALESCE((
                 SELECT COUNT(*)::int
                 FROM support_ticket_comments c
@@ -369,7 +477,7 @@ export async function getHubSupportTickets(role: HubRole, cksCode: string): Prom
     );
   } else {
     result = await query<SupportTicketRow>(
-      `SELECT ${TICKET_SELECT_COLUMNS},
+      `SELECT ${columns},
               COALESCE((
                 SELECT COUNT(*)::int
                 FROM support_ticket_comments c
@@ -467,6 +575,7 @@ export async function updateSupportTicketStatus(
   if (!normalizedTicketId) {
     throw new SupportTicketRepositoryError('Invalid ticket identifier', 400, 'INVALID_TICKET');
   }
+  const returningColumns = await selectTicketColumns();
 
   // Reopen path (resolved -> open)
   if (previousStatus === 'resolved' && nextStatus === 'open') {
@@ -480,7 +589,7 @@ export async function updateSupportTicketStatus(
            resolved_at = NULL,
            updated_at = $2
        WHERE UPPER(ticket_id) = UPPER($1)
-       RETURNING ${TICKET_SELECT_COLUMNS},
+       RETURNING ${returningColumns},
                  COALESCE((
                    SELECT COUNT(*)::int
                    FROM support_ticket_comments c
@@ -506,7 +615,7 @@ export async function updateSupportTicketStatus(
            resolved_at = $5,
            updated_at = $5
        WHERE UPPER(ticket_id) = UPPER($1)
-       RETURNING ${TICKET_SELECT_COLUMNS},
+       RETURNING ${returningColumns},
                  COALESCE((
                    SELECT COUNT(*)::int
                    FROM support_ticket_comments c
@@ -529,7 +638,7 @@ export async function updateSupportTicketStatus(
      SET status = $2,
          updated_at = $3
      WHERE UPPER(ticket_id) = UPPER($1)
-     RETURNING ${TICKET_SELECT_COLUMNS},
+     RETURNING ${returningColumns},
                COALESCE((
                  SELECT COUNT(*)::int
                  FROM support_ticket_comments c
@@ -578,6 +687,7 @@ export async function assignSupportTicket(
 
   const nextStatus = normalizeStatus(row.status) === 'open' ? 'in_progress' : normalizeStatus(row.status);
   const now = new Date().toISOString();
+  const returningColumns = await selectTicketColumns();
 
   const result = await query<SupportTicketRow>(
     `UPDATE support_tickets
@@ -585,7 +695,7 @@ export async function assignSupportTicket(
          status = $3,
          updated_at = $4
      WHERE UPPER(ticket_id) = UPPER($1)
-     RETURNING ${TICKET_SELECT_COLUMNS},
+     RETURNING ${returningColumns},
                COALESCE((
                  SELECT COUNT(*)::int
                  FROM support_ticket_comments c
@@ -617,13 +727,14 @@ export async function unassignSupportTicket(
   }
 
   const now = new Date().toISOString();
+  const returningColumns = await selectTicketColumns();
 
   const result = await query<SupportTicketRow>(
     `UPDATE support_tickets
      SET assigned_to = NULL,
          updated_at = $2
      WHERE UPPER(ticket_id) = UPPER($1)
-     RETURNING ${TICKET_SELECT_COLUMNS},
+     RETURNING ${returningColumns},
                COALESCE((
                  SELECT COUNT(*)::int
                  FROM support_ticket_comments c
@@ -662,6 +773,7 @@ export async function reopenSupportTicket(
   }
 
   const now = new Date().toISOString();
+  const returningColumns = await selectTicketColumns();
 
   const result = await query<SupportTicketRow>(
     `UPDATE support_tickets
@@ -673,7 +785,7 @@ export async function reopenSupportTicket(
          resolved_at = NULL,
          updated_at = $2
      WHERE UPPER(ticket_id) = UPPER($1)
-     RETURNING ${TICKET_SELECT_COLUMNS},
+     RETURNING ${returningColumns},
                COALESCE((
                  SELECT COUNT(*)::int
                  FROM support_ticket_comments c

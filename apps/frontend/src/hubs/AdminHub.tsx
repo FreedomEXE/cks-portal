@@ -350,7 +350,9 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
   const supportTickets = useMemo(() => buildSupportTickets(supportData), [supportData]);
   const supportItems = useMemo(() => {
     const tickets = supportData?.tickets ?? [];
-    return tickets.map((ticket) => ({
+    return tickets
+      .filter((ticket): ticket is NonNullable<typeof ticket> => Boolean(ticket && ticket.id))
+      .map((ticket) => ({
       id: ticket.id,
       title: ticket.subject,
       status: ticket.status,
@@ -359,7 +361,7 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
       submittedDate: ticket.submittedDate,
       updatedDate: ticket.updatedDate,
       issueType: ticket.issueType,
-    }));
+      }));
   }, [supportData]);
 
   const [activityFeed, setActivityFeed] = useState<Activity[]>([]);

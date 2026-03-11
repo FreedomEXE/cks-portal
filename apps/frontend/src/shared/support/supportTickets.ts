@@ -52,20 +52,22 @@ export function buildSupportTickets(supportData?: HubSupportTicketsResponse | nu
     return [];
   }
 
-  return (supportData.tickets ?? []).map((item) => ({
-    ticketId: item.id,
-    subject: item.subject || 'Untitled',
-    issueType: formatIssueType(item.issueType),
-    priority: (item.priority || 'MEDIUM').charAt(0) + (item.priority || 'MEDIUM').slice(1).toLowerCase(),
-    status: mapSupportStatus(item.status),
-    statusCode: item.status,
-    submittedBy: item.submittedBy,
-    assignedTo: item.assignedTo || null,
-    commentCount: Number(item.commentCount || 0),
-    resolvedAt: item.resolvedAt || null,
-    dateCreated: formatSupportDate(item.submittedDate),
-    lastUpdated: formatSupportDate(item.updatedDate || item.submittedDate),
-  }));
+  return (supportData.tickets ?? [])
+    .filter((item): item is NonNullable<typeof item> => Boolean(item && item.id))
+    .map((item) => ({
+      ticketId: item.id,
+      subject: item.subject || 'Untitled',
+      issueType: formatIssueType(item.issueType),
+      priority: (item.priority || 'MEDIUM').charAt(0) + (item.priority || 'MEDIUM').slice(1).toLowerCase(),
+      status: mapSupportStatus(item.status),
+      statusCode: item.status,
+      submittedBy: item.submittedBy,
+      assignedTo: item.assignedTo || null,
+      commentCount: Number(item.commentCount || 0),
+      resolvedAt: item.resolvedAt || null,
+      dateCreated: formatSupportDate(item.submittedDate),
+      lastUpdated: formatSupportDate(item.updatedDate || item.submittedDate),
+    }));
 }
 
 const MAX_SUPPORT_SCREENSHOT_BYTES = 5 * 1024 * 1024;
