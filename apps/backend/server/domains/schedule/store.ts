@@ -599,6 +599,57 @@ export async function listScheduleBlocksInWindow(input: ListScheduleBlocksQuery)
   return result.rows.map(mapBlockRow);
 }
 
+export async function listScheduleBlockDetailsInWindow(input: ListScheduleBlocksQuery): Promise<ScheduleBlockDetail[]> {
+  const blocks = await listScheduleBlocksInWindow(input);
+  if (!blocks.length) {
+    return [];
+  }
+
+  const blockIds = blocks.map((block) => block.blockId);
+  const [assignmentResult, taskResult] = await Promise.all([
+    query<ScheduleAssignmentRow>(
+      `
+        SELECT *
+        FROM schedule_block_assignments
+        WHERE block_id = ANY($1::text[])
+        ORDER BY is_primary DESC, assignment_id ASC
+      `,
+      [blockIds],
+    ),
+    query<ScheduleTaskRow>(
+      `
+        SELECT *
+        FROM schedule_block_tasks
+        WHERE block_id = ANY($1::text[])
+        ORDER BY sequence ASC, task_id ASC
+      `,
+      [blockIds],
+    ),
+  ]);
+
+  const assignmentsByBlock = new Map<string, ScheduleBlockAssignmentRecord[]>();
+  for (const row of assignmentResult.rows) {
+    const assignment = mapAssignmentRow(row);
+    const bucket = assignmentsByBlock.get(assignment.blockId) ?? [];
+    bucket.push(assignment);
+    assignmentsByBlock.set(assignment.blockId, bucket);
+  }
+
+  const tasksByBlock = new Map<string, ScheduleBlockTaskRecord[]>();
+  for (const row of taskResult.rows) {
+    const task = mapTaskRow(row);
+    const bucket = tasksByBlock.get(task.blockId) ?? [];
+    bucket.push(task);
+    tasksByBlock.set(task.blockId, bucket);
+  }
+
+  return blocks.map((block) => ({
+    ...block,
+    assignments: assignmentsByBlock.get(block.blockId) ?? [],
+    tasks: tasksByBlock.get(block.blockId) ?? [],
+  }));
+}
+
 export async function cancelScheduleBlocksBySource(input: CancelScheduleBlocksBySourceInput): Promise<string[]> {
   const result = await query<{ block_id: string }>(
     `

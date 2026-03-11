@@ -103,9 +103,9 @@ export function useCalendarAgenda(days = 14, scopeType?: string, scopeId?: strin
   );
 }
 
-export function useCalendarEvents({ start, end, scopeType, scopeId, testMode, limit = 500 }: CalendarQueryRange) {
+export function useCalendarEvents({ start, end, scopeType, scopeId, testMode, limit = 500, enabled = true }: CalendarQueryRange & { enabled?: boolean }) {
   const { getToken } = useClerkAuth();
-  const key = `/calendar/events${buildQuery({ start, end, scopeType, scopeId, testMode, limit })}`;
+  const key = enabled ? `/calendar/events${buildQuery({ start, end, scopeType, scopeId, testMode, limit })}` : null;
   return useSWR(key, (path: string) =>
     apiFetch<ApiResponse<CalendarEventItem[]>>(path, { getToken }).then((response) => response.data ?? []),
   );

@@ -72,6 +72,8 @@ export interface UseScheduleScopeControlsInput {
 export interface UseScheduleScopeControlsResult {
   scopeType?: ScheduleScopeType;
   scopeId?: string;
+  scopeIds?: string[];
+  scopeTree?: ScheduleTreeNode | null;
   testMode?: 'include' | 'exclude' | 'only';
   headerActions?: ReactNode;
 }
@@ -235,6 +237,24 @@ function getUniqueOptions(nodes: ScopeNode[]): ScopeOption[] {
   return Array.from(deduped.values()).sort((a, b) => a.label.localeCompare(b.label));
 }
 
+function collectDescendantIds(node: ScopeNode | null, nodes: ScopeNode[]): string[] {
+  if (!node) {
+    return [];
+  }
+  const ids = new Set<string>([node.id]);
+  const queue = [node.id];
+  while (queue.length > 0) {
+    const parentId = queue.shift();
+    nodes.forEach((candidate) => {
+      if (candidate.parentId === parentId && !ids.has(candidate.id)) {
+        ids.add(candidate.id);
+        queue.push(candidate.id);
+      }
+    });
+  }
+  return Array.from(ids);
+}
+
 function getPlaceholder(viewerRole: ScheduleViewerRole | undefined, type: ScheduleScopeType): string {
   if (viewerRole === 'admin' && type === 'manager') {
     return 'All ecosystems';
@@ -337,6 +357,15 @@ export function useScheduleScopeControls({
     }
     return nodesByKey.get(`${effectiveScope.type}:${effectiveScope.id}`) ?? null;
   }, [effectiveScope, nodesByKey]);
+  const scopeIds = useMemo(() => {
+    if (selectedNode) {
+      return collectDescendantIds(selectedNode, nodes);
+    }
+    if (effectiveScope?.id) {
+      return [effectiveScope.id];
+    }
+    return undefined;
+  }, [effectiveScope, nodes, selectedNode]);
 
   const selectedPath = useMemo(() => getNodePath(selectedNode, nodesByKey), [nodesByKey, selectedNode]);
   const selectedIdsByType = useMemo(() => {
@@ -494,6 +523,8 @@ export function useScheduleScopeControls({
   return {
     scopeType: effectiveScope?.type,
     scopeId: effectiveScope?.id,
+    scopeIds,
+    scopeTree,
     testMode: resolvedTestMode,
     headerActions,
   };

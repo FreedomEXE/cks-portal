@@ -29,6 +29,7 @@ import CalendarTab from '../calendar/CalendarTab';
 import type { CalendarView } from '../calendar/CalendarProvider';
 import type { HubRole, HubRoleScopeResponse } from '../../shared/api/hub';
 import { useScheduleScopeControls, type AdminScheduleManagerOption } from './scopeControls';
+import ScheduleDayPlan from './ScheduleDayPlan';
 
 interface ScheduleTreeNode {
   user: {
@@ -120,7 +121,14 @@ export function ScheduleTab({
     },
     [searchParams, setSearchParams],
   );
-  const { scopeType, scopeId, testMode, headerActions: scopeHeaderActions } = useScheduleScopeControls({
+  const {
+    scopeType,
+    scopeId,
+    scopeIds,
+    scopeTree,
+    testMode,
+    headerActions: scopeHeaderActions,
+  } = useScheduleScopeControls({
     viewerRole,
     viewerCode,
     scopeData,
@@ -132,7 +140,6 @@ export function ScheduleTab({
     onShowTestEcosystemsChange,
     extraActions: headerActions,
   });
-
   return (
     <CalendarTab
       title={title}
@@ -142,12 +149,23 @@ export function ScheduleTab({
       headerActions={scopeHeaderActions}
       scopeType={scopeType}
       scopeId={scopeId}
+      scopeIds={scopeIds}
       testMode={testMode}
       initialView={initialView}
       initialDays={initialDays}
       initialAnchorDate={initialAnchorDate}
       providerKey={providerKey}
       onStateChange={handleStateChange}
+      renderDayView={(props) => (
+        <ScheduleDayPlan
+          viewerRole={viewerRole}
+          scopeType={props.scopeType}
+          scopeId={props.scopeId}
+          scopeIds={props.scopeIds}
+          testMode={props.testMode}
+          scopeTree={scopeTree}
+        />
+      )}
     />
   );
 }

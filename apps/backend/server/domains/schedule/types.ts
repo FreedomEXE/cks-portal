@@ -202,3 +202,44 @@ export interface CancelScheduleBlocksBySourceInput {
   sourceId: string;
   updatedBy?: string | null;
 }
+
+export interface ScheduleReadQuery {
+  start: string;
+  end: string;
+  scopeType?: ScheduleScopeType;
+  scopeId?: string;
+  scopeIds?: string[];
+  testMode?: 'include' | 'exclude' | 'only';
+  limit?: number;
+}
+
+export interface ScheduleDayPlanLane {
+  laneId: string;
+  participantId: string | null;
+  participantRole: string | null;
+  blocks: ScheduleBlockDetail[];
+}
+
+export interface ScheduleDayPlanBuilding {
+  buildingKey: string;
+  buildingName: string;
+  areaName: string | null;
+  lanes: ScheduleDayPlanLane[];
+  unassignedBlocks: ScheduleBlockDetail[];
+}
+
+export interface ScheduleDayPlanSummary {
+  blockCount: number;
+  assignedBlockCount: number;
+  unassignedBlockCount: number;
+  taskCount: number;
+}
+
+export interface ScheduleDayPlanResponse {
+  date: string;
+  scopeType?: ScheduleScopeType;
+  scopeId?: string;
+  scopeIds: string[];
+  summary: ScheduleDayPlanSummary;
+  buildings: ScheduleDayPlanBuilding[];
+}

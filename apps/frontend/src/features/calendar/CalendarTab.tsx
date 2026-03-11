@@ -146,19 +146,23 @@ function CalendarHeaderControls({ extraActions }: { extraActions?: ReactNode }) 
 function CalendarTabContent({
   scopeType,
   scopeId,
+  scopeIds,
   testMode,
   agendaTitle,
   agendaDescription,
   agendaEmptyMessage,
   headerActions,
+  renderDayView,
 }: {
   scopeType?: string;
   scopeId?: string;
+  scopeIds?: string[];
   testMode?: 'include' | 'exclude' | 'only';
   agendaTitle?: string;
   agendaDescription?: string;
   agendaEmptyMessage?: string;
   headerActions?: ReactNode;
+  renderDayView?: (props: { scopeType?: string; scopeId?: string; scopeIds?: string[]; testMode?: 'include' | 'exclude' | 'only' }) => ReactNode;
 }) {
   const { days, view, anchorDate } = useCalendarContext();
   const range = getCalendarRange(view, anchorDate, days);
@@ -204,11 +208,13 @@ function CalendarTabContent({
         <CalendarFull
           scopeType={scopeType}
           scopeId={scopeId}
+          scopeIds={scopeIds}
           testMode={testMode}
           title={agendaTitle}
           description={agendaDescription}
           showHeader={false}
           headerActions={undefined}
+          renderDayView={renderDayView}
         />
       )}
     </div>
@@ -219,6 +225,7 @@ export function CalendarTab({
   title = 'Schedule',
   scopeType,
   scopeId,
+  scopeIds,
   testMode,
   agendaTitle,
   agendaDescription,
@@ -229,10 +236,12 @@ export function CalendarTab({
   initialAnchorDate,
   providerKey,
   onStateChange,
+  renderDayView,
 }: {
   title?: string;
   scopeType?: string;
   scopeId?: string;
+  scopeIds?: string[];
   testMode?: 'include' | 'exclude' | 'only';
   agendaTitle?: string;
   agendaDescription?: string;
@@ -243,6 +252,7 @@ export function CalendarTab({
   initialAnchorDate?: Date;
   providerKey?: string;
   onStateChange?: (state: { days: number; view: CalendarView; anchorDate: Date }) => void;
+  renderDayView?: (props: { scopeType?: string; scopeId?: string; scopeIds?: string[]; testMode?: 'include' | 'exclude' | 'only' }) => ReactNode;
 }) {
   return (
     <PageWrapper title={title} showHeader headerSrOnly>
@@ -256,11 +266,13 @@ export function CalendarTab({
         <CalendarTabContent
           scopeType={scopeType}
           scopeId={scopeId}
+          scopeIds={scopeIds}
           testMode={testMode}
           agendaTitle={agendaTitle}
           agendaDescription={agendaDescription}
           agendaEmptyMessage={agendaEmptyMessage}
           headerActions={headerActions}
+          renderDayView={renderDayView}
         />
       </CalendarProvider>
     </PageWrapper>

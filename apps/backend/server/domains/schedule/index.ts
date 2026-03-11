@@ -19,5 +19,6 @@
 /*-----------------------------------------------
   Manifested by Freedom_EXE
 -----------------------------------------------*/
+export { registerScheduleRoutes } from './routes.fastify.js';
 export * from './service.js';
 export * from './types.js';
