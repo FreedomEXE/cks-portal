@@ -67,7 +67,7 @@ import { useAccessCodeRedemption } from '../hooks/useAccessCodeRedemption';
 import OverviewSummaryModal, { type OverviewSummaryItem } from '../components/overview/OverviewSummaryModal';
 import { buildSupportTickets, mapSupportIssuePayload } from '../shared/support/supportTickets';
 import { uploadProfilePhotoAndSyncLogo } from '../shared/profilePhoto';
-import CalendarTab from '../features/calendar/CalendarTab';
+import ScheduleTab from '../features/schedule/ScheduleTab';
 import { CalendarProvider } from '../features/calendar/CalendarProvider';
 import CalendarAgenda from '../features/calendar/CalendarAgenda';
 import {
@@ -586,7 +586,7 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
     { id: 'dashboard', label: 'Dashboard', path: '/crew/dashboard' },
     { id: 'profile', label: 'My Profile', path: '/crew/profile' },
     { id: 'ecosystem', label: 'My Ecosystem', path: '/crew/ecosystem' },
-    { id: 'calendar', label: 'Calendar', path: '/crew/calendar' },
+    { id: 'calendar', label: 'Schedule', path: '/crew/calendar' },
     { id: 'services', label: 'Services', path: '/crew/services' },
     { id: 'orders', label: 'Orders', path: '/crew/orders' },
     { id: 'reports', label: 'Reports', path: '/crew/reports' },
@@ -745,8 +745,8 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
                     scopeType="crew"
                     scopeId={userCode ?? normalizedCode ?? undefined}
                     title="My Schedule"
-                    description="Upcoming calendar events tied to your crew assignments and accepted work."
-                    emptyMessage="No scheduled crew events in this window yet."
+                    description="Upcoming scheduled work tied to your crew assignments and accepted work."
+                    emptyMessage="No scheduled crew work in this window yet."
                   />
                 </CalendarProvider>
               </div>
@@ -766,7 +766,7 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
               />
             </PageWrapper>
           ) : activeTab === 'calendar' ? (
-            <CalendarTab title="Calendar" />
+            <ScheduleTab title="Schedule" />
           ) : activeTab === 'services' ? (
 
             <PageWrapper headerSrOnly>

@@ -45,9 +45,9 @@ export function CalendarAgenda({
   scopeType,
   scopeId,
   testMode,
-  title = 'Upcoming Events',
-  description = 'Read-only projection of scheduled activity across the platform.',
-  emptyMessage = 'No scheduled events in this window yet.',
+  title = 'Upcoming Schedule',
+  description = 'Read-only schedule view across the selected scope.',
+  emptyMessage = 'No scheduled work in this window yet.',
   showWindowSelector = true,
   showHeader = true,
   headerActions,
@@ -93,15 +93,15 @@ export function CalendarAgenda({
 
       {isLoading ? (
         <div className="rounded-[28px] border border-slate-200/80 bg-white px-6 py-6 text-sm text-slate-500 shadow-[0_18px_48px_rgba(15,23,42,0.08)]">
-          Loading calendar...
+          Loading schedule...
         </div>
       ) : error ? (
         <div className="rounded-[28px] border border-rose-200 bg-rose-50 px-6 py-6 text-sm text-rose-800 shadow-[0_18px_48px_rgba(244,63,94,0.12)]">
-          Failed to load calendar.
+          Failed to load schedule.
         </div>
       ) : !data || data.length === 0 ? (
         <div className="rounded-[24px] border border-dashed border-slate-300 bg-white/90 px-5 py-5 text-sm text-slate-500 shadow-[0_12px_30px_rgba(15,23,42,0.04)]">
-          <div className="font-semibold text-slate-900">No events scheduled</div>
+          <div className="font-semibold text-slate-900">No scheduled work</div>
           <div className="mt-1">{emptyMessage}</div>
         </div>
       ) : (

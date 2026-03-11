@@ -65,7 +65,7 @@ import { useAccessCodeRedemption } from '../hooks/useAccessCodeRedemption';
 import OverviewSummaryModal, { type OverviewSummaryItem } from '../components/overview/OverviewSummaryModal';
 import { buildSupportTickets, mapSupportIssuePayload } from '../shared/support/supportTickets';
 import { uploadProfilePhotoAndSyncLogo } from '../shared/profilePhoto';
-import CalendarTab from '../features/calendar/CalendarTab';
+import ScheduleTab from '../features/schedule/ScheduleTab';
 import {
   canRoleEditWatermark,
   sanitizeWatermarkPreferenceWrite,
@@ -622,7 +622,7 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
     { id: 'dashboard', label: 'Dashboard', path: '/contractor/dashboard' },
     { id: 'profile', label: 'My Profile', path: '/contractor/profile' },
     { id: 'ecosystem', label: 'My Ecosystem', path: '/contractor/ecosystem' },
-    { id: 'calendar', label: 'Calendar', path: '/contractor/calendar' },
+    { id: 'calendar', label: 'Schedule', path: '/contractor/calendar' },
     { id: 'services', label: 'Services', path: '/contractor/services' },
     { id: 'orders', label: 'Orders', path: '/contractor/orders' },
     { id: 'reports', label: 'Reports', path: '/contractor/reports' },
@@ -867,7 +867,7 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
               />
             </PageWrapper>
           ) : activeTab === 'calendar' ? (
-            <CalendarTab title="Calendar" />
+            <ScheduleTab title="Schedule" />
           ) : activeTab === 'services' ? (
             <PageWrapper headerSrOnly>
               {ordersLoadMessage && (

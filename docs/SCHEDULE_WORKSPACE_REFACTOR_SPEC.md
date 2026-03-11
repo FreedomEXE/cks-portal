@@ -503,6 +503,7 @@ Additional guidance:
 - `version` is required for optimistic concurrency in multi-user editing
 - `updated_at` is required for active day-plan refresh and future real-time sync
 - `series_parent_id` + `occurrence_index` distinguish recurring instances from manual one-off blocks
+- `block_id` should reserve `BLK` as the first-class CKS block prefix
 
 ### `schedule_block_assignments`
 
@@ -517,6 +518,9 @@ Suggested fields:
 - `assignment_type`
 - `is_primary`
 - `status`
+- `created_by`
+- `created_at`
+- `updated_at`
 
 ### `schedule_block_tasks`
 
@@ -535,8 +539,12 @@ Suggested fields:
 - `area_name`
 - `estimated_minutes`
 - `status`
+- `version`
 - `required_tools`
 - `required_products`
+- `created_by`
+- `created_at`
+- `updated_at`
 - `metadata`
 
 ### Task ID Requirement
@@ -581,6 +589,8 @@ The system should explicitly distinguish:
 - the specific task crew completes in the real world
 
 This is the right model for mobile completion and schedule drill-in.
+
+Task instances should carry their own optimistic concurrency and audit lineage because crew may update task status independently of a manager editing the parent block.
 
 ### Procedure ID Follow-On
 
@@ -746,6 +756,18 @@ Rule:
 
 - Schedule owns temporal and assignment state
 - source domains own business workflow state
+
+### Source Cancellation Propagation
+
+If linked source demand is cancelled, the related schedule block should auto-transition to `cancelled` through the projection pipeline.
+
+Recommended behavior:
+
+- source cancellation updates schedule block status to `cancelled`
+- projected calendar event is also marked `cancelled`
+- an activity log entry records the propagation
+
+Managers should not need to manually clean up cancelled demand in the schedule workspace.
 
 ## 12.4 Task Visibility
 

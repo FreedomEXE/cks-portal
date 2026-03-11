@@ -1724,8 +1724,8 @@ const serviceAdapter: EntityAdapter = {
               scopeType="service"
               scopeId={entityData?.serviceId}
               title="Service Schedule"
-              description="Calendar events materialized for this service from existing scheduling workflows."
-              emptyMessage="No calendar events have been materialized for this service yet."
+              description="Scheduled work materialized for this service from existing scheduling workflows."
+              emptyMessage="No schedule items have been materialized for this service yet."
               showWindowSelector={false}
             />
           </CalendarProvider>

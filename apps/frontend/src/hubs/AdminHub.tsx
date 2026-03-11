@@ -53,7 +53,7 @@ import { isFeatureEnabled } from '../config/featureFlags';
 import AdminAssignSection from './components/AdminAssignSection';
 import AdminCreateSection from './components/AdminCreateSection';
 import CatalogVisibilitySection from './components/CatalogVisibilitySection';
-import CalendarTab from '../features/calendar/CalendarTab';
+import ScheduleTab from '../features/schedule/ScheduleTab';
 import { useHubLoading } from '../contexts/HubLoadingContext';
 import { buildOrderActions } from '@cks/domain-widgets';
 import { mapProfileDataForRole, type DirectoryRole, directoryTabToRole } from '../shared/utils/profileMapping';
@@ -202,7 +202,7 @@ function isTestId(value?: string | null): boolean {
 const HUB_TABS = [
   { id: 'dashboard', label: 'Dashboard', path: '/dashboard' },
   { id: 'ecosystems', label: 'Ecosystems', path: '/ecosystems' },
-  { id: 'calendar', label: 'Calendar', path: '/calendar' },
+  { id: 'calendar', label: 'Schedule', path: '/calendar' },
   { id: 'directory', label: 'Directory', path: '/directory' },
   { id: 'create', label: 'Create', path: '/create' },
   { id: 'assign', label: 'Assign', path: '/assign' },
@@ -2105,21 +2105,21 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
               </div>
             </PageWrapper>
           ) : activeTab === 'calendar' ? (
-            <CalendarTab
-              title="Calendar"
+            <ScheduleTab
+              title="Schedule"
               scopeType={selectedCalendarEcosystemId ? 'manager' : undefined}
               scopeId={selectedCalendarEcosystemId ?? undefined}
               testMode={selectedCalendarEcosystemId && isTestId(selectedCalendarEcosystemId) ? 'only' : 'exclude'}
-              agendaTitle={selectedCalendarEcosystemId ? 'Ecosystem Events' : 'All Ecosystem Events'}
+              agendaTitle={selectedCalendarEcosystemId ? 'Ecosystem Schedule' : 'Platform Schedule'}
               agendaDescription={
                 selectedCalendarEcosystemId
-                  ? 'Read-only projection of scheduled activity for the selected ecosystem.'
-                  : 'Read-only projection of scheduled activity across all ecosystems.'
+                  ? 'Read-only schedule view for the selected ecosystem.'
+                  : 'Read-only schedule view across all ecosystems.'
               }
               agendaEmptyMessage={
                 selectedCalendarEcosystemId
-                  ? 'No scheduled events in this ecosystem for the selected window yet.'
-                  : 'No scheduled events across the platform in this window yet.'
+                  ? 'No scheduled work in this ecosystem for the selected window yet.'
+                  : 'No scheduled work across the platform in this window yet.'
               }
               headerActions={
                 <div className="flex items-center gap-2">

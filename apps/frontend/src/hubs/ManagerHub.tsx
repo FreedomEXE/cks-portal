@@ -83,7 +83,7 @@ import { createCatalogService, getCatalogCategories, uploadCatalogImage, type Cr
 import { loadUserPreferences, saveUserPreferences } from '../shared/preferences';
 import { buildSupportTickets, mapSupportIssuePayload } from '../shared/support/supportTickets';
 import { uploadProfilePhotoAndSyncLogo } from '../shared/profilePhoto';
-import CalendarTab from '../features/calendar/CalendarTab';
+import ScheduleTab from '../features/schedule/ScheduleTab';
 import {
   CKS_DEFAULT_WATERMARK_URL,
   canRoleEditWatermark,
@@ -145,7 +145,7 @@ const HUB_TABS = [
   { id: 'dashboard', label: 'Dashboard', path: '/manager/dashboard' },
   { id: 'profile', label: 'My Profile', path: '/manager/profile' },
   { id: 'ecosystem', label: 'My Ecosystem', path: '/manager/ecosystem' },
-  { id: 'calendar', label: 'Calendar', path: '/manager/calendar' },
+  { id: 'calendar', label: 'Schedule', path: '/manager/calendar' },
   { id: 'services', label: 'My Services', path: '/manager/services' },
   // Removed per request: Procedures & Training
   { id: 'orders', label: 'Orders', path: '/manager/orders' },
@@ -1339,7 +1339,7 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
               />
             </PageWrapper>
           ) : activeTab === 'calendar' ? (
-            <CalendarTab title="Calendar" />
+            <ScheduleTab title="Schedule" />
           ) : activeTab === 'services' ? (
             <PageWrapper title="My Services" showHeader headerSrOnly>
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>

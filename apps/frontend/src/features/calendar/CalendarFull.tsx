@@ -359,8 +359,8 @@ export function CalendarFull({
   scopeType,
   scopeId,
   testMode,
-  title = 'Calendar',
-  description = 'Read-only projection of scheduled activity across the platform.',
+  title = 'Schedule',
+  description = 'Read-only schedule view across the selected scope.',
   showHeader = true,
   headerActions,
 }: {
@@ -403,11 +403,11 @@ export function CalendarFull({
 
       {isLoading ? (
         <div className="rounded-[28px] border border-slate-200/80 bg-white px-6 py-6 text-sm text-slate-500 shadow-[0_18px_48px_rgba(15,23,42,0.08)]">
-          Loading calendar...
+          Loading schedule...
         </div>
       ) : error ? (
         <div className="rounded-[28px] border border-rose-200 bg-rose-50 px-6 py-6 text-sm text-rose-800 shadow-[0_18px_48px_rgba(244,63,94,0.12)]">
-          Failed to load calendar.
+          Failed to load schedule.
         </div>
       ) : (
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">

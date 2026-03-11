@@ -144,7 +144,6 @@ function CalendarHeaderControls({ extraActions }: { extraActions?: ReactNode }) 
 }
 
 function CalendarTabContent({
-  title,
   scopeType,
   scopeId,
   testMode,
@@ -153,7 +152,6 @@ function CalendarTabContent({
   agendaEmptyMessage,
   headerActions,
 }: {
-  title: string;
   scopeType?: string;
   scopeId?: string;
   testMode?: 'include' | 'exclude' | 'only';
@@ -218,7 +216,7 @@ function CalendarTabContent({
 }
 
 export function CalendarTab({
-  title = 'Calendar',
+  title = 'Schedule',
   scopeType,
   scopeId,
   testMode,
@@ -240,7 +238,6 @@ export function CalendarTab({
     <PageWrapper title={title} showHeader headerSrOnly>
       <CalendarProvider initialView="month">
         <CalendarTabContent
-          title={title}
           scopeType={scopeType}
           scopeId={scopeId}
           testMode={testMode}
