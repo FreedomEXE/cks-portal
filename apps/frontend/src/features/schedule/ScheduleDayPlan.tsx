@@ -44,7 +44,7 @@ interface EditorTaskDraft {
 }
 interface BlockEditorState { title: string; description: string; blockType: string; status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled'; buildingName: string; areaName: string; startTime: string; endTime: string; centerId: string; crewId: string; tasks: EditorTaskDraft[]; }
 
-interface ProcedureGroup<TTask extends { taskType?: string | null; catalogItemType?: string | null; estimatedMinutes?: string | number | null; status: string }> {
+interface TaskCategoryGroup<TTask extends { taskType?: string | null; catalogItemType?: string | null; estimatedMinutes?: string | number | null; status: string }> {
   key: string;
   label: string;
   tasks: TTask[];
@@ -90,7 +90,7 @@ function toTimeInput(value?: string | null): string {
 }
 function buildDraftId(prefix: string): string { return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`; }
 function isTestValue(value?: string | null): boolean { return String(value || '').toUpperCase().includes('-TEST'); }
-function formatProcedureLabel(value?: string | null): string {
+function formatCategoryLabel(value?: string | null): string {
   return (value || 'General')
     .replace(/[_-]+/g, ' ')
     .replace(/\s+/g, ' ')
@@ -105,8 +105,8 @@ function toEstimatedMinutes(value: string | number | null | undefined): number {
   }
   return 0;
 }
-function buildProcedureGroups<TTask extends { taskType?: string | null; catalogItemType?: string | null; estimatedMinutes?: string | number | null; status: string }>(tasks: TTask[]): ProcedureGroup<TTask>[] {
-  const groups = new Map<string, ProcedureGroup<TTask>>();
+function buildTaskCategoryGroups<TTask extends { taskType?: string | null; catalogItemType?: string | null; estimatedMinutes?: string | number | null; status: string }>(tasks: TTask[]): TaskCategoryGroup<TTask>[] {
+  const groups = new Map<string, TaskCategoryGroup<TTask>>();
   for (const task of tasks) {
     const key = task.catalogItemType || task.taskType || 'general';
     const existing = groups.get(key);
@@ -118,7 +118,7 @@ function buildProcedureGroups<TTask extends { taskType?: string | null; catalogI
     }
     groups.set(key, {
       key,
-      label: formatProcedureLabel(key),
+      label: formatCategoryLabel(key),
       tasks: [task],
       totalMinutes: toEstimatedMinutes(task.estimatedMinutes),
       completedCount: task.status === 'completed' ? 1 : 0,
@@ -436,17 +436,17 @@ export default function ScheduleDayPlan({ viewerRole, scopeType, scopeId, scopeI
     [editorState, taskParam],
   );
   const activeTask = selectedEditorTask ?? selectedTask;
-  const procedureGroups = useMemo(
-    () => buildProcedureGroups(selectedBlock?.tasks ?? []),
+  const taskCategories = useMemo(
+    () => buildTaskCategoryGroups(selectedBlock?.tasks ?? []),
     [selectedBlock],
   );
-  const editorProcedureGroups = useMemo(
-    () => buildProcedureGroups(editorState?.tasks ?? []),
+  const editorTaskCategories = useMemo(
+    () => buildTaskCategoryGroups(editorState?.tasks ?? []),
     [editorState],
   );
-  const activeProcedureGroup = useMemo(
-    () => (activeTask ? editorProcedureGroups.find((group) => group.tasks.some((task) => normalizeId(task.taskId) === normalizeId(activeTask.taskId))) ?? null : null),
-    [activeTask, editorProcedureGroups],
+  const activeTaskCategory = useMemo(
+    () => (activeTask ? editorTaskCategories.find((group) => group.tasks.some((task) => normalizeId(task.taskId) === normalizeId(activeTask.taskId))) ?? null : null),
+    [activeTask, editorTaskCategories],
   );
 
   return (
@@ -533,7 +533,7 @@ export default function ScheduleDayPlan({ viewerRole, scopeType, scopeId, scopeI
             </div>
             {selectedBlock.description ? <div className="mt-4 text-sm text-white/75">{selectedBlock.description}</div> : null}
             <div className="mt-6 grid gap-4 lg:grid-cols-2">
-              {procedureGroups.map((group) => (
+              {taskCategories.map((group) => (
                 <div key={group.key} className="rounded-[24px] border border-white/10 bg-white/5 p-4">
                   <div className="flex items-center justify-between gap-3">
                     <div>
@@ -569,15 +569,15 @@ export default function ScheduleDayPlan({ viewerRole, scopeType, scopeId, scopeI
             <div className="mt-2 text-sm text-slate-500">{[selectedBlock.title, activeTask.areaName, activeTask.estimatedMinutes ? `${activeTask.estimatedMinutes} min` : null].filter(Boolean).join(' • ')}</div>
             <div className="mt-4 grid gap-3 md:grid-cols-2">
               <div className="rounded-[24px] border border-slate-200 bg-slate-50/80 p-4">
-                <div className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Procedure</div>
-                <div className="mt-2 text-lg font-black tracking-[-0.03em] text-slate-950">{activeProcedureGroup?.label ?? 'General'}</div>
-                <div className="mt-1 text-sm text-slate-500">{activeProcedureGroup ? `${activeProcedureGroup.tasks.length} steps • ${activeProcedureGroup.totalMinutes || 0} min planned` : 'Single task context'}</div>
+                <div className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Task category</div>
+                <div className="mt-2 text-lg font-black tracking-[-0.03em] text-slate-950">{activeTaskCategory?.label ?? 'General'}</div>
+                <div className="mt-1 text-sm text-slate-500">{activeTaskCategory ? `${activeTaskCategory.tasks.length} tasks • ${activeTaskCategory.totalMinutes || 0} min planned` : 'Single task context'}</div>
                 <div className="mt-3 inline-flex rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-slate-700">{activeTask.status.replace(/_/g, ' ')}</div>
               </div>
               <div className="rounded-[24px] border border-slate-200 bg-slate-50/80 p-4">
                 <div className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Execution context</div>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  {[selectedBlock.buildingName, selectedBlock.areaName, activeTask.taskType ? formatProcedureLabel(activeTask.taskType) : null].filter(Boolean).map((item) => (
+                  {[selectedBlock.buildingName, selectedBlock.areaName, activeTask.taskType ? formatCategoryLabel(activeTask.taskType) : null].filter(Boolean).map((item) => (
                     <span key={String(item)} className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700">{item}</span>
                   ))}
                 </div>
@@ -587,16 +587,16 @@ export default function ScheduleDayPlan({ viewerRole, scopeType, scopeId, scopeI
             <div className="mt-4 rounded-[24px] border border-slate-200 bg-white p-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <div className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Procedure steps</div>
+                  <div className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Related tasks</div>
                   <div className="mt-1 text-sm text-slate-500">Stay in this zoom level while moving through related tasks.</div>
                 </div>
                 <button type="button" onClick={() => updateZoomParams({ blockId: selectedBlock.blockId, taskId: null })} className="text-xs font-semibold text-slate-500 hover:text-slate-900">Back to block</button>
               </div>
               <div className="mt-4 flex flex-col gap-2">
-                {(activeProcedureGroup?.tasks ?? [activeTask]).map((task) => {
+                {(activeTaskCategory?.tasks ?? [activeTask]).map((task) => {
                   const isActive = normalizeId(task.taskId) === normalizeId(activeTask.taskId);
                   return (
-                    <button key={task.taskId ?? `${activeProcedureGroup?.key || 'task'}-${task.title}`} type="button" onClick={() => task.taskId && updateZoomParams({ blockId: selectedBlock.blockId, taskId: task.taskId })} className={`rounded-[18px] border px-4 py-3 text-left transition ${isActive ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-slate-50 hover:border-slate-300'}`}>
+                    <button key={task.taskId ?? `${activeTaskCategory?.key || 'task'}-${task.title}`} type="button" onClick={() => task.taskId && updateZoomParams({ blockId: selectedBlock.blockId, taskId: task.taskId })} className={`rounded-[18px] border px-4 py-3 text-left transition ${isActive ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-slate-50 hover:border-slate-300'}`}>
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <div className={`text-[10px] font-black uppercase tracking-[0.12em] ${isActive ? 'text-white/60' : 'text-slate-500'}`}>Step</div>
@@ -644,8 +644,8 @@ export default function ScheduleDayPlan({ viewerRole, scopeType, scopeId, scopeI
                   </div>
                   <div className="grid gap-3 md:grid-cols-2">
                     <div className="rounded-[22px] border border-slate-200 bg-slate-50/70 p-4">
-                      <div className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Procedure grouping</div>
-                      <div className="mt-2 text-sm font-black text-slate-950">{formatProcedureLabel(task.catalogItemType || task.taskType || 'General')}</div>
+                      <div className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Task category</div>
+                      <div className="mt-2 text-sm font-black text-slate-950">{formatCategoryLabel(task.catalogItemType || task.taskType || 'General')}</div>
                       <div className="mt-1 text-sm text-slate-500">{task.catalogItemCode ? `Catalog: ${task.catalogItemCode}` : 'Ad hoc task inside this block.'}</div>
                     </div>
                     <div className="rounded-[22px] border border-slate-200 bg-slate-50/70 p-4">
