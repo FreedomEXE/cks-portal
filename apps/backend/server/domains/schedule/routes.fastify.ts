@@ -25,6 +25,7 @@ import {
   cancelBlocksForSource,
   fetchScheduleBlockById,
   fetchScheduleBlocks,
+  fetchCrewDailyExport,
   fetchScheduleDayPlan,
   getScheduleBlock,
   saveScheduleBlock,
@@ -32,6 +33,7 @@ import {
 import {
   scheduleBlockBodySchema,
   scheduleBlockParamsSchema,
+  scheduleCrewDailyExportQuerySchema,
   scheduleDayPlanQuerySchema,
   scheduleReadQuerySchema,
 } from './validators.js';
@@ -103,6 +105,36 @@ export async function registerScheduleRoutes(server: FastifyInstance) {
       viewerCode: account.cksCode ?? null,
       query: parsed.data,
     });
+
+    reply.send({ data });
+  });
+
+  server.get('/api/schedule/export/crew-daily', async (request, reply) => {
+    const account = await requireActiveRole(request, reply, {});
+    if (!account) return;
+
+    const viewerRole = normalizeRole(account.role ?? null);
+    if (!viewerRole) {
+      reply.code(403).send({ error: 'Unsupported role for schedule access' });
+      return;
+    }
+
+    const parsed = scheduleCrewDailyExportQuerySchema.safeParse(request.query);
+    if (!parsed.success) {
+      reply.code(400).send({ error: 'Invalid crew export query', details: parsed.error.flatten() });
+      return;
+    }
+
+    const data = await fetchCrewDailyExport({
+      viewerRole,
+      viewerCode: account.cksCode ?? null,
+      query: parsed.data,
+    });
+
+    if (!data) {
+      reply.code(404).send({ error: 'Crew daily export not found' });
+      return;
+    }
 
     reply.send({ data });
   });

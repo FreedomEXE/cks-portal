@@ -38,6 +38,9 @@ import type {
   ListScheduleBlocksQuery,
   ScheduleBlockDetail,
   ScheduleBlockRecord,
+  ScheduleCrewDailyExportBlock,
+  ScheduleCrewDailyExportResponse,
+  ScheduleCrewDailyExportTask,
   ScheduleDayPlanBuilding,
   ScheduleDayPlanLane,
   ScheduleDayPlanResponse,
@@ -48,6 +51,14 @@ import type {
 
 function buildGeneratorKey(blockId: string): string {
   return `block:${blockId}`;
+}
+
+function formatCategoryLabel(value?: string | null): string {
+  return (value || 'General')
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 function isScheduleInfraUnavailable(error: unknown): boolean {
@@ -107,6 +118,27 @@ async function resolveViewerAccessibleIds(viewerRole: HubRole, viewerCode: strin
     collectScopeIds(scope.relationships, ids);
   }
   return Array.from(ids);
+}
+
+async function resolveStrictScopeId(
+  viewerRole: HubRole,
+  viewerCode: string | null,
+  requestedId: string,
+): Promise<string | null> {
+  const normalizedRequested = normalizeIdentity(requestedId);
+  if (!normalizedRequested) {
+    return null;
+  }
+  if (viewerRole === 'admin') {
+    return normalizedRequested;
+  }
+  const viewerAccessibleIds = await resolveViewerAccessibleIds(viewerRole, viewerCode);
+  const accessible = new Set((viewerAccessibleIds ?? []).map((value) => value.toUpperCase()));
+  const normalizedViewerCode = normalizeIdentity(viewerCode ?? null);
+  if (normalizedViewerCode) {
+    accessible.add(normalizedViewerCode);
+  }
+  return accessible.has(normalizedRequested) ? normalizedRequested : null;
 }
 
 function deriveRequestedScopeIds(
@@ -404,6 +436,117 @@ export async function fetchScheduleDayPlan(input: {
   );
 
   return buildDayPlan(input.query.date, blocks, input.query.scopeType, input.query.scopeId, scopeIds);
+}
+
+export async function fetchCrewDailyExport(input: {
+  viewerRole: HubRole;
+  viewerCode: string | null;
+  query: { date: string; crewId: string; testMode?: ScheduleReadQuery['testMode'] };
+}): Promise<ScheduleCrewDailyExportResponse | null> {
+  try {
+    const crewId = await resolveStrictScopeId(input.viewerRole, input.viewerCode, input.query.crewId);
+    if (!crewId) {
+      return null;
+    }
+
+    const crewScope = await getRoleScope('crew', crewId);
+    if (!crewScope) {
+      return null;
+    }
+
+    const start = `${input.query.date}T00:00:00.000Z`;
+    const endDate = new Date(`${input.query.date}T00:00:00.000Z`);
+    endDate.setUTCDate(endDate.getUTCDate() + 1);
+    const end = endDate.toISOString();
+
+    const blocks = await fetchScheduleBlocks({
+      viewerRole: input.viewerRole,
+      viewerCode: input.viewerCode,
+      query: {
+        start,
+        end,
+        scopeType: 'crew',
+        scopeId: crewId,
+        scopeIds: [crewId],
+        testMode: input.query.testMode,
+        limit: 500,
+      },
+    });
+
+    const exportBlocks: ScheduleCrewDailyExportBlock[] = blocks
+      .map((block) => {
+        const tasks: ScheduleCrewDailyExportTask[] = block.tasks
+          .slice()
+          .sort((left, right) => left.sequence - right.sequence || left.taskId.localeCompare(right.taskId))
+          .map((task) => ({
+            taskId: task.taskId,
+            sequence: task.sequence,
+            title: task.title,
+            description: task.description,
+            areaName: task.areaName,
+            estimatedMinutes: task.estimatedMinutes,
+            status: task.status,
+            taskType: task.taskType,
+            categoryLabel: formatCategoryLabel(task.catalogItemType || task.taskType || 'General'),
+            requiredTools: task.requiredTools,
+            requiredProducts: task.requiredProducts,
+          }));
+
+        return {
+          blockId: block.blockId,
+          blockType: block.blockType,
+          title: block.title,
+          description: block.description,
+          status: block.status,
+          priority: block.priority,
+          startAt: block.startAt,
+          endAt: block.endAt,
+          timezone: block.timezone,
+          buildingName: block.buildingName,
+          areaName: block.areaName,
+          centerId: block.centerId,
+          centerName:
+            block.centerId === crewScope.relationships.center?.id
+              ? crewScope.relationships.center?.name ?? null
+              : null,
+          sourceType: block.sourceType,
+          sourceId: block.sourceId,
+          tasks,
+        };
+      })
+      .sort((left, right) => left.startAt.localeCompare(right.startAt) || left.blockId.localeCompare(right.blockId));
+
+    const taskCount = exportBlocks.reduce((total, block) => total + block.tasks.length, 0);
+    const completedTaskCount = exportBlocks.reduce(
+      (total, block) => total + block.tasks.filter((task) => task.status === 'completed').length,
+      0,
+    );
+    const scheduledMinutes = exportBlocks.reduce(
+      (total, block) => total + block.tasks.reduce((blockMinutes, task) => blockMinutes + (task.estimatedMinutes ?? 0), 0),
+      0,
+    );
+
+    return {
+      date: input.query.date,
+      crewId: crewScope.cksCode,
+      crewName: crewScope.cksCode,
+      centerId: crewScope.relationships.center?.id ?? null,
+      centerName: crewScope.relationships.center?.name ?? null,
+      generatedAt: new Date().toISOString(),
+      summary: {
+        blockCount: exportBlocks.length,
+        taskCount,
+        completedTaskCount,
+        scheduledMinutes,
+      },
+      blocks: exportBlocks,
+    };
+  } catch (error) {
+    if (isScheduleInfraUnavailable(error)) {
+      return null;
+    }
+    throw error;
+  }
 }
 
 export async function cancelBlocksForSource(input: CancelScheduleBlocksBySourceInput): Promise<string[]> {

@@ -21,9 +21,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useSWRConfig } from 'swr';
+import { useAuth as useClerkAuth } from '@clerk/clerk-react';
 import type { HubRole } from '../../shared/api/hub';
-import { saveScheduleBlock, useScheduleDayPlan, type ScheduleBlockDetail } from '../../shared/api/schedule';
+import {
+  fetchScheduleCrewDailyExport,
+  saveScheduleBlock,
+  useScheduleDayPlan,
+  type ScheduleBlockDetail,
+} from '../../shared/api/schedule';
 import { useCalendarContext } from '../calendar/CalendarProvider';
+import { buildCrewDailyPrintDocument } from './crewDailyPrint';
 
 interface ScheduleTreeNode { user: { id: string; role: string; name: string }; type?: string; children?: ScheduleTreeNode[]; }
 interface NamedNode { id: string; role: string; label: string; }
@@ -180,6 +187,7 @@ function BlockCard({ block, label, onOpen }: { block: ScheduleBlockDetail; label
 export default function ScheduleDayPlan({ viewerRole, scopeType, scopeId, scopeIds, testMode, scopeTree }: { viewerRole?: HubRole | 'admin'; scopeType?: string; scopeId?: string; scopeIds?: string[]; testMode?: 'include' | 'exclude' | 'only'; scopeTree?: ScheduleTreeNode | null; }) {
   const { anchorDate } = useCalendarContext();
   const { mutate: mutateGlobal } = useSWRConfig();
+  const { getToken } = useClerkAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const date = anchorDate.toISOString().slice(0, 10);
   const { data, isLoading, error, mutate } = useScheduleDayPlan({ date, scopeType, scopeId, scopeIds, testMode });
@@ -205,6 +213,8 @@ export default function ScheduleDayPlan({ viewerRole, scopeType, scopeId, scopeI
   const [isSavingEditor, setIsSavingEditor] = useState(false);
   const [editorBlockId, setEditorBlockId] = useState<string | null>(null);
   const [isEditorDirty, setIsEditorDirty] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   const allBlocks = useMemo(
     () => data?.buildings.flatMap((building) => [...building.lanes.flatMap((lane) => lane.blocks), ...building.unassignedBlocks]) ?? [],
@@ -224,6 +234,7 @@ export default function ScheduleDayPlan({ viewerRole, scopeType, scopeId, scopeI
   const isSourceDerived = Boolean(selectedBlock?.sourceType || selectedBlock?.sourceId);
   const zoomLevel: 'day' | 'block' | 'task' = selectedTask ? 'task' : selectedBlock ? 'block' : 'day';
   const isBlockEditorReadOnly = !canAuthor;
+  const canExportCrewDay = scopeType === 'crew' && Boolean(scopeId);
 
   function updateZoomParams(next: { blockId?: string | null; taskId?: string | null }) {
     const params = new URLSearchParams(searchParams);
@@ -244,6 +255,34 @@ export default function ScheduleDayPlan({ viewerRole, scopeType, scopeId, scopeI
   async function refreshScheduleSurfaces() {
     await mutate();
     await mutateGlobal((key) => typeof key === 'string' && (key.startsWith('/calendar/') || key.startsWith('/schedule/')));
+  }
+
+  async function handleExportCrewDay() {
+    if (!scopeId || scopeType !== 'crew') {
+      return;
+    }
+    setIsExporting(true);
+    setExportError(null);
+    try {
+      const data = await fetchScheduleCrewDailyExport({
+        date,
+        crewId: scopeId,
+        testMode,
+        getToken,
+      });
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) {
+        throw new Error('Unable to open print window. Check your popup settings and try again.');
+      }
+      printWindow.document.open();
+      printWindow.document.write(buildCrewDailyPrintDocument(data));
+      printWindow.document.close();
+      printWindow.focus();
+    } catch (failure) {
+      setExportError(failure instanceof Error ? failure.message : 'Failed to export crew schedule.');
+    } finally {
+      setIsExporting(false);
+    }
   }
 
   useEffect(() => {
@@ -456,12 +495,27 @@ export default function ScheduleDayPlan({ viewerRole, scopeType, scopeId, scopeI
           <div>
             <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">{zoomLevel === 'task' ? 'Task Detail' : zoomLevel === 'block' ? 'Block Detail' : 'Day Plan'}</div>
             <div className="mt-1 text-2xl font-black tracking-[-0.04em] text-slate-950">{anchorDate.toLocaleDateString('en-CA', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' })}</div>
+            {exportError ? <div className="mt-2 text-sm text-rose-600">{exportError}</div> : null}
           </div>
-          <div className="grid gap-2 sm:grid-cols-4">
-            <div className="rounded-[18px] border border-slate-200 bg-white px-4 py-3"><div className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Blocks</div><div className="mt-1 text-xl font-black text-slate-950">{data?.summary.blockCount ?? 0}</div></div>
-            <div className="rounded-[18px] border border-slate-200 bg-white px-4 py-3"><div className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Assigned</div><div className="mt-1 text-xl font-black text-slate-950">{data?.summary.assignedBlockCount ?? 0}</div></div>
-            <div className="rounded-[18px] border border-slate-200 bg-white px-4 py-3"><div className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Unassigned</div><div className="mt-1 text-xl font-black text-slate-950">{data?.summary.unassignedBlockCount ?? 0}</div></div>
-            <div className="rounded-[18px] border border-slate-200 bg-white px-4 py-3"><div className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Tasks</div><div className="mt-1 text-xl font-black text-slate-950">{data?.summary.taskCount ?? 0}</div></div>
+          <div className="flex flex-col gap-3 xl:items-end">
+            {canExportCrewDay ? (
+              <div className="flex justify-start xl:justify-end">
+                <button
+                  type="button"
+                  onClick={handleExportCrewDay}
+                  disabled={isExporting}
+                  className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-900 shadow-[0_10px_24px_rgba(15,23,42,0.08)] transition hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isExporting ? 'Preparing export...' : 'Export crew day'}
+                </button>
+              </div>
+            ) : null}
+            <div className="grid gap-2 sm:grid-cols-4">
+              <div className="rounded-[18px] border border-slate-200 bg-white px-4 py-3"><div className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Blocks</div><div className="mt-1 text-xl font-black text-slate-950">{data?.summary.blockCount ?? 0}</div></div>
+              <div className="rounded-[18px] border border-slate-200 bg-white px-4 py-3"><div className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Assigned</div><div className="mt-1 text-xl font-black text-slate-950">{data?.summary.assignedBlockCount ?? 0}</div></div>
+              <div className="rounded-[18px] border border-slate-200 bg-white px-4 py-3"><div className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Unassigned</div><div className="mt-1 text-xl font-black text-slate-950">{data?.summary.unassignedBlockCount ?? 0}</div></div>
+              <div className="rounded-[18px] border border-slate-200 bg-white px-4 py-3"><div className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Tasks</div><div className="mt-1 text-xl font-black text-slate-950">{data?.summary.taskCount ?? 0}</div></div>
+            </div>
           </div>
         </div>
       </section>

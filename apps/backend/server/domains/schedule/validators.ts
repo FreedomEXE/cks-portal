@@ -61,6 +61,12 @@ export const scheduleDayPlanQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(500).optional(),
 });
 
+export const scheduleCrewDailyExportQuerySchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  crewId: z.string().trim().min(1),
+  testMode: scheduleTestModeSchema.optional(),
+});
+
 export const scheduleBlockParamsSchema = z.object({
   blockId: z.string().trim().min(1),
 });

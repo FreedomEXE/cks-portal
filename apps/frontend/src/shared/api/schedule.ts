@@ -123,6 +123,55 @@ export interface ScheduleDayPlanResponse {
   buildings: ScheduleDayPlanBuilding[];
 }
 
+export interface ScheduleCrewDailyExportTask {
+  taskId: string;
+  sequence: number;
+  title: string;
+  description: string | null;
+  areaName: string | null;
+  estimatedMinutes: number | null;
+  status: 'pending' | 'in_progress' | 'completed' | 'cancelled' | 'skipped';
+  taskType: string;
+  categoryLabel: string;
+  requiredTools: string[];
+  requiredProducts: string[];
+}
+
+export interface ScheduleCrewDailyExportBlock {
+  blockId: string;
+  blockType: string;
+  title: string;
+  description: string | null;
+  status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
+  priority: 'low' | 'normal' | 'high' | 'urgent';
+  startAt: string;
+  endAt: string | null;
+  timezone: string;
+  buildingName: string | null;
+  areaName: string | null;
+  centerId: string | null;
+  centerName: string | null;
+  sourceType: string | null;
+  sourceId: string | null;
+  tasks: ScheduleCrewDailyExportTask[];
+}
+
+export interface ScheduleCrewDailyExportResponse {
+  date: string;
+  crewId: string;
+  crewName: string | null;
+  centerId: string | null;
+  centerName: string | null;
+  generatedAt: string;
+  summary: {
+    blockCount: number;
+    taskCount: number;
+    completedTaskCount: number;
+    scheduledMinutes: number;
+  };
+  blocks: ScheduleCrewDailyExportBlock[];
+}
+
 export interface SaveScheduleBlockInput {
   blockId?: string;
   expectedVersion?: number | null;
@@ -221,6 +270,23 @@ export async function saveScheduleBlock(input: SaveScheduleBlockInput) {
       method: input.blockId ? 'PATCH' : 'POST',
       body: JSON.stringify(input),
     },
+  );
+  return response.data;
+}
+
+export async function fetchScheduleCrewDailyExport(input: {
+  date: string;
+  crewId: string;
+  testMode?: 'include' | 'exclude' | 'only';
+  getToken?: () => Promise<string | null>;
+}) {
+  const response = await apiFetch<ApiResponse<ScheduleCrewDailyExportResponse>>(
+    `/schedule/export/crew-daily${buildQuery({
+      date: input.date,
+      crewId: input.crewId,
+      testMode: input.testMode,
+    })}`,
+    { getToken: input.getToken },
   );
   return response.data;
 }
