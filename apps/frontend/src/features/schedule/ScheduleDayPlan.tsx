@@ -9,8 +9,8 @@
  *
  * Responsibilities:
  * - Render building -> worker lanes for a single selected day
- * - Show task stacks inline for selected schedule blocks
  * - Provide block creation and editing for admin/manager users
+ * - Support URL-backed drill-in from day -> block -> task
  *
  * Role in system:
  * - Overrides the generic calendar day view inside the main Schedule tab
@@ -19,6 +19,7 @@
   Manifested by Freedom_EXE
 -----------------------------------------------*/
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useSWRConfig } from 'swr';
 import type { HubRole } from '../../shared/api/hub';
 import { saveScheduleBlock, useScheduleDayPlan, type ScheduleBlockDetail } from '../../shared/api/schedule';
@@ -88,18 +89,18 @@ function buildEditorState(block: ScheduleBlockDetail): BlockEditorState {
   };
 }
 
-function BlockCard({ block, label, selected, onSelect }: { block: ScheduleBlockDetail; label: string; selected: boolean; onSelect: (block: ScheduleBlockDetail) => void }) {
+function BlockCard({ block, label, onOpen }: { block: ScheduleBlockDetail; label: string; onOpen: (block: ScheduleBlockDetail) => void }) {
   const tone = STATUS_TONES[block.status] ?? STATUS_TONES.scheduled;
   return (
-    <button type="button" onClick={() => onSelect(block)} className={`w-full rounded-[22px] border px-4 py-3 text-left shadow-[0_12px_30px_rgba(15,23,42,0.06)] transition hover:-translate-y-0.5 ${selected ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200/80 bg-white hover:border-slate-300'}`}>
+    <button type="button" onClick={() => onOpen(block)} className="w-full rounded-[22px] border border-slate-200/80 bg-white px-4 py-3 text-left shadow-[0_12px_30px_rgba(15,23,42,0.06)] transition hover:-translate-y-0.5 hover:border-slate-300">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className={`text-[10px] font-black uppercase tracking-[0.14em] ${selected ? 'text-white/60' : 'text-slate-500'}`}>{formatTimeLabel(block.startAt, block.endAt)}</div>
-          <div className={`mt-2 text-sm font-black tracking-[-0.02em] ${selected ? 'text-white' : 'text-slate-950'}`}>{block.title}</div>
+          <div className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">{formatTimeLabel(block.startAt, block.endAt)}</div>
+          <div className="mt-2 text-sm font-black tracking-[-0.02em] text-slate-950">{block.title}</div>
         </div>
-        <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] ${selected ? 'border-white/20 bg-white/10 text-white' : tone}`}>{block.status.replace(/_/g, ' ')}</span>
+        <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] ${tone}`}>{block.status.replace(/_/g, ' ')}</span>
       </div>
-      <div className={`mt-2 text-xs ${selected ? 'text-white/70' : 'text-slate-500'}`}>{[label, block.areaName, `${block.tasks.length} tasks`].filter(Boolean).join(' • ')}</div>
+      <div className="mt-2 text-xs text-slate-500">{[label, block.areaName, `${block.tasks.length} tasks`].filter(Boolean).join(' • ')}</div>
     </button>
   );
 }
@@ -107,13 +108,15 @@ function BlockCard({ block, label, selected, onSelect }: { block: ScheduleBlockD
 export default function ScheduleDayPlan({ viewerRole, scopeType, scopeId, scopeIds, testMode, scopeTree }: { viewerRole?: HubRole | 'admin'; scopeType?: string; scopeId?: string; scopeIds?: string[]; testMode?: 'include' | 'exclude' | 'only'; scopeTree?: ScheduleTreeNode | null; }) {
   const { anchorDate } = useCalendarContext();
   const { mutate: mutateGlobal } = useSWRConfig();
+  const [searchParams, setSearchParams] = useSearchParams();
   const date = anchorDate.toISOString().slice(0, 10);
   const { data, isLoading, error, mutate } = useScheduleDayPlan({ date, scopeType, scopeId, scopeIds, testMode });
   const nodes = useMemo(() => flattenTree(scopeTree), [scopeTree]);
   const labelById = useMemo(() => new Map(nodes.map((node) => [node.id, node.label])), [nodes]);
   const centerOptions = useMemo(() => nodes.filter((node) => node.role === 'center'), [nodes]);
   const crewOptions = useMemo(() => nodes.filter((node) => node.role === 'crew'), [nodes]);
-  const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
+  const blockParam = normalizeId(searchParams.get('block'));
+  const taskParam = normalizeId(searchParams.get('task'));
   const [composerOpen, setComposerOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [buildingName, setBuildingName] = useState('');
@@ -128,36 +131,75 @@ export default function ScheduleDayPlan({ viewerRole, scopeType, scopeId, scopeI
   const [editorError, setEditorError] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [isSavingEditor, setIsSavingEditor] = useState(false);
+  const [editorBlockId, setEditorBlockId] = useState<string | null>(null);
+  const [isEditorDirty, setIsEditorDirty] = useState(false);
 
-  const selectedBlock = useMemo(() => {
-    if (!data || !selectedBlockId) return null;
-    for (const building of data.buildings) {
-      for (const lane of building.lanes) {
-        const found = lane.blocks.find((block) => block.blockId === selectedBlockId);
-        if (found) return found;
-      }
-      const found = building.unassignedBlocks.find((block) => block.blockId === selectedBlockId);
-      if (found) return found;
-    }
-    return null;
-  }, [data, selectedBlockId]);
-
+  const allBlocks = useMemo(
+    () => data?.buildings.flatMap((building) => [...building.lanes.flatMap((lane) => lane.blocks), ...building.unassignedBlocks]) ?? [],
+    [data],
+  );
+  const selectedBlock = useMemo(
+    () => (blockParam ? allBlocks.find((block) => normalizeId(block.blockId) === blockParam) ?? null : null),
+    [allBlocks, blockParam],
+  );
+  const selectedTask = useMemo(
+    () => (selectedBlock && taskParam ? selectedBlock.tasks.find((task) => normalizeId(task.taskId) === taskParam) ?? null : null),
+    [selectedBlock, taskParam],
+  );
   const canAuthor = viewerRole === 'admin' || viewerRole === 'manager';
   const effectiveCenterId = centerId || (scopeType === 'center' ? scopeId ?? '' : '');
   const defaultCrewId = crewId || (scopeType === 'crew' ? scopeId ?? '' : '');
   const isSourceDerived = Boolean(selectedBlock?.sourceType || selectedBlock?.sourceId);
+  const zoomLevel: 'day' | 'block' | 'task' = selectedTask ? 'task' : selectedBlock ? 'block' : 'day';
+  const isBlockEditorReadOnly = !canAuthor;
 
-  useEffect(() => { if (selectedBlock) { setEditorState(buildEditorState(selectedBlock)); setEditorError(null); } else setEditorState(null); }, [selectedBlock?.blockId, selectedBlock?.version, selectedBlock?.updatedAt]);
-  useEffect(() => {
-    if (selectedBlockId || !data?.buildings?.length) return;
-    const first = data.buildings.flatMap((building) => [...building.lanes.flatMap((lane) => lane.blocks), ...building.unassignedBlocks])[0] ?? null;
-    if (first) setSelectedBlockId(first.blockId);
-  }, [data, selectedBlockId]);
+  function updateZoomParams(next: { blockId?: string | null; taskId?: string | null }) {
+    const params = new URLSearchParams(searchParams);
+    if (next.blockId) {
+      params.set('block', next.blockId);
+    } else {
+      params.delete('block');
+      params.delete('task');
+    }
+    if (next.blockId && next.taskId) {
+      params.set('task', next.taskId);
+    } else {
+      params.delete('task');
+    }
+    setSearchParams(params, { replace: true });
+  }
 
   async function refreshScheduleSurfaces() {
     await mutate();
     await mutateGlobal((key) => typeof key === 'string' && (key.startsWith('/calendar/') || key.startsWith('/schedule/')));
   }
+
+  useEffect(() => {
+    if (!selectedBlock) {
+      setEditorState(null);
+      setEditorBlockId(null);
+      setIsEditorDirty(false);
+      return;
+    }
+    if (editorBlockId !== selectedBlock.blockId || !isEditorDirty) {
+      setEditorState(buildEditorState(selectedBlock));
+      setEditorBlockId(selectedBlock.blockId);
+      setEditorError(null);
+      if (editorBlockId !== selectedBlock.blockId) {
+        setIsEditorDirty(false);
+      }
+    }
+  }, [selectedBlock, editorBlockId, isEditorDirty]);
+
+  useEffect(() => {
+    if (blockParam && !selectedBlock) {
+      updateZoomParams({ blockId: null, taskId: null });
+      return;
+    }
+    if (taskParam && selectedBlock && !selectedTask) {
+      updateZoomParams({ blockId: selectedBlock.blockId, taskId: null });
+    }
+  }, [blockParam, taskParam, selectedBlock, selectedTask]);
 
   async function handleCreateBlock() {
     if (!title.trim() || !scopeType || !scopeId) {
@@ -189,7 +231,8 @@ export default function ScheduleDayPlan({ viewerRole, scopeType, scopeId, scopeI
       setAreaName('');
       setCenterId('');
       setCrewId('');
-      setSelectedBlockId(created.blockId);
+      setIsEditorDirty(false);
+      updateZoomParams({ blockId: created.blockId, taskId: null });
       await refreshScheduleSurfaces();
     } catch (saveFailure) {
       setComposerError(saveFailure instanceof Error ? saveFailure.message : 'Failed to save schedule block.');
@@ -252,10 +295,12 @@ export default function ScheduleDayPlan({ viewerRole, scopeType, scopeId, scopeI
           taskType: 'task',
         })),
       });
+      setIsEditorDirty(false);
       await refreshScheduleSurfaces();
     } catch (saveFailure) {
       const status = Number((saveFailure as { status?: number } | null)?.status ?? 0);
       if (status === 409) {
+        setIsEditorDirty(false);
         setEditorError('This block changed in another session. The latest version has been reloaded.');
         await refreshScheduleSurfaces();
       } else {
@@ -266,25 +311,47 @@ export default function ScheduleDayPlan({ viewerRole, scopeType, scopeId, scopeI
     }
   }
 
+  function resetEditor() {
+    if (!selectedBlock) return;
+    setEditorState(buildEditorState(selectedBlock));
+    setEditorBlockId(selectedBlock.blockId);
+    setIsEditorDirty(false);
+    setEditorError(null);
+  }
+
   function updateEditor<K extends keyof BlockEditorState>(key: K, value: BlockEditorState[K]) {
     setEditorState((current) => current ? { ...current, [key]: value } : current);
+    setIsEditorDirty(true);
   }
+
   function updateTask(localId: string, patch: Partial<EditorTaskDraft>) {
     setEditorState((current) => current ? { ...current, tasks: current.tasks.map((task) => task.localId === localId ? { ...task, ...patch } : task) } : current);
+    setIsEditorDirty(true);
   }
+
   function addTaskDraft() {
     setEditorState((current) => current ? { ...current, tasks: [...current.tasks, { localId: buildDraftId('task'), title: 'New task', status: 'pending', areaName: current.areaName, estimatedMinutes: '' }] } : current);
+    setIsEditorDirty(true);
   }
-  function removeTaskDraft(localId: string) {
-    setEditorState((current) => current ? { ...current, tasks: current.tasks.filter((task) => task.localId !== localId) } : current);
-  }
+
+  const groupedTasks = useMemo(() => {
+    if (!selectedBlock) return [] as Array<[string, ScheduleBlockDetail['tasks']]>;
+    const groups = new Map<string, ScheduleBlockDetail['tasks']>();
+    for (const task of selectedBlock.tasks) {
+      const key = (task.catalogItemType || task.taskType || 'General').replace(/_/g, ' ');
+      const bucket = groups.get(key) ?? [];
+      bucket.push(task);
+      groups.set(key, bucket);
+    }
+    return Array.from(groups.entries());
+  }, [selectedBlock]);
 
   return (
     <div className="flex flex-col gap-4">
       <section className="rounded-[28px] border border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.94))] p-4 shadow-[0_18px_44px_rgba(15,23,42,0.06)]">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div>
-            <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Day Plan</div>
+            <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">{zoomLevel === 'task' ? 'Task Detail' : zoomLevel === 'block' ? 'Block Detail' : 'Day Plan'}</div>
             <div className="mt-1 text-2xl font-black tracking-[-0.04em] text-slate-950">{anchorDate.toLocaleDateString('en-CA', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' })}</div>
           </div>
           <div className="grid gap-2 sm:grid-cols-4">
@@ -295,7 +362,20 @@ export default function ScheduleDayPlan({ viewerRole, scopeType, scopeId, scopeI
           </div>
         </div>
       </section>
-      {canAuthor ? (
+      {zoomLevel !== 'day' && selectedBlock ? (
+        <section className="rounded-[24px] border border-slate-200/80 bg-white/95 px-4 py-3 shadow-[0_16px_40px_rgba(15,23,42,0.06)]">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <button type="button" onClick={() => updateZoomParams({ blockId: null, taskId: null })} className="font-semibold text-slate-600 hover:text-slate-950">Day Plan</button>
+              <span className="text-slate-300">/</span>
+              <button type="button" onClick={() => updateZoomParams({ blockId: selectedBlock.blockId, taskId: null })} className="font-semibold text-slate-600 hover:text-slate-950">{selectedBlock.title}</button>
+              {selectedTask ? <><span className="text-slate-300">/</span><span className="font-semibold text-slate-950">{selectedTask.title}</span></> : null}
+            </div>
+            <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">{[selectedBlock.buildingName, selectedBlock.areaName, `${selectedBlock.tasks.length} tasks`].filter(Boolean).join(' • ')}</div>
+          </div>
+        </section>
+      ) : null}
+      {canAuthor && zoomLevel === 'day' ? (
         <section className="rounded-[28px] border border-slate-200/80 bg-white/95 p-4 shadow-[0_18px_48px_rgba(15,23,42,0.06)]">
           <div className="flex items-center justify-between gap-3">
             <div><div className="text-sm font-black text-slate-950">Author schedule blocks</div><div className="text-sm text-slate-500">Create editable work blocks directly from the focused day.</div></div>
@@ -311,120 +391,44 @@ export default function ScheduleDayPlan({ viewerRole, scopeType, scopeId, scopeI
               <input type="time" value={endTime} onChange={(event) => setEndTime(event.target.value)} className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
               <select value={centerId} onChange={(event) => setCenterId(event.target.value)} className="rounded-xl border border-slate-200 px-3 py-2 text-sm"><option value="">Center (optional)</option>{centerOptions.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select>
               <select value={crewId} onChange={(event) => setCrewId(event.target.value)} className="rounded-xl border border-slate-200 px-3 py-2 text-sm"><option value="">Primary crew (optional)</option>{crewOptions.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select>
-              <div className="flex items-center gap-3">
-                <button type="button" onClick={handleCreateBlock} disabled={isCreating} className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">{isCreating ? 'Saving...' : 'Create block'}</button>
-                {composerError ? <div className="text-sm text-rose-600">{composerError}</div> : null}
-              </div>
+              <div className="flex items-center gap-3"><button type="button" onClick={handleCreateBlock} disabled={isCreating} className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">{isCreating ? 'Saving...' : 'Create block'}</button>{composerError ? <div className="text-sm text-rose-600">{composerError}</div> : null}</div>
             </div>
           ) : null}
         </section>
       ) : null}
-      {isLoading ? (
-        <div className="rounded-[28px] border border-slate-200/80 bg-white px-6 py-6 text-sm text-slate-500 shadow-[0_18px_48px_rgba(15,23,42,0.08)]">Loading day plan...</div>
-      ) : error ? (
-        <div className="rounded-[28px] border border-rose-200 bg-rose-50 px-6 py-6 text-sm text-rose-800 shadow-[0_18px_48px_rgba(244,63,94,0.12)]">Failed to load day plan.</div>
-      ) : (
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
-          <div className="flex flex-col gap-4">
-            {(data?.buildings ?? []).map((building) => (
-              <section key={building.buildingKey} className="rounded-[30px] border border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.92))] p-4 shadow-[0_18px_48px_rgba(15,23,42,0.08)]">
-                <div className="border-b border-slate-200 pb-3">
-                  <div className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">Building</div>
-                  <div className="mt-1 text-xl font-black tracking-[-0.03em] text-slate-950">{building.buildingName}</div>
-                  {building.areaName ? <div className="mt-1 text-sm text-slate-500">{building.areaName}</div> : null}
-                </div>
-                <div className="mt-4 grid gap-3 xl:grid-cols-2">
-                  {building.lanes.map((lane) => (
-                    <div key={lane.laneId} className="rounded-[24px] border border-slate-200 bg-white/95 p-4 shadow-[0_12px_32px_rgba(15,23,42,0.05)]">
-                      <div className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">{lane.participantRole ?? 'Lane'}</div>
-                      <div className="mt-1 text-sm font-black tracking-[-0.02em] text-slate-950">{lane.participantId ? labelById.get(lane.participantId) ?? lane.participantId : 'Unassigned'}</div>
-                      <div className="mt-3 flex flex-col gap-2">{lane.blocks.map((block) => <BlockCard key={block.blockId} block={block} label={lane.participantId ? labelById.get(lane.participantId) ?? lane.participantId : 'Unassigned'} selected={selectedBlockId === block.blockId} onSelect={(next) => setSelectedBlockId(next.blockId)} />)}</div>
-                    </div>
-                  ))}
-                  {building.unassignedBlocks.length > 0 ? (
-                    <div className="rounded-[24px] border border-dashed border-slate-300 bg-slate-50/80 p-4">
-                      <div className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Unassigned</div>
-                      <div className="mt-3 flex flex-col gap-2">{building.unassignedBlocks.map((block) => <BlockCard key={block.blockId} block={block} label="Unassigned" selected={selectedBlockId === block.blockId} onSelect={(next) => setSelectedBlockId(next.blockId)} />)}</div>
-                    </div>
-                  ) : null}
-                </div>
-              </section>
-            ))}
-            {(data?.buildings ?? []).length === 0 ? <div className="rounded-[28px] border border-dashed border-slate-300 bg-white/80 px-6 py-8 text-sm text-slate-500 shadow-[0_18px_48px_rgba(15,23,42,0.04)]">No schedule blocks exist for this day yet.</div> : null}
-          </div>
-          <aside className="flex flex-col gap-3">
-            <div className="rounded-[28px] border border-slate-200/80 bg-slate-900 px-5 py-5 text-white shadow-[0_24px_64px_rgba(15,23,42,0.2)]">
-              <div className="text-[10px] font-black uppercase tracking-[0.16em] text-white/60">Selected block</div>
-              {selectedBlock ? (
-                <>
-                  <div className="mt-3 flex items-start justify-between gap-3">
-                    <div>
-                      <div className="text-lg font-black tracking-[-0.03em]">{selectedBlock.title}</div>
-                      <div className="mt-2 text-sm text-white/70">{formatTimeLabel(selectedBlock.startAt, selectedBlock.endAt)}</div>
-                      <div className="mt-1 text-sm text-white/60">{[selectedBlock.blockType, selectedBlock.buildingName, selectedBlock.areaName].filter(Boolean).join(' • ')}</div>
-                    </div>
-                    <span className="rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-white/75">v{selectedBlock.version}</span>
-                  </div>
-                  {selectedBlock.description ? <div className="mt-3 text-sm text-white/70">{selectedBlock.description}</div> : null}
-                  {isSourceDerived ? <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 px-3 py-3 text-xs text-white/70">Source-derived block. Schedule can move timing, assignment, and task status, but source workflow owns title and business details.</div> : null}
-                </>
-              ) : <div className="mt-3 text-sm text-white/70">Choose a block to inspect tasks and assignments.</div>}
-            </div>
-            <div className="rounded-[28px] border border-slate-200/80 bg-white/95 px-5 py-5 shadow-[0_18px_48px_rgba(15,23,42,0.08)]">
-              <div className="flex items-center justify-between gap-3">
-                <div className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">Block editor</div>
-                {canAuthor && selectedBlock && editorState ? <button type="button" onClick={() => setEditorState(buildEditorState(selectedBlock))} className="text-xs font-semibold text-slate-500 hover:text-slate-900">Reset</button> : null}
+      {isLoading ? <div className="rounded-[28px] border border-slate-200/80 bg-white px-6 py-6 text-sm text-slate-500 shadow-[0_18px_48px_rgba(15,23,42,0.08)]">Loading day plan...</div> : null}
+      {error ? <div className="rounded-[28px] border border-rose-200 bg-rose-50 px-6 py-6 text-sm text-rose-800 shadow-[0_18px_48px_rgba(244,63,94,0.12)]">Failed to load day plan.</div> : null}
+      {!isLoading && !error && zoomLevel === 'day' ? (
+        <div className="flex flex-col gap-4">
+          {(data?.buildings ?? []).map((building) => (
+            <section key={building.buildingKey} className="rounded-[30px] border border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.92))] p-4 shadow-[0_18px_48px_rgba(15,23,42,0.08)]">
+              <div className="border-b border-slate-200 pb-3"><div className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">Building</div><div className="mt-1 text-xl font-black tracking-[-0.03em] text-slate-950">{building.buildingName}</div>{building.areaName ? <div className="mt-1 text-sm text-slate-500">{building.areaName}</div> : null}</div>
+              <div className="mt-4 grid gap-3 xl:grid-cols-2">
+                {building.lanes.map((lane) => <div key={lane.laneId} className="rounded-[24px] border border-slate-200 bg-white/95 p-4 shadow-[0_12px_32px_rgba(15,23,42,0.05)]"><div className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">{lane.participantRole ?? 'Lane'}</div><div className="mt-1 text-sm font-black tracking-[-0.02em] text-slate-950">{lane.participantId ? labelById.get(lane.participantId) ?? lane.participantId : 'Unassigned'}</div><div className="mt-3 flex flex-col gap-2">{lane.blocks.map((block) => <BlockCard key={block.blockId} block={block} label={lane.participantId ? labelById.get(lane.participantId) ?? lane.participantId : 'Unassigned'} onOpen={(next) => updateZoomParams({ blockId: next.blockId, taskId: null })} />)}</div></div>)}
+                {building.unassignedBlocks.length > 0 ? <div className="rounded-[24px] border border-dashed border-slate-300 bg-slate-50/80 p-4"><div className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Unassigned</div><div className="mt-3 flex flex-col gap-2">{building.unassignedBlocks.map((block) => <BlockCard key={block.blockId} block={block} label="Unassigned" onOpen={(next) => updateZoomParams({ blockId: next.blockId, taskId: null })} />)}</div></div> : null}
               </div>
-              {selectedBlock && editorState ? (
-                <div className="mt-4 flex flex-col gap-4">
-                  <div className="grid gap-3">
-                    <input value={editorState.title} onChange={(event) => updateEditor('title', event.target.value)} disabled={isSourceDerived} className="rounded-2xl border border-slate-200 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400" />
-                    <textarea value={editorState.description} onChange={(event) => updateEditor('description', event.target.value)} disabled={isSourceDerived} rows={3} className="rounded-2xl border border-slate-200 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400" />
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <select value={editorState.blockType} onChange={(event) => updateEditor('blockType', event.target.value)} disabled={isSourceDerived} className="rounded-2xl border border-slate-200 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"><option value="service_visit">Service visit</option><option value="delivery">Delivery</option><option value="shift">Shift</option><option value="manual">Manual block</option></select>
-                      <select value={editorState.status} onChange={(event) => updateEditor('status', event.target.value as BlockEditorState['status'])} className="rounded-2xl border border-slate-200 px-3 py-2 text-sm"><option value="scheduled">Scheduled</option><option value="in_progress">In progress</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option></select>
-                      <input value={editorState.buildingName} onChange={(event) => updateEditor('buildingName', event.target.value)} className="rounded-2xl border border-slate-200 px-3 py-2 text-sm" placeholder="Building / site" />
-                      <input value={editorState.areaName} onChange={(event) => updateEditor('areaName', event.target.value)} className="rounded-2xl border border-slate-200 px-3 py-2 text-sm" placeholder="Area" />
-                      <input type="time" value={editorState.startTime} onChange={(event) => updateEditor('startTime', event.target.value)} className="rounded-2xl border border-slate-200 px-3 py-2 text-sm" />
-                      <input type="time" value={editorState.endTime} onChange={(event) => updateEditor('endTime', event.target.value)} className="rounded-2xl border border-slate-200 px-3 py-2 text-sm" />
-                      <select value={editorState.centerId} onChange={(event) => updateEditor('centerId', event.target.value)} className="rounded-2xl border border-slate-200 px-3 py-2 text-sm"><option value="">Center (optional)</option>{centerOptions.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select>
-                      <select value={editorState.crewId} onChange={(event) => updateEditor('crewId', event.target.value)} className="rounded-2xl border border-slate-200 px-3 py-2 text-sm"><option value="">Primary crew (optional)</option>{crewOptions.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select>
-                    </div>
-                  </div>
-                  <div className="rounded-[24px] border border-slate-200 bg-slate-50/70 p-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <div><div className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Task stack</div><div className="mt-1 text-sm font-black text-slate-950">Execution tasks stay inside the day plan.</div></div>
-                      {canAuthor && !isSourceDerived ? <button type="button" onClick={addTaskDraft} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700">Add task</button> : null}
-                    </div>
-                    <div className="mt-4 flex flex-col gap-3">
-                      {editorState.tasks.length === 0 ? <div className="rounded-[18px] border border-dashed border-slate-200 bg-white px-4 py-4 text-sm text-slate-500">No tasks added to this block yet.</div> : editorState.tasks.map((task, index) => (
-                        <div key={task.localId} className="rounded-[20px] border border-slate-200 bg-white px-4 py-3">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-500">Task {index + 1}</div>
-                            <div className="flex items-center gap-2">
-                              <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] ${STATUS_TONES[task.status] ?? STATUS_TONES.pending}`}>{task.status.replace(/_/g, ' ')}</span>
-                              {canAuthor && !isSourceDerived ? <button type="button" onClick={() => removeTaskDraft(task.localId)} className="text-xs font-semibold text-rose-600 hover:text-rose-700">Remove</button> : null}
-                            </div>
-                          </div>
-                          <div className="mt-3 grid gap-3">
-                            <input value={task.title} onChange={(event) => updateTask(task.localId, { title: event.target.value })} disabled={isSourceDerived && Boolean(task.taskId)} className="rounded-2xl border border-slate-200 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400" />
-                            <div className="grid gap-3 sm:grid-cols-3">
-                              <select value={task.status} onChange={(event) => updateTask(task.localId, { status: event.target.value as EditorTaskDraft['status'] })} className="rounded-2xl border border-slate-200 px-3 py-2 text-sm"><option value="pending">Pending</option><option value="in_progress">In progress</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option><option value="skipped">Skipped</option></select>
-                              <input value={task.areaName} onChange={(event) => updateTask(task.localId, { areaName: event.target.value })} disabled={isSourceDerived && Boolean(task.taskId)} placeholder="Area" className="rounded-2xl border border-slate-200 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400" />
-                              <input value={task.estimatedMinutes} onChange={(event) => updateTask(task.localId, { estimatedMinutes: event.target.value.replace(/[^\d]/g, '') })} disabled={isSourceDerived && Boolean(task.taskId)} placeholder="Minutes" className="rounded-2xl border border-slate-200 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400" />
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  {canAuthor ? <div className="flex items-center gap-3"><button type="button" onClick={handleSaveSelectedBlock} disabled={isSavingEditor} className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">{isSavingEditor ? 'Saving...' : 'Save changes'}</button>{editorError ? <div className="text-sm text-rose-600">{editorError}</div> : null}</div> : null}
-                </div>
-              ) : <div className="mt-3 text-sm text-slate-500">Choose a block to inspect and edit its schedule details inline.</div>}
-            </div>
-          </aside>
+            </section>
+          ))}
+          {(data?.buildings ?? []).length === 0 ? (
+            <section className="rounded-[28px] border border-dashed border-slate-300 bg-white/85 px-6 py-10 text-center shadow-[0_18px_48px_rgba(15,23,42,0.04)]">
+              <div className="text-sm font-black text-slate-950">No schedule blocks for this day yet.</div>
+              <div className="mt-2 text-sm text-slate-500">Use the day composer to create the first block, or move to another date to inspect existing work.</div>
+            </section>
+          ) : null}
         </div>
-      )}
+      ) : null}
+      {!isLoading && !error && zoomLevel === 'block' && selectedBlock && editorState ? (
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(340px,0.85fr)]">
+          <section className="rounded-[30px] border border-slate-200/80 bg-slate-900 px-6 py-6 text-white shadow-[0_24px_64px_rgba(15,23,42,0.2)]"><div className="flex items-start justify-between gap-4"><div><div className="text-[10px] font-black uppercase tracking-[0.16em] text-white/60">{selectedBlock.blockType.replace(/_/g, ' ')}</div><div className="mt-2 text-3xl font-black tracking-[-0.04em]">{selectedBlock.title}</div><div className="mt-2 text-sm text-white/70">{[formatTimeLabel(selectedBlock.startAt, selectedBlock.endAt), selectedBlock.buildingName, selectedBlock.areaName].filter(Boolean).join(' • ')}</div></div><span className="rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-white/75">v{selectedBlock.version}</span></div>{selectedBlock.description ? <div className="mt-4 text-sm text-white/75">{selectedBlock.description}</div> : null}<div className="mt-6 grid gap-4 lg:grid-cols-2">{groupedTasks.map(([groupLabel, tasks]) => <div key={groupLabel} className="rounded-[24px] border border-white/10 bg-white/5 p-4"><div className="text-[10px] font-black uppercase tracking-[0.14em] text-white/55">{groupLabel}</div><div className="mt-3 flex flex-col gap-2">{tasks.map((task) => <button key={task.taskId} type="button" onClick={() => updateZoomParams({ blockId: selectedBlock.blockId, taskId: task.taskId })} className="rounded-[18px] border border-white/10 bg-white/5 px-4 py-3 text-left transition hover:border-white/20 hover:bg-white/10"><div className="flex items-start justify-between gap-3"><div><div className="text-sm font-black tracking-[-0.02em] text-white">{task.title}</div><div className="mt-1 text-xs text-white/60">{[task.areaName, task.estimatedMinutes ? `${task.estimatedMinutes} min` : null].filter(Boolean).join(' • ')}</div></div><span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] ${STATUS_TONES[task.status] ?? STATUS_TONES.pending}`}>{task.status.replace(/_/g, ' ')}</span></div></button>)}</div></div>)}</div></section>
+          <section className="rounded-[28px] border border-slate-200/80 bg-white/95 px-5 py-5 shadow-[0_18px_48px_rgba(15,23,42,0.08)]"><div className="flex items-center justify-between gap-3"><div className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">Block editor</div>{canAuthor ? <button type="button" onClick={resetEditor} className="text-xs font-semibold text-slate-500 hover:text-slate-900">Reset</button> : null}</div>{isSourceDerived ? <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-xs text-slate-600">Source-derived block. Schedule can move timing, assignment, and task status, but source workflow owns title and business details.</div> : null}<div className="mt-4 flex flex-col gap-4"><div className="grid gap-3"><input value={editorState.title} onChange={(event) => updateEditor('title', event.target.value)} disabled={isBlockEditorReadOnly || isSourceDerived} className="rounded-2xl border border-slate-200 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400" /><textarea value={editorState.description} onChange={(event) => updateEditor('description', event.target.value)} disabled={isBlockEditorReadOnly || isSourceDerived} rows={3} className="rounded-2xl border border-slate-200 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400" /><div className="grid gap-3 sm:grid-cols-2"><select value={editorState.blockType} onChange={(event) => updateEditor('blockType', event.target.value)} disabled={isBlockEditorReadOnly || isSourceDerived} className="rounded-2xl border border-slate-200 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"><option value="service_visit">Service visit</option><option value="delivery">Delivery</option><option value="shift">Shift</option><option value="manual">Manual block</option></select><select value={editorState.status} onChange={(event) => updateEditor('status', event.target.value as BlockEditorState['status'])} disabled={isBlockEditorReadOnly} className="rounded-2xl border border-slate-200 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"><option value="scheduled">Scheduled</option><option value="in_progress">In progress</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option></select><input value={editorState.buildingName} onChange={(event) => updateEditor('buildingName', event.target.value)} disabled={isBlockEditorReadOnly} className="rounded-2xl border border-slate-200 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400" placeholder="Building / site" /><input value={editorState.areaName} onChange={(event) => updateEditor('areaName', event.target.value)} disabled={isBlockEditorReadOnly} className="rounded-2xl border border-slate-200 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400" placeholder="Area" /><input type="time" value={editorState.startTime} onChange={(event) => updateEditor('startTime', event.target.value)} disabled={isBlockEditorReadOnly} className="rounded-2xl border border-slate-200 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400" /><input type="time" value={editorState.endTime} onChange={(event) => updateEditor('endTime', event.target.value)} disabled={isBlockEditorReadOnly} className="rounded-2xl border border-slate-200 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400" /><select value={editorState.centerId} onChange={(event) => updateEditor('centerId', event.target.value)} disabled={isBlockEditorReadOnly} className="rounded-2xl border border-slate-200 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"><option value="">Center (optional)</option>{centerOptions.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select><select value={editorState.crewId} onChange={(event) => updateEditor('crewId', event.target.value)} disabled={isBlockEditorReadOnly} className="rounded-2xl border border-slate-200 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"><option value="">Primary crew (optional)</option>{crewOptions.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></div></div><div className="rounded-[24px] border border-slate-200 bg-slate-50/70 p-4"><div className="flex items-center justify-between gap-3"><div><div className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Task stack</div><div className="mt-1 text-sm font-black text-slate-950">Edit task content here, then drill into a task for focused detail.</div></div>{canAuthor && !isSourceDerived ? <button type="button" onClick={addTaskDraft} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700">Add task</button> : null}</div><div className="mt-4 flex flex-col gap-3">{editorState.tasks.map((task, index) => <button key={task.localId} type="button" onClick={() => task.taskId && updateZoomParams({ blockId: selectedBlock.blockId, taskId: task.taskId })} className="rounded-[20px] border border-slate-200 bg-white px-4 py-3 text-left"><div className="flex items-start justify-between gap-3"><div><div className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-500">Task {index + 1}</div><div className="mt-1 text-sm font-black tracking-[-0.02em] text-slate-950">{task.title}</div></div><span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] ${STATUS_TONES[task.status] ?? STATUS_TONES.pending}`}>{task.status.replace(/_/g, ' ')}</span></div></button>)}</div></div>{canAuthor ? <div className="flex items-center gap-3"><button type="button" onClick={handleSaveSelectedBlock} disabled={isSavingEditor} className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">{isSavingEditor ? 'Saving...' : 'Save changes'}</button>{isEditorDirty ? <div className="text-xs font-semibold uppercase tracking-[0.12em] text-amber-700">Unsaved changes</div> : null}{editorError ? <div className="text-sm text-rose-600">{editorError}</div> : null}</div> : null}</div></section>
+        </div>
+      ) : null}
+      {!isLoading && !error && zoomLevel === 'task' && selectedBlock && selectedTask && editorState ? (
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
+          <section className="rounded-[28px] border border-slate-200/80 bg-white/95 px-5 py-5 shadow-[0_18px_48px_rgba(15,23,42,0.08)]"><div className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">Task detail</div><div className="mt-2 text-2xl font-black tracking-[-0.04em] text-slate-950">{selectedTask.title}</div><div className="mt-2 text-sm text-slate-500">{[selectedBlock.title, selectedTask.areaName, selectedTask.estimatedMinutes ? `${selectedTask.estimatedMinutes} min` : null].filter(Boolean).join(' • ')}</div><div className="mt-4 rounded-[24px] border border-slate-200 bg-slate-50/80 p-4"><div className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Execution status</div><div className="mt-3 inline-flex rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-slate-700">{selectedTask.status.replace(/_/g, ' ')}</div><div className="mt-4 text-sm text-slate-600">This zoom layer is where procedure/task execution will expand next. For now it anchors task-specific editing inside the Schedule workspace instead of ejecting to a modal.</div></div></section>
+          <section className="rounded-[28px] border border-slate-200/80 bg-white/95 px-5 py-5 shadow-[0_18px_48px_rgba(15,23,42,0.08)]"><div className="flex items-center justify-between gap-3"><div className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">Task editor</div><button type="button" onClick={() => updateZoomParams({ blockId: selectedBlock.blockId, taskId: null })} className="text-xs font-semibold text-slate-500 hover:text-slate-900">Back to block</button></div><div className="mt-4 flex flex-col gap-4">{editorState.tasks.map((task) => task.taskId === selectedTask.taskId ? <div key={task.localId} className="flex flex-col gap-3"><input value={task.title} onChange={(event) => updateTask(task.localId, { title: event.target.value })} disabled={isBlockEditorReadOnly || (isSourceDerived && Boolean(task.taskId))} className="rounded-2xl border border-slate-200 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400" /><div className="grid gap-3 sm:grid-cols-3"><select value={task.status} onChange={(event) => updateTask(task.localId, { status: event.target.value as EditorTaskDraft['status'] })} disabled={isBlockEditorReadOnly} className="rounded-2xl border border-slate-200 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"><option value="pending">Pending</option><option value="in_progress">In progress</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option><option value="skipped">Skipped</option></select><input value={task.areaName} onChange={(event) => updateTask(task.localId, { areaName: event.target.value })} disabled={isBlockEditorReadOnly || (isSourceDerived && Boolean(task.taskId))} placeholder="Area" className="rounded-2xl border border-slate-200 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400" /><input value={task.estimatedMinutes} onChange={(event) => updateTask(task.localId, { estimatedMinutes: event.target.value.replace(/[^\d]/g, '') })} disabled={isBlockEditorReadOnly || (isSourceDerived && Boolean(task.taskId))} placeholder="Minutes" className="rounded-2xl border border-slate-200 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400" /></div></div> : null)}{canAuthor ? <div className="flex items-center gap-3"><button type="button" onClick={handleSaveSelectedBlock} disabled={isSavingEditor} className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">{isSavingEditor ? 'Saving...' : 'Save task changes'}</button>{isEditorDirty ? <div className="text-xs font-semibold uppercase tracking-[0.12em] text-amber-700">Unsaved changes</div> : null}{editorError ? <div className="text-sm text-rose-600">{editorError}</div> : null}</div> : null}</div></section>
+        </div>
+      ) : null}
     </div>
   );
 }
