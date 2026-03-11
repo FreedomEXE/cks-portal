@@ -27,8 +27,30 @@ import { useCalendarContext } from '../calendar/CalendarProvider';
 
 interface ScheduleTreeNode { user: { id: string; role: string; name: string }; type?: string; children?: ScheduleTreeNode[]; }
 interface NamedNode { id: string; role: string; label: string; }
-interface EditorTaskDraft { localId: string; taskId?: string; version?: number; title: string; status: 'pending' | 'in_progress' | 'completed' | 'cancelled' | 'skipped'; areaName: string; estimatedMinutes: string; }
+interface EditorTaskDraft {
+  localId: string;
+  taskId?: string;
+  version?: number;
+  taskType: string;
+  catalogItemCode?: string | null;
+  catalogItemType?: string | null;
+  title: string;
+  description: string;
+  status: 'pending' | 'in_progress' | 'completed' | 'cancelled' | 'skipped';
+  areaName: string;
+  estimatedMinutes: string;
+  requiredTools: string[];
+  requiredProducts: string[];
+}
 interface BlockEditorState { title: string; description: string; blockType: string; status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled'; buildingName: string; areaName: string; startTime: string; endTime: string; centerId: string; crewId: string; tasks: EditorTaskDraft[]; }
+
+interface ProcedureGroup<TTask extends { taskType?: string | null; catalogItemType?: string | null; estimatedMinutes?: string | number | null; status: string }> {
+  key: string;
+  label: string;
+  tasks: TTask[];
+  totalMinutes: number;
+  completedCount: number;
+}
 
 const STATUS_TONES: Record<string, string> = {
   scheduled: 'border-sky-200 bg-sky-50 text-sky-900',
@@ -68,6 +90,42 @@ function toTimeInput(value?: string | null): string {
 }
 function buildDraftId(prefix: string): string { return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`; }
 function isTestValue(value?: string | null): boolean { return String(value || '').toUpperCase().includes('-TEST'); }
+function formatProcedureLabel(value?: string | null): string {
+  return (value || 'General')
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+function toEstimatedMinutes(value: string | number | null | undefined): number {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
+}
+function buildProcedureGroups<TTask extends { taskType?: string | null; catalogItemType?: string | null; estimatedMinutes?: string | number | null; status: string }>(tasks: TTask[]): ProcedureGroup<TTask>[] {
+  const groups = new Map<string, ProcedureGroup<TTask>>();
+  for (const task of tasks) {
+    const key = task.catalogItemType || task.taskType || 'general';
+    const existing = groups.get(key);
+    if (existing) {
+      existing.tasks.push(task);
+      existing.totalMinutes += toEstimatedMinutes(task.estimatedMinutes);
+      if (task.status === 'completed') existing.completedCount += 1;
+      continue;
+    }
+    groups.set(key, {
+      key,
+      label: formatProcedureLabel(key),
+      tasks: [task],
+      totalMinutes: toEstimatedMinutes(task.estimatedMinutes),
+      completedCount: task.status === 'completed' ? 1 : 0,
+    });
+  }
+  return Array.from(groups.values());
+}
 function getPrimaryCrewId(block: ScheduleBlockDetail): string {
   return block.assignments.find((a) => a.participantRole === 'crew' && a.isPrimary)?.participantId
     ?? block.assignments.find((a) => a.participantRole === 'crew' && a.assignmentType === 'assignee')?.participantId
@@ -85,7 +143,21 @@ function buildEditorState(block: ScheduleBlockDetail): BlockEditorState {
     endTime: toTimeInput(block.endAt),
     centerId: block.centerId ?? '',
     crewId: getPrimaryCrewId(block),
-    tasks: block.tasks.map((task) => ({ localId: task.taskId, taskId: task.taskId, version: task.version, title: task.title, status: task.status, areaName: task.areaName ?? '', estimatedMinutes: task.estimatedMinutes ? String(task.estimatedMinutes) : '' })),
+    tasks: block.tasks.map((task) => ({
+      localId: task.taskId,
+      taskId: task.taskId,
+      version: task.version,
+      taskType: task.taskType,
+      catalogItemCode: task.catalogItemCode,
+      catalogItemType: task.catalogItemType,
+      title: task.title,
+      description: task.description ?? '',
+      status: task.status,
+      areaName: task.areaName ?? '',
+      estimatedMinutes: task.estimatedMinutes ? String(task.estimatedMinutes) : '',
+      requiredTools: task.requiredTools ?? [],
+      requiredProducts: task.requiredProducts ?? [],
+    })),
   };
 }
 
@@ -223,7 +295,7 @@ export default function ScheduleDayPlan({ viewerRole, scopeType, scopeId, scopeI
         status: 'scheduled',
         priority: 'normal',
         assignments: defaultCrewId ? [{ participantId: defaultCrewId, participantRole: 'crew', assignmentType: 'assignee', isPrimary: true, status: 'assigned' }] : undefined,
-        tasks: [{ title: `${title.trim()} prep`, sequence: 1, status: 'pending' }],
+        tasks: [{ title: `${title.trim()} prep`, sequence: 1, status: 'pending', taskType: 'prep' }],
       });
       setComposerOpen(false);
       setTitle('');
@@ -284,16 +356,26 @@ export default function ScheduleDayPlan({ viewerRole, scopeType, scopeId, scopeI
         generatorKey: selectedBlock.generatorKey,
         metadata: selectedBlock.metadata,
         assignments,
-        tasks: editorState.tasks.filter((task) => task.title.trim()).map((task, index) => ({
-          taskId: task.taskId,
-          version: task.version,
-          sequence: index + 1,
-          title: isSourceDerived && task.taskId ? selectedBlock.tasks.find((item) => item.taskId === task.taskId)?.title ?? task.title.trim() : task.title.trim(),
-          status: task.status,
-          areaName: task.areaName.trim() || null,
-          estimatedMinutes: task.estimatedMinutes ? Number(task.estimatedMinutes) : null,
-          taskType: 'task',
-        })),
+        tasks: editorState.tasks.filter((task) => task.title.trim()).map((task, index) => {
+          const persistedTask = task.taskId ? selectedBlock.tasks.find((item) => item.taskId === task.taskId) : null;
+          return {
+            taskId: task.taskId,
+            version: task.version,
+            sequence: index + 1,
+            taskType: persistedTask?.taskType ?? task.taskType ?? 'task',
+            catalogItemCode: persistedTask?.catalogItemCode ?? task.catalogItemCode ?? null,
+            catalogItemType: persistedTask?.catalogItemType ?? task.catalogItemType ?? null,
+            title: isSourceDerived && task.taskId ? persistedTask?.title ?? task.title.trim() : task.title.trim(),
+            description: isSourceDerived && task.taskId
+              ? (persistedTask?.description ?? (task.description.trim() || null))
+              : (task.description.trim() || null),
+            status: task.status,
+            areaName: task.areaName.trim() || null,
+            estimatedMinutes: task.estimatedMinutes ? Number(task.estimatedMinutes) : null,
+            requiredTools: persistedTask?.requiredTools ?? task.requiredTools ?? [],
+            requiredProducts: persistedTask?.requiredProducts ?? task.requiredProducts ?? [],
+          };
+        }),
       });
       setIsEditorDirty(false);
       await refreshScheduleSurfaces();
@@ -330,21 +412,42 @@ export default function ScheduleDayPlan({ viewerRole, scopeType, scopeId, scopeI
   }
 
   function addTaskDraft() {
-    setEditorState((current) => current ? { ...current, tasks: [...current.tasks, { localId: buildDraftId('task'), title: 'New task', status: 'pending', areaName: current.areaName, estimatedMinutes: '' }] } : current);
+    setEditorState((current) => current ? {
+      ...current,
+      tasks: [
+        ...current.tasks,
+        {
+          localId: buildDraftId('task'),
+          taskType: 'task',
+          title: 'New task',
+          description: '',
+          status: 'pending',
+          areaName: current.areaName,
+          estimatedMinutes: '',
+          requiredTools: [],
+          requiredProducts: [],
+        },
+      ],
+    } : current);
     setIsEditorDirty(true);
   }
-
-  const groupedTasks = useMemo(() => {
-    if (!selectedBlock) return [] as Array<[string, ScheduleBlockDetail['tasks']]>;
-    const groups = new Map<string, ScheduleBlockDetail['tasks']>();
-    for (const task of selectedBlock.tasks) {
-      const key = (task.catalogItemType || task.taskType || 'General').replace(/_/g, ' ');
-      const bucket = groups.get(key) ?? [];
-      bucket.push(task);
-      groups.set(key, bucket);
-    }
-    return Array.from(groups.entries());
-  }, [selectedBlock]);
+  const selectedEditorTask = useMemo(
+    () => (editorState && taskParam ? editorState.tasks.find((task) => normalizeId(task.taskId) === taskParam) ?? null : null),
+    [editorState, taskParam],
+  );
+  const activeTask = selectedEditorTask ?? selectedTask;
+  const procedureGroups = useMemo(
+    () => buildProcedureGroups(selectedBlock?.tasks ?? []),
+    [selectedBlock],
+  );
+  const editorProcedureGroups = useMemo(
+    () => buildProcedureGroups(editorState?.tasks ?? []),
+    [editorState],
+  );
+  const activeProcedureGroup = useMemo(
+    () => (activeTask ? editorProcedureGroups.find((group) => group.tasks.some((task) => normalizeId(task.taskId) === normalizeId(activeTask.taskId))) ?? null : null),
+    [activeTask, editorProcedureGroups],
+  );
 
   return (
     <div className="flex flex-col gap-4">
@@ -419,14 +522,144 @@ export default function ScheduleDayPlan({ viewerRole, scopeType, scopeId, scopeI
       ) : null}
       {!isLoading && !error && zoomLevel === 'block' && selectedBlock && editorState ? (
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(340px,0.85fr)]">
-          <section className="rounded-[30px] border border-slate-200/80 bg-slate-900 px-6 py-6 text-white shadow-[0_24px_64px_rgba(15,23,42,0.2)]"><div className="flex items-start justify-between gap-4"><div><div className="text-[10px] font-black uppercase tracking-[0.16em] text-white/60">{selectedBlock.blockType.replace(/_/g, ' ')}</div><div className="mt-2 text-3xl font-black tracking-[-0.04em]">{selectedBlock.title}</div><div className="mt-2 text-sm text-white/70">{[formatTimeLabel(selectedBlock.startAt, selectedBlock.endAt), selectedBlock.buildingName, selectedBlock.areaName].filter(Boolean).join(' • ')}</div></div><span className="rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-white/75">v{selectedBlock.version}</span></div>{selectedBlock.description ? <div className="mt-4 text-sm text-white/75">{selectedBlock.description}</div> : null}<div className="mt-6 grid gap-4 lg:grid-cols-2">{groupedTasks.map(([groupLabel, tasks]) => <div key={groupLabel} className="rounded-[24px] border border-white/10 bg-white/5 p-4"><div className="text-[10px] font-black uppercase tracking-[0.14em] text-white/55">{groupLabel}</div><div className="mt-3 flex flex-col gap-2">{tasks.map((task) => <button key={task.taskId} type="button" onClick={() => updateZoomParams({ blockId: selectedBlock.blockId, taskId: task.taskId })} className="rounded-[18px] border border-white/10 bg-white/5 px-4 py-3 text-left transition hover:border-white/20 hover:bg-white/10"><div className="flex items-start justify-between gap-3"><div><div className="text-sm font-black tracking-[-0.02em] text-white">{task.title}</div><div className="mt-1 text-xs text-white/60">{[task.areaName, task.estimatedMinutes ? `${task.estimatedMinutes} min` : null].filter(Boolean).join(' • ')}</div></div><span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] ${STATUS_TONES[task.status] ?? STATUS_TONES.pending}`}>{task.status.replace(/_/g, ' ')}</span></div></button>)}</div></div>)}</div></section>
+          <section className="rounded-[30px] border border-slate-200/80 bg-slate-900 px-6 py-6 text-white shadow-[0_24px_64px_rgba(15,23,42,0.2)]">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="text-[10px] font-black uppercase tracking-[0.16em] text-white/60">{selectedBlock.blockType.replace(/_/g, ' ')}</div>
+                <div className="mt-2 text-3xl font-black tracking-[-0.04em]">{selectedBlock.title}</div>
+                <div className="mt-2 text-sm text-white/70">{[formatTimeLabel(selectedBlock.startAt, selectedBlock.endAt), selectedBlock.buildingName, selectedBlock.areaName].filter(Boolean).join(' • ')}</div>
+              </div>
+              <span className="rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-white/75">v{selectedBlock.version}</span>
+            </div>
+            {selectedBlock.description ? <div className="mt-4 text-sm text-white/75">{selectedBlock.description}</div> : null}
+            <div className="mt-6 grid gap-4 lg:grid-cols-2">
+              {procedureGroups.map((group) => (
+                <div key={group.key} className="rounded-[24px] border border-white/10 bg-white/5 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-[10px] font-black uppercase tracking-[0.14em] text-white/55">{group.label}</div>
+                      <div className="mt-1 text-xs text-white/55">{group.tasks.length} tasks • {group.totalMinutes || 0} min • {group.completedCount}/{group.tasks.length} complete</div>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex flex-col gap-2">
+                    {group.tasks.map((task) => (
+                      <button key={task.taskId} type="button" onClick={() => updateZoomParams({ blockId: selectedBlock.blockId, taskId: task.taskId })} className="rounded-[18px] border border-white/10 bg-white/5 px-4 py-3 text-left transition hover:border-white/20 hover:bg-white/10">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <div className="text-sm font-black tracking-[-0.02em] text-white">{task.title}</div>
+                            <div className="mt-1 text-xs text-white/60">{[task.areaName, task.estimatedMinutes ? `${task.estimatedMinutes} min` : null].filter(Boolean).join(' • ')}</div>
+                          </div>
+                          <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] ${STATUS_TONES[task.status] ?? STATUS_TONES.pending}`}>{task.status.replace(/_/g, ' ')}</span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
           <section className="rounded-[28px] border border-slate-200/80 bg-white/95 px-5 py-5 shadow-[0_18px_48px_rgba(15,23,42,0.08)]"><div className="flex items-center justify-between gap-3"><div className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">Block editor</div>{canAuthor ? <button type="button" onClick={resetEditor} className="text-xs font-semibold text-slate-500 hover:text-slate-900">Reset</button> : null}</div>{isSourceDerived ? <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-xs text-slate-600">Source-derived block. Schedule can move timing, assignment, and task status, but source workflow owns title and business details.</div> : null}<div className="mt-4 flex flex-col gap-4"><div className="grid gap-3"><input value={editorState.title} onChange={(event) => updateEditor('title', event.target.value)} disabled={isBlockEditorReadOnly || isSourceDerived} className="rounded-2xl border border-slate-200 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400" /><textarea value={editorState.description} onChange={(event) => updateEditor('description', event.target.value)} disabled={isBlockEditorReadOnly || isSourceDerived} rows={3} className="rounded-2xl border border-slate-200 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400" /><div className="grid gap-3 sm:grid-cols-2"><select value={editorState.blockType} onChange={(event) => updateEditor('blockType', event.target.value)} disabled={isBlockEditorReadOnly || isSourceDerived} className="rounded-2xl border border-slate-200 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"><option value="service_visit">Service visit</option><option value="delivery">Delivery</option><option value="shift">Shift</option><option value="manual">Manual block</option></select><select value={editorState.status} onChange={(event) => updateEditor('status', event.target.value as BlockEditorState['status'])} disabled={isBlockEditorReadOnly} className="rounded-2xl border border-slate-200 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"><option value="scheduled">Scheduled</option><option value="in_progress">In progress</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option></select><input value={editorState.buildingName} onChange={(event) => updateEditor('buildingName', event.target.value)} disabled={isBlockEditorReadOnly} className="rounded-2xl border border-slate-200 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400" placeholder="Building / site" /><input value={editorState.areaName} onChange={(event) => updateEditor('areaName', event.target.value)} disabled={isBlockEditorReadOnly} className="rounded-2xl border border-slate-200 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400" placeholder="Area" /><input type="time" value={editorState.startTime} onChange={(event) => updateEditor('startTime', event.target.value)} disabled={isBlockEditorReadOnly} className="rounded-2xl border border-slate-200 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400" /><input type="time" value={editorState.endTime} onChange={(event) => updateEditor('endTime', event.target.value)} disabled={isBlockEditorReadOnly} className="rounded-2xl border border-slate-200 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400" /><select value={editorState.centerId} onChange={(event) => updateEditor('centerId', event.target.value)} disabled={isBlockEditorReadOnly} className="rounded-2xl border border-slate-200 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"><option value="">Center (optional)</option>{centerOptions.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select><select value={editorState.crewId} onChange={(event) => updateEditor('crewId', event.target.value)} disabled={isBlockEditorReadOnly} className="rounded-2xl border border-slate-200 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"><option value="">Primary crew (optional)</option>{crewOptions.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></div></div><div className="rounded-[24px] border border-slate-200 bg-slate-50/70 p-4"><div className="flex items-center justify-between gap-3"><div><div className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Task stack</div><div className="mt-1 text-sm font-black text-slate-950">Edit task content here, then drill into a task for focused detail.</div></div>{canAuthor && !isSourceDerived ? <button type="button" onClick={addTaskDraft} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700">Add task</button> : null}</div><div className="mt-4 flex flex-col gap-3">{editorState.tasks.map((task, index) => <button key={task.localId} type="button" onClick={() => task.taskId && updateZoomParams({ blockId: selectedBlock.blockId, taskId: task.taskId })} className="rounded-[20px] border border-slate-200 bg-white px-4 py-3 text-left"><div className="flex items-start justify-between gap-3"><div><div className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-500">Task {index + 1}</div><div className="mt-1 text-sm font-black tracking-[-0.02em] text-slate-950">{task.title}</div></div><span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] ${STATUS_TONES[task.status] ?? STATUS_TONES.pending}`}>{task.status.replace(/_/g, ' ')}</span></div></button>)}</div></div>{canAuthor ? <div className="flex items-center gap-3"><button type="button" onClick={handleSaveSelectedBlock} disabled={isSavingEditor} className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">{isSavingEditor ? 'Saving...' : 'Save changes'}</button>{isEditorDirty ? <div className="text-xs font-semibold uppercase tracking-[0.12em] text-amber-700">Unsaved changes</div> : null}{editorError ? <div className="text-sm text-rose-600">{editorError}</div> : null}</div> : null}</div></section>
         </div>
       ) : null}
-      {!isLoading && !error && zoomLevel === 'task' && selectedBlock && selectedTask && editorState ? (
+      {!isLoading && !error && zoomLevel === 'task' && selectedBlock && activeTask && editorState ? (
         <div className="grid gap-4 xl:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
-          <section className="rounded-[28px] border border-slate-200/80 bg-white/95 px-5 py-5 shadow-[0_18px_48px_rgba(15,23,42,0.08)]"><div className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">Task detail</div><div className="mt-2 text-2xl font-black tracking-[-0.04em] text-slate-950">{selectedTask.title}</div><div className="mt-2 text-sm text-slate-500">{[selectedBlock.title, selectedTask.areaName, selectedTask.estimatedMinutes ? `${selectedTask.estimatedMinutes} min` : null].filter(Boolean).join(' • ')}</div><div className="mt-4 rounded-[24px] border border-slate-200 bg-slate-50/80 p-4"><div className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Execution status</div><div className="mt-3 inline-flex rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-slate-700">{selectedTask.status.replace(/_/g, ' ')}</div><div className="mt-4 text-sm text-slate-600">This zoom layer is where procedure/task execution will expand next. For now it anchors task-specific editing inside the Schedule workspace instead of ejecting to a modal.</div></div></section>
-          <section className="rounded-[28px] border border-slate-200/80 bg-white/95 px-5 py-5 shadow-[0_18px_48px_rgba(15,23,42,0.08)]"><div className="flex items-center justify-between gap-3"><div className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">Task editor</div><button type="button" onClick={() => updateZoomParams({ blockId: selectedBlock.blockId, taskId: null })} className="text-xs font-semibold text-slate-500 hover:text-slate-900">Back to block</button></div><div className="mt-4 flex flex-col gap-4">{editorState.tasks.map((task) => task.taskId === selectedTask.taskId ? <div key={task.localId} className="flex flex-col gap-3"><input value={task.title} onChange={(event) => updateTask(task.localId, { title: event.target.value })} disabled={isBlockEditorReadOnly || (isSourceDerived && Boolean(task.taskId))} className="rounded-2xl border border-slate-200 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400" /><div className="grid gap-3 sm:grid-cols-3"><select value={task.status} onChange={(event) => updateTask(task.localId, { status: event.target.value as EditorTaskDraft['status'] })} disabled={isBlockEditorReadOnly} className="rounded-2xl border border-slate-200 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"><option value="pending">Pending</option><option value="in_progress">In progress</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option><option value="skipped">Skipped</option></select><input value={task.areaName} onChange={(event) => updateTask(task.localId, { areaName: event.target.value })} disabled={isBlockEditorReadOnly || (isSourceDerived && Boolean(task.taskId))} placeholder="Area" className="rounded-2xl border border-slate-200 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400" /><input value={task.estimatedMinutes} onChange={(event) => updateTask(task.localId, { estimatedMinutes: event.target.value.replace(/[^\d]/g, '') })} disabled={isBlockEditorReadOnly || (isSourceDerived && Boolean(task.taskId))} placeholder="Minutes" className="rounded-2xl border border-slate-200 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400" /></div></div> : null)}{canAuthor ? <div className="flex items-center gap-3"><button type="button" onClick={handleSaveSelectedBlock} disabled={isSavingEditor} className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">{isSavingEditor ? 'Saving...' : 'Save task changes'}</button>{isEditorDirty ? <div className="text-xs font-semibold uppercase tracking-[0.12em] text-amber-700">Unsaved changes</div> : null}{editorError ? <div className="text-sm text-rose-600">{editorError}</div> : null}</div> : null}</div></section>
+          <section className="rounded-[28px] border border-slate-200/80 bg-white/95 px-5 py-5 shadow-[0_18px_48px_rgba(15,23,42,0.08)]">
+            <div className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">Task detail</div>
+            <div className="mt-2 text-2xl font-black tracking-[-0.04em] text-slate-950">{activeTask.title}</div>
+            <div className="mt-2 text-sm text-slate-500">{[selectedBlock.title, activeTask.areaName, activeTask.estimatedMinutes ? `${activeTask.estimatedMinutes} min` : null].filter(Boolean).join(' • ')}</div>
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              <div className="rounded-[24px] border border-slate-200 bg-slate-50/80 p-4">
+                <div className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Procedure</div>
+                <div className="mt-2 text-lg font-black tracking-[-0.03em] text-slate-950">{activeProcedureGroup?.label ?? 'General'}</div>
+                <div className="mt-1 text-sm text-slate-500">{activeProcedureGroup ? `${activeProcedureGroup.tasks.length} steps • ${activeProcedureGroup.totalMinutes || 0} min planned` : 'Single task context'}</div>
+                <div className="mt-3 inline-flex rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-slate-700">{activeTask.status.replace(/_/g, ' ')}</div>
+              </div>
+              <div className="rounded-[24px] border border-slate-200 bg-slate-50/80 p-4">
+                <div className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Execution context</div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {[selectedBlock.buildingName, selectedBlock.areaName, activeTask.taskType ? formatProcedureLabel(activeTask.taskType) : null].filter(Boolean).map((item) => (
+                    <span key={String(item)} className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700">{item}</span>
+                  ))}
+                </div>
+                {activeTask.description ? <div className="mt-4 text-sm text-slate-600">{activeTask.description}</div> : <div className="mt-4 text-sm text-slate-500">No task note added yet.</div>}
+              </div>
+            </div>
+            <div className="mt-4 rounded-[24px] border border-slate-200 bg-white p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Procedure steps</div>
+                  <div className="mt-1 text-sm text-slate-500">Stay in this zoom level while moving through related tasks.</div>
+                </div>
+                <button type="button" onClick={() => updateZoomParams({ blockId: selectedBlock.blockId, taskId: null })} className="text-xs font-semibold text-slate-500 hover:text-slate-900">Back to block</button>
+              </div>
+              <div className="mt-4 flex flex-col gap-2">
+                {(activeProcedureGroup?.tasks ?? [activeTask]).map((task) => {
+                  const isActive = normalizeId(task.taskId) === normalizeId(activeTask.taskId);
+                  return (
+                    <button key={task.taskId ?? `${activeProcedureGroup?.key || 'task'}-${task.title}`} type="button" onClick={() => task.taskId && updateZoomParams({ blockId: selectedBlock.blockId, taskId: task.taskId })} className={`rounded-[18px] border px-4 py-3 text-left transition ${isActive ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-slate-50 hover:border-slate-300'}`}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className={`text-[10px] font-black uppercase tracking-[0.12em] ${isActive ? 'text-white/60' : 'text-slate-500'}`}>Step</div>
+                          <div className={`mt-1 text-sm font-black tracking-[-0.02em] ${isActive ? 'text-white' : 'text-slate-950'}`}>{task.title}</div>
+                          <div className={`mt-1 text-xs ${isActive ? 'text-white/70' : 'text-slate-500'}`}>{[task.areaName, task.estimatedMinutes ? `${task.estimatedMinutes} min` : null].filter(Boolean).join(' • ')}</div>
+                        </div>
+                        <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] ${isActive ? 'border-white/15 bg-white/10 text-white' : STATUS_TONES[task.status] ?? STATUS_TONES.pending}`}>{task.status.replace(/_/g, ' ')}</span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            {(activeTask.requiredTools.length > 0 || activeTask.requiredProducts.length > 0) ? (
+              <div className="mt-4 grid gap-3 md:grid-cols-2">
+                <div className="rounded-[24px] border border-slate-200 bg-white p-4">
+                  <div className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Required tools</div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {activeTask.requiredTools.length ? activeTask.requiredTools.map((tool) => <span key={tool} className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700">{tool}</span>) : <span className="text-sm text-slate-500">None listed.</span>}
+                  </div>
+                </div>
+                <div className="rounded-[24px] border border-slate-200 bg-white p-4">
+                  <div className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Required products</div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {activeTask.requiredProducts.length ? activeTask.requiredProducts.map((product) => <span key={product} className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700">{product}</span>) : <span className="text-sm text-slate-500">None listed.</span>}
+                  </div>
+                </div>
+              </div>
+            ) : null}
+          </section>
+          <section className="rounded-[28px] border border-slate-200/80 bg-white/95 px-5 py-5 shadow-[0_18px_48px_rgba(15,23,42,0.08)]">
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">Task editor</div>
+              <button type="button" onClick={() => updateZoomParams({ blockId: selectedBlock.blockId, taskId: null })} className="text-xs font-semibold text-slate-500 hover:text-slate-900">Back to block</button>
+            </div>
+            <div className="mt-4 flex flex-col gap-4">
+              {editorState.tasks.map((task) => task.taskId === activeTask.taskId ? (
+                <div key={task.localId} className="flex flex-col gap-3">
+                  <input value={task.title} onChange={(event) => updateTask(task.localId, { title: event.target.value })} disabled={isBlockEditorReadOnly || (isSourceDerived && Boolean(task.taskId))} className="rounded-2xl border border-slate-200 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400" />
+                  <textarea value={task.description} onChange={(event) => updateTask(task.localId, { description: event.target.value })} disabled={isBlockEditorReadOnly || (isSourceDerived && Boolean(task.taskId))} rows={4} className="rounded-2xl border border-slate-200 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400" placeholder="Task note / execution guidance" />
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <select value={task.status} onChange={(event) => updateTask(task.localId, { status: event.target.value as EditorTaskDraft['status'] })} disabled={isBlockEditorReadOnly} className="rounded-2xl border border-slate-200 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"><option value="pending">Pending</option><option value="in_progress">In progress</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option><option value="skipped">Skipped</option></select>
+                    <input value={task.areaName} onChange={(event) => updateTask(task.localId, { areaName: event.target.value })} disabled={isBlockEditorReadOnly || (isSourceDerived && Boolean(task.taskId))} placeholder="Area" className="rounded-2xl border border-slate-200 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400" />
+                    <input value={task.estimatedMinutes} onChange={(event) => updateTask(task.localId, { estimatedMinutes: event.target.value.replace(/[^\d]/g, '') })} disabled={isBlockEditorReadOnly || (isSourceDerived && Boolean(task.taskId))} placeholder="Minutes" className="rounded-2xl border border-slate-200 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400" />
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="rounded-[22px] border border-slate-200 bg-slate-50/70 p-4">
+                      <div className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Procedure grouping</div>
+                      <div className="mt-2 text-sm font-black text-slate-950">{formatProcedureLabel(task.catalogItemType || task.taskType || 'General')}</div>
+                      <div className="mt-1 text-sm text-slate-500">{task.catalogItemCode ? `Catalog: ${task.catalogItemCode}` : 'Ad hoc task inside this block.'}</div>
+                    </div>
+                    <div className="rounded-[22px] border border-slate-200 bg-slate-50/70 p-4">
+                      <div className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Resources</div>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {[...task.requiredTools, ...task.requiredProducts].length ? [...task.requiredTools, ...task.requiredProducts].map((resource) => <span key={resource} className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700">{resource}</span>) : <span className="text-sm text-slate-500">No resources listed yet.</span>}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : null)}
+              {canAuthor ? <div className="flex items-center gap-3"><button type="button" onClick={handleSaveSelectedBlock} disabled={isSavingEditor} className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">{isSavingEditor ? 'Saving...' : 'Save block changes'}</button>{isEditorDirty ? <div className="text-xs font-semibold uppercase tracking-[0.12em] text-amber-700">Unsaved changes</div> : null}{editorError ? <div className="text-sm text-rose-600">{editorError}</div> : null}</div> : null}
+            </div>
+          </section>
         </div>
       ) : null}
     </div>
