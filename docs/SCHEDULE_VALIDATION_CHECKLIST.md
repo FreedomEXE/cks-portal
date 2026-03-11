@@ -80,6 +80,17 @@ Minimum data conditions:
 - at least 1 building with multiple crew assigned across the week
 - at least 1 multi-crew block if possible
 
+Preparation commands:
+
+- run backend migrations:
+  - `pnpm --dir apps/backend migrate`
+- seed dense source-driven TEST fixtures:
+  - `pnpm --dir apps/backend seed:calendar-test-fixtures`
+- seed dense authored Schedule fixtures:
+  - `pnpm --dir apps/backend seed:schedule-test-fixtures`
+- or run the full TEST review seed in one shot:
+  - `pnpm --dir apps/backend seed:schedule-review-fixtures`
+
 ## Review Format
 
 For every issue found, log:

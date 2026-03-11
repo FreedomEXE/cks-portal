@@ -10,6 +10,8 @@
     "migrate": "node scripts/migrate.cjs",
     "backfill:catalog-activities": "tsx -r dotenv/config scripts/backfill-catalog-activities.ts",
     "seed:calendar-test-fixtures": "tsx -r dotenv/config scripts/seed-calendar-test-fixtures.ts",
+    "seed:schedule-test-fixtures": "tsx -r dotenv/config scripts/seed-schedule-test-fixtures.ts",
+    "seed:schedule-review-fixtures": "pnpm -s seed:calendar-test-fixtures && pnpm -s seed:schedule-test-fixtures",
     "normalize:created-activities": "tsx -r dotenv/config scripts/normalize-created-activities.ts",
     "backfill:assignments-and-certs": "tsx -r dotenv/config scripts/backfill-assignments-and-certifications.ts",
     "backfill:all-activities": "pnpm -s backfill:catalog-activities && pnpm -s normalize:created-activities && pnpm -s backfill:assignments-and-certs",

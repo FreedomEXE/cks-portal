@@ -18,7 +18,7 @@
 /*-----------------------------------------------
   Manifested by Freedom_EXE
 -----------------------------------------------*/
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useSWRConfig } from 'swr';
 import { useAuth as useClerkAuth } from '@clerk/clerk-react';
@@ -70,6 +70,12 @@ const STATUS_TONES: Record<string, string> = {
   cancelled: 'border-rose-200 bg-rose-50 text-rose-900',
   pending: 'border-slate-200 bg-slate-50 text-slate-700',
   skipped: 'border-violet-200 bg-violet-50 text-violet-900',
+};
+
+const ZOOM_DEPTH: Record<'day' | 'block' | 'task', number> = {
+  day: 0,
+  block: 1,
+  task: 2,
 };
 
 function normalizeId(value?: string | null): string | null { if (!value) return null; const trimmed = value.trim(); return trimmed ? trimmed.toUpperCase() : null; }
@@ -242,6 +248,12 @@ export default function ScheduleDayPlan({ viewerRole, scopeType, scopeId, scopeI
   const isBlockEditorReadOnly = !canAuthor;
   const canExportCrewDay = scopeType === 'crew' && Boolean(scopeId);
   const canExportSummary = canAuthor;
+  const [surfaceMotionClass, setSurfaceMotionClass] = useState('');
+  const zoomStateRef = useRef<{ level: 'day' | 'block' | 'task'; blockId: string | null; taskId: string | null }>({
+    level: zoomLevel,
+    blockId: selectedBlock?.blockId ?? null,
+    taskId: selectedTask?.taskId ?? null,
+  });
 
   function updateZoomParams(next: { blockId?: string | null; taskId?: string | null }) {
     const params = new URLSearchParams(searchParams);
@@ -386,6 +398,27 @@ export default function ScheduleDayPlan({ viewerRole, scopeType, scopeId, scopeI
       updateZoomParams({ blockId: selectedBlock.blockId, taskId: null });
     }
   }, [blockParam, taskParam, selectedBlock, selectedTask]);
+
+  useEffect(() => {
+    const previous = zoomStateRef.current;
+    const next = {
+      level: zoomLevel,
+      blockId: selectedBlock?.blockId ?? null,
+      taskId: selectedTask?.taskId ?? null,
+    };
+    const levelChanged = previous.level !== next.level;
+    const targetChanged = previous.blockId !== next.blockId || previous.taskId !== next.taskId;
+    if (!levelChanged && !targetChanged) {
+      return;
+    }
+    const motionClass = levelChanged
+      ? (ZOOM_DEPTH[next.level] > ZOOM_DEPTH[previous.level] ? 'schedule-zoom-enter-in' : 'schedule-zoom-enter-out')
+      : 'schedule-zoom-swap';
+    setSurfaceMotionClass(motionClass);
+    zoomStateRef.current = next;
+    const timeout = window.setTimeout(() => setSurfaceMotionClass(''), 240);
+    return () => window.clearTimeout(timeout);
+  }, [zoomLevel, selectedBlock?.blockId, selectedTask?.taskId]);
 
   async function handleCreateBlock() {
     if (!title.trim() || !scopeType || !scopeId) {
@@ -570,6 +603,13 @@ export default function ScheduleDayPlan({ viewerRole, scopeType, scopeId, scopeI
           <div>
             <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">{zoomLevel === 'task' ? 'Task Detail' : zoomLevel === 'block' ? 'Block Detail' : 'Day Plan'}</div>
             <div className="mt-1 text-2xl font-black tracking-[-0.04em] text-slate-950">{anchorDate.toLocaleDateString('en-CA', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' })}</div>
+            <div className="mt-2 text-sm text-slate-500">
+              {zoomLevel === 'day'
+                ? 'Select a block to zoom deeper into the live schedule for this day.'
+                : zoomLevel === 'block'
+                  ? 'You are inside one work block. Select a task to keep zooming in without leaving the day.'
+                  : 'Task detail stays nested inside the selected block so the day context remains intact.'}
+            </div>
             {exportError ? <div className="mt-2 text-sm text-rose-600">{exportError}</div> : null}
           </div>
           <div className="flex flex-col gap-3 xl:items-end">
@@ -643,7 +683,7 @@ export default function ScheduleDayPlan({ viewerRole, scopeType, scopeId, scopeI
       {isLoading ? <div className="rounded-[28px] border border-slate-200/80 bg-white px-6 py-6 text-sm text-slate-500 shadow-[0_18px_48px_rgba(15,23,42,0.08)]">Loading day plan...</div> : null}
       {error ? <div className="rounded-[28px] border border-rose-200 bg-rose-50 px-6 py-6 text-sm text-rose-800 shadow-[0_18px_48px_rgba(244,63,94,0.12)]">Failed to load day plan.</div> : null}
       {!isLoading && !error && zoomLevel === 'day' ? (
-        <div className="flex flex-col gap-4">
+        <div className={`schedule-zoom-surface flex flex-col gap-4 ${surfaceMotionClass}`}>
           {(data?.buildings ?? []).map((building) => (
             <section key={building.buildingKey} className="rounded-[30px] border border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.92))] p-4 shadow-[0_18px_48px_rgba(15,23,42,0.08)]">
               <div className="flex flex-col gap-3 border-b border-slate-200 pb-3 lg:flex-row lg:items-start lg:justify-between">
@@ -676,7 +716,7 @@ export default function ScheduleDayPlan({ viewerRole, scopeType, scopeId, scopeI
         </div>
       ) : null}
       {!isLoading && !error && zoomLevel === 'block' && selectedBlock && editorState ? (
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(340px,0.85fr)]">
+        <div className={`schedule-zoom-surface grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(340px,0.85fr)] ${surfaceMotionClass}`}>
           <section className="rounded-[30px] border border-slate-200/80 bg-slate-900 px-6 py-6 text-white shadow-[0_24px_64px_rgba(15,23,42,0.2)]">
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -717,7 +757,7 @@ export default function ScheduleDayPlan({ viewerRole, scopeType, scopeId, scopeI
         </div>
       ) : null}
       {!isLoading && !error && zoomLevel === 'task' && selectedBlock && activeTask && editorState ? (
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
+        <div className={`schedule-zoom-surface grid gap-4 xl:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] ${surfaceMotionClass}`}>
           <section className="rounded-[28px] border border-slate-200/80 bg-white/95 px-5 py-5 shadow-[0_18px_48px_rgba(15,23,42,0.08)]">
             <div className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">Task detail</div>
             <div className="mt-2 text-2xl font-black tracking-[-0.04em] text-slate-950">{activeTask.title}</div>
