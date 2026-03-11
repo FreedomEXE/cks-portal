@@ -201,24 +201,30 @@ export async function buildServer() {
       }
 
       const auth = await authenticate(request);
-      if (process.env.NODE_ENV === 'development') {
-        console.log(
-          '[bootstrap] Auth context:',
-          auth.ok ? 'valid' : 'invalid (' + (auth.reason || 'unknown') + ')'
-        );
-      }
+      console.log(
+        '[bootstrap] Auth result:',
+        auth.ok ? `ok userId=${auth.userId}` : `fail reason=${auth.reason}`,
+      );
 
       const authContext = auth.ok ? auth : null;
 
       let hubAccount = authContext ? await getHubAccountByClerkId(authContext.userId) : null;
+      console.log(
+        '[bootstrap] Hub account lookup:',
+        authContext?.userId ?? 'no-auth',
+        '->',
+        hubAccount ? `found role=${hubAccount.role} code=${hubAccount.cksCode}` : 'NOT FOUND',
+      );
       if (!hubAccount && DEV_AUTH_ENABLED && headerSchema.data.devRole) {
         hubAccount = await getHubAccountByCode(headerSchema.data.devCode ?? '');
         if (!hubAccount) {
+          console.log('[bootstrap] Dev override account not found:', headerSchema.data.devCode);
           return reply.code(404).send({ error: 'Not provisioned' });
         }
       }
 
       if (!hubAccount) {
+        console.log('[bootstrap] No hub account for userId:', authContext?.userId, '- returning 401');
         return reply.code(401).send({ error: 'Unauthorized' });
       }
 

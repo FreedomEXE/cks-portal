@@ -26,10 +26,7 @@ export async function authenticate(req: FastifyRequest): Promise<AuthResult> {
   const authorization = req.headers.authorization ?? '';
   const [scheme, token] = authorization.split(' ');
 
-  // Log only in development mode without exposing token data
-  if (process.env.NODE_ENV === 'development') {
-    console.log('[auth] Header received:', token ? 'yes' : 'no');
-  }
+  console.log('[auth] Header received:', token ? 'yes' : 'no', '| scheme:', scheme ?? 'none');
 
   if (scheme !== 'Bearer' || !token) {
     return { ok: false, reason: 'missing_header' };
@@ -37,7 +34,7 @@ export async function authenticate(req: FastifyRequest): Promise<AuthResult> {
 
   try {
     if (!CLERK_SECRET_KEY) {
-      // Without a secret key we cannot verify; return failure so guards can fall back to dev headers
+      console.log('[auth] No CLERK_SECRET_KEY - cannot verify token');
       return { ok: false, reason: 'verify_fail' };
     }
     const payload = await verifyToken(token, {
@@ -49,6 +46,7 @@ export async function authenticate(req: FastifyRequest): Promise<AuthResult> {
     const userId = typeof claims.sub === 'string' ? (claims.sub as string) : null;
 
     if (!userId) {
+      console.log('[auth] Token verified but no sub claim');
       return { ok: false, reason: 'no_userid' };
     }
 
@@ -58,10 +56,7 @@ export async function authenticate(req: FastifyRequest): Promise<AuthResult> {
         ? (claims['email_address'] as string)
         : null;
 
-    // Log only in development mode without exposing full userId
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[auth] User authenticated successfully');
-    }
+    console.log('[auth] Authenticated:', userId, email ?? 'no-email');
 
     return {
       ok: true,
@@ -69,10 +64,7 @@ export async function authenticate(req: FastifyRequest): Promise<AuthResult> {
       email,
     };
   } catch (error) {
-    // Log error without exposing sensitive details
-    if (process.env.NODE_ENV === 'development') {
-      console.error('[auth] Token verification failed');
-    }
+    console.error('[auth] Token verification failed:', (error as Error)?.message ?? 'unknown');
     req.log?.warn?.({ err: error }, 'Failed to verify Clerk token');
     return { ok: false, reason: 'verify_fail' };
   }
