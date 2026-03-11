@@ -125,6 +125,7 @@ export interface ScheduleDayPlanResponse {
 
 export interface SaveScheduleBlockInput {
   blockId?: string;
+  expectedVersion?: number | null;
   isTest?: boolean;
   scopeType: string;
   scopeId: string;
@@ -160,6 +161,7 @@ export interface SaveScheduleBlockInput {
   tasks?: Array<{
     taskId?: string;
     sequence?: number;
+    version?: number;
     taskType?: string;
     catalogItemCode?: string | null;
     catalogItemType?: string | null;

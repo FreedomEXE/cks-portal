@@ -113,6 +113,12 @@ type ScheduleTaskRow = QueryResultRow & {
   updated_by: string | null;
 };
 
+function createScheduleConflictError(message: string): Error & { statusCode: number } {
+  const error = new Error(message) as Error & { statusCode: number };
+  error.statusCode = 409;
+  return error;
+}
+
 function toIso(value: Date | string | null | undefined): string | null {
   if (!value) return null;
   const parsed = value instanceof Date ? value : new Date(value);
@@ -277,8 +283,8 @@ async function replaceTasks(
   tasks: UpsertScheduleBlockTaskInput[] | undefined,
   actorId: string,
 ): Promise<void> {
-  await tx(`DELETE FROM schedule_block_tasks WHERE block_id = $1`, [blockId]);
   if (!tasks?.length) {
+    await tx(`DELETE FROM schedule_block_tasks WHERE block_id = $1`, [blockId]);
     return;
   }
 
@@ -295,6 +301,7 @@ async function replaceTasks(
   const requiredTools: string[][] = [];
   const requiredProducts: string[][] = [];
   const metadataValues: string[] = [];
+  const versions: number[] = [];
 
   for (const [index, task] of tasks.entries()) {
     const title = String(task.title || '').trim();
@@ -313,18 +320,30 @@ async function replaceTasks(
     requiredTools.push((task.requiredTools ?? []).map((item) => String(item).trim()).filter(Boolean));
     requiredProducts.push((task.requiredProducts ?? []).map((item) => String(item).trim()).filter(Boolean));
     metadataValues.push(JSON.stringify(task.metadata || {}));
+    versions.push(task.version ?? 1);
   }
 
   if (!taskIds.length) {
+    await tx(`DELETE FROM schedule_block_tasks WHERE block_id = $1`, [blockId]);
     return;
   }
 
   await tx(
     `
+      DELETE FROM schedule_block_tasks
+      WHERE block_id = $1
+        AND NOT (task_id = ANY($2::text[]))
+    `,
+    [blockId, taskIds],
+  );
+
+  const taskUpsertResult = await tx<{ task_id: string }>(
+    `
       INSERT INTO schedule_block_tasks (
         task_id,
         block_id,
         sequence,
+        version,
         task_type,
         catalog_item_code,
         catalog_item_type,
@@ -343,6 +362,7 @@ async function replaceTasks(
         task_id,
         $1,
         sequence,
+        version,
         task_type,
         catalog_item_code,
         catalog_item_type,
@@ -359,20 +379,22 @@ async function replaceTasks(
       FROM UNNEST(
         $2::text[],
         $3::int[],
-        $4::text[],
+        $4::int[],
         $5::text[],
         $6::text[],
         $7::text[],
         $8::text[],
         $9::text[],
-        $10::int[],
-        $11::text[],
-        $12::text[][],
+        $10::text[],
+        $11::int[],
+        $12::text[],
         $14::text[][],
-        $15::text[]
+        $15::text[][],
+        $16::text[]
       ) AS batch(
         task_id,
         sequence,
+        version,
         task_type,
         catalog_item_code,
         catalog_item_type,
@@ -385,11 +407,31 @@ async function replaceTasks(
         required_products,
         metadata
       )
+      ON CONFLICT (task_id) DO UPDATE SET
+        sequence = EXCLUDED.sequence,
+        task_type = EXCLUDED.task_type,
+        catalog_item_code = EXCLUDED.catalog_item_code,
+        catalog_item_type = EXCLUDED.catalog_item_type,
+        title = EXCLUDED.title,
+        description = EXCLUDED.description,
+        area_name = EXCLUDED.area_name,
+        estimated_minutes = EXCLUDED.estimated_minutes,
+        status = EXCLUDED.status,
+        required_tools = EXCLUDED.required_tools,
+        required_products = EXCLUDED.required_products,
+        metadata = EXCLUDED.metadata,
+        updated_at = NOW(),
+        updated_by = EXCLUDED.updated_by,
+        version = schedule_block_tasks.version + 1
+      WHERE schedule_block_tasks.block_id = $1
+        AND schedule_block_tasks.version = EXCLUDED.version
+      RETURNING task_id
     `,
     [
       blockId,
       taskIds,
       sequences,
+      versions,
       taskTypes,
       catalogCodes,
       catalogTypes,
@@ -404,112 +446,173 @@ async function replaceTasks(
       metadataValues,
     ],
   );
+
+  const persistedTaskIds = new Set(taskUpsertResult.rows.map((row) => row.task_id));
+  const conflictedTaskId = taskIds.find((taskId) => !persistedTaskIds.has(taskId));
+  if (conflictedTaskId) {
+    throw createScheduleConflictError(`Schedule task ${conflictedTaskId} was updated by another user. Refresh and try again.`);
+  }
 }
 
 export async function upsertScheduleBlock(input: UpsertScheduleBlockInput & { blockId: string; generatorKey: string }): Promise<string> {
   return withTransaction(async (tx) => {
-    const result = await tx<{ block_id: string }>(
+    const normalizedBlockId = normalizeIdentity(input.blockId) ?? input.blockId;
+    const actorId = input.updatedBy ?? input.createdBy ?? 'SYSTEM';
+    const existingResult = await tx<{ block_id: string; version: number }>(
       `
-        INSERT INTO schedule_blocks (
-          block_id,
-          scope_type,
-          scope_id,
-          center_id,
-          warehouse_id,
-          building_name,
-          area_name,
-          start_at,
-          end_at,
-          timezone,
-          block_type,
-          title,
-          description,
-          status,
-          priority,
-          source_type,
-          source_id,
-          source_action,
-          template_id,
-          recurrence_rule,
-          series_parent_id,
-          occurrence_index,
-          generator_key,
-          metadata,
-          created_by,
-          updated_by
-        )
-        VALUES (
-          $1, $2, $3, $4, $5, $6, $7,
-          $8::timestamptz, $9::timestamptz,
-          $10, $11, $12, $13, $14, $15,
-          $16, $17, $18, $19, $20, $21, $22,
-          $23, $24::jsonb, $25, $26
-        )
-        ON CONFLICT (block_id) DO UPDATE SET
-          scope_type = EXCLUDED.scope_type,
-          scope_id = EXCLUDED.scope_id,
-          center_id = EXCLUDED.center_id,
-          warehouse_id = EXCLUDED.warehouse_id,
-          building_name = EXCLUDED.building_name,
-          area_name = EXCLUDED.area_name,
-          start_at = EXCLUDED.start_at,
-          end_at = EXCLUDED.end_at,
-          timezone = EXCLUDED.timezone,
-          block_type = EXCLUDED.block_type,
-          title = EXCLUDED.title,
-          description = EXCLUDED.description,
-          status = EXCLUDED.status,
-          priority = EXCLUDED.priority,
-          source_type = EXCLUDED.source_type,
-          source_id = EXCLUDED.source_id,
-          source_action = EXCLUDED.source_action,
-          template_id = EXCLUDED.template_id,
-          recurrence_rule = EXCLUDED.recurrence_rule,
-          series_parent_id = EXCLUDED.series_parent_id,
-          occurrence_index = EXCLUDED.occurrence_index,
-          generator_key = EXCLUDED.generator_key,
-          metadata = EXCLUDED.metadata,
-          updated_at = NOW(),
-          updated_by = EXCLUDED.updated_by,
-          version = schedule_blocks.version + 1
-        RETURNING block_id
+        SELECT block_id, version
+        FROM schedule_blocks
+        WHERE UPPER(block_id) = UPPER($1)
+        LIMIT 1
       `,
-      [
-        input.blockId,
-        input.scopeType,
-        normalizeIdentity(input.scopeId) ?? input.scopeId,
-        normalizeIdentity(input.centerId ?? null),
-        normalizeIdentity(input.warehouseId ?? null),
-        input.buildingName ?? null,
-        input.areaName ?? null,
-        input.startAt,
-        input.endAt ?? null,
-        input.timezone ?? 'America/Toronto',
-        input.blockType,
-        input.title,
-        input.description ?? null,
-        input.status ?? 'scheduled',
-        input.priority ?? 'normal',
-        input.sourceType ?? null,
-        normalizeIdentity(input.sourceId ?? null),
-        input.sourceAction ?? null,
-        input.templateId ?? null,
-        input.recurrenceRule ?? null,
-        input.seriesParentId ?? null,
-        input.occurrenceIndex ?? null,
-        input.generatorKey,
-        JSON.stringify(input.metadata ?? {}),
-        input.createdBy ?? 'SYSTEM',
-        input.updatedBy ?? input.createdBy ?? 'SYSTEM',
-      ],
+      [normalizedBlockId],
     );
-
-    const blockId = result.rows[0]?.block_id;
-    if (!blockId) {
-      throw new Error('Failed to upsert schedule block');
+    const existing = existingResult.rows[0] ?? null;
+    if (existing && input.expectedVersion !== undefined && input.expectedVersion !== null && Number(existing.version) !== Number(input.expectedVersion)) {
+      throw createScheduleConflictError(`Schedule block ${normalizedBlockId} was updated by another user. Refresh and try again.`);
     }
 
-    const actorId = input.updatedBy ?? input.createdBy ?? 'SYSTEM';
+    let blockId = normalizedBlockId;
+    if (!existing) {
+      const result = await tx<{ block_id: string }>(
+        `
+          INSERT INTO schedule_blocks (
+            block_id,
+            scope_type,
+            scope_id,
+            center_id,
+            warehouse_id,
+            building_name,
+            area_name,
+            start_at,
+            end_at,
+            timezone,
+            block_type,
+            title,
+            description,
+            status,
+            priority,
+            source_type,
+            source_id,
+            source_action,
+            template_id,
+            recurrence_rule,
+            series_parent_id,
+            occurrence_index,
+            generator_key,
+            metadata,
+            created_by,
+            updated_by
+          )
+          VALUES (
+            $1, $2, $3, $4, $5, $6, $7,
+            $8::timestamptz, $9::timestamptz,
+            $10, $11, $12, $13, $14, $15,
+            $16, $17, $18, $19, $20, $21, $22,
+            $23, $24::jsonb, $25, $26
+          )
+          RETURNING block_id
+        `,
+        [
+          normalizedBlockId,
+          input.scopeType,
+          normalizeIdentity(input.scopeId) ?? input.scopeId,
+          normalizeIdentity(input.centerId ?? null),
+          normalizeIdentity(input.warehouseId ?? null),
+          input.buildingName ?? null,
+          input.areaName ?? null,
+          input.startAt,
+          input.endAt ?? null,
+          input.timezone ?? 'America/Toronto',
+          input.blockType,
+          input.title,
+          input.description ?? null,
+          input.status ?? 'scheduled',
+          input.priority ?? 'normal',
+          input.sourceType ?? null,
+          normalizeIdentity(input.sourceId ?? null),
+          input.sourceAction ?? null,
+          input.templateId ?? null,
+          input.recurrenceRule ?? null,
+          input.seriesParentId ?? null,
+          input.occurrenceIndex ?? null,
+          input.generatorKey,
+          JSON.stringify(input.metadata ?? {}),
+          input.createdBy ?? 'SYSTEM',
+          actorId,
+        ],
+      );
+      blockId = result.rows[0]?.block_id;
+    } else {
+      const result = await tx<{ block_id: string }>(
+        `
+          UPDATE schedule_blocks
+          SET
+            scope_type = $2,
+            scope_id = $3,
+            center_id = $4,
+            warehouse_id = $5,
+            building_name = $6,
+            area_name = $7,
+            start_at = $8::timestamptz,
+            end_at = $9::timestamptz,
+            timezone = $10,
+            block_type = $11,
+            title = $12,
+            description = $13,
+            status = $14,
+            priority = $15,
+            source_type = $16,
+            source_id = $17,
+            source_action = $18,
+            template_id = $19,
+            recurrence_rule = $20,
+            series_parent_id = $21,
+            occurrence_index = $22,
+            generator_key = $23,
+            metadata = $24::jsonb,
+            updated_at = NOW(),
+            updated_by = $25,
+            version = version + 1
+          WHERE UPPER(block_id) = UPPER($1)
+            AND ($26::int IS NULL OR version = $26)
+          RETURNING block_id
+        `,
+        [
+          normalizedBlockId,
+          input.scopeType,
+          normalizeIdentity(input.scopeId) ?? input.scopeId,
+          normalizeIdentity(input.centerId ?? null),
+          normalizeIdentity(input.warehouseId ?? null),
+          input.buildingName ?? null,
+          input.areaName ?? null,
+          input.startAt,
+          input.endAt ?? null,
+          input.timezone ?? 'America/Toronto',
+          input.blockType,
+          input.title,
+          input.description ?? null,
+          input.status ?? 'scheduled',
+          input.priority ?? 'normal',
+          input.sourceType ?? null,
+          normalizeIdentity(input.sourceId ?? null),
+          input.sourceAction ?? null,
+          input.templateId ?? null,
+          input.recurrenceRule ?? null,
+          input.seriesParentId ?? null,
+          input.occurrenceIndex ?? null,
+          input.generatorKey,
+          JSON.stringify(input.metadata ?? {}),
+          actorId,
+          input.expectedVersion ?? null,
+        ],
+      );
+      if (!result.rows[0]?.block_id) {
+        throw createScheduleConflictError(`Schedule block ${normalizedBlockId} was updated by another user. Refresh and try again.`);
+      }
+      blockId = result.rows[0]?.block_id;
+    }
+
     await replaceAssignments(tx, blockId, input.assignments, actorId);
     await replaceTasks(tx, blockId, input.tasks, actorId);
     return blockId;

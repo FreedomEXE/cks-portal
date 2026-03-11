@@ -153,11 +153,20 @@ export async function registerScheduleRoutes(server: FastifyInstance) {
       return;
     }
 
-    const blockId = await saveScheduleBlock({
-      ...parsed.data,
-      createdBy: account.cksCode ?? 'SYSTEM',
-      updatedBy: account.cksCode ?? 'SYSTEM',
-    });
+    let blockId: string;
+    try {
+      blockId = await saveScheduleBlock({
+        ...parsed.data,
+        createdBy: account.cksCode ?? 'SYSTEM',
+        updatedBy: account.cksCode ?? 'SYSTEM',
+      });
+    } catch (error) {
+      if ((error as { statusCode?: number } | null)?.statusCode === 409) {
+        reply.code(409).send({ error: (error as Error).message });
+        return;
+      }
+      throw error;
+    }
 
     const data = await getScheduleBlock(blockId);
     reply.code(201).send({ data });
@@ -185,12 +194,27 @@ export async function registerScheduleRoutes(server: FastifyInstance) {
       return;
     }
 
-    const blockId = await saveScheduleBlock({
-      ...parsed.data,
-      blockId: params.data.blockId,
-      updatedBy: account.cksCode ?? 'SYSTEM',
-      createdBy: account.cksCode ?? 'SYSTEM',
-    });
+    const existing = await getScheduleBlock(params.data.blockId);
+    if (!existing) {
+      reply.code(404).send({ error: 'Schedule block not found' });
+      return;
+    }
+
+    let blockId: string;
+    try {
+      blockId = await saveScheduleBlock({
+        ...parsed.data,
+        blockId: params.data.blockId,
+        updatedBy: account.cksCode ?? 'SYSTEM',
+        createdBy: existing.createdBy ?? account.cksCode ?? 'SYSTEM',
+      });
+    } catch (error) {
+      if ((error as { statusCode?: number } | null)?.statusCode === 409) {
+        reply.code(409).send({ error: (error as Error).message });
+        return;
+      }
+      throw error;
+    }
 
     const data = await getScheduleBlock(blockId);
     reply.send({ data });

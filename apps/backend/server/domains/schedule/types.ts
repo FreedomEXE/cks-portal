@@ -141,6 +141,7 @@ export interface UpsertScheduleBlockAssignmentInput {
 export interface UpsertScheduleBlockTaskInput {
   taskId?: string;
   sequence?: number;
+  version?: number;
   taskType?: string;
   catalogItemCode?: string | null;
   catalogItemType?: string | null;
@@ -156,6 +157,7 @@ export interface UpsertScheduleBlockTaskInput {
 
 export interface UpsertScheduleBlockInput {
   blockId?: string;
+  expectedVersion?: number | null;
   isTest?: boolean;
   scopeType: ScheduleScopeType;
   scopeId: string;

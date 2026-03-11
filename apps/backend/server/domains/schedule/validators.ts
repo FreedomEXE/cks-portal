@@ -77,6 +77,7 @@ const scheduleAssignmentInputSchema = z.object({
 const scheduleTaskInputSchema = z.object({
   taskId: z.string().trim().min(1).optional(),
   sequence: z.coerce.number().int().min(1).optional(),
+  version: z.coerce.number().int().min(1).optional(),
   taskType: z.string().trim().min(1).optional(),
   catalogItemCode: z.string().trim().min(1).nullable().optional(),
   catalogItemType: z.string().trim().min(1).nullable().optional(),
@@ -92,6 +93,7 @@ const scheduleTaskInputSchema = z.object({
 
 export const scheduleBlockBodySchema = z.object({
   blockId: z.string().trim().min(1).optional(),
+  expectedVersion: z.coerce.number().int().min(1).nullable().optional(),
   isTest: z.boolean().optional(),
   scopeType: scheduleScopeTypeSchema,
   scopeId: z.string().trim().min(1),
