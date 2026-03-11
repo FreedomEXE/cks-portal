@@ -23,13 +23,17 @@ import type { UpsertScheduleBlockInput, UpsertScheduleBlockTaskInput } from '../
 const IDS = {
   manager: 'MGR-001-TEST',
   contractor: 'CON-001-TEST',
+  contractorAlt: 'CON-002-TEST',
   customer: 'CUS-001-TEST',
+  customerAlt: 'CUS-002-TEST',
   centerPrimary: 'CEN-001-TEST',
   centerSecondary: 'CEN-002-TEST',
+  centerTertiary: 'CEN-003-TEST',
   crewPrimary: 'CRW-001-TEST',
   crewSupport: 'CRW-002-TEST',
   crewFloat: 'CRW-003-TEST',
   crewSecondary: 'CRW-004-TEST',
+  crewTertiary: 'CRW-005-TEST',
   warehouse: 'WHS-001-TEST',
 } as const;
 
@@ -123,6 +127,91 @@ async function ensureSourceFixturesExist(): Promise<void> {
 async function ensureAdditionalTestEntities(): Promise<void> {
   await query(
     `
+      INSERT INTO contractors (
+        contractor_id,
+        cks_manager,
+        name,
+        num_customers,
+        main_contact,
+        address,
+        phone,
+        email,
+        status,
+        created_at,
+        updated_at
+      ) VALUES (
+        $1,
+        $2,
+        'Test Contractor Annex',
+        1,
+        'Alt Contractor Contact',
+        'Annex Test Address',
+        '+1 (647) 555-0120',
+        'test.contractor.annex@ckscontracting.ca',
+        'active',
+        NOW(),
+        NOW()
+      )
+      ON CONFLICT (contractor_id) DO UPDATE SET
+        cks_manager = EXCLUDED.cks_manager,
+        name = EXCLUDED.name,
+        num_customers = EXCLUDED.num_customers,
+        main_contact = EXCLUDED.main_contact,
+        address = EXCLUDED.address,
+        phone = EXCLUDED.phone,
+        email = EXCLUDED.email,
+        status = EXCLUDED.status,
+        updated_at = NOW()
+    `,
+    [IDS.contractorAlt, IDS.manager],
+  );
+
+  await query(
+    `
+      INSERT INTO customers (
+        customer_id,
+        cks_manager,
+        name,
+        num_centers,
+        main_contact,
+        address,
+        phone,
+        email,
+        status,
+        contractor_id,
+        created_at,
+        updated_at
+      ) VALUES (
+        $1,
+        $2,
+        'Test Customer Annex',
+        1,
+        'Alt Customer Contact',
+        'Annex Test Address',
+        '+1 (647) 555-0121',
+        'test.customer.annex@ckscontracting.ca',
+        'active',
+        $3,
+        NOW(),
+        NOW()
+      )
+      ON CONFLICT (customer_id) DO UPDATE SET
+        cks_manager = EXCLUDED.cks_manager,
+        name = EXCLUDED.name,
+        num_centers = EXCLUDED.num_centers,
+        main_contact = EXCLUDED.main_contact,
+        address = EXCLUDED.address,
+        phone = EXCLUDED.phone,
+        email = EXCLUDED.email,
+        status = EXCLUDED.status,
+        contractor_id = EXCLUDED.contractor_id,
+        updated_at = NOW()
+    `,
+    [IDS.customerAlt, IDS.manager, IDS.contractorAlt],
+  );
+
+  await query(
+    `
       INSERT INTO centers (
         center_id,
         cks_manager,
@@ -160,10 +249,50 @@ async function ensureAdditionalTestEntities(): Promise<void> {
     [IDS.centerSecondary, IDS.manager, IDS.contractor, IDS.customer],
   );
 
+  await query(
+    `
+      INSERT INTO centers (
+        center_id,
+        cks_manager,
+        name,
+        main_contact,
+        address,
+        phone,
+        email,
+        contractor_id,
+        customer_id,
+        status,
+        created_at,
+        updated_at
+      ) VALUES (
+        $1,
+        $2,
+        'West Campus Center',
+        'West Campus Contact',
+        'West Campus Test Address',
+        '+1 (647) 555-0122',
+        'test.west.center@ckscontracting.ca',
+        $3,
+        $4,
+        'active',
+        NOW(),
+        NOW()
+      )
+      ON CONFLICT (center_id) DO UPDATE SET
+        cks_manager = EXCLUDED.cks_manager,
+        contractor_id = EXCLUDED.contractor_id,
+        customer_id = EXCLUDED.customer_id,
+        status = EXCLUDED.status,
+        updated_at = NOW()
+    `,
+    [IDS.centerTertiary, IDS.manager, IDS.contractorAlt, IDS.customerAlt],
+  );
+
   const crewRows = [
     [IDS.crewSupport, 'Test Support Crew', IDS.centerPrimary, 'test.crew.support@ckscontracting.ca', '+1 (647) 555-0111'],
     [IDS.crewFloat, 'Test Float Crew', IDS.centerPrimary, 'test.crew.float@ckscontracting.ca', '+1 (647) 555-0112'],
     [IDS.crewSecondary, 'Test Annex Crew', IDS.centerSecondary, 'test.crew.annex@ckscontracting.ca', '+1 (647) 555-0113'],
+    [IDS.crewTertiary, 'Test West Crew', IDS.centerTertiary, 'test.crew.west@ckscontracting.ca', '+1 (647) 555-0123'],
   ] as const;
 
   for (const [crewId, name, assignedCenter, email, phone] of crewRows) {
@@ -542,6 +671,43 @@ function buildFixtures(): FixtureBlock[] {
       tasks: [
         blockTask('BLK-916-TEST', 1, { title: 'Collect perimeter waste', taskType: 'waste', catalogItemType: 'waste', areaName: 'Level 3 Offices', estimatedMinutes: 30, status: 'pending', description: 'Weekend close pull for the office wing.', requiredTools: ['Liner cart'], requiredProducts: ['Black liners'] }),
         blockTask('BLK-916-TEST', 2, { title: 'Spot mop entries', taskType: 'floor-care', catalogItemType: 'floor-care', areaName: 'Level 3 Entries', estimatedMinutes: 20, status: 'pending', description: 'Clean high-traffic entries before Monday turnover.', requiredTools: ['Flat mop'], requiredProducts: ['Neutral cleaner'] }),
+      ],
+    },
+    {
+      ...centerDefaults,
+      blockId: 'BLK-917-TEST',
+      scopeId: IDS.centerTertiary,
+      centerId: IDS.centerTertiary,
+      buildingName: 'West Campus',
+      areaName: 'Student Lounge',
+      startAt: atUtcDayOffset(2, 13, 0),
+      endAt: atUtcDayOffset(2, 14, 30),
+      blockType: 'manual',
+      title: 'West Campus Lounge Reset',
+      description: 'Additional contractor/customer branch for scope-cascade testing.',
+      status: 'scheduled',
+      assignments: [crewAssignee(IDS.crewTertiary, true)],
+      tasks: [
+        blockTask('BLK-917-TEST', 1, { title: 'Collect lounge waste', taskType: 'waste', catalogItemType: 'waste', areaName: 'Student Lounge', estimatedMinutes: 20, status: 'pending', description: 'Clear bins and remove food-service debris.', requiredTools: ['Liner cart'], requiredProducts: ['Black liners'] }),
+        blockTask('BLK-917-TEST', 2, { title: 'Sanitize seating cluster', taskType: 'sanitization', catalogItemType: 'sanitization', areaName: 'Student Lounge', estimatedMinutes: 25, status: 'pending', description: 'Wipe shared tables, armrests, and touchpoints.', requiredTools: ['Microfiber cloths'], requiredProducts: ['Surface disinfectant'] }),
+      ],
+    },
+    {
+      ...managerDefaults,
+      blockId: 'BLK-918-TEST',
+      centerId: IDS.centerTertiary,
+      buildingName: 'West Campus',
+      areaName: 'Corridor A',
+      startAt: atUtcDayOffset(3, 8, 0),
+      endAt: atUtcDayOffset(3, 9, 30),
+      blockType: 'shift',
+      title: 'West Campus Morning Sweep',
+      description: 'Alternative branch block for manager/admin top-down review.',
+      status: 'scheduled',
+      assignments: [crewAssignee(IDS.crewTertiary, true)],
+      tasks: [
+        blockTask('BLK-918-TEST', 1, { title: 'Spot mop main corridor', taskType: 'floor-care', catalogItemType: 'floor-care', areaName: 'Corridor A', estimatedMinutes: 25, status: 'pending', description: 'Complete the main student corridor before class turnover.', requiredTools: ['Flat mop'], requiredProducts: ['Neutral cleaner'] }),
+        blockTask('BLK-918-TEST', 2, { title: 'Reset recycling stations', taskType: 'restock', catalogItemType: 'restock', areaName: 'Corridor A', estimatedMinutes: 15, status: 'pending', description: 'Replace liners and signage on all recycling stations.', requiredTools: ['Liner cart'], requiredProducts: ['Blue liners'] }),
       ],
     },
   ];

@@ -90,6 +90,25 @@ Preparation commands:
   - `pnpm --dir apps/backend seed:schedule-test-fixtures`
 - or run the full TEST review seed in one shot:
   - `pnpm --dir apps/backend seed:schedule-review-fixtures`
+- root shortcut:
+  - `pnpm seed:schedule-review-fixtures`
+
+Recommended initial validation routes:
+
+- Admin:
+  - `/hub?tab=schedule`
+- Manager:
+  - `/hub?tab=schedule`
+- Contractor:
+  - `/hub?tab=schedule`
+- Customer:
+  - `/hub?tab=schedule`
+- Center:
+  - `/hub?tab=schedule`
+- Crew:
+  - `/hub?tab=schedule`
+- Warehouse:
+  - `/hub?tab=schedule`
 
 ## Review Format
 

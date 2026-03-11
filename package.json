@@ -26,7 +26,8 @@
     "prepare": "husky",
     "dev:backend": "pnpm --filter ./apps/backend dev",
     "dev:frontend": "pnpm --filter ./apps/frontend dev",
-    "dev:gateway": "pnpm --filter ./apps/gateway dev"
+    "dev:gateway": "pnpm --filter ./apps/gateway dev",
+    "seed:schedule-review-fixtures": "pnpm --dir apps/backend seed:schedule-review-fixtures"
   },
   "devDependencies": {
     "@playwright/test": "^1.56.1",
