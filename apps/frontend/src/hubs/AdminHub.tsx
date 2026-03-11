@@ -254,16 +254,17 @@ export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
   return <AdminHubContent initialTab={initialTab} />;
 }
 
-function parseAdminScheduleScope(searchParams: URLSearchParams): string | null {
+function parseAdminScheduleEcosystem(searchParams: URLSearchParams): string | null {
+  const ecosystemValue = searchParams.get('ecosystem');
+  if (ecosystemValue) {
+    return normalizeId(ecosystemValue);
+  }
   const scopeValue = searchParams.get('scope');
   if (!scopeValue) {
     return null;
   }
   const [scopeType, scopeId] = scopeValue.split(':', 2);
-  if (scopeType !== 'manager' || !scopeId) {
-    return null;
-  }
-  return normalizeId(scopeId);
+  return scopeType === 'manager' && scopeId ? normalizeId(scopeId) : null;
 }
 
 // Inner component that has access to modal context
@@ -290,7 +291,7 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
   const [showTestEcosystems, setShowTestEcosystems] = useState(false);
   const [selectedEcosystemId, setSelectedEcosystemId] = useState<string | null>(null);
   const [selectedCalendarEcosystemId, setSelectedCalendarEcosystemId] = useState<string | null>(() =>
-    parseAdminScheduleScope(searchParams),
+    parseAdminScheduleEcosystem(searchParams),
   );
   const [ecosystemSubTab, setEcosystemSubTab] = useState<'tree' | 'catalog'>('tree');
 
@@ -1161,7 +1162,7 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
     if (activeTab !== 'calendar') {
       return;
     }
-    const urlScope = parseAdminScheduleScope(searchParams);
+    const urlScope = parseAdminScheduleEcosystem(searchParams);
     if (urlScope && isTestId(urlScope) && !showTestEcosystems) {
       setShowTestEcosystems(true);
     }
@@ -1171,7 +1172,7 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
     if (activeTab !== 'calendar') {
       return;
     }
-    const urlScope = parseAdminScheduleScope(searchParams);
+    const urlScope = parseAdminScheduleEcosystem(searchParams);
     if (urlScope !== selectedCalendarEcosystemId) {
       setSelectedCalendarEcosystemId(urlScope);
     }
@@ -1183,9 +1184,9 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
     }
     const next = new URLSearchParams(searchParams);
     if (selectedCalendarEcosystemId) {
-      next.set('scope', `manager:${selectedCalendarEcosystemId}`);
+      next.set('ecosystem', selectedCalendarEcosystemId);
     } else {
-      next.delete('scope');
+      next.delete('ecosystem');
     }
     if (next.toString() !== searchParams.toString()) {
       setSearchParams(next, { replace: true });
@@ -1198,16 +1199,18 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
     return managers.find((manager) => normalizeId(manager.id) === target) ?? null;
   }, [managers, selectedEcosystemId]);
 
-  const selectedEcosystemTree = useMemo(() => {
-    if (!selectedManager) {
+  const buildManagerTree = useCallback((managerId: string | null | undefined) => {
+    const normalizedManagerId = normalizeId(managerId);
+    if (!normalizedManagerId) {
+      return null;
+    }
+    const manager = managers.find((entry) => normalizeId(entry.id) === normalizedManagerId) ?? null;
+    if (!manager) {
       return null;
     }
 
     const { centerById, getManagerIdForCenter } = ecosystemLookup;
-    const managerKey = normalizeId(selectedManager.id);
-    if (!managerKey) {
-      return null;
-    }
+    const managerKey = normalizedManagerId;
 
     const contractorsForManager = contractors.filter((contractor) => normalizeId(contractor.managerId) === managerKey);
     const customersForManager = customers.filter((customer) => normalizeId(customer.managerId) === managerKey);
@@ -1288,9 +1291,18 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
     };
 
     return buildEcosystemTree(scope, {
-      rootName: selectedManager.name ?? selectedManager.id,
+      rootName: manager.name ?? manager.id,
     });
-  }, [selectedManager, contractors, customers, centers, crew, ecosystemLookup]);
+  }, [centers, contractors, crew, customers, ecosystemLookup, managers]);
+
+  const selectedEcosystemTree = useMemo(
+    () => buildManagerTree(selectedEcosystemId),
+    [buildManagerTree, selectedEcosystemId],
+  );
+  const selectedCalendarEcosystemTree = useMemo(
+    () => buildManagerTree(selectedCalendarEcosystemId),
+    [buildManagerTree, selectedCalendarEcosystemId],
+  );
 
   const handleEcosystemView = useCallback(
     (node: { user: { id: string }; type?: string }) => {
@@ -2157,51 +2169,17 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
           ) : activeTab === 'calendar' ? (
             <ScheduleTab
               title="Schedule"
-              scopeType={selectedCalendarEcosystemId ? 'manager' : undefined}
-              scopeId={selectedCalendarEcosystemId ?? undefined}
-              testMode={selectedCalendarEcosystemId && isTestId(selectedCalendarEcosystemId) ? 'only' : 'exclude'}
-              agendaTitle={selectedCalendarEcosystemId ? 'Ecosystem Schedule' : 'Platform Schedule'}
-              agendaDescription={
-                selectedCalendarEcosystemId
-                  ? 'Read-only schedule view for the selected ecosystem.'
-                  : 'Read-only schedule view across all ecosystems.'
-              }
-              agendaEmptyMessage={
-                selectedCalendarEcosystemId
-                  ? 'No scheduled work in this ecosystem for the selected window yet.'
-                  : 'No scheduled work across the platform in this window yet.'
-              }
-              headerActions={
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowTestEcosystems((prev) => !prev)}
-                    className={`rounded-xl border px-3 py-2 text-sm font-semibold shadow-sm transition-colors ${
-                      showTestEcosystems
-                        ? 'border-slate-900 bg-slate-900 text-white'
-                        : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900'
-                    }`}
-                  >
-                    {showTestEcosystems ? 'Hide test' : 'Show test'}
-                  </button>
-                  <label htmlFor="admin-calendar-ecosystem" className="text-xs font-bold uppercase tracking-[0.08em] text-slate-500">
-                    View
-                  </label>
-                  <select
-                    id="admin-calendar-ecosystem"
-                    value={selectedCalendarEcosystemId ?? ''}
-                    onChange={(event) => setSelectedCalendarEcosystemId(event.target.value || null)}
-                    className="min-w-[260px] rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-slate-400 focus:outline-none"
-                  >
-                    <option value="">All ecosystems</option>
-                    {ecosystemRows.map((row) => (
-                      <option key={row.managerId} value={row.managerId}>
-                        {row.ecosystem} ({row.managerId})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              }
+              viewerRole="admin"
+              adminScopeTree={selectedCalendarEcosystemTree}
+              adminManagerOptions={ecosystemRows.map((row) => ({
+                id: row.managerId,
+                label: `${row.ecosystem} (${row.managerId})`,
+                isTest: row.isTest,
+              }))}
+              selectedAdminManagerId={selectedCalendarEcosystemId}
+              onSelectedAdminManagerIdChange={setSelectedCalendarEcosystemId}
+              showTestEcosystems={showTestEcosystems}
+              onShowTestEcosystemsChange={setShowTestEcosystems}
             />
           ) : activeTab === 'create' ? (
             <AdminCreateSection />

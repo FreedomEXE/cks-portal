@@ -724,7 +724,12 @@ function CustomerHubContent({ initialTab = 'dashboard' }: CustomerHubProps) {
               />
             </PageWrapper>
           ) : activeTab === 'calendar' ? (
-            <ScheduleTab title="Schedule" />
+            <ScheduleTab
+              title="Schedule"
+              viewerRole="customer"
+              viewerCode={userCode}
+              scopeData={scopeData}
+            />
           ) : activeTab === 'services' ? (
 
             <PageWrapper headerSrOnly>

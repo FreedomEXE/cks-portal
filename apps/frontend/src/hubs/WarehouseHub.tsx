@@ -1091,7 +1091,12 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
               />
             </PageWrapper>
           ) : activeTab === 'calendar' ? (
-            <ScheduleTab title="Schedule" />
+            <ScheduleTab
+              title="Schedule"
+              viewerRole="warehouse"
+              viewerCode={userCode ?? normalizedCode}
+              scopeData={scopeData}
+            />
           ) : activeTab === 'inventory' ? (
             <PageWrapper headerSrOnly>
               {inventoryLoadMessage && (

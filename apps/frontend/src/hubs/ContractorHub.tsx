@@ -867,7 +867,12 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
               />
             </PageWrapper>
           ) : activeTab === 'calendar' ? (
-            <ScheduleTab title="Schedule" />
+            <ScheduleTab
+              title="Schedule"
+              viewerRole="contractor"
+              viewerCode={userCode}
+              scopeData={scopeData}
+            />
           ) : activeTab === 'services' ? (
             <PageWrapper headerSrOnly>
               {ordersLoadMessage && (

@@ -766,7 +766,12 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
               />
             </PageWrapper>
           ) : activeTab === 'calendar' ? (
-            <ScheduleTab title="Schedule" />
+            <ScheduleTab
+              title="Schedule"
+              viewerRole="crew"
+              viewerCode={userCode ?? normalizedCode}
+              scopeData={scopeData}
+            />
           ) : activeTab === 'services' ? (
 
             <PageWrapper headerSrOnly>

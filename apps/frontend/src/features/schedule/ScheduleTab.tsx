@@ -27,6 +27,18 @@ import { useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import CalendarTab from '../calendar/CalendarTab';
 import type { CalendarView } from '../calendar/CalendarProvider';
+import type { HubRole, HubRoleScopeResponse } from '../../shared/api/hub';
+import { useScheduleScopeControls, type AdminScheduleManagerOption } from './scopeControls';
+
+interface ScheduleTreeNode {
+  user: {
+    id: string;
+    role: string;
+    name: string;
+  };
+  type?: string;
+  children?: ScheduleTreeNode[];
+}
 
 const VALID_VIEWS: CalendarView[] = ['agenda', 'month', 'week', 'day'];
 
@@ -62,18 +74,30 @@ export function ScheduleTab({
   agendaDescription = 'Read-only schedule view across the selected scope.',
   agendaEmptyMessage = 'No scheduled work in this window yet.',
   headerActions,
-  scopeType,
-  scopeId,
-  testMode,
+  viewerRole,
+  viewerCode,
+  scopeData,
+  adminScopeTree,
+  adminManagerOptions,
+  selectedAdminManagerId,
+  onSelectedAdminManagerIdChange,
+  showTestEcosystems,
+  onShowTestEcosystemsChange,
 }: {
   title?: string;
   agendaTitle?: string;
   agendaDescription?: string;
   agendaEmptyMessage?: string;
   headerActions?: ReactNode;
-  scopeType?: string;
-  scopeId?: string;
-  testMode?: 'include' | 'exclude' | 'only';
+  viewerRole?: HubRole | 'admin';
+  viewerCode?: string | null;
+  scopeData?: HubRoleScopeResponse | null;
+  adminScopeTree?: ScheduleTreeNode | null;
+  adminManagerOptions?: AdminScheduleManagerOption[];
+  selectedAdminManagerId?: string | null;
+  onSelectedAdminManagerIdChange?: (managerId: string | null) => void;
+  showTestEcosystems?: boolean;
+  onShowTestEcosystemsChange?: (value: boolean) => void;
 }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialView = parseView(searchParams.get('view'));
@@ -96,6 +120,18 @@ export function ScheduleTab({
     },
     [searchParams, setSearchParams],
   );
+  const { scopeType, scopeId, testMode, headerActions: scopeHeaderActions } = useScheduleScopeControls({
+    viewerRole,
+    viewerCode,
+    scopeData,
+    adminScopeTree,
+    adminManagerOptions,
+    selectedAdminManagerId,
+    onSelectedAdminManagerIdChange,
+    showTestEcosystems,
+    onShowTestEcosystemsChange,
+    extraActions: headerActions,
+  });
 
   return (
     <CalendarTab
@@ -103,7 +139,7 @@ export function ScheduleTab({
       agendaTitle={agendaTitle}
       agendaDescription={agendaDescription}
       agendaEmptyMessage={agendaEmptyMessage}
-      headerActions={headerActions}
+      headerActions={scopeHeaderActions}
       scopeType={scopeType}
       scopeId={scopeId}
       testMode={testMode}

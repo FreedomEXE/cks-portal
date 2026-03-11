@@ -1339,7 +1339,12 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
               />
             </PageWrapper>
           ) : activeTab === 'calendar' ? (
-            <ScheduleTab title="Schedule" />
+            <ScheduleTab
+              title="Schedule"
+              viewerRole="manager"
+              viewerCode={userCode}
+              scopeData={scopeData}
+            />
           ) : activeTab === 'services' ? (
             <PageWrapper title="My Services" showHeader headerSrOnly>
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>

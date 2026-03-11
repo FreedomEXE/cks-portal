@@ -721,7 +721,12 @@ function CenterHubContent({ initialTab = 'dashboard' }: CenterHubProps) {
               />
             </PageWrapper>
           ) : activeTab === 'calendar' ? (
-            <ScheduleTab title="Schedule" />
+            <ScheduleTab
+              title="Schedule"
+              viewerRole="center"
+              viewerCode={userCode}
+              scopeData={scopeData}
+            />
           ) : activeTab === 'services' ? (
 
             <PageWrapper headerSrOnly>
