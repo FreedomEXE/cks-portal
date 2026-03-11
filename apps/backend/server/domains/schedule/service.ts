@@ -43,6 +43,10 @@ import type {
   ScheduleBuildingWeeklyExportLane,
   ScheduleBuildingWeeklyExportResponse,
   ScheduleBuildingWeeklyExportTask,
+  ScheduleEcosystemSummaryBuilding,
+  ScheduleEcosystemSummaryBuildingCrew,
+  ScheduleEcosystemSummaryCrew,
+  ScheduleEcosystemSummaryResponse,
   ScheduleCrewDailyExportBlock,
   ScheduleCrewDailyExportResponse,
   ScheduleCrewDailyExportTask,
@@ -264,6 +268,17 @@ function mapBuildingWeeklyBlock(block: ScheduleBlockDetail): ScheduleBuildingWee
     sourceId: block.sourceId,
     tasks: mapBuildingWeeklyTasks(block),
   };
+}
+
+async function resolveCrewDisplayName(crewId: string, centerId?: string | null): Promise<string | null> {
+  const normalizedCrewId = normalizeIdentity(crewId);
+  const normalizedCenterId = normalizeIdentity(centerId ?? null);
+  if (!normalizedCrewId || !normalizedCenterId) {
+    return null;
+  }
+  const centerScope = await getRoleScope('center', normalizedCenterId);
+  const crew = centerScope?.relationships.crew.find((entry) => normalizeIdentity(entry.id) === normalizedCrewId) ?? null;
+  return crew?.name ?? null;
 }
 
 function buildDayPlan(
@@ -576,7 +591,7 @@ export async function fetchCrewDailyExport(input: {
     return {
       date: input.query.date,
       crewId: crewScope.cksCode,
-      crewName: crewScope.cksCode,
+      crewName: (await resolveCrewDisplayName(crewScope.cksCode, crewScope.relationships.center?.id)) ?? crewScope.cksCode,
       centerId: crewScope.relationships.center?.id ?? null,
       centerName: crewScope.relationships.center?.name ?? null,
       generatedAt: new Date().toISOString(),
@@ -587,6 +602,190 @@ export async function fetchCrewDailyExport(input: {
         scheduledMinutes,
       },
       blocks: exportBlocks,
+    };
+  } catch (error) {
+    if (isScheduleInfraUnavailable(error)) {
+      return null;
+    }
+    throw error;
+  }
+}
+
+export async function fetchEcosystemSummaryExport(input: {
+  viewerRole: HubRole;
+  viewerCode: string | null;
+  query: {
+    weekStart: string;
+    scopeType?: ScheduleReadQuery['scopeType'];
+    scopeId?: string;
+    scopeIds?: string[];
+    testMode?: ScheduleReadQuery['testMode'];
+  };
+}): Promise<ScheduleEcosystemSummaryResponse | null> {
+  try {
+    const weekStartDate = new Date(`${input.query.weekStart}T00:00:00.000Z`);
+    if (Number.isNaN(weekStartDate.getTime())) {
+      return null;
+    }
+    const weekEndDate = new Date(weekStartDate.getTime());
+    weekEndDate.setUTCDate(weekEndDate.getUTCDate() + 7);
+    const weekEnd = weekEndDate.toISOString().slice(0, 10);
+
+    const blocks = await fetchScheduleBlocks({
+      viewerRole: input.viewerRole,
+      viewerCode: input.viewerCode,
+      query: {
+        start: weekStartDate.toISOString(),
+        end: weekEndDate.toISOString(),
+        scopeType: input.query.scopeType,
+        scopeId: input.query.scopeId,
+        scopeIds: input.query.scopeIds,
+        testMode: input.query.testMode,
+        limit: 500,
+      },
+    });
+
+    const buildingMap = new Map<string, ScheduleEcosystemSummaryBuilding>();
+    const crewMap = new Map<string, { row: ScheduleEcosystemSummaryCrew; buildingSet: Set<string> }>();
+    const statusBreakdown: Record<'scheduled' | 'in_progress' | 'completed' | 'cancelled', number> = {
+      scheduled: 0,
+      in_progress: 0,
+      completed: 0,
+      cancelled: 0,
+    };
+    let totalTaskCount = 0;
+    let totalScheduledMinutes = 0;
+    let assignedBlockCount = 0;
+    let unassignedBlockCount = 0;
+
+    const crewLabelCache = new Map<string, string | null>();
+
+    for (const block of blocks) {
+      statusBreakdown[block.status] += 1;
+      const blockTaskCount = block.tasks.length;
+      const blockScheduledMinutes = block.tasks.reduce((sum, task) => sum + (task.estimatedMinutes ?? 0), 0);
+      totalTaskCount += blockTaskCount;
+      totalScheduledMinutes += blockScheduledMinutes;
+
+      const buildingName = block.buildingName || block.centerId || block.scopeId || 'Unassigned location';
+      const areaName = block.areaName ?? null;
+      const buildingKey = `${buildingName}::${areaName ?? ''}`;
+      let building = buildingMap.get(buildingKey);
+      if (!building) {
+        building = {
+          buildingName,
+          areaName,
+          blockCount: 0,
+          taskCount: 0,
+          assignedBlockCount: 0,
+          unassignedBlockCount: 0,
+          scheduledMinutes: 0,
+          crews: [],
+        };
+        buildingMap.set(buildingKey, building);
+      }
+
+      building.blockCount += 1;
+      building.taskCount += blockTaskCount;
+      building.scheduledMinutes += blockScheduledMinutes;
+
+      const crewAssignments = block.assignments.filter(
+        (assignment) => assignment.participantRole === 'crew' && assignment.assignmentType === 'assignee',
+      );
+
+      if (!crewAssignments.length) {
+        building.unassignedBlockCount += 1;
+        unassignedBlockCount += 1;
+        continue;
+      }
+
+      building.assignedBlockCount += 1;
+      assignedBlockCount += 1;
+
+      for (const assignment of crewAssignments) {
+        const crewId = assignment.participantId;
+        const cachedLabel = crewLabelCache.has(crewId)
+          ? crewLabelCache.get(crewId) ?? null
+          : await resolveCrewDisplayName(crewId, block.centerId);
+        crewLabelCache.set(crewId, cachedLabel ?? null);
+
+        let buildingCrew = building.crews.find((entry) => entry.crewId === crewId);
+        if (!buildingCrew) {
+          buildingCrew = {
+            crewId,
+            crewLabel: cachedLabel ?? null,
+            blockCount: 0,
+            taskCount: 0,
+            scheduledMinutes: 0,
+          } satisfies ScheduleEcosystemSummaryBuildingCrew;
+          building.crews.push(buildingCrew);
+        }
+        buildingCrew.blockCount += 1;
+        buildingCrew.taskCount += blockTaskCount;
+        buildingCrew.scheduledMinutes += blockScheduledMinutes;
+
+        const crewEntry = crewMap.get(crewId);
+        if (!crewEntry) {
+          crewMap.set(crewId, {
+            row: {
+              crewId,
+              crewLabel: cachedLabel ?? null,
+              blockCount: 1,
+              taskCount: blockTaskCount,
+              scheduledMinutes: blockScheduledMinutes,
+              buildings: [buildingName],
+            },
+            buildingSet: new Set([buildingName]),
+          });
+        } else {
+          crewEntry.row.blockCount += 1;
+          crewEntry.row.taskCount += blockTaskCount;
+          crewEntry.row.scheduledMinutes += blockScheduledMinutes;
+          crewEntry.buildingSet.add(buildingName);
+        }
+      }
+    }
+
+    const buildings = Array.from(buildingMap.values())
+      .map((building) => ({
+        ...building,
+        crews: [...building.crews].sort((left, right) => {
+          const leftLabel = left.crewLabel ?? left.crewId;
+          const rightLabel = right.crewLabel ?? right.crewId;
+          return leftLabel.localeCompare(rightLabel);
+        }),
+      }))
+      .sort((left, right) => left.buildingName.localeCompare(right.buildingName));
+
+    const crews = Array.from(crewMap.values())
+      .map(({ row, buildingSet }) => ({
+        ...row,
+        buildings: Array.from(buildingSet).sort((left, right) => left.localeCompare(right)),
+      }))
+      .sort((left, right) => {
+        const leftLabel = left.crewLabel ?? left.crewId;
+        const rightLabel = right.crewLabel ?? right.crewId;
+        return leftLabel.localeCompare(rightLabel);
+      });
+
+    return {
+      weekStart: input.query.weekStart,
+      weekEnd,
+      scopeType: input.query.scopeType,
+      scopeId: input.query.scopeId,
+      generatedAt: new Date().toISOString(),
+      summary: {
+        buildingCount: buildings.length,
+        crewCount: crews.length,
+        blockCount: blocks.length,
+        taskCount: totalTaskCount,
+        assignedBlockCount,
+        unassignedBlockCount,
+        scheduledMinutes: totalScheduledMinutes,
+        statusBreakdown,
+      },
+      buildings,
+      crews,
     };
   } catch (error) {
     if (isScheduleInfraUnavailable(error)) {

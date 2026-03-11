@@ -356,3 +356,51 @@ export interface ScheduleBuildingWeeklyExportResponse {
   };
   days: ScheduleBuildingWeeklyExportDay[];
 }
+
+export interface ScheduleEcosystemSummaryBuildingCrew {
+  crewId: string;
+  crewLabel: string | null;
+  blockCount: number;
+  taskCount: number;
+  scheduledMinutes: number;
+}
+
+export interface ScheduleEcosystemSummaryBuilding {
+  buildingName: string;
+  areaName: string | null;
+  blockCount: number;
+  taskCount: number;
+  assignedBlockCount: number;
+  unassignedBlockCount: number;
+  scheduledMinutes: number;
+  crews: ScheduleEcosystemSummaryBuildingCrew[];
+}
+
+export interface ScheduleEcosystemSummaryCrew {
+  crewId: string;
+  crewLabel: string | null;
+  blockCount: number;
+  taskCount: number;
+  scheduledMinutes: number;
+  buildings: string[];
+}
+
+export interface ScheduleEcosystemSummaryResponse {
+  weekStart: string;
+  weekEnd: string;
+  scopeType?: ScheduleScopeType;
+  scopeId?: string;
+  generatedAt: string;
+  summary: {
+    buildingCount: number;
+    crewCount: number;
+    blockCount: number;
+    taskCount: number;
+    assignedBlockCount: number;
+    unassignedBlockCount: number;
+    scheduledMinutes: number;
+    statusBreakdown: Record<ScheduleBlockStatus, number>;
+  };
+  buildings: ScheduleEcosystemSummaryBuilding[];
+  crews: ScheduleEcosystemSummaryCrew[];
+}

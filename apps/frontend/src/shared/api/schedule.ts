@@ -234,6 +234,54 @@ export interface ScheduleBuildingWeeklyExportResponse {
   days: ScheduleBuildingWeeklyExportDay[];
 }
 
+export interface ScheduleEcosystemSummaryBuildingCrew {
+  crewId: string;
+  crewLabel: string | null;
+  blockCount: number;
+  taskCount: number;
+  scheduledMinutes: number;
+}
+
+export interface ScheduleEcosystemSummaryBuilding {
+  buildingName: string;
+  areaName: string | null;
+  blockCount: number;
+  taskCount: number;
+  assignedBlockCount: number;
+  unassignedBlockCount: number;
+  scheduledMinutes: number;
+  crews: ScheduleEcosystemSummaryBuildingCrew[];
+}
+
+export interface ScheduleEcosystemSummaryCrew {
+  crewId: string;
+  crewLabel: string | null;
+  blockCount: number;
+  taskCount: number;
+  scheduledMinutes: number;
+  buildings: string[];
+}
+
+export interface ScheduleEcosystemSummaryResponse {
+  weekStart: string;
+  weekEnd: string;
+  scopeType?: string;
+  scopeId?: string;
+  generatedAt: string;
+  summary: {
+    buildingCount: number;
+    crewCount: number;
+    blockCount: number;
+    taskCount: number;
+    assignedBlockCount: number;
+    unassignedBlockCount: number;
+    scheduledMinutes: number;
+    statusBreakdown: Record<'scheduled' | 'in_progress' | 'completed' | 'cancelled', number>;
+  };
+  buildings: ScheduleEcosystemSummaryBuilding[];
+  crews: ScheduleEcosystemSummaryCrew[];
+}
+
 export interface SaveScheduleBlockInput {
   blockId?: string;
   expectedVersion?: number | null;
@@ -368,6 +416,27 @@ export async function fetchScheduleBuildingWeeklyExport(input: {
       weekStart: input.weekStart,
       buildingName: input.buildingName,
       areaName: input.areaName,
+      scopeType: input.scopeType,
+      scopeId: input.scopeId,
+      scopeIds: input.scopeIds,
+      testMode: input.testMode,
+    })}`,
+    { getToken: input.getToken },
+  );
+  return response.data;
+}
+
+export async function fetchScheduleEcosystemSummaryExport(input: {
+  weekStart: string;
+  scopeType?: string;
+  scopeId?: string;
+  scopeIds?: string[];
+  testMode?: 'include' | 'exclude' | 'only';
+  getToken?: () => Promise<string | null>;
+}) {
+  const response = await apiFetch<ApiResponse<ScheduleEcosystemSummaryResponse>>(
+    `/schedule/export/ecosystem-summary${buildQuery({
+      weekStart: input.weekStart,
       scopeType: input.scopeType,
       scopeId: input.scopeId,
       scopeIds: input.scopeIds,

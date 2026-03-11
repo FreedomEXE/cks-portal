@@ -26,6 +26,7 @@ import type { HubRole } from '../../shared/api/hub';
 import {
   fetchScheduleBuildingWeeklyExport,
   fetchScheduleCrewDailyExport,
+  fetchScheduleEcosystemSummaryExport,
   saveScheduleBlock,
   useScheduleDayPlan,
   type ScheduleBlockDetail,
@@ -33,6 +34,7 @@ import {
 import { getCalendarRange, useCalendarContext } from '../calendar/CalendarProvider';
 import { buildBuildingWeeklyPrintDocument } from './buildingWeeklyPrint';
 import { buildCrewDailyPrintDocument } from './crewDailyPrint';
+import { buildEcosystemSummaryPrintDocument } from './ecosystemSummaryPrint';
 
 interface ScheduleTreeNode { user: { id: string; role: string; name: string }; type?: string; children?: ScheduleTreeNode[]; }
 interface NamedNode { id: string; role: string; label: string; }
@@ -217,6 +219,7 @@ export default function ScheduleDayPlan({ viewerRole, scopeType, scopeId, scopeI
   const [isEditorDirty, setIsEditorDirty] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [exportingBuildingKey, setExportingBuildingKey] = useState<string | null>(null);
+  const [isExportingSummary, setIsExportingSummary] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
 
   const allBlocks = useMemo(
@@ -238,6 +241,7 @@ export default function ScheduleDayPlan({ viewerRole, scopeType, scopeId, scopeI
   const zoomLevel: 'day' | 'block' | 'task' = selectedTask ? 'task' : selectedBlock ? 'block' : 'day';
   const isBlockEditorReadOnly = !canAuthor;
   const canExportCrewDay = scopeType === 'crew' && Boolean(scopeId);
+  const canExportSummary = canAuthor;
 
   function updateZoomParams(next: { blockId?: string | null; taskId?: string | null }) {
     const params = new URLSearchParams(searchParams);
@@ -322,6 +326,37 @@ export default function ScheduleDayPlan({ viewerRole, scopeType, scopeId, scopeI
       setExportError(failure instanceof Error ? failure.message : 'Failed to export building schedule.');
     } finally {
       setExportingBuildingKey(null);
+    }
+  }
+
+  async function handleExportEcosystemSummary() {
+    setIsExportingSummary(true);
+    setExportError(null);
+    try {
+      const weekStart = getCalendarRange('week', anchorDate, 7).start.slice(0, 10);
+      const exported = await fetchScheduleEcosystemSummaryExport({
+        weekStart,
+        scopeType,
+        scopeId,
+        scopeIds,
+        testMode,
+        getToken,
+      });
+      const scopeLabel = scopeId ? labelById.get(scopeId) ?? scopeId : scopeType ? `${scopeType} scope` : 'Current scope';
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) {
+        throw new Error('Unable to open print window. Check your popup settings and try again.');
+      }
+      printWindow.document.open();
+      printWindow.document.write(
+        buildEcosystemSummaryPrintDocument(exported, { scopeLabel }),
+      );
+      printWindow.document.close();
+      printWindow.focus();
+    } catch (failure) {
+      setExportError(failure instanceof Error ? failure.message : 'Failed to export schedule summary.');
+    } finally {
+      setIsExportingSummary(false);
     }
   }
 
@@ -538,8 +573,19 @@ export default function ScheduleDayPlan({ viewerRole, scopeType, scopeId, scopeI
             {exportError ? <div className="mt-2 text-sm text-rose-600">{exportError}</div> : null}
           </div>
           <div className="flex flex-col gap-3 xl:items-end">
-            {canExportCrewDay ? (
-              <div className="flex justify-start xl:justify-end">
+            {(canExportCrewDay || canExportSummary) ? (
+              <div className="flex flex-wrap justify-start gap-2 xl:justify-end">
+                {canExportSummary ? (
+                  <button
+                    type="button"
+                    onClick={handleExportEcosystemSummary}
+                    disabled={isExportingSummary}
+                    className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-900 shadow-[0_10px_24px_rgba(15,23,42,0.08)] transition hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isExportingSummary ? 'Preparing summary...' : 'Export summary'}
+                  </button>
+                ) : null}
+                {canExportCrewDay ? (
                 <button
                   type="button"
                   onClick={handleExportCrewDay}
@@ -548,6 +594,7 @@ export default function ScheduleDayPlan({ viewerRole, scopeType, scopeId, scopeI
                 >
                   {isExporting ? 'Preparing export...' : 'Export crew day'}
                 </button>
+                ) : null}
               </div>
             ) : null}
             <div className="grid gap-2 sm:grid-cols-4">

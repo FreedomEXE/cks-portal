@@ -24,6 +24,7 @@ import type { HubRole } from '../profile/types.js';
 import {
   cancelBlocksForSource,
   fetchBuildingWeeklyExport,
+  fetchEcosystemSummaryExport,
   fetchScheduleBlockById,
   fetchScheduleBlocks,
   fetchCrewDailyExport,
@@ -37,6 +38,7 @@ import {
   scheduleBuildingWeeklyExportQuerySchema,
   scheduleCrewDailyExportQuerySchema,
   scheduleDayPlanQuerySchema,
+  scheduleEcosystemSummaryExportQuerySchema,
   scheduleReadQuerySchema,
 } from './validators.js';
 
@@ -165,6 +167,36 @@ export async function registerScheduleRoutes(server: FastifyInstance) {
 
     if (!data) {
       reply.code(404).send({ error: 'Building weekly export not found' });
+      return;
+    }
+
+    reply.send({ data });
+  });
+
+  server.get('/api/schedule/export/ecosystem-summary', async (request, reply) => {
+    const account = await requireActiveRole(request, reply, {});
+    if (!account) return;
+
+    const viewerRole = normalizeRole(account.role ?? null);
+    if (!viewerRole) {
+      reply.code(403).send({ error: 'Unsupported role for schedule access' });
+      return;
+    }
+
+    const parsed = scheduleEcosystemSummaryExportQuerySchema.safeParse(request.query);
+    if (!parsed.success) {
+      reply.code(400).send({ error: 'Invalid ecosystem summary query', details: parsed.error.flatten() });
+      return;
+    }
+
+    const data = await fetchEcosystemSummaryExport({
+      viewerRole,
+      viewerCode: account.cksCode ?? null,
+      query: parsed.data,
+    });
+
+    if (!data) {
+      reply.code(404).send({ error: 'Ecosystem summary export not found' });
       return;
     }
 

@@ -77,6 +77,14 @@ export const scheduleBuildingWeeklyExportQuerySchema = z.object({
   testMode: scheduleTestModeSchema.optional(),
 });
 
+export const scheduleEcosystemSummaryExportQuerySchema = z.object({
+  weekStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  scopeType: scheduleScopeTypeSchema.optional(),
+  scopeId: z.string().trim().min(1).optional(),
+  scopeIds: z.preprocess(parseScopeIds, z.array(z.string().trim().min(1)).max(500).optional()),
+  testMode: scheduleTestModeSchema.optional(),
+});
+
 export const scheduleBlockParamsSchema = z.object({
   blockId: z.string().trim().min(1),
 });
