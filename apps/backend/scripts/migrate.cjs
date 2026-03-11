@@ -10,7 +10,8 @@ try {
 } catch {}
 
 const BACKEND_DIR = path.resolve(__dirname, '..');
-const MIGRATIONS_DIR = path.resolve(process.cwd(), 'database', 'migrations');
+const REPO_ROOT = path.resolve(BACKEND_DIR, '..', '..');
+const MIGRATIONS_DIR = path.join(REPO_ROOT, 'database', 'migrations');
 const SEEDS_DIR = path.join(BACKEND_DIR, 'server', 'db', 'seeds');
 const MIGRATIONS_TABLE = 'schema_migrations';
 

@@ -298,8 +298,8 @@ async function replaceTasks(
   const areaNames: (string | null)[] = [];
   const estimatedMinutes: (number | null)[] = [];
   const statuses: string[] = [];
-  const requiredTools: string[][] = [];
-  const requiredProducts: string[][] = [];
+  const requiredTools: string[] = [];
+  const requiredProducts: string[] = [];
   const metadataValues: string[] = [];
   const versions: number[] = [];
 
@@ -317,8 +317,8 @@ async function replaceTasks(
     areaNames.push(task.areaName ?? null);
     estimatedMinutes.push(task.estimatedMinutes ?? null);
     statuses.push(String(task.status || 'pending').trim().toLowerCase() || 'pending');
-    requiredTools.push((task.requiredTools ?? []).map((item) => String(item).trim()).filter(Boolean));
-    requiredProducts.push((task.requiredProducts ?? []).map((item) => String(item).trim()).filter(Boolean));
+    requiredTools.push(JSON.stringify((task.requiredTools ?? []).map((item) => String(item).trim()).filter(Boolean)));
+    requiredProducts.push(JSON.stringify((task.requiredProducts ?? []).map((item) => String(item).trim()).filter(Boolean)));
     metadataValues.push(JSON.stringify(task.metadata || {}));
     versions.push(task.version ?? 1);
   }
@@ -359,54 +359,24 @@ async function replaceTasks(
         updated_by
       )
       SELECT
-        task_id,
+        ($2::text[])[idx],
         $1,
-        sequence,
-        version,
-        task_type,
-        catalog_item_code,
-        catalog_item_type,
-        title,
-        description,
-        area_name,
-        estimated_minutes,
-        status,
-        required_tools,
-        required_products,
-        metadata::jsonb,
-        $13,
-        $13
-      FROM UNNEST(
-        $2::text[],
-        $3::int[],
-        $4::int[],
-        $5::text[],
-        $6::text[],
-        $7::text[],
-        $8::text[],
-        $9::text[],
-        $10::text[],
-        $11::int[],
-        $12::text[],
-        $14::text[][],
-        $15::text[][],
-        $16::text[]
-      ) AS batch(
-        task_id,
-        sequence,
-        version,
-        task_type,
-        catalog_item_code,
-        catalog_item_type,
-        title,
-        description,
-        area_name,
-        estimated_minutes,
-        status,
-        required_tools,
-        required_products,
-        metadata
-      )
+        ($3::int[])[idx],
+        ($4::int[])[idx],
+        ($5::text[])[idx],
+        ($6::text[])[idx],
+        ($7::text[])[idx],
+        ($8::text[])[idx],
+        ($9::text[])[idx],
+        ($10::text[])[idx],
+        ($11::int[])[idx],
+        ($12::text[])[idx],
+        COALESCE(ARRAY(SELECT jsonb_array_elements_text((($13::jsonb[])[idx]))), '{}'::text[]),
+        COALESCE(ARRAY(SELECT jsonb_array_elements_text((($14::jsonb[])[idx]))), '{}'::text[]),
+        (($15::text[])[idx])::jsonb,
+        $16,
+        $16
+      FROM generate_subscripts($2::text[], 1) AS idx
       ON CONFLICT (task_id) DO UPDATE SET
         sequence = EXCLUDED.sequence,
         task_type = EXCLUDED.task_type,
@@ -441,9 +411,9 @@ async function replaceTasks(
       estimatedMinutes,
       statuses,
       requiredTools,
-      actorId,
       requiredProducts,
       metadataValues,
+      actorId,
     ],
   );
 
