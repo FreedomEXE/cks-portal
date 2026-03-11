@@ -2123,6 +2123,17 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
               }
               headerActions={
                 <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowTestEcosystems((prev) => !prev)}
+                    className={`rounded-xl border px-3 py-2 text-sm font-semibold shadow-sm transition-colors ${
+                      showTestEcosystems
+                        ? 'border-slate-900 bg-slate-900 text-white'
+                        : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900'
+                    }`}
+                  >
+                    {showTestEcosystems ? 'Hide test' : 'Show test'}
+                  </button>
                   <label htmlFor="admin-calendar-ecosystem" className="text-xs font-bold uppercase tracking-[0.08em] text-slate-500">
                     View
                   </label>
