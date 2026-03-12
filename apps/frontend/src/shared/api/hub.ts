@@ -477,6 +477,145 @@ function buildFetcher<T>(getToken: () => Promise<string | null>): Fetcher<T> {
   return (endpoint: string) => apiFetch<ApiResponse<T>>(endpoint, { getToken }).then((res) => res.data);
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function toNullableString(value: unknown): string | null {
+  if (typeof value === 'string') {
+    return value;
+  }
+  if (value === null || value === undefined) {
+    return null;
+  }
+  return String(value);
+}
+
+function toStringValue(value: unknown, fallback = ''): string {
+  return toNullableString(value) ?? fallback;
+}
+
+function sanitizeNestedValue<T = unknown>(value: T): T {
+  if (Array.isArray(value)) {
+    return value
+      .filter((entry) => entry !== null && entry !== undefined)
+      .map((entry) => sanitizeNestedValue(entry)) as T;
+  }
+
+  if (isRecord(value)) {
+    const sanitized = Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => [key, sanitizeNestedValue(entry)]),
+    );
+    return sanitized as T;
+  }
+
+  return value;
+}
+
+function normalizeApprovalStages(value: unknown): NonNullable<HubOrderItem['approvalStages']> {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter((entry): entry is Record<string, unknown> => isRecord(entry))
+    .map((entry) => ({
+      role: toStringValue(entry.role),
+      status: toStringValue(entry.status),
+      userId: toNullableString(entry.userId ?? entry.user),
+      timestamp: toNullableString(entry.timestamp),
+    }));
+}
+
+function normalizeHubOrderItem(value: unknown): HubOrderItem | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  return {
+    orderId: toStringValue(value.orderId ?? value.id),
+    orderType: value.orderType === 'product' ? 'product' : 'service',
+    title: toNullableString(value.title),
+    requestedBy: toNullableString(value.requestedBy),
+    requesterRole: toNullableString(value.requesterRole),
+    destination: toNullableString(value.destination),
+    destinationRole: toNullableString(value.destinationRole),
+    requestedDate: toNullableString(value.requestedDate ?? value.orderDate),
+    expectedDate: toNullableString(value.expectedDate ?? value.completionDate),
+    status: toNullableString(value.status),
+    totalAmount: toNullableString(value.totalAmount),
+    serviceId: toNullableString(value.serviceId),
+    centerId: toNullableString(value.centerId),
+    assignedWarehouse: toNullableString(value.assignedWarehouse),
+    notes: toNullableString(value.notes),
+    items: Array.isArray(value.items)
+      ? value.items.filter((item): item is HubOrderLineItem => isRecord(item) && typeof item.id === 'string')
+      : undefined,
+    id: toNullableString(value.id ?? value.orderId),
+    customerId: toNullableString(value.customerId),
+    orderDate: toNullableString(value.orderDate ?? value.requestedDate),
+    completionDate: toNullableString(value.completionDate ?? value.expectedDate),
+    viewerStatus: toNullableString(value.viewerStatus),
+    approvalStages: normalizeApprovalStages(value.approvalStages),
+    transformedId: toNullableString(value.transformedId ?? value.transformed_id),
+    metadata: isRecord(value.metadata) ? sanitizeNestedValue(value.metadata) : null,
+    archivedAt: toNullableString(value.archivedAt),
+  };
+}
+
+function normalizeHubOrdersResponse(value: HubOrdersResponse): HubOrdersResponse {
+  const serviceOrders = Array.isArray(value?.serviceOrders)
+    ? value.serviceOrders
+        .map((item) => normalizeHubOrderItem(item))
+        .filter((item): item is HubOrderItem => item !== null)
+    : [];
+  const productOrders = Array.isArray(value?.productOrders)
+    ? value.productOrders
+        .map((item) => normalizeHubOrderItem(item))
+        .filter((item): item is HubOrderItem => item !== null)
+    : [];
+  const orders = Array.isArray(value?.orders) && value.orders.length > 0
+    ? value.orders
+        .map((item) => normalizeHubOrderItem(item))
+        .filter((item): item is HubOrderItem => item !== null)
+    : [...serviceOrders, ...productOrders];
+
+  return {
+    ...value,
+    role: toStringValue(value?.role),
+    cksCode: toStringValue(value?.cksCode),
+    serviceOrders,
+    productOrders,
+    orders,
+  };
+}
+
+function normalizeHubSupportTicketsResponse(value: HubSupportTicketsResponse): HubSupportTicketsResponse {
+  return {
+    ...value,
+    role: toStringValue(value?.role),
+    cksCode: toStringValue(value?.cksCode),
+    tickets: Array.isArray(value?.tickets)
+      ? value.tickets.filter((ticket): ticket is HubSupportTicketItem => isRecord(ticket) && typeof ticket.id === 'string')
+      : [],
+  };
+}
+
+function normalizeHubReportsResponse(value: HubReportsResponse): HubReportsResponse {
+  const normalizeItems = (items: unknown): HubReportItem[] =>
+    Array.isArray(items)
+      ? items.filter((item): item is HubReportItem => isRecord(item) && typeof item.id === 'string')
+      : [];
+
+  return {
+    ...value,
+    role: toStringValue(value?.role),
+    cksCode: toStringValue(value?.cksCode),
+    reports: normalizeItems(value?.reports),
+    feedback: normalizeItems(value?.feedback),
+  };
+}
+
 function useHubSWR<T>(key: string | null, transform?: (value: T) => T) {
   const { getToken } = useClerkAuth();
   const fetcher = useCallback(
@@ -586,13 +725,7 @@ export function useHubOrders(cksCode?: string | null, options?: { status?: strin
   }
   const base = sectionPath('orders', cksCode);
   const key = base ? `${base}${query.toString() ? `?${query.toString()}` : ''}` : null;
-  const result = useHubSWR<HubOrdersResponse>(key, (value) => ({
-    ...value,
-    orders:
-      Array.isArray(value.orders) && value.orders.length > 0
-        ? value.orders
-        : [...(value.serviceOrders ?? []), ...(value.productOrders ?? [])],
-  }));
+  const result = useHubSWR<HubOrdersResponse>(key, normalizeHubOrdersResponse);
   return {
     data: result.data ?? null,
     isLoading: result.isLoading,
@@ -611,12 +744,12 @@ export async function fetchHubOrders(cksCode: string, options?: { status?: strin
   }
   const path = `/hub/orders/${encodeURIComponent(cksCode)}${params.toString() ? `?${params.toString()}` : ''}`;
   const response = await apiFetch<ApiResponse<HubOrdersResponse>>(path, init);
-  return response.data;
+  return normalizeHubOrdersResponse(response.data);
 }
 
 export function useHubReports(cksCode?: string | null) {
   const key = sectionPath('reports', cksCode);
-  const result = useHubSWR<HubReportsResponse>(key);
+  const result = useHubSWR<HubReportsResponse>(key, normalizeHubReportsResponse);
   return {
     data: result.data ?? null,
     isLoading: result.isLoading,
@@ -627,12 +760,12 @@ export function useHubReports(cksCode?: string | null) {
 
 export async function fetchHubReports(cksCode: string, init?: ApiFetchInit) {
   const response = await apiFetch<ApiResponse<HubReportsResponse>>(`/hub/reports/${encodeURIComponent(cksCode)}`, init);
-  return response.data;
+  return normalizeHubReportsResponse(response.data);
 }
 
 export function useHubSupportTickets(cksCode?: string | null) {
   const key = sectionPath('support', cksCode);
-  const result = useHubSWR<HubSupportTicketsResponse>(key);
+  const result = useHubSWR<HubSupportTicketsResponse>(key, normalizeHubSupportTicketsResponse);
   return {
     data: result.data ?? null,
     isLoading: result.isLoading,
@@ -643,7 +776,7 @@ export function useHubSupportTickets(cksCode?: string | null) {
 
 export async function fetchHubSupportTickets(cksCode: string, init?: ApiFetchInit) {
   const response = await apiFetch<ApiResponse<HubSupportTicketsResponse>>(`/hub/support/${encodeURIComponent(cksCode)}`, init);
-  return response.data;
+  return normalizeHubSupportTicketsResponse(response.data);
 }
 
 // Reports & Feedback actions
