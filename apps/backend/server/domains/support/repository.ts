@@ -495,7 +495,10 @@ export async function getHubSupportTickets(role: HubRole, cksCode: string): Prom
     return null;
   }
 
+  const capabilities = await getSupportSchemaCapabilities();
   const columns = await selectTicketColumns();
+  const archivedClause = capabilities.hasArchivedAt ? 't.archived_at IS NULL' : 'TRUE';
+  const creatorClause = capabilities.hasCreatedById ? 'AND UPPER(t.created_by_id) = UPPER($1)' : 'AND 1 = 0';
 
   let result;
   if (isAdminRole(role)) {
@@ -507,7 +510,7 @@ export async function getHubSupportTickets(role: HubRole, cksCode: string): Prom
                 WHERE UPPER(c.ticket_id) = UPPER(t.ticket_id)
               ), 0) AS comment_count
        FROM support_tickets t
-       WHERE t.archived_at IS NULL
+       WHERE ${archivedClause}
        ORDER BY t.created_at DESC NULLS LAST`,
     );
   } else {
@@ -519,8 +522,8 @@ export async function getHubSupportTickets(role: HubRole, cksCode: string): Prom
                 WHERE UPPER(c.ticket_id) = UPPER(t.ticket_id)
               ), 0) AS comment_count
        FROM support_tickets t
-       WHERE t.archived_at IS NULL
-         AND UPPER(t.created_by_id) = UPPER($1)
+       WHERE ${archivedClause}
+         ${creatorClause}
        ORDER BY t.created_at DESC NULLS LAST`,
       [normalizedCode],
     );
