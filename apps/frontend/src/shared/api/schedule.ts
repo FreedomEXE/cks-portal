@@ -353,6 +353,203 @@ function buildQuery(params: Record<string, string | number | string[] | undefine
   return query ? `?${query}` : '';
 }
 
+const BLOCK_STATUSES = new Set<ScheduleBlockDetail['status']>(['scheduled', 'in_progress', 'completed', 'cancelled']);
+const TASK_STATUSES = new Set<ScheduleBlockTask['status']>(['pending', 'in_progress', 'completed', 'cancelled', 'skipped']);
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function toNullableString(value: unknown): string | null {
+  if (typeof value === 'string') {
+    return value;
+  }
+  if (value === null || value === undefined) {
+    return null;
+  }
+  return String(value);
+}
+
+function toStringValue(value: unknown, fallback = ''): string {
+  return toNullableString(value) ?? fallback;
+}
+
+function toNumberOrNull(value: unknown): number | null {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : null;
+  }
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+function toStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .map((entry) => toNullableString(entry)?.trim() ?? '')
+    .filter((entry): entry is string => entry.length > 0);
+}
+
+function normalizeStatus<TStatus extends string>(value: unknown, allowed: Set<TStatus>, fallback: TStatus): TStatus {
+  return typeof value === 'string' && allowed.has(value as TStatus) ? (value as TStatus) : fallback;
+}
+
+function normalizeScheduleAssignment(raw: unknown, blockId: string, index: number): ScheduleBlockAssignment | null {
+  if (!isRecord(raw)) {
+    return null;
+  }
+
+  return {
+    assignmentId: toNumberOrNull(raw.assignmentId) ?? index + 1,
+    blockId: toStringValue(raw.blockId, blockId),
+    participantId: toStringValue(raw.participantId),
+    participantRole: toStringValue(raw.participantRole),
+    assignmentType: toStringValue(raw.assignmentType),
+    isPrimary: raw.isPrimary === true,
+    status: toStringValue(raw.status, 'assigned'),
+    metadata: isRecord(raw.metadata) ? raw.metadata : {},
+    createdAt: toStringValue(raw.createdAt),
+    createdBy: toStringValue(raw.createdBy),
+    updatedAt: toStringValue(raw.updatedAt),
+    updatedBy: toNullableString(raw.updatedBy),
+  };
+}
+
+function normalizeScheduleTask(raw: unknown, blockId: string, index: number): ScheduleBlockTask | null {
+  if (!isRecord(raw)) {
+    return null;
+  }
+
+  return {
+    taskId: toStringValue(raw.taskId, `${blockId || 'schedule-block'}-task-${index + 1}`),
+    blockId: toStringValue(raw.blockId, blockId),
+    sequence: toNumberOrNull(raw.sequence) ?? index + 1,
+    taskType: toStringValue(raw.taskType, 'general'),
+    catalogItemCode: toNullableString(raw.catalogItemCode),
+    catalogItemType: toNullableString(raw.catalogItemType),
+    title: toStringValue(raw.title, `Task ${index + 1}`),
+    description: toNullableString(raw.description),
+    areaName: toNullableString(raw.areaName),
+    estimatedMinutes: toNumberOrNull(raw.estimatedMinutes),
+    status: normalizeStatus(raw.status, TASK_STATUSES, 'pending'),
+    version: toNumberOrNull(raw.version) ?? 0,
+    requiredTools: toStringArray(raw.requiredTools),
+    requiredProducts: toStringArray(raw.requiredProducts),
+    metadata: isRecord(raw.metadata) ? raw.metadata : {},
+    createdAt: toStringValue(raw.createdAt),
+    createdBy: toStringValue(raw.createdBy),
+    updatedAt: toStringValue(raw.updatedAt),
+    updatedBy: toNullableString(raw.updatedBy),
+  };
+}
+
+function normalizeScheduleBlockDetail(raw: unknown, index = 0): ScheduleBlockDetail {
+  const block = isRecord(raw) ? raw : {};
+  const blockId = toStringValue(block.blockId, `schedule-block-${index + 1}`);
+
+  return {
+    blockId,
+    scopeType: toStringValue(block.scopeType),
+    scopeId: toStringValue(block.scopeId),
+    centerId: toNullableString(block.centerId),
+    warehouseId: toNullableString(block.warehouseId),
+    buildingName: toNullableString(block.buildingName),
+    areaName: toNullableString(block.areaName),
+    startAt: toStringValue(block.startAt),
+    endAt: toNullableString(block.endAt),
+    timezone: toStringValue(block.timezone, 'UTC'),
+    blockType: toStringValue(block.blockType, 'manual'),
+    title: toStringValue(block.title, 'Untitled block'),
+    description: toNullableString(block.description),
+    status: normalizeStatus(block.status, BLOCK_STATUSES, 'scheduled'),
+    priority: (() => {
+      const value = toStringValue(block.priority, 'normal');
+      return value === 'low' || value === 'normal' || value === 'high' || value === 'urgent' ? value : 'normal';
+    })(),
+    sourceType: toNullableString(block.sourceType),
+    sourceId: toNullableString(block.sourceId),
+    sourceAction: toNullableString(block.sourceAction),
+    templateId: toNullableString(block.templateId),
+    recurrenceRule: toNullableString(block.recurrenceRule),
+    seriesParentId: toNullableString(block.seriesParentId),
+    occurrenceIndex: toNumberOrNull(block.occurrenceIndex),
+    generatorKey: toStringValue(block.generatorKey),
+    metadata: isRecord(block.metadata) ? block.metadata : {},
+    createdAt: toStringValue(block.createdAt),
+    createdBy: toStringValue(block.createdBy),
+    updatedAt: toStringValue(block.updatedAt),
+    updatedBy: toNullableString(block.updatedBy),
+    version: toNumberOrNull(block.version) ?? 0,
+    archivedAt: toNullableString(block.archivedAt),
+    archivedBy: toNullableString(block.archivedBy),
+    assignments: Array.isArray(block.assignments)
+      ? block.assignments
+          .map((assignment, assignmentIndex) => normalizeScheduleAssignment(assignment, blockId, assignmentIndex))
+          .filter((assignment): assignment is ScheduleBlockAssignment => assignment !== null)
+      : [],
+    tasks: Array.isArray(block.tasks)
+      ? block.tasks
+          .map((task, taskIndex) => normalizeScheduleTask(task, blockId, taskIndex))
+          .filter((task): task is ScheduleBlockTask => task !== null)
+      : [],
+  };
+}
+
+function normalizeScheduleDayPlanResponse(raw: unknown): ScheduleDayPlanResponse {
+  const response = isRecord(raw) ? raw : {};
+
+  return {
+    date: toStringValue(response.date),
+    scopeType: toNullableString(response.scopeType) ?? undefined,
+    scopeId: toNullableString(response.scopeId) ?? undefined,
+    scopeIds: toStringArray(response.scopeIds),
+    summary: {
+      blockCount: toNumberOrNull(isRecord(response.summary) ? response.summary.blockCount : null) ?? 0,
+      assignedBlockCount: toNumberOrNull(isRecord(response.summary) ? response.summary.assignedBlockCount : null) ?? 0,
+      unassignedBlockCount: toNumberOrNull(isRecord(response.summary) ? response.summary.unassignedBlockCount : null) ?? 0,
+      taskCount: toNumberOrNull(isRecord(response.summary) ? response.summary.taskCount : null) ?? 0,
+    },
+    buildings: Array.isArray(response.buildings)
+      ? response.buildings
+          .map((building, buildingIndex) => {
+            if (!isRecord(building)) {
+              return null;
+            }
+            return {
+              buildingKey: toStringValue(building.buildingKey, `building-${buildingIndex + 1}`),
+              buildingName: toStringValue(building.buildingName, `Building ${buildingIndex + 1}`),
+              areaName: toNullableString(building.areaName),
+              lanes: Array.isArray(building.lanes)
+                ? building.lanes
+                    .map((lane, laneIndex) => {
+                      if (!isRecord(lane)) {
+                        return null;
+                      }
+                      return {
+                        laneId: toStringValue(lane.laneId, `lane-${laneIndex + 1}`),
+                        participantId: toNullableString(lane.participantId),
+                        participantRole: toNullableString(lane.participantRole),
+                        blocks: Array.isArray(lane.blocks)
+                          ? lane.blocks.map((block, blockIndex) => normalizeScheduleBlockDetail(block, blockIndex))
+                          : [],
+                      };
+                    })
+                    .filter((lane): lane is ScheduleDayPlanLane => lane !== null)
+                : [],
+              unassignedBlocks: Array.isArray(building.unassignedBlocks)
+                ? building.unassignedBlocks.map((block, blockIndex) => normalizeScheduleBlockDetail(block, blockIndex))
+                : [],
+            };
+          })
+          .filter((building): building is ScheduleDayPlanBuilding => building !== null)
+      : [],
+  };
+}
+
 export function useScheduleDayPlan({
   date,
   scopeType,
@@ -369,7 +566,7 @@ export function useScheduleDayPlan({
   const { getToken } = useClerkAuth();
   const key = `/schedule/day-plan${buildQuery({ date, scopeType, scopeId, scopeIds, testMode })}`;
   return useSWR(key, (path: string) =>
-    apiFetch<ApiResponse<ScheduleDayPlanResponse>>(path, { getToken }).then((response) => response.data),
+    apiFetch<ApiResponse<ScheduleDayPlanResponse>>(path, { getToken }).then((response) => normalizeScheduleDayPlanResponse(response.data)),
   );
 }
 
@@ -381,7 +578,7 @@ export async function saveScheduleBlock(input: SaveScheduleBlockInput) {
       body: JSON.stringify(input),
     },
   );
-  return response.data;
+  return normalizeScheduleBlockDetail(response.data);
 }
 
 export async function fetchScheduleCrewDailyExport(input: {

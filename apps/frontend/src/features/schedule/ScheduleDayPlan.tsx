@@ -55,7 +55,7 @@ interface EditorTaskDraft {
 }
 interface BlockEditorState { title: string; description: string; blockType: string; status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled'; buildingName: string; areaName: string; startTime: string; endTime: string; centerId: string; crewId: string; tasks: EditorTaskDraft[]; }
 
-interface TaskCategoryGroup<TTask extends { taskType?: string | null; catalogItemType?: string | null; estimatedMinutes?: string | number | null; status: string }> {
+interface TaskCategoryGroup<TTask extends { taskType?: string | null; catalogItemType?: string | null; estimatedMinutes?: string | number | null; status?: string | null }> {
   key: string;
   label: string;
   tasks: TTask[];
@@ -122,15 +122,19 @@ function toEstimatedMinutes(value: string | number | null | undefined): number {
   }
   return 0;
 }
-function buildTaskCategoryGroups<TTask extends { taskType?: string | null; catalogItemType?: string | null; estimatedMinutes?: string | number | null; status: string }>(tasks: TTask[]): TaskCategoryGroup<TTask>[] {
+function buildTaskCategoryGroups<TTask extends { taskType?: string | null; catalogItemType?: string | null; estimatedMinutes?: string | number | null; status?: string | null }>(tasks: Array<TTask | null | undefined>): TaskCategoryGroup<TTask>[] {
   const groups = new Map<string, TaskCategoryGroup<TTask>>();
   for (const task of tasks) {
+    if (!task) {
+      continue;
+    }
     const key = task.catalogItemType || task.taskType || 'general';
+    const status = typeof task.status === 'string' ? task.status : 'pending';
     const existing = groups.get(key);
     if (existing) {
       existing.tasks.push(task);
       existing.totalMinutes += toEstimatedMinutes(task.estimatedMinutes);
-      if (task.status === 'completed') existing.completedCount += 1;
+      if (status === 'completed') existing.completedCount += 1;
       continue;
     }
     groups.set(key, {
@@ -138,7 +142,7 @@ function buildTaskCategoryGroups<TTask extends { taskType?: string | null; catal
       label: formatCategoryLabel(key),
       tasks: [task],
       totalMinutes: toEstimatedMinutes(task.estimatedMinutes),
-      completedCount: task.status === 'completed' ? 1 : 0,
+      completedCount: status === 'completed' ? 1 : 0,
     });
   }
   return Array.from(groups.values());
