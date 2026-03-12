@@ -2,6 +2,7 @@ import React from 'react';
 import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { renderToString } from 'react-dom/server';
 import { ProvidersWrapper } from './renderWithProviders';
+import { buildLegacyHubRedirect } from '../shared/utils/hubRouting';
 
 vi.mock('@cks/auth', () => ({
   useAuth: vi.fn(),
@@ -10,7 +11,7 @@ vi.mock('@cks/auth', () => ({
 }));
 
 vi.mock('../hubs/AdminHub', () => ({
-  default: ({ initialTab }: { initialTab?: string }) => <div>admin hub view:{initialTab ?? 'none'}</div>,
+  default: ({ activeTab }: { activeTab: string }) => <div>admin hub view:{activeTab}</div>,
 }));
 
 vi.mock('../hubs/ContractorHub', () => ({
@@ -50,14 +51,32 @@ describe('App routing', () => {
     expect(html).toContain('admin hub view');
   });
 
-  it('aliases tab=schedule to the internal calendar tab key', () => {
+  it('renders schedule tab at /hub/schedule path', () => {
     const html = renderToString(
-      <ProvidersWrapper route="/hub?tab=schedule" currentUserId="TEST-ADMIN" role="admin">
+      <ProvidersWrapper route="/hub/schedule" currentUserId="TEST-ADMIN" role="admin">
         <AuthenticatedApp />
       </ProvidersWrapper>
     );
 
     expect(html).toContain('admin hub view:<!-- -->calendar');
+  });
+
+  it('renders nested schedule routes as the schedule tab', () => {
+    const html = renderToString(
+      <ProvidersWrapper route="/hub/schedule/week/2026-03-12" currentUserId="TEST-ADMIN" role="admin">
+        <AuthenticatedApp />
+      </ProvidersWrapper>
+    );
+
+    expect(html).toContain('admin hub view:<!-- -->calendar');
+  });
+
+  it('promotes legacy schedule query state into the new path format', () => {
+    const redirect = buildLegacyHubRedirect(
+      new URLSearchParams('tab=schedule&view=week&date=2026-03-12&scope=manager:MGR-001'),
+    );
+
+    expect(redirect).toBe('/hub/schedule/week/2026-03-12?scope=manager%3AMGR-001');
   });
 
   it('shows contractor stub when role is contractor', () => {

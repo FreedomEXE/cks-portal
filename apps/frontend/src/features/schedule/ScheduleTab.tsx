@@ -24,12 +24,13 @@
 -----------------------------------------------*/
 import type { ReactNode } from 'react';
 import { useCallback, useMemo } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import CalendarTab from '../calendar/CalendarTab';
 import type { CalendarView } from '../calendar/CalendarProvider';
 import type { HubRole, HubRoleScopeResponse } from '../../shared/api/hub';
 import { useScheduleScopeControls, type AdminScheduleManagerOption } from './scopeControls';
 import ScheduleDayPlan from './ScheduleDayPlan';
+import { buildSchedulePath, parseScheduleDate, parseScheduleView, toScheduleDateKey } from '../../shared/utils/hubRouting';
 
 interface ScheduleTreeNode {
   user: {
@@ -40,17 +41,8 @@ interface ScheduleTreeNode {
   type?: string;
   children?: ScheduleTreeNode[];
 }
-
-const VALID_VIEWS: CalendarView[] = ['agenda', 'month', 'week', 'day'];
 const DEFAULT_VIEW: CalendarView = 'month';
 const DEFAULT_DAYS = 14;
-
-function parseView(value: string | null): CalendarView {
-  if (value && VALID_VIEWS.includes(value as CalendarView)) {
-    return value as CalendarView;
-  }
-  return DEFAULT_VIEW;
-}
 
 function parseDays(value: string | null): number {
   const parsed = Number(value);
@@ -58,25 +50,6 @@ function parseDays(value: string | null): number {
     return DEFAULT_DAYS;
   }
   return parsed;
-}
-
-function parseAnchorDate(value: string | null): Date {
-  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    return new Date();
-  }
-  const parsed = new Date(`${value}T00:00:00Z`);
-  if (Number.isNaN(parsed.getTime())) {
-    return new Date();
-  }
-  return parsed;
-}
-
-function toDateKey(value: Date): string {
-  return value.toISOString().slice(0, 10);
-}
-
-function isToday(value: Date): boolean {
-  return toDateKey(value) === toDateKey(new Date());
 }
 
 export function ScheduleTab({
@@ -110,39 +83,45 @@ export function ScheduleTab({
   showTestEcosystems?: boolean;
   onShowTestEcosystemsChange?: (value: boolean) => void;
 }) {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const initialView = parseView(searchParams.get('view'));
+  const navigate = useNavigate();
+  const { view: viewParam, date: dateParam } = useParams<{ view?: string; date?: string }>();
+  const [searchParams] = useSearchParams();
+
+  // Primary state from route path segments
+  const initialView = parseScheduleView(viewParam) as CalendarView;
+  const initialAnchorDate = parseScheduleDate(dateParam);
+  // Secondary state remains in query params
   const initialDays = parseDays(searchParams.get('days'));
-  const initialAnchorDate = parseAnchorDate(searchParams.get('date'));
+
   const providerKey = useMemo(
-    () => `${initialView}:${initialDays}:${toDateKey(initialAnchorDate)}`,
+    () => `${initialView}:${initialDays}:${toScheduleDateKey(initialAnchorDate)}`,
     [initialAnchorDate, initialDays, initialView],
   );
+
   const handleStateChange = useCallback(
     (state: { days: number; view: CalendarView; anchorDate: Date }) => {
+      const path = buildSchedulePath(state.view, state.anchorDate);
+
+      // Only keep secondary/filter query params
       const next = new URLSearchParams(searchParams);
-      next.set('tab', 'schedule');
-      if (state.view === DEFAULT_VIEW) {
-        next.delete('view');
-      } else {
-        next.set('view', state.view);
-      }
-      if (isToday(state.anchorDate)) {
-        next.delete('date');
-      } else {
-        next.set('date', toDateKey(state.anchorDate));
-      }
+      // Remove legacy keys that no longer belong in query params
+      next.delete('tab');
+      next.delete('view');
+      next.delete('date');
+
       if (state.view === 'agenda' && state.days !== DEFAULT_DAYS) {
         next.set('days', String(state.days));
       } else {
         next.delete('days');
       }
-      if (next.toString() !== searchParams.toString()) {
-        setSearchParams(next, { replace: true });
-      }
+
+      const qs = next.toString();
+      const fullPath = qs ? `${path}?${qs}` : path;
+      navigate(fullPath, { replace: true });
     },
-    [searchParams, setSearchParams],
+    [navigate, searchParams],
   );
+
   const {
     scopeType,
     scopeId,
@@ -162,6 +141,7 @@ export function ScheduleTab({
     onShowTestEcosystemsChange,
     extraActions: headerActions,
   });
+
   return (
     <CalendarTab
       title={title}

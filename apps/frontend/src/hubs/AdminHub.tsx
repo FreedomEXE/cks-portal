@@ -93,7 +93,7 @@ import { ActivityFeed } from '../components/ActivityFeed';
 // Removed unused: const MILLIS_PER_DAY = 1000 * 60 * 60 * 24;
 
 interface AdminHubProps {
-  initialTab?: string;
+  activeTab: string;
 }
 
 const GO_LIVE_DATE_INPUT = (import.meta as any).env?.VITE_GO_LIVE_DATE as string | undefined;
@@ -254,8 +254,8 @@ interface DirectorySectionConfig {
 }
 
 // AdminHub now renders directly - ModalProvider is at app level
-export default function AdminHub({ initialTab = 'dashboard' }: AdminHubProps) {
-  return <AdminHubContent initialTab={initialTab} />;
+export default function AdminHub({ activeTab }: AdminHubProps) {
+  return <AdminHubContent activeTab={activeTab} />;
 }
 
 function parseAdminScheduleEcosystem(searchParams: URLSearchParams): string | null {
@@ -272,14 +272,11 @@ function parseAdminScheduleEcosystem(searchParams: URLSearchParams): string | nu
 }
 
 // Inner component that has access to modal context
-function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
+function AdminHubContent({ activeTab }: AdminHubProps) {
   const { code, firstName, fullName } = useAuth();
   const { setHubLoading } = useHubLoading();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-
-  // Local tab state (no URL changes)
-  const [activeTab, setActiveTab] = useState(initialTab);
   const [overviewModal, setOverviewModal] = useState<{
     id: string;
     title: string;
@@ -1981,7 +1978,7 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
         hubName="Administrator Hub"
         tabs={HUB_TABS}
         activeTab={activeTab}
-        onTabClick={setActiveTab}
+        onTabClick={() => {}}
         onLogout={logout}
       />
 

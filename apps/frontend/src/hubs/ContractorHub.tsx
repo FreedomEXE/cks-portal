@@ -72,7 +72,7 @@ import {
 } from '../shared/watermark';
 
 interface ContractorHubProps {
-  initialTab?: string;
+  activeTab: string;
 }
 
 const ACTIVE_STATUSES = new Set(['pending', 'in-progress', 'approved', 'submitted']);
@@ -210,17 +210,16 @@ function normalizeOrderStatus(value?: string | null): HubOrderItem['status'] {
 }
 
 // Main wrapper component that sets up ModalProvider
-export default function ContractorHub({ initialTab = 'dashboard' }: ContractorHubProps) {
+export default function ContractorHub({ activeTab }: ContractorHubProps) {
   const { code: authCode } = useAuth();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
 
-  return <ContractorHubContent initialTab={initialTab} />;
+  return <ContractorHubContent activeTab={activeTab} />;
 }
 
 // Inner component that has access to modal context
-function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) {
+function ContractorHubContent({ activeTab }: ContractorHubProps) {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState(initialTab);
   const [servicesTab, setServicesTab] = useState<'my' | 'active' | 'history'>('my');
   const [servicesSearchQuery, setServicesSearchQuery] = useState('');
   const [overviewModal, setOverviewModal] = useState<{
@@ -761,7 +760,7 @@ function ContractorHubContent({ initialTab = 'dashboard' }: ContractorHubProps) 
         hubName={(loadUserPreferences(userCode ?? null).hubTitle?.trim() || 'Contractor Hub')}
         tabs={tabs}
         activeTab={activeTab}
-        onTabClick={setActiveTab}
+        onTabClick={() => {}}
         userId={userCode ?? 'CONTRACTOR'}
         welcomeName={welcomeName}
         role="contractor"

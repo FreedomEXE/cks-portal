@@ -1,6 +1,6 @@
 import { Forgot, Login, RoleGuard, useAuth } from '@cks/auth';
 import { useEffect, useRef, type ComponentType } from 'react';
-import { Navigate, Route, Routes, useLocation, useSearchParams } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { useLoading } from './contexts/LoadingContext';
 import { useHubLoading } from './contexts/HubLoadingContext';
 import { ModalProvider } from './contexts/ModalProvider';
@@ -21,8 +21,9 @@ import Impersonate from './pages/Impersonate';
 import Memos from './pages/Memos';
 import News from './pages/News';
 import { useAccountWatermark } from './hooks/useAccountWatermark';
+import { buildLegacyHubRedirect, isKnownHubTabSlug, tabIdToSlug, tabSlugToId } from './shared/utils/hubRouting';
 
-type HubComponent = ComponentType<{ initialTab?: string }>;
+type HubComponent = ComponentType<{ activeTab: string }>;
 
 const HUB_COMPONENTS: Record<string, HubComponent> = {
   admin: AdminHub,
@@ -34,37 +35,7 @@ const HUB_COMPONENTS: Record<string, HubComponent> = {
   warehouse: WarehouseHub,
 };
 
-function sanitizeTab(value: string | null): string | undefined {
-  if (!value) {
-    return undefined;
-  }
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return undefined;
-  }
-  if (trimmed.toLowerCase() === 'schedule') {
-    return 'calendar';
-  }
-  return trimmed;
-}
-
-function resolveInitialHubTab(searchParams: URLSearchParams): string | undefined {
-  const explicitTab = sanitizeTab(searchParams.get('tab'));
-  if (explicitTab) {
-    return explicitTab;
-  }
-  const hasScheduleState =
-    searchParams.has('view') ||
-    searchParams.has('date') ||
-    searchParams.has('days') ||
-    searchParams.has('scope') ||
-    searchParams.has('ecosystem') ||
-    searchParams.has('block') ||
-    searchParams.has('task');
-  return hasScheduleState ? 'calendar' : undefined;
-}
-
-function HubLoader({ initialTab }: { initialTab?: string }): JSX.Element | null {
+function HubLoader({ activeTab }: { activeTab: string }): JSX.Element | null {
   const { status, role, code, accessStatus } = useAuth();
   const { start } = useLoading();
   const { isHubLoading } = useHubLoading();
@@ -116,18 +87,36 @@ function HubLoader({ initialTab }: { initialTab?: string }): JSX.Element | null 
   return (
     <>
       {accessStatus === 'locked' && !['admin', 'administrator'].includes(normalizedRole) ? <AccessGate /> : null}
-      <Hub initialTab={initialTab} />
+      <Hub activeTab={activeTab} />
     </>
   );
 }
 
+/** Resolve tab from URL path params, with backward compat for legacy ?tab= URLs */
 function RoleHubRoute(): JSX.Element {
+  const { tabSlug, view: viewParam } = useParams<{ tabSlug?: string; view?: string }>();
   const [searchParams] = useSearchParams();
-  const initialTab = resolveInitialHubTab(searchParams);
+  const legacyRedirect = buildLegacyHubRedirect(searchParams);
+  if (legacyRedirect) {
+    return <Navigate to={legacyRedirect} replace />;
+  }
+
+  const requestedSlug = viewParam ? 'schedule' : (tabSlug ?? 'dashboard');
+  if (!isKnownHubTabSlug(requestedSlug)) {
+    return <Navigate to="/hub" replace />;
+  }
+
+  const canonicalSlug = tabIdToSlug(tabSlugToId(requestedSlug));
+  if (!viewParam && requestedSlug !== canonicalSlug) {
+    const query = searchParams.toString();
+    return <Navigate to={`${canonicalSlug === 'dashboard' ? '/hub' : `/hub/${canonicalSlug}`}${query ? `?${query}` : ''}`} replace />;
+  }
+
+  const activeTab = tabSlugToId(requestedSlug);
 
   return (
-    <RoleGuard initialTab={initialTab}>
-      <HubLoader initialTab={initialTab} />
+    <RoleGuard>
+      <HubLoader activeTab={activeTab} />
     </RoleGuard>
   );
 }
@@ -151,12 +140,18 @@ export function AuthenticatedApp(): JSX.Element {
         <Toaster position="top-right" />
         <Routes>
           <Route path="/" element={<Navigate to="/hub" replace />} />
+
+          {/* Hub routes — path-based tab navigation */}
           <Route path="/hub" element={<RoleHubRoute />} />
+          <Route path="/hub/:tabSlug" element={<RoleHubRoute />} />
+          {/* Schedule nested routes: /hub/schedule/:view/:date */}
+          <Route path="/hub/schedule/:view" element={<RoleHubRoute />} />
+          <Route path="/hub/schedule/:view/:date" element={<RoleHubRoute />} />
+
           <Route path="/catalog" element={<CKSCatalog />} />
           <Route path="/memos" element={<Memos />} />
           <Route path="/news" element={<News />} />
           <Route path="/impersonate" element={<Impersonate />} />
-          <Route path="/hub/*" element={<Navigate to="/hub" replace />} />
           <Route path="*" element={<Navigate to="/hub" replace />} />
         </Routes>
       </ModalProvider>

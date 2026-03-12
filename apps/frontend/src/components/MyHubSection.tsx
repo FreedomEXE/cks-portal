@@ -1,12 +1,12 @@
 import { useCallback, useEffect } from 'react';
-import { useLocation, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@cks/auth';
 import { useUser } from '@clerk/clerk-react';
 import { MyHubSection as BaseMyHubSection, type MyHubSectionProps } from '@cks/ui';
 import { useLogout } from '../hooks/useLogout';
+import { tabIdToSlug } from '../shared/utils/hubRouting';
 
 type Props = MyHubSectionProps;
-const SCHEDULE_QUERY_KEYS = ['tab', 'view', 'date', 'days', 'scope', 'ecosystem', 'block', 'task'] as const;
 
 export default function MyHubSection({
   welcomeName: providedWelcomeName,
@@ -21,34 +21,26 @@ export default function MyHubSection({
   const { code, firstName, ownerFirstName, role } = useAuth();
   const { user } = useUser();
   const location = useLocation();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const onLogout = providedOnLogout ?? logout;
   const welcomeName = providedWelcomeName ?? ownerFirstName ?? firstName ?? undefined;
   const userId = code ?? providedUserId ?? user?.username ?? undefined;
   const resolvedRole = (providedRole ?? role ?? 'admin').toLowerCase();
 
-  // Handle navigation from catalog with specific tab request
+  // Navigate to path-based route when tab is clicked
+  const handleTabClick = useCallback((tabId: string) => {
+    const slug = tabIdToSlug(tabId);
+    const target = slug === 'dashboard' ? '/hub' : `/hub/${slug}`;
+    navigate(target);
+  }, [navigate]);
+
+  // Handle navigation from catalog with specific tab request (location.state.openTab)
   useEffect(() => {
     const tabFromState = (location.state as any)?.openTab;
-    if (tabFromState && onTabClick) {
-      onTabClick(tabFromState);
+    if (tabFromState) {
+      handleTabClick(tabFromState);
     }
-  }, [location.state, onTabClick]);
-
-  useEffect(() => {
-    if (activeTab === 'calendar') {
-      return;
-    }
-    const hasScheduleParams = SCHEDULE_QUERY_KEYS.some((key) => searchParams.has(key));
-    if (!hasScheduleParams) {
-      return;
-    }
-    const next = new URLSearchParams(searchParams);
-    SCHEDULE_QUERY_KEYS.forEach((key) => next.delete(key));
-    if (next.toString() !== searchParams.toString()) {
-      setSearchParams(next, { replace: true });
-    }
-  }, [activeTab, searchParams, setSearchParams]);
+  }, [location.state, handleTabClick]);
 
   useEffect(() => {
     try {
@@ -96,6 +88,7 @@ export default function MyHubSection({
       ) : null}
       <BaseMyHubSection
         {...rest}
+        activeTab={activeTab}
         role={resolvedRole}
         welcomeName={welcomeName}
         userId={userId}
@@ -105,7 +98,7 @@ export default function MyHubSection({
           onClick: handleReturnToAdmin,
           variant: 'secondary',
         } : undefined}
-        onTabClick={onTabClick}
+        onTabClick={handleTabClick}
       />
     </>
   );

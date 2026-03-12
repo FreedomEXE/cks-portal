@@ -72,7 +72,7 @@ import {
 } from '../shared/watermark';
 
 interface CustomerHubProps {
-  initialTab?: string;
+  activeTab: string;
 }
 
 const ACTIVE_STATUSES = new Set(['pending', 'in-progress', 'approved', 'submitted']);
@@ -170,19 +170,18 @@ function normalizeOrderStatus(value?: string | null): HubOrderItem['status'] {
 
 
 // Main wrapper component that sets up ModalProvider
-export default function CustomerHub({ initialTab = 'dashboard' }: CustomerHubProps) {
+export default function CustomerHub({ activeTab }: CustomerHubProps) {
   const { code: authCode } = useAuth();
   const { openUserProfile } = useClerk();
   const { setTheme } = useAppTheme();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
 
-  return <CustomerHubContent initialTab={initialTab} />;
+  return <CustomerHubContent activeTab={activeTab} />;
 }
 
 // Inner component that has access to modal context
-function CustomerHubContent({ initialTab = 'dashboard' }: CustomerHubProps) {
+function CustomerHubContent({ activeTab }: CustomerHubProps) {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState(initialTab);
   const [servicesTab, setServicesTab] = useState<'my' | 'history'>('my');
   const [servicesSearchQuery, setServicesSearchQuery] = useState('');
   const [overviewModal, setOverviewModal] = useState<{
@@ -628,7 +627,7 @@ function CustomerHubContent({ initialTab = 'dashboard' }: CustomerHubProps) {
         hubName={(loadUserPreferences(userCode ?? normalizedCode).hubTitle?.trim() || 'Customer Hub')}
         tabs={tabs}
           activeTab={activeTab}
-          onTabClick={setActiveTab}
+          onTabClick={() => {}}
         userId={normalizedCode ?? 'CUSTOMER'}
         role="customer"
       />

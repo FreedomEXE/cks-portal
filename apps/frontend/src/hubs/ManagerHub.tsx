@@ -91,7 +91,7 @@ import {
 } from '../shared/watermark';
 
 interface ManagerHubProps {
-  initialTab?: string;
+  activeTab: string;
 }
 
 type OrderStatus =
@@ -426,7 +426,7 @@ function formatReportsTo(value: string | null | undefined): string | null {
 // Sorting is handled within the shared ecosystem builder where applicable
 
 // Main wrapper component that sets up ModalProvider
-export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps) {
+export default function ManagerHub({ activeTab }: ManagerHubProps) {
   const viewerCode = useViewerCodeSafe();
   const userCode = useMemo(() => resolvedUserCode(null, viewerCode), [viewerCode]);
   const { data: reportsData } = useHubReports(userCode);
@@ -464,14 +464,12 @@ export default function ManagerHub({ initialTab = 'dashboard' }: ManagerHubProps
     mutate(`/hub/orders/${userCode}`, undefined, { revalidate: true });
   }, [userCode, mutate]);
 
-  return <ManagerHubContent initialTab={initialTab} />;
+  return <ManagerHubContent activeTab={activeTab} />;
 }
 
 // Inner component that has access to modal context
-function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
+function ManagerHubContent({ activeTab }: ManagerHubProps) {
   const navigate = useNavigate();
-
-  const [activeTab, setActiveTab] = useState(initialTab);
   const [servicesTab, setServicesTab] = useState<'my' | 'active' | 'history'>('my');
   const [servicesSearchQuery, setServicesSearchQuery] = useState('');
   const [showCreateService, setShowCreateService] = useState(false);
@@ -1252,11 +1250,11 @@ function ManagerHubContent({ initialTab = 'dashboard' }: ManagerHubProps) {
           hubName={managerPrefs.hubTitle?.trim() || 'Manager Hub'}
           tabs={HUB_TABS}
           activeTab={activeTab}
-          onTabClick={setActiveTab}
-        onLogout={logout}
-        userId={userCode ?? undefined}
-        role="manager"
-      />
+          onTabClick={() => {}}
+          onLogout={logout}
+          userId={userCode ?? undefined}
+          role="manager"
+        />
 
       <Scrollbar style={{ flex: 1, padding: '0 var(--hub-gutter, 24px)' }} className="hub-content-scroll">
         <div style={{ maxWidth: '1400px', margin: '0 auto' }}>

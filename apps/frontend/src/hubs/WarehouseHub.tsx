@@ -84,7 +84,7 @@ import {
 } from '../shared/api/admin';
 
 interface WarehouseHubProps {
-  initialTab?: string;
+  activeTab: string;
 }
 
 const HISTORY_STATUSES = new Set(['delivered', 'rejected', 'cancelled', 'completed', 'service-created']);
@@ -176,18 +176,17 @@ function normalizeOrderStatus(value?: string | null): HubOrderItem['status'] {
 // Activities are now sourced from the backend via useFormattedActivities
 
 // Main wrapper component that sets up ModalProvider
-export default function WarehouseHub({ initialTab = 'dashboard' }: WarehouseHubProps) {
+export default function WarehouseHub({ activeTab }: WarehouseHubProps) {
   const { code: authCode } = useAuth();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
 
-  return <WarehouseHubContent initialTab={initialTab} />;
+  return <WarehouseHubContent activeTab={activeTab} />;
 }
 
 // Inner component that has access to modal context
-function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
+function WarehouseHubContent({ activeTab }: WarehouseHubProps) {
   const navigate = useNavigate();
   // local UI state (tabs/search)
-  const [activeTab, setActiveTab] = useState(initialTab);
   const [servicesTab, setServicesTab] = useState<'my' | 'active' | 'history'>('active');
   const [servicesSearchQuery, setServicesSearchQuery] = useState('');
   const [deliveriesTab, setDeliveriesTab] = useState<'pending' | 'completed'>('pending');
@@ -1013,7 +1012,7 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
           hubName={(loadUserPreferences(normalizedCode ?? null).hubTitle?.trim() || 'Warehouse Hub')}
           tabs={tabs}
         activeTab={activeTab}
-        onTabClick={setActiveTab}
+        onTabClick={() => {}}
         userId={normalizedCode ?? 'WAREHOUSE'}
         role="warehouse"
       />

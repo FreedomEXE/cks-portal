@@ -71,7 +71,7 @@ import {
 } from '../shared/watermark';
 
 interface CenterHubProps {
-  initialTab?: string;
+  activeTab: string;
 }
 
 const ACTIVE_STATUSES = new Set(['pending', 'in-progress', 'approved', 'submitted', 'active']);
@@ -168,19 +168,18 @@ function normalizeOrderStatus(value?: string | null): HubOrderItem['status'] {
 }
 
 // Main wrapper component that sets up ModalProvider
-export default function CenterHub({ initialTab = 'dashboard' }: CenterHubProps) {
+export default function CenterHub({ activeTab }: CenterHubProps) {
   const { code: authCode } = useAuth();
   const { openUserProfile } = useClerk();
   const { setTheme } = useAppTheme();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
 
-  return <CenterHubContent initialTab={initialTab} />;
+  return <CenterHubContent activeTab={activeTab} />;
 }
 
 // Inner component that has access to modal context
-function CenterHubContent({ initialTab = 'dashboard' }: CenterHubProps) {
+function CenterHubContent({ activeTab }: CenterHubProps) {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState(initialTab);
   const [servicesTab, setServicesTab] = useState<'active' | 'history'>('active');
   const [servicesSearchQuery, setServicesSearchQuery] = useState('');
   const [overviewModal, setOverviewModal] = useState<{
@@ -625,7 +624,7 @@ function CenterHubContent({ initialTab = 'dashboard' }: CenterHubProps) {
               hubName={(loadUserPreferences(userCode ?? normalizedCode).hubTitle?.trim() || 'Center Hub')}
               tabs={tabs}
           activeTab={activeTab}
-          onTabClick={setActiveTab}
+          onTabClick={() => {}}
         userId={normalizedCode ?? 'CENTER'}
         role="center"
       />

@@ -77,7 +77,7 @@ import {
 } from '../shared/watermark';
 
 interface CrewHubProps {
-  initialTab?: string;
+  activeTab: string;
 }
 
 const ACTIVE_STATUSES = new Set(['pending', 'in-progress', 'approved', 'submitted', 'active']);
@@ -175,19 +175,18 @@ function normalizeOrderStatus(value?: string | null): HubOrderItem['status'] {
 
 
 // Main wrapper component that sets up ModalProvider
-export default function CrewHub({ initialTab = 'dashboard' }: CrewHubProps) {
+export default function CrewHub({ activeTab }: CrewHubProps) {
   const { code: authCode } = useAuth();
   const { openUserProfile } = useClerk();
   const { setTheme } = useAppTheme();
   const normalizedCode = useMemo(() => normalizeIdentity(authCode), [authCode]);
 
-  return <CrewHubContent initialTab={initialTab} />;
+  return <CrewHubContent activeTab={activeTab} />;
 }
 
 // Inner component that has access to modal context
-function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
+function CrewHubContent({ activeTab }: CrewHubProps) {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState(initialTab);
   const [servicesTab, setServicesTab] = useState<'my' | 'active' | 'history'>('active');
   const [servicesSearchQuery, setServicesSearchQuery] = useState('');
   const [overviewModal, setOverviewModal] = useState<{
@@ -663,7 +662,7 @@ function CrewHubContent({ initialTab = 'dashboard' }: CrewHubProps) {
               hubName={(loadUserPreferences(userCode ?? normalizedCode).hubTitle?.trim() || 'Crew Hub')}
               tabs={tabs}
           activeTab={activeTab}
-          onTabClick={setActiveTab}
+          onTabClick={() => {}}
         userId={normalizedCode ?? 'CREW'}
         role="crew"
       />
