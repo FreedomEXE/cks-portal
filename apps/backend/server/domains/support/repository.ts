@@ -40,8 +40,8 @@ type SupportTicketRow = {
   steps_to_reproduce: string | null;
   screenshot_url: string | null;
   status: string;
-  created_by_role: string;
-  created_by_id: string;
+  created_by_role: string | null;
+  created_by_id: string | null;
   cks_manager: string | null;
   assigned_to: string | null;
   resolution_notes: string | null;
@@ -98,22 +98,61 @@ const VALID_STATUS_TRANSITIONS: Record<TicketStatus, TicketStatus[]> = {
   cancelled: [],
 };
 
-let supportSchemaCapabilitiesPromise: Promise<{ hasScreenshotUrl: boolean }> | null = null;
+type SupportSchemaCapabilities = {
+  hasStepsToReproduce: boolean;
+  hasScreenshotUrl: boolean;
+  hasCreatedByRole: boolean;
+  hasCreatedById: boolean;
+  hasCksManager: boolean;
+  hasAssignedTo: boolean;
+  hasResolutionNotes: boolean;
+  hasActionTaken: boolean;
+  hasResolvedById: boolean;
+  hasResolvedAt: boolean;
+  hasReopenedCount: boolean;
+  hasArchivedAt: boolean;
+};
 
-async function getSupportSchemaCapabilities(): Promise<{ hasScreenshotUrl: boolean }> {
+let supportSchemaCapabilitiesPromise: Promise<SupportSchemaCapabilities> | null = null;
+
+async function getSupportSchemaCapabilities(): Promise<SupportSchemaCapabilities> {
   if (!supportSchemaCapabilitiesPromise) {
     supportSchemaCapabilitiesPromise = (async () => {
-      const result = await query<{ exists: boolean }>(
-        `SELECT EXISTS (
-           SELECT 1
-           FROM information_schema.columns
-           WHERE table_schema = 'public'
-             AND table_name = 'support_tickets'
-             AND column_name = 'screenshot_url'
-         ) AS exists`,
+      const result = await query<{ column_name: string }>(
+        `SELECT column_name
+         FROM information_schema.columns
+         WHERE table_schema = 'public'
+           AND table_name = 'support_tickets'
+           AND column_name = ANY($1::text[])`,
+        [[
+          'steps_to_reproduce',
+          'screenshot_url',
+          'created_by_role',
+          'created_by_id',
+          'cks_manager',
+          'assigned_to',
+          'resolution_notes',
+          'action_taken',
+          'resolved_by_id',
+          'resolved_at',
+          'reopened_count',
+          'archived_at',
+        ]],
       );
+      const columns = new Set(result.rows.map((row) => String(row.column_name || '').trim().toLowerCase()));
       return {
-        hasScreenshotUrl: Boolean(result.rows[0]?.exists),
+        hasStepsToReproduce: columns.has('steps_to_reproduce'),
+        hasScreenshotUrl: columns.has('screenshot_url'),
+        hasCreatedByRole: columns.has('created_by_role'),
+        hasCreatedById: columns.has('created_by_id'),
+        hasCksManager: columns.has('cks_manager'),
+        hasAssignedTo: columns.has('assigned_to'),
+        hasResolutionNotes: columns.has('resolution_notes'),
+        hasActionTaken: columns.has('action_taken'),
+        hasResolvedById: columns.has('resolved_by_id'),
+        hasResolvedAt: columns.has('resolved_at'),
+        hasReopenedCount: columns.has('reopened_count'),
+        hasArchivedAt: columns.has('archived_at'),
       };
     })().catch((error) => {
       supportSchemaCapabilitiesPromise = null;
@@ -126,29 +165,25 @@ async function getSupportSchemaCapabilities(): Promise<{ hasScreenshotUrl: boole
 
 async function selectTicketColumns(): Promise<string> {
   const capabilities = await getSupportSchemaCapabilities();
-  if (capabilities.hasScreenshotUrl) {
-    return TICKET_SELECT_COLUMNS;
-  }
-
   return `
     ticket_id,
     issue_type,
     priority,
     subject,
     description,
-    steps_to_reproduce,
-    NULL::text AS screenshot_url,
+    ${capabilities.hasStepsToReproduce ? 'steps_to_reproduce' : 'NULL::text AS steps_to_reproduce'},
+    ${capabilities.hasScreenshotUrl ? 'screenshot_url' : 'NULL::text AS screenshot_url'},
     status,
-    created_by_role,
-    created_by_id,
-    cks_manager,
-    assigned_to,
-    resolution_notes,
-    action_taken,
-    resolved_by_id,
-    resolved_at,
-    reopened_count,
-    archived_at,
+    ${capabilities.hasCreatedByRole ? 'created_by_role' : "'user'::text AS created_by_role"},
+    ${capabilities.hasCreatedById ? 'created_by_id' : 'NULL::text AS created_by_id'},
+    ${capabilities.hasCksManager ? 'cks_manager' : 'NULL::text AS cks_manager'},
+    ${capabilities.hasAssignedTo ? 'assigned_to' : 'NULL::text AS assigned_to'},
+    ${capabilities.hasResolutionNotes ? 'resolution_notes' : 'NULL::text AS resolution_notes'},
+    ${capabilities.hasActionTaken ? 'action_taken' : 'NULL::text AS action_taken'},
+    ${capabilities.hasResolvedById ? 'resolved_by_id' : 'NULL::text AS resolved_by_id'},
+    ${capabilities.hasResolvedAt ? 'resolved_at' : 'NULL::timestamptz AS resolved_at'},
+    ${capabilities.hasReopenedCount ? 'reopened_count' : '0::int AS reopened_count'},
+    ${capabilities.hasArchivedAt ? 'archived_at' : 'NULL::timestamptz AS archived_at'},
     created_at,
     updated_at
   `;
@@ -203,8 +238,8 @@ function mapRowToHubTicket(row: SupportTicketRow): HubSupportTicketItem {
     stepsToReproduce: row.steps_to_reproduce,
     screenshotUrl: row.screenshot_url,
     status: normalizeStatus(row.status),
-    submittedBy: row.created_by_id,
-    submittedRole: row.created_by_role,
+    submittedBy: row.created_by_id ?? '',
+    submittedRole: row.created_by_role ?? 'user',
     assignedTo: row.assigned_to,
     submittedDate: row.created_at,
     updatedDate: row.updated_at,
@@ -327,7 +362,7 @@ async function canAccessTicket(role: HubRole, viewerCode: string, row: SupportTi
   if (!normalizedViewer) {
     return false;
   }
-  return normalizeIdentity(row.created_by_id) === normalizedViewer;
+  return normalizeIdentity(row.created_by_id || null) === normalizedViewer;
 }
 
 export function isValidStatusTransition(from: TicketStatus, to: TicketStatus): boolean {
@@ -925,6 +960,6 @@ export async function assertTicketAccess(
 
   return {
     ticket: mapRowToHubTicket(row),
-    createdById: row.created_by_id,
+    createdById: row.created_by_id ?? '',
   };
 }
