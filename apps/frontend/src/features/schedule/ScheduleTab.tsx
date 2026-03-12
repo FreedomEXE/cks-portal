@@ -42,18 +42,20 @@ interface ScheduleTreeNode {
 }
 
 const VALID_VIEWS: CalendarView[] = ['agenda', 'month', 'week', 'day'];
+const DEFAULT_VIEW: CalendarView = 'month';
+const DEFAULT_DAYS = 14;
 
 function parseView(value: string | null): CalendarView {
   if (value && VALID_VIEWS.includes(value as CalendarView)) {
     return value as CalendarView;
   }
-  return 'month';
+  return DEFAULT_VIEW;
 }
 
 function parseDays(value: string | null): number {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed <= 0) {
-    return 14;
+    return DEFAULT_DAYS;
   }
   return parsed;
 }
@@ -67,6 +69,14 @@ function parseAnchorDate(value: string | null): Date {
     return new Date();
   }
   return parsed;
+}
+
+function toDateKey(value: Date): string {
+  return value.toISOString().slice(0, 10);
+}
+
+function isToday(value: Date): boolean {
+  return toDateKey(value) === toDateKey(new Date());
 }
 
 export function ScheduleTab({
@@ -105,16 +115,28 @@ export function ScheduleTab({
   const initialDays = parseDays(searchParams.get('days'));
   const initialAnchorDate = parseAnchorDate(searchParams.get('date'));
   const providerKey = useMemo(
-    () => `${initialView}:${initialDays}:${initialAnchorDate.toISOString().slice(0, 10)}`,
+    () => `${initialView}:${initialDays}:${toDateKey(initialAnchorDate)}`,
     [initialAnchorDate, initialDays, initialView],
   );
   const handleStateChange = useCallback(
     (state: { days: number; view: CalendarView; anchorDate: Date }) => {
       const next = new URLSearchParams(searchParams);
       next.set('tab', 'schedule');
-      next.set('view', state.view);
-      next.set('date', state.anchorDate.toISOString().slice(0, 10));
-      next.set('days', String(state.days));
+      if (state.view === DEFAULT_VIEW) {
+        next.delete('view');
+      } else {
+        next.set('view', state.view);
+      }
+      if (isToday(state.anchorDate)) {
+        next.delete('date');
+      } else {
+        next.set('date', toDateKey(state.anchorDate));
+      }
+      if (state.view === 'agenda' && state.days !== DEFAULT_DAYS) {
+        next.set('days', String(state.days));
+      } else {
+        next.delete('days');
+      }
       if (next.toString() !== searchParams.toString()) {
         setSearchParams(next, { replace: true });
       }

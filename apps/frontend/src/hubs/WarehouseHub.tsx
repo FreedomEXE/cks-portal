@@ -500,7 +500,7 @@ function WarehouseHubContent({ initialTab = 'dashboard' }: WarehouseHubProps) {
         try {
           await uploadCatalogImage(productPhotoFile, 'product', result.productId, { getToken });
         } catch {
-          console.warn('Photo upload failed after product creation');
+          toast.error('Product created but photo upload failed. You can retry from the product detail.');
         }
       }
 

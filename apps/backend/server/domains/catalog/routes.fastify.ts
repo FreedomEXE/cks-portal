@@ -1930,7 +1930,6 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
       return;
     }
 
-    const normalizedAccountCode = (account.cksCode ?? '').trim().toUpperCase();
     if (itemType === 'product') {
       const productExists = await query<{ exists: number }>(
         `SELECT 1 AS exists
@@ -1942,26 +1941,6 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
       if (productExists.rowCount === 0) {
         reply.code(404).send({ error: `Product ${normalizedItemId} not found` });
         return;
-      }
-
-      if (role === 'warehouse') {
-        if (!normalizedAccountCode) {
-          reply.code(403).send({ error: 'Warehouse account is missing a valid warehouse code' });
-          return;
-        }
-        const inventoryCheck = await query<{ exists: number }>(
-          `SELECT 1 AS exists
-           FROM inventory_items
-           WHERE UPPER(warehouse_id) = UPPER($1)
-             AND UPPER(item_id) = UPPER($2)
-             AND status = 'active'
-           LIMIT 1`,
-          [normalizedAccountCode, normalizedItemId],
-        );
-        if (inventoryCheck.rowCount === 0) {
-          reply.code(403).send({ error: 'You can only upload images for products in your inventory' });
-          return;
-        }
       }
     } else {
       const serviceExists = await query<{ exists: number }>(

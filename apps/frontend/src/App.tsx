@@ -48,6 +48,22 @@ function sanitizeTab(value: string | null): string | undefined {
   return trimmed;
 }
 
+function resolveInitialHubTab(searchParams: URLSearchParams): string | undefined {
+  const explicitTab = sanitizeTab(searchParams.get('tab'));
+  if (explicitTab) {
+    return explicitTab;
+  }
+  const hasScheduleState =
+    searchParams.has('view') ||
+    searchParams.has('date') ||
+    searchParams.has('days') ||
+    searchParams.has('scope') ||
+    searchParams.has('ecosystem') ||
+    searchParams.has('block') ||
+    searchParams.has('task');
+  return hasScheduleState ? 'calendar' : undefined;
+}
+
 function HubLoader({ initialTab }: { initialTab?: string }): JSX.Element | null {
   const { status, role, code, accessStatus } = useAuth();
   const { start } = useLoading();
@@ -107,7 +123,7 @@ function HubLoader({ initialTab }: { initialTab?: string }): JSX.Element | null 
 
 function RoleHubRoute(): JSX.Element {
   const [searchParams] = useSearchParams();
-  const initialTab = sanitizeTab(searchParams.get('tab'));
+  const initialTab = resolveInitialHubTab(searchParams);
 
   return (
     <RoleGuard initialTab={initialTab}>

@@ -6,6 +6,7 @@ import { MyHubSection as BaseMyHubSection, type MyHubSectionProps } from '@cks/u
 import { useLogout } from '../hooks/useLogout';
 
 type Props = MyHubSectionProps;
+const SCHEDULE_QUERY_KEYS = ['tab', 'view', 'date', 'days', 'scope', 'ecosystem', 'block', 'task'] as const;
 
 export default function MyHubSection({
   welcomeName: providedWelcomeName,
@@ -35,16 +36,18 @@ export default function MyHubSection({
   }, [location.state, onTabClick]);
 
   useEffect(() => {
-    if (!activeTab) {
+    if (activeTab === 'calendar') {
       return;
     }
-    const queryTab = activeTab === 'calendar' ? 'schedule' : activeTab;
-    if (searchParams.get('tab') === queryTab) {
+    const hasScheduleParams = SCHEDULE_QUERY_KEYS.some((key) => searchParams.has(key));
+    if (!hasScheduleParams) {
       return;
     }
     const next = new URLSearchParams(searchParams);
-    next.set('tab', queryTab);
-    setSearchParams(next, { replace: true });
+    SCHEDULE_QUERY_KEYS.forEach((key) => next.delete(key));
+    if (next.toString() !== searchParams.toString()) {
+      setSearchParams(next, { replace: true });
+    }
   }, [activeTab, searchParams, setSearchParams]);
 
   useEffect(() => {
