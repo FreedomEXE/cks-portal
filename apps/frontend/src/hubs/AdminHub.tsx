@@ -194,6 +194,10 @@ function normalizeId(value?: string | null): string | null {
   return value.trim().toUpperCase();
 }
 
+function compactItems<T>(items?: Array<T | null | undefined> | null): T[] {
+  return (items ?? []).filter((item): item is T => item != null);
+}
+
 function isTestId(value?: string | null): boolean {
   if (!value) return false;
   return value.toUpperCase().includes('-TEST');
@@ -347,6 +351,22 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
   const { data: reportsData, isLoading: reportsLoading } = useHubReports(code || 'ADMIN');
   const { data: supportData } = useHubSupportTickets(code || 'ADMIN');
   const { data: activityItems, isLoading: activitiesLoading, error: activitiesError } = useActivities();
+
+  const safeAdminUsers = useMemo(() => compactItems(adminUsers), [adminUsers]);
+  const safeManagers = useMemo(() => compactItems(managers), [managers]);
+  const safeContractors = useMemo(() => compactItems(contractors), [contractors]);
+  const safeCustomers = useMemo(() => compactItems(customers), [customers]);
+  const safeCenters = useMemo(() => compactItems(centers), [centers]);
+  const safeCrew = useMemo(() => compactItems(crew), [crew]);
+  const safeWarehouses = useMemo(() => compactItems(warehouses), [warehouses]);
+  const safeServices = useMemo(() => compactItems(services), [services]);
+  const safeOrders = useMemo(() => compactItems(orders), [orders]);
+  const safeProducts = useMemo(() => compactItems(products), [products]);
+  const safeTrainingRecords = useMemo(() => compactItems(trainingRecords), [trainingRecords]);
+  const safeProcedures = useMemo(() => compactItems(procedures), [procedures]);
+  const safeReports = useMemo(() => compactItems(reportsData?.reports), [reportsData]);
+  const safeFeedback = useMemo(() => compactItems(reportsData?.feedback), [reportsData]);
+
   const supportTickets = useMemo(() => buildSupportTickets(supportData), [supportData]);
   const supportItems = useMemo(() => {
     const tickets = supportData?.tickets ?? [];
@@ -607,17 +627,17 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
 
   const overviewData = useMemo(() =>
     buildAdminOverviewData({
-      adminUsers,
-      managers,
-      contractors,
-      customers,
-      centers,
-      crew,
-      warehouses,
+      adminUsers: safeAdminUsers,
+      managers: safeManagers,
+      contractors: safeContractors,
+      customers: safeCustomers,
+      centers: safeCenters,
+      crew: safeCrew,
+      warehouses: safeWarehouses,
       reports: supportItems,
       goLiveTimestamp: GO_LIVE_TIMESTAMP,
     }),
-  [adminUsers, managers, contractors, customers, centers, crew, warehouses, supportItems]);
+  [safeAdminUsers, safeManagers, safeContractors, safeCustomers, safeCenters, safeCrew, safeWarehouses, supportItems]);
 
   const overviewCards = useMemo(() => {
     return adminOverviewCards.map((card) => ({
@@ -633,12 +653,12 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
               title: 'User Breakdown',
               subtitle: 'Current totals by role',
               items: [
-                { primary: 'Managers', secondary: String(managers.length) },
-                { primary: 'Contractors', secondary: String(contractors.length) },
-                { primary: 'Customers', secondary: String(customers.length) },
-                { primary: 'Centers', secondary: String(centers.length) },
-                { primary: 'Crew', secondary: String(crew.length) },
-                { primary: 'Warehouses', secondary: String(warehouses.length) },
+                { primary: 'Managers', secondary: String(safeManagers.length) },
+                { primary: 'Contractors', secondary: String(safeContractors.length) },
+                { primary: 'Customers', secondary: String(safeCustomers.length) },
+                { primary: 'Centers', secondary: String(safeCenters.length) },
+                { primary: 'Crew', secondary: String(safeCrew.length) },
+                { primary: 'Warehouses', secondary: String(safeWarehouses.length) },
               ],
               emptyMessage: 'No users found.',
               accentColor: card.color,
@@ -689,11 +709,11 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
         setOverviewModal((prev) => (prev?.id === card.id ? null : { id: card.id, ...payload }));
       },
     }));
-  }, [managers.length, contractors.length, customers.length, centers.length, crew.length, warehouses.length, supportItems, overviewData?.daysOnline]);
+  }, [safeManagers.length, safeContractors.length, safeCustomers.length, safeCenters.length, safeCrew.length, safeWarehouses.length, supportItems, overviewData?.daysOnline]);
 
   const adminRows = useMemo(
     () =>
-      adminUsers.map((admin) => ({
+      safeAdminUsers.map((admin) => ({
         id: admin.id,
         code: (admin.cksCode ?? admin.id).toUpperCase(),
         name: admin.fullName ?? admin.email ?? admin.cksCode ?? admin.id,
@@ -702,12 +722,12 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
         status: (admin.status ?? 'unassigned').toLowerCase(),
         createdAt: formatDate(admin.createdAt),
       })),
-    [adminUsers],
+    [safeAdminUsers],
   );
 
   const managerRows = useMemo(
     () =>
-      managers.map((manager) => ({
+      safeManagers.map((manager) => ({
         id: manager.id,
         managerId: manager.id,
         name: formatText(manager.name),
@@ -717,12 +737,12 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
         status: (manager.status ?? 'unassigned').toLowerCase(),
         createdAt: formatDate(manager.createdAt),
       })),
-    [managers],
+    [safeManagers],
   );
 
   const contractorRows = useMemo(
     () =>
-      contractors.map((contractor) => ({
+      safeContractors.map((contractor) => ({
         id: contractor.id,
         name: formatText(contractor.name),
         mainContact: formatText(contractor.mainContact),
@@ -732,11 +752,11 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
         status: (contractor.status ?? 'unassigned').toLowerCase(),
         createdAt: formatDate(contractor.createdAt),
       })),
-    [contractors],
+    [safeContractors],
   );
   const customerRows = useMemo(
     () =>
-      customers.map((customer) => ({
+      safeCustomers.map((customer) => ({
         id: customer.id,
         name: formatText(customer.name),
         email: formatText(customer.email),
@@ -744,11 +764,11 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
         status: customer.status?.toLowerCase() ?? null,
         createdAt: formatDate(customer.createdAt),
       })),
-    [customers],
+    [safeCustomers],
   );
   const centerRows = useMemo(
     () =>
-      centers.map((center) => ({
+      safeCenters.map((center) => ({
         id: center.id,
         name: formatText(center.name),
         contractorId: formatText(center.contractorId),
@@ -760,11 +780,11 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
         status: center.customerId ? 'active' : 'unassigned',
         createdAt: formatDate(center.createdAt),
       })),
-    [centers],
+    [safeCenters],
   );
   const crewRows = useMemo(
     () =>
-      crew.map((member) => ({
+      safeCrew.map((member) => ({
         id: member.id,
         name: formatText(member.name),
         emergencyContact: formatText(member.emergencyContact),
@@ -774,11 +794,11 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
         status: member.assignedCenter ? 'active' : 'unassigned',
         createdAt: formatDate(member.createdAt),
       })),
-    [crew],
+    [safeCrew],
   );
   const warehouseRows = useMemo(
     () =>
-      warehouses.map((warehouse) => ({
+      safeWarehouses.map((warehouse) => ({
         id: warehouse.id,
         name: formatText(warehouse.name),
         email: formatText(warehouse.email),
@@ -786,11 +806,11 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
         status: (warehouse.status ?? 'operational').toLowerCase(),
         createdAt: formatDate(warehouse.createdAt),
       })),
-    [warehouses],
+    [safeWarehouses],
   );
   const serviceRows = useMemo(
     () =>
-      services.map((service) => ({
+      safeServices.map((service) => ({
         id: service.id,
         name: formatText(service.name),
         category: formatText(service.category),
@@ -800,12 +820,12 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
         metadata: (service as any).metadata ?? null,
         description: (service as any).description ?? null,
       })),
-    [services],
+    [safeServices],
   );
 
   const productOrderRows = useMemo(
     () =>
-      orders
+      safeOrders
         .filter((order) => {
           const extra = order as any;
           return extra.orderType === 'product';
@@ -837,12 +857,12 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
             _fullOrder: order,
           };
         }),
-    [orders],
+    [safeOrders],
   );
 
   const serviceOrderRows = useMemo(
     () =>
-      orders
+      safeOrders
         .filter((order) => {
           const extra = order as any;
           return extra.orderType === 'service';
@@ -874,12 +894,12 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
             _fullOrder: order,
           };
         }),
-    [orders],
+    [safeOrders],
   );
 
   const productRows = useMemo(
     () =>
-      products.map((product) => ({
+      safeProducts.map((product) => ({
         id: product.id,
         rawId: (product as any).rawId ?? null,
         name: formatText(product.name),
@@ -892,35 +912,35 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
         updatedAt: formatDate(product.updatedAt),
         source: (product as any).source ?? 'products',
       })),
-    [products],
+    [safeProducts],
   );
 
   const trainingRows = useMemo(
     () =>
-      trainingRecords.map((record) => ({
+      safeTrainingRecords.map((record) => ({
         id: record.id,
         crewName: formatText(record.crewName),
         serviceName: formatText(record.serviceName),
         status: formatText(record.status),
         startDate: formatDate(record.date),
       })),
-    [trainingRecords],
+    [safeTrainingRecords],
   );
 
   const procedureRows = useMemo(
     () =>
-      procedures.map((procedure) => ({
+      safeProcedures.map((procedure) => ({
         id: procedure.id,
         serviceId: formatText(procedure.serviceId),
         type: formatText(procedure.type),
         contractorId: formatText(procedure.contractorId),
         customerId: formatText(procedure.customerId),
       })),
-    [procedures],
+    [safeProcedures],
   );
 
   const reportRows = useMemo(() => {
-    return (reportsData?.reports || []).map((report: any) => ({
+    return safeReports.map((report: any) => ({
       id: report.id,
       title: report.title,
       severity: formatText(report.severity),
@@ -933,11 +953,11 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
       _fullReport: report,
       _entityType: 'report',
     }));
-  }, [reportsData]);
+  }, [safeReports]);
 
   const feedbackRows = useMemo(
     () =>
-      (reportsData?.feedback || []).map((entry: any) => ({
+      safeFeedback.map((entry: any) => ({
         id: entry.id,
         kind: formatText(entry.kind || (entry as any).category),
         title: entry.title,
@@ -949,30 +969,30 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
         _fullFeedback: entry,
         _entityType: 'feedback',
       })),
-    [reportsData],
+    [safeFeedback],
   );
 
   const ecosystemLookup = useMemo(() => {
     const contractorById = new Map<string, typeof contractors[number]>();
-    contractors.forEach((contractor) => {
+    safeContractors.forEach((contractor) => {
       const key = normalizeId(contractor.id);
       if (key) contractorById.set(key, contractor);
     });
 
     const customerById = new Map<string, typeof customers[number]>();
-    customers.forEach((customer) => {
+    safeCustomers.forEach((customer) => {
       const key = normalizeId(customer.id);
       if (key) customerById.set(key, customer);
     });
 
     const centerById = new Map<string, typeof centers[number]>();
-    centers.forEach((center) => {
+    safeCenters.forEach((center) => {
       const key = normalizeId(center.id);
       if (key) centerById.set(key, center);
     });
 
     const warehouseById = new Map<string, typeof warehouses[number]>();
-    warehouses.forEach((warehouse) => {
+    safeWarehouses.forEach((warehouse) => {
       const key = normalizeId(warehouse.id);
       if (key) warehouseById.set(key, warehouse);
     });
@@ -993,13 +1013,13 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
       warehouseById,
       getManagerIdForCenter,
     };
-  }, [contractors, customers, centers, warehouses]);
+  }, [safeContractors, safeCustomers, safeCenters, safeWarehouses]);
 
   const ecosystemRows = useMemo(() => {
     const { contractorById, customerById, centerById, warehouseById, getManagerIdForCenter } = ecosystemLookup;
 
     const contractorByManager = new Map<string, typeof contractors>();
-    contractors.forEach((contractor) => {
+    safeContractors.forEach((contractor) => {
       const key = normalizeId(contractor.managerId);
       if (!key) return;
       const list = contractorByManager.get(key) ?? [];
@@ -1008,7 +1028,7 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
     });
 
     const customerByManager = new Map<string, typeof customers>();
-    customers.forEach((customer) => {
+    safeCustomers.forEach((customer) => {
       const key = normalizeId(customer.managerId);
       if (!key) return;
       const list = customerByManager.get(key) ?? [];
@@ -1018,7 +1038,7 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
 
     const centerByManager = new Map<string, typeof centers>();
 
-    centers.forEach((center) => {
+    safeCenters.forEach((center) => {
       const key = getManagerIdForCenter(center);
       if (!key) return;
       const list = centerByManager.get(key) ?? [];
@@ -1027,7 +1047,7 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
     });
 
     const warehouseByManager = new Map<string, typeof warehouses>();
-    warehouses.forEach((warehouse) => {
+    safeWarehouses.forEach((warehouse) => {
       const key = normalizeId(warehouse.managerId);
       if (!key) return;
       const list = warehouseByManager.get(key) ?? [];
@@ -1036,7 +1056,7 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
     });
 
     const crewByManager = new Map<string, typeof crew>();
-    crew.forEach((member) => {
+    safeCrew.forEach((member) => {
       const center = centerById.get(normalizeId(member.assignedCenter) ?? '');
       const key = getManagerIdForCenter(center);
       if (!key) return;
@@ -1046,7 +1066,7 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
     });
 
     const ordersByManager = new Map<string, Array<unknown>>();
-    const allOrders = [...(orders?.productOrders || []), ...(orders?.serviceOrders || [])];
+    const allOrders = safeOrders;
     allOrders.forEach((order: any) => {
       const key =
         normalizeId(order.managerId) ??
@@ -1060,7 +1080,7 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
     });
 
     const reportsByManager = new Map<string, Array<unknown>>();
-    (reportsData?.reports || []).forEach((report: any) => {
+    safeReports.forEach((report: any) => {
       const key =
         getManagerIdForCenter(centerById.get(normalizeId(report.centerId) ?? '') ?? null) ??
         normalizeId(customerById.get(normalizeId(report.customerId) ?? '')?.managerId);
@@ -1071,7 +1091,7 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
     });
 
     const feedbackByManager = new Map<string, Array<unknown>>();
-    (reportsData?.feedback || []).forEach((entry: any) => {
+    safeFeedback.forEach((entry: any) => {
       const key =
         getManagerIdForCenter(centerById.get(normalizeId(entry.centerId) ?? '') ?? null) ??
         normalizeId(customerById.get(normalizeId(entry.customerId) ?? '')?.managerId);
@@ -1081,7 +1101,7 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
       feedbackByManager.set(key, list);
     });
 
-    return managers
+    return safeManagers
       .filter((manager) => (showTestEcosystems ? true : !isTestId(manager.id)))
       .map((manager) => {
         const key = normalizeId(manager.id) ?? '';
@@ -1117,14 +1137,15 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
         };
       });
   }, [
-    managers,
-    contractors,
-    customers,
-    centers,
-    crew,
-    warehouses,
-    orders,
-    reportsData,
+    safeManagers,
+    safeContractors,
+    safeCustomers,
+    safeCenters,
+    safeCrew,
+    safeWarehouses,
+    safeOrders,
+    safeReports,
+    safeFeedback,
     showTestEcosystems,
     ecosystemLookup,
   ]);
@@ -1198,15 +1219,15 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
   const selectedManager = useMemo(() => {
     const target = normalizeId(selectedEcosystemId ?? '');
     if (!target) return null;
-    return managers.find((manager) => normalizeId(manager.id) === target) ?? null;
-  }, [managers, selectedEcosystemId]);
+    return safeManagers.find((manager) => normalizeId(manager.id) === target) ?? null;
+  }, [safeManagers, selectedEcosystemId]);
 
   const buildManagerTree = useCallback((managerId: string | null | undefined) => {
     const normalizedManagerId = normalizeId(managerId);
     if (!normalizedManagerId) {
       return null;
     }
-    const manager = managers.find((entry) => normalizeId(entry.id) === normalizedManagerId) ?? null;
+    const manager = safeManagers.find((entry) => normalizeId(entry.id) === normalizedManagerId) ?? null;
     if (!manager) {
       return null;
     }
@@ -1214,10 +1235,10 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
     const { centerById, getManagerIdForCenter } = ecosystemLookup;
     const managerKey = normalizedManagerId;
 
-    const contractorsForManager = contractors.filter((contractor) => normalizeId(contractor.managerId) === managerKey);
-    const customersForManager = customers.filter((customer) => normalizeId(customer.managerId) === managerKey);
-    const centersForManager = centers.filter((center) => getManagerIdForCenter(center) === managerKey);
-    const crewForManager = crew.filter((member) => {
+    const contractorsForManager = safeContractors.filter((contractor) => normalizeId(contractor.managerId) === managerKey);
+    const customersForManager = safeCustomers.filter((customer) => normalizeId(customer.managerId) === managerKey);
+    const centersForManager = safeCenters.filter((center) => getManagerIdForCenter(center) === managerKey);
+    const crewForManager = safeCrew.filter((member) => {
       const center = centerById.get(normalizeId(member.assignedCenter) ?? '');
       return getManagerIdForCenter(center ?? null) === managerKey;
     });
@@ -1236,7 +1257,7 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
 
     const scope = {
       role: 'manager' as const,
-      cksCode: selectedManager.id,
+      cksCode: manager.id,
       summary: {
         contractorCount: contractorsForManager.length,
         customerCount: customersForManager.length,
@@ -1295,7 +1316,7 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
     return buildEcosystemTree(scope, {
       rootName: manager.name ?? manager.id,
     });
-  }, [centers, contractors, crew, customers, ecosystemLookup, managers]);
+  }, [ecosystemLookup, safeCenters, safeContractors, safeCrew, safeCustomers, safeManagers]);
 
   const selectedEcosystemTree = useMemo(
     () => buildManagerTree(selectedEcosystemId),
@@ -1362,7 +1383,7 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
       data: adminRows,
       emptyMessage: 'No admin users found yet.',
       onRowClick: (row: any) => {
-        const full = (adminUsers || []).find((admin) => admin.id === row.id);
+        const full = safeAdminUsers.find((admin) => admin.id === row.id);
         if (!full) {
           return;
         }
@@ -1840,22 +1861,22 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
 
       try {
         if (directoryTab === 'managers') {
-          const found = (managers || []).find((m) => m.id === row.id);
+          const found = safeManagers.find((m) => m.id === row.id);
           if (found) full = found;
         } else if (directoryTab === 'contractors') {
-          const found = (contractors || []).find((m) => m.id === row.id);
+          const found = safeContractors.find((m) => m.id === row.id);
           if (found) full = found;
         } else if (directoryTab === 'customers') {
-          const found = (customers || []).find((m) => m.id === row.id);
+          const found = safeCustomers.find((m) => m.id === row.id);
           if (found) full = found;
         } else if (directoryTab === 'centers') {
-          const found = (centers || []).find((m) => m.id === row.id);
+          const found = safeCenters.find((m) => m.id === row.id);
           if (found) full = found;
         } else if (directoryTab === 'crew') {
-          const found = (crew || []).find((m) => m.id === row.id);
+          const found = safeCrew.find((m) => m.id === row.id);
           if (found) full = found;
         } else if (directoryTab === 'warehouses') {
-          const found = (warehouses || []).find((m) => m.id === row.id);
+          const found = safeWarehouses.find((m) => m.id === row.id);
           if (found) full = found;
         }
       } catch {}
