@@ -75,6 +75,7 @@ export interface UseScheduleScopeControlsResult {
   scopeIds?: string[];
   scopeTree?: ScheduleTreeNode | null;
   testMode?: 'include' | 'exclude' | 'only';
+  scopeLabel?: string;
   headerActions?: ReactNode;
 }
 
@@ -477,12 +478,12 @@ export function useScheduleScopeControls({
       return undefined;
     }
     return (
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-end gap-3">
         {typeof showTestEcosystems === 'boolean' && onShowTestEcosystemsChange ? (
           <button
             type="button"
             onClick={() => onShowTestEcosystemsChange(!showTestEcosystems)}
-            className={`rounded-xl border px-3 py-2 text-sm font-semibold shadow-sm transition-colors ${
+            className={`rounded-full border px-3 py-2 text-xs font-black uppercase tracking-[0.14em] shadow-sm transition-colors ${
               showTestEcosystems
                 ? 'border-slate-900 bg-slate-900 text-white'
                 : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900'
@@ -492,15 +493,15 @@ export function useScheduleScopeControls({
           </button>
         ) : null}
         {selectorConfigs.map((selector) => (
-          <div key={selector.type} className="flex items-center gap-2">
-            <label htmlFor={`schedule-scope-${selector.type}`} className="text-xs font-bold uppercase tracking-[0.08em] text-slate-500">
+          <div key={selector.type} className="min-w-[170px] flex-1">
+            <label htmlFor={`schedule-scope-${selector.type}`} className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
               {selector.label}
             </label>
             <select
               id={`schedule-scope-${selector.type}`}
               value={selector.value}
               onChange={(event) => handleSelectorChange(selector.type, event.target.value)}
-              className="min-w-[200px] rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-slate-400 focus:outline-none"
+              className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 shadow-[0_10px_22px_rgba(15,23,42,0.05)] focus:border-slate-400 focus:outline-none"
             >
               <option value="">{selector.placeholder}</option>
               {selector.options.map((option) => (
@@ -516,6 +517,20 @@ export function useScheduleScopeControls({
     );
   }, [extraActions, handleSelectorChange, onShowTestEcosystemsChange, selectorConfigs, showTestEcosystems]);
 
+  const scopeLabel = useMemo(() => {
+    if (selectedNode?.label) {
+      return selectedNode.label;
+    }
+    if (viewerRole === 'admin') {
+      const selectedManager = adminManagerOptions.find((option) => normalizeId(option.id) === normalizeId(selectedAdminManagerId));
+      return selectedManager?.label ?? 'All ecosystems';
+    }
+    if (defaultRootScope) {
+      return nodesByKey.get(`${defaultRootScope.type}:${defaultRootScope.id}`)?.label ?? defaultRootScope.id;
+    }
+    return undefined;
+  }, [adminManagerOptions, defaultRootScope, nodesByKey, selectedAdminManagerId, selectedNode, viewerRole]);
+
   const resolvedTestMode = viewerRole === 'admin'
     ? (selectedAdminManagerId && selectedAdminManagerId.includes('-TEST') ? 'only' : 'exclude')
     : undefined;
@@ -526,6 +541,7 @@ export function useScheduleScopeControls({
     scopeIds,
     scopeTree,
     testMode: resolvedTestMode,
+    scopeLabel,
     headerActions,
   };
 }

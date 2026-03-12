@@ -28,14 +28,10 @@ import CalendarAgenda from './CalendarAgenda';
 import CalendarFull from './CalendarFull';
 
 function formatHeaderTitle(view: CalendarView, anchorDate: Date, days: number): string {
-  const range = getCalendarRange(view, anchorDate, days);
-  if (view === 'agenda') {
-    return `Next ${days} days`;
-  }
-  return range.label;
+  return getCalendarRange(view, anchorDate, days).label;
 }
 
-function formatHeaderSubtitle(view: CalendarView): string {
+function formatHeaderEyebrow(view: CalendarView, days: number): string {
   if (view === 'day') {
     return 'Daily schedule';
   }
@@ -45,7 +41,7 @@ function formatHeaderSubtitle(view: CalendarView): string {
   if (view === 'month') {
     return 'Monthly schedule';
   }
-  return 'Upcoming schedule';
+  return `Agenda schedule · ${days} days`;
 }
 
 function SummaryCard({
@@ -105,41 +101,91 @@ function ViewButton({
 }
 
 function CalendarHeaderControls({ extraActions }: { extraActions?: ReactNode }) {
-  const { view, setView, goToToday, shiftRange } = useCalendarContext();
+  const { days, setDays, view, setView, goToToday, shiftRange } = useCalendarContext();
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-2">
-        {extraActions}
-        <button
-          type="button"
-          onClick={() => shiftRange(-1)}
-          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 shadow-sm hover:border-slate-300 hover:text-slate-900"
-        >
-          Prev
-        </button>
-        <button
-          type="button"
-          onClick={goToToday}
-          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 shadow-sm hover:border-slate-300 hover:text-slate-900"
-        >
-          Today
-        </button>
-        <button
-          type="button"
-          onClick={() => shiftRange(1)}
-          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 shadow-sm hover:border-slate-300 hover:text-slate-900"
-        >
-          Next
-        </button>
-        <div className="flex items-center gap-1 rounded-[18px] border border-slate-200 bg-slate-50 p-1 shadow-sm">
-          <ViewButton value="agenda" label="Agenda" activeView={view} onSelect={setView} />
-          <ViewButton value="month" label="Month" activeView={view} onSelect={setView} />
-          <ViewButton value="week" label="Week" activeView={view} onSelect={setView} />
-          <ViewButton value="day" label="Day" activeView={view} onSelect={setView} />
+    <div className="flex w-full flex-col gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => shiftRange(-1)}
+            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 shadow-sm hover:border-slate-300 hover:text-slate-900"
+          >
+            Prev
+          </button>
+          <button
+            type="button"
+            onClick={goToToday}
+            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 shadow-sm hover:border-slate-300 hover:text-slate-900"
+          >
+            Today
+          </button>
+          <button
+            type="button"
+            onClick={() => shiftRange(1)}
+            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 shadow-sm hover:border-slate-300 hover:text-slate-900"
+          >
+            Next
+          </button>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {view === 'agenda' ? (
+            <select
+              value={days}
+              onChange={(event) => setDays(Number(event.target.value))}
+              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm focus:border-slate-400 focus:outline-none"
+            >
+              <option value={7}>7 days</option>
+              <option value={14}>14 days</option>
+              <option value={30}>30 days</option>
+            </select>
+          ) : null}
+          <div className="flex items-center gap-1 rounded-[18px] border border-slate-200 bg-slate-50 p-1 shadow-sm">
+            <ViewButton value="agenda" label="Agenda" activeView={view} onSelect={setView} />
+            <ViewButton value="month" label="Month" activeView={view} onSelect={setView} />
+            <ViewButton value="week" label="Week" activeView={view} onSelect={setView} />
+            <ViewButton value="day" label="Day" activeView={view} onSelect={setView} />
+          </div>
         </div>
       </div>
+      {extraActions ? (
+        <div className="rounded-[24px] border border-slate-200/80 bg-slate-50/70 px-4 py-3">
+          <div className="mb-2 text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">Scope</div>
+          {extraActions}
+        </div>
+      ) : null}
     </div>
+  );
+}
+
+function HeaderScopeLine({ scopeLabel }: { scopeLabel?: string }) {
+  if (!scopeLabel) {
+    return null;
+  }
+  return <div className="text-sm font-semibold text-slate-500">{scopeLabel}</div>;
+}
+
+function CalendarHeader({ scopeLabel, headerActions }: { scopeLabel?: string; headerActions?: ReactNode }) {
+  const { days, view, anchorDate } = useCalendarContext();
+
+  return (
+    <section className="rounded-[28px] border border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.94))] p-5 shadow-[0_18px_44px_rgba(15,23,42,0.06)]">
+      <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+        <div className="space-y-2">
+          <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">
+            {formatHeaderEyebrow(view, days)}
+          </div>
+          <div className="text-3xl font-black tracking-[-0.05em] text-slate-950">
+            {formatHeaderTitle(view, anchorDate, days)}
+          </div>
+          <HeaderScopeLine scopeLabel={scopeLabel} />
+        </div>
+        <div className="xl:max-w-[720px] xl:flex-1">
+          <CalendarHeaderControls extraActions={headerActions} />
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -153,6 +199,7 @@ function CalendarTabContent({
   agendaEmptyMessage,
   headerActions,
   renderDayView,
+  scopeLabel,
 }: {
   scopeType?: string;
   scopeId?: string;
@@ -163,6 +210,7 @@ function CalendarTabContent({
   agendaEmptyMessage?: string;
   headerActions?: ReactNode;
   renderDayView?: (props: { scopeType?: string; scopeId?: string; scopeIds?: string[]; testMode?: 'include' | 'exclude' | 'only' }) => ReactNode;
+  scopeLabel?: string;
 }) {
   const { days, view, anchorDate } = useCalendarContext();
   const range = getCalendarRange(view, anchorDate, days);
@@ -171,21 +219,10 @@ function CalendarTabContent({
       ? { days, scopeType, scopeId, testMode }
       : { start: range.start, end: range.end, scopeType, scopeId, testMode, limit: 500 },
   );
-  const controls = <CalendarHeaderControls extraActions={headerActions} />;
-  const headerTitle = formatHeaderTitle(view, anchorDate, days);
-  const headerSubtitle = formatHeaderSubtitle(view);
 
   return (
     <div className="flex flex-col gap-4">
-      <section className="rounded-[28px] border border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.94))] p-4 shadow-[0_18px_44px_rgba(15,23,42,0.06)]">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-          <div className="space-y-1">
-            <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">{headerSubtitle}</div>
-            <div className="text-2xl font-black tracking-[-0.04em] text-slate-950">{headerTitle}</div>
-          </div>
-          {controls}
-        </div>
-      </section>
+      <CalendarHeader scopeLabel={scopeLabel} headerActions={headerActions} />
 
       <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(170px,1fr))]">
         <SummaryCard label="Total" value={data?.total ?? 0} tone="slate" />
@@ -203,6 +240,7 @@ function CalendarTabContent({
           emptyMessage={agendaEmptyMessage}
           showHeader={false}
           headerActions={undefined}
+          showWindowSelector={false}
         />
       ) : (
         <CalendarFull
@@ -231,6 +269,7 @@ export function CalendarTab({
   agendaDescription,
   agendaEmptyMessage,
   headerActions,
+  scopeLabel,
   initialDays,
   initialView,
   initialAnchorDate,
@@ -247,6 +286,7 @@ export function CalendarTab({
   agendaDescription?: string;
   agendaEmptyMessage?: string;
   headerActions?: ReactNode;
+  scopeLabel?: string;
   initialDays?: number;
   initialView?: CalendarView;
   initialAnchorDate?: Date;
@@ -272,6 +312,7 @@ export function CalendarTab({
           agendaDescription={agendaDescription}
           agendaEmptyMessage={agendaEmptyMessage}
           headerActions={headerActions}
+          scopeLabel={scopeLabel}
           renderDayView={renderDayView}
         />
       </CalendarProvider>

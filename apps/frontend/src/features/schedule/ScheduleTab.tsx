@@ -128,6 +128,7 @@ export function ScheduleTab({
     scopeIds,
     scopeTree,
     testMode,
+    scopeLabel,
     headerActions: scopeHeaderActions,
   } = useScheduleScopeControls({
     viewerRole,
@@ -149,6 +150,7 @@ export function ScheduleTab({
       agendaDescription={agendaDescription}
       agendaEmptyMessage={agendaEmptyMessage}
       headerActions={scopeHeaderActions}
+      scopeLabel={scopeLabel}
       scopeType={scopeType}
       scopeId={scopeId}
       scopeIds={scopeIds}

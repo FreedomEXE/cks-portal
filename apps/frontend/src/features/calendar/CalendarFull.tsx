@@ -152,15 +152,6 @@ function CalendarEventPill({ event, compact = false }: { event: CalendarEventIte
   );
 }
 
-function EmptyRangeNotice({ message }: { message: string }) {
-  return (
-    <div className="rounded-[24px] border border-dashed border-slate-300 bg-white/90 px-5 py-5 text-sm text-slate-500 shadow-[0_12px_30px_rgba(15,23,42,0.04)]">
-      <div className="font-semibold text-slate-900">No events in this view</div>
-      <div className="mt-1">{message}</div>
-    </div>
-  );
-}
-
 function MonthView({ events }: { events: CalendarEventItem[] }) {
   const { anchorDate, focusDate } = useCalendarContext();
   const monthStart = startOfMonth(anchorDate);
@@ -172,7 +163,6 @@ function MonthView({ events }: { events: CalendarEventItem[] }) {
 
   return (
     <div className="flex flex-col gap-3">
-      {events.length === 0 ? <EmptyRangeNotice message="No scheduled events in this month view yet." /> : null}
       <div className="overflow-hidden rounded-[30px] border border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.92))] p-3 shadow-[0_22px_60px_rgba(15,23,42,0.08)]">
         <div className="grid grid-cols-7 gap-2">
         {DAY_LABELS.map((label) => (
@@ -250,7 +240,6 @@ function WeekView({ events }: { events: CalendarEventItem[] }) {
 
   return (
     <div className="flex flex-col gap-3">
-      {events.length === 0 ? <EmptyRangeNotice message="No scheduled events in this week view yet." /> : null}
       <div className="grid gap-3 lg:grid-cols-7">
         {dates.map((date) => {
           const key = date.toISOString().slice(0, 10);
@@ -277,9 +266,7 @@ function WeekView({ events }: { events: CalendarEventItem[] }) {
               </div>
               <div className="flex min-h-[220px] flex-col gap-2 p-3">
                 {dayEvents.length === 0 ? (
-                  <div className="rounded-[20px] border border-dashed border-slate-200 px-3 py-5 text-center text-xs text-slate-400">
-                    No events
-                  </div>
+                  <div className="flex-1 rounded-[20px] border border-dashed border-slate-200/70 bg-slate-50/60" />
                 ) : (
                   dayEvents.map((event) => <CalendarEventPill key={event.eventId} event={event} compact />)
                 )}
@@ -307,7 +294,9 @@ function DayView({ events }: { events: CalendarEventItem[] }) {
           </div>
         </div>
         {events.length === 0 ? (
-          <EmptyRangeNotice message="No scheduled events on this day yet." />
+          <div className="rounded-[24px] border border-dashed border-slate-300/80 bg-white/90 px-5 py-6 text-sm text-slate-500 shadow-[0_12px_30px_rgba(15,23,42,0.04)]">
+            Nothing scheduled for this day yet.
+          </div>
         ) : (
           <div className="flex flex-col gap-3">
             {events.map((event) => (
