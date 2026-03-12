@@ -1264,7 +1264,7 @@ function AdminHubContent({ initialTab = 'dashboard' }: AdminHubProps) {
         centerCount: centersForManager.length,
         crewCount: crewForManager.length,
         pendingOrders: 0,
-        accountStatus: selectedManager.status ?? null,
+        accountStatus: manager.status ?? null,
       },
       relationships: {
         contractors: contractorsForManager.map((contractor) => ({
