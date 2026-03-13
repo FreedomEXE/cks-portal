@@ -399,22 +399,24 @@ function InlineHeaderValue({
   options,
   onSelect,
   tone = 'secondary',
+  hint,
 }: {
   value: string;
   selectedValue?: string;
   options?: ScopeOption[];
   onSelect?: (value: string) => void;
   tone?: 'primary' | 'secondary';
+  hint?: string;
 }) {
   const triggerClasses = tone === 'primary'
-    ? 'rounded-2xl px-4 py-2 text-xl font-black text-slate-700 transition hover:bg-slate-100 hover:text-slate-900'
-    : 'rounded-2xl px-4 py-2 text-lg font-semibold text-slate-500 transition hover:bg-slate-100 hover:text-slate-800';
+    ? 'rounded-2xl px-3 py-1.5 text-lg font-black text-slate-700 transition hover:bg-slate-100 hover:text-slate-900'
+    : 'rounded-2xl px-3 py-1.5 text-base font-semibold text-slate-500 transition hover:bg-slate-100 hover:text-slate-800';
   const panelWidth = tone === 'primary' ? 'min-w-[220px]' : 'min-w-[280px]';
   const selectableOptions = options ?? [];
 
   if (!onSelect || selectableOptions.length <= 1) {
     return (
-      <div className={triggerClasses}>
+      <div title={hint} className={triggerClasses}>
         {value}
       </div>
     );
@@ -422,13 +424,8 @@ function InlineHeaderValue({
 
   return (
     <details className="group relative">
-      <summary className={`list-none cursor-pointer ${triggerClasses}`}>
-        <span className="inline-flex items-center gap-2">
-          <span>{value}</span>
-          <span className="text-slate-400 transition group-hover:text-slate-600 group-open:rotate-180 group-open:text-slate-600">
-            v
-          </span>
-        </span>
+      <summary title={hint} className={`list-none cursor-pointer ${triggerClasses}`}>
+        <span>{value}</span>
       </summary>
       <div className={`absolute left-1/2 top-[calc(100%+10px)] z-20 w-max ${panelWidth} -translate-x-1/2 rounded-[24px] border border-slate-200 bg-white/98 p-2 shadow-[0_18px_40px_rgba(15,23,42,0.16)] backdrop-blur`}>
         {selectableOptions.map((option) => (
@@ -811,14 +808,15 @@ export function useScheduleScopeControls({
     const identityMenuOptions = identitySelector?.options ?? [];
 
     return (
-      <div className="flex flex-col items-center gap-2 text-center">
-        <div className="flex flex-wrap items-center justify-center gap-2">
+      <div className="flex flex-col items-center gap-1.5 text-center">
+        <div className="flex flex-wrap items-center justify-center gap-1.5">
           <InlineHeaderValue
             value={scopeLabel ?? 'Current Scope'}
             selectedValue={activeScopeMode}
             options={scopeMenuOptions}
             onSelect={handleScopeModeChange}
             tone="primary"
+            hint="Click to change scope"
           />
 
           {identityLabel ? (
@@ -828,14 +826,13 @@ export function useScheduleScopeControls({
               options={identityMenuOptions}
               onSelect={identitySelector ? identitySelector.onChange : undefined}
               tone="secondary"
+              hint="Click to change identity"
             />
           ) : null}
-        </div>
-
-        {typeof showTestEcosystems === 'boolean' && onShowTestEcosystemsChange ? (
-          <div className="flex flex-wrap items-center justify-center gap-2">
+          {typeof showTestEcosystems === 'boolean' && onShowTestEcosystemsChange ? (
             <button
               type="button"
+              title="Click to toggle test ecosystems"
               onClick={() => onShowTestEcosystemsChange(!showTestEcosystems)}
               className={`rounded-full border px-3 py-2 text-xs font-black uppercase tracking-[0.14em] shadow-sm transition-colors ${
                 showTestEcosystems
@@ -845,13 +842,9 @@ export function useScheduleScopeControls({
             >
               {showTestEcosystems ? 'Hide test' : 'Show test'}
             </button>
-            {extraActions}
-          </div>
-        ) : extraActions ? (
-          <div className="flex flex-wrap items-center justify-center gap-2">
-            {extraActions}
-          </div>
-        ) : null}
+          ) : null}
+          {extraActions}
+        </div>
       </div>
     );
   }, [

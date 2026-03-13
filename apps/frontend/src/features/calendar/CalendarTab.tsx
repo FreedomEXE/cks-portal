@@ -148,25 +148,22 @@ function SummaryCard({
 function HeaderTextTrigger({
   value,
   emphasis = 'secondary',
+  hint,
 }: {
   value: string;
   emphasis?: 'primary' | 'secondary' | 'eyebrow';
+  hint?: string;
 }) {
   const classes =
     emphasis === 'primary'
-      ? 'rounded-2xl px-4 py-2 text-4xl font-black tracking-[-0.06em] text-slate-950 transition hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300'
+      ? 'rounded-2xl px-3 py-1.5 text-[2rem] font-black tracking-[-0.06em] text-slate-950 transition hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300'
       : emphasis === 'eyebrow'
-        ? 'rounded-xl px-3 py-1 text-[13px] font-black uppercase tracking-[0.18em] text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300'
-        : 'rounded-2xl px-4 py-2 text-lg font-bold text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300';
+        ? 'rounded-xl px-2.5 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300'
+        : 'rounded-2xl px-3 py-1.5 text-base font-bold text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300';
 
   return (
-    <summary className={`list-none cursor-pointer ${classes}`}>
-      <span className="inline-flex items-center gap-2">
-        <span>{value}</span>
-        <span className="text-slate-400 transition group-hover:text-slate-600 group-open:rotate-180 group-open:text-slate-600">
-          v
-        </span>
-      </span>
+    <summary title={hint} className={`list-none cursor-pointer ${classes}`}>
+      <span>{value}</span>
     </summary>
   );
 }
@@ -183,7 +180,7 @@ function ViewSwitcher() {
 
   return (
     <details className="group relative">
-      <HeaderTextTrigger value={formatHeaderEyebrow(view)} emphasis="eyebrow" />
+      <HeaderTextTrigger value={formatHeaderEyebrow(view)} emphasis="eyebrow" hint="Click to change view" />
       <div className="absolute left-1/2 top-[calc(100%+10px)] z-20 w-64 -translate-x-1/2 rounded-[24px] border border-slate-200 bg-white/98 p-2 shadow-[0_18px_40px_rgba(15,23,42,0.16)] backdrop-blur">
         {options.map((option) => (
           <button
@@ -230,7 +227,7 @@ function DateSwitcher() {
 
   return (
     <details className="group relative">
-      <HeaderTextTrigger value={formatHeaderTitle(view, anchorDate, days)} emphasis="primary" />
+      <HeaderTextTrigger value={formatHeaderTitle(view, anchorDate, days)} emphasis="primary" hint="Click to change date" />
       <div className="absolute left-1/2 top-[calc(100%+12px)] z-20 w-[300px] -translate-x-1/2 rounded-[26px] border border-slate-200 bg-white/98 p-4 shadow-[0_18px_40px_rgba(15,23,42,0.16)] backdrop-blur">
         <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">
           {label}
@@ -306,27 +303,22 @@ function CalendarHeader({
   const hasInteractiveMeta = Boolean(headerMeta);
 
   return (
-    <section className="rounded-[28px] border border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.94))] p-5 shadow-[0_18px_44px_rgba(15,23,42,0.06)]">
+    <section className="rounded-[28px] border border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.94))] p-4 shadow-[0_18px_44px_rgba(15,23,42,0.06)]">
       <div className="flex justify-end">
         <CalendarHeaderControls extraActions={headerActions} />
       </div>
-      <div className="mt-4 flex flex-col items-center text-center">
+      <div className="mt-2 flex flex-col items-center text-center">
         <ViewSwitcher />
-        <div className="mt-1">
+        <div className="mt-0.5">
           <DateSwitcher />
         </div>
         {hasInteractiveMeta ? (
-          <div className="mt-3 flex w-full justify-center">
+          <div className="mt-1.5 flex w-full justify-center">
             {headerMeta}
           </div>
         ) : (
-          <div className="mt-3">
+          <div className="mt-1.5">
             <HeaderContextLine scopeLabel={scopeLabel} identityLabel={identityLabel} />
-          </div>
-        )}
-        {!hasInteractiveMeta && !scopeLabel && !identityLabel ? null : (
-          <div className="mt-1 text-xs text-slate-400">
-            Click the header text to switch what you are looking at.
           </div>
         )}
       </div>
