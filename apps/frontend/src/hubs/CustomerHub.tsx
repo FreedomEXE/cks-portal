@@ -727,6 +727,7 @@ function CustomerHubContent({ activeTab }: CustomerHubProps) {
               title="Schedule"
               viewerRole="customer"
               viewerCode={userCode}
+              viewerLabel={`${profile?.name ?? userCode ?? 'Customer'} (${userCode ?? 'CUSTOMER'})`}
               scopeData={scopeData}
             />
           ) : activeTab === 'services' ? (

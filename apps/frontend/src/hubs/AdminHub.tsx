@@ -2190,6 +2190,7 @@ function AdminHubContent({ activeTab }: AdminHubProps) {
             <ScheduleTab
               title="Schedule"
               viewerRole="admin"
+              viewerLabel={`${fullName ?? firstName ?? 'Administrator'}${code ? ` (${code})` : ''}`}
               adminScopeTree={selectedCalendarEcosystemTree}
               adminManagerOptions={ecosystemRows.map((row) => ({
                 id: row.managerId,

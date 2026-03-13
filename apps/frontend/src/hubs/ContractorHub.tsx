@@ -870,6 +870,7 @@ function ContractorHubContent({ activeTab }: ContractorHubProps) {
               title="Schedule"
               viewerRole="contractor"
               viewerCode={userCode}
+              viewerLabel={`${profile?.name ?? userCode ?? 'Contractor'} (${userCode ?? 'CONTRACTOR'})`}
               scopeData={scopeData}
             />
           ) : activeTab === 'services' ? (

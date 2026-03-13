@@ -51,6 +51,7 @@ export function ScheduleTab({
   headerActions,
   viewerRole,
   viewerCode,
+  viewerLabel,
   scopeData,
   adminScopeTree,
   adminManagerOptions,
@@ -66,6 +67,7 @@ export function ScheduleTab({
   headerActions?: ReactNode;
   viewerRole?: HubRole | 'admin';
   viewerCode?: string | null;
+  viewerLabel?: string;
   scopeData?: HubRoleScopeResponse | null;
   adminScopeTree?: ScheduleTreeNode | null;
   adminManagerOptions?: AdminScheduleManagerOption[];
@@ -114,10 +116,12 @@ export function ScheduleTab({
     scopeTree,
     testMode,
     scopeLabel,
-    headerActions: scopeHeaderActions,
+    identityLabel,
+    headerMeta,
   } = useScheduleScopeControls({
     viewerRole,
     viewerCode,
+    viewerLabel,
     scopeData,
     adminScopeTree,
     adminManagerOptions,
@@ -134,8 +138,10 @@ export function ScheduleTab({
       agendaTitle={agendaTitle}
       agendaDescription={agendaDescription}
       agendaEmptyMessage={agendaEmptyMessage}
-      headerActions={scopeHeaderActions}
+      headerActions={undefined}
+      headerMeta={headerMeta}
       scopeLabel={scopeLabel}
+      identityLabel={identityLabel}
       scopeType={scopeType}
       scopeId={scopeId}
       scopeIds={scopeIds}

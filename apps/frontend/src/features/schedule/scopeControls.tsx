@@ -59,6 +59,7 @@ export interface AdminScheduleManagerOption {
 export interface UseScheduleScopeControlsInput {
   viewerRole?: ScheduleViewerRole;
   viewerCode?: string | null;
+  viewerLabel?: string;
   scopeData?: HubRoleScopeResponse | null;
   adminScopeTree?: ScheduleTreeNode | null;
   adminManagerOptions?: AdminScheduleManagerOption[];
@@ -76,13 +77,25 @@ export interface UseScheduleScopeControlsResult {
   scopeTree?: ScheduleTreeNode | null;
   testMode?: 'include' | 'exclude' | 'only';
   scopeLabel?: string;
-  headerActions?: ReactNode;
+  identityLabel?: string;
+  headerMeta?: ReactNode;
 }
 
 interface ParsedScope {
   type: ScheduleScopeType;
   id: string;
 }
+
+type HeaderScopeMode =
+  | 'all_ecosystems'
+  | 'manager'
+  | 'contractor'
+  | 'customer'
+  | 'center'
+  | 'crew'
+  | 'my_schedule'
+  | 'center_schedule'
+  | 'warehouse';
 
 const TYPE_LABELS: Record<ScheduleScopeType, string> = {
   manager: 'Ecosystem',
@@ -277,9 +290,106 @@ function getPlaceholder(viewerRole: ScheduleViewerRole | undefined, type: Schedu
   }
 }
 
+function getHeaderScopeOptions(
+  viewerRole?: ScheduleViewerRole,
+  hasSelectedRoot = false,
+): Array<{ value: HeaderScopeMode; label: string }> {
+  switch (viewerRole) {
+    case 'admin':
+      return hasSelectedRoot ? [
+        { value: 'all_ecosystems', label: 'All Ecosystems' },
+        { value: 'manager', label: 'Ecosystem' },
+        { value: 'contractor', label: 'Contractor' },
+        { value: 'customer', label: 'Customer' },
+        { value: 'center', label: 'Center' },
+        { value: 'crew', label: 'Crew' },
+      ] : [
+        { value: 'all_ecosystems', label: 'All Ecosystems' },
+        { value: 'manager', label: 'Ecosystem' },
+      ];
+    case 'manager':
+      return [
+        { value: 'manager', label: 'Ecosystem' },
+        { value: 'contractor', label: 'Contractor' },
+        { value: 'customer', label: 'Customer' },
+        { value: 'center', label: 'Center' },
+        { value: 'crew', label: 'Crew' },
+      ];
+    case 'contractor':
+      return [
+        { value: 'contractor', label: 'Contractor' },
+        { value: 'customer', label: 'Customer' },
+        { value: 'center', label: 'Center' },
+        { value: 'crew', label: 'Crew' },
+      ];
+    case 'customer':
+      return [
+        { value: 'customer', label: 'Customer' },
+        { value: 'center', label: 'Center' },
+        { value: 'crew', label: 'Crew' },
+      ];
+    case 'center':
+      return [
+        { value: 'center', label: 'Center' },
+        { value: 'crew', label: 'Crew' },
+      ];
+    case 'crew':
+      return [
+        { value: 'my_schedule', label: 'My Schedule' },
+        { value: 'center_schedule', label: 'Center Schedule' },
+      ];
+    case 'warehouse':
+      return [{ value: 'warehouse', label: 'Warehouse' }];
+    default:
+      return [];
+  }
+}
+
+function getHeaderScopeMode(
+  viewerRole: ScheduleViewerRole | undefined,
+  effectiveScope: ParsedScope | null,
+  defaultRootScope: ParsedScope | null,
+): HeaderScopeMode {
+  if (viewerRole === 'admin') {
+    return effectiveScope?.type ?? 'all_ecosystems';
+  }
+  if (viewerRole === 'crew') {
+    return effectiveScope?.type === 'center' ? 'center_schedule' : 'my_schedule';
+  }
+  if (viewerRole === 'warehouse') {
+    return 'warehouse';
+  }
+  return (effectiveScope?.type ?? defaultRootScope?.type ?? 'manager') as HeaderScopeMode;
+}
+
+function getIdentityFallbackLabel(
+  viewerRole: ScheduleViewerRole | undefined,
+  viewerLabel?: string | null,
+  viewerCode?: string | null,
+): string | undefined {
+  if (viewerLabel?.trim()) {
+    return viewerLabel.trim();
+  }
+  const normalizedCode = normalizeId(viewerCode);
+  if (normalizedCode) {
+    if (viewerRole === 'admin') {
+      return `Administrator (${normalizedCode})`;
+    }
+    return normalizedCode;
+  }
+  if (viewerRole === 'admin') {
+    return 'Administrator';
+  }
+  if (viewerRole === 'warehouse') {
+    return 'Warehouse';
+  }
+  return undefined;
+}
+
 export function useScheduleScopeControls({
   viewerRole,
   viewerCode,
+  viewerLabel,
   scopeData,
   adminScopeTree,
   adminManagerOptions = [],
@@ -445,6 +555,32 @@ export function useScheduleScopeControls({
     });
   }, [adminManagerOptions, nodes, nodesByKey, selectedAdminManagerId, selectedIdsByType, selectorOrder, viewerRole]);
 
+  const scopeOptions = useMemo(
+    () => getHeaderScopeOptions(viewerRole, Boolean(effectiveScope?.id)),
+    [effectiveScope?.id, viewerRole],
+  );
+  const activeScopeMode = useMemo(
+    () => getHeaderScopeMode(viewerRole, effectiveScope, defaultRootScope),
+    [defaultRootScope, effectiveScope, viewerRole],
+  );
+
+  const resolveFirstOptionId = useCallback((type: ScheduleScopeType): string | null => {
+    if (viewerRole === 'admin' && type === 'manager') {
+      return normalizeId(selectedAdminManagerId) ?? normalizeId(adminManagerOptions[0]?.id);
+    }
+
+    if (selectedIdsByType.get(type)) {
+      return selectedIdsByType.get(type) ?? null;
+    }
+
+    if (defaultRootScope?.type === type) {
+      return defaultRootScope.id;
+    }
+
+    const selector = selectorConfigs.find((config) => config.type === type);
+    return selector?.options[0]?.id ?? null;
+  }, [adminManagerOptions, defaultRootScope, selectedAdminManagerId, selectedIdsByType, selectorConfigs, viewerRole]);
+
   const handleSelectorChange = useCallback((type: ScheduleScopeType, value: string) => {
     const normalizedValue = normalizeId(value);
     if (viewerRole === 'admin' && type === 'manager') {
@@ -472,13 +608,183 @@ export function useScheduleScopeControls({
     updateScope(defaultRootScope);
   }, [defaultRootScope, onSelectedAdminManagerIdChange, selectedIdsByType, selectorOrder, updateScope, viewerRole]);
 
-  const headerActions = useMemo(() => {
-    const hasScopeControls = selectorConfigs.length > 0 || Boolean(extraActions) || Boolean(onShowTestEcosystemsChange);
-    if (!hasScopeControls) {
+  const scopeLabel = useMemo(() => {
+    switch (activeScopeMode) {
+      case 'all_ecosystems':
+        return 'All Ecosystems';
+      case 'my_schedule':
+        return 'My Schedule';
+      case 'center_schedule':
+        return 'Center Schedule';
+      case 'manager':
+        return 'Ecosystem';
+      case 'contractor':
+        return 'Contractor';
+      case 'customer':
+        return 'Customer';
+      case 'center':
+        return 'Center';
+      case 'crew':
+        return 'Crew';
+      case 'warehouse':
+        return 'Warehouse';
+      default:
+        return undefined;
+    }
+  }, [activeScopeMode]);
+
+  const identityLabel = useMemo(() => {
+    if (activeScopeMode === 'all_ecosystems') {
+      return getIdentityFallbackLabel(viewerRole, viewerLabel, viewerCode);
+    }
+
+    if (activeScopeMode === 'my_schedule' || activeScopeMode === 'warehouse') {
+      return getIdentityFallbackLabel(viewerRole, viewerLabel, viewerCode);
+    }
+
+    if (activeScopeMode === 'manager' && viewerRole === 'admin') {
+      const selectedManager = adminManagerOptions.find((option) => normalizeId(option.id) === normalizeId(selectedAdminManagerId));
+      return selectedManager?.label ?? getIdentityFallbackLabel(viewerRole, viewerLabel, viewerCode);
+    }
+
+    if (defaultRootScope && effectiveScope?.type === defaultRootScope.type && effectiveScope.id === defaultRootScope.id) {
+      return getIdentityFallbackLabel(viewerRole, viewerLabel, viewerCode) ?? selectedNode?.label;
+    }
+
+    return selectedNode?.label ?? getIdentityFallbackLabel(viewerRole, viewerLabel, viewerCode);
+  }, [
+    activeScopeMode,
+    adminManagerOptions,
+    defaultRootScope,
+    effectiveScope,
+    selectedAdminManagerId,
+    selectedNode,
+    viewerCode,
+    viewerLabel,
+    viewerRole,
+  ]);
+
+  const identitySelector = useMemo(() => {
+    if (activeScopeMode === 'all_ecosystems' || activeScopeMode === 'my_schedule' || activeScopeMode === 'warehouse') {
+      return null;
+    }
+
+    if (viewerRole === 'admin' && activeScopeMode === 'manager') {
+      return {
+        value: normalizeId(selectedAdminManagerId) ?? '',
+        options: adminManagerOptions.map((option) => ({ id: option.id, label: option.label })),
+        onChange: (value: string) => handleSelectorChange('manager', value),
+      };
+    }
+
+    if (activeScopeMode === 'center_schedule') {
+      const centerSelector = selectorConfigs.find((config) => config.type === 'center');
+      return centerSelector
+        ? {
+            value: centerSelector.value,
+            options: centerSelector.options,
+            onChange: (value: string) => handleSelectorChange('center', value),
+          }
+        : null;
+    }
+
+    const mappedType = activeScopeMode as ScheduleScopeType;
+    const selector = selectorConfigs.find((config) => config.type === mappedType);
+    return selector
+      ? {
+          value: selector.value,
+          options: selector.options,
+          onChange: (value: string) => handleSelectorChange(mappedType, value),
+        }
+      : null;
+  }, [activeScopeMode, adminManagerOptions, handleSelectorChange, selectedAdminManagerId, selectorConfigs, viewerRole]);
+
+  const handleScopeModeChange = useCallback((value: string) => {
+    const mode = value as HeaderScopeMode;
+
+    if (mode === 'all_ecosystems') {
+      onSelectedAdminManagerIdChange?.(null);
+      updateScope(null);
+      return;
+    }
+
+    if (mode === 'my_schedule' || mode === 'warehouse') {
+      updateScope(defaultRootScope);
+      return;
+    }
+
+    if (mode === 'center_schedule') {
+      const centerId = resolveFirstOptionId('center');
+      if (centerId) {
+        updateScope({ type: 'center', id: centerId });
+      }
+      return;
+    }
+
+    const nextType = mode as ScheduleScopeType;
+    const nextId = resolveFirstOptionId(nextType);
+
+    if (viewerRole === 'admin' && nextType === 'manager') {
+      onSelectedAdminManagerIdChange?.(nextId);
+    }
+
+    if (nextId) {
+      updateScope({ type: nextType, id: nextId });
+    }
+  }, [defaultRootScope, onSelectedAdminManagerIdChange, resolveFirstOptionId, updateScope, viewerRole]);
+
+  const headerMeta = useMemo(() => {
+    const hasControls =
+      scopeOptions.length > 0 ||
+      identitySelector?.options.length ||
+      Boolean(onShowTestEcosystemsChange) ||
+      Boolean(extraActions);
+
+    if (!hasControls) {
       return undefined;
     }
+
+    const fieldLabelClasses = 'text-[10px] font-black uppercase tracking-[0.14em] text-slate-400';
+    const fieldValueClasses = 'mt-1 min-w-0 rounded-2xl border border-slate-200 bg-white/95 px-3 py-2.5 text-sm font-semibold text-slate-700 shadow-[0_10px_24px_rgba(15,23,42,0.05)]';
+
     return (
       <div className="flex flex-wrap items-end gap-3">
+        <div className="min-w-[170px] flex-1">
+          <div className={fieldLabelClasses}>Scope</div>
+          <select
+            value={activeScopeMode}
+            onChange={(event) => handleScopeModeChange(event.target.value)}
+            className={`w-full ${fieldValueClasses} focus:border-slate-400 focus:outline-none`}
+          >
+            {scopeOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="min-w-[220px] flex-[1.25]">
+          <div className={fieldLabelClasses}>Identity</div>
+          {identitySelector && identitySelector.options.length > 0 ? (
+            <select
+              value={identitySelector.value}
+              onChange={(event) => identitySelector.onChange(event.target.value)}
+              className={`w-full ${fieldValueClasses} focus:border-slate-400 focus:outline-none`}
+            >
+              {identitySelector.options.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <div className={`${fieldValueClasses} truncate`}>
+              {identityLabel ?? 'Current view'}
+            </div>
+          )}
+        </div>
+
         {typeof showTestEcosystems === 'boolean' && onShowTestEcosystemsChange ? (
           <button
             type="button"
@@ -492,44 +798,20 @@ export function useScheduleScopeControls({
             {showTestEcosystems ? 'Hide test' : 'Show test'}
           </button>
         ) : null}
-        {selectorConfigs.map((selector) => (
-          <div key={selector.type} className="min-w-[170px] flex-1">
-            <label htmlFor={`schedule-scope-${selector.type}`} className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
-              {selector.label}
-            </label>
-            <select
-              id={`schedule-scope-${selector.type}`}
-              value={selector.value}
-              onChange={(event) => handleSelectorChange(selector.type, event.target.value)}
-              className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 shadow-[0_10px_22px_rgba(15,23,42,0.05)] focus:border-slate-400 focus:outline-none"
-            >
-              <option value="">{selector.placeholder}</option>
-              {selector.options.map((option) => (
-                <option key={option.id} value={option.id}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-        ))}
+
         {extraActions}
       </div>
     );
-  }, [extraActions, handleSelectorChange, onShowTestEcosystemsChange, selectorConfigs, showTestEcosystems]);
-
-  const scopeLabel = useMemo(() => {
-    if (selectedNode?.label) {
-      return selectedNode.label;
-    }
-    if (viewerRole === 'admin') {
-      const selectedManager = adminManagerOptions.find((option) => normalizeId(option.id) === normalizeId(selectedAdminManagerId));
-      return selectedManager?.label ?? 'All ecosystems';
-    }
-    if (defaultRootScope) {
-      return nodesByKey.get(`${defaultRootScope.type}:${defaultRootScope.id}`)?.label ?? defaultRootScope.id;
-    }
-    return undefined;
-  }, [adminManagerOptions, defaultRootScope, nodesByKey, selectedAdminManagerId, selectedNode, viewerRole]);
+  }, [
+    activeScopeMode,
+    extraActions,
+    handleScopeModeChange,
+    identityLabel,
+    identitySelector,
+    onShowTestEcosystemsChange,
+    scopeOptions,
+    showTestEcosystems,
+  ]);
 
   const resolvedTestMode = viewerRole === 'admin'
     ? (selectedAdminManagerId && selectedAdminManagerId.includes('-TEST') ? 'only' : 'exclude')
@@ -542,6 +824,7 @@ export function useScheduleScopeControls({
     scopeTree,
     testMode: resolvedTestMode,
     scopeLabel,
-    headerActions,
+    identityLabel,
+    headerMeta,
   };
 }

@@ -215,7 +215,7 @@ function MonthView({ events }: { events: CalendarEventItem[] }) {
                   return (
                     <div
                       key={key}
-                      className={`flex min-h-[150px] flex-col gap-2 rounded-[24px] border p-3 transition-shadow ${
+                      className={`flex h-[170px] min-h-[170px] flex-col gap-2 overflow-hidden rounded-[24px] border p-3 transition-shadow ${
                         isSelected
                           ? 'border-slate-900 bg-white shadow-[0_18px_40px_rgba(15,23,42,0.14)]'
                           : isCurrentMonth
@@ -244,7 +244,7 @@ function MonthView({ events }: { events: CalendarEventItem[] }) {
                           </span>
                         </div>
                       </div>
-                      <div className="flex flex-col gap-1.5">
+                      <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-hidden">
                         {dayEvents.slice(0, 3).map((event) => (
                           <CalendarEventPill key={event.eventId} event={event} compact />
                         ))}

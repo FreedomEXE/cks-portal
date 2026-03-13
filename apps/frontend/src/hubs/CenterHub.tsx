@@ -724,6 +724,7 @@ function CenterHubContent({ activeTab }: CenterHubProps) {
               title="Schedule"
               viewerRole="center"
               viewerCode={userCode}
+              viewerLabel={`${profile?.name ?? userCode ?? 'Center'} (${userCode ?? 'CENTER'})`}
               scopeData={scopeData}
             />
           ) : activeTab === 'services' ? (

@@ -1341,6 +1341,7 @@ function ManagerHubContent({ activeTab }: ManagerHubProps) {
               title="Schedule"
               viewerRole="manager"
               viewerCode={userCode}
+              viewerLabel={`${managerDisplayName} (${userCode ?? 'MANAGER'})`}
               scopeData={scopeData}
             />
           ) : activeTab === 'services' ? (

@@ -1094,6 +1094,7 @@ function WarehouseHubContent({ activeTab }: WarehouseHubProps) {
               title="Schedule"
               viewerRole="warehouse"
               viewerCode={userCode ?? normalizedCode}
+              viewerLabel={`${profile?.name ?? userCode ?? normalizedCode ?? 'Warehouse'} (${userCode ?? normalizedCode ?? 'WAREHOUSE'})`}
               scopeData={scopeData}
             />
           ) : activeTab === 'inventory' ? (

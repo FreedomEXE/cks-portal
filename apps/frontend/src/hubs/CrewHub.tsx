@@ -769,6 +769,7 @@ function CrewHubContent({ activeTab }: CrewHubProps) {
               title="Schedule"
               viewerRole="crew"
               viewerCode={userCode ?? normalizedCode}
+              viewerLabel={`${profile?.name ?? userCode ?? normalizedCode ?? 'Crew'} (${userCode ?? normalizedCode ?? 'CREW'})`}
               scopeData={scopeData}
             />
           ) : activeTab === 'services' ? (
