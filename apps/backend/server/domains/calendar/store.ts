@@ -295,6 +295,38 @@ async function runEventsQuery(whereClause: string, params: unknown[], limit: num
   const queryParams = [...params, limit];
   const result = await query<EventRow>(
     `
+      WITH limited_events AS (
+        SELECT
+          e.event_id,
+          e.event_type,
+          e.event_category,
+          e.title,
+          e.description,
+          e.planned_start_at,
+          e.planned_end_at,
+          e.actual_start_at,
+          e.actual_end_at,
+          e.all_day,
+          e.timezone,
+          e.status,
+          e.priority,
+          e.source_type,
+          e.source_id,
+          e.source_action,
+          e.center_id,
+          e.warehouse_id,
+          e.location_name,
+          e.location_address,
+          e.metadata,
+          e.tags,
+          e.updated_at,
+          e.version
+        FROM calendar_events e
+        WHERE e.archived_at IS NULL
+        ${whereClause}
+        ORDER BY e.planned_start_at ASC, e.event_id ASC
+        LIMIT $${queryParams.length}
+      )
       SELECT
         e.event_id,
         e.event_type,
@@ -331,13 +363,34 @@ async function runEventsQuery(whereClause: string, params: unknown[], limit: num
           ) FILTER (WHERE ep.id IS NOT NULL),
           '[]'::json
         ) AS participants
-      FROM calendar_events e
+      FROM limited_events e
       LEFT JOIN calendar_event_participants ep ON ep.event_id = e.event_id
-      WHERE e.archived_at IS NULL
-      ${whereClause}
-      GROUP BY e.event_id
+      GROUP BY
+        e.event_id,
+        e.event_type,
+        e.event_category,
+        e.title,
+        e.description,
+        e.planned_start_at,
+        e.planned_end_at,
+        e.actual_start_at,
+        e.actual_end_at,
+        e.all_day,
+        e.timezone,
+        e.status,
+        e.priority,
+        e.source_type,
+        e.source_id,
+        e.source_action,
+        e.center_id,
+        e.warehouse_id,
+        e.location_name,
+        e.location_address,
+        e.metadata,
+        e.tags,
+        e.updated_at,
+        e.version
       ORDER BY e.planned_start_at ASC, e.event_id ASC
-      LIMIT $${queryParams.length}
     `,
     queryParams,
   );

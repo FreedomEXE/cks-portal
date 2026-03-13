@@ -411,7 +411,7 @@ function InlineHeaderValue({
   const triggerClasses = tone === 'primary'
     ? 'rounded-2xl px-3 py-1.5 text-lg font-black text-slate-700 transition hover:bg-slate-100 hover:text-slate-900'
     : 'rounded-2xl px-3 py-1.5 text-base font-semibold text-slate-500 transition hover:bg-slate-100 hover:text-slate-800';
-  const panelWidth = tone === 'primary' ? 'min-w-[220px]' : 'min-w-[280px]';
+  const panelWidth = tone === 'primary' ? 'w-[18rem] max-w-[90vw]' : 'w-[22rem] max-w-[90vw]';
   const selectableOptions = options ?? [];
 
   if (!onSelect || selectableOptions.length <= 1) {
@@ -427,7 +427,8 @@ function InlineHeaderValue({
       <summary title={hint} className={`list-none cursor-pointer ${triggerClasses}`}>
         <span>{value}</span>
       </summary>
-      <div className={`absolute left-1/2 top-[calc(100%+10px)] z-20 w-max ${panelWidth} -translate-x-1/2 rounded-[24px] border border-slate-200 bg-white/98 p-2 shadow-[0_18px_40px_rgba(15,23,42,0.16)] backdrop-blur`}>
+      <div className={`absolute left-1/2 top-[calc(100%+8px)] z-20 ${panelWidth} -translate-x-1/2 overflow-hidden rounded-[22px] border border-slate-200 bg-white p-2 shadow-[0_18px_40px_rgba(15,23,42,0.16)]`}>
+        <div className="max-h-[320px] overflow-y-auto pr-1">
         {selectableOptions.map((option) => (
           <button
             key={option.id}
@@ -445,6 +446,7 @@ function InlineHeaderValue({
             {option.label}
           </button>
         ))}
+        </div>
       </div>
     </details>
   );

@@ -24,7 +24,7 @@
 -----------------------------------------------*/
 import type { ReactNode } from 'react';
 import { useCallback, useMemo } from 'react';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import CalendarTab from '../calendar/CalendarTab';
 import type { CalendarView } from '../calendar/CalendarProvider';
 import type { HubRole, HubRoleScopeResponse } from '../../shared/api/hub';
@@ -77,6 +77,7 @@ export function ScheduleTab({
   onShowTestEcosystemsChange?: (value: boolean) => void;
 }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const { view: viewParam, date: dateParam } = useParams<{ view?: string; date?: string }>();
   const [searchParams] = useSearchParams();
 
@@ -104,9 +105,13 @@ export function ScheduleTab({
 
       const qs = next.toString();
       const fullPath = qs ? `${path}?${qs}` : path;
+      const currentPath = `${location.pathname}${location.search}`;
+      if (fullPath === currentPath) {
+        return;
+      }
       navigate(fullPath, { replace: true });
     },
-    [navigate, searchParams],
+    [location.pathname, location.search, navigate, searchParams],
   );
 
   const {

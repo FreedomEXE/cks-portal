@@ -181,7 +181,7 @@ function ViewSwitcher() {
   return (
     <details className="group relative">
       <HeaderTextTrigger value={formatHeaderEyebrow(view)} emphasis="eyebrow" hint="Click to change view" />
-      <div className="absolute left-1/2 top-[calc(100%+10px)] z-20 w-64 -translate-x-1/2 rounded-[24px] border border-slate-200 bg-white/98 p-2 shadow-[0_18px_40px_rgba(15,23,42,0.16)] backdrop-blur">
+      <div className="absolute left-1/2 top-[calc(100%+8px)] z-20 w-64 max-w-[90vw] -translate-x-1/2 overflow-hidden rounded-[22px] border border-slate-200 bg-white p-2 shadow-[0_18px_40px_rgba(15,23,42,0.16)]">
         {options.map((option) => (
           <button
             key={option.view}
@@ -228,7 +228,7 @@ function DateSwitcher() {
   return (
     <details className="group relative">
       <HeaderTextTrigger value={formatHeaderTitle(view, anchorDate, days)} emphasis="primary" hint="Click to change date" />
-      <div className="absolute left-1/2 top-[calc(100%+12px)] z-20 w-[300px] -translate-x-1/2 rounded-[26px] border border-slate-200 bg-white/98 p-4 shadow-[0_18px_40px_rgba(15,23,42,0.16)] backdrop-blur">
+      <div className="absolute left-1/2 top-[calc(100%+8px)] z-20 w-[300px] max-w-[90vw] -translate-x-1/2 overflow-hidden rounded-[22px] border border-slate-200 bg-white p-4 shadow-[0_18px_40px_rgba(15,23,42,0.16)]">
         <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">
           {label}
         </div>
