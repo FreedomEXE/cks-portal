@@ -22,7 +22,7 @@
 -----------------------------------------------*/
 import { useModals } from '../../contexts/ModalProvider';
 import { useCalendarEvents, type CalendarEventItem } from '../../shared/api/calendar';
-import { getCalendarRange, useCalendarContext } from './CalendarProvider';
+import { addDays, getCalendarRange, useCalendarContext } from './CalendarProvider';
 import type { ReactNode } from 'react';
 
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -42,12 +42,6 @@ const STATUS_BADGE_CLASSES: Record<string, string> = {
   completed: 'border-emerald-200 bg-emerald-50 text-emerald-900',
   cancelled: 'border-rose-200 bg-rose-50 text-rose-900',
 };
-
-function addDays(value: Date, days: number): Date {
-  const next = new Date(value.getTime());
-  next.setUTCDate(next.getUTCDate() + days);
-  return next;
-}
 
 function startOfMonth(value: Date): Date {
   return new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), 1, 0, 0, 0, 0));
@@ -110,6 +104,22 @@ function getPrimaryLocation(event: CalendarEventItem): string | null {
   return event.locationName || event.centerId || event.warehouseId || null;
 }
 
+function formatWeekRangeLabel(start: Date): string {
+  const end = addDays(start, 6);
+  const startText = start.toLocaleDateString('en-CA', {
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
+  });
+  const endText = end.toLocaleDateString('en-CA', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
+  return `${startText} - ${endText}`;
+}
+
 function CalendarEventPill({ event, compact = false }: { event: CalendarEventItem; compact?: boolean }) {
   const modals = useModals();
   const tone = toneForEvent(event);
@@ -158,73 +168,99 @@ function MonthView({ events }: { events: CalendarEventItem[] }) {
   const range = getCalendarRange('month', anchorDate, 42);
   const gridStart = new Date(range.start);
   const dates = Array.from({ length: 42 }, (_, index) => addDays(gridStart, index));
+  const weeks = Array.from({ length: dates.length / 7 }, (_, index) => dates.slice(index * 7, index * 7 + 7));
   const eventsByDate = groupEventsByDate(events);
   const today = new Date();
 
   return (
     <div className="flex flex-col gap-3">
       <div className="overflow-hidden rounded-[30px] border border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.92))] p-3 shadow-[0_22px_60px_rgba(15,23,42,0.08)]">
-        <div className="grid grid-cols-7 gap-2">
-        {DAY_LABELS.map((label) => (
-          <div
-            key={label}
-            className="rounded-2xl bg-slate-900 px-3 py-2 text-center text-[11px] font-black uppercase tracking-[0.12em] text-white"
-          >
-            {label}
+        <div className="flex flex-col gap-2">
+          <div className="grid grid-cols-[40px_repeat(7,1fr)] gap-2">
+            <div />
+            {DAY_LABELS.map((label) => (
+              <div
+                key={label}
+                className="rounded-2xl bg-slate-900 px-3 py-2 text-center text-[11px] font-black uppercase tracking-[0.12em] text-white"
+              >
+                {label}
+              </div>
+            ))}
           </div>
-        ))}
-        {dates.map((date) => {
-          const key = date.toISOString().slice(0, 10);
-          const dayEvents = eventsByDate.get(key) ?? [];
-          const isCurrentMonth = date.getUTCMonth() === monthStart.getUTCMonth();
-          const isToday = isSameUtcDay(date, today);
-          const isSelected = isSameUtcDay(date, anchorDate);
-          return (
-            <div
-              key={key}
-              className={`flex min-h-[150px] flex-col gap-2 rounded-[24px] border p-3 transition-shadow ${
-                isSelected
-                  ? 'border-slate-900 bg-white shadow-[0_18px_40px_rgba(15,23,42,0.14)]'
-                  : isCurrentMonth
-                    ? 'border-slate-200/80 bg-white/95 shadow-[0_10px_28px_rgba(15,23,42,0.06)]'
-                    : 'border-slate-100 bg-slate-50/90'
-              } hover:border-slate-300 hover:shadow-[0_18px_40px_rgba(15,23,42,0.1)]`}
-            >
-              <div className="flex items-center justify-between">
+
+          {weeks.map((weekDates, weekIndex) => {
+            const monday = weekDates[0];
+
+            return (
+              <div
+                key={`${monday.toISOString()}-${weekIndex}`}
+                className="group grid grid-cols-[40px_repeat(7,1fr)] gap-2 rounded-[26px] p-1 transition-colors hover:bg-slate-50/70"
+              >
                 <button
                   type="button"
-                  onClick={() => focusDate(date, 'day')}
-                  className={`flex h-9 w-9 items-center justify-center rounded-2xl text-sm font-black transition-transform hover:scale-[1.03] ${
-                    isToday ? 'bg-slate-900 text-white' : isCurrentMonth ? 'text-slate-900' : 'text-slate-400'
-                  }`}
+                  onClick={() => focusDate(monday, 'week')}
+                  title={`View ${formatWeekRangeLabel(monday)}`}
+                  className="flex items-center justify-center rounded-[20px] text-slate-300 opacity-0 transition-[opacity,background-color,color] group-hover:opacity-100 hover:bg-white hover:text-slate-700 focus:opacity-100 focus-visible:opacity-100"
                 >
-                  {date.getUTCDate()}
+                  <span className="text-xs font-black">→</span>
                 </button>
-                <div className="flex items-center gap-1">
-                  {isToday ? (
-                    <span className="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] text-white">
-                      Today
-                    </span>
-                  ) : null}
-                  <span className="text-[10px] uppercase tracking-[0.08em] text-slate-400">
-                    {date.toLocaleDateString('en-CA', { month: 'short', timeZone: 'UTC' })}
-                  </span>
-                </div>
+
+                {weekDates.map((date) => {
+                  const key = date.toISOString().slice(0, 10);
+                  const dayEvents = eventsByDate.get(key) ?? [];
+                  const isCurrentMonth = date.getUTCMonth() === monthStart.getUTCMonth();
+                  const isToday = isSameUtcDay(date, today);
+                  const isSelected = isSameUtcDay(date, anchorDate);
+
+                  return (
+                    <div
+                      key={key}
+                      className={`flex min-h-[150px] flex-col gap-2 rounded-[24px] border p-3 transition-shadow ${
+                        isSelected
+                          ? 'border-slate-900 bg-white shadow-[0_18px_40px_rgba(15,23,42,0.14)]'
+                          : isCurrentMonth
+                            ? 'border-slate-200/80 bg-white/95 shadow-[0_10px_28px_rgba(15,23,42,0.06)]'
+                            : 'border-slate-100 bg-slate-50/90'
+                      } hover:border-slate-300 hover:shadow-[0_18px_40px_rgba(15,23,42,0.1)]`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <button
+                          type="button"
+                          onClick={() => focusDate(date, 'day')}
+                          className={`flex h-9 w-9 items-center justify-center rounded-2xl text-sm font-black transition-transform hover:scale-[1.03] ${
+                            isToday ? 'bg-slate-900 text-white' : isCurrentMonth ? 'text-slate-900' : 'text-slate-400'
+                          }`}
+                        >
+                          {date.getUTCDate()}
+                        </button>
+                        <div className="flex items-center gap-1">
+                          {isToday ? (
+                            <span className="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] text-white">
+                              Today
+                            </span>
+                          ) : null}
+                          <span className="text-[10px] uppercase tracking-[0.08em] text-slate-400">
+                            {date.toLocaleDateString('en-CA', { month: 'short', timeZone: 'UTC' })}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        {dayEvents.slice(0, 3).map((event) => (
+                          <CalendarEventPill key={event.eventId} event={event} compact />
+                        ))}
+                        {dayEvents.length > 3 ? (
+                          <div className="px-1 text-[11px] font-semibold text-slate-500">
+                            +{dayEvents.length - 3} more
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-              <div className="flex flex-col gap-1.5">
-                {dayEvents.slice(0, 3).map((event) => (
-                  <CalendarEventPill key={event.eventId} event={event} compact />
-                ))}
-                {dayEvents.length > 3 ? (
-                  <div className="px-1 text-[11px] font-semibold text-slate-500">
-                    +{dayEvents.length - 3} more
-                  </div>
-                ) : null}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

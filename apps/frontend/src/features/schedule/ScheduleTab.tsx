@@ -42,15 +42,6 @@ interface ScheduleTreeNode {
   children?: ScheduleTreeNode[];
 }
 const DEFAULT_VIEW: CalendarView = 'month';
-const DEFAULT_DAYS = 14;
-
-function parseDays(value: string | null): number {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    return DEFAULT_DAYS;
-  }
-  return parsed;
-}
 
 export function ScheduleTab({
   title = 'Schedule',
@@ -88,14 +79,13 @@ export function ScheduleTab({
   const [searchParams] = useSearchParams();
 
   // Primary state from route path segments
-  const initialView = parseScheduleView(viewParam) as CalendarView;
+  const parsedView = parseScheduleView(viewParam) as CalendarView;
+  const initialView = parsedView === 'agenda' ? DEFAULT_VIEW : parsedView;
   const initialAnchorDate = parseScheduleDate(dateParam);
-  // Secondary state remains in query params
-  const initialDays = parseDays(searchParams.get('days'));
 
   const providerKey = useMemo(
-    () => `${initialView}:${initialDays}:${toScheduleDateKey(initialAnchorDate)}`,
-    [initialAnchorDate, initialDays, initialView],
+    () => `${initialView}:${toScheduleDateKey(initialAnchorDate)}`,
+    [initialAnchorDate, initialView],
   );
 
   const handleStateChange = useCallback(
@@ -108,12 +98,7 @@ export function ScheduleTab({
       next.delete('tab');
       next.delete('view');
       next.delete('date');
-
-      if (state.view === 'agenda' && state.days !== DEFAULT_DAYS) {
-        next.set('days', String(state.days));
-      } else {
-        next.delete('days');
-      }
+      next.delete('days');
 
       const qs = next.toString();
       const fullPath = qs ? `${path}?${qs}` : path;
@@ -156,7 +141,6 @@ export function ScheduleTab({
       scopeIds={scopeIds}
       testMode={testMode}
       initialView={initialView}
-      initialDays={initialDays}
       initialAnchorDate={initialAnchorDate}
       providerKey={providerKey}
       onStateChange={handleStateChange}

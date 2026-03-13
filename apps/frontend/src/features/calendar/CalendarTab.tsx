@@ -23,35 +23,65 @@
 import { PageWrapper } from '@cks/ui';
 import type { ReactNode } from 'react';
 import { useCalendarSummary } from '../../shared/api/calendar';
-import { CalendarProvider, getCalendarRange, type CalendarView, useCalendarContext } from './CalendarProvider';
-import CalendarAgenda from './CalendarAgenda';
+import { addDays, CalendarProvider, getCalendarRange, startOfWeek, type CalendarView, useCalendarContext } from './CalendarProvider';
 import CalendarFull from './CalendarFull';
 
-function formatHeaderTitle(view: CalendarView, anchorDate: Date, days: number): string {
-  return getCalendarRange(view, anchorDate, days).label;
+type PrimaryCalendarView = Exclude<CalendarView, 'agenda'>;
+
+function normalizePrimaryView(view: CalendarView): PrimaryCalendarView {
+  return view === 'agenda' ? 'month' : view;
 }
 
-function formatHeaderEyebrow(view: CalendarView, days: number): string {
-  if (view === 'day') {
-    return 'Daily schedule';
+function formatHeaderTitle(view: CalendarView, anchorDate: Date, days: number): string {
+  return getCalendarRange(normalizePrimaryView(view), anchorDate, days).label;
+}
+
+function formatHeaderEyebrow(view: CalendarView): string {
+  const normalizedView = normalizePrimaryView(view);
+
+  if (normalizedView === 'day') {
+    return 'Daily Schedule';
   }
-  if (view === 'week') {
-    return 'Weekly schedule';
+  if (normalizedView === 'week') {
+    return 'Weekly Schedule';
   }
-  if (view === 'month') {
-    return 'Monthly schedule';
+  if (normalizedView === 'month') {
+    return 'Monthly Schedule';
   }
-  return `Agenda schedule · ${days} days`;
+  return 'Monthly Schedule';
+}
+
+function getResetLabel(view: CalendarView): string {
+  const normalizedView = normalizePrimaryView(view);
+  if (normalizedView === 'day') {
+    return 'Today';
+  }
+  if (normalizedView === 'week') {
+    return 'This Week';
+  }
+  return 'This Month';
+}
+
+function getSummarySubtitle(value: number, view: CalendarView): string {
+  if (value === 0) {
+    return 'Quiet window';
+  }
+
+  const normalizedView = normalizePrimaryView(view);
+  const unit = normalizedView === 'day' ? 'today' : normalizedView === 'week' ? 'this week' : 'this month';
+  return value === 1 ? `1 event ${unit}` : `${value} events ${unit}`;
 }
 
 function SummaryCard({
   label,
   value,
   tone,
+  view,
 }: {
   label: string;
   value: number;
   tone: 'slate' | 'sky' | 'amber' | 'emerald';
+  view: CalendarView;
 }) {
   const toneClasses =
     tone === 'sky'
@@ -67,41 +97,14 @@ function SummaryCard({
       <div className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500/90">{label}</div>
       <div className="mt-1.5 text-2xl font-black leading-none">{value}</div>
       <div className="mt-1.5 text-xs font-medium text-slate-500/80">
-        {value === 0 ? 'Quiet window' : value === 1 ? '1 event in view' : `${value} events in view`}
+        {getSummarySubtitle(value, view)}
       </div>
     </div>
   );
 }
 
-function ViewButton({
-  value,
-  label,
-  activeView,
-  onSelect,
-}: {
-  value: CalendarView;
-  label: string;
-  activeView: CalendarView;
-  onSelect: (value: CalendarView) => void;
-}) {
-  const isActive = activeView === value;
-  return (
-    <button
-      type="button"
-      onClick={() => onSelect(value)}
-      className={`rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
-        isActive
-          ? 'bg-slate-900 text-white shadow-[0_10px_24px_rgba(15,23,42,0.22)]'
-          : 'bg-transparent text-slate-600 hover:bg-white hover:text-slate-900'
-      }`}
-    >
-      {label}
-    </button>
-  );
-}
-
 function CalendarHeaderControls({ extraActions }: { extraActions?: ReactNode }) {
-  const { days, setDays, view, setView, goToToday, shiftRange } = useCalendarContext();
+  const { view, goToToday, shiftRange } = useCalendarContext();
 
   return (
     <div className="flex w-full flex-col gap-3">
@@ -119,7 +122,7 @@ function CalendarHeaderControls({ extraActions }: { extraActions?: ReactNode }) 
             onClick={goToToday}
             className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 shadow-sm hover:border-slate-300 hover:text-slate-900"
           >
-            Today
+            {getResetLabel(view)}
           </button>
           <button
             type="button"
@@ -128,25 +131,6 @@ function CalendarHeaderControls({ extraActions }: { extraActions?: ReactNode }) 
           >
             Next
           </button>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {view === 'agenda' ? (
-            <select
-              value={days}
-              onChange={(event) => setDays(Number(event.target.value))}
-              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm focus:border-slate-400 focus:outline-none"
-            >
-              <option value={7}>7 days</option>
-              <option value={14}>14 days</option>
-              <option value={30}>30 days</option>
-            </select>
-          ) : null}
-          <div className="flex items-center gap-1 rounded-[18px] border border-slate-200 bg-slate-50 p-1 shadow-sm">
-            <ViewButton value="agenda" label="Agenda" activeView={view} onSelect={setView} />
-            <ViewButton value="month" label="Month" activeView={view} onSelect={setView} />
-            <ViewButton value="week" label="Week" activeView={view} onSelect={setView} />
-            <ViewButton value="day" label="Day" activeView={view} onSelect={setView} />
-          </div>
         </div>
       </div>
       {extraActions ? (
@@ -166,6 +150,85 @@ function HeaderScopeLine({ scopeLabel }: { scopeLabel?: string }) {
   return <div className="text-sm font-semibold text-slate-500">{scopeLabel}</div>;
 }
 
+function formatMonthLabel(value: Date): string {
+  return value.toLocaleDateString('en-CA', {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
+}
+
+function formatWeekLabel(value: Date): string {
+  const weekStart = startOfWeek(value);
+  const weekEnd = addDays(weekStart, 6);
+  const startText = weekStart.toLocaleDateString('en-CA', {
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
+  });
+  const endText = weekEnd.toLocaleDateString('en-CA', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
+  return `${startText} - ${endText}`;
+}
+
+function formatDayLabel(value: Date): string {
+  return value.toLocaleDateString('en-CA', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
+}
+
+function ZoomBreadcrumb() {
+  const { view, anchorDate, focusDate } = useCalendarContext();
+  const normalizedView = normalizePrimaryView(view);
+
+  if (normalizedView === 'month') {
+    return null;
+  }
+
+  const monthLabel = formatMonthLabel(anchorDate);
+  const weekStart = startOfWeek(anchorDate);
+  const weekLabel = formatWeekLabel(anchorDate);
+  const dayLabel = formatDayLabel(anchorDate);
+
+  return (
+    <nav className="rounded-[20px] border border-slate-200/80 bg-white/95 px-4 py-3 shadow-sm">
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        <button
+          type="button"
+          onClick={() => focusDate(anchorDate, 'month')}
+          className="font-semibold text-slate-500 transition-colors hover:text-slate-900"
+        >
+          {monthLabel}
+        </button>
+        <span className="text-slate-300">/</span>
+        {normalizedView === 'week' ? (
+          <span className="font-semibold text-slate-900">{weekLabel}</span>
+        ) : (
+          <>
+            <button
+              type="button"
+              onClick={() => focusDate(weekStart, 'week')}
+              className="font-semibold text-slate-500 transition-colors hover:text-slate-900"
+            >
+              {weekLabel}
+            </button>
+            <span className="text-slate-300">/</span>
+            <span className="font-semibold text-slate-900">{dayLabel}</span>
+          </>
+        )}
+      </div>
+    </nav>
+  );
+}
+
 function CalendarHeader({ scopeLabel, headerActions }: { scopeLabel?: string; headerActions?: ReactNode }) {
   const { days, view, anchorDate } = useCalendarContext();
 
@@ -174,7 +237,7 @@ function CalendarHeader({ scopeLabel, headerActions }: { scopeLabel?: string; he
       <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
         <div className="space-y-2">
           <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">
-            {formatHeaderEyebrow(view, days)}
+            {formatHeaderEyebrow(view)}
           </div>
           <div className="text-3xl font-black tracking-[-0.05em] text-slate-950">
             {formatHeaderTitle(view, anchorDate, days)}
@@ -213,48 +276,34 @@ function CalendarTabContent({
   scopeLabel?: string;
 }) {
   const { days, view, anchorDate } = useCalendarContext();
-  const range = getCalendarRange(view, anchorDate, days);
+  const normalizedView = normalizePrimaryView(view);
+  const range = getCalendarRange(normalizedView, anchorDate, days);
   const { data } = useCalendarSummary(
-    view === 'agenda'
-      ? { days, scopeType, scopeId, testMode }
-      : { start: range.start, end: range.end, scopeType, scopeId, testMode, limit: 500 },
+    { start: range.start, end: range.end, scopeType, scopeId, testMode, limit: 500 },
   );
 
   return (
     <div className="flex flex-col gap-4">
       <CalendarHeader scopeLabel={scopeLabel} headerActions={headerActions} />
+      <ZoomBreadcrumb />
 
       <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(170px,1fr))]">
-        <SummaryCard label="Total" value={data?.total ?? 0} tone="slate" />
-        <SummaryCard label="Scheduled" value={data?.scheduled ?? 0} tone="sky" />
-        <SummaryCard label="In Progress" value={data?.inProgress ?? 0} tone="amber" />
-        <SummaryCard label="Completed" value={data?.completed ?? 0} tone="emerald" />
+        <SummaryCard label="Total" value={data?.total ?? 0} tone="slate" view={normalizedView} />
+        <SummaryCard label="Scheduled" value={data?.scheduled ?? 0} tone="sky" view={normalizedView} />
+        <SummaryCard label="In Progress" value={data?.inProgress ?? 0} tone="amber" view={normalizedView} />
+        <SummaryCard label="Completed" value={data?.completed ?? 0} tone="emerald" view={normalizedView} />
       </div>
-      {view === 'agenda' ? (
-        <CalendarAgenda
-          scopeType={scopeType}
-          scopeId={scopeId}
-          testMode={testMode}
-          title={agendaTitle}
-          description={agendaDescription}
-          emptyMessage={agendaEmptyMessage}
-          showHeader={false}
-          headerActions={undefined}
-          showWindowSelector={false}
-        />
-      ) : (
-        <CalendarFull
-          scopeType={scopeType}
-          scopeId={scopeId}
-          scopeIds={scopeIds}
-          testMode={testMode}
-          title={agendaTitle}
-          description={agendaDescription}
-          showHeader={false}
-          headerActions={undefined}
-          renderDayView={renderDayView}
-        />
-      )}
+      <CalendarFull
+        scopeType={scopeType}
+        scopeId={scopeId}
+        scopeIds={scopeIds}
+        testMode={testMode}
+        title={agendaTitle}
+        description={agendaDescription}
+        showHeader={false}
+        headerActions={undefined}
+        renderDayView={renderDayView}
+      />
     </div>
   );
 }

@@ -34,13 +34,13 @@ function startOfDay(value: Date): Date {
   return new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate(), 0, 0, 0, 0));
 }
 
-function addDays(value: Date, days: number): Date {
+export function addDays(value: Date, days: number): Date {
   const next = new Date(value.getTime());
   next.setUTCDate(next.getUTCDate() + days);
   return next;
 }
 
-function startOfWeek(value: Date): Date {
+export function startOfWeek(value: Date): Date {
   const normalized = startOfDay(value);
   const day = normalized.getUTCDay();
   const offset = day === 0 ? -6 : 1 - day;
@@ -142,10 +142,14 @@ type CalendarContextValue = {
 
 const CalendarContext = createContext<CalendarContextValue | null>(null);
 
+function normalizeCalendarView(view: CalendarView): CalendarView {
+  return view === 'agenda' ? 'month' : view;
+}
+
 export function CalendarProvider({
   children,
   initialDays = 14,
-  initialView = 'agenda',
+  initialView = 'month',
   initialAnchorDate,
   onStateChange,
 }: {
@@ -156,7 +160,7 @@ export function CalendarProvider({
   onStateChange?: (state: { days: number; view: CalendarView; anchorDate: Date }) => void;
 }) {
   const [days, setDays] = useState(initialDays);
-  const [view, setView] = useState<CalendarView>(initialView);
+  const [view, setViewState] = useState<CalendarView>(normalizeCalendarView(initialView));
   const [anchorDate, setAnchorDate] = useState(() => initialAnchorDate ?? new Date());
 
   useEffect(() => {
@@ -167,7 +171,7 @@ export function CalendarProvider({
     days,
     setDays,
     view,
-    setView,
+    setView: (nextView: CalendarView) => setViewState(normalizeCalendarView(nextView)),
     anchorDate,
     setAnchorDate,
     goToToday: () => setAnchorDate(new Date()),
@@ -188,7 +192,7 @@ export function CalendarProvider({
     focusDate: (value: Date, nextView?: CalendarView) => {
       setAnchorDate(value);
       if (nextView) {
-        setView(nextView);
+        setViewState(normalizeCalendarView(nextView));
       }
     },
   };
