@@ -386,6 +386,73 @@ function getIdentityFallbackLabel(
   return undefined;
 }
 
+function closeMenu(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) {
+    return;
+  }
+  target.closest('details')?.removeAttribute('open');
+}
+
+function InlineHeaderValue({
+  value,
+  selectedValue,
+  options,
+  onSelect,
+  tone = 'secondary',
+}: {
+  value: string;
+  selectedValue?: string;
+  options?: ScopeOption[];
+  onSelect?: (value: string) => void;
+  tone?: 'primary' | 'secondary';
+}) {
+  const triggerClasses = tone === 'primary'
+    ? 'rounded-2xl px-4 py-2 text-xl font-black text-slate-700 transition hover:bg-slate-100 hover:text-slate-900'
+    : 'rounded-2xl px-4 py-2 text-lg font-semibold text-slate-500 transition hover:bg-slate-100 hover:text-slate-800';
+  const panelWidth = tone === 'primary' ? 'min-w-[220px]' : 'min-w-[280px]';
+  const selectableOptions = options ?? [];
+
+  if (!onSelect || selectableOptions.length <= 1) {
+    return (
+      <div className={triggerClasses}>
+        {value}
+      </div>
+    );
+  }
+
+  return (
+    <details className="group relative">
+      <summary className={`list-none cursor-pointer ${triggerClasses}`}>
+        <span className="inline-flex items-center gap-2">
+          <span>{value}</span>
+          <span className="text-slate-400 transition group-hover:text-slate-600 group-open:rotate-180 group-open:text-slate-600">
+            v
+          </span>
+        </span>
+      </summary>
+      <div className={`absolute left-1/2 top-[calc(100%+10px)] z-20 w-max ${panelWidth} -translate-x-1/2 rounded-[24px] border border-slate-200 bg-white/98 p-2 shadow-[0_18px_40px_rgba(15,23,42,0.16)] backdrop-blur`}>
+        {selectableOptions.map((option) => (
+          <button
+            key={option.id}
+            type="button"
+            onClick={(event) => {
+              onSelect(option.id);
+              closeMenu(event.currentTarget);
+            }}
+            className={`w-full rounded-2xl px-4 py-3 text-left text-sm font-semibold transition ${
+              option.id === selectedValue
+                ? 'bg-slate-900 text-white'
+                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+            }`}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+    </details>
+  );
+}
+
 export function useScheduleScopeControls({
   viewerRole,
   viewerCode,
@@ -734,72 +801,57 @@ export function useScheduleScopeControls({
   }, [defaultRootScope, onSelectedAdminManagerIdChange, resolveFirstOptionId, updateScope, viewerRole]);
 
   const headerMeta = useMemo(() => {
-    const hasControls =
-      scopeOptions.length > 0 ||
-      identitySelector?.options.length ||
-      Boolean(onShowTestEcosystemsChange) ||
-      Boolean(extraActions);
+    const hasControls = scopeOptions.length > 0 || Boolean(identityLabel) || Boolean(onShowTestEcosystemsChange) || Boolean(extraActions);
 
     if (!hasControls) {
       return undefined;
     }
 
-    const fieldLabelClasses = 'text-[10px] font-black uppercase tracking-[0.14em] text-slate-400';
-    const fieldValueClasses = 'mt-1 min-w-0 rounded-2xl border border-slate-200 bg-white/95 px-3 py-2.5 text-sm font-semibold text-slate-700 shadow-[0_10px_24px_rgba(15,23,42,0.05)]';
+    const scopeMenuOptions = scopeOptions.map((option) => ({ id: option.value, label: option.label }));
+    const identityMenuOptions = identitySelector?.options ?? [];
 
     return (
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="min-w-[170px] flex-1">
-          <div className={fieldLabelClasses}>Scope</div>
-          <select
-            value={activeScopeMode}
-            onChange={(event) => handleScopeModeChange(event.target.value)}
-            className={`w-full ${fieldValueClasses} focus:border-slate-400 focus:outline-none`}
-          >
-            {scopeOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </div>
+      <div className="flex flex-col items-center gap-2 text-center">
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <InlineHeaderValue
+            value={scopeLabel ?? 'Current Scope'}
+            selectedValue={activeScopeMode}
+            options={scopeMenuOptions}
+            onSelect={handleScopeModeChange}
+            tone="primary"
+          />
 
-        <div className="min-w-[220px] flex-[1.25]">
-          <div className={fieldLabelClasses}>Identity</div>
-          {identitySelector && identitySelector.options.length > 0 ? (
-            <select
-              value={identitySelector.value}
-              onChange={(event) => identitySelector.onChange(event.target.value)}
-              className={`w-full ${fieldValueClasses} focus:border-slate-400 focus:outline-none`}
-            >
-              {identitySelector.options.map((option) => (
-                <option key={option.id} value={option.id}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <div className={`${fieldValueClasses} truncate`}>
-              {identityLabel ?? 'Current view'}
-            </div>
-          )}
+          {identityLabel ? (
+            <InlineHeaderValue
+              value={identityLabel}
+              selectedValue={identitySelector?.value}
+              options={identityMenuOptions}
+              onSelect={identitySelector ? identitySelector.onChange : undefined}
+              tone="secondary"
+            />
+          ) : null}
         </div>
 
         {typeof showTestEcosystems === 'boolean' && onShowTestEcosystemsChange ? (
-          <button
-            type="button"
-            onClick={() => onShowTestEcosystemsChange(!showTestEcosystems)}
-            className={`rounded-full border px-3 py-2 text-xs font-black uppercase tracking-[0.14em] shadow-sm transition-colors ${
-              showTestEcosystems
-                ? 'border-slate-900 bg-slate-900 text-white'
-                : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900'
-            }`}
-          >
-            {showTestEcosystems ? 'Hide test' : 'Show test'}
-          </button>
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <button
+              type="button"
+              onClick={() => onShowTestEcosystemsChange(!showTestEcosystems)}
+              className={`rounded-full border px-3 py-2 text-xs font-black uppercase tracking-[0.14em] shadow-sm transition-colors ${
+                showTestEcosystems
+                  ? 'border-slate-900 bg-slate-900 text-white'
+                  : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900'
+              }`}
+            >
+              {showTestEcosystems ? 'Hide test' : 'Show test'}
+            </button>
+            {extraActions}
+          </div>
+        ) : extraActions ? (
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            {extraActions}
+          </div>
         ) : null}
-
-        {extraActions}
       </div>
     );
   }, [

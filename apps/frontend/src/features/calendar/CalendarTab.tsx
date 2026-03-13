@@ -21,9 +21,9 @@
   Manifested by Freedom_EXE
 -----------------------------------------------*/
 import { PageWrapper } from '@cks/ui';
-import type { ReactNode } from 'react';
+import type { ChangeEvent, ReactNode } from 'react';
 import { useCalendarSummary } from '../../shared/api/calendar';
-import { CalendarProvider, getCalendarRange, type CalendarView, useCalendarContext } from './CalendarProvider';
+import { CalendarProvider, getCalendarRange, startOfWeek, type CalendarView, useCalendarContext } from './CalendarProvider';
 import CalendarFull from './CalendarFull';
 
 type PrimaryCalendarView = Exclude<CalendarView, 'agenda'>;
@@ -72,6 +72,48 @@ function getSummarySubtitle(value: number, view: CalendarView): string {
   return value === 1 ? `1 event ${unit}` : `${value} events ${unit}`;
 }
 
+function closeDetails(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) {
+    return;
+  }
+  target.closest('details')?.removeAttribute('open');
+}
+
+function formatDateInputValue(value: Date): string {
+  const year = value.getUTCFullYear();
+  const month = String(value.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(value.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function formatMonthInputValue(value: Date): string {
+  const year = value.getUTCFullYear();
+  const month = String(value.getUTCMonth() + 1).padStart(2, '0');
+  return `${year}-${month}`;
+}
+
+function parseUtcDate(value: string): Date | null {
+  if (!value) {
+    return null;
+  }
+  const [year, month, day] = value.split('-').map((part) => Number.parseInt(part, 10));
+  if (!year || !month || !day) {
+    return null;
+  }
+  return new Date(Date.UTC(year, month - 1, day, 12, 0, 0, 0));
+}
+
+function parseUtcMonth(value: string): Date | null {
+  if (!value) {
+    return null;
+  }
+  const [year, month] = value.split('-').map((part) => Number.parseInt(part, 10));
+  if (!year || !month) {
+    return null;
+  }
+  return new Date(Date.UTC(year, month - 1, 1, 12, 0, 0, 0));
+}
+
 function SummaryCard({
   label,
   value,
@@ -100,6 +142,114 @@ function SummaryCard({
         {getSummarySubtitle(value, view)}
       </div>
     </div>
+  );
+}
+
+function HeaderTextTrigger({
+  value,
+  emphasis = 'secondary',
+}: {
+  value: string;
+  emphasis?: 'primary' | 'secondary' | 'eyebrow';
+}) {
+  const classes =
+    emphasis === 'primary'
+      ? 'rounded-2xl px-4 py-2 text-4xl font-black tracking-[-0.06em] text-slate-950 transition hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300'
+      : emphasis === 'eyebrow'
+        ? 'rounded-xl px-3 py-1 text-[13px] font-black uppercase tracking-[0.18em] text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300'
+        : 'rounded-2xl px-4 py-2 text-lg font-bold text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300';
+
+  return (
+    <summary className={`list-none cursor-pointer ${classes}`}>
+      <span className="inline-flex items-center gap-2">
+        <span>{value}</span>
+        <span className="text-slate-400 transition group-hover:text-slate-600 group-open:rotate-180 group-open:text-slate-600">
+          v
+        </span>
+      </span>
+    </summary>
+  );
+}
+
+function ViewSwitcher() {
+  const { anchorDate, view, focusDate } = useCalendarContext();
+  const current = normalizePrimaryView(view);
+
+  const options: Array<{ view: PrimaryCalendarView; label: string }> = [
+    { view: 'month', label: 'Monthly Schedule' },
+    { view: 'week', label: 'Weekly Schedule' },
+    { view: 'day', label: 'Daily Schedule' },
+  ];
+
+  return (
+    <details className="group relative">
+      <HeaderTextTrigger value={formatHeaderEyebrow(view)} emphasis="eyebrow" />
+      <div className="absolute left-1/2 top-[calc(100%+10px)] z-20 w-64 -translate-x-1/2 rounded-[24px] border border-slate-200 bg-white/98 p-2 shadow-[0_18px_40px_rgba(15,23,42,0.16)] backdrop-blur">
+        {options.map((option) => (
+          <button
+            key={option.view}
+            type="button"
+            onClick={(event) => {
+              focusDate(anchorDate, option.view);
+              closeDetails(event.currentTarget);
+            }}
+            className={`w-full rounded-2xl px-4 py-3 text-left text-sm font-semibold transition ${
+              current === option.view
+                ? 'bg-slate-900 text-white'
+                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+            }`}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+    </details>
+  );
+}
+
+function DateSwitcher() {
+  const { anchorDate, days, setAnchorDate, view } = useCalendarContext();
+  const normalizedView = normalizePrimaryView(view);
+
+  const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const nextValue = normalizedView === 'month'
+      ? parseUtcMonth(event.target.value)
+      : parseUtcDate(event.target.value);
+
+    if (!nextValue) {
+      return;
+    }
+
+    setAnchorDate(normalizedView === 'week' ? startOfWeek(nextValue) : nextValue);
+    closeDetails(event.target);
+  };
+
+  const inputType = normalizedView === 'month' ? 'month' : 'date';
+  const inputValue = normalizedView === 'month' ? formatMonthInputValue(anchorDate) : formatDateInputValue(anchorDate);
+  const label = normalizedView === 'month' ? 'Jump to month' : normalizedView === 'week' ? 'Jump to week' : 'Jump to day';
+
+  return (
+    <details className="group relative">
+      <HeaderTextTrigger value={formatHeaderTitle(view, anchorDate, days)} emphasis="primary" />
+      <div className="absolute left-1/2 top-[calc(100%+12px)] z-20 w-[300px] -translate-x-1/2 rounded-[26px] border border-slate-200 bg-white/98 p-4 shadow-[0_18px_40px_rgba(15,23,42,0.16)] backdrop-blur">
+        <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">
+          {label}
+        </div>
+        <input
+          type={inputType}
+          value={inputValue}
+          onChange={handleChange}
+          className="mt-3 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-base font-semibold text-slate-700 outline-none transition focus:border-slate-400 focus:bg-white"
+        />
+        <div className="mt-3 text-sm text-slate-500">
+          {normalizedView === 'month'
+            ? 'Choose a month to move the schedule window.'
+            : normalizedView === 'week'
+              ? 'Pick any day in the week you want to inspect.'
+              : 'Pick the specific day you want to inspect.'}
+        </div>
+      </div>
+    </details>
   );
 }
 
@@ -153,24 +303,32 @@ function CalendarHeader({
   headerMeta?: ReactNode;
   headerActions?: ReactNode;
 }) {
-  const { days, view, anchorDate } = useCalendarContext();
+  const hasInteractiveMeta = Boolean(headerMeta);
 
   return (
     <section className="rounded-[28px] border border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.94))] p-5 shadow-[0_18px_44px_rgba(15,23,42,0.06)]">
-      <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-        <div className="min-w-0 space-y-3 xl:flex-1">
-          <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">
-            {formatHeaderEyebrow(view)}
-          </div>
-          <div className="text-3xl font-black tracking-[-0.05em] text-slate-950">
-            {formatHeaderTitle(view, anchorDate, days)}
-          </div>
-          <HeaderContextLine scopeLabel={scopeLabel} identityLabel={identityLabel} />
-          {headerMeta}
+      <div className="flex justify-end">
+        <CalendarHeaderControls extraActions={headerActions} />
+      </div>
+      <div className="mt-4 flex flex-col items-center text-center">
+        <ViewSwitcher />
+        <div className="mt-1">
+          <DateSwitcher />
         </div>
-        <div className="xl:min-w-[220px]">
-          <CalendarHeaderControls extraActions={headerActions} />
-        </div>
+        {hasInteractiveMeta ? (
+          <div className="mt-3 flex w-full justify-center">
+            {headerMeta}
+          </div>
+        ) : (
+          <div className="mt-3">
+            <HeaderContextLine scopeLabel={scopeLabel} identityLabel={identityLabel} />
+          </div>
+        )}
+        {!hasInteractiveMeta && !scopeLabel && !identityLabel ? null : (
+          <div className="mt-1 text-xs text-slate-400">
+            Click the header text to switch what you are looking at.
+          </div>
+        )}
       </div>
     </section>
   );
