@@ -1899,6 +1899,7 @@ export async function registerCatalogRoutes(server: FastifyInstance) {
     if (!account) return;
 
     const role = (account.role ?? '').trim().toLowerCase();
+    const normalizedAccountCode = (account.cksCode ?? '').trim().toUpperCase();
 
     const data = await request.file();
     if (!data) {
