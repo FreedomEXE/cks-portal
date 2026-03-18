@@ -61,6 +61,22 @@ describe('App routing', () => {
     expect(html).toContain('admin hub view:<!-- -->calendar');
   });
 
+  it('accepts warehouse inventory and deliveries tab slugs', () => {
+    const inventoryHtml = renderToString(
+      <ProvidersWrapper route="/hub/inventory" currentUserId="TEST-ADMIN" role="admin">
+        <AuthenticatedApp />
+      </ProvidersWrapper>
+    );
+    const deliveriesHtml = renderToString(
+      <ProvidersWrapper route="/hub/deliveries" currentUserId="TEST-ADMIN" role="admin">
+        <AuthenticatedApp />
+      </ProvidersWrapper>
+    );
+
+    expect(inventoryHtml).toContain('admin hub view:<!-- -->inventory');
+    expect(deliveriesHtml).toContain('admin hub view:<!-- -->deliveries');
+  });
+
   it('renders nested schedule routes as the schedule tab', () => {
     const html = renderToString(
       <ProvidersWrapper route="/hub/schedule/week/2026-03-12" currentUserId="TEST-ADMIN" role="admin">
