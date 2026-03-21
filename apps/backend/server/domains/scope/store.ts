@@ -343,10 +343,11 @@ async function getManagerRoleScope(cksCode: string): Promise<ManagerRoleScopePay
       address: string | null;
       status: string | null;
     }>(
-      `SELECT crew_id, assigned_center, name, email, phone, address, status
-       FROM crew
-       WHERE UPPER(cks_manager) = $1
-       ORDER BY crew_id`,
+      `SELECT c.crew_id, c.assigned_center, c.name, c.email, c.phone, c.address, c.status
+       FROM crew c
+       INNER JOIN centers ct ON UPPER(c.assigned_center) = UPPER(ct.center_id)
+       WHERE UPPER(ct.cks_manager) = $1
+       ORDER BY c.crew_id`,
       [normalizedCode],
     ),
     query<{ count: string }>(

@@ -1300,7 +1300,12 @@ function buildRoleFilter(role: HubRole, cksCode: string): { clause: string; para
         customer_id IN (SELECT customer_id FROM customers WHERE cks_manager = $1) OR
         contractor_id IN (SELECT contractor_id FROM contractors WHERE cks_manager = $1) OR
         center_id IN (SELECT center_id FROM centers WHERE cks_manager = $1) OR
-        crew_id IN (SELECT crew_id FROM crew WHERE cks_manager = $1)
+        crew_id IN (
+          SELECT c.crew_id
+          FROM crew c
+          INNER JOIN centers ct ON UPPER(c.assigned_center) = UPPER(ct.center_id)
+          WHERE UPPER(ct.cks_manager) = $1
+        )
       `;
       return { clause: `${clause} ${testVisibility}`, params: [cksCode] };
     }
