@@ -6,6 +6,7 @@ interface ImportMetaEnv {
   readonly VITE_CLERK_FRONTEND_API?: string;
   readonly VITE_CLERK_API_URL?: string;
   readonly VITE_API_BASE_URL?: string;
+  readonly VITE_CKS_ENABLE_ACCESS_GATE?: string;
 }
 
 interface ImportMeta {

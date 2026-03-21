@@ -23,6 +23,10 @@ const ROLE_PREFIXES: Array<{ prefix: string; role: string }> = [
   { prefix: 'WHS-', role: 'warehouse' },
 ];
 
+function isAccessGateEnabled(): boolean {
+  return String(process.env.CKS_ENABLE_ACCESS_GATE ?? 'false').trim().toLowerCase() === 'true';
+}
+
 function normalizeRole(role: string | null | undefined): string | null {
   if (!role) {
     return null;
@@ -340,6 +344,10 @@ export async function resolveAccessStatus(role: string, cksCode: string): Promis
   tier: AccessTier | null;
   source: 'direct' | 'cascade' | null;
 }> {
+  if (!isAccessGateEnabled()) {
+    return { status: 'active', tier: null, source: null };
+  }
+
   const normalizedRole = normalizeRole(role);
   const normalizedCode = normalizeIdentity(cksCode) ?? cksCode;
 
@@ -361,6 +369,10 @@ export async function resolveAccessStatus(role: string, cksCode: string): Promis
 }
 
 export async function hasActionAccess(role: string, cksCode: string): Promise<boolean> {
+  if (!isAccessGateEnabled()) {
+    return true;
+  }
+
   const normalizedCode = normalizeIdentity(cksCode) ?? cksCode;
   if (normalizedCode?.toUpperCase().includes('-TEST')) {
     return true;

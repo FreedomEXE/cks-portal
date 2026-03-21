@@ -1,5 +1,5 @@
 import React from 'react';
-import { describe, expect, it, beforeEach, vi } from 'vitest';
+import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 import { renderToString } from 'react-dom/server';
 import { ProvidersWrapper } from './renderWithProviders';
 import { buildLegacyHubRedirect } from '../shared/utils/hubRouting';
@@ -39,6 +39,10 @@ describe('App routing', () => {
       error: null,
       refresh: vi.fn(),
     });
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it('renders admin hub at /hub for admin users', () => {
@@ -117,6 +121,30 @@ describe('App routing', () => {
     );
 
     expect(html).toContain('Coming soon');
+  });
+
+  it('keeps the access gate hidden by default for locked non-admin users', () => {
+    mockUseAuth.mockReturnValue({
+      status: 'ready',
+      role: 'crew',
+      code: 'CRW-012',
+      fullName: null,
+      firstName: null,
+      ownerFirstName: null,
+      accessStatus: 'locked',
+      accessTier: null,
+      accessSource: null,
+      error: null,
+      refresh: vi.fn(),
+    });
+
+    const html = renderToString(
+      <ProvidersWrapper route="/hub" currentUserId="TEST-CREW" role="crew">
+        <AuthenticatedApp />
+      </ProvidersWrapper>
+    );
+
+    expect(html).not.toContain('Activate your account');
   });
 
   // TODO: Fix SSR rendering for UnauthenticatedApp

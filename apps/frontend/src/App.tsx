@@ -35,6 +35,10 @@ const HUB_COMPONENTS: Record<string, HubComponent> = {
   warehouse: WarehouseHub,
 };
 
+function isAccessGateEnabled(): boolean {
+  return String((import.meta as any).env?.VITE_CKS_ENABLE_ACCESS_GATE ?? 'false') === 'true';
+}
+
 function HubLoader({ activeTab }: { activeTab: string }): JSX.Element | null {
   const { status, role, code, accessStatus } = useAuth();
   const { start } = useLoading();
@@ -86,7 +90,7 @@ function HubLoader({ activeTab }: { activeTab: string }): JSX.Element | null {
   // can scroll and measure correctly under the global loader overlay
   return (
     <>
-      {accessStatus === 'locked' && !['admin', 'administrator'].includes(normalizedRole) ? <AccessGate /> : null}
+      {isAccessGateEnabled() && accessStatus === 'locked' && !['admin', 'administrator'].includes(normalizedRole) ? <AccessGate /> : null}
       <Hub activeTab={activeTab} />
     </>
   );

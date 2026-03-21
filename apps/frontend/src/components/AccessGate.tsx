@@ -3,6 +3,10 @@ import { useAuth } from '@cks/auth';
 import { useAccessCodeRedemption } from '../hooks/useAccessCodeRedemption';
 import styles from './AccessGate.module.css';
 
+function isAccessGateEnabled(): boolean {
+  return String((import.meta as any).env?.VITE_CKS_ENABLE_ACCESS_GATE ?? 'false') === 'true';
+}
+
 export function AccessGate() {
   const { accessStatus, accessTier, accessSource } = useAuth();
   const { redeem, isRedeeming, error } = useAccessCodeRedemption();
@@ -10,7 +14,7 @@ export function AccessGate() {
   const [message, setMessage] = useState<string | null>(null);
   const [dismissed, setDismissed] = useState(false);
 
-  if (dismissed || accessStatus === 'active') {
+  if (!isAccessGateEnabled() || dismissed || accessStatus === 'active') {
     return null;
   }
 
